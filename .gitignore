@@ -8,3 +8,6 @@ build/
 *.egg-info/
 __pycache__/
 .venv/
+
+# Internal design docs — not for the public repo
+docs/
