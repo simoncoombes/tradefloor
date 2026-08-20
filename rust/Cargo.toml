@@ -1,0 +1,11 @@
+[package]
+name = "pretium"
+version = "0.0.0"
+edition = "2021"
+description = "Deterministic market simulation with a real limit order book. Placeholder release; under active development."
+license = "Apache-2.0"
+keywords = ["simulation", "finance", "market", "orderbook", "deterministic"]
+categories = ["simulation", "science"]
+readme = "README.md"
+
+[dependencies]

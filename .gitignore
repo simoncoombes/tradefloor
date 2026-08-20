@@ -1,0 +1,10 @@
+# Rust
+target/
+Cargo.lock
+
+# Python
+dist/
+build/
+*.egg-info/
+__pycache__/
+.venv/
