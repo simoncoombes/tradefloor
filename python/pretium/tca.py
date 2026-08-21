@@ -75,7 +75,7 @@ import struct
 from typing import Any, Sequence
 
 from ._core import Engine, Instrument, Macro, OrderError, ValidationError
-from .harness import Observation
+from .harness import Observation, session_clock
 from .portfolio import Portfolio
 from .universe_util import as_universe, fingerprint_of
 
@@ -314,7 +314,10 @@ def analyse(
                     # A refused trade is not an execution and has no cost. It
                     # is the agent's problem, not the analysis's.
                     pass
-            engine.run_session(hour, minute, day_of_week, ticks_per_step,
+            engine.run_session(*session_clock((hour, minute, day_of_week),
+                                              step % steps_per_day,
+                                              ticks_per_step),
+                               ticks_per_step,
                                order_flow=portfolio.pending_flow())
             portfolio.clear_flow()
             step += 1
@@ -330,9 +333,13 @@ def analyse(
         if scenario is not None:
             scenario.apply(quiet, day)
         quiet.open_market()
-        for _ in range(steps_per_day):
+        for step in range(steps_per_day):
             baseline_path.append(_f64(quiet.prices()))
-            quiet.run_session(hour, minute, day_of_week, ticks_per_step)
+            # Identical clock to world A. The two worlds must differ only by
+            # the agent's orders.
+            quiet.run_session(*session_clock((hour, minute, day_of_week),
+                                             step, ticks_per_step),
+                              ticks_per_step)
         quiet.close_market()
     baseline_path.append(_f64(quiet.prices()))
 

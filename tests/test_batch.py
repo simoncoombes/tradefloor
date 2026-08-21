@@ -225,3 +225,34 @@ def test_a_batch_opens_the_day_the_way_an_engine_does():
     engine = pretium.Engine(seed=1, universe=universe)
     engine.run_session(9, 30, 3, 60)
     assert _member(batch, 0, len(universe)) == engine.prices()
+
+
+def test_run_days_is_the_explicit_loop():
+    """The convenience must be the same thing spelled shorter.
+
+    `run_days` opens, runs, closes and records each day. A user who writes
+    that loop by hand must get the identical market, or the shorthand is a
+    third code path with its own behaviour -- which is how the batch quietly
+    became a different model.
+
+    Compared on prices, GARCH variance, the recorded tape AND the order log,
+    because the log is what reproduces a run and a shorthand that logged
+    differently would replay differently.
+    """
+    pa = pytest.importorskip("pyarrow")
+    universe = pretium.Universe.random(8, seed=5)
+
+    shorthand = pretium.Engine(seed=3, universe=universe)
+    shorthand.run_days(3, record=True, ticks_per_day=120)
+
+    by_hand = pretium.Engine(seed=3, universe=universe)
+    for day in range(3):
+        by_hand.open_market()
+        by_hand.run_session(9, 30, 3, 120)
+        by_hand.close_market()
+        by_hand.record(day)
+
+    assert shorthand.prices() == by_hand.prices()
+    assert shorthand.column("garch_variance") == by_hand.column("garch_variance")
+    assert pa.table(shorthand.bars()).equals(pa.table(by_hand.bars()))
+    assert shorthand.order_log == by_hand.order_log

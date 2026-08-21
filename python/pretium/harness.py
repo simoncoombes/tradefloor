@@ -193,6 +193,41 @@ class Scorecard:
         )
 
 
+def session_clock(start: tuple[int, int, int], step_within_day: int,
+                  ticks_per_step: int) -> tuple[int, int, int]:
+    """The wall-clock time step ``step_within_day`` begins at.
+
+    A tick is a minute, so a step of ``ticks_per_step`` ticks advances the
+    clock by that many minutes. Without this every step of a day started at
+    ``start`` and the market open was replayed N times instead of a trading
+    day being traversed.
+
+    That was not cosmetic. Time of day drives the intraday activity profile:
+    measured on twenty names, a day run as six 65-tick steps all starting at
+    09:30 produced **1,840,015,161** shares of volume against **1,181,790,628**
+    for the same day run as one 390-tick session -- 56% too much, because the
+    busiest hour was counted six times.
+
+    With the clock advancing, a stepped day is **bit-identical** to the single
+    session: prices, GARCH variance and draw count, for every split tried
+    (2x195, 3x130, 4x100, 6x65). That is the property an evaluation harness
+    needs -- stepping is how the agent is given a turn, and it must not be a
+    change to the market.
+
+    Steps that run past the close are allowed rather than refused. The engine
+    models after-hours as reduced activity rather than as nothing (measured:
+    about 25 draws a tick against 49 while open), so a caller who configures
+    more minutes than a session holds gets a modelled evening, not silence.
+    """
+    hour, minute, day_of_week = start
+    total = hour * 60 + minute + step_within_day * ticks_per_step
+    # Wrapped rather than allowed to exceed 24, which the engine refuses. The
+    # day of week is deliberately NOT advanced: a "day" here is the caller's
+    # loop iteration, and rolling it silently would put a Saturday in the
+    # middle of someone's five-day evaluation.
+    return (total // 60) % 24, total % 60, day_of_week
+
+
 def _dominant_factor(engine: Engine) -> str | None:
     """The factor with the largest absolute contribution across the roster.
 
@@ -274,8 +309,13 @@ def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
         if scenario is not None:
             scenario.apply(engine, day)
         engine.open_market()
-        for _ in range(steps_per_day):
-            engine.run_session(hour, minute, day_of_week, ticks_per_step)
+        for step in range(steps_per_day):
+            # The same advancing clock as the traded run. If this stepped
+            # differently the two worlds would differ for a reason that had
+            # nothing to do with the agent.
+            engine.run_session(*session_clock((hour, minute, day_of_week),
+                                              step, ticks_per_step),
+                               ticks_per_step)
         engine.close_market()
     return _f64(engine.prices())
 
@@ -333,7 +373,12 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                     rejected += 1
                     errors.append(f"step {step}: {exc}")
 
-            engine.run_session(hour, minute, day_of_week, ticks_per_step,
+            # The clock advances with the step, so a day of N steps traverses
+            # a trading day instead of replaying its first minutes N times.
+            step_hour, step_minute, step_dow = session_clock(
+                (hour, minute, day_of_week), step % steps_per_day,
+                ticks_per_step)
+            engine.run_session(step_hour, step_minute, step_dow, ticks_per_step,
                                order_flow=portfolio.pending_flow())
             portfolio.clear_flow()
 

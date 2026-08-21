@@ -2,7 +2,14 @@
 
 import pytest
 
+import struct
+
 import pretium
+from pretium import harness
+
+
+def _f64(buf):
+    return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
 
 UNIVERSE = pretium.Universe.random(8, seed=5)
 # The roster spans four orders of magnitude of liquidity by design, so the
@@ -242,3 +249,58 @@ def test_an_unknown_ranking_key_is_refused():
 def test_no_agents_is_refused():
     with pytest.raises(pretium.ValidationError, match="no agents"):
         pretium.evaluate({}, seed=1, universe=UNIVERSE)
+
+
+# --------------------------------------------------------------------------
+# Stepping is how the agent gets a turn, not a change to the market
+# --------------------------------------------------------------------------
+
+
+def test_a_stepped_day_is_the_same_market_as_one_session():
+    """The property the whole evaluation harness rests on.
+
+    An agent is given turns by splitting the day into steps. If that split
+    changed the market, every score would be measured somewhere the model does
+    not describe.
+
+    It did. Each step started at the harness's `start` time, so a six-step day
+    replayed the market open six times instead of traversing a trading day.
+    Measured on twenty names: 1,840,015,161 shares of volume against
+    1,181,790,628 for the same day as one 390-tick session -- 56% too much,
+    because the busiest hour was counted six times.
+
+    With the clock advancing it is bit-identical, and that is asserted for
+    several splits, because a single split could agree by coincidence.
+    """
+    universe = pretium.Universe.random(20, seed=5)
+    reference = pretium.Engine(seed=1, universe=universe)
+    reference.open_market()
+    reference.run_session(9, 30, 3, 390)
+    reference.close_market()
+
+    for steps, per_step in ((2, 195), (3, 130), (6, 65)):
+        stepped = harness._run_untraded(
+            1, universe, None, 1, steps, per_step, 9, 30, 3)
+        assert stepped == _f64(reference.prices()), (
+            f"{steps} steps of {per_step} ticks is not the same day"
+        )
+
+
+def test_the_clock_advances_by_a_minute_a_tick():
+    from pretium.harness import session_clock
+
+    assert [session_clock((9, 30, 3), k, 65) for k in range(6)] == [
+        (9, 30, 3), (10, 35, 3), (11, 40, 3),
+        (12, 45, 3), (13, 50, 3), (14, 55, 3),
+    ]
+
+
+def test_the_clock_wraps_rather_than_running_past_midnight():
+    from pretium.harness import session_clock
+
+    # The engine refuses an hour outside 0..24, so a long configuration must
+    # wrap. The day of week deliberately does not advance -- a "day" here is
+    # the caller's loop iteration, and rolling it silently would drop a
+    # Saturday into the middle of a five-day evaluation.
+    assert session_clock((23, 30, 3), 1, 60) == (0, 30, 3)
+    assert session_clock((9, 30, 3), 30, 60) == (15, 30, 3)

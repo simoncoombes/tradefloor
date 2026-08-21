@@ -99,19 +99,31 @@ def test_a_capture_ratio_is_meaningless_without_its_horizon():
     Mispricing mean-reverts on a sixty-day half-life, so a five-day evaluation
     sees only the beginning of the convergence the Oracle is trading -- and
     momentum, whose signal is the price trend that convergence produces, sees
-    even less of it. Measured on this seed: momentum captures 27% of the
-    ceiling over five days and 94% over sixty.
+    even less of it. Measured on this seed: momentum captures 68% of the
+    reference over five days and 100% over sixty.
 
     The same agent, the same market, the same Oracle. Only the horizon
-    changed, and the headline number more than tripled.
+    changed, and the headline number moved by half again.
+
+    Re-measured after the harness began advancing its clock within the day;
+    it read 27% and 94% when every step replayed the market open. The GAP is
+    the finding and it survived. The absolute numbers are a property of this
+    seed and this horizon pair, so the assertion below is on the gap.
     """
     short = pretium.evaluate({"oracle": Oracle(), "momentum": Momentum()},
                              seed=2026, universe=UNIVERSE, days=5)
     long = pretium.evaluate({"oracle": Oracle(), "momentum": Momentum()},
                             seed=2026, universe=UNIVERSE, days=60)
     assert long["oracle"].pnl > short["oracle"].pnl
-    assert capture_ratio(long)["momentum"] > capture_ratio(short)["momentum"]
-    assert capture_ratio(short)["momentum"] < 0.55
+    near, far = capture_ratio(short)["momentum"], capture_ratio(long)["momentum"]
+    assert far > near
+    # A gap worth the warning, rather than a threshold on the near value. That
+    # was `< 0.55` against a measured 0.677 once the clock started advancing:
+    # a test calibrated to a number rather than to the effect it names.
+    assert far - near > 0.2, (
+        f"the horizon moved capture only from {near:.3f} to {far:.3f}; the "
+        "caveat this test exists to justify is no longer warranted"
+    )
 
 
 def test_the_reference_agents_stay_inside_the_leverage_limit(scores):

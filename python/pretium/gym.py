@@ -41,6 +41,7 @@ from __future__ import annotations
 from typing import Any, Sequence
 
 from ._core import Engine, Instrument, Macro, OrderError, ValidationError
+from .harness import session_clock
 from .portfolio import Portfolio
 from .universe_util import as_universe
 
@@ -195,8 +196,14 @@ class TradingEnv(_Base):
 
         rejected = self._rebalance(action)
 
-        self.engine.run_session(*self.start, self.ticks_per_step,
-                                order_flow=self.portfolio.pending_flow())
+        # The clock advances within the day, so an episode traverses trading
+        # days rather than replaying each one's opening minutes. See
+        # `harness.session_clock` for the measurement.
+        self.engine.run_session(
+            *session_clock(self.start, self._step % self.steps_per_day,
+                           self.ticks_per_step),
+            self.ticks_per_step,
+            order_flow=self.portfolio.pending_flow())
         self.portfolio.clear_flow()
 
         self._step += 1
