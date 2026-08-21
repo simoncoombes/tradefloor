@@ -21,6 +21,13 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 
+[project.optional-dependencies]
+# The core package depends on NOTHING. These are for surfaces that genuinely
+# need them: the RL environment needs arrays, and the Arrow tables are read
+# through whichever dataframe library the consumer already has.
+rl = ["numpy>=1.24", "gymnasium>=0.29"]
+arrow = ["pyarrow>=14"]
+
 [tool.maturin]
 manifest-path = "rust/Cargo.toml"
 # Mixed layout: the compiled extension is pretium._core and the Python package
