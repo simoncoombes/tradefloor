@@ -147,6 +147,15 @@ class OrderBook:
 # ---------------------------------------------------------------------------
 
 class Instrument:
+    """One tradable company.
+
+    ``short_interest`` is a SHARE COUNT, not a fraction: the squeeze rule
+    divides it by the float. Values strictly between 0 and 1 are refused for a
+    company with a meaningful share count, because that is what a fraction
+    looks like and the mistake is otherwise silent -- three hundredths of one
+    share gives a ratio of 3e-11 and a squeeze that can never fire.
+    """
+
     ticker: str
     sector: str
     initial_price: float

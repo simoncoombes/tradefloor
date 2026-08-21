@@ -122,6 +122,25 @@ impl PyInstrument {
                 )));
             }
         }
+        // short_interest is a SHARE COUNT, and the shape of the mistake is
+        // predictable enough to refuse. Someone writing 0.03 means three per
+        // cent; what they get is three hundredths of one share, a ratio of
+        // 3e-11 against the float, and a squeeze that can never fire. The
+        // failure is silent -- the value is legal, the market runs, and one of
+        // the four shock factors is simply dead.
+        //
+        // A fractional short position in a company with a meaningful share
+        // count is not a scenario anyone is modelling, so the ambiguous range
+        // is rejected rather than guessed at. This is the same treatment rates
+        // get: refuse the plausible-looking mistake at the boundary instead of
+        // producing a market nobody specified.
+        if short_interest > 0.0 && short_interest < 1.0 && shares_outstanding >= 1000.0 {
+            let as_percent = short_interest * 100.0;
+            let as_shares = shares_outstanding * short_interest;
+            return Err(ValidationError::new_err(format!(
+                "short_interest = {short_interest} looks like a fraction, but it is a SHARE COUNT: the squeeze rule divides it by the float. If you meant {as_percent}% of {shares_outstanding} shares, pass {as_shares}. Values between 0 and 1 are refused because a fractional short position is never what anyone means."
+            )));
+        }
         for (name, v) in [
             ("eps", eps),
             ("book_value_per_share", book_value_per_share),

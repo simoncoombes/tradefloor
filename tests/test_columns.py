@@ -133,3 +133,64 @@ def test_reading_a_column_does_not_disturb_the_market():
         watched.column(field)
     assert watched.prices() == quiet.prices()
     assert watched.draws_consumed == quiet.draws_consumed
+
+
+# --------------------------------------------------------------------------
+# short_interest: a share count, and the mistake that looks like one
+# --------------------------------------------------------------------------
+
+
+def test_a_fraction_shaped_short_interest_is_refused():
+    """The silent failure this guard exists to stop.
+
+    `short_interest` is a share COUNT — the squeeze rule computes
+    `short_interest / float`. Someone writing 0.03 means three per cent; what
+    they get is three hundredths of one share, a ratio of 3e-11, and a squeeze
+    that can never fire. Nothing errors, the market runs, and one of the four
+    shock factors is simply dead for that company.
+
+    I made this exact mistake while testing the squeeze path: set 0.25,
+    watched the output not move, and only then read the formula. Refusing the
+    ambiguous range is the same treatment rates get.
+    """
+    with pytest.raises(pretium.ValidationError) as caught:
+        pretium.Instrument("AAA", "technology", initial_price=50.0,
+                           shares_outstanding=1e9, eps=3.0, short_interest=0.03)
+    message = str(caught.value)
+    assert "SHARE COUNT" in message
+    # And it names the value they should have passed, rather than leaving them
+    # to work out the conversion that just caught them out.
+    assert "30000000" in message
+
+
+def test_a_real_share_count_is_accepted():
+    instrument = pretium.Instrument(
+        "AAA", "technology", initial_price=50.0, shares_outstanding=1e9,
+        eps=3.0, short_interest=3e7)
+    assert instrument.short_interest == 3e7
+
+
+def test_zero_short_interest_is_legal():
+    # Zero is "nobody is short", which is a real and common state. Only the
+    # ambiguous open interval is refused.
+    instrument = pretium.Instrument(
+        "AAA", "technology", initial_price=50.0, shares_outstanding=1e9,
+        eps=3.0, short_interest=0.0)
+    assert instrument.short_interest == 0.0
+
+
+def test_a_fractional_share_is_legal_in_a_tiny_company():
+    # The guard keys on the share count, not on the value alone. Half a share
+    # of a hundred-share company is a coherent position; half a share of a
+    # billion-share company is a typo.
+    instrument = pretium.Instrument(
+        "AAA", "technology", initial_price=50.0, shares_outstanding=100.0,
+        eps=3.0, short_interest=0.5)
+    assert instrument.short_interest == 0.5
+
+
+def test_generated_universes_pass_their_own_guard():
+    # The generator draws a fraction of shares outstanding, so it must never
+    # produce a value the constructor would reject.
+    for instrument in pretium.Universe.random(60, seed=5):
+        assert instrument.short_interest == 0.0 or instrument.short_interest >= 1.0
