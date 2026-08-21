@@ -439,6 +439,69 @@ impl Engine {
         self.companies.is_empty()
     }
 
+    // ── Roster mutation ───────────────────────────────────────────────────
+    //
+    // A listed universe is not static: companies IPO in, go bankrupt, and are
+    // acquired. An engine that could not represent that would force the
+    // embedder to choose between rebuilding — which resets the generator and
+    // destroys reproducibility — and pretending, which silently attaches
+    // results to the wrong companies because every column is positional.
+    //
+    // # What these guarantee, and what they cannot
+    //
+    // They do NOT keep the rest of the market unchanged. They cannot: the tick
+    // draws per company, so changing `n` shifts every subsequent draw and the
+    // whole market moves from that point. That is a property of the model, not
+    // a limitation of the implementation, and `Engine::new` already says so
+    // about roster size.
+    //
+    // What they DO guarantee is reproducibility, which is the property that
+    // actually matters: the generator carries forward across the change, so
+    // one seed plus the same sequence of roster edits, applied at the same
+    // ticks, reproduces the same market exactly. Replay works; invariance was
+    // never on offer.
+
+    /// Append a company. Returns its index.
+    ///
+    /// Appends rather than inserting, because index order is the draw order:
+    /// inserting into the middle would renumber every company after it and
+    /// change which draws they receive. An embedder that needs a particular
+    /// ordering must establish it before the first tick.
+    pub fn add_company(&mut self, company: TickCompany) -> usize {
+        self.companies.push(company);
+        self.companies.len() - 1
+    }
+
+    /// Remove the company at `index`, returning it.
+    ///
+    /// `Vec::remove`, so the tail shifts down by one and keeps its relative
+    /// order. `swap_remove` would be cheaper and is wrong: it moves the last
+    /// company into the hole, silently reordering the roster, and roster order
+    /// is contractual.
+    ///
+    /// Returns `None` for an out-of-range index rather than panicking — a
+    /// removal racing a bankruptcy is an embedder bug worth reporting, not a
+    /// reason to abort the module and take the session with it.
+    pub fn remove_company(&mut self, index: usize) -> Option<TickCompany> {
+        if index >= self.companies.len() {
+            return None;
+        }
+        Some(self.companies.remove(index))
+    }
+
+    /// Find a company's index by id.
+    ///
+    /// Linear, because the roster is ~100 names and a map would be a second
+    /// structure to keep in step with the ordering that actually matters.
+    pub fn index_of(&self, id: &str) -> Option<usize> {
+        self.companies.iter().position(|c| c.id == id)
+    }
+
+    /// Company ids, in roster order. The mapping every column is positional against.
+    pub fn ids(&self) -> Vec<String> {
+        self.companies.iter().map(|c| c.id.clone()).collect()
+    }
+
     /// Columnar read of one field, for the FFI boundary.
     ///
     /// A single contiguous `f64` buffer crosses a WASM boundary as one view;

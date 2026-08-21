@@ -601,6 +601,47 @@ impl PyEngine {
         self.buffer.ticks_written
     }
 
+    /// List a new instrument. Returns its index.
+    ///
+    /// # This changes the whole market from here, and that is correct
+    ///
+    /// It does not append a name to an otherwise-unchanged simulation. The
+    /// tick draws per instrument, so a larger roster shifts every subsequent
+    /// draw and every existing instrument's path moves too. That is the model,
+    /// not a limitation.
+    ///
+    /// What IS guaranteed is reproducibility: the generator carries across the
+    /// change, so one seed plus the same edits at the same ticks reproduces
+    /// the same market exactly. Replay works; invariance was never available.
+    fn list_instrument(&mut self, instrument: PyInstrument) -> usize {
+        let index = self.inner.len();
+        let core = instrument.to_core(index);
+        self.tickers.push(instrument.ticker.clone());
+        self.inner.add_company(core)
+    }
+
+    /// Delist the instrument at `index`, returning its ticker.
+    ///
+    /// The tail keeps its relative order and shifts down by one, so any index
+    /// a caller is holding past this point is stale. Re-read `tickers`.
+    fn delist(&mut self, index: usize) -> PyResult<String> {
+        match self.inner.remove_company(index) {
+            Some(c) => {
+                self.tickers.remove(index);
+                Ok(c.ticker)
+            }
+            None => Err(ValidationError::new_err(format!(
+                "no instrument at index {index}; the roster holds {}",
+                self.inner.len()
+            ))),
+        }
+    }
+
+    /// Index of a ticker, or None. Indices shift after a delisting.
+    fn index_of(&self, ticker: &str) -> Option<usize> {
+        self.tickers.iter().position(|t| t == ticker)
+    }
+
     /// Instrument tickers, in roster order.
     ///
     /// Order is CONTRACTUAL: every column comes back positionally against

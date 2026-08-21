@@ -261,3 +261,88 @@ def test_draw_count_reports_alignment():
         e.open_market()
         e.run_session(9, 30, 3, 30)
     assert a.draws_consumed == b.draws_consumed
+
+
+# --------------------------------------------------------------------------
+# Roster mutation
+# --------------------------------------------------------------------------
+
+def test_listing_and_delisting_reproduce_on_replay():
+    """One seed plus the same edits at the same ticks gives the same market.
+
+    This is the guarantee. It is what lets a seed identify a run whose universe
+    changed partway through — an IPO, a bankruptcy, an acquisition — which a
+    static roster could not represent at all.
+    """
+    def run():
+        e = engine(seed=7, n=4)
+        e.open_market()
+        e.run_session(9, 30, 3, 20)
+        e.list_instrument(pretium.Instrument(
+            "IPO", "energy", initial_price=33.0, shares_outstanding=5e7, eps=1.5))
+        e.run_session(9, 50, 3, 20)
+        e.delist(1)
+        e.run_session(10, 10, 3, 20)
+        return arr(e.prices()), e.draws_consumed, e.tickers
+
+    assert run() == run()
+
+
+def test_an_edit_moves_the_rest_of_the_market():
+    """The half that is NOT guaranteed, asserted so nobody relies on it.
+
+    Listing an instrument does not append a name to an otherwise-unchanged
+    market. The tick draws per instrument, so a larger roster shifts every
+    subsequent draw. Anyone building on the assumption that existing paths are
+    untouched needs to see this fail loudly if the model ever changed.
+    """
+    untouched = engine(seed=11, n=4)
+    untouched.open_market()
+    untouched.run_session(9, 30, 3, 40)
+
+    edited = engine(seed=11, n=4)
+    edited.open_market()
+    edited.run_session(9, 30, 3, 20)
+    edited.list_instrument(pretium.Instrument(
+        "IPO", "energy", initial_price=33.0, shares_outstanding=5e7, eps=1.5))
+    edited.run_session(9, 50, 3, 20)
+
+    assert arr(untouched.prices()) != arr(edited.prices())[:4]
+
+
+def test_delisting_preserves_the_order_of_the_rest():
+    e = engine(n=5)
+    assert e.tickers == ["C0", "C1", "C2", "C3", "C4"]
+    assert e.delist(1) == "C1"
+    assert e.tickers == ["C0", "C2", "C3", "C4"]
+    # Indices shift down; a held index is stale after a delisting.
+    assert e.index_of("C2") == 1
+
+
+def test_roster_edits_draw_nothing():
+    # An edit is bookkeeping, not simulation. If it consumed draws, the
+    # market would move merely by being observed.
+    e = engine(n=3)
+    e.open_market()
+    e.run_session(9, 30, 3, 10)
+    before = e.draws_consumed
+    e.list_instrument(pretium.Instrument("X", "utilities", initial_price=10.0,
+                                         shares_outstanding=1e7))
+    e.delist(0)
+    assert e.draws_consumed == before
+
+
+def test_delisting_out_of_range_reports_the_roster_size():
+    e = engine(n=2)
+    with pytest.raises(pretium.ValidationError, match="roster holds 2"):
+        e.delist(5)
+    assert len(e) == 2, "a failed delisting must not disturb the roster"
+
+
+def test_columns_follow_the_edited_roster():
+    e = engine(n=3)
+    e.list_instrument(pretium.Instrument("NEW", "materials", initial_price=77.0,
+                                         shares_outstanding=1e8))
+    assert len(arr(e.prices())) == 4
+    assert e.tickers[3] == "NEW"
+    assert arr(e.prices())[3] == 77.0
