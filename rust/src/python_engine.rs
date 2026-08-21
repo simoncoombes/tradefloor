@@ -286,6 +286,107 @@ impl PyMacro {
 }
 
 impl PyEngine {
+    /// Resolve a ticker to the engine's internal company id.
+    ///
+    /// Needed because the two tick inputs key differently: order volumes match
+    /// on TICKER, while news matches on the internal ID. That asymmetry is the
+    /// reference behaviour and is not worth exporting, so the Python API takes
+    /// a ticker for both and this does the translation.
+    ///
+    /// Resolved through the LIVE roster rather than by rebuilding the id from
+    /// a ticker and an index: ids carry the index a company had when it was
+    /// created, which stops matching its position as soon as anything is
+    /// delisted.
+    fn id_for(&self, ticker: &str) -> Option<String> {
+        let pos = self.tickers.iter().position(|t| t == ticker)?;
+        self.inner.ids().get(pos).cloned()
+    }
+
+    fn build_news(&self, news: Option<Vec<PyNews>>) -> PyResult<Vec<NewsEvent>> {
+        let Some(items) = news else { return Ok(Vec::new()) };
+        let mut out = Vec::with_capacity(items.len());
+        for n in items {
+            let company_id = match n.ticker.as_deref() {
+                Some(t) => Some(self.id_for(t).ok_or_else(|| {
+                    ValidationError::new_err(format!(
+                        "no instrument with ticker {t:?} in this universe"
+                    ))
+                })?),
+                None => None,
+            };
+            out.push(NewsEvent {
+                company_id,
+                sector: n.sector.clone(),
+                // Some(), so a genuine zero reaches the truthy-or in the
+                // factor model and contributes nothing -- which is what the
+                // reference does with a zero impact.
+                price_impact: Some(n.price_impact),
+            });
+        }
+        Ok(out)
+    }
+
+    fn build_impacts(
+        &self,
+        impacts: Option<Vec<PyNewsImpact>>,
+    ) -> PyResult<Vec<NewsImpactEntry>> {
+        let Some(items) = impacts else { return Ok(Vec::new()) };
+        let mut out = Vec::with_capacity(items.len());
+        for i in items {
+            let company_id = match i.ticker.as_deref() {
+                Some(t) => Some(self.id_for(t).ok_or_else(|| {
+                    ValidationError::new_err(format!(
+                        "no instrument with ticker {t:?} in this universe"
+                    ))
+                })?),
+                None => None,
+            };
+            out.push(NewsImpactEntry {
+                company_id,
+                sector: i.sector.clone(),
+                sectors: i.sectors.clone(),
+                remaining_impact: i.remaining_impact,
+                reversal_phase: i.reversal_phase,
+            });
+        }
+        Ok(out)
+    }
+
+    /// Order flow, keyed by ticker.
+    ///
+    /// An unknown ticker is an error rather than being ignored. Silently
+    /// dropping flow would mean a study believing it had applied pressure
+    /// that never reached the book, and nothing would say so.
+    fn build_flow(
+        &self,
+        flow: Option<std::collections::HashMap<String, (f64, f64)>>,
+    ) -> PyResult<Vec<(String, OrderVolume)>> {
+        let Some(map) = flow else { return Ok(Vec::new()) };
+        let mut out = Vec::with_capacity(map.len());
+        // Sorted, so the vector this builds does not depend on HashMap
+        // iteration order. The engine looks flow up by ticker rather than
+        // walking it, so order does not currently reach the market -- but a
+        // structure whose contents depend on hash ordering is one refactor
+        // away from doing so, and that would be a platform-dependent market.
+        let mut keys: Vec<&String> = map.keys().collect();
+        keys.sort();
+        for ticker in keys {
+            let (buy, sell) = map[ticker];
+            if !buy.is_finite() || !sell.is_finite() || buy < 0.0 || sell < 0.0 {
+                return Err(ValidationError::new_err(format!(
+                    "order flow for {ticker:?} must be finite and not negative, got ({buy}, {sell})"
+                )));
+            }
+            if !self.tickers.iter().any(|t| t == ticker) {
+                return Err(ValidationError::new_err(format!(
+                    "no instrument with ticker {ticker:?} in this universe"
+                )));
+            }
+            out.push((ticker.clone(), OrderVolume { buy, sell }));
+        }
+        Ok(out)
+    }
+
     /// The portion of a session buffer this session actually wrote.
     ///
     /// Written with an `if` rather than `usize::min`, which would be perfectly
@@ -436,13 +537,20 @@ impl PyEngine {
     ///
     /// A closed market costs nothing and draws nothing, which is why a caller
     /// may tick straight through a weekend without special-casing it.
-    #[pyo3(signature = (hour, minute, day_of_week, *, volatility = 1.0))]
+    #[pyo3(signature = (
+        hour, minute, day_of_week, *, volatility = 1.0,
+        news = None, news_impacts = None, order_flow = None
+    ))]
+    #[allow(clippy::too_many_arguments)]
     fn tick(
         &mut self,
         hour: i64,
         minute: i64,
         day_of_week: i64,
         volatility: f64,
+        news: Option<Vec<PyNews>>,
+        news_impacts: Option<Vec<PyNewsImpact>>,
+        order_flow: Option<std::collections::HashMap<String, (f64, f64)>>,
     ) -> PyResult<PyTickResult> {
         if !(0..24).contains(&hour) || !(0..60).contains(&minute) {
             return Err(ValidationError::new_err(format!(
@@ -459,6 +567,9 @@ impl PyEngine {
                 "volatility must be finite and not negative, got {volatility}"
             )));
         }
+        let news = self.build_news(news)?;
+        let impacts = self.build_impacts(news_impacts)?;
+        let flow = self.build_flow(order_flow)?;
         let outcome: TickOutcome = self.inner.tick(&TickRequest {
             time: GameTime {
                 hour,
@@ -466,9 +577,9 @@ impl PyEngine {
                 day_of_week,
             },
             volatility_multiplier: volatility,
-            news: &[] as &[NewsEvent],
-            news_impact_queue: &[] as &[NewsImpactEntry],
-            order_volumes: &[] as &[(String, OrderVolume)],
+            news: &news,
+            news_impact_queue: &impacts,
+            order_volumes: &flow,
         });
         Ok(PyTickResult {
             market_status: status_name(outcome.market_status).to_string(),
@@ -486,7 +597,11 @@ impl PyEngine {
     /// the same name.
     ///
     /// Returns the number of ticks written.
-    #[pyo3(signature = (hour, minute, day_of_week, ticks, *, volatility = 1.0, close_at_end = false))]
+    #[pyo3(signature = (
+        hour, minute, day_of_week, ticks, *, volatility = 1.0,
+        close_at_end = false, news = None, news_impacts = None, order_flow = None
+    ))]
+    #[allow(clippy::too_many_arguments)]
     fn run_session(
         &mut self,
         hour: i64,
@@ -495,10 +610,21 @@ impl PyEngine {
         ticks: usize,
         volatility: f64,
         close_at_end: bool,
+        // Held for the WHOLE session rather than being applied on the first
+        // tick and then dropped. That matches how the engine reads them -- the
+        // impact queue is a standing residue, not an impulse -- but it does
+        // mean a one-off news item belongs in `tick`, not here.
+        news: Option<Vec<PyNews>>,
+        news_impacts: Option<Vec<PyNewsImpact>>,
+        order_flow: Option<std::collections::HashMap<String, (f64, f64)>>,
     ) -> PyResult<usize> {
         if ticks == 0 {
             return Err(ValidationError::new_err("ticks must be greater than zero"));
         }
+        let session_news = self.build_news(news)?;
+        let session_impacts = self.build_impacts(news_impacts)?;
+        let session_flow = self.build_flow(order_flow)?;
+
         let n = self.inner.len();
         let innovations: Vec<Option<f64>> = vec![None; n];
         let variances: Vec<f64> = self
@@ -521,9 +647,9 @@ impl PyEngine {
                 },
                 ticks,
                 volatility_multiplier: volatility,
-                news: &[],
-                news_impact_queue: &[],
-                order_volumes: &[],
+                news: &session_news,
+                news_impact_queue: &session_impacts,
+                order_volumes: &session_flow,
                 close_at_end,
                 daily_innovations: &innovations,
                 sector_base_variances: &variances,
@@ -864,5 +990,112 @@ fn cycle_name(p: CyclePhase) -> &'static str {
         CyclePhase::Contraction => "contraction",
         CyclePhase::Trough => "trough",
         CyclePhase::Recovery => "recovery",
+    }
+}
+
+/// A news event, as the price model sees it.
+///
+/// Reduced to the three fields the factor model actually reads. The game's
+/// richer event objects -- headlines, bodies, storyline phases -- never reach
+/// the price loop, so carrying them across the boundary would be marshalling
+/// cost for nothing.
+///
+/// Scope is decided by which fields are set, and the rules are not symmetric:
+///
+///   ticker set                    -> that instrument only
+///   sector set, no ticker         -> every instrument in that sector
+///   neither set                   -> market-wide
+///
+/// So an event with no ticker and no sector is not "unscoped and inert", it is
+/// the broadest possible event. That is the reference behaviour and it
+/// surprises people, which is why it is written down here.
+#[pyclass(name = "News", module = "pretium._core", frozen, get_all)]
+#[derive(Debug, Clone)]
+pub struct PyNews {
+    pub ticker: Option<String>,
+    pub sector: Option<String>,
+    pub price_impact: f64,
+}
+
+#[pymethods]
+impl PyNews {
+    #[new]
+    #[pyo3(signature = (*, ticker = None, sector = None, price_impact = 0.0))]
+    fn new(ticker: Option<String>, sector: Option<String>, price_impact: f64) -> PyResult<Self> {
+        if !price_impact.is_finite() {
+            return Err(ValidationError::new_err(format!(
+                "price_impact must be finite, got {price_impact}"
+            )));
+        }
+        if let Some(s) = sector.as_deref() {
+            if crate::sectors::by_key(s).is_none() {
+                return Err(ValidationError::new_err(format!(
+                    "unknown sector {s:?}. Valid sectors: {}",
+                    crate::sectors::keys().join(", ")
+                )));
+            }
+        }
+        Ok(Self { ticker, sector, price_impact })
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "News(ticker={:?}, sector={:?}, price_impact={})",
+            self.ticker, self.sector, self.price_impact
+        )
+    }
+}
+
+/// A decaying news impact, carried across ticks.
+///
+/// Distinct from [`PyNews`]: news is an impulse arriving now, this is the
+/// residue of one still working through the tape. It also drives the volume
+/// amplifier, which is why a name in the middle of a story trades heavier.
+#[pyclass(name = "NewsImpact", module = "pretium._core", frozen, get_all)]
+#[derive(Debug, Clone)]
+pub struct PyNewsImpact {
+    pub ticker: Option<String>,
+    pub sector: Option<String>,
+    pub sectors: Vec<String>,
+    pub remaining_impact: f64,
+    pub reversal_phase: bool,
+}
+
+#[pymethods]
+impl PyNewsImpact {
+    #[new]
+    #[pyo3(signature = (
+        *, ticker = None, sector = None, sectors = None,
+        remaining_impact = 0.0, reversal_phase = false
+    ))]
+    fn new(
+        ticker: Option<String>,
+        sector: Option<String>,
+        sectors: Option<Vec<String>>,
+        remaining_impact: f64,
+        reversal_phase: bool,
+    ) -> PyResult<Self> {
+        if !remaining_impact.is_finite() {
+            return Err(ValidationError::new_err(format!(
+                "remaining_impact must be finite, got {remaining_impact}"
+            )));
+        }
+        let sectors = sectors.unwrap_or_default();
+        for s in sector.iter().chain(sectors.iter()) {
+            if crate::sectors::by_key(s).is_none() {
+                return Err(ValidationError::new_err(format!(
+                    "unknown sector {s:?}. Valid sectors: {}",
+                    crate::sectors::keys().join(", ")
+                )));
+            }
+        }
+        Ok(Self { ticker, sector, sectors, remaining_impact, reversal_phase })
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "NewsImpact(ticker={:?}, remaining_impact={}, reversal_phase={})",
+            self.ticker, self.remaining_impact, self.reversal_phase
+        )
     }
 }

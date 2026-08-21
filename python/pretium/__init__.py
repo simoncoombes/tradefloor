@@ -26,6 +26,8 @@ from ._core import (  # noqa: F401
     Macro,
     MatchResult,
     MispricingState,
+    News,
+    NewsImpact,
     OrderBook,
     OrderError,
     PriceLevel,
@@ -47,7 +49,8 @@ from ._core import (  # noqa: F401
 __version__ = _core.__version__
 __all__ = [
     "Engine", "FairValue", "Fill", "GameRng", "Instrument", "Macro",
-    "MatchResult", "MispricingState", "OrderBook", "OrderError", "PriceLevel",
+    "MatchResult", "MispricingState", "News", "NewsImpact", "OrderBook",
+    "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",

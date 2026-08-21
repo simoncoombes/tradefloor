@@ -346,3 +346,112 @@ def test_columns_follow_the_edited_roster():
     assert len(arr(e.prices())) == 4
     assert e.tickers[3] == "NEW"
     assert arr(e.prices())[3] == 77.0
+
+
+# --------------------------------------------------------------------------
+# Tick inputs: news and order flow
+# --------------------------------------------------------------------------
+
+def test_news_reaches_the_price():
+    e_none = engine(n=4)
+    e_none.open_market()
+    e_none.run_session(9, 30, 3, 60)
+
+    e_news = engine(n=4)
+    e_news.open_market()
+    e_news.run_session(9, 30, 3, 60,
+                       news=[pretium.News(ticker="C0", price_impact=0.05)])
+
+    assert arr(e_none.prices()) != arr(e_news.prices())
+
+
+def test_order_flow_moves_the_targeted_name_in_the_right_direction():
+    """Sustained pressure, because a single tick's effect is sub-cent.
+
+    Worth stating plainly: order flow at one tick moves the model price by
+    roughly 5e-6 in log terms, which on a $12 stock is $0.00006 and rounds
+    away on the cent grid. A test asserting a one-tick price change would
+    fail while the model was working perfectly -- the same quantisation that
+    hides the cross-language `cos` divergence.
+    """
+    def run(flow=None):
+        e = engine(seed=42, n=3)
+        e.open_market()
+        e.run_session(9, 30, 3, 300, order_flow=flow)
+        return arr(e.column("mispricing_s")), arr(e.prices())
+
+    s_none, p_none = run()
+    s_buy, p_buy = run({"C0": (5e6, 0.0)})
+    s_sell, p_sell = run({"C0": (0.0, 5e6)})
+
+    assert s_buy[0] > s_none[0] > s_sell[0], "buying pressure must lift the name"
+    assert p_buy[0] > p_sell[0]
+    assert p_none[1:] == p_buy[1:], "untargeted names must be untouched"
+
+
+def test_order_flow_is_visible_in_the_state_even_when_the_print_rounds_away():
+    # The single-tick case the test above avoids. It IS working; the cent grid
+    # is simply coarser than one tick of pressure.
+    def one(flow=None):
+        e = engine(seed=42, n=3)
+        e.open_market()
+        e.tick(9, 30, 3, order_flow=flow)
+        return arr(e.column("mispricing_s")), arr(e.prices())
+
+    s_none, p_none = one()
+    s_buy, p_buy = one({"C0": (5e6, 0.0)})
+    assert s_buy[0] != s_none[0], "the model must respond"
+    assert p_buy == p_none, "and the cent grid hides it at this size"
+
+
+def test_an_unknown_ticker_is_refused_not_ignored():
+    # Silently dropping flow would mean a study believing it applied pressure
+    # that never reached the book, with nothing to say otherwise.
+    e = engine(n=3)
+    with pytest.raises(pretium.ValidationError, match="NOPE"):
+        e.tick(9, 30, 3, order_flow={"NOPE": (1.0, 1.0)})
+    with pytest.raises(pretium.ValidationError, match="NOPE"):
+        e.tick(9, 30, 3, news=[pretium.News(ticker="NOPE", price_impact=0.1)])
+
+
+def test_news_scope_is_decided_by_which_fields_are_set():
+    # An event with neither ticker nor sector is MARKET-WIDE, not inert. That
+    # asymmetry surprises people, so it is pinned.
+    market_wide = engine(n=4)
+    market_wide.open_market()
+    market_wide.run_session(9, 30, 3, 60, news=[pretium.News(price_impact=0.04)])
+
+    quiet = engine(n=4)
+    quiet.open_market()
+    quiet.run_session(9, 30, 3, 60)
+
+    a, b = arr(quiet.prices()), arr(market_wide.prices())
+    assert a != b
+    assert sum(1 for x, y in zip(a, b) if x != y) > 1, "market-wide must touch more than one name"
+
+
+def test_news_validates_its_sector():
+    with pytest.raises(pretium.ValidationError, match="sector"):
+        pretium.News(sector="tecnology", price_impact=0.1)
+    with pytest.raises(pretium.ValidationError, match="finite"):
+        pretium.News(ticker="C0", price_impact=float("nan"))
+
+
+def test_negative_order_flow_is_refused():
+    e = engine(n=3)
+    with pytest.raises(pretium.ValidationError, match="negative"):
+        e.tick(9, 30, 3, order_flow={"C0": (-1.0, 0.0)})
+
+
+def test_news_driven_runs_are_reproducible():
+    def run():
+        e = engine(seed=5, n=4)
+        e.open_market()
+        e.run_session(9, 30, 3, 80,
+                      news=[pretium.News(ticker="C1", price_impact=0.03)],
+                      news_impacts=[pretium.NewsImpact(ticker="C1",
+                                                       remaining_impact=0.02)],
+                      order_flow={"C0": (2e6, 1e5)})
+        return arr(e.prices()), e.draws_consumed
+
+    assert run() == run()

@@ -131,6 +131,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::python_engine::PyInstrument>()?;
     m.add_class::<crate::python_engine::PyMacro>()?;
     m.add_class::<crate::python_engine::PyTickResult>()?;
+    m.add_class::<crate::python_engine::PyNews>()?;
+    m.add_class::<crate::python_engine::PyNewsImpact>()?;
     m.add_function(wrap_pyfunction!(crate::python_engine::market_status, m)?)?;
     m.add_function(wrap_pyfunction!(crate::python_engine::random_instruments, m)?)?;
     m.add("ValidationError", m.py().get_type_bound::<ValidationError>())?;
