@@ -574,6 +574,34 @@ impl Engine {
         self.companies.iter().position(|c| c.id == id)
     }
 
+    /// Build the executable order book for one instrument, right now.
+    ///
+    /// # This is the book the tick itself settles through
+    ///
+    /// Not a display copy or an approximation of one. The same
+    /// `build_live_book` call the price settlement uses, on the same state, so
+    /// the depth a caller reads is the depth they would actually trade
+    /// against. That is what makes slippage emergent: a large order pays worse
+    /// prices because it consumed real levels, not because a coefficient said
+    /// large orders cost more.
+    ///
+    /// Rebuilt per call rather than persisted, which is correct rather than
+    /// merely convenient: a market maker re-quotes every tick anyway, so the
+    /// book is a pure function of fair value, spread and resting orders. That
+    /// keeps the tick pure and replay deterministic for free.
+    ///
+    /// Returns `None` for an out-of-range index.
+    pub fn book_for(&self, index: usize) -> Option<crate::order_book::OrderBook> {
+        let company = self.companies.get(index)?;
+        Some(crate::microstructure::build_live_book(
+            &company.micro_view(company.stock.price),
+            &crate::microstructure::LiveBookOptions {
+                vix: self.economy.vix,
+                ..Default::default()
+            },
+        ))
+    }
+
     /// Company ids, in roster order. The mapping every column is positional against.
     pub fn ids(&self) -> Vec<String> {
         self.companies.iter().map(|c| c.id.clone()).collect()

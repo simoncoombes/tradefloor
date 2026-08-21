@@ -17,6 +17,7 @@ import json
 from typing import Any, Iterable, Sequence
 
 from . import _core
+from .portfolio import Portfolio, Position
 from ._core import (  # noqa: F401
     Engine,
     FairValue,
@@ -52,7 +53,7 @@ __all__ = [
     "MatchResult", "MispricingState", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "Counterfactual",
-    "counterfactual",
+    "counterfactual", "Portfolio", "Position",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
     "market_status", "model_preset", "run_many", "sectors", "step_mispricing_daily",

@@ -145,7 +145,13 @@ impl TickCompany {
         }
     }
 
-    fn micro_view(&self, price: f64) -> CompanyMicrostructure {
+    /// The microstructure view of this company at a given price.
+    ///
+    /// Public so an embedder can build the executable book for an instrument
+    /// and trade against it. The book a caller sees is therefore the same one
+    /// the tick settles through -- displayed depth IS executable depth, which
+    /// is the property that makes slippage emergent rather than modelled.
+    pub fn micro_view(&self, price: f64) -> CompanyMicrostructure {
         CompanyMicrostructure {
             id: self.id.clone(),
             sector_volatility: self.sector_volatility,

@@ -1023,6 +1023,36 @@ impl PyEngine {
         ))
     }
 
+    /// The executable order book for one instrument, right now.
+    ///
+    /// # The depth you read is the depth you trade against
+    ///
+    /// This is the same book the tick settles prices through, not a display
+    /// copy of it. So `sweep_cost` tells you what size would ACTUALLY cost,
+    /// and submitting an order pays those prices because it consumed those
+    /// levels -- market impact is emergent rather than a coefficient.
+    ///
+    /// # It is a snapshot, and trading it does not move the market
+    ///
+    /// Worth being explicit, because the opposite is easy to assume. The book
+    /// is rebuilt per call from current state, so the object returned is
+    /// detached: filling against it tells you your execution price, but the
+    /// market only learns about your trading through `order_flow` on the next
+    /// tick. Those are two separate channels on purpose -- one prices your
+    /// fill, the other applies your pressure -- and a harness that wants both
+    /// must do both.
+    fn book(&self, ticker: &str) -> PyResult<crate::python_book::PyOrderBook> {
+        let index = self.tickers.iter().position(|t| t == ticker).ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "no instrument with ticker {ticker:?} in this universe"
+            ))
+        })?;
+        let inner = self.inner.book_for(index).ok_or_else(|| {
+            ValidationError::new_err(format!("no instrument at index {index}"))
+        })?;
+        Ok(crate::python_book::PyOrderBook::from_core(inner))
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "Engine({} instruments, draws={})",

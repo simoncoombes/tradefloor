@@ -165,6 +165,15 @@ pub struct PyOrderBook {
     inner: crate::order_book::OrderBook,
 }
 
+impl PyOrderBook {
+    /// Wrap a book the engine built. Not a `#[new]`: a caller cannot
+    /// construct one of these from nothing, because its depth comes from an
+    /// instrument's state rather than from arguments.
+    pub fn from_core(inner: crate::order_book::OrderBook) -> Self {
+        Self { inner }
+    }
+}
+
 #[pymethods]
 impl PyOrderBook {
     #[new]
