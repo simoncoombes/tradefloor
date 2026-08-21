@@ -45,6 +45,7 @@ from typing import Any, Literal, Protocol, Sequence
 
 from ._core import Engine, Instrument, Macro, OrderError, ValidationError
 from .portfolio import Portfolio
+from .universe_util import fingerprint_of
 
 
 # The seven components, as literals a checker can match against
@@ -152,13 +153,14 @@ class Scorecard:
 
     __slots__ = ("name", "pnl", "return_pct", "trades", "turnover", "impact_bps",
                  "max_leverage", "rejected", "explanations", "explanation_accuracy",
-                 "final_net_worth", "errors")
+                 "final_net_worth", "errors", "seed", "universe_fingerprint")
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
         turnover: float, impact_bps: float, max_leverage: float, rejected: int,
         explanations: list[tuple[str, str]], explanation_accuracy: float | None,
-        final_net_worth: float, errors: list[str],
+        final_net_worth: float, errors: list[str], seed: int = -1,
+        universe_fingerprint: str = "",
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -172,6 +174,13 @@ class Scorecard:
         self.explanation_accuracy = explanation_accuracy
         self.final_net_worth = final_net_worth
         self.errors = errors
+        # What market this score came from. A leaderboard without it is a
+        # table of numbers that cannot be re-run: the seed alone does not
+        # identify a market, because the same seed over a different roster is
+        # a different market -- and tickers do not distinguish rosters, since
+        # they are generated positionally.
+        self.seed = seed
+        self.universe_fingerprint = universe_fingerprint
 
     def as_dict(self) -> dict[str, Any]:
         return {slot: getattr(self, slot) for slot in self.__slots__}
@@ -235,6 +244,10 @@ def evaluate(
     # impact is measured against this, so it is computed once rather than per
     # agent -- and because it is the same run each time, the comparison between
     # two agents' impact is a comparison and not two separate experiments.
+    # Computed ONCE for the whole evaluation. Every agent runs the same
+    # market, so a per-agent hash would be the same value hashed N times.
+    fingerprint = fingerprint_of(universe)
+
     baseline = _run_untraded(seed, universe, macro, days, steps_per_day,
                              ticks_per_step, hour, minute, day_of_week,
                              scenario)
@@ -243,7 +256,7 @@ def evaluate(
         results[name] = _evaluate_one(
             name, agent, seed, universe, macro, days, steps_per_day,
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
-            baseline, scenario,
+            baseline, scenario, fingerprint,
         )
     return results
 
@@ -263,7 +276,8 @@ def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
 
 def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   ticks_per_step, cash, max_leverage, hour, minute,
-                  day_of_week, baseline, scenario=None) -> Scorecard:
+                  day_of_week, baseline, scenario=None,
+                  fingerprint="") -> Scorecard:
     engine = Engine(seed=seed, universe=universe, macro_state=macro)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage)
     tickers = engine.tickers
@@ -359,6 +373,8 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         explanation_accuracy=accuracy,
         final_net_worth=final,
         errors=errors,
+        seed=seed,
+        universe_fingerprint=fingerprint,
     )
 
 

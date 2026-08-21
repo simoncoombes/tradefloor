@@ -238,6 +238,12 @@ name and share no earnings. Use `universe.fingerprint` — a sha256 over the
 roster's canonical form — anywhere you need to ask whether two universes are
 the same one.
 
+Every result carries it. `Scorecard.universe_fingerprint`,
+`facts.measure()["universe_fingerprint"]` and
+`Execution.universe_fingerprint` all name the market they came from, alongside
+the seed — because a seed alone does not identify a market, and the same seed
+over a different roster is a different one.
+
 A `Checkpoint` records it and refuses to load against a roster that arrived
 changed, because restoring across two same-named universes gives right prices
 and wrong fair values: plausible in every visible way, wrong in the one that

@@ -24,3 +24,17 @@ def as_universe(universe: Sequence[Instrument]) -> list[Instrument]:
 
         raise ValidationError("universe is empty")
     return items
+
+
+def fingerprint_of(universe: Sequence[Instrument]) -> str:
+    """The roster's content hash, from anything list-shaped.
+
+    Lives here rather than being computed at each call site so the three
+    result types stamp the SAME value from the same definition. Two places
+    computing "the universe's identity" slightly differently would be worse
+    than one place computing it wrongly, because only one of those is
+    findable.
+    """
+    from . import Universe
+
+    return Universe(as_universe(universe)).fingerprint

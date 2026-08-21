@@ -80,6 +80,7 @@ import statistics
 from typing import Any, Sequence
 
 from ._core import Engine, Instrument, Macro, ValidationError
+from .universe_util import fingerprint_of
 
 #: What the same statistics look like for real daily equity returns, as
 #: reported in the empirical finance literature. Ranges rather than points,
@@ -185,6 +186,10 @@ def measure(
 
     return {
         "seed": seed,
+        # Which market these statistics describe. A realism claim without it
+        # is unfalsifiable: "kurtosis is +4.8" is only checkable against the
+        # roster it was measured on, and tickers do not identify a roster.
+        "universe_fingerprint": fingerprint_of(universe),
         "days": days,
         "instruments": count,
         "observations": len(pooled),

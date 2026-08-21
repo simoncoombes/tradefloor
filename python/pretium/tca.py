@@ -77,7 +77,7 @@ from typing import Any, Sequence
 from ._core import Engine, Instrument, Macro, OrderError, ValidationError
 from .harness import Observation
 from .portfolio import Portfolio
-from .universe_util import as_universe
+from .universe_util import as_universe, fingerprint_of
 
 
 def _f64(buf: bytes) -> list[float]:
@@ -89,10 +89,10 @@ class Execution:
 
     __slots__ = ("tickers", "fills", "baseline_path", "actual_path",
                  "baseline_final", "actual_final", "seed", "portfolio",
-                 "steps")
+                 "steps", "universe_fingerprint")
 
     def __init__(self, *, tickers, fills, baseline_path, actual_path, seed,
-                 portfolio, steps):
+                 portfolio, steps, universe_fingerprint=""):
         self.tickers = list(tickers)
         self.fills = list(fills)
         # One cross-section per decision step, in both worlds. The path rather
@@ -106,6 +106,10 @@ class Execution:
         self.seed = seed
         self.portfolio = portfolio
         self.steps = steps
+        # Which market this cost was paid in. A shortfall in basis points is
+        # meaningless without the book it was paid against, and the book is a
+        # property of the roster.
+        self.universe_fingerprint = universe_fingerprint
 
     # -- shortfall --------------------------------------------------------
 
@@ -221,6 +225,7 @@ class Execution:
         traded = sorted({f["ticker"] for f in self.fills})
         return {
             "seed": self.seed,
+            "universe_fingerprint": self.universe_fingerprint,
             "steps": self.steps,
             "fills": len(self.fills),
             "traded": traded,
@@ -335,4 +340,5 @@ def analyse(
         seed=seed,
         portfolio=portfolio,
         steps=step,
+        universe_fingerprint=fingerprint_of(universe),
     )
