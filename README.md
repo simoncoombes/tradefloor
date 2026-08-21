@@ -21,10 +21,24 @@ truth = engine.truth()                    # why each price moved
 Four things, and the combination is the point.
 
 **The market is reproducible to the bit.** Same seed, same inputs, same
-market — on Linux, macOS and Windows, because the library ships its own
-transcendental maths rather than calling the platform's libm. Every release
-runs one fixed simulation on every wheel target and compares digests; no wheel
-ships that disagrees with the others.
+market — on Linux, macOS and Windows, and on x86_64 and arm64 alike, because
+the library ships its own transcendental maths rather than calling the
+platform's libm.
+
+That is measured, not argued. Every release builds a wheel on all five
+targets, runs one fixed simulation inside each, and compares digests; no wheel
+ships that disagrees with the others. The current run:
+
+```
+linux-x86_64     4cdfb033b42a53c42d83155bf695a2805d53da58610e19c9d7da8c3f6bf0e3b8
+linux-aarch64    4cdfb033b42a53c42d83155bf695a2805d53da58610e19c9d7da8c3f6bf0e3b8
+macos-arm64      4cdfb033b42a53c42d83155bf695a2805d53da58610e19c9d7da8c3f6bf0e3b8
+macos-x86_64     4cdfb033b42a53c42d83155bf695a2805d53da58610e19c9d7da8c3f6bf0e3b8
+windows-x86_64   4cdfb033b42a53c42d83155bf695a2805d53da58610e19c9d7da8c3f6bf0e3b8
+```
+
+A missing target is not a pass — the gate fails on four of five, because a
+platform that did not report is a platform whose determinism is unverified.
 
 **It knows why every price moved, and the reasons add up.** The simulator
 computed them, so it can report them — and the `truth` table carries one row
