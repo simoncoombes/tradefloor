@@ -1608,3 +1608,23 @@ pub const FACTOR_NAMES: [&str; 4] = [
     "short_squeeze_effect",
     "random_noise",
 ];
+
+/// A sector's relative volatility multiplier.
+///
+/// Exposed so a loader can derive a beta with the same cross-sector structure
+/// a generated universe has, without consuming an RNG draw -- drawing here
+/// would make building a universe perturb the market it is built for.
+///
+/// DIMENSIONLESS and relative (0.6 to 1.3). Not a volatility in any unit, and
+/// not the thing to square for a variance -- see the sector table.
+#[pyfunction]
+pub fn sector_volatility(sector: &str) -> PyResult<f64> {
+    crate::sectors::by_key(sector)
+        .map(|s| s.volatility)
+        .ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "unknown sector {sector:?}. Valid sectors: {}",
+                crate::sectors::keys().join(", ")
+            ))
+        })
+}

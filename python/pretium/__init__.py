@@ -20,6 +20,7 @@ from . import _core
 from .portfolio import Portfolio, Position
 from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
 from .replay import replay
+from . import edgar
 from ._core import (  # noqa: F401
     Engine,
     EngineBatch,
@@ -57,7 +58,7 @@ __all__ = [
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "Counterfactual",
     "counterfactual", "Portfolio", "Position", "Agent", "Observation",
-    "Scorecard", "evaluate", "leaderboard", "replay",
+    "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
     "market_status", "model_preset", "run_many", "sectors", "step_mispricing_daily",
@@ -116,6 +117,22 @@ class Universe(list):
         every platform, which is what makes ``random(108, seed=7)`` citable.
         """
         return cls(_core.random_instruments(n, seed=seed))
+
+    @classmethod
+    def from_edgar(cls, snapshot, **kwargs: Any) -> "Universe":
+        """Build a universe from an EDGAR snapshot. Pure and reproducible.
+
+        Takes a :class:`pretium.edgar.Snapshot` or a path to a saved one.
+        Extra keyword arguments are the macro conditions the fair values are
+        computed under, and they must match the macro the engine then runs --
+        otherwise every company starts mispriced by the difference, which is a
+        quiet way to get a universe nobody specified.
+        """
+        from . import edgar as _edgar
+
+        if isinstance(snapshot, str):
+            snapshot = _edgar.Snapshot.load(snapshot)
+        return cls(_edgar.to_instruments(snapshot, **kwargs))
 
     def to_json(self, **kwargs: Any) -> str:
         """Serialise to JSON.
