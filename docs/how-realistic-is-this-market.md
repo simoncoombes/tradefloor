@@ -61,9 +61,9 @@ differ a little.
 ## The eight statistics
 
 Measured on `pt.Universe.random(40, seed=111)` over 252 days, seeds 1 to 6, at
-commit `a57982e`. The median across the six seeds, with the seed-to-seed range
-beside it, because one seed of a fourth moment is noise rather than a model
-property.
+commit `e2aded1`, universe fingerprint `5d8de78b55aad752`. The median across
+the six seeds, with the seed-to-seed range beside it, because one seed of a
+fourth moment is noise rather than a model property.
 
 **Marginal - one series on its own**
 

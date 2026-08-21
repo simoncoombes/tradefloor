@@ -21,7 +21,7 @@ follows it. The one dependence that comes out too strong is return
 autocorrelation, and that is the mispricing process showing through.
 
 Every figure below: `Universe.random(40, seed=111)`, 252 days, median over
-seeds 1 to 6, at commit a57982e.
+seeds 1 to 6, at commit e2aded1.
 
 ## What matches
 
