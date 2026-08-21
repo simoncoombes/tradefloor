@@ -1,6 +1,8 @@
 ---
 title: Real fundamentals from SEC EDGAR
 nav_order: 12
+rack: connect
+short: SEC EDGAR
 ---
 
 # Real fundamentals from SEC EDGAR

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% if page.title and page.title != "Home" %}{{ page.title }} &middot; {% endif %}{{ site.title }}</title>
+<meta name="description" content="{{ page.description | default: site.description }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Public+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ '/assets/css/pretium.css' | relative_url }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23f2d64b'/><rect x='2' y='4' width='12' height='1.4' fill='%231a1a18'/><rect x='2' y='7' width='9' height='1.4' fill='%231a1a18'/><rect x='2' y='10' width='11' height='1.4' fill='%231a1a18'/></svg>">
+</head>
+<body>
+<!--
+THESIS: A market simulator's documentation belongs on the market's own paper -- the
+order ticket -- refusing the dark terminal-and-neon docs theme every dev tool ships.
+OWN-WORLD: Warm form stock, typed Courier Prime for every number and label, Public Sans
+for prose, carbon-copy tints in canary / blue / pink, printed hairline rules, perforated
+tear lines between sections, a rubber stamp for state.
+STORY: A quant or ML researcher sees a filled-in trade ticket, recognises the register
+immediately, finds their own job in the rack, and installs the package.
+FIRST VIEWPORT: A full-width ticket header, ruled and fielded, carrying the product line
+and the install command; the filed rack of section tabs to its left; digest tape beneath.
+FORM: Order tickets and tape, candidate 4 of 7, seed key aef7aa05.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="ticket">
+  <div class="ticket__rule"></div>
+  <div class="ticket__fields">
+    <a class="ticket__mark" href="{{ '/' | relative_url }}">
+      <span class="ticket__mark-name">pretium</span>
+      <span class="ticket__mark-gloss">n. price</span>
+    </a>
+    <dl class="ticket__meta">
+      <div><dt>Form</dt><dd>{{ page.title | default: "Home" }}</dd></div>
+      <div><dt>Sheet</dt><dd>{{ page.nav_order | default: 1 }} of {{ site.pages | where_exp:"p","p.nav_order" | size }}</dd></div>
+      <div><dt>Precision</dt><dd>f64</dd></div>
+      <div><dt>Licence</dt><dd>Apache&#8209;2.0</dd></div>
+    </dl>
+    <a class="ticket__repo" href="https://github.com/simoncoombes/pretium">
+      <svg viewBox="0 0 16 16" aria-hidden="true" width="15" height="15"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38l-.01-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.93-.89-1.18-.89-1.18-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .21.14.46.55.38A8 8 0 0 0 8 0Z"/></svg>
+      <span>Repository</span>
+    </a>
+  </div>
+  <div class="ticket__rule ticket__rule--double"></div>
+</header>
+
+<div class="sheet">
+
+  <nav class="rack" aria-label="Documentation">
+    <a class="rack__home{% if page.title == 'Home' %} is-filed{% endif %}" href="{{ '/' | relative_url }}">Contents</a>
+    {% assign docs = site.pages | where_exp:"p","p.nav_order" | sort:"nav_order" %}
+    {% for rack in site.racks %}
+      {% assign in_rack = docs | where:"rack", rack.id %}
+      {% if in_rack.size > 0 %}
+      <div class="rack__group" data-stock="{{ rack.id }}">
+        <h2 class="rack__label">{{ rack.label }}</h2>
+        <ul>
+          {% for doc in in_rack %}
+          <li>
+            <a href="{{ doc.url | relative_url }}"{% if doc.url == page.url %} aria-current="page" class="is-filed"{% endif %}>
+              <span class="rack__tab" aria-hidden="true"></span>
+              {{ doc.short | default: doc.title }}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </nav>
+
+  <main id="main" class="body{% if page.title == 'Home' %} body--home{% endif %}">
+    {{ content }}
+
+    {% assign docs = site.pages | where_exp:"p","p.nav_order" | sort:"nav_order" %}
+    {% for doc in docs %}
+      {% if doc.url == page.url %}
+        {% assign idx = forloop.index0 %}
+        {% assign prev_i = idx | minus: 1 %}
+        {% assign next_i = idx | plus: 1 %}
+        {% if prev_i >= 0 %}{% assign prev_doc = docs[prev_i] %}{% endif %}
+        {% if next_i < docs.size %}{% assign next_doc = docs[next_i] %}{% endif %}
+      {% endif %}
+    {% endfor %}
+    {% if prev_doc or next_doc %}
+    <nav class="onward" aria-label="Adjacent forms">
+      {% if prev_doc %}<a class="onward__prev" href="{{ prev_doc.url | relative_url }}"><span>Previous</span>{{ prev_doc.title }}</a>{% else %}<span></span>{% endif %}
+      {% if next_doc %}<a class="onward__next" href="{{ next_doc.url | relative_url }}"><span>Next</span>{{ next_doc.title }}</a>{% endif %}
+    </nav>
+    {% endif %}
+  </main>
+
+</div>
+
+<footer class="foot">
+  <div class="tape" aria-hidden="true">
+    <div class="tape__run">
+      {% for i in (1..8) %}<span>112fd73e8e5bc0d6</span><b>&middot;</b>{% endfor %}
+    </div>
+  </div>
+  <p>Five wheel targets, one fixed simulation inside each, digests compared. Any disagreement fails the release.</p>
+  <p class="foot__legal">pretium is pre&#8209;release software, licensed Apache&#8209;2.0. Nothing here is investment advice or a prediction of real returns.</p>
+</footer>
+
+</body>
+</html>

@@ -1,6 +1,8 @@
 ---
 title: Sweeps and parallelism
 nav_order: 10
+rack: experiment
+short: Sweeps and parallelism
 ---
 
 # Sweeps and parallelism

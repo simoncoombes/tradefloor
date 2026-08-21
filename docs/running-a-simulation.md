@@ -1,6 +1,8 @@
 ---
 title: Running a simulation
 nav_order: 3
+rack: start
+short: Running a simulation
 ---
 
 # Running a simulation

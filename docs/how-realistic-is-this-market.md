@@ -1,6 +1,8 @@
 ---
 title: How realistic is this market
 nav_order: 14
+rack: reference
+short: Realism
 ---
 
 # How realistic is this market

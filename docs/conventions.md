@@ -1,6 +1,7 @@
 ---
 title: Conventions
 nav_order: 15
+rack: reference
 ---
 
 # Conventions

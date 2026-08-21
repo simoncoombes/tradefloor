@@ -1,6 +1,7 @@
 ---
 title: Scenarios
 nav_order: 8
+rack: experiment
 ---
 
 # Scenarios

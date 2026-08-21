@@ -1,6 +1,8 @@
 ---
 title: Reinforcement learning
 nav_order: 13
+rack: connect
+short: Reinforcement learning
 ---
 
 # Reinforcement learning

@@ -1,6 +1,7 @@
 ---
 title: Ground truth
 nav_order: 5
+rack: measure
 ---
 
 # Ground truth

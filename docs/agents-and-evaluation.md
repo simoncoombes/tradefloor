@@ -1,6 +1,7 @@
 ---
 title: Agents and evaluation
 nav_order: 6
+rack: measure
 ---
 
 # Agents and evaluation

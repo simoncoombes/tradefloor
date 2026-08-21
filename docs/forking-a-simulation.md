@@ -1,6 +1,8 @@
 ---
 title: Forking a simulation
 nav_order: 9
+rack: experiment
+short: Forking a run
 ---
 
 # Forking a simulation
