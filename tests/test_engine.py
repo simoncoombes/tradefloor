@@ -7,6 +7,7 @@ properties a user depends on — determinism, that the fast path is the same
 simulation as the slow one, and that the columnar contract holds.
 """
 
+import math
 import struct
 
 import pytest
@@ -589,13 +590,54 @@ def test_close_at_end_is_the_same_close_as_calling_it_yourself():
     assert inline.draws_consumed == explicit.draws_consumed
 
 
-def test_run_until_rolls_the_day_from_the_engines_own_noise():
-    # The third path with the same defect. It closes internally too, so it
-    # takes the same correction; checked by running the day to completion and
-    # comparing against the explicit spelling.
+def test_run_until_does_not_close_the_day():
+    """It is the interactive shape: you stop mid-day and look.
+
+    I claimed the opposite when fixing the innovation fallback -- that
+    `run_until` closed internally and so took the same correction. It does
+    not: it passes `close_at_end: false`, so the innovations and sector
+    variances it builds are never read. It was never affected by that bug.
+
+    The test I wrote on that false premise asserted `garch_variance > 0` after
+    a run, which is true before any close and would have passed whatever
+    happened. Replaced with the property that actually distinguishes the two:
+    `run_until` leaves the day OPEN, so its state matches an unclosed session
+    exactly and differs from a closed one on precisely the fields a close
+    rolls.
+    """
     universe = pretium.Universe.random(6, seed=2)
-    engine = pretium.Engine(seed=5, universe=universe)
-    engine.open_market()
-    # A band nothing will cross, so it runs the full tick budget and closes.
-    engine.run_until(ticker=engine.tickers[0], above=1e12, max_ticks=390)
-    assert all(v > 0 for v in arr(engine.column("garch_variance")))
+
+    halted = pretium.Engine(seed=5, universe=universe)
+    halted.open_market()
+    # A band nothing crosses, so it runs the full budget and stops on ticks.
+    assert halted.run_until(ticker=halted.tickers[0], above=1e12,
+                            max_ticks=100) is None
+
+    unclosed = pretium.Engine(seed=5, universe=universe)
+    unclosed.open_market()
+    unclosed.run_session(9, 30, 3, 100)
+
+    closed = pretium.Engine(seed=5, universe=universe)
+    closed.open_market()
+    closed.run_session(9, 30, 3, 100, close_at_end=True)
+
+    def matches(a, b, field):
+        # NaN-aware. `last_daily_return` is NaN until the first close, and
+        # NaN != NaN -- comparing raw lists reported three columns as
+        # differing when nothing did, which is how I nearly filed a bug
+        # against the engine for my own comparator.
+        left, right = arr(a.column(field)), arr(b.column(field))
+        return all(
+            (math.isnan(x) and math.isnan(y)) or x == y
+            for x, y in zip(left, right)
+        )
+
+    for field in ("price", "garch_variance", "mispricing_s",
+                  "mispricing_momentum", "last_daily_return"):
+        assert matches(halted, unclosed, field), field
+
+    # And it is genuinely a different state from a closed day, on exactly the
+    # fields the close rolls.
+    assert not matches(halted, closed, "garch_variance")
+    assert not matches(halted, closed, "mispricing_momentum")
+    assert matches(halted, closed, "price")
