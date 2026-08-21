@@ -493,11 +493,22 @@ def fetch(
     eps = _frame(get, "us-gaap", "EarningsPerShareDiluted", "USD-per-shares",
                  duration)
     equity = _frame(get, "us-gaap", "StockholdersEquity", "USD", instant)
-    shares = _frame(get, "dei", "EntityCommonStockSharesOutstanding", "shares",
+    # BOTH share tags, merged, not one-or-the-other.
+    #
+    # Measured against the live SEC for CY2023: `dei` covers 2,717 filers and
+    # `us-gaap` covers 4,971, overlapping partially. Of the 5,716 filers with
+    # diluted EPS, the dei tag alone reaches 1,966 -- the union reaches 4,733.
+    # Taking dei and only falling back when it came back EMPTY dropped more
+    # than half the usable universe, and it did so invisibly: the result was a
+    # perfectly good smaller universe with no indication that most of the
+    # market had been filtered out for want of a share count.
+    #
+    # dei wins a tie because it is the cover-page figure -- as-of the filing
+    # date rather than the period end, so it is the more current of the two.
+    shares = _frame(get, "us-gaap", "CommonStockSharesOutstanding", "shares",
                     instant)
-    if not shares:
-        shares = _frame(get, "us-gaap", "CommonStockSharesOutstanding",
-                        "shares", instant)
+    shares.update(_frame(get, "dei", "EntityCommonStockSharesOutstanding",
+                         "shares", instant))
 
     revenue_now: dict[int, float] = {}
     revenue_prior: dict[int, float] = {}

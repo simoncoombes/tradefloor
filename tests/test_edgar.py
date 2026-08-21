@@ -704,3 +704,94 @@ def test_stationary_sigma_refuses_nonsense_and_reports_non_stationarity():
     # A unit root has infinite variance. None rather than a large finite
     # number, which would be worse: it would get used.
     assert pretium.stationary_sigma(0.01, phi=1.0, theta=0.0) is None
+
+
+# --------------------------------------------------------------------------
+# Against the real SEC
+# --------------------------------------------------------------------------
+#
+# Opt-in, because a test suite that needs a network is a test suite that fails
+# on a train. Run with PRETIUM_NETWORK_TESTS=1 and a contact address in
+# PRETIUM_SEC_USER_AGENT.
+#
+# Everything above drives `fetch` through an injected transport, which proves
+# the DERIVATION and says nothing about whether the SEC returns the shape it
+# was written against. This is the half that only reality can answer, and it
+# has been answered once by hand -- these record what was found so a change at
+# the SEC surfaces as a failure rather than as an empty universe.
+
+import os
+
+NETWORK = os.environ.get("PRETIUM_NETWORK_TESTS") == "1"
+SEC_UA = os.environ.get("PRETIUM_SEC_USER_AGENT", "")
+
+network = pytest.mark.skipif(
+    not NETWORK or "@" not in SEC_UA,
+    reason="set PRETIUM_NETWORK_TESTS=1 and PRETIUM_SEC_USER_AGENT='Name you@example.org'",
+)
+
+
+@network
+def test_the_frames_api_returns_the_shape_this_was_written_against():
+    from pretium.edgar import _frame, default_transport
+
+    get = default_transport(SEC_UA)
+    eps = _frame(get, "us-gaap", "EarningsPerShareDiluted", "USD-per-shares",
+                 "CY2023")
+    # Verified live: 5,716 filers reported diluted EPS for CY2023. The exact
+    # count moves as companies amend, so this asserts the ORDER of magnitude,
+    # which is what would change if the endpoint or the tag did.
+    assert len(eps) > 3_000
+    assert all(isinstance(k, int) and isinstance(v, float) for k, v in
+               list(eps.items())[:20])
+
+
+@network
+def test_a_missing_frame_really_does_404():
+    # The fallback chain depends on it. Verified live: SalesRevenueNet has no
+    # CY2023 frame and returns 404, which `_frame` turns into an empty dict
+    # rather than an exception -- so the chain moves on instead of dying.
+    from pretium.edgar import _frame, default_transport
+
+    get = default_transport(SEC_UA)
+    assert _frame(get, "us-gaap", "SalesRevenueNet", "USD", "CY2023") == {}
+
+
+@network
+def test_merging_both_share_tags_reaches_far_more_filers():
+    """The defect this found, pinned against the live API.
+
+    Measured on CY2023: `dei` covers 2,717 filers and `us-gaap` 4,971. Of the
+    5,716 with diluted EPS, dei alone reaches 1,966 and the union reaches
+    4,733 -- so taking dei and falling back only when it came back EMPTY
+    dropped more than half the usable universe, invisibly.
+    """
+    from pretium.edgar import _frame, default_transport
+
+    get = default_transport(SEC_UA)
+    dei = _frame(get, "dei", "EntityCommonStockSharesOutstanding", "shares",
+                 "CY2023Q4I")
+    gaap = _frame(get, "us-gaap", "CommonStockSharesOutstanding", "shares",
+                  "CY2023Q4I")
+    assert len(gaap) > len(dei), "us-gaap is the broader tag"
+    assert len(set(dei) | set(gaap)) > len(gaap), "each carries filers the other lacks"
+
+
+@network
+def test_a_real_fetch_builds_a_universe_that_drives_an_engine():
+    snapshot = pretium.edgar.fetch(as_of="2024-06-30", user_agent=SEC_UA,
+                                   limit=20)
+    assert len(snapshot.rows) == 20
+    assert snapshot.notes["candidates"] > 3_000
+    for row in snapshot.rows:
+        assert row["sector"] in pretium.sectors()
+        assert row["shares_outstanding"] > 0
+
+    universe = pretium.Universe.from_edgar(snapshot, federal_funds_rate=0.05,
+                                           corporate_bond_yield=0.055)
+    engine = pretium.Engine(
+        seed=1, universe=universe,
+        macro_state=pretium.Macro(federal_funds_rate=0.05,
+                                  corporate_bond_yield=0.055))
+    engine.run_days(3)
+    assert all(p > 0 for p in arr(engine.prices()))
