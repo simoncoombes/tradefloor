@@ -28,11 +28,20 @@ libm = "0.2.16"
 # `cargo test` leaves off.
 pyo3 = { version = "0.22", features = ["abi3-py311"], optional = true }
 
+# Arrow, for the columnar results surface. OPTIONAL and pulled in only by the
+# `python` feature, deliberately: the WASM consumer needs none of it, and arrow
+# is a large dependency to compile into a browser payload for a surface that
+# build never touches.
+#
+# `ffi` gives the C Data Interface, which is how a record batch reaches polars,
+# pandas, pyarrow and duckdb without this crate depending on any of them.
+arrow = { version = "53", default-features = false, features = ["ffi"], optional = true }
+
 [features]
 # abi3-py311: one wheel per platform covers CPython 3.11 and every later
 # version. The floor is 3.11 rather than WP7's "CPython 3.9+" sketch, which
 # is stale -- 3.9 is past EOL and SPEC 0 has dropped 3.10.
-python = ["dep:pyo3", "pyo3/extension-module"]
+python = ["dep:pyo3", "pyo3/extension-module", "dep:arrow"]
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }

@@ -57,4 +57,8 @@ mod python_book;
 #[cfg(feature = "python")]
 mod python_engine;
 
+/// Arrow record batches for the results surface.
+#[cfg(feature = "python")]
+mod python_arrow;
+
 pub use rng::{to_uint32, GameRng, Pcg32};

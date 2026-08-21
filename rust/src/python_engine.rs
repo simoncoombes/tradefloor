@@ -971,6 +971,58 @@ impl PyEngine {
         Ok(f64_bytes(py, &self.inner.attribution_column(index)))
     }
 
+    /// The last session's `bars` table, as an Arrow stream.
+    ///
+    /// One row per (tick, instrument): day, tick, instrument_id, close,
+    /// volume. Consume it with `polars.from_arrow`, `pyarrow.table` or duckdb
+    /// -- all of which read the C stream zero-copy, and none of which this
+    /// package depends on.
+    ///
+    /// `instrument_id` is an index into `tickers`, not a repeated string. At
+    /// the row counts this table reaches, that difference is the difference
+    /// between a column and a memory problem.
+    #[pyo3(signature = (*, day = 0))]
+    fn bars(&self, day: u32) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let ticks = self.buffer.ticks_written;
+        let n = self.buffer.companies;
+        let batch = crate::python_arrow::bars_batch(
+            day,
+            ticks,
+            n,
+            self.written(&self.buffer.prices),
+            self.written(&self.buffer.volumes),
+        )
+        .map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "bars",
+            crate::python_arrow::bars_schema(),
+            vec![batch],
+        ))
+    }
+
+    /// The last session's `truth` table, as an Arrow stream.
+    ///
+    /// The labelled-dataset output: the log deviation from fair value that
+    /// produced each print. No historical dataset carries this column, because
+    /// no historical dataset knows what fair value was.
+    #[pyo3(signature = (*, day = 0))]
+    fn truth(&self, day: u32) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let ticks = self.buffer.ticks_written;
+        let n = self.buffer.companies;
+        let batch = crate::python_arrow::truth_batch(
+            day,
+            ticks,
+            n,
+            self.written(&self.buffer.mispricing_s),
+        )
+        .map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "truth",
+            crate::python_arrow::truth_schema(),
+            vec![batch],
+        ))
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "Engine({} instruments, draws={})",
