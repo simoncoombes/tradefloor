@@ -342,8 +342,25 @@ Every numeric column is `f64`. There is no `f32` option and there will not be
 one: bit-exactness is the product, and a half-precision copy would be a
 different market that happens to plot the same.
 
-Results stream as one batch per day, so a hundred-seed sweep at tick grain
-does not have to fit in memory.
+Results stream as one batch per day, and `sweep` streams them per seed too, so
+a hundred-seed study at tick grain never has to fit in memory:
+
+```python
+for seed, table in pt.sweep(range(100), universe=universe, days=252,
+                            collect="truth"):
+    results.append(pl.from_arrow(table).select(...).mean())
+```
+
+The arithmetic that motivates it: one recorded engine at 252 days, 390 ticks
+and 100 instruments retains twelve buffers of 9.8 million f64 — about 940 MB —
+and materialises 9.8 million rows of ground truth. A hundred of those at once
+is roughly ninety gigabytes; one at a time is under one, and the analysis is
+usually a reduction that never needed them resident.
+
+Laziness is the feature, so `list(sweep(...))` puts the memory straight back.
+`workers=n` keeps n engines alive and is an explicit trade, not a free
+speedup — which is why the default is one. Seeds always arrive in seed order,
+never completion order.
 
 ## Reproducing a run
 
