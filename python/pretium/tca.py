@@ -294,7 +294,8 @@ def analyse(
             prices = _f64(engine.prices())
             actual_path.append(prices)
             portfolio.stamp(day, step)
-            obs = Observation(step, day, tickers, prices, portfolio, engine, adv)
+            obs = Observation(step, day, tickers, prices, portfolio, engine,
+                              adv, steps_per_day)
             for ticker, quantity in (agent.act(obs) or {}).items():
                 if not quantity:
                     continue

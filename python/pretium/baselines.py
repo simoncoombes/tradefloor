@@ -190,14 +190,46 @@ class RandomTrader:
 
 
 class _Trend:
-    """Shared machinery for the two price-history baselines."""
+    """Shared machinery for the two price-history baselines.
+
+    ## `lookback` is in STEPS, not days
+
+    The agent sees one observation per decision step, so a lookback of six is
+    six steps. It equals one day only when ``steps_per_day`` is six, which is
+    the harness default -- so the default agent is a one-day trader by a
+    coincidence of two defaults matching, not by contract. Change
+    ``steps_per_day`` and the same number means a different horizon.
+
+    Pass ``lookback_days`` instead to say what you mean. It is converted using
+    ``obs.steps_per_day`` on the first observation, so it holds whatever the
+    harness is configured to do.
+
+    ## Rebalancing more often costs more than the signal is worth
+
+    Measured on seed 2026, 40 instruments, 30 days, holding the horizon at
+    exactly one day and varying only how often the agent rebalances:
+
+        3 steps/day, lookback 3    +88.72%
+        6 steps/day, lookback 6    +30.89%
+       12 steps/day, lookback 12   -13.18%
+
+    The same signal over the same horizon, turned from strongly profitable to
+    loss-making by trading four times as often. Nothing charges a fee: the
+    orders simply cross a real spread and consume real depth more times. This
+    is the impact model making "trade more" unprofitable on its own, which is
+    the same mechanism that makes "trade bigger" unprofitable.
+    """
 
     sign = 1.0
 
     def __init__(self, *, lookback: int = 6, top_k: int = 5, gross: float = 1.0,
-                 max_participation: float = 0.02):
+                 max_participation: float = 0.02,
+                 lookback_days: float | None = None):
         if lookback < 1:
             raise ValueError("lookback must be >= 1")
+        if lookback_days is not None and lookback_days <= 0:
+            raise ValueError("lookback_days must be positive")
+        self.lookback_days = lookback_days
         self.lookback = int(lookback)
         self.top_k = int(top_k)
         self.gross = float(gross)
@@ -205,6 +237,14 @@ class _Trend:
         self._history: list[list[float]] = []
 
     def act(self, obs: Observation) -> dict[str, float]:
+        if self.lookback_days is not None:
+            # Resolved from the observation rather than at construction,
+            # because the agent does not know the harness's cadence until it
+            # is handed one. Rounded up: a lookback of zero steps would
+            # compare a price with itself and trade on nothing.
+            steps = self.lookback_days * getattr(obs, "steps_per_day", 1)
+            self.lookback = max(1, int(round(steps)))
+            self.lookback_days = None
         self._history.append(list(obs.prices))
         if len(self._history) <= self.lookback:
             # No signal yet. Holding cash is the honest answer; guessing would

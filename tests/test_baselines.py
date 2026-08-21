@@ -298,3 +298,93 @@ def test_capture_ratio_declines_to_answer_when_the_oracle_lost_money():
 
     assert capture_ratio({"oracle": Card(-1.0), "a": Card(-2.0)}) == {}
     assert capture_ratio({"a": Card(1.0)}) == {}
+
+
+# --------------------------------------------------------------------------
+# Horizons, cadence, and the cost of trading often
+# --------------------------------------------------------------------------
+
+
+def test_lookback_is_counted_in_steps_not_days():
+    # The agent sees one observation per decision step, so six is six STEPS.
+    # It equals a day only when steps_per_day is six -- which is the harness
+    # default, so the default agent is a one-day trader by two defaults
+    # happening to match rather than by contract.
+    agent = Momentum(lookback=3)
+    engine = pretium.Engine(seed=1, universe=SMALL)
+    portfolio = pretium.Portfolio()
+    prices = list(struct.unpack("<%dd" % len(SMALL), engine.prices()))
+    adv = [i.avg_volume for i in SMALL]
+    for step in range(3):
+        assert agent.act(Observation(step, 0, list(engine.tickers), prices,
+                                     portfolio, engine, adv, 6)) == {}
+    # The fourth observation completes three steps of history, regardless of
+    # how many days that is.
+    agent.act(Observation(3, 0, list(engine.tickers), prices, portfolio,
+                          engine, adv, 6))
+
+
+def test_lookback_days_holds_a_horizon_across_cadences():
+    """Say what you mean, and it survives a change to steps_per_day.
+
+    Resolved from the observation rather than at construction, because the
+    agent cannot know the harness's cadence until it is handed one.
+    """
+    for steps_per_day, expected in ((3, 3), (6, 6), (12, 12)):
+        agent = Momentum(lookback_days=1.0)
+        engine = pretium.Engine(seed=1, universe=SMALL)
+        portfolio = pretium.Portfolio()
+        prices = list(struct.unpack("<%dd" % len(SMALL), engine.prices()))
+        adv = [i.avg_volume for i in SMALL]
+        agent.act(Observation(0, 0, list(engine.tickers), prices, portfolio,
+                              engine, adv, steps_per_day))
+        assert agent.lookback == expected
+
+
+def test_trading_more_often_loses_money_on_the_same_signal():
+    """The impact model making "trade more" unprofitable, on its own.
+
+    Horizon held at exactly one day; only the rebalance frequency changes.
+    Measured on seed 2026, 40 instruments, 30 days:
+
+        3 steps/day   +88.72%
+        6 steps/day   +30.89%
+       12 steps/day   -13.18%
+
+    Nothing charges a fee. The orders simply cross a real spread and consume
+    real depth four times as often. This is the same mechanism that makes
+    "trade bigger" unprofitable, and it is why an agent cannot win here by
+    turning the dial up.
+    """
+    returns = []
+    for steps_per_day in (3, 6, 12):
+        scores = pretium.evaluate(
+            {"m": Momentum(lookback_days=1.0)}, seed=2026, universe=UNIVERSE,
+            days=30, steps_per_day=steps_per_day,
+            ticks_per_step=390 // steps_per_day)
+        returns.append(scores["m"].return_pct)
+    assert returns[0] > returns[1] > returns[2]
+    assert returns[0] > 50.0
+    assert returns[2] < 0.0
+
+
+def test_the_observation_carries_the_cadence():
+    # Without it, "a one-day lookback" is unwriteable except by hard-coding
+    # the harness default and hoping nobody changes it.
+    seen = []
+
+    class Probe:
+        def act(self, obs):
+            seen.append(obs.steps_per_day)
+            return {}
+
+    pretium.evaluate({"p": Probe()}, seed=1, universe=SMALL, days=2,
+                     steps_per_day=4, ticks_per_step=20)
+    assert set(seen) == {4}
+
+
+def test_a_nonsense_lookback_days_is_refused():
+    with pytest.raises(ValueError, match="lookback_days"):
+        Momentum(lookback_days=0.0)
+    with pytest.raises(ValueError, match="lookback_days"):
+        MeanReversion(lookback_days=-1.0)

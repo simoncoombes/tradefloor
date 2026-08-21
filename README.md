@@ -64,6 +64,18 @@ price-time priority, so a large order pays worse prices because it *consumed
 levels*, not because a slippage coefficient said large orders cost more.
 Displayed depth is executable depth.
 
+Which means an agent cannot win by turning a dial up. Holding the signal and
+the horizon fixed at one day and changing only how often it rebalances:
+
+| rebalances per day | return |
+|---|---|
+| 3 | +88.7% |
+| 6 | +30.9% |
+| 12 | −13.2% |
+
+Nothing charges a fee. The orders simply cross a real spread and consume real
+depth four times as often.
+
 **Counterfactuals exist.** Run the same seed with and without your own orders
 and measure exactly what your trading cost. In a real market you observe the
 price you got and can never observe the price you would have got had you not

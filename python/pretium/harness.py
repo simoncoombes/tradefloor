@@ -77,11 +77,17 @@ class Observation:
     """
 
     __slots__ = ("step", "day", "tickers", "prices", "portfolio", "engine",
-                 "_adv")
+                 "_adv", "steps_per_day")
 
-    def __init__(self, step, day, tickers, prices, portfolio, engine, adv):
+    def __init__(self, step, day, tickers, prices, portfolio, engine, adv,
+                 steps_per_day=1):
         self.step = step
         self.day = day
+        # Exposed because an agent reasoning about a HORIZON needs it and
+        # cannot infer it: at step zero there is nothing to infer it from.
+        # Without this, "a one-day lookback" is unwriteable except by
+        # hard-coding the harness's default and hoping it is not changed.
+        self.steps_per_day = steps_per_day
         self.tickers = tickers
         self.prices = prices
         self.portfolio = portfolio
@@ -279,7 +285,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         engine.open_market()
         for _ in range(steps_per_day):
             obs = Observation(step, day, tickers, _f64(engine.prices()),
-                              portfolio, engine, adv)
+                              portfolio, engine, adv, steps_per_day)
             portfolio.stamp(day, step)
             try:
                 orders = agent.act(obs) or {}
