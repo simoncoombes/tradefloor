@@ -80,16 +80,19 @@ What does move. Mean quoted spread across 25 instruments after five days:
     VIX 45    20.05 bps
     VIX 65    28.41 bps
 
-And mean pairwise correlation of daily log returns, 25 names over 120 days,
-300 pairs: +0.022 at VIX 15, +0.023 at VIX 45, +0.041 at VIX 65. The
-correlation channel does fire above 40, but it moves a number that starts near
-zero, for the reason set out in the realism documentation.
+The correlation channel is weaker still. Mean pairwise correlation of daily
+log returns, 25 names over 120 days, 300 pairs: +0.022 at VIX 15, +0.023 at
+VIX 45, +0.041 at VIX 65. It fires above 40, but it blends SECTOR factors,
+whose sigma is 0.002, against per-stock GARCH noise running 0.008 to 0.025. So
+the feature is correct in construction and close to invisible in output, and
+diversification keeps working at VIX 65. The realism documentation has the
+arithmetic.
 
-So a VIX path answers what an execution algorithm does when spreads widen, and
-what a diversified book does when correlations rise. It does not answer what
-happens when volatility triples. Nothing in this model raises realised
-volatility, and that limitation is stated here rather than left for a user to
-discover after publishing.
+**The bid-ask is the channel that genuinely moves.** In practice this is a
+liquidity and spread stress variable. It does not answer what happens when
+volatility triples: nothing in this model raises realised volatility, and that
+limitation is stated here rather than left for a user to discover after
+publishing.
 
 ## A macro counterfactual is near-exact, not exact — and that is worth knowing
 
@@ -309,22 +312,22 @@ class Scenario:
     @classmethod
     def vix_shock(cls, *, calm: float = 15.0, peak: float = 45.0,
                   at: int = 10, over: int = 20) -> "Scenario":
-        """A VIX spike that decays back: wider spreads, higher correlation.
+        """A VIX spike that decays back. Mostly, a spread widening.
 
         Up as a step, down as a ramp, because that is the shape a stress
         episode has: it arrives at once and subsides slowly.
 
         **This does not raise realised volatility.** VIX has no term in the
-        variance process here, so a spike widens the quoted bid-ask and, above
-        VIX 40, pulls idiosyncratic returns toward the market factor. Measured
-        on 20 instruments over 120 days, seed 3: taking the peak from 45 to 80
-        moves annualised realised volatility from 58.01% to 58.36%, against a
-        no-scenario baseline of 58.05%. This module's docstring sets out the
-        three channels and what each one is worth.
+        variance process here. What a spike does is widen the quoted bid-ask,
+        and above VIX 40 pull idiosyncratic returns a little toward the market
+        factor. Measured on 20 instruments over 120 days, seed 3: taking the
+        peak from 45 to 80 moves annualised realised volatility from 58.01% to
+        58.36%, against a no-scenario baseline of 58.05%. This module's
+        docstring sets out the three channels and what each one is worth.
 
-        Use it for a liquidity or correlation stress. No lever in this model
-        raises realised volatility, and this one was renamed because its old
-        name claimed otherwise.
+        Use it for a liquidity and spread stress. No lever in this model raises
+        realised volatility, and this one was renamed because its old name
+        claimed otherwise.
         """
         def driver(day: int) -> float:
             if day < at:

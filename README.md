@@ -175,8 +175,10 @@ under honest impact costs. Read the failures, not the P&L.
 **Momentum works here for the wrong reason.** Measured return autocorrelation
 is +0.219 at lag one where real equities sit near zero. That's the mispricing
 process showing through, and an agent trading it has an edge that won't
-transfer. `pt.facts.measure()` reports this and three other statistics against
-real ranges, including the ones that match.
+transfer. `pt.facts.measure()` reports this and seven other statistics against
+real ranges, including the ones that match. Four are marginal properties of a
+single series and four are measures of dependence - how things move together,
+across names and across time.
 
 **Single venue, no latency, no strategic counterparties.** Orders arrive
 instantly, there's one book per name, and you trade against a market maker and
@@ -185,8 +187,8 @@ aggregate flow rather than agents that adapt to you.
 **There's no volatility knob.** VIX looks like one and isn't: it has no term
 in the variance process. Measured, a thirteenfold move in VIX changes
 annualised realised volatility by under one point, and below VIX 15 it changes
-nothing at all. What it moves is the quoted spread, and above VIX 40
-cross-sectional correlation. Use it to stress liquidity.
+nothing at all. What it moves is the quoted spread, and above VIX 40 a small
+lift in cross-sectional correlation. Use it to stress liquidity.
 [Scenarios](https://simoncoombes.github.io/pretium/scenarios.html) has the
 numbers.
 

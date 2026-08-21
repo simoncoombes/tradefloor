@@ -55,21 +55,25 @@ Below VIX 15 it changes nothing at all: VIX 5, 10 and 15 produce bit-identical
 prices over 60 days, because the spread multiplier floors at 1.0 and the
 correlation blend has not started.
 
-Here VIX is a **liquidity and correlation** variable. Three channels:
+Here VIX is a **liquidity and spread** variable. Three channels:
 
 1. **Quoted bid-ask**, through a multiplier `1 + max(0, (vix - 15) / 30)`.
    Mean quoted spread across 25 instruments after five days: 12.17 bps at VIX
-   15, 14.72 at 25, 20.05 at 45, 28.41 at 65.
-2. **Cross-sectional correlation above VIX 40**, where idiosyncratic sector
-   factors blend toward the market factor. Mean pairwise correlation of daily
-   log returns over 300 pairs: +0.022 at VIX 15, +0.023 at 45, +0.041 at 65.
-   The channel fires, but it moves a number that starts near zero.
+   15, 14.72 at 25, 20.05 at 45, 28.41 at 65. This is the channel that
+   genuinely moves.
+2. **Cross-sectional correlation above VIX 40**, where sector factors blend
+   toward the market factor. Mean pairwise correlation of daily log returns
+   over 300 pairs: +0.022 at VIX 15, +0.023 at 45, +0.041 at 65. The blend is
+   correct in construction and close to invisible in output, because it acts
+   on sector factors with sigma 0.002 against per-stock noise running 0.008 to
+   0.025. Diversification keeps working at VIX 65. See
+   [How realistic is this market](how-realistic-is-this-market.html).
 3. **Credit spreads** in the daily economy step, which is not reachable from
    Python in this release. See [Core concepts](core-concepts.html).
 
-So use a VIX path to ask what an execution algorithm does when spreads widen,
-or what a diversified book does when correlations rise. Do not use it to ask
-what happens when volatility triples. Nothing in this model raises realised
+So use a VIX path to ask what an execution algorithm does when spreads widen.
+Do not use it to ask what happens when volatility triples, and do not expect
+much from the correlation channel. Nothing in this model raises realised
 volatility, and that limitation is stated rather than papered over.
 
 ## Scenarios reach every entry point
