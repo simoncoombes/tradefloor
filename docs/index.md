@@ -41,8 +41,8 @@ instruments in index order and draws random numbers as it goes, so a re-sorted
 universe produces a different market from the same seed. Sorting your tickers
 alphabetically upstream will silently give you a different world.
 
-Use `universe.fingerprint` — a sha256 over the roster's canonical form,
-including order — whenever you need to ask whether two universes are the same
+Use `universe.fingerprint` - a sha256 over the roster's canonical form,
+including order - whenever you need to ask whether two universes are the same
 one. Tickers are generated positionally, so `Universe.random(40, seed=1)` and
 `Universe.random(40, seed=99)` share every name and no fundamentals.
 
@@ -60,7 +60,7 @@ pt.Universe.from_edgar(snapshot)                 # real SEC fundamentals
 
 ### Macro
 
-The macro chain runs endogenously by default — a Taylor rule feeding off
+The macro chain runs endogenously by default - a Taylor rule feeding off
 Phillips and Okun relationships over a cycle. You set initial conditions and it
 evolves. To drive a series yourself, see [Scenarios](#scenarios).
 
@@ -143,8 +143,8 @@ known-answer tests and the cross-platform release gate hash these buffers, and
 a half-precision copy would be a different market that happens to plot the
 same.
 
-Results stream one batch per day. Grain is a read-time decision — the raw
-buffers are kept and Arrow batches are built on read — which is why recording
+Results stream one batch per day. Grain is a read-time decision - the raw
+buffers are kept and Arrow batches are built on read - which is why recording
 ground truth costs about 3% rather than doubling the run.
 
 ---
@@ -153,10 +153,10 @@ ground truth costs about 3% rather than doubling the run.
 
 `truth` carries one row per instrument per tick:
 
-- `fundamental_value` — what the company is worth on its fundamentals
-- `anchor_price` — what the model wanted before the book touched it
-- `mispricing_s` — log deviation of price from fair value
-- seven factor columns — mean reversion, momentum, crowd, news, order flow,
+- `fundamental_value` - what the company is worth on its fundamentals
+- `anchor_price` - what the model wanted before the book touched it
+- `mispricing_s` - log deviation of price from fair value
+- seven factor columns - mean reversion, momentum, crowd, news, order flow,
   short squeeze, noise
 
 Keep the three price levels apart. Conflating them ruins the join.
@@ -182,7 +182,7 @@ you cannot observe that 60% of the fall was order flow, because nobody knows.
 ## Agents and evaluation
 
 An agent sees prices, the order book and its own positions. It does not see
-fair value, mispricing or the attribution — inferring those is the task, and
+fair value, mispricing or the attribution - inferring those is the task, and
 they are used for scoring on the other side of the wall.
 
 ```python
@@ -212,7 +212,7 @@ be asked, because answering it means observing fair value.
 
 Treat it as a reference point rather than a ceiling. It gets the same gross
 exposure and participation cap as everything else and spends them on a naive
-rule — equal weight across the ten most mispriced names. Over 384 agent-seed
+rule - equal weight across the ten most mispriced names. Over 384 agent-seed
 pairs, agents beat it 9.9% of the time:
 
 | agent | beats the Oracle |
@@ -251,7 +251,7 @@ ranking.separation("momentum", "buy_and_hold")     # 12-0, p = 0.00049
 
 That 2:1 aggregate gap does not establish momentum is better. Paired across the
 same twelve markets it wins six and loses six. It wins by more, not more often,
-and no average of returns separates those two cases — hence the paired sign
+and no average of returns separates those two cases - hence the paired sign
 test alongside the number.
 
 `rank` takes a factory rather than built agents, because agents are stateful
@@ -288,7 +288,7 @@ Two results to understand before reading a number:
 +16.7 bps in one measured example; buying and selling three steps later comes
 to −10.8 bps. The entry pushed the price up, part of that persisted, and the
 exit sold into it. Shortfall answers what each execution cost, not whether the
-strategy made money — read `pnl` from `evaluate` for that. `by_step()` shows
+strategy made money - read `pnl` from `evaluate` for that. `by_step()` shows
 entry and exit separately rather than netting them.
 
 **Check `partial_fills()` before believing a low cost.** A request for 4,856
@@ -308,7 +308,7 @@ shock = pt.Scenario.rate_shock(start=0.025, end=0.05, over=15)
 pt.evaluate(agents, seed=7, universe=universe, days=20, scenario=shock)
 ```
 
-Measured on seed 7 — same market, same agents, only the macro path differs:
+Measured on seed 7 - same market, same agents, only the macro path differs:
 
 | agent | calm | hiked | delta |
 |---|---|---|---|
@@ -320,7 +320,7 @@ Buy-and-hold is long-only and holds through the repricing. Momentum gains
 because it can rotate. The Oracle is untouched because it trades mispricing,
 and the shock moves fair value along with price.
 
-**One trap.** Pinning `federal_funds_rate` alone does nothing — measured at
+**One trap.** Pinning `federal_funds_rate` alone does nothing - measured at
 exactly 0.00% across twenty instruments. Equities discount off the corporate
 bond yield, and the policy rate only applies as a fallback when no yield is
 present. `rate_shock` moves the whole curve; `ramp` isolates a single lever
@@ -367,14 +367,14 @@ Two mechanisms for different jobs:
 | `pt.branch(engine, 2, ...)` | < 1 ms | no |
 | `Checkpoint.resume()` | 2.7 s | yes |
 
-`branch` copies engine state — every column plus the generator position — in
+`branch` copies engine state - every column plus the generator position - in
 constant time. `Checkpoint` replays the order log, three orders of magnitude
 slower, and is what you want when the fork has to outlive the process. Cite the
 log in a published result, since that is what someone else can re-run.
 
 A `Checkpoint` records the universe fingerprint and refuses to load against a
 roster that changed, because restoring across two same-named universes gives
-right prices and wrong fair values — plausible everywhere visible, wrong in the
+right prices and wrong fair values - plausible everywhere visible, wrong in the
 one place that drives everything.
 
 The low-level `restore_state` cannot make that check, since an engine holds no
@@ -392,7 +392,7 @@ for seed, table in pt.sweep(range(100), universe=universe, days=252,
 ```
 
 `sweep` streams one seed at a time. One recorded engine at 252 days, 390 ticks
-and 100 instruments retains twelve buffers of 9.8 million f64 — about 940 MB —
+and 100 instruments retains twelve buffers of 9.8 million f64 - about 940 MB -
 and materialises 9.8 million rows of ground truth. A hundred of those at once
 is roughly 90 GB; one at a time is under one, and the analysis is usually a
 reduction that never needed them resident.
@@ -423,9 +423,9 @@ same = pt.replay(log, seed=42, universe=universe)
 That makes a published result replayable without the code that produced it, a
 divergence bisectable, and an experiment archivable as data.
 
-Every result object carries the universe fingerprint alongside the seed —
+Every result object carries the universe fingerprint alongside the seed -
 `Scorecard.universe_fingerprint`, `facts.measure()["universe_fingerprint"]`,
-`Execution.universe_fingerprint` — because the same seed over a different
+`Execution.universe_fingerprint` - because the same seed over a different
 roster is a different market.
 
 ---
@@ -440,8 +440,8 @@ snap.save("edgar-2024h1.json")            # the artifact, hashed and citable
 universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)
 ```
 
-Seeding from filings gives you a cross-section that is real — true valuation
-dispersion, actual sector weights, loss-makers in realistic proportion — while
+Seeding from filings gives you a cross-section that is real - true valuation
+dispersion, actual sector weights, loss-makers in realistic proportion - while
 every price path stays synthetic.
 
 Save the snapshot and cite that, not the query. EDGAR is not append-only, so
@@ -460,7 +460,7 @@ Ranking is by shareholders' equity, because EDGAR carries no market
 capitalisation, so the universe skews toward balance-sheet-heavy names.
 
 This loads fundamentals, not behaviour. A loaded ticker gives you a stock with
-that company's fundamentals under this model's assumptions — not that company,
+that company's fundamentals under this model's assumptions - not that company,
 not its volatility, not its microstructure.
 
 ---
@@ -517,7 +517,7 @@ by day two before reverting, so a shock today is amplified tomorrow.
 > their ranking here says very little about which is better anywhere else.
 
 Both mismatches were investigated. The autocorrelation can be corrected by one
-constant — `MOMENTUM_THETA` from 0.25 to 0.05 takes it to +0.034, inside the
+constant - `MOMENTUM_THETA` from 0.25 to 0.05 takes it to +0.034, inside the
 real band, with volatility and kurtosis unchanged. It also fails seven parity
 tests, including the one asserting the model constants match the reference
 implementation this library is a port of. Changing that constant makes this a
@@ -528,8 +528,8 @@ raising the variance ceiling lifts clustering by 0.016 while pushing volatility
 from 52.7% to 72%.
 
 Volatility runs high because a generated universe is deliberately dispersed and
-skews small. Prefer ratios — capture against the Oracle, shortfall in basis
-points — over raw percentages.
+skews small. Prefer ratios - capture against the Oracle, shortfall in basis
+points - over raw percentages.
 
 Re-measure after changing the preset, the generator or the scenario.
 
@@ -542,7 +542,7 @@ error that says so.
 
 **Absence differs from zero.** `corporate_bond_yield=None` falls through to the
 policy rate; `0.0` is a real observation used as given. In columnar reads, where
-a column cannot carry `None`, absence is `NaN`, never zero — zero is a real
+a column cannot carry `None`, absence is `NaN`, never zero - zero is a real
 maker inventory, a real mispricing and a real return.
 
 **Invalid input raises.** `ValidationError` for a malformed scenario,
@@ -554,7 +554,7 @@ without them is not realistic.
 
 **Short interest is a share count, not a fraction.** The squeeze rule divides it
 by the float, so `short_interest=0.03` means three hundredths of one share.
-`Universe.random` generates a realistic spread — median about 3.7% of shares
+`Universe.random` generates a realistic spread - median about 3.7% of shares
 outstanding, with roughly one name in eleven above the 20% squeeze threshold.
 
 **Roster order is contractual.** A re-sorted universe is a different market.

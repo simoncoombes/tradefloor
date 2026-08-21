@@ -2,15 +2,15 @@
 
 A market simulator you can run a strategy against. Rust core, Python API.
 
-Give it a seed and a set of companies. It runs a market forward — prices, a
-limit order book, fills, macro state — and your orders match against real
+Give it a seed and a set of companies. It runs a market forward - prices, a
+limit order book, fills, macro state - and your orders match against real
 depth, so trading moves the price the way it would anywhere else.
 
 Two things you can do here that historical data will never let you do: run the
 same market twice with different decisions, and read the true value of every
 stock while you trade it.
 
-It's built to show you what breaks a strategy — bad sizing, execution cost, a
+It's built to show you what breaks a strategy - bad sizing, execution cost, a
 rate shock it can't survive. It won't tell you what one earns, and
 [the last section](#what-it-is-bad-at) explains why.
 
@@ -63,7 +63,7 @@ own footprint.
 
 ### You're building an execution algorithm
 
-TWAP, VWAP, POV, icebergs — the work is all in what happens between the
+TWAP, VWAP, POV, icebergs - the work is all in what happens between the
 decision and the fill, which is exactly what a replayed tape can't show you.
 
 You get queue position, partial fills, and a spread that widens under stress.
@@ -102,7 +102,7 @@ ranking.separation("momentum", "mean_reversion")   # 6-6, p = 1.0
 
 Use it to kill strategies rather than to bless them. Something that dies under
 a rate shock, or whose edge evaporates once impact is charged honestly, is
-genuinely dead — and you learned it for the price of some CPU.
+genuinely dead - and you learned it for the price of some CPU.
 
 ### You're testing a model that claims to explain markets
 
@@ -169,7 +169,7 @@ about 3.3x on eight cores.
 **Good results here don't predict real returns.** The price process comes from
 a known model, so a strategy that happens to fit that model's structure will
 look brilliant and teach you nothing about real markets. A strategy that
-*fails* here has still told you something — it broke against a live order book
+*fails* here has still told you something - it broke against a live order book
 under honest impact costs. Read the failures, not the P&L.
 
 **Momentum works here for the wrong reason.** Measured return autocorrelation
