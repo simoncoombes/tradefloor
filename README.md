@@ -255,6 +255,31 @@ Coefficients ship as a named, versioned preset (`pt-v1`) rather than as
 constructor keywords, so two published results can be compared.
 `model_preset()` returns it.
 
+## How fast
+
+Measured, on one desktop machine — treat the ratios as portable and the
+absolute numbers as a rough guide.
+
+| run | wall clock |
+|---|---|
+| 252 days x 10 instruments | 2.9s |
+| 252 days x 100 instruments | 27.4s |
+| 252 days x 100, recording 9.8M rows of ground truth | 28.2s |
+| 8 seeds x 21 days x 100, serial | 20.0s |
+| 8 seeds x 21 days x 100, 8 workers | 6.1s |
+
+Two things worth knowing from that table. **Recording is roughly free** — 3%
+for a full year of tick-grain ground truth, because the raw buffers are kept
+and the Arrow batches are built on read, so grain stays a read-time decision.
+And **sweeps parallelise about 3.3x on eight cores**, because the engine
+releases the GIL for the whole session compute; `run_many` uses threads, so it
+works in a notebook and does not serialise the universe into each worker.
+
+Cost scales roughly linearly in instruments x days. Parallelism is per seed
+and only per seed: the engine has one shared RNG stream across the market, the
+economy and the microstructure, so there is no decomposition *within* a run
+that preserves the draw schedule.
+
 ## A worked example
 
 `examples/research_workflow.py` runs the whole thing end to end in about ten

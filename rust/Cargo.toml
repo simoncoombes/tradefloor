@@ -1,6 +1,6 @@
 [package]
 name = "pretium"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
 description = "Deterministic market simulation with a real limit order book."
 license = "Apache-2.0"
