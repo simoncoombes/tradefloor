@@ -57,7 +57,12 @@ def test_the_oracle_sets_the_ceiling(scores):
 
 def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     ranked = [card.name for card in pretium.leaderboard(scores)]
-    assert ranked == ["oracle", "momentum", "mean_reversion", "buy_and_hold",
+    # The top and bottom are the robust part; the middle two are separated by
+    # under half a percentage point and have swapped places twice now under
+    # model changes that left everything else intact. Pinned as a full order
+    # anyway, because a leaderboard IS an ordering -- but if this fails on a
+    # deliberate change, re-measure rather than assuming a regression.
+    assert ranked == ["oracle", "momentum", "buy_and_hold", "mean_reversion",
                       "random"]
 
 

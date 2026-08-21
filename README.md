@@ -170,17 +170,17 @@ real equities. The mismatches are the point, and they are not tuned away:
 
 | statistic | measured | real equities | |
 |---|---|---|---|
-| excess kurtosis | **+4.8** | +3 to +10 | matches |
-| \|return\| acf(1) | +0.12 | +0.15 to +0.35 | too weak |
-| return acf(1) | **+0.229** | −0.05 to +0.05 | **too high** |
-| annualised vol | 54% | 15% to 35% | too high |
+| excess kurtosis | **+5.9** | +3 to +10 | matches |
+| \|return\| acf(1) | +0.10 | +0.15 to +0.35 | too weak |
+| return acf(1) | **+0.219** | −0.05 to +0.05 | **too high** |
+| annualised vol | 53% | 15% to 35% | too high |
 
 Fat tails are right — the single most robust fact about asset returns, and the
 one a Gaussian simulator gets wrong. Volatility clusters, but about half as
 strongly as reality and it fades faster.
 
-**Returns are positively autocorrelated and real ones are not.** +0.229 at lag
-one, in six seeds of six, ranging only +0.216 to +0.266. That is the AR(2)
+**Returns are positively autocorrelated and real ones are not.** +0.219 at lag
+one, in six seeds of six, ranging only +0.203 to +0.262. That is the AR(2)
 mispricing process showing through: its impulse response *rises* to 1.284 by
 day two before reverting, so a shock today is amplified tomorrow. Two
 independent measurements of one mechanism — the process's own impulse response,

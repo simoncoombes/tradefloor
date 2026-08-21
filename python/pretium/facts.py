@@ -25,8 +25,21 @@ process is there to produce.
 
 **Volatility clustering is too weak and decays too fast.** Real markets show
 0.2–0.3 at lag one with a slow, near-hyperbolic decay that persists for months.
-Here it is roughly half that and largely gone by lag twenty. A strategy whose
+Here it is about **+0.10** and largely gone by lag twenty. A strategy whose
 edge is volatility forecasting will look worse here than it should.
+
+Worth recording because it was tested: the GARCH process was being fed the
+day's TOTAL RETURN rather than its noise component — the documented fallback,
+taken by accident on every close. Fixing that was expected to strengthen
+clustering, since it is the correction that makes the variance process see the
+shock the model says it should. It did the opposite: clustering fell from
++0.12 to +0.10.
+
+The fix stayed anyway. It is what the model specifies, and the alternative is
+keeping a bug because it happened to score better on a statistic — which is
+how a model gets tuned toward its own report card instead of toward being
+right. These numbers are measurements, not targets, and this is what that
+commitment costs when the two disagree.
 
 **Returns are positively autocorrelated, and real ones are not.** This is the
 big one. Measured at **+0.235** at lag one, in six seeds out of six, ranging

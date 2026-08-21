@@ -46,7 +46,7 @@ import pretium
 # Bumped only when the simulation itself changes. A digest change WITHOUT a
 # version bump means a platform disagreed, which is the thing this exists to
 # catch; a digest change WITH one is an intended new baseline.
-KAT_VERSION = 2
+KAT_VERSION = 3
 
 SEED = 20260820
 DAYS = 250
