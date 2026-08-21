@@ -41,11 +41,17 @@ exercise trivial. They are used for SCORING, on the other side of the wall.
 from __future__ import annotations
 
 import struct
-from typing import Any, Literal, Protocol, Sequence
+from typing import TYPE_CHECKING, Any, Literal, Protocol, Sequence
 
 from ._core import Engine, Instrument, Macro, OrderError, ValidationError
 from .portfolio import Portfolio
 from .universe_util import fingerprint_of
+
+if TYPE_CHECKING:
+    # Runtime import happens inside evaluate(): spec builds agents from
+    # baselines, baselines imports this module, so a top-level import here
+    # would be a cycle.
+    from .spec import StrategySpec
 
 
 # The seven components, as literals a checker can match against
@@ -153,14 +159,15 @@ class Scorecard:
 
     __slots__ = ("name", "pnl", "return_pct", "trades", "turnover", "impact_bps",
                  "max_leverage", "rejected", "explanations", "explanation_accuracy",
-                 "final_net_worth", "errors", "seed", "universe_fingerprint")
+                 "final_net_worth", "errors", "seed", "universe_fingerprint",
+                 "strategy_fingerprint")
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
         turnover: float, impact_bps: float, max_leverage: float, rejected: int,
         explanations: list[tuple[str, str]], explanation_accuracy: float | None,
         final_net_worth: float, errors: list[str], seed: int = -1,
-        universe_fingerprint: str = "",
+        universe_fingerprint: str = "", strategy_fingerprint: str = "",
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -181,6 +188,11 @@ class Scorecard:
         # they are generated positionally.
         self.seed = seed
         self.universe_fingerprint = universe_fingerprint
+        # And what STRATEGY earned it. Filled when the agent was built from a
+        # StrategySpec (or carries one); empty for a hand-written Python
+        # agent, which is the honest reading -- such a result is reproducible
+        # only by citing code at a commit, not from this card.
+        self.strategy_fingerprint = strategy_fingerprint
 
     def as_dict(self) -> dict[str, Any]:
         return {slot: getattr(self, slot) for slot in self.__slots__}
@@ -244,7 +256,7 @@ def _dominant_factor(engine: Engine) -> str | None:
 
 
 def evaluate(
-    agents: dict[str, Agent],
+    agents: dict[str, Agent | StrategySpec],
     *,
     seed: int,
     universe: Sequence[Instrument],
@@ -271,8 +283,18 @@ def evaluate(
     always available and "trade everything" wins. Pass ``None`` deliberately if
     that is what you want to study.
 
+    A value in ``agents`` may be a :class:`pretium.StrategySpec` instead of a
+    built agent. The spec is built HERE, freshly, on every call — which is
+    both what makes a spec-carrying result citable (the scorecard's
+    ``strategy_fingerprint`` names exactly what ran) and what closes a real
+    trap: agents are stateful, and a built instance reused across two
+    evaluations carries the first market's history into the second with no
+    visible symptom. A spec cannot, because it is not the agent; it is the
+    instruction for building one.
+
     Returns a scorecard per agent, keyed by name.
     """
+    from .spec import StrategySpec
     if not agents:
         raise ValidationError("no agents given")
     if days < 1 or steps_per_day < 1 or ticks_per_step < 1:
@@ -293,11 +315,18 @@ def evaluate(
                              ticks_per_step, hour, minute, day_of_week,
                              scenario)
 
-    for name, agent in agents.items():
+    for name, entry in agents.items():
+        agent = entry.build() if isinstance(entry, StrategySpec) else entry
+        # Built agents carry their spec (build() attaches it), so the
+        # fingerprint flows whether the caller passed the spec or the agent
+        # it built. A hand-written agent has none, and its card says so.
+        declared = getattr(agent, "spec", None)
+        strategy_fingerprint = (declared.fingerprint
+                                if isinstance(declared, StrategySpec) else "")
         results[name] = _evaluate_one(
             name, agent, seed, universe, macro, days, steps_per_day,
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
-            baseline, scenario, fingerprint,
+            baseline, scenario, fingerprint, strategy_fingerprint,
         )
     return results
 
@@ -323,7 +352,7 @@ def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
 def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   ticks_per_step, cash, max_leverage, hour, minute,
                   day_of_week, baseline, scenario=None,
-                  fingerprint="") -> Scorecard:
+                  fingerprint="", strategy_fingerprint="") -> Scorecard:
     engine = Engine(seed=seed, universe=universe, macro_state=macro)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage)
     tickers = engine.tickers
@@ -430,6 +459,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         errors=errors,
         seed=seed,
         universe_fingerprint=fingerprint,
+        strategy_fingerprint=strategy_fingerprint,
     )
 
 
