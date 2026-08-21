@@ -242,13 +242,20 @@ def main() -> dict:
 
     # 8. What kind of market is this, statistically? The mismatches matter
     #    more than the matches -- they are where a conclusion drawn here stops
-    #    transferring. Two of the four are known and documented.
+    #    transferring. Six of the eight are known and documented, and they are
+    #    the six that describe how things move together rather than how one
+    #    series looks on its own.
+    #
+    #    `verdict` rather than `direction`, because the leverage effect has a
+    #    NEGATIVE reference band: an absent one is numerically above that band,
+    #    and printing "above" for a missing effect says the opposite of what
+    #    was measured.
     mark = time.time()
     facts = pt.facts.measure(seed=7, universe=universe, days=60)
     verdicts = pt.facts.compare_to_real_markets(facts)
-    report["realism"] = {k: v["direction"] for k, v in verdicts.items()}
+    report["realism"] = {k: v["verdict"] for k, v in verdicts.items()}
     print(f"8. stylised facts in {time.time() - mark:.1f}s: "
-          + ", ".join(f"{k.replace('_', ' ')} {v['direction']}"
+          + ", ".join(f"{k.replace('_', ' ')} {v['verdict']}"
                       for k, v in verdicts.items()))
     # Not all in range, and not none. If every statistic matched, the
     # comparison would be doing no work; if none did, the model would be
