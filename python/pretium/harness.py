@@ -205,6 +205,7 @@ def evaluate(
     cash: float = 1_000_000.0,
     max_leverage: float | None = 2.0,
     start: tuple[int, int, int] = (9, 30, 3),
+    scenario: Any = None,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -229,21 +230,24 @@ def evaluate(
     # agent -- and because it is the same run each time, the comparison between
     # two agents' impact is a comparison and not two separate experiments.
     baseline = _run_untraded(seed, universe, macro, days, steps_per_day,
-                             ticks_per_step, hour, minute, day_of_week)
+                             ticks_per_step, hour, minute, day_of_week,
+                             scenario)
 
     for name, agent in agents.items():
         results[name] = _evaluate_one(
             name, agent, seed, universe, macro, days, steps_per_day,
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
-            baseline,
+            baseline, scenario,
         )
     return results
 
 
 def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
-                  hour, minute, day_of_week) -> list[float]:
+                  hour, minute, day_of_week, scenario=None) -> list[float]:
     engine = Engine(seed=seed, universe=universe, macro_state=macro)
-    for _ in range(days):
+    for day in range(days):
+        if scenario is not None:
+            scenario.apply(engine, day)
         engine.open_market()
         for _ in range(steps_per_day):
             engine.run_session(hour, minute, day_of_week, ticks_per_step)
@@ -253,7 +257,7 @@ def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
 
 def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   ticks_per_step, cash, max_leverage, hour, minute,
-                  day_of_week, baseline) -> Scorecard:
+                  day_of_week, baseline, scenario=None) -> Scorecard:
     engine = Engine(seed=seed, universe=universe, macro_state=macro)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage)
     tickers = engine.tickers
@@ -268,6 +272,10 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
 
     step = 0
     for day in range(days):
+        # Applied before the day opens, so day zero already runs under the
+        # path rather than under whatever the engine was constructed with.
+        if scenario is not None:
+            scenario.apply(engine, day)
         engine.open_market()
         for _ in range(steps_per_day):
             obs = Observation(step, day, tickers, _f64(engine.prices()),
