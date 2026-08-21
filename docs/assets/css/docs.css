@@ -20,8 +20,10 @@
   --warn-weak: #fdf5e7;
   --warn-line: #f0dfbe;
 
-  --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  /* Source Sans 3 and Source Code Pro: humanist, designed for screen UI and
+     code, and not the face every dev-tool site has converged on. */
+  --sans: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: "Source Code Pro", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
   --r:    8px;
   --r-sm: 6px;
@@ -86,7 +88,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 400 15.5px/1.7 var(--sans);
+  font: 400 16.5px/1.68 var(--sans);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -202,13 +204,13 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .prose { max-width: var(--measure); }
 
 h1 {
-  font-size: 2.1rem; font-weight: 600; line-height: 1.2;
-  letter-spacing: -0.025em;
+  font-size: 2.15rem; font-weight: 600; line-height: 1.2;
+  letter-spacing: -0.018em;
   margin: 0 0 .85rem;
 }
 h2 {
-  font-size: 1.3rem; font-weight: 600; line-height: 1.35;
-  letter-spacing: -0.015em;
+  font-size: 1.32rem; font-weight: 600; line-height: 1.35;
+  letter-spacing: -0.01em;
   margin: 2.75rem 0 .75rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--border);
@@ -245,7 +247,7 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 2.5rem 0; }
 /* ---- Code ------------------------------------------------------------- */
 
 code {
-  font: 400 .855em/1.5 var(--mono);
+  font: 400 .875em/1.5 var(--mono);
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -255,7 +257,7 @@ code {
 
 pre {
   position: relative;
-  font: 400 .82rem/1.65 var(--mono);
+  font: 400 .845rem/1.62 var(--mono);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r);
