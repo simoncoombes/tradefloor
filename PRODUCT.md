@@ -99,6 +99,16 @@ dashes, en dashes, typographic minus signs or arrows).
 Licence Apache-2.0. The repository must not reference the commercial product
 the engine was ported from.
 
+**The visual identity is deliberately decoupled from the subject matter.** A
+first attempt themed the documentation as trading-desk stationery, deriving
+its world from markets. The plan owner rejected it: theming the library to
+its domain reads as a game artifact and couples the library's identity to the
+product it was extracted from. The standing commitment is the contemporary
+enterprise documentation standard, executed straight, with the Anthropic and
+Mintlify class of developer documentation as the craft bar. Neutral ground,
+one accent, no costume, no subject-derived metaphor. Light and dark are both
+supported.
+
 ## Evidence on Hand
 
 Real, measured, and already in the docs: the five matching cross-platform
