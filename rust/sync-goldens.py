@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Sync the golden vectors from mc-port into this repo, and verify them.
+"""Sync the golden vectors from the reference checkout, and verify them.
 
-The goldens are the parity contract: they are generated from the TypeScript
-engine by the 15 generators in `mc-port/scripts/rust-port/`, which import the
-live TS source and therefore cannot move here. So mc-port produces them and
-pretium consumes them, and this script is the seam.
+The goldens are the parity contract: they are produced by the reference
+implementation's generators, which import that implementation directly and
+therefore live with it rather than here. This script is the seam between where
+they are produced and where they are consumed.
+
+Point it at the reference checkout with PRETIUM_GOLDENS_SRC, or pass --from.
 
 Two rules it enforces, both learned the hard way:
 
@@ -13,25 +15,40 @@ Two rules it enforces, both learned the hard way:
    fewer cases and report success. Copying 135 MB by hand and trusting it is
    exactly how that happens.
 
-2. **Never sync in the other direction.** The goldens are generated FROM
-   TypeScript and are the thing Rust is checked against. Regenerating them
-   from Rust would make the tests self-confirming: they would assert that Rust
-   agrees with Rust, and pass forever regardless of correctness.
+2. **Never sync in the other direction.** The goldens come FROM the reference
+   implementation and are the thing this crate is checked against.
+   Regenerating them from this crate would make the tests self-confirming:
+   they would assert that the crate agrees with itself, and pass forever
+   regardless of correctness.
 
 Usage:
-    python sync-goldens.py            # copy from mc-port, then verify
+    PRETIUM_GOLDENS_SRC=/path/to/reference/goldens python sync-goldens.py
+    python sync-goldens.py --from /path/to/goldens
     python sync-goldens.py --verify   # verify what is already here
 """
 
 import hashlib
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 DEST = HERE / "goldens"
-SOURCE = HERE.parent.parent / "mc-port" / "docs" / "rust-port" / "goldens"
+
+
+def _source() -> Path | None:
+    """Where the reference goldens live. No default: this is deliberate.
+
+    Guessing a sibling checkout would bake one machine's layout into the tool
+    and, worse, would name the reference implementation in a repository that
+    does not otherwise mention it.
+    """
+    if "--from" in sys.argv:
+        return Path(sys.argv[sys.argv.index("--from") + 1]).expanduser().resolve()
+    env = os.environ.get("PRETIUM_GOLDENS_SRC")
+    return Path(env).expanduser().resolve() if env else None
 
 
 def sha256(path: Path) -> str:
@@ -81,17 +98,19 @@ def main() -> int:
     if "--verify" in sys.argv:
         return verify(DEST)
 
-    if not SOURCE.exists():
-        print(f"  source not found: {SOURCE}", file=sys.stderr)
-        print("  The goldens are generated in mc-port; that checkout must be",
-              file=sys.stderr)
-        print("  adjacent to this one.", file=sys.stderr)
+    source = _source()
+    if source is None:
+        print("  no source given.", file=sys.stderr)
+        print("  Set PRETIUM_GOLDENS_SRC, or pass --from <path>.", file=sys.stderr)
+        return 1
+    if not source.exists():
+        print(f"  source not found: {source}", file=sys.stderr)
         return 1
 
-    print(f"  copying goldens\n    from {SOURCE}\n    to   {DEST}")
+    print(f"  copying goldens\n    from {source}\n    to   {DEST}")
     if DEST.exists():
         shutil.rmtree(DEST)
-    shutil.copytree(SOURCE, DEST)
+    shutil.copytree(source, DEST)
     return verify(DEST)
 
 

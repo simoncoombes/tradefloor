@@ -32,12 +32,25 @@ pub fn percent_to_fraction(percent: f64) -> f64 {
 
 /// The plausibility band for an interest-rate-like input, in FRACTIONAL form.
 ///
-/// Deliberately wide. It is not trying to encode monetary policy — negative
-/// policy rates are real and 20%+ has happened — it is trying to catch the
-/// one specific error this convention invites: a user passing `4.5` meaning
-/// 4.5%, which under a fractional API is 450%.
-const RATE_MIN: f64 = -0.10;
-const RATE_MAX: f64 = 1.00;
+/// Settled by the plan owner. The band exists to catch ONE error -- passing
+/// `4.5` meaning 4.5%, which under a fractional API is 450% -- and not to
+/// encode a view about monetary policy.
+///
+/// The lower bound is negative on purpose. Negative policy rates are not
+/// hypothetical: the SNB held -0.75%, the ECB's deposit rate was negative for
+/// eight years, and Japan ran -0.1%. A band starting at zero would make the
+/// eurozone of 2014-2022 unmodellable, which for a rate-sensitivity research
+/// library is a defect rather than a conservative choice.
+///
+/// The upper bound covers every observed policy rate -- Volcker peaked near
+/// 20%, and emerging markets exceed 25% regularly -- while staying a real
+/// guard. Note that tightening it further would not catch more UNIT errors:
+/// the slip passes percent values of roughly 2 to 10, so any ceiling at or
+/// below 1.0 catches all of them. A lower ceiling only rejects more real
+/// scenarios. Neither bound catches a sub-1.0 percent value such as `0.5`
+/// meaning 0.5%, and nothing can.
+const RATE_MIN: f64 = -0.05;
+const RATE_MAX: f64 = 0.50;
 
 /// Validate a fractional rate, returning a message describing the likely
 /// mistake rather than merely reporting a range.
@@ -98,11 +111,25 @@ mod tests {
     }
 
     #[test]
-    fn allows_negative_and_high_but_real_rates() {
-        // Negative policy rates are real; so is 20% inflation. The band is
-        // not a policy opinion.
-        assert!(check_rate("fed_funds", -0.005).is_ok());
-        assert!(check_rate("inflation", 0.22).is_ok());
+    fn admits_every_policy_rate_that_has_actually_happened() {
+        // Named cases, so a future tightening of the band has to explicitly
+        // decide to make one of these unmodellable.
+        for (name, rate) in [
+            ("ECB deposit rate, 2019", -0.005),
+            ("Bank of Japan, 2016", -0.001),
+            ("ZIRP", 0.0),
+            ("US, 2023", 0.0533),
+            ("Volcker peak, 1981", 0.20),
+            ("emerging-market tightening", 0.45),
+        ] {
+            assert!(check_rate("fed_funds", rate).is_ok(), "{name} ({rate}) rejected");
+        }
+    }
+
+    #[test]
+    fn rejects_beyond_the_band_at_both_ends() {
+        assert!(check_rate("fed_funds", -0.20).is_err());
+        assert!(check_rate("fed_funds", 0.75).is_err());
     }
 
     #[test]
