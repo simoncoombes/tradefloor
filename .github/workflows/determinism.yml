@@ -1,0 +1,135 @@
+# The cross-platform determinism gate.
+#
+# This is the workflow that converts the library's headline claim from an
+# argument into a verified artifact. The crate bans std transcendentals and
+# routes everything through libm SPECIFICALLY so that builds on different
+# operating systems agree bit-for-bit. Until this runs, that is enforced by a
+# grep test and a reasoning chain -- neither of which has ever executed on
+# Linux or macOS.
+#
+# Each target builds a wheel, runs the known-answer simulation inside it, and
+# reports a digest. The final job fails if any two targets disagree.
+#
+# Note on cost: this repository's Actions usage is billed. The gate is cheap
+# (a few minutes per target) but it is wired to workflow_dispatch and to
+# release tags rather than to every push, so ordinary development does not
+# spend the budget.
+
+name: determinism
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  digest:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Never cancel siblings: a disagreement is only visible with every
+      # target's digest in hand, so a failure on one must not destroy the
+      # evidence from the others.
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,  target: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, target: linux-aarch64 }
+          - { os: macos-latest,   target: macos-arm64 }
+          - { os: macos-13,       target: macos-x86_64 }
+          - { os: windows-latest, target: windows-x86_64 }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # The abi3 floor. One wheel per platform covers this and every
+          # later CPython, so the matrix does not multiply by Python version.
+          python-version: "3.11"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build and install the wheel
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip maturin pytest
+          # Release profile is contractual: lto, codegen-units=1, and NO
+          # target-cpu=native. A build that let LLVM fuse a multiply-add on
+          # one CPU family would be a different market on that CPU family,
+          # which is the whole reason mul_add is banned in the source.
+          maturin build --release -m rust/Cargo.toml -F python --out dist
+          python -m pip install --find-links dist --force-reinstall pretium
+
+      - name: Run the known-answer simulation
+        shell: bash
+        run: |
+          # Run from a directory that is NOT the repo root, so the installed
+          # wheel is imported rather than any source tree that happens to be
+          # importable. A gate that accidentally tested the source would say
+          # nothing about the artifact being shipped.
+          cd "${{ runner.temp }}"
+          python "${{ github.workspace }}/tests/known_answer.py" | tee kat.txt
+          grep -oE '[0-9a-f]{64}' kat.txt > "digest-${{ matrix.target }}.txt"
+
+      - name: Verify against the committed baseline
+        shell: bash
+        run: |
+          cd "${{ github.workspace }}"
+          # test_known_answer.py deliberately does not depend on the golden
+          # corpus, so it runs here where that corpus does not exist.
+          python -m pytest tests/test_known_answer.py -v
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.target }}
+          path: ${{ runner.temp }}/digest-${{ matrix.target }}.txt
+
+  compare:
+    name: all targets agree
+    needs: digest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: digests
+
+      - name: Compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Digests reported:"
+          for f in digests/*.txt; do
+            printf '  %-20s %s\n' "$(basename "$f" .txt | sed 's/^digest-//')" "$(cat "$f")"
+          done
+
+          count=$(ls digests/*.txt | wc -l)
+          if [ "$count" -lt 5 ]; then
+            echo
+            echo "Only $count of 5 targets reported. A missing target is not a"
+            echo "pass: it is a platform whose determinism is unverified, and"
+            echo "shipping its wheel would publish an unproven claim."
+            exit 1
+          fi
+
+          unique=$(cat digests/*.txt | sort -u | wc -l)
+          if [ "$unique" -ne 1 ]; then
+            echo
+            echo "PLATFORMS DISAGREE. $unique distinct digests across $count targets."
+            echo
+            echo "This is the failure the libm-only design exists to prevent."
+            echo "Do not ship these wheels. Likely causes, in order:"
+            echo "  - a std transcendental reached the source (the grep test"
+            echo "    in mathx_parity should have caught it -- check whether"
+            echo "    it was weakened or its walk stopped being recursive)"
+            echo "  - a build flag enabling float reassociation or FMA"
+            echo "    contraction, or target-cpu=native"
+            echo "  - a dependency that is not itself deterministic"
+            exit 1
+          fi
+
+          echo
+          echo "All $count targets produced: $(cat digests/*.txt | head -1)"
