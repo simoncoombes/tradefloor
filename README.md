@@ -205,6 +205,26 @@ print(pt.facts.report(pt.facts.measure(seed=3, universe=universe)))
 Re-measure after changing the preset, the generator or the scenario. A claim
 about realism should be checked, not inherited.
 
+## Fork a simulation mid-flight
+
+Run to day sixty, then ask two questions of the same market — everything
+before the fork identical, not statistically similar but *identical*.
+
+```python
+mark = pt.Checkpoint.of(engine, universe=universe, seed=42)
+calm, hiked = mark.branch(2)
+```
+
+A third counterfactual, distinct from the other two: `tca.analyse` asks what
+your trading cost, `scenario.compare` asks what a macro path did, and this asks
+what happens **next** from a state you have already reached and want to keep.
+
+Restoring is a replay, so it costs about what the original run cost —
+measured at 2.74s to restore a 60-day, 40-instrument run that took 2.63s to
+produce. There is no cheap state snapshot and the docstring says so. What you
+get instead is a checkpoint that is **data**: a few kilobytes of JSON that
+survive the process, the version and the machine.
+
 ## Scenarios are paths, not settings
 
 A rate shock is not "the rate is 5%". It is the rate walking from 2.5% to 5%
