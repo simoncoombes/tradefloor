@@ -148,6 +148,51 @@ well. This is a model market with knowable structure, and a determined agent
 can learn that structure in ways that will not transfer. Use it to rank agents
 against each other, not to certify one.
 
+That warning is usually vague. Here it is specific, because the structure is
+measured — see below.
+
+## How realistic is this market?
+
+`pretium.facts.measure()` runs a market and lines its statistics up against
+real equities. The mismatches are the point, and they are not tuned away:
+
+| statistic | measured | real equities | |
+|---|---|---|---|
+| excess kurtosis | **+4.1** | +3 to +10 | matches |
+| \|return\| acf(1) | +0.11 | +0.15 to +0.35 | too weak |
+| return acf(1) | **+0.235** | −0.05 to +0.05 | **too high** |
+| annualised vol | 58% | 15% to 35% | too high |
+
+Fat tails are right — the single most robust fact about asset returns, and the
+one a Gaussian simulator gets wrong. Volatility clusters, but about half as
+strongly as reality and it fades faster.
+
+**Returns are positively autocorrelated and real ones are not.** +0.235 at lag
+one, in six seeds of six, ranging only +0.221 to +0.240. That is the AR(2)
+mispricing process showing through: its impulse response *rises* to 1.284 by
+day two before reverting, so a shock today is amplified tomorrow. Two
+independent measurements of one mechanism — the process's own impulse response,
+and the autocorrelation of the prices it produces.
+
+The consequence, which you should carry into any conclusion drawn here:
+
+> **Momentum is mechanically profitable in this market in a way it is not in
+> real markets.** An agent trading serial correlation has an edge that is an
+> artefact of the process, not a skill that transfers. If two agents differ
+> mainly in how much of it they exploit, their ranking here says very little
+> about which is better anywhere else.
+
+Volatility is high because a generated universe is deliberately dispersed and
+skews small. Prefer ratios — capture against the oracle, shortfall in basis
+points — to raw percentages.
+
+```python
+print(pt.facts.report(pt.facts.measure(seed=3, universe=universe)))
+```
+
+Re-measure after changing the preset, the generator or the scenario. A claim
+about realism should be checked, not inherited.
+
 ## Scenarios are paths, not settings
 
 A rate shock is not "the rate is 5%". It is the rate walking from 2.5% to 5%

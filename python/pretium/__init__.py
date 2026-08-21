@@ -25,6 +25,7 @@ from . import edgar
 from . import baselines
 from . import tca
 from . import scenario as _scenario_mod
+from . import facts
 from .scenario import Scenario, run_scenario
 from .tca import Execution
 from .baselines import capture_ratio, reference_agents
@@ -71,7 +72,7 @@ __all__ = [
     "counterfactual", "Portfolio", "Position", "Agent", "Observation",
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
     "baselines", "reference_agents", "capture_ratio", "tca", "Execution",
-    "Scenario", "run_scenario",
+    "Scenario", "run_scenario", "facts",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
     "market_status", "model_preset", "run_many", "sector_daily_sigma", "sectors",
