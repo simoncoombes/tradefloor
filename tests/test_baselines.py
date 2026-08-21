@@ -43,6 +43,10 @@ def test_every_reference_agent_runs_without_error(scores):
                            "mean_reversion", "oracle"}
     for card in scores.values():
         assert card.errors == [], card.errors
+    # An error-free run of agents that never traded is not a passing run. The
+    # emptiness above is satisfied just as well by every agent returning {}.
+    for name, card in scores.items():
+        assert card.trades > 0, name
 
 
 def test_the_oracle_sets_the_ceiling(scores):

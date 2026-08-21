@@ -47,6 +47,11 @@ def test_impact_is_isolated_to_the_names_actually_traded():
         seed=42, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
     )
     assert cf.untouched_moved() == []
+    # And the traded name DID move. Without this the assertion above passes
+    # when the two worlds are accidentally identical -- flow silently dropped,
+    # say -- because then nothing moved and nothing is untouched-and-moved.
+    # "No leak" and "no effect at all" look the same from one direction only.
+    assert cf.impact_bps[cf.tickers.index(TRADED)] != 0.0
 
 
 def test_order_flow_consumes_no_draws():
