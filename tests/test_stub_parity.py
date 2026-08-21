@@ -1,0 +1,239 @@
+"""The type stub, checked against the extension it describes.
+
+`_core.pyi` is hand-written. Nothing makes it true. A checker reading a stub
+that has drifted validates user code against a fiction and reports success —
+which is worse than having no stub, because the failure is confident.
+
+That is not hypothetical. In a sibling codebase a hand-declared interface
+named a static factory the compiled module did not export; the test double was
+written from the same declaration, so the two agreed with each other all the
+way to a browser, where the real module had no such symbol. The declaration
+and its double had never met the thing they described.
+
+PyO3 gives us a way out that a `.d.ts` does not: `__text_signature__` carries
+the real parameter names and defaults. So these tests compare the stub against
+the RUNTIME, and the parameter-name check is the valuable one — every argument
+here is a float, so a transposed pair is invisible to a checker and produces a
+market seeded with volatility in the interest-rate slot.
+"""
+
+import ast
+from pathlib import Path
+
+import pytest
+
+import pretium._core as core
+
+STUB = Path(__file__).resolve().parent.parent / "python" / "pretium" / "_core.pyi"
+
+pytestmark = pytest.mark.skipif(not STUB.exists(), reason="stub not present")
+
+
+def parsed():
+    return ast.parse(STUB.read_text(encoding="utf-8"))
+
+
+def stub_module_symbols():
+    """Top-level names the stub declares, excluding type aliases.
+
+    A `Side = Literal[...]` is a name for a checker and nothing at runtime, so
+    it must not be demanded of the module. Distinguished by shape — an
+    assignment rather than a def or class — rather than by a hand-kept list
+    that would itself drift.
+    """
+    functions, classes, aliases, variables = set(), set(), set(), set()
+    for node in parsed().body:
+        if isinstance(node, ast.FunctionDef):
+            functions.add(node.name)
+        elif isinstance(node, ast.ClassDef):
+            classes.add(node.name)
+        elif isinstance(node, ast.Assign):
+            # `Side = Literal[...]` -- a name for a checker, nothing at runtime.
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    aliases.add(target.id)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            # `__version__: str` -- a declared module VARIABLE, which must
+            # exist. Distinguished from an alias by shape rather than by name,
+            # so the rule does not need a list of exceptions to maintain.
+            variables.add(node.target.id)
+    return functions, classes, aliases, variables
+
+
+def stub_class_members(name: str):
+    for node in parsed().body:
+        if isinstance(node, ast.ClassDef) and node.name == name:
+            methods, attributes = set(), set()
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef):
+                    methods.add(item.name)
+                elif isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                    attributes.add(item.target.id)
+            return methods, attributes
+    raise AssertionError(f"{name} is not declared in the stub")
+
+
+def stub_params(class_name: str | None, func_name: str) -> list[str]:
+    """Parameter names the stub declares, in order, excluding self."""
+    tree = parsed()
+    body = tree.body
+    if class_name is not None:
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef) and node.name == class_name:
+                body = node.body
+                break
+        else:
+            raise AssertionError(f"{class_name} is not declared in the stub")
+    for node in body:
+        if isinstance(node, ast.FunctionDef) and node.name == func_name:
+            args = node.args
+            names = [a.arg for a in args.posonlyargs + args.args + args.kwonlyargs]
+            return [n for n in names if n != "self"]
+    raise AssertionError(f"{func_name} is not declared in the stub")
+
+
+def runtime_params(signature: str) -> list[str]:
+    """Parameter names out of a `__text_signature__`, excluding self.
+
+    Parsed directly rather than through `inspect.signature`. The first version
+    of this built a throwaway class carrying the signature and asked inspect
+    for it; that returned an EMPTY list for everything, and an empty list
+    compared against a stub's parameters fails loudly only because the
+    assertion happens to run that way round. Had I written the comparison as
+    "every runtime name appears in the stub", it would have passed vacuously
+    for every callable in the library.
+    """
+    inner = signature[signature.index("(") + 1: signature.rindex(")")]
+    names: list[str] = []
+    depth = 0
+    current = ""
+    # Split on top-level commas only: a default like `cycle="a,b"` or a nested
+    # tuple would otherwise be split through the middle.
+    for char in inner:
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        if char == "," and depth == 0:
+            names.append(current)
+            current = ""
+        else:
+            current += char
+    names.append(current)
+
+    out: list[str] = []
+    for part in names:
+        part = part.strip()
+        if not part or part in {"*", "/"}:
+            continue
+        name = part.split("=")[0].split(":")[0].strip().lstrip("*")
+        if name and name not in {"self", "$self"}:
+            out.append(name)
+    return out
+
+
+# --------------------------------------------------------------------------
+# The surface
+# --------------------------------------------------------------------------
+
+
+def test_every_stub_symbol_exists_at_runtime():
+    functions, classes, _, variables = stub_module_symbols()
+    missing = sorted(
+        n for n in functions | classes | variables if not hasattr(core, n))
+    assert missing == [], missing
+
+
+def test_every_runtime_symbol_is_declared_in_the_stub():
+    # The other direction, and the one that keeps the stub USEFUL rather than
+    # merely true. An undeclared export is invisible to a checker, so calling
+    # it is an error in correct code -- which is how `version()` and
+    # `ArrowStream` were found missing from the package exports earlier.
+    functions, classes, aliases, variables = stub_module_symbols()
+    declared = functions | classes | aliases | variables
+    runtime = {n for n in dir(core) if not n.startswith("_")}
+    assert sorted(runtime - declared) == []
+
+
+def test_type_aliases_do_not_shadow_real_exports():
+    _, _, aliases, _ = stub_module_symbols()
+    # A type alias is checker-only by design, so it is exempt from existing at
+    # runtime -- but it must not share a name with a real export, which would
+    # shadow the export's true type with a Literal.
+    assert sorted(a for a in aliases if hasattr(core, a)) == []
+
+
+def test_declared_module_variables_exist():
+    _, _, _, variables = stub_module_symbols()
+    assert variables, "the stub declares no module variables; check the parser"
+    assert sorted(v for v in variables if not hasattr(core, v)) == []
+
+
+@pytest.mark.parametrize("name", [
+    "Engine", "EngineBatch", "Instrument", "Macro", "OrderBook", "GameRng",
+    "News", "NewsImpact", "MispricingState", "ArrowStream",
+])
+def test_class_members_exist_at_runtime(name):
+    methods, attributes = stub_class_members(name)
+    cls = getattr(core, name)
+    missing = sorted(
+        m for m in methods | attributes
+        if not hasattr(cls, m) and not m.startswith("__")
+    )
+    assert missing == [], (name, missing)
+
+
+# --------------------------------------------------------------------------
+# Parameter names -- the check that catches a transposition
+# --------------------------------------------------------------------------
+
+
+CALLABLES = [
+    (None, "fair_value"),
+    (None, "step_mispricing_daily"),
+    (None, "impulse_response"),
+    (None, "stationary_sigma"),
+    (None, "random_instruments"),
+    (None, "market_status"),
+    (None, "check_rate"),
+    ("Engine", "tick"),
+    ("Engine", "run_session"),
+    ("Engine", "run_days"),
+    ("Engine", "run_until"),
+    ("Engine", "pin_macro"),
+    ("Engine", "bars"),
+    ("Engine", "snapshot_book"),
+    ("OrderBook", "post_limit"),
+    ("OrderBook", "submit"),
+    ("OrderBook", "sweep_cost"),
+]
+
+
+@pytest.mark.parametrize("class_name,func_name", CALLABLES)
+def test_parameter_names_match_the_extension(class_name, func_name):
+    """Names, in order. This is the check worth having.
+
+    Every one of these arguments is a float or an int, so a transposed pair
+    type-checks perfectly and seeds the economy wrong. In a sibling codebase I
+    wrote ten such parameter names from memory and got six of them wrong;
+    nothing caught it until a test read the real signature.
+    """
+    owner = core if class_name is None else getattr(core, class_name)
+    target = getattr(owner, func_name)
+    signature = getattr(target, "__text_signature__", None)
+    if signature is None:
+        pytest.skip(f"{func_name} exposes no __text_signature__")
+    assert stub_params(class_name, func_name) == runtime_params(signature)
+
+
+@pytest.mark.parametrize("name", ["Instrument", "Macro", "News", "NewsImpact",
+                                 "MispricingState", "OrderBook", "GameRng"])
+def test_constructor_parameter_names_match_the_extension(name):
+    # PyO3 puts a #[new] signature on the CLASS rather than on __init__, which
+    # reports (*args, **kwargs). Reading the wrong one would make this test
+    # vacuous while looking thorough.
+    cls = getattr(core, name)
+    signature = getattr(cls, "__text_signature__", None)
+    if signature is None:
+        pytest.skip(f"{name} exposes no __text_signature__")
+    assert stub_params(name, "__init__") == runtime_params(signature)
