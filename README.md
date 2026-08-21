@@ -84,7 +84,7 @@ counterfactual nobody can run on real data. This one runs it.
 
 ### You're stress-testing a strategy
 
-One history gives you one sample. A strategy that survived 2015–2025 survived
+One history gives you one sample. A strategy that survived 2015-2025 survived
 *a* decade, and you can't run the other ones.
 
 Run it across a thousand seeded markets and watch where it breaks. Walk rates
@@ -151,7 +151,7 @@ changing only how often a strategy rebalances:
 |---|---|
 | 3 | +88.7% |
 | 6 | +30.9% |
-| 12 | −13.2% |
+| 12 | -13.2% |
 
 No fees are charged. That gap is spread and depth alone.
 

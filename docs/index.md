@@ -106,7 +106,7 @@ the close bookkeeping `advance_day()` owns. Mixing granularities is legal.
 
 ### Why not a tick loop
 
-A Python `for` loop calling `tick()` crosses the Python↔Rust boundary about
+A Python `for` loop calling `tick()` crosses the Python<->Rust boundary about
 98,000 times per simulated year, and every attribute read on the result is
 another crossing. A loop touching five fields per tick makes roughly 500,000.
 Prefer `days()` or `run_until` unless you genuinely need per-tick control; the
@@ -229,7 +229,7 @@ better under the same gross, not from information.
 Two things affect the denominator, so quote both with any ratio:
 
 - **Oracle configuration.** Giving it the same information across three times
-  as many names makes it worse (median P&L 110k → 70k). Ratios computed with
+  as many names makes it worse (median P&L 110k -> 70k). Ratios computed with
   different Oracle settings are not comparable.
 - **Horizon.** Mispricing reverts on a 60-day half-life. On seed 2026 the same
   momentum agent captures 27% over five days and 94% over sixty.
@@ -286,7 +286,7 @@ Two results to understand before reading a number:
 
 **Negative shortfall is possible on a round trip.** Buying and holding costs
 +16.7 bps in one measured example; buying and selling three steps later comes
-to −10.8 bps. The entry pushed the price up, part of that persisted, and the
+to -10.8 bps. The entry pushed the price up, part of that persisted, and the
 exit sold into it. Shortfall answers what each execution cost, not whether the
 strategy made money - read `pnl` from `evaluate` for that. `by_step()` shows
 entry and exit separately rather than netting them.
@@ -312,8 +312,8 @@ Measured on seed 7 - same market, same agents, only the macro path differs:
 
 | agent | calm | hiked | delta |
 |---|---|---|---|
-| buy_and_hold | +3.51% | −0.87% | −4.37 |
-| momentum | −2.36% | −0.63% | +1.73 |
+| buy_and_hold | +3.51% | -0.87% | -4.37 |
+| momentum | -2.36% | -0.63% | +1.73 |
 | oracle | +20.86% | +20.91% | +0.05 |
 
 Buy-and-hold is long-only and holds through the repricing. Momentum gains
@@ -499,7 +499,7 @@ print(pt.facts.report(pt.facts.measure(seed=3, universe=universe)))
 |---|---|---|---|
 | excess kurtosis | +5.9 | +3 to +10 | matches |
 | \|return\| acf(1) | +0.10 | +0.15 to +0.35 | too weak |
-| return acf(1) | +0.219 | −0.05 to +0.05 | too high |
+| return acf(1) | +0.219 | -0.05 to +0.05 | too high |
 | annualised vol | 53% | 15% to 35% | too high |
 
 Fat tails come out right, which is the most robust fact about asset returns and
