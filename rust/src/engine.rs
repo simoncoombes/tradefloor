@@ -878,6 +878,55 @@ impl Engine {
         Ok(())
     }
 
+    /// Write the two trading-status flags back onto the roster.
+    ///
+    /// The last per-company state an embedder could not update. A company that
+    /// goes bankrupt or is taken private in the game kept trading here: the
+    /// tick skips a company only when it reads `is_bankrupt || !is_public`
+    /// (`market/tick.rs`), and the index excludes bankrupt constituents
+    /// (`market/index_value.rs`). Without a setter, neither could ever become
+    /// true after construction, so a failed company went on printing prices
+    /// and went on counting toward the index.
+    ///
+    /// Narrower than [`Engine::set_fundamentals`] because it does not
+    /// compound -- a stale `eps` misprices a company a little more every
+    /// quarter, while a stale flag is wrong from the moment it changes and no
+    /// worse afterwards. Both are wrong, so both are settable.
+    ///
+    /// `&[bool]` rather than the f64 columnar convention used elsewhere,
+    /// deliberately: there is no "absent" flag for NaN to mean, and a boolean
+    /// carried as a float invites a caller to pass 0.5.
+    ///
+    /// Consumes no draws.
+    pub fn set_status(
+        &mut self,
+        is_bankrupt: &[bool],
+        is_public: &[bool],
+    ) -> Result<(), String> {
+        let n = self.companies.len();
+        for (name, len) in [
+            ("is_bankrupt", is_bankrupt.len()),
+            ("is_public", is_public.len()),
+        ] {
+            if len != n {
+                return Err(format!("{name} has {len} values for {n} companies"));
+            }
+        }
+        for (i, company) in self.companies.iter_mut().enumerate() {
+            company.is_bankrupt = is_bankrupt[i];
+            company.is_public = is_public[i];
+        }
+        Ok(())
+    }
+
+    /// The two trading-status flags, in roster order.
+    pub fn status(&self) -> (Vec<bool>, Vec<bool>) {
+        (
+            self.companies.iter().map(|c| c.is_bankrupt).collect(),
+            self.companies.iter().map(|c| c.is_public).collect(),
+        )
+    }
+
     /// The three fair-value inputs, NaN where absent.
     ///
     /// The read side of [`Engine::set_fundamentals`], so a caller can check
@@ -1758,5 +1807,57 @@ mod tests {
         // number of times, so the divergence is the valuation rather than a
         // shifted stream.
         assert_eq!(stale.draws_consumed(), fresh.draws_consumed());
+    }
+
+    #[test]
+    fn a_bankrupt_company_stops_ticking_once_the_engine_is_told() {
+        // The reason `set_status` exists. The tick skips a company only when
+        // it reads `is_bankrupt || !is_public`, so before there was a setter
+        // a failed company went on printing prices for ever.
+        let mut e = engine(5);
+        e.open_market();
+        e.run_session(&session(30, &[None; 3], &[0.000225; 3]), &mut SessionBuffer::new());
+        let before = e.prices()[0];
+
+        e.set_status(&[true, false, false], &[true, true, true])
+            .expect("one flag per company");
+        e.run_session(&session(30, &[None; 3], &[0.000225; 3]), &mut SessionBuffer::new());
+
+        assert_eq!(
+            e.prices()[0],
+            before,
+            "company 0 was marked bankrupt and kept printing"
+        );
+        // And its neighbours did keep moving, so the test is not observing a
+        // dead market.
+        assert!(
+            e.prices()[1] != before || e.prices()[2] != before,
+            "nothing moved at all; this proves nothing about the flag"
+        );
+    }
+
+    #[test]
+    fn a_company_taken_private_stops_ticking_too() {
+        let mut e = engine(5);
+        e.open_market();
+        e.run_session(&session(30, &[None; 3], &[0.000225; 3]), &mut SessionBuffer::new());
+        let before = e.prices()[1];
+
+        e.set_status(&[false; 3], &[true, false, true])
+            .expect("one flag per company");
+        e.run_session(&session(30, &[None; 3], &[0.000225; 3]), &mut SessionBuffer::new());
+        assert_eq!(e.prices()[1], before, "an unlisted company kept printing");
+    }
+
+    #[test]
+    fn status_round_trips_and_refuses_a_length_mismatch() {
+        let mut e = engine(5);
+        e.set_status(&[true, false, true], &[false, true, false])
+            .expect("one flag per company");
+        let (bankrupt, public) = e.status();
+        assert_eq!(bankrupt, vec![true, false, true]);
+        assert_eq!(public, vec![false, true, false]);
+        assert!(e.set_status(&[true; 2], &[true; 3]).is_err());
+        assert!(e.set_status(&[true; 3], &[true; 4]).is_err());
     }
 }
