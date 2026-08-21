@@ -27,11 +27,13 @@ Buy-and-hold is long-only and holds through the repricing. Momentum gains
 because it can rotate. The Oracle is untouched because it trades mispricing,
 and the shock moves fair value along with price.
 
-**One trap.** Pinning `federal_funds_rate` alone does nothing - measured at
-exactly 0.00% across twenty instruments. Equities discount off the corporate
-bond yield, and the policy rate only applies as a fallback when no yield is
-present. `rate_shock` moves the whole curve; `ramp` isolates a single lever
-when that is what you want.
+**One trap.** Pinning `federal_funds_rate` alone does nothing until the first
+central-bank meeting - measured at exactly 0.00% across twenty instruments
+over 40 days, and a median -3.99% once a 60-day run crosses the meeting at
+day 45, where the corporate yield is recomputed off the 10Y. Equities
+discount off the corporate bond yield, so a short policy-only study sees
+nothing, silently. `rate_shock` moves the whole curve for an immediate
+repricing; `ramp` isolates a single lever when that is what you want.
 
 ## The second trap: VIX does not drive volatility
 

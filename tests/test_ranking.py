@@ -1,9 +1,11 @@
 """Ranking across seeds, and the two ways a ranking lies.
 
 One seed ranks the seed. An aggregate median ranks the median, which is not
-the same as ranking the agents -- momentum's +0.519 against mean-reversion's
-+0.242 is a 6-6 split when you pair it. Both failures are measured here rather
-than described.
+the same as ranking the agents -- mean-reversion's +0.064 pooled capture
+against random's +0.019 is a 6-6 split when you pair it. Both failures are
+measured here rather than described. (Before the 2026-08 era boundary the
+demonstration pair was momentum against mean-reversion, +0.519 against
++0.242; the era re-roll moved which pair shows it, not the phenomenon.)
 """
 
 import pytest
@@ -165,34 +167,36 @@ def test_sign_test_never_exceeds_one():
 def test_a_real_difference_separates_and_a_median_gap_may_not(ranking):
     """The finding this module was built around.
 
-    Momentum ranks above random on pooled capture AND wins 10 of 12 paired
-    seeds, p = 0.039. It also ranks above mean-reversion, and THAT ordering is
-    not established -- 7-5, p = 0.77. It wins bigger, not much more often.
+    Momentum ranks above random on pooled capture AND wins 11 of 12 paired
+    seeds, p = 0.0063. Mean-reversion also ranks above random on the pooled
+    aggregate (+0.064 against +0.019), and THAT ordering is not established
+    at all -- 6-6, p = 1.0. It wins bigger, not more often.
 
-    The pair used to be momentum against buy-and-hold at 12-0. That stopped
-    being a clean sweep when a stepped day was fixed to stop re-opening the
-    market at every step -- which reset `previous_close`, and so reset
-    `last_daily_return`, the exact signal momentum trades. Part of momentum's
-    edge over a buy-and-hold was an artefact of that reset.
+    Re-measured twice: once when a stepped day stopped re-opening the market
+    at every step (which had inflated momentum's edge through the
+    `previous_close` reset), and again at the 2026-08 era boundary, which
+    moved the weak pair from momentum-vs-mean-reversion (7-5 then) to
+    mean-reversion-vs-random. The phenomenon -- an aggregate ordering the
+    sign test refuses to confirm -- survives both re-rolls.
 
     Asserted as the CONTRAST rather than as two fixed p-values, because the
     counts belong to these seeds. What must hold is that the sign test can
     tell the two situations apart at all.
     """
     strong = ranking.separation("momentum", "random")
-    weak = ranking.separation("momentum", "mean_reversion")
+    weak = ranking.separation("mean_reversion", "random")
     assert strong["p_value"] < 0.05, (
         f"momentum did not separate from random: {strong}"
     )
     assert not weak["decisive"]
     assert weak["p_value"] > strong["p_value"], (
-        "the sign test gave momentum-vs-mean-reversion at least as much "
+        "the sign test gave mean-reversion-vs-random at least as much "
         "confidence as momentum-vs-random; it is not discriminating"
     )
     # And the ordering the aggregate suggests is the one the sign test
     # refuses to confirm -- which is the entire point of reporting both.
     table = {r.name: r.pooled_capture for r in ranking.table()}
-    assert table["momentum"] > table["mean_reversion"]
+    assert table["mean_reversion"] > table["random"]
 
 
 def test_separation_is_symmetric_in_its_verdict(ranking):

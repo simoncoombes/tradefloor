@@ -39,7 +39,7 @@ use pretium::economy::{
     InitialEconomyOptions,
 };
 use pretium::engine::{DayAdvanceRequest, DayCloseRequest, Engine, PriceField, TickRequest};
-use pretium::market::{GameTime, TickCompany, TickStock};
+use pretium::market::{AvgVolumePolicy, GameTime, TickCompany, TickStock};
 use pretium::rng::Rng;
 use serde_json::Value as Json;
 
@@ -334,9 +334,14 @@ fn check(file: &str) {
             tape_of(&draws["close"]).is_empty(),
             "day {day}: the TypeScript close drew — the schedule has changed"
         );
+        // `ReferenceEma`, because this replays a recorded reference run and
+        // must reproduce the reference's state evolution exactly -- the
+        // shipped `Hold` policy is an argued divergence tested in
+        // `market/daily.rs`, not here.
         engine.close_market(&DayCloseRequest {
             daily_innovations: &vec![None; roster],
             sector_base_variances: &sector_variances,
+            avg_volume: AvgVolumePolicy::ReferenceEma,
         });
 
         // ── Compare ───────────────────────────────────────────────────────

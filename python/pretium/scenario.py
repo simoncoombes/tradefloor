@@ -17,18 +17,26 @@ scores = pt.evaluate(agents, seed=7, universe=u, days=60, scenario=shock)
 
 ## The trap this exists to close
 
-Pinning `federal_funds_rate` on its own does **nothing**. Measured: a 250bp
-hike over thirty days moved twenty instruments by exactly 0.00%.
+Pinning `federal_funds_rate` on its own does **nothing inside the first
+central-bank meeting window**. Measured: a 250bp hike over thirty days moved
+twenty instruments by exactly 0.00% at 40 days.
 
 That is not a defect, it is the valuation model. Equities are discounted off
 the **corporate bond yield**, and the policy rate is only a fallback used when
 no yield is present — `Some(0.0)` is a real zero yield and must be used, so
 inside the engine, where the economy always carries one, the policy rate never
-reaches fair value.
+reaches fair value directly.
 
-Economically that is right. As an interface it is a trap, because the failure
-is silent: you run your rate shock, nothing happens, and you conclude the model
-does not care about rates. It cares. You moved the wrong lever.
+Since the macro chain runs endogenously (2026-08), transmission exists but is
+lagged: the corporate yield is recomputed from the 10Y at central-bank
+MEETINGS, the first of which is scheduled 45 days out. Measured at 60 days,
+the same policy-only ramp prices the median instrument down 3.99%. So the
+trap is now a horizon trap: a short study sees nothing, silently.
+
+The failure mode survives: you run a month-long rate shock, nothing happens,
+and you conclude the model does not care about rates. It cares — at meeting
+cadence, through the curve. For an immediate repricing you still have to move
+the yield equities actually discount off.
 
 So :meth:`Scenario.rate_shock` moves the whole curve — policy rate and
 corporate yield together, separated by a credit spread — which is what a rate
@@ -387,9 +395,12 @@ def run_scenario(
         scenario.apply(engine, day)
         engine.open_market()
         engine.run_session(hour, minute, day_of_week, ticks_per_day)
-        engine.close_market()
+        # Record before the close: the close advances the macro chain into
+        # the next day, and the recorded macro row must carry the values the
+        # day traded under -- for a pinned series, the pin itself.
         if record:
             engine.record(day)
+        engine.close_market()
     return engine
 
 

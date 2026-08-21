@@ -249,8 +249,10 @@ def test_run_days_is_the_explicit_loop():
     for day in range(3):
         by_hand.open_market()
         by_hand.run_session(9, 30, 3, 120)
-        by_hand.close_market()
+        # Record before the close, as run_days does: the close advances the
+        # macro chain, and the macro row must carry the traded-under values.
         by_hand.record(day)
+        by_hand.close_market()
 
     assert shorthand.prices() == by_hand.prices()
     assert shorthand.column("garch_variance") == by_hand.column("garch_variance")

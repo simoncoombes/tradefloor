@@ -35,16 +35,66 @@ use crate::mathx;
 /// Rolling-average-volume EMA span, in days.
 const AVG_VOLUME_EMA_DAYS: f64 = 20.0;
 
-/// Mean of the intraday volume curve across a session.
-///
-/// The daily volume total carries both this and [`VOLUME_SCALE_MEAN`] as
-/// multiplicative bias. Dividing them out is what stops `avgVolume` drifting
-/// upward every day — and `avgVolume` feeds the volume model and the maker's
-/// quote size, so a drift there compounds into wider books and larger prints.
+/// Mean of the intraday volume curve across a session, as the reference
+/// implementation assumed it. Used only under
+/// [`AvgVolumePolicy::ReferenceEma`]; see that variant for why the shipped
+/// path does not divide by this.
 const INTRADAY_VOLUME_MEAN: f64 = 1.45;
 
-/// Mean of the per-tick `volumeScale` term.
+/// Mean of the per-tick `volumeScale` term, as the reference assumed it.
 const VOLUME_SCALE_MEAN: f64 = 1.4;
+
+/// How the close treats `avg_volume`.
+///
+/// # Why this is a policy rather than a behaviour
+///
+/// This is the one place the shipped engine deliberately diverges from the
+/// reference implementation, and the port's faithfulness rule says a
+/// divergence must be argued, not slipped in. Keeping both paths explicit
+/// keeps the argument visible AND keeps the reference path testable: the
+/// TS-tape parity gates replay recorded reference runs, where bit-fidelity
+/// to the reference -- including its EMA -- is the property under test.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AvgVolumePolicy {
+    /// Hold the calibrated level. The shipped default.
+    ///
+    /// The reference feeds realised volume back into a 20-day EMA, divided
+    /// by assumed multiplier means (intraday curve ~1.45, volumeScale ~1.4)
+    /// to remove the volume model's own multiplicative bias
+    /// (`transitions.ts:119-125`). The correction is present, deliberate,
+    /// and correctly reasoned -- and calibrated for a market this engine
+    /// does not produce. Measured here (20 instruments, 252 days, seed 3):
+    /// realised volume runs well above the assumed product, so the EMA is
+    /// fed more than the level it tracks every single day and `avg_volume`
+    /// compounds at ~1.7% a day -- 59x over one simulated year on this
+    /// build, +8.5%/day and a company trading 5.2e9x its float daily on the
+    /// build where it was first measured.
+    ///
+    /// The structural fact that makes holding correct rather than a tuning
+    /// choice: realised volume in this engine is a PURE FUNCTION of
+    /// `avg_volume` -- every tick prints `avg_volume/390` times bounded
+    /// multipliers, and nothing else reaches the tape (agent flow moves
+    /// price through the book but never adds volume). An exact
+    /// realised-multiplier normalisation would reduce the EMA input to
+    /// `avg_volume` itself, a no-op; any other divisor injects pure bias
+    /// that compounds. The feedback carries no information either way.
+    /// Re-tuning the assumed means to this build's realised behaviour would
+    /// stop the divergence while cementing the excess volatility that
+    /// drives the mismatch.
+    ///
+    /// So `avg_volume` stays what the universe calibrated it to be. An
+    /// embedder that wants to move it writes `PriceField::AvgVolume`; if a
+    /// genuine exogenous volume source ever reaches the tape, an EMA over
+    /// THAT signal is the right reintroduction.
+    #[default]
+    Hold,
+    /// The reference implementation's EMA feedback, bit-for-bit.
+    ///
+    /// Exists for the TS-tape parity gates, which replay recorded reference
+    /// runs and must reproduce the reference's state evolution exactly --
+    /// divergence and all. Nothing in the shipped path selects this.
+    ReferenceEma,
+}
 
 /// Reset the daily bars at the open (`market.ts:1708`).
 ///
@@ -75,6 +125,9 @@ pub struct CloseInputs {
     /// `sectorBaseDailyVariance(sector)` — the sector's long-run daily
     /// variance, which sets both GARCH bounds.
     pub sector_base_daily_variance: f64,
+    /// How the close treats `avg_volume`. [`AvgVolumePolicy::Hold`] unless
+    /// you are replaying a reference tape.
+    pub avg_volume: AvgVolumePolicy,
 }
 
 /// Close-of-day bookkeeping for one company.
@@ -117,26 +170,28 @@ pub fn close_day(company: &mut TickCompany, inputs: &CloseInputs) {
         stock.mispricing_s_prev_close = Some(s);
     }
 
-    // 20-day EMA of volume, with the intraday and scale biases divided out.
+    // The one argued divergence from the reference: under the shipped
+    // policy, `avg_volume` is not updated from realised volume at all. The
+    // full argument lives on [`AvgVolumePolicy::Hold`]; in one line, the
+    // reference's EMA feedback tracks a quantity that is a pure function of
+    // `avg_volume` itself, so it carries no information and any
+    // normalisation mismatch compounds exponentially (measured at ~1.7%/day
+    // on this build, +8.5%/day where first found).
     //
-    // `Math.round`, not `f64::round` — see `mathx::js_round`. And the whole
-    // update is skipped when the normalised volume is not positive, so a
-    // closed or untraded day leaves `avgVolume` alone instead of decaying it
-    // toward zero.
-    //
-    // Worth knowing: on THIS domain the two rounding functions are
-    // indistinguishable. They differ only on negative halves — `js_round`
-    // rounds half up, `f64::round` half away from zero — and both operands
-    // here are positive, guaranteed by the guard above and by `avgVolume`
-    // being a volume. Mutation-tested: swapping in `f64::round` changes no
-    // output across 43,200 cases and three 500-day chains. `js_round` stays
-    // because it is what the source says, not because anything downstream can
-    // currently tell.
-    let alpha = 2.0 / (AVG_VOLUME_EMA_DAYS + 1.0);
-    let normalised_daily_vol = stock.volume / (INTRADAY_VOLUME_MEAN * VOLUME_SCALE_MEAN);
-    if normalised_daily_vol > 0.0 {
-        stock.avg_volume =
-            mathx::js_round(stock.avg_volume * (1.0 - alpha) + normalised_daily_vol * alpha);
+    // The `ReferenceEma` arm is the reference bit-for-bit, for tape replay.
+    // `Math.round`, not `f64::round` -- see `mathx::js_round`. The update is
+    // skipped when the normalised volume is not positive, so a closed or
+    // untraded day leaves `avgVolume` alone instead of decaying it toward
+    // zero. (On this domain the two rounding functions are
+    // indistinguishable; mutation-tested, `js_round` stays because it is
+    // what the source says.)
+    if inputs.avg_volume == AvgVolumePolicy::ReferenceEma {
+        let alpha = 2.0 / (AVG_VOLUME_EMA_DAYS + 1.0);
+        let normalised_daily_vol = stock.volume / (INTRADAY_VOLUME_MEAN * VOLUME_SCALE_MEAN);
+        if normalised_daily_vol > 0.0 {
+            stock.avg_volume =
+                mathx::js_round(stock.avg_volume * (1.0 - alpha) + normalised_daily_vol * alpha);
+        }
     }
 }
 
@@ -202,6 +257,13 @@ mod tests {
         CloseInputs {
             daily_innovation: innovation,
             sector_base_daily_variance: BASE,
+            avg_volume: AvgVolumePolicy::Hold,
+        }
+    }
+    fn reference_inputs(innovation: Option<f64>) -> CloseInputs {
+        CloseInputs {
+            avg_volume: AvgVolumePolicy::ReferenceEma,
+            ..inputs(innovation)
         }
     }
 
@@ -306,53 +368,55 @@ mod tests {
     // ── Average volume ────────────────────────────────────────────────────
 
     #[test]
-    fn average_volume_is_stable_when_the_day_is_typical() {
-        // A day whose volume is exactly the biased mean must leave avgVolume
-        // where it was. If the normalisation were wrong, avgVolume would
-        // ratchet upward every single day — and it feeds both the volume
-        // model and the maker's quote size.
+    fn the_shipped_close_never_moves_average_volume() {
+        // The argued divergence: realised volume is a pure function of
+        // `avg_volume`, so feeding it back was a positive feedback loop with
+        // no information in it, and it compounded at ~1.7%/day on this
+        // build. Under the shipped policy the close leaves the calibrated
+        // level exactly alone, whatever the day did.
+        for daily_volume in [0.0, 1.0, 2_030_000.0, 4.2e15] {
+            let mut c = company();
+            c.stock.avg_volume = 1_000_000.0;
+            c.stock.volume = daily_volume;
+            close_day(&mut c, &inputs(None));
+            assert_eq!(
+                c.stock.avg_volume, 1_000_000.0,
+                "a day of volume {daily_volume} must leave the average alone"
+            );
+        }
+    }
+
+    #[test]
+    fn the_reference_ema_is_preserved_for_tape_replay() {
+        // The `ReferenceEma` arm must keep behaving exactly as the reference
+        // does, because the TS-tape parity gates replay recorded reference
+        // runs through it. A day at the assumed biased mean is a fixed
+        // point; a heavier day moves the average by one EMA step.
         let mut c = company();
         c.stock.avg_volume = 1_000_000.0;
         c.stock.volume = 1_000_000.0 * INTRADAY_VOLUME_MEAN * VOLUME_SCALE_MEAN;
-        close_day(&mut c, &inputs(None));
+        close_day(&mut c, &reference_inputs(None));
         assert_eq!(c.stock.avg_volume, 1_000_000.0);
-    }
 
-    #[test]
-    fn average_volume_does_not_drift_over_a_long_quiet_run() {
         let mut c = company();
         c.stock.avg_volume = 1_000_000.0;
-        for _ in 0..500 {
-            c.stock.volume = 1_000_000.0 * INTRADAY_VOLUME_MEAN * VOLUME_SCALE_MEAN;
-            close_day(&mut c, &inputs(None));
-        }
-        assert_eq!(
-            c.stock.avg_volume, 1_000_000.0,
-            "500 typical days must leave the average exactly where it started"
-        );
+        c.stock.volume = 5_000_000.0 * INTRADAY_VOLUME_MEAN * VOLUME_SCALE_MEAN;
+        close_day(&mut c, &reference_inputs(None));
+        let alpha = 2.0 / 21.0;
+        let expected = mathx::js_round(1_000_000.0 * (1.0 - alpha) + 5_000_000.0 * alpha);
+        assert_eq!(c.stock.avg_volume, expected);
     }
 
     #[test]
-    fn an_untraded_day_leaves_the_average_alone() {
+    fn an_untraded_day_leaves_the_reference_average_alone() {
         let mut c = company();
         c.stock.avg_volume = 1_000_000.0;
         c.stock.volume = 0.0;
-        close_day(&mut c, &inputs(None));
+        close_day(&mut c, &reference_inputs(None));
         assert_eq!(
             c.stock.avg_volume, 1_000_000.0,
             "a zero-volume day must not decay the average toward zero"
         );
-    }
-
-    #[test]
-    fn a_heavy_day_raises_the_average_by_roughly_one_ema_step() {
-        let mut c = company();
-        c.stock.avg_volume = 1_000_000.0;
-        c.stock.volume = 5_000_000.0 * INTRADAY_VOLUME_MEAN * VOLUME_SCALE_MEAN;
-        close_day(&mut c, &inputs(None));
-        let alpha = 2.0 / 21.0;
-        let expected = mathx::js_round(1_000_000.0 * (1.0 - alpha) + 5_000_000.0 * alpha);
-        assert_eq!(c.stock.avg_volume, expected);
     }
 
     // ── Open reset ────────────────────────────────────────────────────────
