@@ -167,3 +167,61 @@ def test_invalid_stepping_is_refused():
         b.tick(25, 0, 3)
     with pytest.raises(pretium.ValidationError, match="greater than zero"):
         b.run_session(9, 30, 3, 0)
+
+
+# --------------------------------------------------------------------------
+# A batch member IS a standalone engine, not a near-enough one
+# --------------------------------------------------------------------------
+
+
+def _solo(seed, universe, sessions):
+    engine = pretium.Engine(seed=seed, universe=universe)
+    engine.open_market()
+    for step in range(sessions):
+        hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
+        engine.run_session(hour, minute, 3, 60)
+    return engine.prices()
+
+
+def _member(batch, index, count):
+    flat = batch.prices()
+    width = count * 8
+    return flat[index * width:(index + 1) * width]
+
+
+@pytest.mark.parametrize("sessions", [1, 4])
+def test_a_batch_member_matches_a_standalone_engine(sessions):
+    """The whole justification for the batch: it is a fast path, not a model.
+
+    This held for a single session and failed for four. `run_session` re-opened
+    the market on every call here after `Engine` had stopped doing so, which
+    made a day of several sessions several days in a batch and one day in an
+    engine. Measured before the fix: up to 0.5% apart on prices.
+
+    Parameterised over both, because the one-session case passes either way
+    and would have gone on passing while the fast path drifted into being a
+    different market.
+    """
+    universe = pretium.Universe.random(8, seed=5)
+    seeds = [1, 2, 3]
+    batch = pretium.EngineBatch(seeds=seeds, universe=universe)
+    batch.open_market()
+    for step in range(sessions):
+        hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
+        batch.run_session(hour, minute, 3, 60)
+
+    for index, seed in enumerate(seeds):
+        assert _member(batch, index, len(universe)) == _solo(
+            seed, universe, sessions), f"seed {seed} diverged"
+
+
+def test_a_batch_opens_the_day_the_way_an_engine_does():
+    # Neither requires an explicit open_market, and both must give the same
+    # market when it is left out.
+    universe = pretium.Universe.random(8, seed=5)
+    batch = pretium.EngineBatch(seeds=[1, 2], universe=universe)
+    batch.run_session(9, 30, 3, 60)
+
+    engine = pretium.Engine(seed=1, universe=universe)
+    engine.run_session(9, 30, 3, 60)
+    assert _member(batch, 0, len(universe)) == engine.prices()

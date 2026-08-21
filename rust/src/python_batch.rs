@@ -54,6 +54,18 @@ pub struct PyEngineBatch {
     buffers: Vec<SessionBuffer>,
     seeds: Vec<u32>,
     tickers: Vec<String>,
+    /// Whether `open_market` has been called and a day is in progress.
+    ///
+    /// Mirrors `Engine`, and it has to. Without it `run_session` re-opened on
+    /// every call, so a day made of several sessions was several days here and
+    /// one day there -- and a batch member stopped being the same market as a
+    /// standalone `Engine` on the same seed. Measured before fixing: up to
+    /// **0.5%** apart on prices after four sessions in a day.
+    ///
+    /// A batch has no `close_market`, so `open_market` is the only day
+    /// boundary. That is the same contract `Engine` offers; `close_market`
+    /// merely ends the day early there.
+    market_open: bool,
 }
 
 #[pymethods]
@@ -114,10 +126,12 @@ impl PyEngineBatch {
             buffers,
             seeds,
             tickers: universe.iter().map(|i| i.ticker.clone()).collect(),
+            market_open: false,
         })
     }
 
     fn open_market(&mut self) {
+        self.market_open = true;
         for engine in &mut self.engines {
             engine.open_market();
         }
@@ -165,6 +179,12 @@ impl PyEngineBatch {
         if ticks == 0 {
             return Err(ValidationError::new_err("ticks must be greater than zero"));
         }
+        // Open the day if the caller has not, and exactly once however many
+        // sessions it holds. Same rule as `Engine`, so a batch member and a
+        // standalone engine on the same seed stay the same market.
+        if !self.market_open {
+            self.open_market();
+        }
         for (engine, buffer) in self.engines.iter_mut().zip(self.buffers.iter_mut()) {
             let n = engine.len();
             let innovations: Vec<Option<f64>> = vec![None; n];
@@ -190,19 +210,15 @@ impl PyEngineBatch {
                     news_impact_queue: &[],
                     order_volumes: &[],
                     close_at_end: false,
-                    // True here, unlike `Engine`, and deliberately.
+                    // False, matching `Engine`. The day is opened once, above.
                     //
-                    // A batch has no day: it exposes `open_market` but no
-                    // `close_market`, no `record` and no attribution, so
-                    // "advance every member" is the whole contract. With no
-                    // day boundary to hang it on, session and day are the same
-                    // window, which is exactly what `reopen: true` means.
-                    //
-                    // Changing it would move batch prices -- `open_market`
-                    // re-anchors the daily open, so the circuit-breaker band
-                    // moves with it -- to fix a reporting bug this surface
-                    // cannot exhibit. See `SessionRequest::reopen`.
-                    reopen: true,
+                    // This was `true` on the argument that a batch has no day
+                    // boundary. It does: `open_market`. Leaving it true made a
+                    // batch member diverge from a standalone `Engine` on the
+                    // same seed as soon as a day held more than one session --
+                    // measured at up to 0.5% on prices after four. A fast path
+                    // that is a different market is not a fast path.
+                    reopen: false,
                     daily_innovations: &innovations,
                     sector_base_variances: &variances,
                     stop: None,
