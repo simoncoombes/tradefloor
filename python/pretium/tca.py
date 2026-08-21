@@ -298,7 +298,11 @@ def analyse(
         for _ in range(steps_per_day):
             prices = _f64(engine.prices())
             actual_path.append(prices)
-            portfolio.stamp(day, step)
+            # The within-day tick the fill lands on: agents act at the START of
+            # a step, so `ticks_per_step` ticks per completed step have
+            # run this day. This is what makes the fills table joinable
+            # to bars and truth on (day, tick, instrument_id).
+            portfolio.stamp(day, step, (step % steps_per_day) * ticks_per_step)
             obs = Observation(step, day, tickers, prices, portfolio, engine,
                               adv, steps_per_day)
             for ticker, quantity in (agent.act(obs) or {}).items():

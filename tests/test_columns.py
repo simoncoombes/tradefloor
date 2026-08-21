@@ -194,3 +194,73 @@ def test_generated_universes_pass_their_own_guard():
     # produce a value the constructor would reject.
     for instrument in pretium.Universe.random(60, seed=5):
         assert instrument.short_interest == 0.0 or instrument.short_interest >= 1.0
+
+
+# --------------------------------------------------------------------------
+# The tables must actually join
+# --------------------------------------------------------------------------
+
+
+def test_fills_join_to_the_tape_on_day_tick_instrument():
+    """The claim the fills docstring made and only half-delivered.
+
+    `bars`, `truth` and `book` are keyed on a within-day tick. `step` is a
+    GLOBAL counter, so before the `tick` column a fill read `day=1, step=6`
+    under four steps a day -- which looks wrong and joins to nothing.
+    Recovering the tick needed `steps_per_day` and `ticks_per_step`, neither
+    of which appears in any table, so the join worked only for someone who
+    still had the call that produced the data.
+
+    This does the join for real rather than asserting the column exists.
+    """
+    pa = pytest.importorskip("pyarrow")
+
+    universe = pretium.Universe.random(6, seed=1)
+    engine = pretium.Engine(seed=1, universe=universe)
+    engine.run_days(3, record=True, ticks_per_day=40)
+    bars = pa.table(engine.bars())
+
+    portfolio = pretium.Portfolio(cash=1_000_000.0)
+    portfolio.stamp(1, 6, 20)
+    fills = pa.table(pretium._core.fills_stream(
+        [1], [6], [20], [0], [100.0], [10.0], [10.0], [1000.0]))
+
+    joined = fills.join(bars, keys=["day", "tick", "instrument_id"])
+    assert joined.num_rows == 1, "the fill matched no bar"
+    assert "close" in joined.column_names
+    # And the bar it matched is a real one, not a null-filled outer join.
+    assert joined.column("close")[0].as_py() > 0
+
+
+def test_the_join_key_is_the_tick_the_fill_preceded():
+    """Agents act at the START of a step, so the arithmetic is exact.
+
+    A fill at within-day step k carries k * ticks_per_step -- the index of the
+    next tick to run. Checked against the harness rather than restated: every
+    fill's tick must equal that, for the steps_per_day and ticks_per_step the
+    run actually used.
+    """
+    universe = pretium.Universe.random(6, seed=1)
+    steps_per_day, ticks_per_step = 4, 10
+    execution = pretium.tca.analyse(
+        _AlwaysBuys(), seed=1, universe=universe, days=3,
+        steps_per_day=steps_per_day, ticks_per_step=ticks_per_step)
+    assert execution.fills, "no fills, so this proves nothing"
+    for fill in execution.fills:
+        expected = (fill["step"] % steps_per_day) * ticks_per_step
+        assert fill["tick"] == expected, fill
+        # And it is a within-day index, unlike step.
+        assert 0 <= fill["tick"] < steps_per_day * ticks_per_step
+
+
+def test_stamping_without_a_tick_is_a_type_error():
+    # Defaulting it would put every fill at tick zero: a table that joins
+    # cleanly, to the wrong bar, with nothing to indicate it.
+    portfolio = pretium.Portfolio(cash=1_000.0)
+    with pytest.raises(TypeError):
+        portfolio.stamp(1, 6)
+
+
+class _AlwaysBuys:
+    def act(self, obs):
+        return {obs.tickers[0]: 0.001 * obs.avg_volume(obs.tickers[0])}

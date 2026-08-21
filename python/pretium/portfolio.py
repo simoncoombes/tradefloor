@@ -86,7 +86,7 @@ class Portfolio:
                 f"max_leverage must be finite and positive, got {max_leverage}"
             )
         self.max_leverage = max_leverage
-        self._stamp = (0, 0)
+        self._stamp = (0, 0, 0)
         self.cash = float(cash)
         self.starting_cash = float(cash)
         self.positions: dict[str, Position] = {}
@@ -154,6 +154,7 @@ class Portfolio:
             "partial": size < abs(quantity),
             "day": self._stamp[0],
             "step": self._stamp[1],
+            "tick": self._stamp[2],
         }
         self.fills.append(fill)
         return fill
@@ -287,21 +288,39 @@ class Portfolio:
         self._flow.clear()
 
     def fills_table(self, tickers: list[str]):
-        """The fill log as an Arrow stream.
+        """The fill log as an Arrow stream, joinable to the tape.
 
         ``tickers`` is the roster, so fills carry an ``instrument_id`` index
         rather than a repeated string -- and so this table joins to ``bars``
-        and ``truth`` on the same key rather than on text.
+        and ``truth`` on that key rather than on text.
 
         The join is the point: ``bars`` says where the price was, this says
         where you were filled, and the gap between them is your execution
         quality. Neither table can answer that alone.
+
+        # Why there is a ``tick`` column as well as a ``step``
+
+        This docstring used to claim the join and only half-deliver it.
+        ``bars``, ``truth`` and ``book`` are keyed on a WITHIN-DAY tick;
+        ``step`` is a GLOBAL counter, so a fill at ``day=1, step=6`` under
+        four steps a day looks wrong and joins to nothing. Recovering the tick
+        needed ``steps_per_day`` and ``ticks_per_step``, which appear in no
+        table -- so the join was possible only for someone who still had the
+        call that produced the data.
+
+        ``tick`` is the number of ticks already run that day when the order
+        crossed. Agents act at the START of a step and the session runs
+        afterwards, so a fill at within-day step ``k`` carries
+        ``k * ticks_per_step``: the index of the next tick to run. Joining on
+        ``(day, tick, instrument_id)`` therefore lines a fill up with the bar
+        it immediately preceded, which is the bar its impact shows up in.
         """
         index = {t: i for i, t in enumerate(tickers)}
         rows = [f for f in self.fills if f["ticker"] in index]
         return _core.fills_stream(
             [int(f.get("day", 0)) for f in rows],
             [int(f.get("step", 0)) for f in rows],
+            [int(f.get("tick", 0)) for f in rows],
             [index[f["ticker"]] for f in rows],
             [f["quantity"] for f in rows],
             [f["price"] for f in rows],
@@ -309,14 +328,19 @@ class Portfolio:
             [f["notional"] for f in rows],
         )
 
-    def stamp(self, day: int, step: int) -> None:
-        """Tag subsequent fills with a day and step.
+    def stamp(self, day: int, step: int, tick: int) -> None:
+        """Tag subsequent fills with a day, a global step and a within-day tick.
 
         Called by the harness between steps. Without it every fill would sit
         at day zero and the fills table could not be joined to anything on
         time, which is most of what it is for.
+
+        ``tick`` is required rather than defaulted. Defaulting it would put
+        every fill at tick zero -- a table that joins cleanly, to the wrong
+        bar, with nothing to indicate it. That is worse than a TypeError.
+        See :meth:`fills_table` for what the value means.
         """
-        self._stamp = (int(day), int(step))
+        self._stamp = (int(day), int(step), int(tick))
 
     def __repr__(self) -> str:
         held = {t: round(p.quantity, 2) for t, p in self.positions.items() if p.quantity}

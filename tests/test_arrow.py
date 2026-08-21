@@ -14,6 +14,7 @@ import pytest
 import pretium
 
 pa = pytest.importorskip("pyarrow", reason="pyarrow is a test-only dependency")
+pc = pytest.importorskip("pyarrow.compute")
 
 
 def arr(buf):
@@ -239,7 +240,9 @@ def traded(days=3, steps=4, ticks=60):
     for day in range(days):
         e.open_market()
         for step in range(steps):
-            p.stamp(day, step)
+            # Global step, within-day tick -- the same arithmetic the harness
+            # uses, so this helper produces a joinable table like a real run.
+            p.stamp(day, day * steps + step, step * ticks)
             size = u[0].avg_volume * 0.5
             p.execute(e, ticker, size if step % 2 == 0 else -size)
             e.run_session(9, 30, 3, ticks, order_flow=p.pending_flow())
@@ -254,19 +257,29 @@ def test_fills_records_every_execution():
     fills = pa.table(p.fills_table(e.tickers))
     assert fills.num_rows == days * steps
     assert fills.column_names == [
-        "day", "step", "instrument_id", "quantity", "price", "worst_price", "notional",
+        "day", "step", "tick", "instrument_id", "quantity", "price",
+        "worst_price", "notional",
     ]
 
 
-def test_fills_joins_to_bars_on_instrument_and_day():
-    # bars says where the price was; fills says where you were filled. The gap
-    # between them is execution quality, and neither table can answer that
-    # alone.
+def test_fills_joins_to_bars_on_instrument_day_and_tick():
+    """bars says where the price was; fills says where you were filled.
+
+    This test used to check only that the fills' instrument ids and days were
+    SUBSETS of the bars' -- a containment check wearing the name of a join. It
+    passed with every fill sitting at tick zero, which is exactly the state
+    the `tick` column was added to fix. It now does the join.
+    """
     e, p, _, _ = traded()
-    fills = pa.table(p.fills_table(e.tickers)).to_pydict()
-    bars = pa.table(e.bars()).to_pydict()
-    assert set(fills["instrument_id"]) <= set(bars["instrument_id"])
-    assert set(fills["day"]) <= set(bars["day"])
+    fills = pa.table(p.fills_table(e.tickers))
+    bars = pa.table(e.bars())
+    joined = fills.join(bars, keys=["day", "tick", "instrument_id"])
+    assert joined.num_rows == fills.num_rows, (
+        f"{fills.num_rows - joined.num_rows} fills matched no bar"
+    )
+    # Not an outer join filling nulls: every matched bar is a real one.
+    assert all(v is not None and v > 0
+               for v in joined.column("close").to_pylist())
 
 
 def test_fills_are_stamped_with_when_they_happened():
@@ -275,7 +288,11 @@ def test_fills_are_stamped_with_when_they_happened():
     e, p, days, steps = traded()
     fills = pa.table(p.fills_table(e.tickers)).to_pydict()
     assert sorted(set(fills["day"])) == list(range(days))
-    assert sorted(set(fills["step"])) == list(range(steps))
+    # `step` is GLOBAL and `tick` is within-day. Asserting both shapes,
+    # because the two being different scales is the thing that made the table
+    # unjoinable and is easy to "tidy" back into agreement.
+    assert sorted(set(fills["step"])) == list(range(days * steps))
+    assert sorted(set(fills["tick"])) == [s * 60 for s in range(steps)]
 
 
 def test_fills_carry_the_worst_price_not_only_the_average():
@@ -512,3 +529,90 @@ def test_clearing_a_recording_clears_depth_too():
     e, _, _, _ = snapshotted()
     e.clear_recording()
     assert e.recorded_book_rows == 0
+
+
+# --------------------------------------------------------------------------
+# record() captures a DAY, not the last session of one
+# --------------------------------------------------------------------------
+
+
+def test_a_day_of_many_sessions_records_every_tick():
+    """The defect that made the fills join fail, and it was the bigger one.
+
+    `SessionBuffer` is the LAST session's path -- it rewrites from tick zero
+    each call, which is right for `prices()`. `record(day)` snapshotted it,
+    and is named for a day. An agent-shaped run calls `run_session` once per
+    step, so four steps a day recorded 60 ticks of a 240-tick day: a table
+    that was well-formed, self-consistent, and missing 75% of the market with
+    nothing to indicate it.
+    """
+    universe = pretium.Universe.random(4, seed=5)
+    engine = pretium.Engine(seed=1, universe=universe)
+    engine.open_market()
+    for step in range(4):
+        hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
+        engine.run_session(hour, minute, 3, 60)
+    engine.close_market()
+    engine.record(0)
+
+    bars = pa.table(engine.bars())
+    ticks = sorted(set(bars.column("tick").to_pylist()))
+    assert len(ticks) == 240, f"recorded {len(ticks)} ticks of a 240-tick day"
+    assert ticks == list(range(240)), "the tick index is not continuous"
+
+
+def test_the_recorded_day_is_exactly_its_sessions_concatenated():
+    """Not merely the right LENGTH -- the right values, in the right order.
+
+    A buffer that appended garbage of the correct size would satisfy the test
+    above. This holds each session's own path as it is produced and asserts
+    the day's tape is those, end to end, bit for bit.
+    """
+    universe = pretium.Universe.random(4, seed=5)
+    count = len(universe)
+    engine = pretium.Engine(seed=1, universe=universe)
+    engine.open_market()
+    sessions = []
+    for step in range(4):
+        hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
+        engine.run_session(hour, minute, 3, 60)
+        sessions.append(list(struct.unpack(
+            "<%dd" % (60 * count), engine.session_prices())))
+    engine.close_market()
+    engine.record(0)
+
+    day = pa.table(engine.bars()).column("close").to_pylist()
+    assert day == [value for session in sessions for value in session]
+
+
+def test_opening_a_new_day_starts_a_new_tape():
+    # Without the clear, a run that opened twice would accumulate one
+    # unbounded "day" and every per-day table would be wrong from day two.
+    universe = pretium.Universe.random(4, seed=5)
+    engine = pretium.Engine(seed=1, universe=universe)
+    for day in range(3):
+        engine.open_market()
+        engine.run_session(9, 30, 3, 30)
+        engine.run_session(10, 0, 3, 30)
+        engine.close_market()
+        engine.record(day)
+    bars = pa.table(engine.bars())
+    for day in range(3):
+        rows = bars.filter(pc.equal(bars.column("day"), day))
+        assert len(set(rows.column("tick").to_pylist())) == 60, (
+            f"day {day} recorded {len(set(rows.column('tick').to_pylist()))} "
+            "ticks; the accumulator is leaking across days"
+        )
+
+
+def test_prices_still_means_the_last_session():
+    # The fix must not change what `session_prices` has always meant. It is
+    # the session buffer, and a caller reading it between steps is reading the
+    # step, not the day.
+    universe = pretium.Universe.random(4, seed=5)
+    engine = pretium.Engine(seed=1, universe=universe)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 30)
+    engine.run_session(10, 0, 3, 45)
+    assert engine.session_ticks_written == 45
+    assert len(engine.session_prices()) == 45 * len(universe) * 8

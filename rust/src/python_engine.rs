@@ -432,6 +432,36 @@ impl PyEngine {
     /// one call would be a bad trade -- it exists so nobody has to remember
     /// the distinction, and an exemption is exactly how the four `f64::max`
     /// calls got into a supposedly-guarded crate the first time.
+    /// Append the session just run onto the day's accumulator.
+    ///
+    /// Called after EVERY inner `run_session`, so a day made of many sessions
+    /// records as one continuous tape. Copies only what was written, which is
+    /// less than capacity whenever a stop condition fired.
+    fn accumulate_session(&mut self) {
+        let ticks = self.buffer.ticks_written;
+        if ticks == 0 {
+            return;
+        }
+        let n = ticks * self.buffer.companies;
+        self.day_buffer.companies = self.buffer.companies;
+        self.day_buffer.ticks += ticks;
+        self.day_buffer.prices.extend_from_slice(&self.buffer.prices[..n]);
+        self.day_buffer.volumes.extend_from_slice(&self.buffer.volumes[..n]);
+        self.day_buffer
+            .mispricing
+            .extend_from_slice(&self.buffer.mispricing_s[..n]);
+        self.day_buffer
+            .fundamental
+            .extend_from_slice(&self.buffer.fundamental[..n]);
+        self.day_buffer
+            .anchor
+            .extend_from_slice(&self.buffer.anchor[..n]);
+        for k in 0..7 {
+            self.day_buffer.components[k]
+                .extend_from_slice(&self.buffer.components[k][..n]);
+        }
+    }
+
     fn written<'a>(&self, buf: &'a [f64]) -> &'a [f64] {
         let n = self.buffer.ticks_written * self.buffer.companies;
         let end = if n > buf.len() { buf.len() } else { n };
@@ -544,6 +574,36 @@ fn parse_field(name: &str) -> PyResult<PriceField> {
     })
 }
 
+/// One day's sessions, concatenated in the order they ran.
+///
+/// Holds the same columns as [`SessionBuffer`] and nothing else; the only
+/// difference is that it appends where the session buffer overwrites.
+#[derive(Debug, Default, Clone)]
+struct DayBuffer {
+    ticks: usize,
+    companies: usize,
+    prices: Vec<f64>,
+    volumes: Vec<f64>,
+    mispricing: Vec<f64>,
+    fundamental: Vec<f64>,
+    anchor: Vec<f64>,
+    components: [Vec<f64>; 7],
+}
+
+impl DayBuffer {
+    fn clear(&mut self) {
+        self.ticks = 0;
+        self.prices.clear();
+        self.volumes.clear();
+        self.mispricing.clear();
+        self.fundamental.clear();
+        self.anchor.clear();
+        for column in self.components.iter_mut() {
+            column.clear();
+        }
+    }
+}
+
 /// A whole market, stepped through time.
 #[pyclass(name = "Engine", module = "pretium._core")]
 pub struct PyEngine {
@@ -562,6 +622,21 @@ pub struct PyEngine {
     /// as one batch that is a memory problem, as 252 daily batches it is a
     /// pull protocol the consumer drives.
     recorded: Vec<crate::python_arrow::RecordedDay>,
+    /// Every session since the last `open_market`, concatenated.
+    ///
+    /// `SessionBuffer` is, as its name and docs say, the LAST session's path:
+    /// `resize` rewrites it from tick zero each time. That is right for
+    /// `prices()`, and it was silently wrong for `record`, which is named for
+    /// a DAY. An agent-shaped run calls `run_session` once per step -- the
+    /// harness does exactly this -- so `record(day)` kept the last step and
+    /// discarded the rest of the day. Four steps a day meant a tape with 75%
+    /// of its ticks missing, with nothing to indicate it: the table was
+    /// well-formed, self-consistent and short.
+    ///
+    /// Accumulating here rather than changing `SessionBuffer` keeps
+    /// `prices()` meaning what it has always meant, and costs a copy per
+    /// session that only a recording caller pays.
+    day_buffer: DayBuffer,
     recorded_macro: Vec<crate::python_arrow::MacroRow>,
     /// Recorded order-book depth. Empty unless a caller asks for it.
     recorded_book: Vec<crate::python_arrow::BookRow>,
@@ -605,6 +680,7 @@ impl PyEngine {
                 crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
             ),
             buffer: SessionBuffer::new(),
+            day_buffer: DayBuffer::default(),
             tickers,
             recorded: Vec::new(),
             recorded_macro: Vec::new(),
@@ -616,6 +692,9 @@ impl PyEngine {
     /// Roll the day's opening marks. Call once before the session's ticks.
     fn open_market(&mut self) {
         self.log.push(crate::python_log::LogEntry::OpenMarket);
+        // A new day's tape starts here. Without this, a run that never closed
+        // would grow one unbounded "day".
+        self.day_buffer.clear();
         self.inner.open_market();
     }
 
@@ -805,6 +884,7 @@ impl PyEngine {
                 buffer,
             )
         });
+        self.accumulate_session();
         Ok(self.buffer.ticks_written)
     }
 
@@ -955,6 +1035,7 @@ impl PyEngine {
             },
             &mut self.buffer,
         );
+        self.accumulate_session();
         Ok(outcome.halted_at)
     }
 
@@ -1440,18 +1521,17 @@ impl PyEngine {
     #[pyo3(signature = (day))]
     fn record(&mut self, day: u32) -> PyResult<()> {
         self.log.push(crate::python_log::LogEntry::Record { day });
+        // The DAY's tape, not the last session's. See `DayBuffer`.
         self.recorded.push(crate::python_arrow::RecordedDay {
             day,
-            ticks: self.buffer.ticks_written,
-            instruments: self.buffer.companies,
-            prices: self.written(&self.buffer.prices).to_vec(),
-            volumes: self.written(&self.buffer.volumes).to_vec(),
-            mispricing: self.written(&self.buffer.mispricing_s).to_vec(),
-            fundamental: self.written(&self.buffer.fundamental).to_vec(),
-            anchor: self.written(&self.buffer.anchor).to_vec(),
-            components: std::array::from_fn(|k| {
-                self.written(&self.buffer.components[k]).to_vec()
-            }),
+            ticks: self.day_buffer.ticks,
+            instruments: self.day_buffer.companies,
+            prices: self.day_buffer.prices.clone(),
+            volumes: self.day_buffer.volumes.clone(),
+            mispricing: self.day_buffer.mispricing.clone(),
+            fundamental: self.day_buffer.fundamental.clone(),
+            anchor: self.day_buffer.anchor.clone(),
+            components: std::array::from_fn(|k| self.day_buffer.components[k].clone()),
         });
         let e = self.inner.economy();
         self.recorded_macro.push(crate::python_arrow::MacroRow {

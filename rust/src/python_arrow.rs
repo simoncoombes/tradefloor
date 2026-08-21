@@ -372,6 +372,12 @@ pub fn fills_schema() -> SchemaRef {
     Arc::new(Schema::new(vec![
         Field::new("day", DataType::UInt32, false),
         Field::new("step", DataType::UInt32, false),
+        // The join key. `bars`, `truth` and `book` are keyed on a WITHIN-DAY
+        // tick; `step` is a global counter, so without this column the fills
+        // table cannot be joined to the tape from the data alone -- it would
+        // need `steps_per_day` and `ticks_per_step`, which appear in no table.
+        // A columnar contract whose tables do not join is not a contract.
+        Field::new("tick", DataType::UInt32, false),
         Field::new("instrument_id", DataType::UInt32, false),
         Field::new("quantity", DataType::Float64, false),
         Field::new("price", DataType::Float64, false),
@@ -384,6 +390,7 @@ pub fn fills_schema() -> SchemaRef {
 pub fn fills_batch(
     day: Vec<u32>,
     step: Vec<u32>,
+    tick: Vec<u32>,
     instrument_id: Vec<u32>,
     quantity: Vec<f64>,
     price: Vec<f64>,
@@ -393,6 +400,7 @@ pub fn fills_batch(
     let n = day.len();
     for (name, len) in [
         ("step", step.len()),
+        ("tick", tick.len()),
         ("instrument_id", instrument_id.len()),
         ("quantity", quantity.len()),
         ("price", price.len()),
@@ -406,6 +414,7 @@ pub fn fills_batch(
     let columns: Vec<ArrayRef> = vec![
         Arc::new(UInt32Array::from(day)),
         Arc::new(UInt32Array::from(step)),
+        Arc::new(UInt32Array::from(tick)),
         Arc::new(UInt32Array::from(instrument_id)),
         Arc::new(Float64Array::from(quantity)),
         Arc::new(Float64Array::from(price)),
@@ -426,14 +435,17 @@ pub fn fills_batch(
 pub fn fills_stream(
     day: Vec<u32>,
     step: Vec<u32>,
+    tick: Vec<u32>,
     instrument_id: Vec<u32>,
     quantity: Vec<f64>,
     price: Vec<f64>,
     worst_price: Vec<f64>,
     notional: Vec<f64>,
 ) -> PyResult<PyArrowStream> {
-    let batch = fills_batch(day, step, instrument_id, quantity, price, worst_price, notional)
-        .map_err(arrow_err)?;
+    let batch = fills_batch(
+        day, step, tick, instrument_id, quantity, price, worst_price, notional,
+    )
+    .map_err(arrow_err)?;
     Ok(PyArrowStream::new("fills", fills_schema(), vec![batch]))
 }
 
