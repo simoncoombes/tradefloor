@@ -50,7 +50,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 <div class="sheet">
 
-  <nav class="rack" aria-label="Documentation">
+  <details class="rack" open>
+    <summary class="rack__summary">Contents</summary>
+    <nav class="rack__inner" aria-label="Documentation">
     <a class="rack__home{% if page.title == 'Home' %} is-filed{% endif %}" href="{{ '/' | relative_url }}">Contents</a>
     {% assign docs = site.pages | where_exp:"p","p.nav_order" | sort:"nav_order" %}
     {% for rack in site.racks %}
@@ -71,7 +73,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       </div>
       {% endif %}
     {% endfor %}
-  </nav>
+    </nav>
+  </details>
 
   <main id="main" class="body{% if page.title == 'Home' %} body--home{% endif %}">
     {{ content }}
@@ -106,5 +109,15 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <p class="foot__legal">pretium is pre&#8209;release software, licensed Apache&#8209;2.0. Nothing here is investment advice or a prediction of real returns.</p>
 </footer>
 
+<script>
+(function () {
+  var rack = document.querySelector('.rack');
+  if (!rack) return;
+  var narrow = window.matchMedia('(max-width: 62rem)');
+  function sync(e) { if (e.matches) rack.removeAttribute('open'); else rack.setAttribute('open', ''); }
+  sync(narrow);
+  narrow.addEventListener('change', sync);
+})();
+</script>
 </body>
 </html>
