@@ -53,12 +53,25 @@ state and a maker inventory would not.
 
 ## Why not snapshot the engine state directly
 
-Because it would be a second thing to keep correct. The engine holds the
-generator position, a cached Box-Muller spare, per-company GARCH variance,
-maker inventories and the mispricing carry; a snapshot that missed one field
-would restore a market that looked right and diverged later. The order log is
-already the reproduction mechanism, already tested, and already the thing a
-published result cites.
+Because it is a second thing to keep correct, and it has already been wrong.
+
+The engine holds the generator position, a cached Box-Muller spare,
+per-company GARCH variance, maker inventories, the mispricing carry -- and,
+beside all of those, per-DAY accumulators. The snapshot carried the columns
+and the generator and missed the accumulators, so a fork taken BETWEEN two
+sessions of the same day lost the day's attribution and the market-open flag.
+It then re-opened the day on its next session, re-anchored `previous_close`,
+and priced differently from the parent it was supposed to be a copy of. It
+also closed on a different GARCH variance, which does not show up in today's
+prices at all -- only in tomorrow's.
+
+Every test forked on a day boundary, where there is no per-day state to lose,
+so nothing caught it. That is the shape of the hazard: a snapshot that misses
+one field restores a market that looks right and diverges later.
+
+The order log has none of this exposure. It is already the reproduction
+mechanism, already tested, and already the thing a published result cites --
+which is why it, not the snapshot, is what :class:`Checkpoint` serialises.
 """
 
 from __future__ import annotations

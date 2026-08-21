@@ -292,3 +292,99 @@ def test_an_older_checkpoint_without_a_fingerprint_still_loads():
     del payload["universe_fingerprint"]
     restored = pretium.Checkpoint.from_json(json.dumps(payload))
     assert restored.resume().prices() == engine.prices()
+
+
+# --------------------------------------------------------------------------
+# Forking MID-DAY, which is where the snapshot was incomplete
+# --------------------------------------------------------------------------
+
+
+def _first(engine, factor, count):
+    return struct.unpack("<%dd" % count, engine.attribution(factor))[0]
+
+
+def test_a_mid_day_fork_continues_the_parent_exactly():
+    """`branch` promises identical, not similar. Mid-day it delivered neither.
+
+    The state snapshot carried the per-COMPANY columns and the generator
+    position, and not the per-DAY accumulators that live beside them. A fork
+    taken between two sessions of the same day lost the attribution
+    accumulator and the market-open flag, so it re-opened the day on its next
+    session, re-anchored `previous_close`, and priced differently from the
+    parent it was supposed to be a copy of.
+
+    Every existing test forked on a day boundary, where there is no per-day
+    state to lose.
+    """
+    universe = pretium.Universe.random(6, seed=5)
+    count = len(universe)
+    parent = pretium.Engine(seed=1, universe=universe)
+    parent.open_market()
+    parent.run_session(9, 30, 3, 60)
+
+    forks = pretium.branch(parent, 2, universe=universe, seed=1)
+    assert _first(forks[0], "random_noise", count) == _first(
+        parent, "random_noise", count), "the fork lost the day's attribution"
+
+    parent.run_session(10, 30, 3, 60)
+    for fork in forks:
+        fork.run_session(10, 30, 3, 60)
+
+    assert forks[0].prices() == parent.prices(), "the fork diverged in price"
+    assert forks[1].prices() == parent.prices()
+    assert _first(forks[0], "random_noise", count) == _first(
+        parent, "random_noise", count)
+
+
+def test_a_mid_day_fork_closes_the_day_the_same_way():
+    """The deepest consequence, and the one a price check alone would miss.
+
+    `close_market` feeds the day's accumulated random_noise to GARCH as the
+    innovation. A fork that lost the accumulator closes on a different
+    variance -- which does not show up in today's prices at all, only in
+    tomorrow's.
+    """
+    universe = pretium.Universe.random(6, seed=5)
+    count = len(universe)
+    parent = pretium.Engine(seed=1, universe=universe)
+    parent.open_market()
+    parent.run_session(9, 30, 3, 60)
+    fork = pretium.branch(parent, 1, universe=universe, seed=1)[0]
+
+    parent.run_session(10, 30, 3, 60)
+    fork.run_session(10, 30, 3, 60)
+    parent.close_market()
+    fork.close_market()
+
+    assert fork.column("garch_variance") == parent.column("garch_variance")
+    # And the variance actually moved, or this compared two untouched arrays.
+    fresh = pretium.Engine(seed=1, universe=universe)
+    assert fork.column("garch_variance") != fresh.column("garch_variance")
+
+
+def test_a_snapshot_without_the_day_state_still_restores():
+    # Written before the per-day accumulators were carried. Such a snapshot
+    # described a day that had not started, so that is what it restores to --
+    # refusing it would break every archived state for no gain.
+    universe = pretium.Universe.random(6, seed=5)
+    engine = pretium.Engine(seed=1, universe=universe)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 60)
+    snapshot = engine.state_snapshot()
+    for key in ("attribution", "tick_components", "tick_fundamental",
+                "tick_anchor", "market_open"):
+        snapshot.pop(key)
+
+    restored = pretium.Engine(seed=1, universe=universe)
+    restored.restore_state(snapshot)
+    assert restored.prices() == engine.prices()
+
+
+def test_the_snapshot_carries_the_open_flag():
+    universe = pretium.Universe.random(6, seed=5)
+    engine = pretium.Engine(seed=1, universe=universe)
+    assert engine.state_snapshot()["market_open"] is False
+    engine.open_market()
+    assert engine.state_snapshot()["market_open"] is True
+    engine.close_market()
+    assert engine.state_snapshot()["market_open"] is False

@@ -1467,6 +1467,25 @@ impl PyEngine {
             ],
         )?;
         out.set_item("tickers", self.inner.ids().to_vec())?;
+        // The per-DAY accumulators. The columns above are per-company state;
+        // these live beside them and were missing, which made a mid-day fork
+        // diverge in PRICE -- `attribution` is the day's GARCH innovation at
+        // the close, and `market_open` decides whether the next session
+        // re-opens the day and re-anchors `previous_close`.
+        let flat = |rows: &[[f64; 7]]| -> Vec<f64> {
+            rows.iter().flat_map(|r| r.iter().copied()).collect()
+        };
+        out.set_item("attribution", f64_bytes(py, &flat(self.inner.attribution())))?;
+        out.set_item(
+            "tick_components",
+            f64_bytes(py, &flat(self.inner.tick_components())),
+        )?;
+        out.set_item(
+            "tick_fundamental",
+            f64_bytes(py, self.inner.tick_fundamental()),
+        )?;
+        out.set_item("tick_anchor", f64_bytes(py, self.inner.tick_anchor()))?;
+        out.set_item("market_open", self.market_open)?;
         Ok(out.into())
     }
 
@@ -1533,6 +1552,40 @@ impl PyEngine {
             increment: rng[1].to_bits(),
             spare: if rng[2].is_nan() { None } else { Some(rng[2]) },
         });
+
+        // The per-day accumulators. Absent from a snapshot written before
+        // these were carried, so they are optional and default to "a day that
+        // has not started" -- which is what such a snapshot described.
+        let buffer = |key: &str| -> PyResult<Option<Vec<f64>>> {
+            match snapshot.get_item(key)? {
+                None => Ok(None),
+                Some(raw) => {
+                    let bytes: &[u8] = raw.extract()?;
+                    Ok(Some(
+                        bytes
+                            .chunks_exact(8)
+                            .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                            .collect(),
+                    ))
+                }
+            }
+        };
+        let n = self.inner.len();
+        if let Some(attribution) = buffer("attribution")? {
+            let components = buffer("tick_components")?.unwrap_or_else(|| vec![0.0; n * 7]);
+            let fundamental =
+                buffer("tick_fundamental")?.unwrap_or_else(|| vec![f64::NAN; n]);
+            let anchor = buffer("tick_anchor")?.unwrap_or_else(|| vec![f64::NAN; n]);
+            self.inner
+                .restore_day_state(&attribution, &components, &fundamental, &anchor)
+                .map_err(ValidationError::new_err)?;
+        }
+        if let Some(flag) = snapshot.get_item("market_open")? {
+            // Without this the fork believes the day has not started, re-opens
+            // on its next session, and re-anchors `previous_close` mid-day --
+            // so it prices differently from the parent it forked from.
+            self.market_open = flag.extract()?;
+        }
         Ok(())
     }
 

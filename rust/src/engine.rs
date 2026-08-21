@@ -392,6 +392,48 @@ impl Engine {
         &self.tick_anchor
     }
 
+    /// Restore the per-day accumulators that a column snapshot does not hold.
+    ///
+    /// The columns are per-COMPANY state -- price, variance, inventory, the
+    /// mispricing carry. These four are per-DAY, live beside them, and were
+    /// missing from the snapshot, which made a mid-day fork diverge:
+    /// `attribution` is fed to GARCH as the day's innovation at the close, so
+    /// a fork that lost it closed on a different variance and priced
+    /// differently from the parent it was supposed to be identical to.
+    ///
+    /// Lengths are checked rather than truncated. A short slice would restore
+    /// a market correct for its first companies and stale for the rest.
+    pub fn restore_day_state(
+        &mut self,
+        attribution: &[f64],
+        components: &[f64],
+        fundamental: &[f64],
+        anchor: &[f64],
+    ) -> Result<(), String> {
+        let n = self.companies.len();
+        for (name, len, want) in [
+            ("attribution", attribution.len(), n * 7),
+            ("tick_components", components.len(), n * 7),
+            ("tick_fundamental", fundamental.len(), n),
+            ("tick_anchor", anchor.len(), n),
+        ] {
+            if len != want {
+                return Err(format!("{name} has {len} values, expected {want}"));
+            }
+        }
+        self.attribution = attribution
+            .chunks_exact(7)
+            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6]])
+            .collect();
+        self.tick_components = components
+            .chunks_exact(7)
+            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6]])
+            .collect();
+        self.tick_fundamental = fundamental.to_vec();
+        self.tick_anchor = anchor.to_vec();
+        Ok(())
+    }
+
     /// One attribution column across all companies, by index 0..7.
     pub fn attribution_column(&self, factor: usize) -> Vec<f64> {
         self.attribution
