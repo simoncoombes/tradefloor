@@ -97,7 +97,7 @@ pt.evaluate(agents, seed=7, universe=universe, days=20, scenario=shock)
 
 ranking = pt.rank(lambda: pt.reference_agents(seed=3), seeds=range(12),
                   universe=universe, days=10, workers=4)
-ranking.separation("momentum", "mean_reversion")   # 6-6, p = 1.0
+ranking.separation("momentum", "mean_reversion")   # 7-5,  p = 0.77
 ```
 
 Use it to kill strategies rather than to bless them. Something that dies under
