@@ -303,17 +303,432 @@ def filter_rows(rows: Sequence[dict], *, exclude_negative_equity: bool = True):
     return keep, drop
 
 
-def fetch(*args, **kwargs):
-    """Fetch filings from EDGAR. Requires the ``edgar`` extra.
+# ---------------------------------------------------------------------------
+# The network half
+# ---------------------------------------------------------------------------
 
-    Separated from :func:`to_instruments` because the two have different
-    determinism properties: this does I/O and cannot be reproducible, while
-    building a universe from a snapshot is pure. The engine never touches a
-    socket.
+# The frames API returns every filer that reported one concept for one period
+# in a single response. That is the whole reason a market-wide fetch is
+# practical: five requests instead of one per company. The per-company
+# submissions endpoint is then hit only for the names actually kept, and only
+# because SIC is the one field the frames do not carry.
+_FRAMES = "https://data.sec.gov/api/xbrl/frames"
+_SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
+
+# EPS, equity and share count each have one obvious tag. Revenue does not:
+# ASC 606 filers use RevenueFromContractWithCustomer..., older and financial
+# filers use Revenues or SalesRevenueNet. Tried in order, first hit wins, and
+# a company matching none simply has no growth figure rather than a zero --
+# which would be a claim of flat revenue rather than an absence.
+_REVENUE_TAGS = (
+    ("us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax", "USD"),
+    ("us-gaap", "Revenues", "USD"),
+    ("us-gaap", "SalesRevenueNet", "USD"),
+)
+
+# The SEC asks for a declaring User-Agent and no more than ten requests a
+# second. Both are conditions of access, not politeness: the rate limiter is
+# built in and the User-Agent is a required argument with no default, because
+# a library that shipped a fake one would get every one of its users blocked
+# under the same string.
+_MAX_REQUESTS_PER_SECOND = 8.0
+
+
+class FetchError(RuntimeError):
+    """A request to EDGAR failed, or returned something unusable."""
+
+
+def default_transport(user_agent: str, *, timeout: float = 30.0, clock=None,
+                      sleep=None):
+    """A rate-limited urllib transport. Standard library only.
+
+    Injectable, and the injection point is the whole design: :func:`fetch` is
+    pure given a transport, so the derivation is tested against recorded
+    responses with no socket in the test suite. That matters more here than it
+    usually would -- the one part of this library that cannot be
+    deterministic is the part that talks to the network, so the boundary is
+    drawn tightly around it.
     """
-    raise NotImplementedError(
-        "pretium.edgar.fetch is not implemented yet. The pure half -- Snapshot, "
-        "filter_rows and to_instruments -- is complete and testable offline; "
-        "the network fetcher is the remaining piece. Build a Snapshot by hand "
-        "or load one with Snapshot.load(path) in the meantime."
+    import time
+    import urllib.error
+    import urllib.request
+
+    now = clock or time.monotonic
+    wait = sleep or time.sleep
+    interval = 1.0 / _MAX_REQUESTS_PER_SECOND
+    last = [now() - interval]
+
+    def get(url: str) -> bytes:
+        gap = now() - last[0]
+        if gap < interval:
+            wait(interval - gap)
+        last[0] = now()
+        request = urllib.request.Request(url, headers={
+            "User-Agent": user_agent,
+            "Accept-Encoding": "gzip, deflate",
+        })
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                raw = response.read()
+                if response.headers.get("Content-Encoding") == "gzip":
+                    import gzip
+                    raw = gzip.decompress(raw)
+                return raw
+        except urllib.error.HTTPError as exc:
+            raise FetchError(f"HTTP {exc.code} {exc.reason} for {url}") from exc
+        except urllib.error.URLError as exc:
+            raise FetchError(f"could not reach {url}: {exc.reason}") from exc
+
+    return get
+
+
+class _Missing(Exception):
+    """A 404 from the frames API: nobody reported that concept that period."""
+
+
+def _get_json(transport, url: str):
+    try:
+        raw = transport(url)
+    except FetchError as exc:
+        if "HTTP 404" in str(exc):
+            raise _Missing(url) from exc
+        raise
+    try:
+        return json.loads(raw)
+    except (ValueError, TypeError) as exc:
+        raise FetchError(f"{url} did not return JSON") from exc
+
+
+def _frame(transport, taxonomy: str, tag: str, unit: str, period: str):
+    """One frame as {cik: value}. A missing frame is empty, not fatal."""
+    url = f"{_FRAMES}/{taxonomy}/{tag}/{unit}/{period}.json"
+    try:
+        payload = _get_json(transport, url)
+    except _Missing:
+        return {}
+    out: dict[int, float] = {}
+    for point in payload.get("data", ()):
+        cik, val = point.get("cik"), point.get("val")
+        if cik is None or val is None:
+            continue
+        # Frames are one point per filer per period, but a duplicate would
+        # otherwise resolve by whichever the JSON listed last -- an ordering
+        # dependency. Stated rather than incidental.
+        out[int(cik)] = float(val)
+    return out
+
+
+def _fiscal_year_for(as_of: str, fiscal_year: int | None) -> int:
+    """Which annual frame to ask for, given a date.
+
+    Annual reports for calendar year Y are filed between February and April of
+    Y+1, so before April the CY(Y-1) frame holds a fraction of the market --
+    and not a random fraction. Early filers are large, well-resourced and
+    clean-audit; a universe built from them is biased in a way that looks like
+    data rather than like a sampling artifact. Hence the shift back a year.
+    """
+    parts = as_of.split("-")
+    try:
+        if len(parts) != 3:
+            raise ValueError(as_of)
+        year, month = int(parts[0]), int(parts[1])
+        if not 1 <= month <= 12:
+            raise ValueError(as_of)
+    except ValueError as exc:
+        raise ValidationError(f"as_of must be YYYY-MM-DD, got {as_of!r}") from exc
+    if fiscal_year is None:
+        return year - 1 if month >= 4 else year - 2
+    return int(fiscal_year)
+
+
+def fetch(
+    *,
+    as_of: str,
+    user_agent: str,
+    limit: int = 100,
+    fiscal_year: int | None = None,
+    transport=None,
+    progress=None,
+    exclude_negative_equity: bool = True,
+) -> Snapshot:
+    """Build a :class:`Snapshot` from SEC filings.
+
+    ``user_agent`` is required and must identify you -- the SEC's fair-access
+    policy asks for a name and a contact address, e.g.
+    ``"Jane Roe jane@example.org"``. Requests without one are refused at the
+    edge, and this function will not invent one on your behalf.
+
+    Companies are ranked by shareholders' equity and the largest ``limit``
+    that map to a sector are kept. Equity is a mediocre size proxy -- it
+    understates asset-light companies badly -- and it is used anyway because
+    the alternative is market capitalisation, which EDGAR does not carry.
+    Said plainly rather than discovered later: **the ranking is by book size,
+    not market size**, so the universe skews towards balance-sheet-heavy
+    names. Take a larger ``limit`` and filter yourself if that matters.
+
+    Roughly ``5 + limit`` requests, rate limited to eight a second.
+
+    The result is a frozen artifact. Save it, hash it, cite it -- and do not
+    expect a re-fetch to reproduce it. EDGAR is not append-only: companies
+    amend and restate, so the same query returns different numbers next year.
+    That is exactly why the snapshot, not the query, is the input to
+    everything downstream.
+    """
+    if not user_agent or "@" not in user_agent:
+        raise ValidationError(
+            'user_agent must identify you with a contact address, e.g. '
+            '"Jane Roe jane@example.org". The SEC requires it and refuses '
+            'requests without one. pretium will not send a fabricated '
+            'User-Agent on your behalf.'
+        )
+    if limit < 1:
+        raise ValidationError(f"limit must be >= 1, got {limit}")
+
+    fy = _fiscal_year_for(as_of, fiscal_year)
+    duration, instant = f"CY{fy}", f"CY{fy}Q4I"
+    get = transport if transport is not None else default_transport(user_agent)
+    say = progress if progress is not None else (lambda _message: None)
+
+    say(f"fundamentals for {duration}")
+    eps = _frame(get, "us-gaap", "EarningsPerShareDiluted", "USD-per-shares",
+                 duration)
+    equity = _frame(get, "us-gaap", "StockholdersEquity", "USD", instant)
+    shares = _frame(get, "dei", "EntityCommonStockSharesOutstanding", "shares",
+                    instant)
+    if not shares:
+        shares = _frame(get, "us-gaap", "CommonStockSharesOutstanding",
+                        "shares", instant)
+
+    revenue_now: dict[int, float] = {}
+    revenue_prior: dict[int, float] = {}
+    for taxonomy, tag, unit in _REVENUE_TAGS:
+        for cik, value in _frame(get, taxonomy, tag, unit, duration).items():
+            revenue_now.setdefault(cik, value)
+        for cik, value in _frame(get, taxonomy, tag, unit, f"CY{fy - 1}").items():
+            revenue_prior.setdefault(cik, value)
+
+    if not eps or not shares:
+        raise FetchError(
+            f"no usable {duration} data came back. Either the fiscal year is "
+            "too recent to have been filed, or the requests were refused -- "
+            "check the User-Agent."
+        )
+
+    # Equity descending, CIK ascending. The tie-break is not decoration:
+    # without it, two filers with identical equity would order by whichever
+    # the response happened to list first, and the universe would depend on a
+    # detail of the JSON rather than on the data.
+    candidates = sorted(
+        (cik for cik in eps if cik in shares and shares[cik] > 0),
+        key=lambda cik: (-equity.get(cik, 0.0), cik),
     )
+    say(f"{len(candidates)} filers have EPS and a share count")
+
+    rows: list[dict] = []
+    excluded: list[dict] = []
+    seen: set[str] = set()
+
+    for cik in candidates:
+        if len(rows) >= limit:
+            break
+        try:
+            meta = _get_json(get, _SUBMISSIONS.format(cik=cik))
+        except (_Missing, FetchError):
+            excluded.append({"cik": cik, "reason": "no submissions record"})
+            continue
+
+        tickers = meta.get("tickers") or []
+        name = meta.get("name", "")
+        if not tickers:
+            # No ticker means no listed equity: a bond-only filer, or a
+            # subsidiary filing because of a debt covenant.
+            excluded.append({"cik": cik, "name": name, "reason": "not listed"})
+            continue
+        ticker = str(tickers[0]).upper()
+        if ticker in seen:
+            excluded.append({"cik": cik, "name": name, "ticker": ticker,
+                             "reason": "duplicate ticker"})
+            continue
+
+        sector = sector_for_sic(meta.get("sic"))
+        if sector is None:
+            excluded.append({"cik": cik, "name": name, "ticker": ticker,
+                             "sic": meta.get("sic"),
+                             "reason": "SIC maps to no sector"})
+            continue
+
+        count = shares[cik]
+        book = equity.get(cik)
+        row = {
+            "ticker": ticker,
+            "sector": sector,
+            "cik": cik,
+            "name": name,
+            "sic": str(meta.get("sic", "")),
+            "eps": eps[cik],
+            "shares_outstanding": count,
+            "book_value_per_share": (book / count) if book is not None else None,
+        }
+        prior, current = revenue_prior.get(cik), revenue_now.get(cik)
+        if prior is not None and current is not None and prior > 0:
+            row["revenue_growth"] = current / prior - 1.0
+        seen.add(ticker)
+        rows.append(row)
+        say(f"{len(rows)}/{limit} {ticker}")
+
+    keep, dropped = filter_rows(
+        rows, exclude_negative_equity=exclude_negative_equity)
+    return Snapshot(
+        as_of=as_of,
+        rows=keep,
+        excluded=excluded + dropped,
+        notes={
+            "fiscal_year": fy,
+            "duration_frame": duration,
+            "instant_frame": instant,
+            "ranked_by": "stockholders_equity",
+            "candidates": len(candidates),
+            "requested": limit,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# SIC -> sector
+# ---------------------------------------------------------------------------
+
+# The SEC classifies filers by SIC, a 1987 scheme with no "software" division
+# and no "semiconductors" division, so the mapping below is a JUDGEMENT and is
+# written out rather than hidden in a dict comprehension. Two consequences a
+# user should know before citing a universe built this way:
+#
+#   - It is coarse. SIC 7372 is prepackaged software, which covers both an
+#     operating-system vendor and a two-person game studio; both land in
+#     `technology` and get the same anchor P/E and base variance.
+#   - It is stale by construction. A company whose business changed since it
+#     registered keeps its original code, and the SEC does not backfill.
+#
+# Overrides are checked before ranges, so a four-digit code can escape its
+# major group -- pharmaceuticals out of chemicals, computers out of machinery,
+# REITs out of finance. That is where most of the accuracy lives.
+
+_SIC_OVERRIDES: dict[int, str] = {}
+
+# Codes that map to no sector rather than to a wrong one. 6770 is blank
+# checks -- SPACs and shells, which have a share count and no business -- and
+# 9995/9999 are the SEC's own "nonclassifiable" bucket.
+_SIC_EXCLUDE = frozenset({0, 6770, 9995, 9999})
+
+
+def _override(codes, sector: str) -> None:
+    for code in codes:
+        _SIC_OVERRIDES[code] = sector
+
+
+# Drugs and biologicals sit inside the chemicals major group (28).
+_override(range(2833, 2837), "healthcare")
+# Computers, storage and peripherals inside industrial machinery (35).
+_override(range(3570, 3580), "technology")
+# Semiconductors and related devices inside electronic equipment (36).
+_override([3672, 3674, 3675, 3676, 3677, 3678, 3679], "technology")
+# Telephone and broadcast equipment: the maker is technology; the CARRIER,
+# further down in major group 48, is telecommunications.
+_override([3661, 3663, 3669], "technology")
+# Motor vehicles inside transportation equipment (37) -- consumer, not
+# industrial, because demand is discretionary household spending.
+_override(range(3711, 3717), "consumer_discretionary")
+# Medical instruments inside instruments (38).
+_override(range(3841, 3852), "healthcare")
+# Pipelines inside transportation (46) belong with energy: the economics are
+# throughput of hydrocarbons, not a logistics network.
+_override([4610, 4612, 4613, 4619], "energy")
+# Broadcasting and cable inside communications (48). Media revenue is
+# advertising and subscriptions, which behave like consumer spending, not like
+# the regulated-utility economics of a telephone carrier.
+_override([4832, 4833, 4841], "consumer_discretionary")
+# Drugs wholesale inside wholesale nondurable (51).
+_override([5122], "healthcare")
+# Food stores and drug stores inside retail (52-59): staples, not
+# discretionary. Grocery demand does not cycle.
+_override([5411, 5412, 5912], "consumer_staples")
+# Real estate and REITs inside the finance division (60-67).
+_override(list(range(6500, 6600)) + [6798], "real_estate")
+# Prepackaged software, data processing and computer services inside business
+# services (73) -- this is where most of the modern technology sector lives,
+# under a code written before the industry existed.
+_override(range(7370, 7380), "technology")
+# Commercial physical and biological research inside engineering services (87):
+# contract research organisations and pre-revenue biotech.
+_override([8731], "healthcare")
+
+# Major-group ranges, checked only when no override matched. Inclusive on both
+# ends, ordered as SIC orders them.
+_SIC_RANGES: tuple[tuple[int, int, str], ...] = (
+    (100, 999, "consumer_staples"),        # agricultural production
+    (1000, 1099, "materials"),             # metal mining
+    (1200, 1299, "energy"),                # coal
+    (1300, 1399, "energy"),                # oil and gas extraction
+    (1400, 1499, "materials"),             # nonmetallic minerals
+    (1500, 1799, "industrials"),           # construction
+    (2000, 2199, "consumer_staples"),      # food and tobacco
+    (2200, 2399, "consumer_discretionary"),  # textiles and apparel
+    (2400, 2499, "materials"),             # lumber and wood
+    (2500, 2599, "consumer_discretionary"),  # furniture
+    (2600, 2699, "materials"),             # paper
+    (2700, 2799, "consumer_discretionary"),  # printing and publishing
+    (2800, 2899, "materials"),             # chemicals
+    (2900, 2999, "energy"),                # petroleum refining
+    (3000, 3099, "materials"),             # rubber and plastics
+    (3100, 3199, "consumer_discretionary"),  # leather
+    (3200, 3299, "materials"),             # stone, clay and glass
+    (3300, 3399, "materials"),             # primary metal
+    (3400, 3499, "industrials"),           # fabricated metal
+    (3500, 3599, "industrials"),           # industrial machinery
+    (3600, 3699, "technology"),            # electronic equipment
+    (3700, 3799, "industrials"),           # transportation equipment
+    (3800, 3899, "technology"),            # instruments
+    (3900, 3999, "consumer_discretionary"),  # miscellaneous manufacturing
+    (4000, 4099, "transportation"),        # railroads
+    (4100, 4299, "transportation"),        # transit and trucking
+    (4400, 4599, "transportation"),        # water and air
+    (4600, 4699, "transportation"),        # pipelines (overridden to energy)
+    (4700, 4799, "transportation"),        # transportation services
+    (4800, 4899, "telecommunications"),    # communications
+    (4900, 4999, "utilities"),             # electric, gas, sanitary
+    (5000, 5099, "industrials"),           # wholesale durable goods
+    (5100, 5199, "consumer_staples"),      # wholesale nondurable goods
+    (5200, 5999, "consumer_discretionary"),  # retail
+    (6000, 6499, "financial_services"),    # depository, credit, insurance
+    (6600, 6799, "financial_services"),    # investment offices, holding
+    (7000, 7299, "consumer_discretionary"),  # hotels and personal services
+    (7300, 7399, "industrials"),           # business services
+    (7500, 7999, "consumer_discretionary"),  # auto services, entertainment
+    (8000, 8099, "healthcare"),            # health services
+    (8100, 8299, "consumer_discretionary"),  # legal and educational
+    (8300, 8399, "healthcare"),            # social services
+    (8700, 8799, "industrials"),           # engineering and accounting
+)
+
+
+def sector_for_sic(sic) -> str | None:
+    """Map an SEC SIC code to one of the model's twelve sectors.
+
+    Returns ``None`` for a code with no sensible home -- 6770 blank checks,
+    9995 nonclassifiable, an empty string on a filer that never got one. A
+    guess would be worse than an exclusion: it would put a shell company in a
+    sector and give it that sector's volatility and anchor P/E.
+    """
+    if sic is None or sic == "":
+        return None
+    try:
+        code = int(sic)
+    except (TypeError, ValueError):
+        return None
+    if code in _SIC_EXCLUDE:
+        return None
+    if code in _SIC_OVERRIDES:
+        return _SIC_OVERRIDES[code]
+    for low, high, sector in _SIC_RANGES:
+        if low <= code <= high:
+            return sector
+    return None

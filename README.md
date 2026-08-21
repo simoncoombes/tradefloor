@@ -128,7 +128,10 @@ a divergence bisectable, and an experiment archivable as data.
 ## Real fundamentals
 
 ```python
-snap = pt.edgar.Snapshot.load("edgar-2024h1.json")
+snap = pt.edgar.fetch(as_of="2024-06-30", limit=100,
+                      user_agent="Jane Roe jane@example.org")
+snap.save("edgar-2024h1.json")            # the artifact, hashed and citable
+
 universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)
 ```
 
@@ -138,7 +141,16 @@ realistic proportion — while every price path stays synthetic.
 
 The snapshot is the artifact, not the query: EDGAR is not append-only, so the
 same request returns different numbers next year. Snapshots are hashed and
-serialisable; a citable specification names one alongside the seed.
+serialisable; a citable specification names one alongside the seed. The fetch
+uses the XBRL frames API — five market-wide requests plus one per company
+kept, rather than one per filer — and takes a `transport` so the derivation is
+testable without a socket.
+
+`user_agent` is required and must carry a contact address; the SEC's
+fair-access policy asks for one and this library will not send a fabricated
+one on your behalf. Ranking is by shareholders’ equity, because EDGAR carries
+no market capitalisation — so the universe skews towards balance-sheet-heavy
+names.
 
 Note this loads *fundamentals*, not behaviour. A loaded ticker is a stock with
 that company's fundamentals under this model's assumptions — not that company,

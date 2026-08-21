@@ -235,11 +235,361 @@ def test_from_edgar_accepts_a_path(tmp_path):
 # The unbuilt half
 # --------------------------------------------------------------------------
 
-def test_fetch_says_plainly_that_it_is_not_built():
-    # Better than a stub that returns something plausible. A loader that
-    # quietly produced empty or fabricated data would be discovered late.
-    with pytest.raises(NotImplementedError, match="not implemented"):
-        pretium.edgar.fetch(as_of="2024-06-30")
+# --------------------------------------------------------------------------
+# The network half, exercised without a network
+# --------------------------------------------------------------------------
+#
+# fetch() is pure given a transport, and that is the point of taking one. The
+# fetch itself can never be deterministic -- EDGAR restates -- so the boundary
+# is drawn tightly around the socket and everything on this side of it is
+# tested exactly like the rest of the library.
+
+import json as _json
+
+from pretium import ValidationError
+from pretium.edgar import FetchError, fetch, sector_for_sic
+
+UA = "Test Runner test@example.org"
+
+
+def frame_url(tag, unit, period, taxonomy="us-gaap"):
+    return f"https://data.sec.gov/api/xbrl/frames/{taxonomy}/{tag}/{unit}/{period}.json"
+
+
+def frame(values):
+    return {"data": [{"cik": cik, "val": val} for cik, val in values.items()]}
+
+
+class FakeEdgar:
+    """Recorded EDGAR responses. Records every URL asked for."""
+
+    def __init__(self, *, eps, equity, shares, submissions, revenue=None,
+                 revenue_prior=None, missing=(), fy=2023):
+        self.calls = []
+        self.missing = set(missing)
+        self.routes = {
+            frame_url("EarningsPerShareDiluted", "USD-per-shares", f"CY{fy}"): frame(eps),
+            frame_url("StockholdersEquity", "USD", f"CY{fy}Q4I"): frame(equity),
+            frame_url("EntityCommonStockSharesOutstanding", "shares",
+                      f"CY{fy}Q4I", taxonomy="dei"): frame(shares),
+        }
+        if revenue:
+            self.routes[frame_url(
+                "RevenueFromContractWithCustomerExcludingAssessedTax", "USD",
+                f"CY{fy}")] = frame(revenue)
+        if revenue_prior:
+            self.routes[frame_url(
+                "RevenueFromContractWithCustomerExcludingAssessedTax", "USD",
+                f"CY{fy - 1}")] = frame(revenue_prior)
+        for cik, meta in submissions.items():
+            self.routes[f"https://data.sec.gov/submissions/CIK{cik:010d}.json"] = meta
+
+    def __call__(self, url):
+        self.calls.append(url)
+        if url in self.missing:
+            raise FetchError(f"HTTP 404 Not Found for {url}")
+        if url not in self.routes:
+            # A frame nobody reported is a 404 from EDGAR, not an error. The
+            # fake reproduces that rather than inventing an empty body, so the
+            # code under test meets the shape it will meet in production.
+            raise FetchError(f"HTTP 404 Not Found for {url}")
+        return _json.dumps(self.routes[url]).encode()
+
+
+def submission(name, ticker, sic):
+    return {"name": name, "tickers": [ticker] if ticker else [], "sic": sic}
+
+
+def small_market():
+    return FakeEdgar(
+        eps={320193: 6.13, 789019: 11.06, 1045810: 1.19, 66740: 7.09},
+        equity={320193: 62e9, 789019: 206e9, 1045810: 42e9, 66740: 47e9},
+        shares={320193: 15.5e9, 789019: 7.4e9, 1045810: 24.6e9, 66740: 1.2e9},
+        revenue={320193: 383e9, 789019: 211e9, 1045810: 60e9, 66740: 32e9},
+        revenue_prior={320193: 394e9, 789019: 198e9, 1045810: 26e9},
+        submissions={
+            320193: submission("Apple Inc.", "AAPL", "3571"),
+            789019: submission("Microsoft Corp", "MSFT", "7372"),
+            1045810: submission("NVIDIA Corp", "NVDA", "3674"),
+            66740: submission("3M Co", "MMM", "3841"),
+        },
+    )
+
+
+def test_a_fetch_produces_a_usable_snapshot():
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market())
+    assert [r["ticker"] for r in snap.rows] == ["MSFT", "AAPL", "MMM", "NVDA"]
+    assert snap.notes["fiscal_year"] == 2023
+    assert snap.notes["ranked_by"] == "stockholders_equity"
+
+
+def test_companies_are_ranked_by_equity_not_by_response_order():
+    # The response lists Apple first; Microsoft has more equity and must come
+    # first regardless. Ordering is contractual here -- roster order decides
+    # the RNG draw order, so a universe that reordered would be a different
+    # market.
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market())
+    assert snap.rows[0]["ticker"] == "MSFT"
+
+
+def test_ties_break_by_cik_rather_than_by_iteration_order():
+    tied = FakeEdgar(
+        eps={100: 1.0, 200: 1.0, 300: 1.0},
+        equity={100: 5e9, 200: 5e9, 300: 5e9},
+        shares={100: 1e9, 200: 1e9, 300: 1e9},
+        submissions={c: submission(f"C{c}", f"T{c}", "7372")
+                     for c in (100, 200, 300)},
+    )
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=tied)
+    assert [r["cik"] for r in snap.rows] == [100, 200, 300]
+
+
+def test_the_derivation_is_deterministic_even_though_the_fetch_is_not():
+    a = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market())
+    b = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market())
+    assert a.hash == b.hash
+
+
+def test_book_value_per_share_is_derived_from_equity_and_share_count():
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market())
+    apple = next(r for r in snap.rows if r["ticker"] == "AAPL")
+    assert apple["book_value_per_share"] == pytest.approx(62e9 / 15.5e9)
+
+
+def test_revenue_growth_is_computed_only_when_both_years_exist():
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market())
+    apple = next(r for r in snap.rows if r["ticker"] == "AAPL")
+    assert apple["revenue_growth"] == pytest.approx(383 / 394 - 1.0)
+    # 3M has a current-year revenue but no prior year in the fake. An absent
+    # growth figure is right; a zero would be a claim that revenue was flat.
+    mmm = next(r for r in snap.rows if r["ticker"] == "MMM")
+    assert "revenue_growth" not in mmm
+
+
+def test_a_filer_reporting_only_the_older_revenue_tag_still_gets_growth():
+    # ASC 606 filers use RevenueFromContractWithCustomer...; financials and
+    # older filers use Revenues. The fallback chain is the point.
+    fake = small_market()
+    fake.routes[frame_url("Revenues", "USD", "CY2023")] = frame({66740: 32e9})
+    fake.routes[frame_url("Revenues", "USD", "CY2022")] = frame({66740: 34e9})
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=fake)
+    mmm = next(r for r in snap.rows if r["ticker"] == "MMM")
+    assert mmm["revenue_growth"] == pytest.approx(32 / 34 - 1.0)
+
+
+def test_the_newer_tag_wins_when_a_filer_reports_both():
+    fake = small_market()
+    fake.routes[frame_url("Revenues", "USD", "CY2023")] = frame({320193: 1.0})
+    fake.routes[frame_url("Revenues", "USD", "CY2022")] = frame({320193: 2.0})
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=fake)
+    apple = next(r for r in snap.rows if r["ticker"] == "AAPL")
+    assert apple["revenue_growth"] == pytest.approx(383 / 394 - 1.0)
+
+
+def test_a_missing_frame_is_empty_rather_than_fatal():
+    # Nobody reported a concept that period -> 404. That is normal and must
+    # not take the whole fetch down.
+    fake = small_market()
+    fake.missing.add(frame_url(
+        "RevenueFromContractWithCustomerExcludingAssessedTax", "USD", "CY2023"))
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=fake)
+    assert len(snap.rows) == 4
+    assert all("revenue_growth" not in r for r in snap.rows)
+
+
+def test_a_filer_with_no_ticker_is_excluded_with_a_reason():
+    fake = small_market()
+    fake.routes["https://data.sec.gov/submissions/CIK0000789019.json"] = \
+        submission("Bond Only Corp", None, "7372")
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=fake)
+    assert "MSFT" not in [r["ticker"] for r in snap.rows]
+    assert any(e["reason"] == "not listed" for e in snap.excluded)
+
+
+def test_an_unmappable_sic_is_excluded_rather_than_guessed():
+    # A blank-check shell has a share count and no business. Putting it in a
+    # sector would give it that sector's volatility and anchor P/E.
+    fake = small_market()
+    fake.routes["https://data.sec.gov/submissions/CIK0001045810.json"] = \
+        submission("Shell Acquisition Corp", "SPAC", "6770")
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=fake)
+    assert "SPAC" not in [r["ticker"] for r in snap.rows]
+    assert any(e["reason"] == "SIC maps to no sector" for e in snap.excluded)
+
+
+def test_a_duplicate_ticker_is_kept_once():
+    fake = small_market()
+    fake.routes["https://data.sec.gov/submissions/CIK0000066740.json"] = \
+        submission("Not Actually Apple", "AAPL", "3841")
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=fake)
+    assert [r["ticker"] for r in snap.rows].count("AAPL") == 1
+    assert any(e["reason"] == "duplicate ticker" for e in snap.excluded)
+
+
+def test_the_submissions_endpoint_is_hit_only_until_the_limit_is_reached():
+    # The cost model is the reason the frames API is used at all: five
+    # market-wide requests plus one per company KEPT. Walking every filer's
+    # submissions would be thousands of requests for a hundred-name universe.
+    fake = small_market()
+    fetch(as_of="2024-06-30", user_agent=UA, limit=2, transport=fake)
+    submissions = [u for u in fake.calls if "/submissions/" in u]
+    assert len(submissions) == 2
+
+
+def test_a_user_agent_without_a_contact_is_refused():
+    # Not pedantry: the SEC blocks by User-Agent, so one library shipping a
+    # default would get every user of it blocked under the same string.
+    with pytest.raises(ValidationError, match="contact address"):
+        fetch(as_of="2024-06-30", user_agent="pretium", transport=small_market())
+    with pytest.raises(ValidationError, match="contact address"):
+        fetch(as_of="2024-06-30", user_agent="", transport=small_market())
+
+
+def test_a_malformed_as_of_is_refused():
+    with pytest.raises(ValidationError, match="YYYY-MM-DD"):
+        fetch(as_of="June 2024", user_agent=UA, transport=small_market())
+    with pytest.raises(ValidationError, match="YYYY-MM-DD"):
+        fetch(as_of="2024-13-01", user_agent=UA, transport=small_market())
+
+
+def test_an_empty_market_is_an_error_not_an_empty_universe():
+    empty = FakeEdgar(eps={}, equity={}, shares={}, submissions={})
+    with pytest.raises(FetchError, match="no usable"):
+        fetch(as_of="2024-06-30", user_agent=UA, transport=empty)
+
+
+def test_the_fiscal_year_steps_back_before_annual_filings_land():
+    # Before April, CY(Y-1) holds only the early filers -- large, clean-audit
+    # companies. That is a selection bias that looks like data.
+    january = FakeEdgar(fy=2022, eps={320193: 6.11}, equity={320193: 50e9},
+                        shares={320193: 15.8e9},
+                        submissions={320193: submission("Apple", "AAPL", "3571")})
+    snap = fetch(as_of="2024-01-15", user_agent=UA, transport=january)
+    assert snap.notes["fiscal_year"] == 2022
+
+
+def test_an_explicit_fiscal_year_overrides_the_rule():
+    fake = FakeEdgar(fy=2019, eps={320193: 2.97}, equity={320193: 90e9},
+                     shares={320193: 17.7e9},
+                     submissions={320193: submission("Apple", "AAPL", "3571")})
+    snap = fetch(as_of="2024-06-30", user_agent=UA, fiscal_year=2019,
+                 transport=fake)
+    assert snap.notes["fiscal_year"] == 2019
+
+
+def test_negative_equity_filers_are_excluded_by_the_same_filter():
+    fake = FakeEdgar(
+        eps={100: -2.0, 200: 3.0},
+        equity={100: -1e9, 200: 5e9},
+        shares={100: 1e9, 200: 1e9},
+        submissions={100: submission("Underwater Inc", "UND", "7372"),
+                     200: submission("Solid Inc", "SOL", "7372")},
+    )
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=fake)
+    assert [r["ticker"] for r in snap.rows] == ["SOL"]
+    assert any("loss-maker" in e["reason"] for e in snap.excluded)
+
+
+def test_progress_reports_something_per_company():
+    seen = []
+    fetch(as_of="2024-06-30", user_agent=UA, transport=small_market(),
+          progress=seen.append)
+    assert any("AAPL" in m for m in seen)
+
+
+def test_a_fetched_snapshot_drives_an_engine():
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market())
+    universe = pretium.Universe.from_edgar(snap, federal_funds_rate=0.03)
+    engine = pretium.Engine(seed=1, universe=universe,
+                            macro_state=pretium.Macro(federal_funds_rate=0.03))
+    engine.run_days(3)
+    import struct
+    prices = struct.unpack("<%dd" % len(universe), engine.prices())
+    assert all(p > 0 for p in prices)
+
+
+def test_a_fetched_snapshot_round_trips_and_keeps_its_hash(tmp_path):
+    snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market())
+    path = str(tmp_path / "snap.json")
+    snap.save(path)
+    assert pretium.edgar.Snapshot.load(path).hash == snap.hash
+
+
+def test_the_rate_limiter_actually_waits():
+    # Eight a second, under the SEC's ten. Verified by measurement, with an
+    # injected clock -- a sleep the test cannot see is a sleep that could be
+    # removed by accident.
+    from pretium.edgar import default_transport
+
+    slept = []
+    ticks = [0.0]
+
+    def clock():
+        return ticks[0]
+
+    def sleep(seconds):
+        slept.append(seconds)
+        ticks[0] += seconds
+
+    get = default_transport(UA, clock=clock, sleep=sleep)
+    calls = []
+
+    class _Response:
+        headers = {}
+
+        def read(self):
+            return b"{}"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    import urllib.request
+    original = urllib.request.urlopen
+    urllib.request.urlopen = lambda *a, **k: (calls.append(a) or _Response())
+    try:
+        for _ in range(3):
+            get("https://data.sec.gov/x.json")
+    finally:
+        urllib.request.urlopen = original
+
+    assert len(calls) == 3
+    # First call does not wait; the next two each wait a full interval,
+    # because the fake clock only advances when the limiter sleeps.
+    assert slept == [pytest.approx(0.125), pytest.approx(0.125)]
+
+
+def test_sic_mapping_puts_modern_industries_under_their_1987_codes():
+    # The overrides are where the accuracy lives: SIC has no software
+    # division, so software sits under business services and semiconductors
+    # under electronic equipment.
+    assert sector_for_sic(7372) == "technology"
+    assert sector_for_sic(3674) == "technology"
+    assert sector_for_sic(2834) == "healthcare"
+    assert sector_for_sic(6798) == "real_estate"
+    assert sector_for_sic(3711) == "consumer_discretionary"
+    assert sector_for_sic(4813) == "telecommunications"
+    assert sector_for_sic(4832) == "consumer_discretionary"
+    assert sector_for_sic(4610) == "energy"
+
+
+def test_every_sic_mapping_names_a_real_sector():
+    # A typo in the table would put a company in a sector the engine does not
+    # know, and the failure would surface as a construction error on some
+    # unlucky user's universe rather than here.
+    valid = set(pretium.sectors())
+    for code in range(0, 10000):
+        sector = sector_for_sic(code)
+        assert sector is None or sector in valid, (code, sector)
+
+
+def test_sic_codes_outside_the_table_map_to_nothing():
+    assert sector_for_sic(9995) is None
+    assert sector_for_sic("") is None
+    assert sector_for_sic(None) is None
+    assert sector_for_sic("not a code") is None
 
 
 # --------------------------------------------------------------------------
