@@ -34,8 +34,8 @@
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
-use crate::economy::{create_initial_central_bank_state};
-use crate::engine::{Engine, PriceField, SessionBuffer, SessionRequest, TickRequest};
+use crate::economy::create_initial_central_bank_state;
+use crate::engine::{Engine, SessionBuffer, SessionRequest, TickRequest};
 use crate::market::{GameTime, TickCompany};
 use crate::python::ValidationError;
 
@@ -260,9 +260,4 @@ impl PyEngineBatch {
             self.tickers.len()
         )
     }
-}
-
-/// Exposed for the batch, which needs the same field parsing.
-pub fn price_field(name: &str) -> PyResult<PriceField> {
-    crate::python_engine::parse_field_public(name)
 }
