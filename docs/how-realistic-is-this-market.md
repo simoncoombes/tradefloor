@@ -145,17 +145,24 @@ volatility surprise. Neither happens here, so an execution algorithm tested
 against this market faces an easier problem than the one it was written for.
 
 **There is no leverage effect.** Today's signed return against tomorrow's
-absolute return measures -0.004 against a real -0.30 to -0.10. Across six seeds
-it ranges -0.018 to +0.005, so its sign is not even reliably negative. Bad news
-does not raise volatility more than good news of the same size does.
+absolute return measures -0.004 against a real -0.30 to -0.10. Bad news does
+not raise volatility more than good news of the same size does.
 
-This one is absent by construction rather than by calibration, and the
-mechanism is short enough to state exactly. The variance process is a symmetric
-GARCH(1,1), `omega + alpha * r^2 + beta * v` (`rust/src/market/garch.rs`), and
-squaring the return discards its sign. No symmetric GARCH can produce a
-leverage effect, at any coefficients. Reproducing one needs an asymmetric term
-such as GJR or EGARCH, which is a change to the model rather than to a
-calibration.
+Read the seed range on that row before reading the median: across six seeds it
+runs -0.018 to +0.005, so the sign is not even stable. An effect whose sign
+flips between seeds is absent rather than small, and that is a stronger
+statement than "too weak".
+
+It is absent by construction rather than by calibration, and the mechanism is
+short enough to state exactly. The variance process is a symmetric GARCH(1,1),
+`omega + alpha * r^2 + beta * v` (`rust/src/market/garch.rs`), and squaring the
+return discards its sign. No symmetric GARCH can produce a leverage effect, at
+any coefficients. Reproducing one needs an asymmetric term such as GJR or
+EGARCH, which is a change to the model rather than to a calibration.
+
+The two halves corroborate each other. There is nothing in the model that could
+give this term a consistent sign, and measured over six seeds it does not have
+one.
 
 ## The one that is too strong
 
