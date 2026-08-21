@@ -38,10 +38,16 @@ def test_worker_count_does_not_change_the_answer():
     # Per-seed isolation is total: each worker builds its own engine from its
     # own seed and shares nothing. If that were not so, results would depend on
     # how the work happened to be divided.
+    #
+    # The workers are THREADS sharing an address space, so a mistake here is a
+    # data race rather than a serialisation bug -- which is why several counts
+    # are checked rather than one. A race that a 4-thread run hides can still
+    # show at 8.
     seeds = list(range(10))
     one = pretium.run_many(seeds, universe=UNIVERSE, ticks=60, workers=1)
-    many = pretium.run_many(seeds, universe=UNIVERSE, ticks=60, workers=4)
-    assert one == many
+    for workers in (2, 4, 8):
+        assert pretium.run_many(seeds, universe=UNIVERSE, ticks=60,
+                                workers=workers) == one
 
 
 def test_a_sweep_matches_running_each_seed_by_hand():
@@ -83,7 +89,7 @@ def test_collect_modes():
     assert sorted(attribution) == sorted(pretium.Engine.FACTORS)
 
 
-def test_a_macro_state_survives_the_process_boundary():
+def test_a_macro_state_reaches_every_worker():
     macro = pretium.Macro(vix=28.0, federal_funds_rate=0.05, cycle="contraction")
     swept = pretium.run_many([9], universe=UNIVERSE, ticks=80, macro=macro)[0]
     e = pretium.Engine(seed=9, universe=UNIVERSE, macro_state=macro)
@@ -100,3 +106,39 @@ def test_degenerate_inputs_are_refused():
         pretium.run_many([1], universe=UNIVERSE, ticks=0)
     with pytest.raises(pretium.ValidationError, match="unknown collect"):
         pretium.run_many([1], universe=UNIVERSE, ticks=10, collect="everything")
+
+
+def test_a_sweep_runs_where_there_is_no_importable_main():
+    """The regression that matters most, because the failure was a HANG.
+
+    `run_many` used a process pool. Windows spawns rather than forks, and
+    spawning re-imports ``__main__`` in every child — which a REPL, a Jupyter
+    notebook and a piped script do not have. The children died on
+    ``OSError: [Errno 22] Invalid argument: '<stdin>'`` and the parent waited
+    for results that were never coming. Measured as a ten-minute hang on a
+    twenty-seed sweep, with no error and no output.
+
+    Jupyter is where a library like this is most likely to be used, so that
+    was not an edge case; it was broken exactly where it mattered. Threads
+    fixed it, and this runs the sweep through stdin — with no ``__main__``
+    file — to hold the fix in place.
+
+    The timeout is the assertion. A regression reintroduces a hang, not a
+    failure, and a test without a deadline would hang the suite with it.
+    """
+    import subprocess
+    import sys
+
+    script = (
+        "import pretium as pt\n"
+        "u = pt.Universe.random(6, seed=1)\n"
+        "r = pt.run_many(seeds=[1, 2, 3, 4], universe=u, days=1, ticks=20,"
+        " workers=4, collect='prices')\n"
+        "print('OK', len(r))\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-"], input=script, capture_output=True, text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "OK 4" in result.stdout

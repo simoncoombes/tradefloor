@@ -298,19 +298,22 @@ def run_many(
     ``"attribution"`` (the seven component columns), or ``"summary"`` (prices,
     draw count and tickers).
 
-    # Workers are not free, and below a threshold they lose
+    # Threads, and why that is not a compromise
 
-    Measured on 60 instruments, one session each:
+    The engine releases the GIL for the whole session compute, so a thread
+    pool gives real parallelism with no serialisation of the universe into
+    each worker and no pickling of results back.
 
-        4 seeds    serial 0.23s    8 workers 0.47s    0.50x  (slower)
-        16 seeds   serial 1.04s    8 workers 0.58s    1.80x
+    It also WORKS in the places a process pool does not. Windows spawns rather
+    than forks, and spawning re-imports ``__main__`` in every child -- which a
+    notebook, a REPL and a piped script do not have. The children die, the
+    parent waits, and the sweep hangs with no error. That is the single most
+    likely way to use this library, so the process pool was not an
+    optimisation with an edge case; it was broken where it mattered most.
 
-    Spawning a pool and shipping the universe to each worker costs more than a
-    handful of short runs. The crossover sits somewhere around a dozen seeds on
-    this machine, and it moves with instrument count and session length. So
-    ``workers`` is not defaulted to the core count: a sweep small enough to be
-    interactive is faster serially, and quietly making it slower would be a
-    poor default dressed as a good one.
+    ``workers`` is still not defaulted to the core count: a sweep small enough
+    to be interactive can be faster serially, and quietly making it slower
+    would be a poor default dressed as a good one.
 
     A single seed always runs in-process, whatever ``workers`` says.
     """
@@ -339,17 +342,32 @@ def run_many(
         for seed in seeds
     ]
 
-    # One seed is not worth a process. Spawning a pool costs more than the run.
+    # One seed is not worth a pool.
     if workers is not None and workers <= 1 or len(seeds) == 1:
         return [_run_one(p) for p in payloads]
 
-    import multiprocessing
+    from concurrent.futures import ThreadPoolExecutor
 
-    with multiprocessing.Pool(processes=workers) as pool:
-        # `map` preserves input order regardless of completion order, which is
-        # the property this function promises. `imap_unordered` would be
-        # faster and wrong.
-        return pool.map(_run_one, payloads)
+    # THREADS, not processes, because the engine releases the GIL for the
+    # whole session compute. Three things follow, and the third is why this
+    # was changed:
+    #
+    #   - no universe serialised into every worker
+    #   - no pickling of results back
+    #   - it works from a notebook, a REPL or a piped script
+    #
+    # A process pool did not. On Windows the spawn start method re-imports
+    # `__main__` in each child, and a REPL, a notebook or a script fed on
+    # stdin has no importable `__main__` -- so the children die and the parent
+    # waits for results that will never arrive. Measured as a ten-minute hang
+    # on a twenty-seed sweep, with no error and no output. Jupyter is where
+    # this library is most likely to be used, and that is exactly where the
+    # process pool could not run.
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        # `map` yields in INPUT order regardless of completion order, which is
+        # the property this function promises. Completion order would be
+        # faster to yield and wrong.
+        return list(pool.map(_run_one, payloads))
 
 
 # --------------------------------------------------------------------------
@@ -357,8 +375,27 @@ def run_many(
 # --------------------------------------------------------------------------
 
 class Counterfactual:
-    """What a trader's own activity did to the market.
+    """What a synthetic order-flow imbalance did to the market.
 
+    .. note::
+
+       For **what your trading cost you**, use :func:`pretium.tca.analyse`.
+       It runs an agent that actually executes against the book and prices
+       every fill against the untraded world.
+
+       This measures one specific, narrower thing: the effect of an order
+       IMBALANCE fed to the factor model, which is the information channel
+       alone. No order is submitted and no liquidity is consumed, so the book
+       channel -- where a large trade's cost actually comes from -- is not
+       exercised at all.
+
+       That channel is also bounded at both ends. Below about 1.3x the
+       average minute volume a floor applies and the response is flat; above
+       10x it saturates and is flat again. Doubling the flow outside the band
+       between them changes nothing, so this is the wrong tool for asking how
+       cost scales with size.
+
+    
     Two runs of the SAME seed — one with the trader's order flow, one without —
     and the difference between them.
 
@@ -488,8 +525,8 @@ def counterfactual(
             engine.close_market()
         return engine
 
-    # Baseline FIRST, so a validation error in the flow surfaces before any
-    # work is done rather than after half of it.
+    # The FLOW world first, so a validation error in the flow surfaces before
+    # any work is done rather than after half of it.
     with_flow = run(order_flow)
     without = run(None)
 

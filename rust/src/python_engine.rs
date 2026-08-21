@@ -682,6 +682,7 @@ impl PyEngine {
     #[allow(clippy::too_many_arguments)]
     fn run_session(
         &mut self,
+        py: Python<'_>,
         hour: i64,
         minute: i64,
         day_of_week: i64,
@@ -738,26 +739,44 @@ impl PyEngine {
             })
             .collect();
 
-        let outcome = self.inner.run_session(
-            &SessionRequest {
-                start: GameTime {
-                    hour,
-                    minute,
-                    day_of_week,
+        // The GIL is released for the compute, and that is what makes a
+        // parallel sweep possible at all.
+        //
+        // `run_many` used processes before this, because a thread pool holding
+        // the GIL would have run the sweep serially with extra bookkeeping.
+        // Processes cost a universe serialised per worker -- and on Windows
+        // they HANG: the spawn start method re-imports `__main__`, which does
+        // not exist for a REPL, a notebook or a piped script, so the children
+        // die and the parent waits forever. A ten-minute wait for a twenty-seed
+        // sweep, with no error.
+        //
+        // Nothing Python is touched inside: news, impacts and flow are already
+        // converted to Rust types above, and the engine and buffer are plain
+        // data. That is the precondition for releasing it, not an optimisation
+        // note.
+        let inner = &mut self.inner;
+        let buffer = &mut self.buffer;
+        py.allow_threads(move || {
+            inner.run_session(
+                &SessionRequest {
+                    start: GameTime {
+                        hour,
+                        minute,
+                        day_of_week,
+                    },
+                    ticks,
+                    volatility_multiplier: volatility,
+                    news: &session_news,
+                    news_impact_queue: &session_impacts,
+                    order_volumes: &session_flow,
+                    close_at_end,
+                    daily_innovations: &innovations,
+                    sector_base_variances: &variances,
+                    stop: None,
                 },
-                ticks,
-                volatility_multiplier: volatility,
-                news: &session_news,
-                news_impact_queue: &session_impacts,
-                order_volumes: &session_flow,
-                close_at_end,
-                daily_innovations: &innovations,
-                sector_base_variances: &variances,
-                stop: None,
-            },
-            &mut self.buffer,
-        );
-        let _ = outcome;
+                buffer,
+            )
+        });
         Ok(self.buffer.ticks_written)
     }
 
@@ -782,6 +801,7 @@ impl PyEngine {
     #[allow(clippy::too_many_arguments)]
     fn run_days(
         &mut self,
+        py: Python<'_>,
         days: usize,
         hour: i64,
         minute: i64,
@@ -799,7 +819,7 @@ impl PyEngine {
         }
         for offset in 0..days {
             self.open_market();
-            self.run_session(hour, minute, day_of_week, ticks_per_day, volatility,
+            self.run_session(py, hour, minute, day_of_week, ticks_per_day, volatility,
                              false, None, None, None)?;
             self.close_market();
             if record {
