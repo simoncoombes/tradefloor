@@ -69,9 +69,9 @@ def test_a_bigger_hike_hurts_more():
     assert large["median_pct"] < small["median_pct"]
 
 
-def test_a_volatility_shock_moves_dispersion_more_than_level():
-    # Volatility is not direction. The median barely moves; the tails do.
-    result = run(Scenario.vol_shock(calm=15.0, peak=45.0, at=10, over=20))
+def test_a_vix_shock_moves_dispersion_more_than_level():
+    # A stress episode is not direction. The median barely moves; the tails do.
+    result = run(Scenario.vix_shock(calm=15.0, peak=45.0, at=10, over=20))
     assert abs(result["median_pct"]) < 0.1
     # The tails move where the median does not: measured -0.25% worst against
     # +0.53% best, a spread twenty times the median shift.
@@ -89,14 +89,16 @@ def test_the_draw_divergence_is_reported_rather_than_hidden():
 
     Unlike order flow, which consumes zero draws, a macro path changes prices,
     prices change which branch the book settlement takes, and that branch
-    draws four uniforms or none. Measured across scenarios the delta is always
-    zero or a multiple of four — 4 in 425,600, which is 0.00094%.
+    draws four uniforms or none. Re-measured on this build the delta is zero
+    in 24 of 24 comparisons; on an older build it was -4 in 425,600, which is
+    where the multiple-of-four mechanism was identified. The mechanism is
+    still present, so this asserts the shape rather than zero.
 
     Reported rather than asserted away, because a user comparing two worlds
     should know whether they saw the same random numbers.
     """
     for scenario in (Scenario.rate_shock(start=0.025, end=0.05, over=30),
-                     Scenario.vol_shock(),
+                     Scenario.vix_shock(),
                      Scenario.rate_shock(start=0.025, end=0.10, over=30)):
         result = run(scenario)
         assert result["draw_delta"] % 4 == 0
@@ -348,3 +350,49 @@ def test_a_pin_holds_for_the_whole_day_it_was_applied_to():
         engine.record(day)
     recorded = pa.table(engine.macro_table()).to_pydict()["corporate_bond_yield"]
     assert recorded == pytest.approx(wanted)
+
+
+# --------------------------------------------------------------------------
+# The rename: VIX is a liquidity and correlation lever, not a volatility one
+# --------------------------------------------------------------------------
+
+
+def test_vol_shock_still_works_and_says_it_is_deprecated():
+    """The old name is kept so nobody's archived script breaks in silence."""
+    with pytest.warns(DeprecationWarning, match="vix_shock"):
+        old = Scenario.vol_shock(calm=15.0, peak=45.0, at=10, over=20)
+    new = Scenario.vix_shock(calm=15.0, peak=45.0, at=10, over=20)
+    # The PATH is what defines a scenario, and the two are the same path, so
+    # a run under either name reproduces the other exactly.
+    assert old.to_json(40) == new.to_json(40)
+
+
+def test_vix_at_or_below_fifteen_is_inert():
+    """Not "weak" -- inert, and worth a test because the docs now say so.
+
+    Below VIX 15 the spread multiplier floors at 1.0 and the correlation blend
+    (VIX > 40) has not started, so there is no channel left. Measured:
+    identical prices to the last bit.
+    """
+    calm = run_scenario(Scenario().hold(vix=15.0), seed=3,
+                        universe=UNIVERSE, days=4)
+    panic_free = run_scenario(Scenario().hold(vix=5.0), seed=3,
+                              universe=UNIVERSE, days=4)
+    assert calm.prices() == panic_free.prices()
+    assert calm.draws_consumed == panic_free.draws_consumed
+
+
+def test_a_vix_spike_widens_the_quoted_spread():
+    """The channel VIX DOES have, asserted so a silent regression is caught."""
+    def median_spread_bps(vix):
+        engine = run_scenario(Scenario().hold(vix=vix), seed=3,
+                              universe=UNIVERSE, days=4)
+        out = []
+        for ticker in engine.tickers:
+            book = engine.book(ticker)
+            if book.best_bid and book.best_ask and book.best_ask > book.best_bid:
+                mid = (book.best_bid + book.best_ask) / 2
+                out.append((book.best_ask - book.best_bid) / mid * 1e4)
+        return sum(out) / len(out)
+
+    assert median_spread_bps(65.0) > median_spread_bps(15.0) * 1.5

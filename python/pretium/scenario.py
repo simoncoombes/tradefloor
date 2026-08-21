@@ -40,6 +40,57 @@ With both moving, the same 250bp hike prices twenty instruments down a median
 0.25%. That dispersion is the point: a scenario that moved everything equally
 would tell a cross-sectional strategy nothing.
 
+## What a VIX path actually moves
+
+Worth reading before reaching for :meth:`Scenario.vix_shock`, because the name
+VIX carries an assumption from everywhere else in finance that does not hold
+here. In this model VIX does not enter the variance process at all. The GARCH
+recursion is ``omega + alpha * r^2 + beta * v`` with a sector-relative clamp,
+and there is no VIX term in it or in the noise magnitude.
+
+What VIX does reach:
+
+1. The quoted bid-ask, through a spread multiplier
+   ``1 + max(0, (vix - 15) / 30)``.
+2. Cross-sectional correlation, but only above VIX 40, where idiosyncratic
+   sector factors blend toward the market factor, up to 0.8.
+3. Credit spreads in the daily economy step, which is not reachable from
+   Python in this build. See the note under `Macro` in the Core concepts
+   documentation.
+
+Measured on this build, 20 instruments over 120 days, seed 3, annualised
+realised volatility:
+
+    VIX  5    58.05%
+    VIX 15    58.05%   (the default)
+    VIX 45    58.22%
+    VIX 65    58.92%
+
+A thirteenfold move in VIX changes realised volatility by under one point.
+Below VIX 15 it changes nothing whatsoever: the spread multiplier floors at
+1.0 and the correlation blend has not started, so there is no channel left,
+and VIX 5, VIX 10 and VIX 15 produce BIT-IDENTICAL prices over 60 days on 20
+instruments.
+
+What does move. Mean quoted spread across 25 instruments after five days:
+
+    VIX  5    12.17 bps
+    VIX 15    12.17 bps
+    VIX 25    14.72 bps
+    VIX 45    20.05 bps
+    VIX 65    28.41 bps
+
+And mean pairwise correlation of daily log returns, 25 names over 120 days,
+300 pairs: +0.022 at VIX 15, +0.023 at VIX 45, +0.041 at VIX 65. The
+correlation channel does fire above 40, but it moves a number that starts near
+zero, for the reason set out in the realism documentation.
+
+So a VIX path answers what an execution algorithm does when spreads widen, and
+what a diversified book does when correlations rise. It does not answer what
+happens when volatility triples. Nothing in this model raises realised
+volatility, and that limitation is stated here rather than left for a user to
+discover after publishing.
+
 ## A macro counterfactual is near-exact, not exact — and that is worth knowing
 
 This is the counterfactual real markets cannot offer: you cannot re-run a year
@@ -53,18 +104,23 @@ byte-identical and the subtraction is exact. A macro path does not have that
 property: it changes prices, prices change which branches the microstructure
 takes, and one of those branches consumes draws.
 
-Measured, on twenty instruments over forty days — 425,600 draws in the flat
-run:
+Re-measured on this build, twenty instruments over forty days, 2,074,800
+draws in the flat run:
 
-    rate_shock 2.5% -> 5%      -4 draws
+    rate_shock 2.5% -> 5%       0 draws
     rate_shock 2.5% -> 10%      0 draws
-    vol_shock  15 -> 45        -4 draws
-    vol_shock  15 -> 80        -4 draws
+    vix_shock  15 -> 45         0 draws
+    vix_shock  15 -> 80         0 draws
 
-Always zero or a multiple of four, which identifies the mechanism exactly:
-settling a price through the book draws four uniforms, or none if it returns
-early, and a macro-induced price difference flipped that branch once. The
-largest divergence is 0.00094% of the schedule.
+Zero in all four, and zero again when three of them are repeated across seeds
+1 to 8. An earlier measurement on an older build recorded a delta of -4 for
+three of these cases, which is where the mechanism was
+identified: settling a price through the book draws four uniforms, or none if
+it returns early, so a macro-induced price difference can flip that branch
+once and shift the schedule by a multiple of four.
+
+The mechanism has not been removed, so the guarantee is "measured at zero on
+this build" rather than "cannot happen".
 
 So :func:`compare` REPORTS the divergence rather than asserting it away. A
 ``draw_delta`` of zero means the two worlds saw an identical random sequence
@@ -77,6 +133,7 @@ comfortable choice and the wrong one.
 from __future__ import annotations
 
 import json
+import warnings
 from typing import Any, Callable, Sequence
 
 from ._core import Engine, Instrument, Macro, ValidationError
@@ -250,12 +307,24 @@ class Scenario:
         )
 
     @classmethod
-    def vol_shock(cls, *, calm: float = 15.0, peak: float = 45.0,
+    def vix_shock(cls, *, calm: float = 15.0, peak: float = 45.0,
                   at: int = 10, over: int = 20) -> "Scenario":
-        """A volatility spike that decays back.
+        """A VIX spike that decays back: wider spreads, higher correlation.
 
-        Up as a step, down as a ramp, because that is the shape volatility
-        actually has: it arrives at once and subsides slowly.
+        Up as a step, down as a ramp, because that is the shape a stress
+        episode has: it arrives at once and subsides slowly.
+
+        **This does not raise realised volatility.** VIX has no term in the
+        variance process here, so a spike widens the quoted bid-ask and, above
+        VIX 40, pulls idiosyncratic returns toward the market factor. Measured
+        on 20 instruments over 120 days, seed 3: taking the peak from 45 to 80
+        moves annualised realised volatility from 58.01% to 58.36%, against a
+        no-scenario baseline of 58.05%. This module's docstring sets out the
+        three channels and what each one is worth.
+
+        Use it for a liquidity or correlation stress. No lever in this model
+        raises realised volatility, and this one was renamed because its old
+        name claimed otherwise.
         """
         def driver(day: int) -> float:
             if day < at:
@@ -264,9 +333,30 @@ class Scenario:
                 return calm
             return peak + (calm - peak) * (day - at) / over
 
-        scenario = cls(label=f"vol_shock {calm}->{peak} at day {at}")
+        scenario = cls(label=f"vix_shock {calm}->{peak} at day {at}")
         scenario._drivers["vix"] = driver
         return scenario
+
+    @classmethod
+    def vol_shock(cls, *, calm: float = 15.0, peak: float = 45.0,
+                  at: int = 10, over: int = 20) -> "Scenario":
+        """Deprecated alias for :meth:`vix_shock`. Same path, honest name.
+
+        The old name said "volatility shock" about a lever that moves VIX, and
+        VIX does not drive realised volatility in this model. The path is
+        unchanged, so a run under this name reproduces exactly; only the
+        ``label`` differs, because the serialised path now carries the name
+        that describes it.
+        """
+        warnings.warn(
+            "Scenario.vol_shock is deprecated; use Scenario.vix_shock. It "
+            "drives VIX, and VIX in this model is a liquidity and correlation "
+            "variable with no term in the variance process. The path is "
+            "identical, so results do not change.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return cls.vix_shock(calm=calm, peak=peak, at=at, over=over)
 
 
 def run_scenario(
