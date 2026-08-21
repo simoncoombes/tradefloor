@@ -44,9 +44,34 @@ pt.Universe.from_edgar(snapshot)                 # real SEC fundamentals
 
 ### Macro
 
-The macro chain runs endogenously by default - a Taylor rule feeding off
-Phillips and Okun relationships over a cycle. You set initial conditions and it
-evolves. To drive a series yourself, see [Scenarios](scenarios.html).
+**The macro state is exogenous. It does not evolve on its own.** You set the
+initial conditions, and every macro field holds that value for the whole run
+unless you move it. Measured over `run_days(120)`: `vix`,
+`federal_funds_rate`, `corporate_bond_yield`, `inflation_rate`,
+`unemployment_rate`, `gdp_growth`, `qe_pe_boost` and `fear_greed_index` each
+take exactly one distinct value, and `fundamental_value` takes exactly one
+distinct value per instrument.
 
-Read it back per day from `day.economy`, or over a whole run from the `macro`
-table.
+The engine does carry a full macro chain - a Taylor rule feeding off Phillips
+and Okun relationships over a cycle - and it is implemented and unit-tested in
+the Rust core. It is simply not reachable from Python in this release, so it
+never steps.
+
+That matters for what you can conclude. A run with no macro path has a
+constant fair value, so mean reversion pulls toward a fixed anchor and nothing
+reprices. To get a macro that moves, drive it yourself with
+[Scenarios](scenarios.html) - and the exogenous path works exactly as
+designed:
+
+```python
+engine.pin_macro(corporate_bond_yield=0.09)   # from a default of 0.0456
+```
+
+Measured on twenty instruments, that repriced nineteen of them. The twentieth
+is a loss-maker, valued off book value, and book value carries no discount
+rate - see [Conventions](conventions.html). Pinning `federal_funds_rate` alone
+repriced none of the twenty, for the reason set out under
+[Scenarios](scenarios.html).
+
+Read the macro back per day from `day.economy`, or over a whole run from the
+`macro` table.

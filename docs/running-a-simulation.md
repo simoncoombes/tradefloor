@@ -33,12 +33,16 @@ ev = engine.run_until(fill=True, day_close=True, max_ticks=390)
 engine.submit(pt.Order("ACME", side="buy", qty=500, type="limit", price=99.5))
 tick = engine.tick()
 tick.fills
-engine.advance_day()    # close bookkeeping: momentum roll, GARCH innovation
+engine.close_market()   # close bookkeeping: momentum roll, GARCH innovation
 ```
 
 `days()` and `run_days()` simulate exactly the same thing and differ only in
 how many times you get control back. A day is 390 regular-session ticks plus
-the close bookkeeping `advance_day()` owns. Mixing granularities is legal.
+the close bookkeeping `close_market()` owns. Mixing granularities is legal.
+
+Driving a day by hand is `open_market()`, `run_session(...)`, `close_market()`,
+and `record(day)` if you want that day in the Arrow tables. That is exactly
+what `run_days()` does for you.
 
 ### Why not a tick loop
 
