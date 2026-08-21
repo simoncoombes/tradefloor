@@ -725,8 +725,22 @@ impl Engine {
                 PriceField::Volume => c.stock.volume,
                 PriceField::MarketCap => c.stock.market_cap,
                 PriceField::MispricingS => c.stock.mispricing_s.unwrap_or(f64::NAN),
-                PriceField::MakerInventory => c.stock.maker_inventory.unwrap_or(0.0),
+                PriceField::MakerInventory => c.stock.maker_inventory.unwrap_or(f64::NAN),
                 PriceField::GarchVariance => c.stock.garch_variance,
+                PriceField::PreviousTickPrice => {
+                    c.stock.previous_tick_price.unwrap_or(f64::NAN)
+                }
+                PriceField::MispricingSPrevClose => {
+                    c.stock.mispricing_s_prev_close.unwrap_or(f64::NAN)
+                }
+                PriceField::MispricingMomentum => {
+                    c.stock.mispricing_momentum.unwrap_or(f64::NAN)
+                }
+                PriceField::LastDailyReturn => c.stock.last_daily_return.unwrap_or(f64::NAN),
+                PriceField::AvgVolume => c.stock.avg_volume,
+                PriceField::Beta => c.stock.beta.unwrap_or(f64::NAN),
+                PriceField::ShortInterest => c.stock.short_interest,
+                PriceField::FloatShares => c.stock.float,
             })
             .collect()
     }
@@ -764,8 +778,30 @@ pub enum PriceField {
     /// `NaN` for a company that has never ticked, since a column cannot carry
     /// `None`. The embedder should read it as "unset", not as a number.
     MispricingS,
+    /// `NaN` when the maker has never quoted this company.
+    ///
+    /// Not zero. Zero is a REAL inventory -- a maker holding nothing -- and
+    /// before the first tick every company read 0.0, which said "flat" about a
+    /// book that did not exist yet. Absence is not zero anywhere else in this
+    /// library and it should not have been here.
     MakerInventory,
     GarchVariance,
+    /// The previous tick's print. `NaN` before the second tick.
+    PreviousTickPrice,
+    /// `s` as it stood at the last close, and the momentum term carried from
+    /// it. Both `NaN` before the first close: they are day-boundary state, so
+    /// a session that has not crossed one has no value to report.
+    MispricingSPrevClose,
+    MispricingMomentum,
+    /// The last completed day's return. `NaN` before the first close.
+    LastDailyReturn,
+    /// Cross-sectional characteristics, constant through a run. Exposed as
+    /// columns so a factor study can join them to `bars` without carrying the
+    /// universe alongside.
+    AvgVolume,
+    Beta,
+    ShortInterest,
+    FloatShares,
 }
 
 /// Counts draws as they are taken.

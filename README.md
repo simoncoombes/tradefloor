@@ -349,7 +349,9 @@ not its volatility, not its microstructure.
 error that says so.
 
 **Absence is not zero.** `corporate_bond_yield=None` falls through to the
-policy rate; `0.0` is a real observation used as given.
+policy rate; `0.0` is a real observation used as given. In columnar reads,
+where a column cannot carry `None`, absence is `NaN` — never zero, because
+zero is a real maker inventory, a real mispricing and a real return.
 
 **Invalid input raises.** `ValidationError` for a malformed scenario,
 `OrderError` for a rejected order. Nothing is silently clamped: a simulator

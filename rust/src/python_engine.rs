@@ -507,10 +507,18 @@ fn parse_field(name: &str) -> PyResult<PriceField> {
         "mispricing_s" => PriceField::MispricingS,
         "maker_inventory" => PriceField::MakerInventory,
         "garch_variance" => PriceField::GarchVariance,
+        "previous_tick_price" => PriceField::PreviousTickPrice,
+        "mispricing_s_prev_close" => PriceField::MispricingSPrevClose,
+        "mispricing_momentum" => PriceField::MispricingMomentum,
+        "last_daily_return" => PriceField::LastDailyReturn,
+        "avg_volume" => PriceField::AvgVolume,
+        "beta" => PriceField::Beta,
+        "short_interest" => PriceField::ShortInterest,
+        "float_shares" => PriceField::FloatShares,
         other => {
             return Err(ValidationError::new_err(format!(
-                "unknown field {other:?}. Valid: price, previous_close, open, high, \
-                 low, volume, market_cap, mispricing_s, maker_inventory, garch_variance"
+                "unknown field {other:?}. Valid: {}",
+                COLUMN_FIELDS.join(", ")
             )))
         }
     })
@@ -1799,6 +1807,32 @@ impl PyNewsImpact {
 /// eventually disagree and every column would still look plausible -- the
 /// `truth` schema is generated from the same constant for the same reason.
 pub const FACTOR_NAMES: [&str; 7] = crate::market::factors::S_COMPONENT_KEYS;
+
+/// Every field `column()` accepts, in one place.
+///
+/// Declared once so the error message cannot drift from the match arms above
+/// it -- a list of valid names that omits a name it accepts is worse than no
+/// list, because it sends the reader looking for a different mistake.
+pub const COLUMN_FIELDS: [&str; 18] = [
+    "price",
+    "previous_close",
+    "previous_tick_price",
+    "open",
+    "high",
+    "low",
+    "volume",
+    "avg_volume",
+    "market_cap",
+    "mispricing_s",
+    "mispricing_s_prev_close",
+    "mispricing_momentum",
+    "last_daily_return",
+    "maker_inventory",
+    "garch_variance",
+    "beta",
+    "short_interest",
+    "float_shares",
+];
 
 /// A sector's relative volatility multiplier.
 ///
