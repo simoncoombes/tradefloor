@@ -34,6 +34,7 @@ After that, go to whichever of these is your job:
 | you want to | read |
 |---|---|
 | train an agent | [Reinforcement learning](reinforcement-learning.html), [Agents and evaluation](agents-and-evaluation.html) |
+| drive an agent with an LLM | [An LLM agent](an-llm-agent.html) |
 | build an execution algorithm | [Transaction cost analysis](transaction-cost-analysis.html), [Reading results](reading-results.html) |
 | stress-test a strategy | [Scenarios](scenarios.html), [Sweeps and parallelism](sweeps-and-parallelism.html), [Forking a simulation](forking-a-simulation.html) |
 | score a model against known answers | [Ground truth](ground-truth.html) |
@@ -61,6 +62,7 @@ absence differing from zero, and roster order being contractual.
 - [Reproducing a run](reproducing-a-run.html)
 - [Real fundamentals from SEC EDGAR](real-fundamentals-from-sec-edgar.html)
 - [Reinforcement learning](reinforcement-learning.html)
+- [An LLM agent](an-llm-agent.html)
 - [How realistic is this market](how-realistic-is-this-market.html)
 - [Conventions](conventions.html)
 - [Performance](performance.html)
