@@ -29,6 +29,8 @@ from . import scenario as _scenario_mod
 from . import facts
 from .checkpoint import Checkpoint, branch
 from .sweep import sweep
+from . import spec
+from .spec import SPEC_VERSION, StrategySpec
 from .scenario import Scenario, run_scenario
 from .tca import Execution
 from .baselines import capture_ratio, reference_agents
@@ -77,6 +79,7 @@ __all__ = [
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
     "baselines", "reference_agents", "capture_ratio", "tca", "Execution",
     "rank", "Ranking", "AgentRecord",
+    "spec", "StrategySpec", "SPEC_VERSION",
     "Scenario", "run_scenario", "facts", "Checkpoint", "branch", "sweep",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",

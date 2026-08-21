@@ -93,6 +93,15 @@ actually exists, not the paper value of knowing everything.
 Which means the Oracle's own scorecard is worth reading. If its `impact_bps`
 is large, the market is thin and the headline mispricing was never harvestable
 in the first place.
+
+## Every one of these is expressible as data
+
+The five classes here share one grammar — a signal, a concentration, an
+exposure, a participation cap — and :class:`pretium.StrategySpec` writes it
+down as versioned, hashable JSON, so a result built on these agents can cite
+its strategy the way it already cites its seed and universe. Construct the
+spec instead of the class when the result is going anywhere other people
+will read: ``pt.StrategySpec.momentum()`` builds exactly ``Momentum()``.
 """
 
 from __future__ import annotations
