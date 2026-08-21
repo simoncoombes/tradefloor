@@ -169,10 +169,17 @@ def test_declared_module_variables_exist():
     assert sorted(v for v in variables if not hasattr(core, v)) == []
 
 
-@pytest.mark.parametrize("name", [
-    "Engine", "EngineBatch", "Instrument", "Macro", "OrderBook", "GameRng",
-    "News", "NewsImpact", "MispricingState", "ArrowStream",
-])
+#: Every class the extension exports. Derived from the runtime rather than
+#: listed, because a hand-kept list of things-to-check is the same kind of
+#: artifact as the stub itself: it drifts, and what falls off it stops being
+#: checked without anything failing.
+RUNTIME_CLASSES = sorted(
+    name for name in dir(core)
+    if not name.startswith("_") and isinstance(getattr(core, name), type)
+)
+
+
+@pytest.mark.parametrize("name", RUNTIME_CLASSES)
 def test_class_members_exist_at_runtime(name):
     methods, attributes = stub_class_members(name)
     cls = getattr(core, name)
@@ -188,25 +195,45 @@ def test_class_members_exist_at_runtime(name):
 # --------------------------------------------------------------------------
 
 
-CALLABLES = [
-    (None, "fair_value"),
-    (None, "step_mispricing_daily"),
-    (None, "impulse_response"),
-    (None, "stationary_sigma"),
-    (None, "random_instruments"),
-    (None, "market_status"),
-    (None, "check_rate"),
-    ("Engine", "tick"),
-    ("Engine", "run_session"),
-    ("Engine", "run_days"),
-    ("Engine", "run_until"),
-    ("Engine", "pin_macro"),
-    ("Engine", "bars"),
-    ("Engine", "snapshot_book"),
-    ("OrderBook", "post_limit"),
-    ("OrderBook", "submit"),
-    ("OrderBook", "sweep_cost"),
-]
+def runtime_callables():
+    """Every callable the extension exposes that carries a signature.
+
+    Enumerated from the module, not curated. The previous version listed
+    seventeen by hand and there are seventy-two; the fifty-five it missed were
+    unchecked, and nothing said so. A list of what to verify has exactly the
+    drift problem of the thing being verified.
+    """
+    out: list[tuple[str | None, str]] = []
+    for name in sorted(n for n in dir(core) if not n.startswith("_")):
+        obj = getattr(core, name)
+        if isinstance(obj, type):
+            # `vars(obj)`, not `dir(obj)`. dir() walks the bases, so the
+            # exception classes contributed BaseException's own add_note and
+            # with_traceback -- real callables with real signatures that the
+            # stub has no business redeclaring. Only what the class itself
+            # defines is part of this extension's surface.
+            for member in sorted(m for m in vars(obj) if not m.startswith("_")):
+                attribute = getattr(obj, member, None)
+                if callable(attribute) and getattr(
+                    attribute, "__text_signature__", None
+                ):
+                    out.append((name, member))
+        elif callable(obj) and getattr(obj, "__text_signature__", None):
+            out.append((None, name))
+    return out
+
+
+CALLABLES = runtime_callables()
+
+
+def test_the_callable_sweep_is_not_empty():
+    # If enumeration ever returns nothing -- a PyO3 change stops emitting
+    # __text_signature__, say -- every parametrised test below silently
+    # vanishes and the suite still passes. This is the guard against a whole
+    # class of checks disappearing quietly.
+    assert len(CALLABLES) > 50, len(CALLABLES)
+    assert any(owner is None for owner, _ in CALLABLES)
+    assert any(owner == "Engine" for owner, _ in CALLABLES)
 
 
 @pytest.mark.parametrize("class_name,func_name", CALLABLES)
