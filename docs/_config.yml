@@ -1,0 +1,39 @@
+title: pretium
+description: A market simulator you can run a strategy against. Rust core, Python API.
+
+url: https://simoncoombes.github.io
+baseurl: /pretium
+
+# just-the-docs is pulled as a remote theme rather than vendored, so GitHub
+# Pages builds it without a Gemfile or a build workflow. Classic Pages builds
+# are free; a MkDocs or Actions-driven build would spend Actions minutes on
+# every push, which is not worth it for a docs site this size.
+remote_theme: just-the-docs/just-the-docs
+
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+
+search_enabled: true
+search:
+  heading_level: 3
+  previews: 3
+
+color_scheme: dark
+heading_anchors: true
+
+aux_links:
+  "GitHub": https://github.com/simoncoombes/pretium
+aux_links_new_tab: true
+
+back_to_top: true
+back_to_top_text: "Back to top"
+
+# Only the documentation is a site. Everything else in the repository -- the
+# crate, the Python package, the tests -- must not be swept into the build.
+include:
+  - "*.md"
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor

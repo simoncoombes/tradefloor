@@ -184,7 +184,7 @@ aggregate flow rather than agents that adapt to you.
 
 ## Documentation
 
-Full docs: [**pretium documentation**](docs/index.md)
+Full docs: [**simoncoombes.github.io/pretium**](https://simoncoombes.github.io/pretium/)
 
 Scenarios and macro paths, checkpointing and forking, Arrow output and
 streaming sweeps, SEC EDGAR loading, the RL environment, reproducibility and
