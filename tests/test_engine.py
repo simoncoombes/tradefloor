@@ -550,3 +550,52 @@ def test_attribution_is_reproducible():
         return [arr(e.attribution(f)) for f in pretium.Engine.FACTORS]
 
     assert run() == run()
+
+
+def test_close_at_end_is_the_same_close_as_calling_it_yourself():
+    """Two spellings of one close must produce one market.
+
+    `run_session(close_at_end=True)` and `run_session(); close_market()` roll
+    the same day, so every field they touch must agree. They did not.
+
+    The close takes a per-company innovation and falls back to the day's total
+    return when it is absent. On the `close_at_end` path the request is built
+    BEFORE the session runs, so the caller is being asked for the noise the
+    session has not accumulated yet -- a parameter that cannot be supplied
+    correctly. It was therefore always absent, always the fallback, and the
+    two paths rolled GARCH from different quantities: measured elsewhere at a
+    median factor of 0.82 apart, with a tenth percentile of 0.22.
+
+    The engine now fills an empty slot from its own accumulator. Asserted on
+    garch_variance specifically because that is the field the innovation
+    drives -- prices alone would have matched either way and hidden it.
+    """
+    universe = pretium.Universe.random(6, seed=2)
+
+    inline = pretium.Engine(seed=5, universe=universe)
+    inline.open_market()
+    inline.run_session(9, 30, 3, 390, close_at_end=True)
+
+    explicit = pretium.Engine(seed=5, universe=universe)
+    explicit.open_market()
+    explicit.run_session(9, 30, 3, 390)
+    explicit.close_market()
+
+    assert arr(inline.column("garch_variance")) == arr(
+        explicit.column("garch_variance"))
+    assert arr(inline.column("mispricing_momentum")) == arr(
+        explicit.column("mispricing_momentum"))
+    assert inline.prices() == explicit.prices()
+    assert inline.draws_consumed == explicit.draws_consumed
+
+
+def test_run_until_rolls_the_day_from_the_engines_own_noise():
+    # The third path with the same defect. It closes internally too, so it
+    # takes the same correction; checked by running the day to completion and
+    # comparing against the explicit spelling.
+    universe = pretium.Universe.random(6, seed=2)
+    engine = pretium.Engine(seed=5, universe=universe)
+    engine.open_market()
+    # A band nothing will cross, so it runs the full tick budget and closes.
+    engine.run_until(ticker=engine.tickers[0], above=1e12, max_ticks=390)
+    assert all(v > 0 for v in arr(engine.column("garch_variance")))

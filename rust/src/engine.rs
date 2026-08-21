@@ -550,8 +550,26 @@ impl Engine {
         }
 
         if request.close_at_end && halted_at.is_none() {
+            // The engine's OWN accumulated noise, where the caller left the
+            // slot empty. It cannot be the caller's job to fill it here: the
+            // request is built BEFORE the session runs, and the value being
+            // asked for is the noise this session is about to accumulate.
+            //
+            // So on this path an absent innovation is not a choice, it is the
+            // only thing an embedder can supply -- and `None` falls through to
+            // the day's total return, which is a different quantity (measured
+            // elsewhere: median factor 0.82, tenth percentile 0.22, ninetieth
+            // 3.20). A parameter that cannot be supplied correctly is a trap,
+            // not a feature.
+            let own = self.attribution_column(random_noise_index());
+            let innovations: Vec<Option<f64>> = request
+                .daily_innovations
+                .iter()
+                .enumerate()
+                .map(|(i, supplied)| supplied.or_else(|| own.get(i).copied()))
+                .collect();
             self.close_market(&DayCloseRequest {
-                daily_innovations: request.daily_innovations,
+                daily_innovations: &innovations,
                 sector_base_variances: request.sector_base_variances,
             });
         }
@@ -802,6 +820,18 @@ pub enum PriceField {
     Beta,
     ShortInterest,
     FloatShares,
+}
+
+/// Index of `random_noise` among the components, found rather than written.
+///
+/// Every component is an f64, so a literal index would keep compiling and
+/// start feeding the variance process the crowd lean the day a component is
+/// inserted ahead of it.
+fn random_noise_index() -> usize {
+    crate::market::factors::S_COMPONENT_KEYS
+        .iter()
+        .position(|name| *name == "random_noise")
+        .expect("random_noise is one of the components")
 }
 
 /// Counts draws as they are taken.
