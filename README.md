@@ -68,6 +68,33 @@ meant to infer, and they are used for scoring on the other side of the wall.
 If an agent implements `explain()`, its stated reason is checked against what
 actually drove the move.
 
+### How much was there to win?
+
+A P&L of $61,000 means nothing on its own. `pretium.baselines` ships the
+reference points that make it readable — buy-and-hold, random, momentum,
+mean-reversion — and an **Oracle** that reads the true mispricing and trades
+it without estimation error.
+
+```python
+scores = pt.evaluate(pt.reference_agents(), seed=2026, universe=universe, days=60)
+pt.capture_ratio(scores)     # each agent's P&L as a fraction of the Oracle's
+```
+
+The Oracle is not competing; it is a measuring instrument. It answers the
+question a real market cannot even be asked — *how much alpha was available at
+all* — because doing so requires observing fair value, and the gap between
+price and fair value is precisely what is unobservable out there.
+
+That converts a bare number into a fraction. And it is a **real** ceiling, not
+an informational one: the Oracle's orders hit the same book as everyone
+else's, so past some participation the impact eats the edge. Perfect
+information does not buy unlimited size.
+
+Quote the horizon with the ratio. Mispricing reverts on a 60-day half-life, so
+a short evaluation sees only the start of the convergence: on seed 2026 the
+same momentum agent captures **27% of the ceiling over five days and 94% over
+sixty**.
+
 **What this does not tell you:** whether an agent would trade real markets
 well. This is a model market with knowable structure, and a determined agent
 can learn that structure in ways that will not transfer. Use it to rank agents
