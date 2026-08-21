@@ -90,3 +90,40 @@ def test_a_plain_list_is_fingerprinted_the_same_as_a_universe():
     plain = list(UNIVERSE)
     facts = pretium.facts.measure(seed=3, universe=plain, days=60)
     assert facts["universe_fingerprint"] == UNIVERSE.fingerprint
+
+
+def test_a_sweep_row_names_its_market():
+    """The case where provenance matters most.
+
+    A hundred rows keyed only by seed look interchangeable. Two sweeps over
+    different rosters merge into one table that is wrong in no visible way --
+    same seeds, same tickers, same shape, different markets.
+    """
+    rows = pretium.run_many(seeds=[1, 2, 3], universe=UNIVERSE, days=1,
+                            ticks=40, collect="summary")
+    assert all(r["universe_fingerprint"] == UNIVERSE.fingerprint for r in rows)
+
+
+def test_sweep_rows_distinguish_the_decoy_where_tickers_do_not():
+    ours = pretium.run_many(seeds=[1], universe=UNIVERSE, days=1, ticks=40,
+                            collect="summary")[0]
+    theirs = pretium.run_many(seeds=[1], universe=DECOY, days=1, ticks=40,
+                              collect="summary")[0]
+    # The row already carried `tickers`, and they are equal — which is exactly
+    # why that field could never have served as identity.
+    assert ours["tickers"] == theirs["tickers"]
+    assert ours["universe_fingerprint"] != theirs["universe_fingerprint"]
+
+
+def test_the_stamp_survives_the_worker_boundary():
+    # Workers rebuild the universe from JSON, so a fingerprint computed inside
+    # a worker could in principle differ from one computed outside. It is
+    # hashed once in the parent and carried, and this asserts the parallel and
+    # serial paths agree.
+    serial = pretium.run_many(seeds=[1, 2, 3, 4], universe=UNIVERSE, days=1,
+                              ticks=40, workers=1, collect="summary")
+    threaded = pretium.run_many(seeds=[1, 2, 3, 4], universe=UNIVERSE, days=1,
+                                ticks=40, workers=4, collect="summary")
+    assert [r["universe_fingerprint"] for r in serial] == \
+           [r["universe_fingerprint"] for r in threaded]
+    assert serial[0]["universe_fingerprint"] == UNIVERSE.fingerprint

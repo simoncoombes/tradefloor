@@ -19,6 +19,7 @@ from typing import Any, Iterable, Sequence
 from . import _core
 from .portfolio import Portfolio, Position
 from . import harness as _harness
+from . import universe_util as _universe_util
 from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
 from .replay import replay
 from . import edgar
@@ -263,7 +264,7 @@ def _run_one(args: tuple) -> Any:
     waiting to happen. A list of dicts cannot be.
     """
     (seed, universe_json, macro_kwargs, days, ticks, hour, minute, day_of_week,
-     collect, path) = args
+     collect, path, fingerprint) = args
     universe = Universe.from_json(universe_json)
     engine = Engine(
         seed=seed,
@@ -286,6 +287,15 @@ def _run_one(args: tuple) -> Any:
     if collect == "summary":
         return {
             "seed": seed,
+            # Which market this row belongs to. A sweep is the case where it
+            # matters most: a hundred rows keyed only by seed look
+            # interchangeable, and two sweeps over different rosters merge
+            # into a table that is wrong in no visible way.
+            #
+            # `tickers` is deliberately NOT that identity. Tickers are
+            # generated positionally, so two universes share every name and
+            # no fundamentals.
+            "universe_fingerprint": fingerprint,
             "prices": engine.prices(),
             "draws_consumed": engine.draws_consumed,
             "tickers": engine.tickers,
@@ -378,9 +388,12 @@ def run_many(
     # A path is plain data, so a worker cannot be handed a driver that closes
     # over shared state, and the sweep records exactly what it ran.
     path = None if scenario is None else [scenario.at(d) for d in range(days)]
+    # Hashed ONCE, not per worker. The universe is the same for every seed,
+    # and hashing it N times would be N times the work for one answer.
+    fingerprint = _universe_util.fingerprint_of(universe)
     payloads = [
         (seed, universe_json, macro_kwargs, days, ticks, hour, minute,
-         day_of_week, collect, path)
+         day_of_week, collect, path, fingerprint)
         for seed in seeds
     ]
 
