@@ -115,6 +115,50 @@ a:hover { color: var(--stamp); }
 }
 .ticket__repo:hover { background: var(--canary); color: var(--ink); }
 
+/* ---- The stamp -------------------------------------------------------- */
+
+.stamp {
+  width: 108px; height: 38px; flex: 0 0 auto;
+  color: var(--stamp); opacity: .82;
+  transform: rotate(-4.5deg);
+  /* Ink sits ON the paper, so it multiplies rather than covers. */
+  mix-blend-mode: multiply;
+}
+.stamp text {
+  font: 700 13px/1 var(--mono);
+  letter-spacing: .1em; fill: currentColor;
+}
+
+/* ---- Release tape ----------------------------------------------------- */
+
+.tape {
+  display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap;
+  max-width: 82rem; margin: 0 auto;
+  padding: .5rem 1.6rem .55rem;
+  /* A real punched edge: holes the colour of what is behind the tape, at
+     enough contrast to read as holes rather than as a texture. */
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  background:
+    radial-gradient(circle at 7px 6px, var(--rule) 0 2.4px, transparent 2.6px) 0 0 / 16px 100%,
+    radial-gradient(circle at 7px calc(100% - 6px), var(--rule) 0 2.4px, transparent 2.6px) 0 0 / 16px 100%,
+    var(--paper);
+}
+.tape__label, .tape__note {
+  font: 400 .66rem/1 var(--mono);
+  text-transform: uppercase; letter-spacing: .12em; color: var(--ink-faint);
+}
+.tape__targets {
+  display: flex; gap: 1rem; flex-wrap: wrap;
+  list-style: none; margin: 0; padding: 0; flex: 1 1 auto;
+}
+.tape__targets li { display: flex; gap: .4rem; align-items: baseline; margin: 0; }
+.tape__targets b {
+  font: 400 .66rem/1 var(--mono); color: var(--ink-faint);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.tape__targets span { font: 700 .74rem/1 var(--mono); color: var(--ink); }
+
 /* ---- Sheet and rack --------------------------------------------------- */
 
 .sheet {
@@ -210,6 +254,19 @@ h1 {
   max-width: none;
 }
 
+/* The section's stock, at sheet scale rather than on a 9px chip: a band of
+   the rack's own colour under the title rule, so the tab a reader clicked in
+   the rack is still the colour of the page they land on. */
+.body::before {
+  content: ""; display: block; height: 7px;
+  margin: -2.6rem -2.4rem 2.2rem -2.8rem;
+}
+[data-stock="start"]::before      { background: var(--canary); }
+[data-stock="measure"]::before    { background: var(--blue-pale); border-bottom: 1px solid var(--blue); }
+[data-stock="experiment"]::before { background: var(--pink-pale); border-bottom: 1px solid var(--pink); }
+[data-stock="connect"]::before    { background: var(--canary-pale); border-bottom: 1px solid var(--canary); }
+[data-stock="reference"]::before  { background: var(--carbon); border-bottom: 1px solid var(--rule); }
+
 h2 {
   font: 700 1.28rem/1.25 var(--mono);
   letter-spacing: -0.01em;
@@ -258,7 +315,9 @@ pre {
   overflow-x: auto;
   margin: 0 0 1.2rem;
   /* Carbon copy: the sheet beneath shows at the edge. */
-  box-shadow: 3px 3px 0 -1px var(--carbon), 3px 3px 0 0 var(--rule-fine);
+  /* The duplicate underneath, offset far enough to be a sheet rather than a
+     seam, with its own printed edge. */
+  box-shadow: 5px 5px 0 0 var(--carbon), 5px 5px 0 1px var(--rule);
 }
 pre code { background: none; border: 0; padding: 0; font-size: inherit; }
 
@@ -314,12 +373,6 @@ tbody td:not(:first-child) { font-family: var(--mono); font-size: .84rem; }
   max-width: 47%;
 }
 .onward__next { text-align: right; }
-.onward a span {
-  display: block;
-  font: 400 .66rem/1 var(--mono);
-  text-transform: uppercase; letter-spacing: .12em;
-  color: var(--ink-faint); margin-bottom: .25rem;
-}
 .onward a:hover { color: var(--stamp); }
 
 /* ---- Foot and tape ---------------------------------------------------- */
@@ -330,26 +383,6 @@ tbody td:not(:first-child) { font-family: var(--mono); font-size: .84rem; }
   padding: 0 0 2.5rem;
   background: var(--paper-edge);
 }
-
-.tape {
-  overflow: hidden;
-  border-bottom: 1px solid var(--rule);
-  background: var(--paper);
-  padding: .42rem 0;
-  margin-bottom: 1.4rem;
-  /* The punched edge of a tape reel. */
-  background-image: radial-gradient(circle at 6px 50%, var(--paper-edge) 2px, transparent 2.2px);
-  background-size: 12px 100%;
-}
-.tape__run {
-  display: flex; gap: .7rem; white-space: nowrap;
-  font: 400 .7rem/1 var(--mono); color: var(--ink-faint);
-  padding-left: 1.6rem;
-  animation: tape 90s linear infinite;
-}
-.tape__run b { color: var(--canary); }
-@keyframes tape { to { transform: translateX(-50%); } }
-@media (prefers-reduced-motion: reduce) { .tape__run { animation: none; } }
 
 .foot p {
   max-width: 60ch; margin: 0 auto .5rem; padding: 0 1.6rem;
@@ -394,7 +427,14 @@ tbody td:not(:first-child) { font-family: var(--mono); font-size: .84rem; }
 }
 
 @media (max-width: 34rem) {
-  body { font-size: 16px; background-image: none; }
+  body {
+    font-size: 16px;
+    background-image: repeating-linear-gradient(
+      to bottom, transparent 0 25px, var(--rule-fine) 25px 26px);
+  }
+  .stamp { width: 84px; height: 30px; }
+  .tape { gap: .6rem; padding: .45rem 1.1rem; }
+  .tape__note { display: none; }
   .ticket__fields { padding: .7rem 1.1rem .75rem; gap: .9rem; }
   .ticket__meta div:nth-child(n+3) { display: none; }
   .rack__inner { grid-template-columns: 1fr; }
@@ -407,6 +447,6 @@ tbody td:not(:first-child) { font-family: var(--mono); font-size: .84rem; }
 }
 
 @media print {
-  .rack, .rack__summary, .ticket__repo, .onward, .tape { display: none; }
+  .rack, .rack__summary, .ticket__repo, .onward, .stamp { display: none; }
   body { background: #fff; }
 }

@@ -34,18 +34,40 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <span class="ticket__mark-name">pretium</span>
       <span class="ticket__mark-gloss">n. price</span>
     </a>
+    {% assign rack_label = "" %}
+    {% for r in site.racks %}{% if r.id == page.rack %}{% assign rack_label = r.label %}{% endif %}{% endfor %}
     <dl class="ticket__meta">
       <div><dt>Form</dt><dd>{{ page.title | default: "Home" }}</dd></div>
       <div><dt>Sheet</dt><dd>{{ page.nav_order | default: 1 }} of {{ site.pages | where_exp:"p","p.nav_order" | size }}</dd></div>
-      <div><dt>Precision</dt><dd>f64</dd></div>
-      <div><dt>Licence</dt><dd>Apache&#8209;2.0</dd></div>
+      <div><dt>File</dt><dd>{{ rack_label | default: "Contents" }}</dd></div>
+      <div class="ticket__install"><dt>Install</dt><dd><code>pip install pretium</code></dd></div>
     </dl>
     <a class="ticket__repo" href="https://github.com/simoncoombes/pretium">
       <svg viewBox="0 0 16 16" aria-hidden="true" width="15" height="15"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38l-.01-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.93-.89-1.18-.89-1.18-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .21.14.46.55.38A8 8 0 0 0 8 0Z"/></svg>
       <span>Repository</span>
     </a>
+    <svg class="stamp" viewBox="0 0 132 46" role="img" aria-label="Pre-release">
+      <!-- Drawn as one broken path rather than a border-plus-rotate: a rubber
+           stamp lifts unevenly, so the ink skips at the corners. -->
+      <path d="M5 7 L61 4 L127 8 M129 12 L126 39 M124 42 L70 44 L9 41 M5 37 L4 26 M4 21 L5 11"
+            fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M9 12 L120 10 M12 35 L118 36" fill="none" stroke="currentColor"
+            stroke-width="1" opacity=".5"/>
+      <text x="66" y="30" text-anchor="middle">PRE-RELEASE</text>
+    </svg>
   </div>
   <div class="ticket__rule ticket__rule--double"></div>
+  <div class="tape">
+    <span class="tape__label">Release gate</span>
+    <ol class="tape__targets">
+      <li><b>linux-x86_64</b> <span>112fd73e8e5bc0d6</span></li>
+      <li><b>linux-aarch64</b> <span>112fd73e8e5bc0d6</span></li>
+      <li><b>macos-arm64</b> <span>112fd73e8e5bc0d6</span></li>
+      <li><b>macos-x86_64</b> <span>112fd73e8e5bc0d6</span></li>
+      <li><b>windows-x86_64</b> <span>112fd73e8e5bc0d6</span></li>
+    </ol>
+    <span class="tape__note">one seed, five wheels, digests agree</span>
+  </div>
 </header>
 
 <div class="sheet">
@@ -76,7 +98,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     </nav>
   </details>
 
-  <main id="main" class="body{% if page.title == 'Home' %} body--home{% endif %}">
+  <main id="main" class="body{% if page.title == 'Home' %} body--home{% endif %}" data-stock="{{ page.rack | default: 'start' }}">
     {{ content }}
 
     {% assign docs = site.pages | where_exp:"p","p.nav_order" | sort:"nav_order" %}
@@ -91,8 +113,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     {% endfor %}
     {% if prev_doc or next_doc %}
     <nav class="onward" aria-label="Adjacent forms">
-      {% if prev_doc %}<a class="onward__prev" href="{{ prev_doc.url | relative_url }}"><span>Previous</span>{{ prev_doc.title }}</a>{% else %}<span></span>{% endif %}
-      {% if next_doc %}<a class="onward__next" href="{{ next_doc.url | relative_url }}"><span>Next</span>{{ next_doc.title }}</a>{% endif %}
+      {% if prev_doc %}<a class="onward__prev" href="{{ prev_doc.url | relative_url }}">Back to {{ prev_doc.title }}</a>{% else %}<span></span>{% endif %}
+      {% if next_doc %}<a class="onward__next" href="{{ next_doc.url | relative_url }}">On to {{ next_doc.title }}</a>{% endif %}
     </nav>
     {% endif %}
   </main>
@@ -100,12 +122,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 </div>
 
 <footer class="foot">
-  <div class="tape" aria-hidden="true">
-    <div class="tape__run">
-      {% for i in (1..8) %}<span>112fd73e8e5bc0d6</span><b>&middot;</b>{% endfor %}
-    </div>
-  </div>
-  <p>Five wheel targets, one fixed simulation inside each, digests compared. Any disagreement fails the release.</p>
+  <p>The digests above are the first 16 characters of one sha256, printed by
+  five separate wheel builds running the same fixed simulation. Any
+  disagreement fails the release.</p>
   <p class="foot__legal">pretium is pre&#8209;release software, licensed Apache&#8209;2.0. Nothing here is investment advice or a prediction of real returns.</p>
 </footer>
 
