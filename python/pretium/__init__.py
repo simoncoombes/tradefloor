@@ -55,6 +55,7 @@ from ._core import (  # noqa: F401
     sectors,
     stationary_sigma,
     step_mispricing_daily,
+    version,
 )
 
 __version__ = _core.__version__
@@ -69,7 +70,7 @@ __all__ = [
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
     "market_status", "model_preset", "run_many", "sector_daily_sigma", "sectors",
-    "stationary_sigma", "step_mispricing_daily",
+    "stationary_sigma", "step_mispricing_daily", "version",
     "__version__",
 ]
 

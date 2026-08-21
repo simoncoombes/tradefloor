@@ -63,7 +63,11 @@ jobs:
           # feature, so the layout lives in one place rather than being repeated
           # in every invocation.
           maturin build --release --out dist
-          python -m pip install --find-links dist --force-reinstall pretium
+          # --no-index is load-bearing, not caution. Without it pip is free to
+          # resolve the name from PyPI, and the gate would then compare
+          # digests from a package that is not the one just built -- a green
+          # run proving nothing at all.
+          python -m pip install --no-index --find-links dist --force-reinstall pretium
 
       - name: Run the known-answer simulation
         shell: bash
