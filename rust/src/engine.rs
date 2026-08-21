@@ -114,6 +114,12 @@ pub struct Engine {
     economy: EconomyState,
     central_bank: CentralBankState,
     sector_keys: Vec<String>,
+    /// Per-company factor attribution, accumulated across the current day.
+    ///
+    /// Four entries per company -- company_news, order_flow_impact,
+    /// short_squeeze_effect, random_noise -- summed tick by tick and reset at
+    /// `open_market`.
+    attribution: Vec<[f64; 4]>,
     /// Cumulative MAIN-stream draws, including any the embedder took through
     /// [`Engine::draw_uniform`]. The single most useful number for diagnosing
     /// a cross-language divergence: if these differ, nothing downstream is
@@ -148,11 +154,13 @@ impl Engine {
         central_bank: CentralBankState,
         sector_keys: Vec<String>,
     ) -> Self {
+        let companies_len = companies.len();
         Self {
             rng: GameRng::new(seed, MAIN_STREAM),
             companies,
             economy,
             central_bank,
+            attribution: vec![[0.0; 4]; companies_len],
             sector_keys,
             draws: 0,
         }
@@ -235,6 +243,21 @@ impl Engine {
             rng,
         );
 
+        // Accumulate attribution before the outcome is consumed. Raw factors
+        // as the tick computed them -- NOT the reference's scaled UI
+        // accumulator, which multiplies by the drift scale for presentation.
+        // The raw decomposition is the ground truth; the scaling is a display
+        // choice, and reproducing it here would bake a presentation decision
+        // into the labelled dataset.
+        for (slot, f) in outcome.active_indices.iter().zip(outcome.factors.iter()) {
+            if let Some(acc) = self.attribution.get_mut(*slot) {
+                acc[0] += f.company_news;
+                acc[1] += f.order_flow_impact;
+                acc[2] += f.short_squeeze_effect;
+                acc[3] += f.random_noise;
+            }
+        }
+
         TickOutcome {
             market_status: status,
             active_indices: outcome.active_indices,
@@ -251,7 +274,40 @@ impl Engine {
     /// This is what anchors the circuit-breaker band to today's open, which is
     /// what makes it a SESSION band and leaves the overnight gap outside it by
     /// design (D6).
+    /// Attribution for the current day, four values per company:
+    /// `[company_news, order_flow_impact, short_squeeze_effect, random_noise]`.
+    ///
+    /// # Four, not the reference's six
+    ///
+    /// The reference declares six attribution keys, but three of them --
+    /// `earningsRevision`, `multipleChange` and `sentiment` -- belong to
+    /// factors the live flags discard, and its `shortSqueezeEffect` is folded
+    /// into `orderFlowImpact` for display rather than reported separately.
+    ///
+    /// Reporting six columns here would mean shipping three columns of
+    /// structural zeros, which is the "knobs wired to nothing" documentation
+    /// lie this port has already had to correct once. So the four live
+    /// components are reported, and the squeeze is kept separate because it is
+    /// genuinely a distinct mechanism.
+    pub fn attribution(&self) -> &[[f64; 4]] {
+        &self.attribution
+    }
+
+    /// One attribution column across all companies, by index 0..4.
+    pub fn attribution_column(&self, factor: usize) -> Vec<f64> {
+        self.attribution
+            .iter()
+            .map(|a| a.get(factor).copied().unwrap_or(f64::NAN))
+            .collect()
+    }
+
     pub fn open_market(&mut self) {
+        // Attribution is per DAY. Resetting here rather than at close means a
+        // caller can still read yesterday's decomposition after the close has
+        // run, which is when they would actually want it.
+        self.attribution.clear();
+        self.attribution.resize(self.companies.len(), [0.0; 4]);
+
         reset_daily_prices(&mut self.companies);
     }
 
@@ -486,6 +542,7 @@ impl Engine {
     /// ordering must establish it before the first tick.
     pub fn add_company(&mut self, company: TickCompany) -> usize {
         self.companies.push(company);
+        self.attribution.push([0.0; 4]);
         self.companies.len() - 1
     }
 
@@ -502,6 +559,9 @@ impl Engine {
     pub fn remove_company(&mut self, index: usize) -> Option<TickCompany> {
         if index >= self.companies.len() {
             return None;
+        }
+        if index < self.attribution.len() {
+            self.attribution.remove(index);
         }
         Some(self.companies.remove(index))
     }

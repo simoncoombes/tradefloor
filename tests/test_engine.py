@@ -455,3 +455,90 @@ def test_news_driven_runs_are_reproducible():
         return arr(e.prices()), e.draws_consumed
 
     assert run() == run()
+
+
+# --------------------------------------------------------------------------
+# Ground truth: factor attribution
+# --------------------------------------------------------------------------
+
+def test_attribution_names_the_cause_of_each_move():
+    """The labelled-dataset output, and the thing no real dataset has.
+
+    You can observe from history that a stock fell. You cannot observe that
+    sixty per cent of the fall was order-flow pressure and the rest was noise.
+    The simulator knows, because it computed the reasons.
+    """
+    u = pretium.Universe.random(4, seed=1)
+    e = pretium.Engine(seed=42, universe=u)
+    e.open_market()
+    e.run_session(9, 30, 3, 200,
+                  order_flow={u[0].ticker: (4e6, 0.0)},
+                  news=[pretium.News(ticker=u[1].ticker, price_impact=0.04)])
+
+    news = arr(e.attribution("company_news"))
+    flow = arr(e.attribution("order_flow_impact"))
+    noise = arr(e.attribution("random_noise"))
+
+    # The cause lands on the instrument it was applied to, and nowhere else.
+    assert news[1] != 0 and news[0] == 0 and news[2] == 0
+    assert flow[0] != 0 and flow[1] == 0
+    # Noise touches everything -- it is the residual, not a targeted effect.
+    assert all(x != 0 for x in noise)
+
+
+def test_attribution_reports_four_live_factors_not_six():
+    # The reference declares six keys, but three belong to discarded factors
+    # and its shortSqueezeEffect is folded into orderFlowImpact for display.
+    # Reporting six would ship three columns of structural zeros -- the "knobs
+    # wired to nothing" lie this model has already had to correct once.
+    assert pretium.Engine.FACTORS == [
+        "company_news", "order_flow_impact", "short_squeeze_effect", "random_noise",
+    ]
+
+
+def test_attribution_is_per_day_and_survives_the_close():
+    # Reset at open, not at close, so a caller can still read the day's
+    # decomposition after closing -- which is when they actually want it.
+    e = engine(n=3)
+    e.open_market()
+    e.run_session(9, 30, 3, 100)
+    e.close_market()
+    after_close = arr(e.attribution("random_noise"))
+    assert any(x != 0 for x in after_close)
+
+    e.open_market()
+    assert all(x == 0 for x in arr(e.attribution("random_noise"))), "open must reset"
+
+
+def test_attribution_tracks_roster_edits():
+    # The buffer is positional like every other column, so a listing or
+    # delisting that did not move it would attribute one company's causes to
+    # another.
+    e = engine(n=3)
+    e.open_market()
+    e.run_session(9, 30, 3, 50)
+    assert len(arr(e.attribution("random_noise"))) == 3
+
+    e.list_instrument(pretium.Instrument("NEW", "utilities", initial_price=10.0,
+                                         shares_outstanding=1e7))
+    assert len(arr(e.attribution("random_noise"))) == 4
+    assert arr(e.attribution("random_noise"))[3] == 0, "a new listing starts at zero"
+
+    e.delist(0)
+    assert len(arr(e.attribution("random_noise"))) == 3
+
+
+def test_an_unknown_factor_names_the_valid_ones():
+    e = engine(n=2)
+    with pytest.raises(pretium.ValidationError, match="order_flow_impact"):
+        e.attribution("sentiment")
+
+
+def test_attribution_is_reproducible():
+    def run():
+        e = engine(seed=9, n=3)
+        e.open_market()
+        e.run_session(9, 30, 3, 60, order_flow={"C0": (1e6, 5e5)})
+        return [arr(e.attribution(f)) for f in pretium.Engine.FACTORS]
+
+    assert run() == run()

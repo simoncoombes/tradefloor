@@ -923,6 +923,54 @@ impl PyEngine {
         Ok(())
     }
 
+    /// The live factor names, in the order `attribution` reports them.
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn FACTORS() -> Vec<String> {
+        FACTOR_NAMES.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// One attribution column across every instrument, as f64 bytes.
+    ///
+    /// # Why the simulator can tell you this at all
+    ///
+    /// It knows WHY each price moved, because it computed the reasons. No
+    /// historical dataset carries those labels -- you can observe that a stock
+    /// fell, never that 60% of the fall was order-flow pressure and the rest
+    /// was noise. This is the labelled-dataset output.
+    ///
+    /// Accumulated per DAY and reset at `open_market`, so a read after
+    /// `close_market` still returns the day just finished.
+    ///
+    /// # Four columns, not the reference's six
+    ///
+    /// The reference declares six attribution keys. Three of them --
+    /// `earningsRevision`, `multipleChange`, `sentiment` -- belong to factors
+    /// the live flags discard, and its `shortSqueezeEffect` is folded into
+    /// `orderFlowImpact` for display rather than reported separately.
+    ///
+    /// Reporting six here would ship three columns of structural zeros, which
+    /// is a documentation lie of exactly the kind this model has already had
+    /// to correct once. So the four live components are reported, with the
+    /// squeeze kept separate because it is a genuinely distinct mechanism.
+    ///
+    /// These are the RAW factors, not the reference's scaled display
+    /// accumulator: the decomposition is the ground truth, the scaling is a
+    /// presentation choice, and baking it in would put a display decision
+    /// inside the dataset.
+    fn attribution(&self, py: Python<'_>, factor: &str) -> PyResult<Py<PyBytes>> {
+        let index = FACTOR_NAMES
+            .iter()
+            .position(|f| *f == factor)
+            .ok_or_else(|| {
+                ValidationError::new_err(format!(
+                    "unknown factor {factor:?}. Valid: {}",
+                    FACTOR_NAMES.join(", ")
+                ))
+            })?;
+        Ok(f64_bytes(py, &self.inner.attribution_column(index)))
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "Engine({} instruments, draws={})",
@@ -1099,3 +1147,12 @@ impl PyNewsImpact {
         )
     }
 }
+
+
+/// The live factor decomposition, in reporting order.
+pub const FACTOR_NAMES: [&str; 4] = [
+    "company_news",
+    "order_flow_impact",
+    "short_squeeze_effect",
+    "random_noise",
+];

@@ -43,7 +43,8 @@ use crate::mispricing::{crowd_lean, MISPRICING_CAP, MOMENTUM_THETA};
 use crate::rng::Rng;
 
 use super::factors::{
-    calculate_live_factors, order_imbalance, FactorCompany, NewsEvent, SharedFactors,
+    calculate_live_factors, order_imbalance, FactorCompany, LiveFactors, NewsEvent,
+    SharedFactors,
 };
 use super::hours::{intraday_vol, intraday_volume, MarketStatus};
 
@@ -204,6 +205,14 @@ pub struct TickOutcome {
     pub fair_values: Vec<f64>,
     /// Volume printed per active company.
     pub volumes: Vec<f64>,
+    /// The live factor decomposition per active company, in `active_indices`
+    /// order.
+    ///
+    /// This is the labelled-dataset output: the simulator knows WHY each price
+    /// moved, which no historical dataset can tell you. Retained rather than
+    /// discarded after the drift is summed -- the components cost nothing to
+    /// carry and cannot be recovered afterwards.
+    pub factors: Vec<LiveFactors>,
     pub shared_factors: SharedFactors,
 }
 
@@ -223,6 +232,7 @@ pub fn simulate_market_tick(
             active_indices: Vec::new(),
             fair_values: Vec::new(),
             volumes: Vec::new(),
+            factors: Vec::new(),
             shared_factors: SharedFactors {
                 market_factor: 0.0,
                 sector_factors: Vec::new(),
@@ -266,6 +276,7 @@ pub fn simulate_market_tick(
 
     // ── Phase 1: factors ──────────────────────────────────────────────────
     let mut active_indices: Vec<usize> = Vec::new();
+    let mut all_factors: Vec<LiveFactors> = Vec::new();
     let mut all_drifts: Vec<f64> = Vec::new();
     let mut all_noises: Vec<f64> = Vec::new();
     let mut all_news_vol_mults: Vec<f64> = Vec::new();
@@ -311,6 +322,7 @@ pub fn simulate_market_tick(
         };
         all_drifts.push(drift);
         all_noises.push(noise);
+        all_factors.push(factors);
 
         // News amplifies volume, capped at 10x.
         let mut news_volume_mult = 1.0;
@@ -488,6 +500,7 @@ pub fn simulate_market_tick(
         active_indices,
         fair_values: new_prices,
         volumes,
+        factors: all_factors,
         shared_factors: shared,
     }
 }
