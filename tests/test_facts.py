@@ -155,12 +155,24 @@ def test_stocks_here_barely_move_together(facts):
     assert verdict["verdict"] == "too low"
 
 
-def test_volume_and_volatility_barely_move_together(facts):
-    # Real equity volume rises with volatility at +0.3 to +0.6. An execution
-    # algorithm tested here faces an easier problem than the one it was
-    # written for, because the volume surprise and the volatility surprise
-    # do not arrive together.
-    assert compare_to_real_markets(facts)["volume_abs_return_corr"]["verdict"] == "too low"
+def test_volume_and_volatility_arrive_together_since_the_volume_fix(facts):
+    """The one dependence statistic the 2026-08 era boundary moved into band.
+
+    Before the `avg_volume` feedback was removed this measured +0.105 against
+    a real +0.30 to +0.60, and the gap was an artefact of the divergence: the
+    compounding volume level swamped the day-to-day covariation with returns.
+    With the level held, the per-tick channel shows through -- volume scales
+    with the size of the day's move by construction -- and the statistic reads
+    +0.499 to +0.537 across seeds 1 to 6, solidly inside the band.
+
+    Kept in the dependence section deliberately: an execution algorithm now at
+    least faces volume that arrives with volatility. What it still does not
+    face is a volume shock that persists, which is the change-autocorrelation
+    test below and the caveat that survives.
+    """
+    verdict = compare_to_real_markets(facts)["volume_abs_return_corr"]
+    assert verdict["matches"]
+    assert facts["volume_abs_return_corr"] > 0.30
 
 
 def test_there_is_no_leverage_effect_and_a_symmetric_garch_is_why(facts):
@@ -193,14 +205,19 @@ def test_an_absent_leverage_effect_reads_as_weak_against_a_negative_band(facts):
 def test_volume_is_measured_in_changes_because_the_level_says_nothing():
     """Why the reported statistic differences volume instead of using levels.
 
-    The LEVEL autocorrelation is dominated by a slowly varying level and reads
-    high whatever the daily dynamics are, so it cannot tell one model of
-    volume from another. The CHANGE autocorrelation can: it comes out near
-    -0.5 here, which is the signature of a smooth level plus independent daily
-    noise. Real volume shocks persist, so real markets sit near zero.
+    The LEVEL autocorrelation tracks whatever the level happens to be doing
+    and says nothing about whether volume SHOCKS persist. Before the 2026-08
+    era boundary it read +0.945 -- pure artefact of the `avg_volume` feedback
+    compounding the level a percent-plus a day. With the feedback removed and
+    the level held it reads about +0.10. Opposite engines, and the level
+    statistic cannot tell them apart from the dynamics side. The CHANGE
+    autocorrelation can, and it reads near -0.5 in BOTH worlds: the signature
+    of independent daily noise around whatever the level is. Real volume
+    shocks persist, so real markets sit near zero.
 
-    Both are measured here on the same series, and the gap between them is the
-    argument for differencing.
+    The upper bound on the level doubles as the tripwire for the divergence
+    coming back: a compounding level drives the level autocorrelation toward
+    +1, so this test fails if `avg_volume` ever feeds back on itself again.
     """
     import statistics
 
@@ -224,7 +241,7 @@ def test_volume_is_measured_in_changes_because_the_level_says_nothing():
         ]
         changes.append(_correlation(differenced[:-1], differenced[1:]))
 
-    assert statistics.median(levels) > 0.5
+    assert statistics.median(levels) < 0.5
     assert statistics.median(changes) < -0.2
 
 

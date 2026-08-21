@@ -35,7 +35,7 @@ use pretium::economy::{
     InitialEconomyOptions,
 };
 use pretium::engine::{DayAdvanceRequest, DayCloseRequest, Engine, TickRequest};
-use pretium::market::{GameTime, TickCompany, TickStock};
+use pretium::market::{AvgVolumePolicy, GameTime, TickCompany, TickStock};
 use serde_json::Value as Json;
 
 fn bits(hex: &str) -> f64 {
@@ -179,9 +179,11 @@ pub fn run(doc: &Json) -> Vec<DayResult> {
                 hour += 1;
             }
         }
+        // A reference tape is being replayed, so the reference's EMA runs.
         engine.close_market(&DayCloseRequest {
             daily_innovations: &vec![None; roster],
             sector_base_variances: &variances,
+            avg_volume: AvgVolumePolicy::ReferenceEma,
         });
 
         let want: Vec<f64> = day_doc["closePrices"]

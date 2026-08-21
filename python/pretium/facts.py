@@ -15,13 +15,18 @@ not targets the model was tuned to hit; most of them are frank mismatches.
 TOGETHER wrong.** Fat tails land inside the real band; volatility runs high,
 for a reason about how a universe is generated rather than about the price
 process. Almost everything about how things move together comes out weaker
-than a real market: across stocks, across time within volatility, between
-volume and returns, and between the sign of a return and the volatility that
-follows it. The one dependence that comes out too strong is return
-autocorrelation, and that is the mispricing process showing through.
+than a real market: across stocks, across time within volatility, and between
+the sign of a return and the volatility that follows it. The one dependence
+that comes out too strong is return autocorrelation, and that is the
+mispricing process showing through. Volume moving with returns is the single
+dependence the 2026-08 engine fixes brought into the real band, and the volume
+paragraph below says how.
 
 Every figure below: `Universe.random(40, seed=111)`, 252 days, median over
-seeds 1 to 6, at commit e2aded1.
+seeds 1 to 6, at commit e2aded1 -- except the volume paragraph, which names
+the 2026-08 era boundary that superseded it. Re-measured across that boundary
+with the same method, the other figures come back inside their seed ranges;
+volume against absolute return is the one that moved.
 
 ## What matches
 
@@ -50,17 +55,25 @@ works far better here than in any real market, and market beta barely exists.
 months. Here it is +0.117 and largely gone by lag twenty. A strategy whose edge
 is volatility forecasting will look worse here than it should.
 
-**Volume and volatility are nearly independent.** Volume correlates with
-absolute return at **+0.105**, against a real +0.30 to +0.60. Volume CHANGES
+**Volume arrives with volatility now, but volume shocks still do not
+persist.** Volume correlates with absolute return at **+0.511**, inside the
+real +0.30 to +0.60 -- measured after the 2026-08 era boundary, same method,
+seeds 1 to 6 ranging +0.499 to +0.537. Before it this figure read **+0.105**:
+the `avg_volume` feedback compounded the volume level a percent-plus a day,
+and that trend swamped the day-to-day covariation with returns. Removing the
+feedback let the per-tick channel show through, because per-tick volume scales
+with the size of the day's move by construction. Volume CHANGES still
 autocorrelate at **-0.463** where real ones sit near zero, which is the
-signature of a smooth level plus independent daily noise rather than of
-persistent volume shocks. Volume levels autocorrelate above +0.9, which sounds
-like persistence and says nothing, because a level autocorrelation is dominated
-by the slowly varying level whatever the daily dynamics are.
+signature of a held level plus independent daily noise rather than of
+persistent volume shocks. (The LEVEL autocorrelation read +0.9 off the old
+compounding trend and reads about +0.1 off the held level -- neither says
+anything about the daily dynamics, which is why the statistic differences.)
 
-Execution work is where that bites: VWAP and POV live or die on forecasting the
-day's volume, and the hard part in a real market is a volume surprise that
-keeps going and arrives with a volatility surprise. Neither happens here.
+Execution work is where that bites, more narrowly than before: VWAP and POV
+live or die on forecasting the day's volume, and the hard part in a real
+market is a volume surprise that keeps going and arrives with a volatility
+surprise. The arriving-together half is now present; the keeps-going half is
+still absent, so a forecast here is never wrong twice running.
 
 **There is no leverage effect.** Today's signed return against tomorrow's
 absolute return measures **-0.004**, against a real -0.30 to -0.10, and across
@@ -414,8 +427,10 @@ def measure(
             scenario.apply(engine, day)
         engine.open_market()
         engine.run_session(9, 30, 3, 390)
-        engine.close_market()
+        # Record before the close: the close advances the macro chain, and
+        # the macro row must carry the values the day traded under.
         engine.record(day)
+        engine.close_market()
 
     table = engine.bars(grain="day")
     try:

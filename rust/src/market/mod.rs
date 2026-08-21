@@ -48,7 +48,7 @@ pub mod hours;
 pub mod index_value;
 pub mod tick;
 
-pub use daily::{close_day, close_day_all, reset_daily_prices, CloseInputs};
+pub use daily::{close_day, close_day_all, reset_daily_prices, AvgVolumePolicy, CloseInputs};
 pub use factors::{
     calculate_live_factors, order_imbalance, FactorCompany, LiveFactors, NewsEvent, SharedFactors,
 };

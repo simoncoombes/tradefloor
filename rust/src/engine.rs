@@ -44,8 +44,8 @@ use crate::economy::{
 };
 use crate::market::{
     close_day, get_market_status, intraday_fraction, reset_daily_prices, simulate_market_tick,
-    CloseInputs, GameTime, MarketStatus, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany,
-    TickInputs,
+    AvgVolumePolicy, CloseInputs, GameTime, MarketStatus, NewsEvent, NewsImpactEntry, OrderVolume,
+    TickCompany, TickInputs,
 };
 use crate::rng::{GameRng, Rng};
 
@@ -88,6 +88,10 @@ pub struct DayCloseRequest<'a> {
     pub daily_innovations: &'a [Option<f64>],
     /// Per company, `sectorBaseDailyVariance(sector)`.
     pub sector_base_variances: &'a [f64],
+    /// How the close treats `avg_volume`. `AvgVolumePolicy::Hold` -- the
+    /// shipped default -- unless you are replaying a reference tape; the
+    /// argument for the divergence lives on the policy itself.
+    pub avg_volume: AvgVolumePolicy,
 }
 
 /// What the embedder supplies for the daily macro step.
@@ -482,6 +486,7 @@ impl Engine {
                 &CloseInputs {
                     daily_innovation: request.daily_innovations[i],
                     sector_base_daily_variance: request.sector_base_variances[i],
+                    avg_volume: request.avg_volume,
                 },
             );
         }
@@ -638,6 +643,7 @@ impl Engine {
             self.close_market(&DayCloseRequest {
                 daily_innovations: &innovations,
                 sector_base_variances: request.sector_base_variances,
+                avg_volume: AvgVolumePolicy::default(),
             });
         }
 
@@ -671,6 +677,14 @@ impl Engine {
     }
     pub fn central_bank(&self) -> &CentralBankState {
         &self.central_bank
+    }
+    /// Mutable access to the central bank, for restoring a snapshot.
+    ///
+    /// Exists for the same reason as [`Engine::economy_mut`]: now that the
+    /// macro chain advances between days, a fork that did not carry the
+    /// bank's meeting calendar would hold a meeting its parent never held.
+    pub fn central_bank_mut(&mut self) -> &mut CentralBankState {
+        &mut self.central_bank
     }
     pub fn companies(&self) -> &[TickCompany] {
         &self.companies
@@ -1526,6 +1540,7 @@ mod tests {
         e.close_market(&DayCloseRequest {
             daily_innovations: &[None, None, None],
             sector_base_variances: &[0.000225; 3],
+            avg_volume: AvgVolumePolicy::default(),
         });
         assert_eq!(e.draws_consumed(), before, "the close must not draw");
         // `s` has moved during the session, so the roll must record it.
@@ -1585,6 +1600,7 @@ mod tests {
             e.close_market(&DayCloseRequest {
                 daily_innovations: &innovations,
                 sector_base_variances: &variances,
+                avg_volume: AvgVolumePolicy::default(),
             });
             (e.prices(), e.draws_consumed())
         };
@@ -1721,6 +1737,7 @@ mod tests {
         e.close_market(&DayCloseRequest {
             daily_innovations: &[None; 3],
             sector_base_variances: &[0.000225; 3],
+            avg_volume: AvgVolumePolicy::default(),
         });
 
         for (i, price) in e.prices().iter().enumerate() {

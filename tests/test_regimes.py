@@ -71,7 +71,10 @@ def test_run_days_appears_in_the_log_as_its_constituent_calls():
     e = engine()
     e.run_days(2, ticks_per_day=50)
     ops = [x["op"] for x in e.order_log]
-    assert ops == ["open_market", "run_session", "close_market", "record"] * 2
+    # Record comes BEFORE the close: the close advances the macro chain into
+    # the next day, and the recorded macro row must carry the values the day
+    # traded under.
+    assert ops == ["open_market", "run_session", "record", "close_market"] * 2
 
     replayed = pretium.replay(e.order_log, seed=2026, universe=UNIVERSE)
     assert arr(replayed.prices()) == arr(e.prices())

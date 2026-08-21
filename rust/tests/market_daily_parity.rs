@@ -3,6 +3,13 @@
 //! The close bookkeeping takes no draws, so this is a hard Tier-1 gate with no
 //! exceptions of any kind.
 //!
+//! Everything here runs under `AvgVolumePolicy::ReferenceEma`, which is the
+//! policy's whole reason to exist: these vectors are recorded reference runs,
+//! and bit-fidelity to the reference -- its volume EMA included -- is the
+//! property under test. The SHIPPED policy deliberately holds `avg_volume`
+//! fixed instead; that divergence is argued in `market/daily.rs` and tested
+//! there.
+//!
 //! **Provenance caveat, carried from the generator.** `resetDailyPrices` and
 //! `updateGarchVariance` are called for real, but the momentum roll,
 //! innovation selection and volume EMA are transcribed from
@@ -126,6 +133,7 @@ fn close_day_matches_bit_for_bit() {
                 // Passed in rather than looked up, following the crate's
                 // convention: the sector table lives in the TypeScript.
                 sector_base_daily_variance: bits(i["sectorBaseDailyVariance"].as_str().unwrap()),
+                avg_volume: AvgVolumePolicy::ReferenceEma,
             },
         );
 
@@ -220,6 +228,7 @@ fn five_hundred_day_chains_match_without_drift() {
                 &CloseInputs {
                     daily_innovation: None,
                     sector_base_daily_variance: base,
+                    avg_volume: AvgVolumePolicy::ReferenceEma,
                 },
             );
 

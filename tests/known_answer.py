@@ -46,7 +46,12 @@ import pretium
 # Bumped only when the simulation itself changes. A digest change WITHOUT a
 # version bump means a platform disagreed, which is the thing this exists to
 # catch; a digest change WITH one is an intended new baseline.
-KAT_VERSION = 3
+#
+# v4: the 2026-08 era boundary. The daily macro step now runs at every
+# close (advance_day was previously unreachable from Python) and
+# avg_volume no longer feeds back on itself (the reference's EMA
+# compounded without bound). Both change every seed's trajectory.
+KAT_VERSION = 4
 
 SEED = 20260820
 DAYS = 250

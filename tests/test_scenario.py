@@ -27,24 +27,42 @@ def run(scenario, **kwargs):
 # --------------------------------------------------------------------------
 
 
-def test_the_policy_rate_alone_moves_nothing():
+def test_the_policy_rate_alone_moves_nothing_before_the_first_meeting():
     """The measurement that justifies the whole rate_shock constructor.
 
     Not a defect: equities discount off the corporate bond yield, and the
     policy rate is only the fallback when no yield is present. Inside the
     engine the economy always carries one, so the policy rate never reaches
-    fair value.
+    fair value DIRECTLY.
 
-    It is pinned as a test because it is SILENT. A user ramps the rate, sees
-    nothing move, and concludes the model does not care about rates. If this
-    ever starts moving prices, the semantics changed and the documentation
-    around it is now wrong.
+    Since the macro chain began running endogenously (2026-08), the trap is
+    horizon-dependent rather than absolute: the corporate yield is recomputed
+    from the 10Y at central-bank MEETINGS, and the first meeting is scheduled
+    45 days out. Inside that window a policy-only ramp still moves exactly
+    nothing -- measured 0.00% at 40 days -- which is this test. Past it, the
+    chain transmits: see the companion test below.
+
+    It is pinned as a test because it is SILENT. A user ramps the rate over a
+    month, sees nothing move, and concludes the model does not care about
+    rates. It cares -- at meeting cadence, through the curve.
     """
     policy_only = Scenario().ramp("federal_funds_rate",
                                   start=0.025, end=0.05, over=30)
     result = run(policy_only)
     assert result["median_pct"] == pytest.approx(0.0, abs=1e-9)
     assert result["worst_pct"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_the_policy_rate_reaches_the_curve_at_the_first_meeting():
+    # The other half of the horizon dependence: past the first central-bank
+    # meeting (day 45), the pinned policy path feeds the Taylor-rule state,
+    # the meeting recomputes the corporate yield off the 10Y, and equities
+    # reprice. Measured at 60 days: median -3.99%, worst -5.56%.
+    policy_only = Scenario().ramp("federal_funds_rate",
+                                  start=0.025, end=0.05, over=30)
+    result = run(policy_only, days=60)
+    assert result["median_pct"] < -1.0
+    assert result["worst_pct"] < result["median_pct"]
 
 
 def test_rate_shock_moves_the_whole_curve_and_prices_fall():
@@ -346,8 +364,10 @@ def test_a_pin_holds_for_the_whole_day_it_was_applied_to():
         engine.pin_macro(corporate_bond_yield=wanted[day])
         engine.open_market()
         engine.run_session(9, 30, 3, 60)
-        engine.close_market()
+        # Record before the close: the close advances the macro chain into
+        # the next day, and the row for THIS day must carry this day's pin.
         engine.record(day)
+        engine.close_market()
     recorded = pa.table(engine.macro_table()).to_pydict()["corporate_bond_yield"]
     assert recorded == pytest.approx(wanted)
 

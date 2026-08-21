@@ -363,6 +363,27 @@ pub enum ForwardGuidance {
     AsAppropriate,
 }
 
+impl ForwardGuidance {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ForwardGuidance::OngoingIncreases => "ongoing_increases",
+            ForwardGuidance::Accommodative => "accommodative",
+            ForwardGuidance::AsAppropriate => "as_appropriate",
+        }
+    }
+
+    /// `Option` for the same reason as [`CyclePhase::from_name`]: a failed
+    /// parse is a malformed snapshot, not a user input error.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "ongoing_increases" => ForwardGuidance::OngoingIncreases,
+            "accommodative" => ForwardGuidance::Accommodative,
+            "as_appropriate" => ForwardGuidance::AsAppropriate,
+            _ => return None,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CentralBankState {
     /// Game timestamps are integer minutes.

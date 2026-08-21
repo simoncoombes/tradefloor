@@ -60,8 +60,10 @@ def _run_one(seed, universe, macro, days, ticks_per_day, start, scenario,
             scenario.apply(engine, day)
         engine.open_market()
         engine.run_session(hour, minute, day_of_week, ticks_per_day)
-        engine.close_market()
+        # Record before the close: the close advances the macro chain, and
+        # the macro row must carry the values the day traded under.
         engine.record(day)
+        engine.close_market()
     if collect == "bars":
         return engine.bars(grain=grain, minutes=minutes)
     if collect == "truth":

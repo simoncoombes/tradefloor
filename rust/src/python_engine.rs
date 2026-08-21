@@ -30,9 +30,9 @@ use pyo3::types::PyDict;
 use pyo3::types::PyBytes;
 
 use crate::economy::{create_initial_central_bank_state, create_initial_economy_state};
-use crate::economy::{CyclePhase, InitialEconomyOptions};
+use crate::economy::{CyclePhase, ForwardGuidance, InitialEconomyOptions};
 use crate::engine::{Engine, PriceField, SessionBuffer, SessionRequest, TickRequest};
-use crate::engine::{DayCloseRequest, TickOutcome};
+use crate::engine::{DayAdvanceRequest, DayCloseRequest, TickOutcome};
 use crate::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany, TickStock};
 use crate::python::ValidationError;
 
@@ -462,6 +462,74 @@ impl PyEngine {
         }
     }
 
+    /// The daily macro step, run at every day boundary -- the explicit
+    /// `close_market` and the `close_at_end` session path alike, so the two
+    /// spellings of one close roll one world.
+    ///
+    /// Not exposed to Python: the boundary owns it.
+    fn advance_macro_day(&mut self) {
+        // Inputs assembled the way the reference implementation's day
+        // transition assembles them (`tick/daily.ts:87-98`):
+        //
+        // - `market_pe`: market-cap-weighted trailing PE over public,
+        //   solvent, positive-earnings names, with the same 0 < pe < 200
+        //   filter. Written before the step because the cycle-transition
+        //   logic reads it; the TypeScript computes it in the same breath.
+        // - `market_return_pct`: the reference feeds the average of its
+        //   indices' per-TICK `changePercent` (percent units, so a routine
+        //   value is a few hundredths). There is no index state on this
+        //   surface, so the closest faithful quantity is the cap-weighted
+        //   cross-section of the roster's final tick, in percent. Feeding the
+        //   DAY return instead would run two orders of magnitude hot against
+        //   the `+-0.03` clamp the VIX update applies to this input.
+        // - `volatility`: 1.0, `update_economy_daily`'s own default. The
+        //   game scales this by difficulty (0.3 to 0.9); the library has no
+        //   difficulty setting and takes the function's default.
+        // - no active shocks: the shock system is not part of this surface.
+        let mut total_mcap = 0.0;
+        let mut weighted_pe = 0.0;
+        let mut last_tick_mcap = 0.0;
+        let mut last_tick_return_pct = 0.0;
+        for c in self.inner.companies() {
+            if !c.is_public || c.is_bankrupt {
+                continue;
+            }
+            if let Some(eps) = c.eps {
+                if eps > 0.0 {
+                    let pe = c.stock.price / eps;
+                    if pe > 0.0 && pe < 200.0 {
+                        total_mcap += c.stock.market_cap;
+                        weighted_pe += pe * c.stock.market_cap;
+                    }
+                }
+            }
+            if let Some(prev) = c.stock.previous_tick_price {
+                if prev > 0.0 {
+                    let ret_pct = (c.stock.price - prev) / prev * 100.0;
+                    last_tick_return_pct += ret_pct * c.stock.market_cap;
+                    last_tick_mcap += c.stock.market_cap;
+                }
+            }
+        }
+        if total_mcap > 0.0 {
+            self.inner.economy_mut().market_pe = Some(weighted_pe / total_mcap);
+        }
+        let market_return_pct = if last_tick_mcap > 0.0 {
+            last_tick_return_pct / last_tick_mcap
+        } else {
+            0.0
+        };
+        self.day_count += 1;
+        self.inner.advance_day(&DayAdvanceRequest {
+            volatility: 1.0,
+            active_shocks: &[],
+            market_return_pct,
+            game_day: i64::from(self.day_count),
+            timestamp: i64::from(self.day_count) * 24 * 60,
+        });
+    }
+
+
     fn written<'a>(&self, buf: &'a [f64]) -> &'a [f64] {
         let n = self.buffer.ticks_written * self.buffer.companies;
         let end = if n > buf.len() { buf.len() } else { n };
@@ -644,6 +712,14 @@ pub struct PyEngine {
     /// attribution accumulator and the daily open per-session; see
     /// `SessionRequest::reopen`.
     market_open: bool,
+    /// Completed days, counted at `close_market`.
+    ///
+    /// This is the macro chain's clock: it becomes `game_day` and (times
+    /// 1,440 minutes) the timestamp the central bank's meeting calendar runs
+    /// on. It rides in `state()` snapshots because a fork that restarted the
+    /// clock would re-run day-dependent macro branches -- the OPEC cycle, the
+    /// meeting schedule -- differently from the engine it forked from.
+    day_count: u32,
     recorded_macro: Vec<crate::python_arrow::MacroRow>,
     /// Recorded order-book depth. Empty unless a caller asks for it.
     recorded_book: Vec<crate::python_arrow::BookRow>,
@@ -689,6 +765,7 @@ impl PyEngine {
             buffer: SessionBuffer::new(),
             day_buffer: DayBuffer::default(),
             market_open: false,
+            day_count: 0,
             tickers,
             recorded: Vec::new(),
             recorded_macro: Vec::new(),
@@ -908,6 +985,15 @@ impl PyEngine {
             )
         });
         self.accumulate_session();
+        if close_at_end {
+            // The core ran the close bookkeeping; the daily macro step
+            // belongs to the same boundary. Without this the two spellings
+            // of one close -- `run_session(close_at_end=True)` and
+            // `run_session(); close_market()` -- would roll different
+            // worlds, which is exactly the divergence the equivalence tests
+            // exist to forbid.
+            self.advance_macro_day();
+        }
         Ok(self.buffer.ticks_written)
     }
 
@@ -952,10 +1038,13 @@ impl PyEngine {
             self.open_market();
             self.run_session(py, hour, minute, day_of_week, ticks_per_day, volatility,
                              false, None, None, None)?;
-            self.close_market();
+            // Record BEFORE the close: the close advances the macro chain
+            // into the next day, and the macro row for day N must carry the
+            // values day N actually traded under, not the ones day N+1 will.
             if record {
                 self.record(first_day + offset as u32)?;
             }
+            self.close_market();
         }
         Ok(days)
     }
@@ -1066,7 +1155,8 @@ impl PyEngine {
         Ok(outcome.halted_at)
     }
 
-    /// Run the close bookkeeping: GARCH update and the daily roll.
+    /// Run the close bookkeeping: GARCH update, the daily roll, and the
+    /// daily macro step.
     ///
     /// The innovation handed to GARCH is the day's accumulated NOISE, not the
     /// day's total return.
@@ -1081,6 +1171,27 @@ impl PyEngine {
     /// Measured before changing it, over 397 company-days: the two differ by
     /// a median factor of 0.82, a tenth percentile of 0.22 and a ninetieth of
     /// 3.20. Not a rounding difference -- a different quantity.
+    ///
+    /// # The macro chain advances here
+    ///
+    /// `Engine::advance_day` -- economy update, cycle transition, central
+    /// bank -- runs at the end of every close. Before this it was implemented,
+    /// unit-tested, and reachable from nowhere in Python: every macro field
+    /// sat at its initial value for the whole run and fair value never
+    /// revalued, so the fundamentals anchoring was inert by default. The
+    /// recorded design decision (PYTHON-API-DESIGN.md section 6.3) is that the
+    /// full chain runs endogenously by default; this is that default, wired.
+    ///
+    /// The close is the day boundary the reference implementation uses too:
+    /// the rates and VIX the factor model reads on the first tick of a new
+    /// day are already the day's NEW values.
+    ///
+    /// Interaction with `pin_macro`: a pin applied at the START of a day (the
+    /// `Scenario` convention) overrides whatever the previous close evolved,
+    /// so a day-by-day pinned series stays exogenous exactly as before. A
+    /// single pin no longer freezes its field forever -- the chain keeps
+    /// evolving FROM the pinned value, which is what "everything else keeps
+    /// responding" was always meant to say.
     fn close_market(&mut self) {
         self.log.push(crate::python_log::LogEntry::CloseMarket);
         // The day is over, so the next session opens a new one.
@@ -1104,7 +1215,10 @@ impl PyEngine {
         self.inner.close_market(&DayCloseRequest {
             daily_innovations: &innovations,
             sector_base_variances: &variances,
+            avg_volume: crate::market::AvgVolumePolicy::Hold,
         });
+
+        self.advance_macro_day();
     }
 
     /// One column across every instrument, as little-endian f64 bytes.
@@ -1486,6 +1600,56 @@ impl PyEngine {
         )?;
         out.set_item("tick_anchor", f64_bytes(py, self.inner.tick_anchor()))?;
         out.set_item("market_open", self.market_open)?;
+
+        // The macro chain's state. The chain advances at every close now, so
+        // a fork that did not carry these would snap back to the initial
+        // economy and diverge from its parent on the first day boundary --
+        // the same failure class the per-day accumulators above fix, one
+        // level up. Field-by-field rather than opaque bytes, for the same
+        // reason the columns are named: a snapshot someone archived should
+        // be inspectable data, not a blob only this build can read.
+        let economy = self.inner.economy();
+        let econ = PyDict::new_bound(py);
+        macro_rules! econ_put {
+            ($($field:ident),* $(,)?) => {
+                $(econ.set_item(stringify!($field), economy.$field)?;)*
+            };
+        }
+        econ_put!(
+            federal_funds_rate, prime_rate, corporate_bond_yield,
+            treasury_yield_10y, treasury_yield_2y, mortgage_rate_30y,
+            cpi, inflation_rate, core_inflation,
+            gdp_growth, gdp,
+            unemployment_rate, jobs_created, labor_force_participation,
+            usd_index, oil_price, gold_price, copper_price,
+            housing_index, home_starts_monthly, housing_transaction_volume,
+            long_term_unemployment_rate, structural_unemployment,
+            consumer_confidence, business_confidence, fear_greed_index, vix,
+            tariff_rate, trade_balance,
+            oil_inventory_level, oil_last_opec_day,
+            wage_growth,
+            previous_day_market_return, rolling_market_return_30d,
+            market_pe, qe_pe_boost,
+            fiscal_stimulus, government_debt_to_gdp,
+            months_in_current_phase, recession_probability,
+        );
+        econ.set_item("gdp_trend", economy.gdp_trend.to_vec())?;
+        econ.set_item("cycle_phase", economy.cycle_phase.as_str())?;
+        out.set_item("economy", econ)?;
+
+        let bank = self.inner.central_bank();
+        let cb = PyDict::new_bound(py);
+        cb.set_item("last_meeting_date", bank.last_meeting_date)?;
+        cb.set_item("next_meeting_date", bank.next_meeting_date)?;
+        cb.set_item("target_inflation", bank.target_inflation)?;
+        cb.set_item("target_unemployment", bank.target_unemployment)?;
+        cb.set_item("qe_active", bank.qe_active)?;
+        cb.set_item("qe_monthly_purchases", bank.qe_monthly_purchases)?;
+        cb.set_item("hawkish_dovish_score", bank.hawkish_dovish_score)?;
+        cb.set_item("forward_guidance", bank.forward_guidance.as_str())?;
+        out.set_item("central_bank", cb)?;
+
+        out.set_item("day_count", self.day_count)?;
         Ok(out.into())
     }
 
@@ -1585,6 +1749,94 @@ impl PyEngine {
             // on its next session, and re-anchors `previous_close` mid-day --
             // so it prices differently from the parent it forked from.
             self.market_open = flag.extract()?;
+        }
+
+        // The macro chain's state. Optional for the same reason as the
+        // per-day accumulators above: a snapshot written before the chain
+        // was carried described a world where the macro never moved, and
+        // restoring one leaves this engine's constructed economy in place --
+        // which is exactly what that snapshot meant.
+        if let Some(raw) = snapshot.get_item("economy")? {
+            let d = raw.downcast::<PyDict>()?;
+            let economy = self.inner.economy_mut();
+            macro_rules! econ_get {
+                ($($field:ident),* $(,)?) => {
+                    $(if let Some(v) = d.get_item(stringify!($field))? {
+                        economy.$field = v.extract()?;
+                    })*
+                };
+            }
+            econ_get!(
+                federal_funds_rate, prime_rate, corporate_bond_yield,
+                treasury_yield_10y, treasury_yield_2y, mortgage_rate_30y,
+                cpi, inflation_rate, core_inflation,
+                gdp_growth, gdp,
+                unemployment_rate, jobs_created, labor_force_participation,
+                usd_index, oil_price, gold_price, copper_price,
+                housing_index, home_starts_monthly, housing_transaction_volume,
+                long_term_unemployment_rate, structural_unemployment,
+                consumer_confidence, business_confidence, fear_greed_index, vix,
+                tariff_rate, trade_balance,
+                oil_inventory_level, oil_last_opec_day,
+                wage_growth,
+                previous_day_market_return, rolling_market_return_30d,
+                market_pe, qe_pe_boost,
+                fiscal_stimulus, government_debt_to_gdp,
+                months_in_current_phase, recession_probability,
+            );
+            if let Some(v) = d.get_item("gdp_trend")? {
+                let trend: Vec<f64> = v.extract()?;
+                if trend.len() != 4 {
+                    return Err(ValidationError::new_err(format!(
+                        "gdp_trend must be 4 numbers, got {}",
+                        trend.len()
+                    )));
+                }
+                economy.gdp_trend = [trend[0], trend[1], trend[2], trend[3]];
+            }
+            if let Some(v) = d.get_item("cycle_phase")? {
+                let name: String = v.extract()?;
+                economy.cycle_phase = CyclePhase::from_name(&name).ok_or_else(|| {
+                    ValidationError::new_err(format!("unknown cycle phase {name:?}"))
+                })?;
+            }
+        }
+        if let Some(raw) = snapshot.get_item("central_bank")? {
+            let d = raw.downcast::<PyDict>()?;
+            let bank = self.inner.central_bank_mut();
+            if let Some(v) = d.get_item("last_meeting_date")? {
+                bank.last_meeting_date = v.extract()?;
+            }
+            if let Some(v) = d.get_item("next_meeting_date")? {
+                bank.next_meeting_date = v.extract()?;
+            }
+            if let Some(v) = d.get_item("target_inflation")? {
+                bank.target_inflation = v.extract()?;
+            }
+            if let Some(v) = d.get_item("target_unemployment")? {
+                bank.target_unemployment = v.extract()?;
+            }
+            if let Some(v) = d.get_item("qe_active")? {
+                bank.qe_active = v.extract()?;
+            }
+            if let Some(v) = d.get_item("qe_monthly_purchases")? {
+                bank.qe_monthly_purchases = v.extract()?;
+            }
+            if let Some(v) = d.get_item("hawkish_dovish_score")? {
+                bank.hawkish_dovish_score = v.extract()?;
+            }
+            if let Some(v) = d.get_item("forward_guidance")? {
+                let name: String = v.extract()?;
+                bank.forward_guidance =
+                    ForwardGuidance::from_name(&name).ok_or_else(|| {
+                        ValidationError::new_err(format!(
+                            "unknown forward guidance {name:?}"
+                        ))
+                    })?;
+            }
+        }
+        if let Some(v) = snapshot.get_item("day_count")? {
+            self.day_count = v.extract()?;
         }
         Ok(())
     }
