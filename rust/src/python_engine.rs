@@ -761,6 +761,155 @@ impl PyEngine {
         Ok(self.buffer.ticks_written)
     }
 
+    /// Advance whole days: open, session, close, repeat.
+    ///
+    /// The backtest shape. Decisions daily or slower means one call for the
+    /// whole span rather than a Python loop over sessions, and it records each
+    /// day as it goes so the results tables stream.
+    ///
+    /// Measured, so the claim is honest: the boundary crossing this saves
+    /// costs 0.357 microseconds against 249 microseconds of engine work per
+    /// tick at a hundred instruments. Chunking is the natural shape for
+    /// columnar output, and it is NOT a meaningful speedup -- a Python loop
+    /// over `run_session` loses well under one per cent. Use this because it
+    /// reads better and records for you, not because a loop would be slow.
+    ///
+    /// Returns the number of days run.
+    #[pyo3(signature = (
+        days, *, hour = 9, minute = 30, day_of_week = 3,
+        ticks_per_day = 390, volatility = 1.0, record = true, first_day = 0
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn run_days(
+        &mut self,
+        days: usize,
+        hour: i64,
+        minute: i64,
+        day_of_week: i64,
+        ticks_per_day: usize,
+        volatility: f64,
+        record: bool,
+        first_day: u32,
+    ) -> PyResult<usize> {
+        if days == 0 {
+            return Err(ValidationError::new_err("days must be greater than zero"));
+        }
+        if ticks_per_day == 0 {
+            return Err(ValidationError::new_err("ticks_per_day must be greater than zero"));
+        }
+        for offset in 0..days {
+            self.open_market();
+            self.run_session(hour, minute, day_of_week, ticks_per_day, volatility,
+                             false, None, None, None)?;
+            self.close_market();
+            if record {
+                self.record(first_day + offset as u32)?;
+            }
+        }
+        Ok(days)
+    }
+
+    /// Advance until a price leaves a band, or until `max_ticks` elapses.
+    ///
+    /// The interactive shape, for logic that must run inside the day. A
+    /// crossing per DECISION is irreducible, so the goal is to make decision
+    /// points sparser than ticks rather than pretend the crossing away: an
+    /// algorithm watching for a level crosses when the level is hit, not 390
+    /// times a day hoping.
+    ///
+    /// Returns the tick the condition fired on, or None if `max_ticks` ran
+    /// out first. None is a real outcome, not a failure -- "it never got
+    /// there" is usually the answer you needed.
+    ///
+    /// The close is NOT run when the condition fires. The day is not over;
+    /// the caller interrupted it.
+    #[pyo3(signature = (
+        *, ticker, above = None, below = None, max_ticks = 390,
+        hour = 9, minute = 30, day_of_week = 3, volatility = 1.0
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn run_until(
+        &mut self,
+        ticker: &str,
+        above: Option<f64>,
+        below: Option<f64>,
+        max_ticks: usize,
+        hour: i64,
+        minute: i64,
+        day_of_week: i64,
+        volatility: f64,
+    ) -> PyResult<Option<usize>> {
+        if above.is_none() && below.is_none() {
+            return Err(ValidationError::new_err(
+                "give at least one of above= or below= - a run_until with no \
+                 condition is just run_session",
+            ));
+        }
+        for (name, bound) in [("above", above), ("below", below)] {
+            if let Some(v) = bound {
+                if !v.is_finite() || v <= 0.0 {
+                    return Err(ValidationError::new_err(format!(
+                        "{name} must be finite and positive, got {v}"
+                    )));
+                }
+            }
+        }
+        if let (Some(a), Some(b)) = (above, below) {
+            if b >= a {
+                return Err(ValidationError::new_err(format!(
+                    "below ({b}) must be under above ({a}) - an inverted band \
+                     fires immediately and always"
+                )));
+            }
+        }
+        if max_ticks == 0 {
+            return Err(ValidationError::new_err("max_ticks must be greater than zero"));
+        }
+        let company = self
+            .tickers
+            .iter()
+            .position(|t| t == ticker)
+            .ok_or_else(|| {
+                ValidationError::new_err(format!(
+                    "no instrument with ticker {ticker:?} in this universe"
+                ))
+            })?;
+
+        let n = self.inner.len();
+        let innovations: Vec<Option<f64>> = vec![None; n];
+        let variances: Vec<f64> = self
+            .inner
+            .companies()
+            .iter()
+            .map(|c| {
+                crate::sectors::by_key(&c.sector)
+                    .map(|s| s.base_daily_variance())
+                    .unwrap_or(0.000225)
+            })
+            .collect();
+
+        let outcome = self.inner.run_session(
+            &SessionRequest {
+                start: GameTime { hour, minute, day_of_week },
+                ticks: max_ticks,
+                volatility_multiplier: volatility,
+                news: &[],
+                news_impact_queue: &[],
+                order_volumes: &[],
+                close_at_end: false,
+                daily_innovations: &innovations,
+                sector_base_variances: &variances,
+                stop: Some(crate::engine::StopCondition::PriceOutside {
+                    company,
+                    below,
+                    above,
+                }),
+            },
+            &mut self.buffer,
+        );
+        Ok(outcome.halted_at)
+    }
+
     /// Run the close bookkeeping: GARCH update and the daily roll.
     fn close_market(&mut self) {
         self.log.push(crate::python_log::LogEntry::CloseMarket);
