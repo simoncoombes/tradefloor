@@ -224,6 +224,12 @@ def evaluate(
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
+    One market. Every agent meets the same one, which is what makes the
+    comparison exact -- but a verdict from a single seed is a measurement of
+    that seed as much as of the agents. See :func:`pretium.rank` for the
+    across-seed version, and :func:`leaderboard` for the measured size of the
+    effect.
+
     ``max_leverage`` defaults to 2x rather than to unlimited. An agent that can
     trade arbitrary size is not being tested against the market: the book makes
     large trades expensive, but with no funding limit arbitrarily large is
@@ -405,11 +411,25 @@ def _impact_bps(portfolio, tickers, baseline, actual) -> float:
 
 
 def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard]:
-    """Scorecards sorted best-first.
+    """Scorecards sorted best-first, for ONE market.
 
     Ties break on name, so the order is total and reproducible. A leaderboard
     whose order depended on dict insertion would rank differently for reasons
     that have nothing to do with the agents.
+
+    .. warning::
+
+       This ranks the seed at least as much as the agents, and the effect is
+       not subtle. Measured on the reference agents over twelve markets, a
+       single seed picks the top-ranked agent **exactly half the time**, and
+       the leader's capture ratio ranges from +0.075 to +1.133 depending only
+       on which market it drew.
+
+       Use this to read one market. To rank agents, use :func:`pretium.rank`,
+       which takes the verdict across seeds and reports a paired sign test
+       saying whether the ordering is established at all -- because even the
+       across-seed aggregate can order two agents that a paired test cannot
+       separate.
     """
     if by not in ("pnl", "return_pct", "impact_bps", "turnover"):
         raise ValidationError(f"cannot rank by {by!r}")
