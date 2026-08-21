@@ -194,6 +194,19 @@ The consequence, which you should carry into any conclusion drawn here:
 > mainly in how much of it they exploit, their ranking here says very little
 > about which is better anywhere else.
 
+**Both mismatches were investigated with intent to fix, and the outcome is a
+decision rather than a shrug.** The autocorrelation *can* be corrected — one
+constant, `MOMENTUM_THETA` from 0.25 to 0.05, takes it from +0.219 to **+0.034,
+inside the real band**, with volatility and kurtosis unchanged. It also fails
+seven parity tests, including the one asserting the model constants match the
+reference implementation this library is a port of. Those constants are not
+ours to choose; changing one makes this a fork. The lever is one line when
+that decision is made.
+
+Clustering resists every available lever: GARCH persistence is already 0.99,
+and raising the variance ceiling lifts clustering by 0.016 while pushing
+volatility from 52.7% to 72%. `pretium.facts` records the measurements.
+
 Volatility is high because a generated universe is deliberately dispersed and
 skews small. Prefer ratios — capture against the oracle, shortfall in basis
 points — to raw percentages.

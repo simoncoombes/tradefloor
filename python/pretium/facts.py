@@ -65,6 +65,44 @@ caps. A generated universe is deliberately dispersed and skews small; treat
 absolute return figures as scaled up, and prefer ratios — capture against the
 oracle, shortfall in basis points — over raw percentages.
 
+## Can the mismatches be fixed? Measured, and the answer is a decision
+
+Both were investigated with the intent of correcting them, not defending them.
+What came back is worth recording, because "unfixed" and "unfixable here" are
+different states.
+
+**The return autocorrelation CAN be fixed, and the price is the port.** It
+comes from the herding term in the mispricing process, `MOMENTUM_THETA = 0.25`.
+Lowering it to 0.05 brings the AR(2) impulse response at lag two from 1.284 to
+1.029 and the measured autocorrelation from **+0.219 to +0.034 — inside the
+real-market band**, with volatility and kurtosis essentially unchanged.
+
+It also fails seven parity tests, including the one that asserts the model
+constants match the reference implementation. These constants are not this
+library's to choose: it is a PORT, and its coefficients are the reference's
+coefficients. Changing one makes it a fork and invalidates the entire golden
+corpus. That is a product decision about whether the two implementations may
+diverge, not a calibration, and it cannot be taken from inside a stylised-fact
+report.
+
+The lever is one constant when that decision is made.
+
+**The clustering resists every lever available.** Persistence is not the
+problem: `ALPHA + BETA` is 0.99, which is what real equity GARCH shows. The
+variance is clamped to between 0.25x and 5x its sector base, and that clamp
+binds 16.4% of the time — 13.9% at the ceiling, which truncates exactly the
+high-volatility days where clustering is most visible.
+
+Raising the ceiling to 10x lifts clustering only from +0.096 to +0.112, still
+below the real band, while pushing annualised volatility from 52.7% to 72% —
+trading a small gain in one mismatch for a large loss in another. Lowering
+`MOMENTUM_THETA` makes clustering worse, not better, so the two mismatches are
+coupled through the same term and cannot both be improved by moving it.
+
+Fixing clustering properly means changing the variance process, which is a
+modelling redesign rather than a calibration, and the same port constraint
+applies to it.
+
 ## Re-measure after any change
 
 `model_preset()` is versioned, but a change to a coefficient, a different
