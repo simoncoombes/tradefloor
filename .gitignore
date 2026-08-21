@@ -11,3 +11,7 @@ __pycache__/
 
 # Internal design docs — not for the public repo
 docs/
+
+# Spike artifacts
+dist-spike/
+.venv-spike/
