@@ -482,9 +482,11 @@ that preserves the draw schedule.
 
 ## A worked example
 
-`examples/research_workflow.py` runs the whole thing end to end in about ten
-seconds — universe, 20-seed sweep, five-agent evaluation, TCA, 234,000 rows of
-ground truth, then archives the run as JSON and replays it to identical prices.
+`examples/research_workflow.py` runs the whole thing end to end in about
+fifteen seconds — universe, 20-seed sweep, five-agent evaluation, TCA, 234,000
+rows of ground truth, a fork into two macro futures, a realism report, a
+provenance check, then archives the run as JSON and replays it to identical
+prices.
 
 ```
 python examples/research_workflow.py

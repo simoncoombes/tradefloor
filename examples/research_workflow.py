@@ -17,6 +17,7 @@ round trip. Both had green unit tests. Neither survived one honest end-to-end
 run.
 """
 
+import struct
 import time
 
 import pretium as pt
@@ -106,7 +107,65 @@ def main() -> dict:
     print("6. drivers, largest first: "
           + ", ".join(f"{k} {v:.1e}" for k, v in ranked[:3]))
 
-    # 7. Archive it. The log plus the seed plus the universe reproduce the run
+    # 7. Fork the market and run two futures. Everything before the fork is
+    #    identical -- not statistically similar, identical -- so the
+    #    difference between the branches is the shock and nothing else. This
+    #    is the counterfactual a real market cannot give you: you cannot
+    #    re-run a year without its hiking cycle.
+    from pretium.scenario import Scenario
+
+    mark = time.time()
+    calm, hiked = pt.branch(engine, 2, universe=universe, seed=7)
+    flat = Scenario().hold(federal_funds_rate=0.025, corporate_bond_yield=0.045)
+    shock = Scenario.rate_shock(start=0.025, end=0.06, over=5)
+    for branch_engine, path in ((calm, flat), (hiked, shock)):
+        for day in range(6):
+            path.apply(branch_engine, day)
+            branch_engine.open_market()
+            branch_engine.run_session(9, 30, 3, 390)
+            branch_engine.close_market()
+
+    after = struct.unpack("<%dd" % len(universe), hiked.prices())
+    before = struct.unpack("<%dd" % len(universe), calm.prices())
+    moves = sorted(h / c - 1.0 for h, c in zip(after, before))
+    median_move = moves[len(moves) // 2] * 100.0
+    report["hike_median_pct"] = median_move
+    print(f"7. forked and ran two futures in {time.time() - mark:.1f}s: "
+          f"the hike moved the median name {median_move:+.2f}%")
+    # A rate rise should price equities DOWN. If this ever flips, either the
+    # scenario stopped reaching fair value or the fork is not isolating.
+    assert median_move < 0, f"a hike priced the market up: {median_move:+.2f}%"
+
+    # 8. What kind of market is this, statistically? The mismatches matter
+    #    more than the matches -- they are where a conclusion drawn here stops
+    #    transferring. Two of the four are known and documented.
+    mark = time.time()
+    facts = pt.facts.measure(seed=7, universe=universe, days=60)
+    verdicts = pt.facts.compare_to_real_markets(facts)
+    report["realism"] = {k: v["direction"] for k, v in verdicts.items()}
+    print(f"8. stylised facts in {time.time() - mark:.1f}s: "
+          + ", ".join(f"{k.replace('_', ' ')} {v['direction']}"
+                      for k, v in verdicts.items()))
+    # Not all in range, and not none. If every statistic matched, the
+    # comparison would be doing no work; if none did, the model would be
+    # unusable and the report should say so loudly.
+    assert any(not v["matches"] for v in verdicts.values())
+    assert any(v["matches"] for v in verdicts.values())
+
+    # 9. Every result names the market it came from. A seed does not identify
+    #    a market -- the same seed over a different roster is a different one
+    #    -- and tickers do not identify a roster, because they are generated
+    #    positionally.
+    stamps = {
+        scores["momentum"].universe_fingerprint,
+        execution.universe_fingerprint,
+        facts["universe_fingerprint"],
+    }
+    report["provenance"] = stamps == {universe.fingerprint}
+    assert report["provenance"], stamps
+    print(f"9. provenance: every result stamped {universe.fingerprint[:12]}...")
+
+    # 10. Archive it. The log plus the seed plus the universe reproduce the run
     #    without this script.
     import json
 
@@ -123,7 +182,7 @@ def main() -> dict:
         universe=pt.Universe.from_json(json.dumps(restored["universe"])),
     )
     assert replayed.prices() == engine.prices(), "replay diverged"
-    print(f"7. archived {len(blob):,} bytes and replayed it to identical prices")
+    print(f"10. archived {len(blob):,} bytes and replayed it to identical prices")
 
     print(f"\ntotal {time.time() - started:.1f}s")
     return report
