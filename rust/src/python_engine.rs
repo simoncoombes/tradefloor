@@ -1678,7 +1678,7 @@ pub fn random_instruments(n: usize, seed: u32) -> PyResult<Vec<PyInstrument>> {
             revenue_growth: Some(g.revenue_growth),
             avg_volume: g.avg_volume,
             beta: g.beta,
-            short_interest: 0.0,
+            short_interest: g.short_interest,
         })
         .collect())
 }

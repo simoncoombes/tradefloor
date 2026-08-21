@@ -170,17 +170,17 @@ real equities. The mismatches are the point, and they are not tuned away:
 
 | statistic | measured | real equities | |
 |---|---|---|---|
-| excess kurtosis | **+4.1** | +3 to +10 | matches |
-| \|return\| acf(1) | +0.11 | +0.15 to +0.35 | too weak |
-| return acf(1) | **+0.235** | −0.05 to +0.05 | **too high** |
-| annualised vol | 58% | 15% to 35% | too high |
+| excess kurtosis | **+4.8** | +3 to +10 | matches |
+| \|return\| acf(1) | +0.12 | +0.15 to +0.35 | too weak |
+| return acf(1) | **+0.229** | −0.05 to +0.05 | **too high** |
+| annualised vol | 54% | 15% to 35% | too high |
 
 Fat tails are right — the single most robust fact about asset returns, and the
 one a Gaussian simulator gets wrong. Volatility clusters, but about half as
 strongly as reality and it fades faster.
 
-**Returns are positively autocorrelated and real ones are not.** +0.235 at lag
-one, in six seeds of six, ranging only +0.221 to +0.240. That is the AR(2)
+**Returns are positively autocorrelated and real ones are not.** +0.229 at lag
+one, in six seeds of six, ranging only +0.216 to +0.266. That is the AR(2)
 mispricing process showing through: its impulse response *rises* to 1.284 by
 day two before reverting, so a shock today is amplified tomorrow. Two
 independent measurements of one mechanism — the process's own impulse response,
@@ -359,6 +359,12 @@ that helpfully repairs your inputs produces a market nobody specified.
 
 **Negative EPS is legal.** Loss-makers are valued off book value. A universe
 without them is not a realistic universe.
+
+**Short interest is a share COUNT, not a fraction.** The squeeze rule divides
+it by the float, so `short_interest=0.03` means three hundredths of one share,
+not three per cent. `Universe.random` generates a realistic spread — median
+about 3.7% of shares outstanding, with roughly one name in eleven above the
+20% threshold where a squeeze can fire.
 
 **Roster order is contractual.** The engine iterates instruments in index
 order and draws as it goes, so a re-sorted universe is a different market.

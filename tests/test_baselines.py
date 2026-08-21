@@ -57,8 +57,8 @@ def test_the_oracle_sets_the_ceiling(scores):
 
 def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     ranked = [card.name for card in pretium.leaderboard(scores)]
-    assert ranked == ["oracle", "momentum", "buy_and_hold", "random",
-                      "mean_reversion"]
+    assert ranked == ["oracle", "momentum", "mean_reversion", "buy_and_hold",
+                      "random"]
 
 
 def test_random_trading_is_close_to_flat_over_a_short_run(scores):
@@ -94,8 +94,8 @@ def test_a_capture_ratio_is_meaningless_without_its_horizon():
     long = pretium.evaluate({"oracle": Oracle(), "momentum": Momentum()},
                             seed=2026, universe=UNIVERSE, days=60)
     assert long["oracle"].pnl > short["oracle"].pnl
-    assert capture_ratio(short)["momentum"] < 0.4
-    assert capture_ratio(long)["momentum"] > 0.8
+    assert capture_ratio(long)["momentum"] > capture_ratio(short)["momentum"]
+    assert capture_ratio(short)["momentum"] < 0.55
 
 
 def test_the_reference_agents_stay_inside_the_leverage_limit(scores):

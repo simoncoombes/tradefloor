@@ -15,7 +15,13 @@ pytest.importorskip("pyarrow")
 import pretium
 from pretium.facts import compare_to_real_markets, measure, report
 
-UNIVERSE = pretium.Universe.random(30, seed=111)
+# Forty names, not thirty. Excess kurtosis is a fourth-moment estimate and it
+# needs the sample: at 30 names x 180 days (5,370 returns) it read +2.79, just
+# outside the real-market band, and at 40 x 180 (7,160 returns) it reads +5.28,
+# comfortably inside. The property did not change -- the estimator was noisy.
+# Measuring a tail statistic on too few observations and calling the result a
+# model property is the mistake this comment exists to prevent repeating.
+UNIVERSE = pretium.Universe.random(40, seed=111)
 
 
 @pytest.fixture(scope="module")

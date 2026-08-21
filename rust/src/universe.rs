@@ -47,6 +47,10 @@ pub struct GeneratedInstrument {
     pub revenue_growth: f64,
     pub avg_volume: f64,
     pub beta: f64,
+    /// Shares sold short. A COUNT, not a fraction -- the squeeze rule divides
+    /// it by the float, so a value of `0.03` means three hundredths of one
+    /// share, not three per cent.
+    pub short_interest: f64,
 }
 
 /// Uniform in `[lo, hi)`.
@@ -135,6 +139,20 @@ pub fn random_universe(n: usize, seed: u32) -> Vec<GeneratedInstrument> {
         // field is actually for.
         let beta = crate::mathx::max(0.15, sector.volatility * between(&mut rng, 0.6, 1.35));
 
+        // Shares sold short, as a COUNT. Log-uniform between 0.4% and 30% of
+        // shares outstanding: the squeeze rule fires above a fifth of the
+        // float, so roughly one name in eleven can squeeze.
+        //
+        // Drawn LAST in the per-instrument block, and inside the loop rather
+        // than in a second pass over the roster. A second pass would have left
+        // every other field byte-identical to the previous generator, which
+        // was tempting -- and it breaks the invariant that a larger universe
+        // extends a smaller one, because the second pass starts at a stream
+        // position that depends on `n`. Generation is a single pass over one
+        // stream, and that is what makes "the same market plus twenty more
+        // instruments" expressible.
+        let short_interest = shares_outstanding * log_between(&mut rng, 0.004, 0.30);
+
         out.push(GeneratedInstrument {
             ticker: ticker_for(i),
             sector: sector.key,
@@ -145,8 +163,10 @@ pub fn random_universe(n: usize, seed: u32) -> Vec<GeneratedInstrument> {
             revenue_growth,
             avg_volume,
             beta,
+            short_interest,
         });
     }
+
 
     out
 }
