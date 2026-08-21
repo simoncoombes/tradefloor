@@ -239,3 +239,75 @@ def test_a_trading_session_is_reproducible():
         return p.pnl(e), p.realised(), [f["price"] for f in p.fills]
 
     assert run() == run()
+
+
+# --------------------------------------------------------------------------
+# The short side, where signs go wrong quietly
+# --------------------------------------------------------------------------
+
+
+def test_a_short_gains_when_the_price_falls():
+    """Direction, on the side where a sign error is invisible.
+
+    A long with a flipped sign is obvious the first time you look at a
+    number. A short with a flipped sign looks like an unlucky position, and
+    every P&L identity still balances -- cash and marks would simply both be
+    wrong together.
+    """
+    engine = market()
+    ticker = engine.tickers[0]
+    portfolio = pretium.Portfolio(cash=1_000_000.0)
+    portfolio.execute(engine, ticker, -500)
+
+    import struct
+    price = lambda: struct.unpack("<%dd" % len(UNIVERSE), engine.prices())[0]
+    entry = price()
+    before = portfolio.net_worth(engine)
+    for _ in range(6):
+        engine.run_session(9, 30, 3, 60)
+    after = price()
+    worth = portfolio.net_worth(engine)
+
+    assert entry != after, "the price did not move; the test proves nothing"
+    # Falling price, rising worth -- and the converse if the market went the
+    # other way. Asserted as an equivalence so the test holds whichever way
+    # this seed happens to run.
+    assert (after < entry) == (worth > before)
+
+
+def test_the_leverage_cap_counts_shorts():
+    # Gross exposure, not net. A cap that only looked at longs would let an
+    # account short without limit while reporting itself constrained.
+    engine = market()
+    ticker = engine.tickers[0]
+    portfolio = pretium.Portfolio(cash=100_000.0, max_leverage=2.0)
+
+    refused = False
+    for _ in range(60):
+        try:
+            portfolio.execute(engine, ticker, -2000)
+        except (pretium.OrderError, pretium.ValidationError):
+            refused = True
+            break
+    assert refused, "shorting was never refused; the cap does not see it"
+    assert portfolio.leverage(engine) <= 2.0 + 1e-9
+    assert portfolio.positions[ticker].quantity < 0
+
+
+def test_pnl_decomposes_into_realised_and_unrealised():
+    # An identity rather than a value, so it holds for any market. If these
+    # ever disagree, one of the three is computed from a different basis.
+    engine = market()
+    ticker = engine.tickers[0]
+    portfolio = pretium.Portfolio(cash=1_000_000.0)
+    portfolio.execute(engine, ticker, 150)
+    engine.run_session(9, 30, 3, 60)
+    portfolio.execute(engine, ticker, -50)
+    engine.run_session(9, 30, 3, 60)
+
+    assert portfolio.pnl(engine) == pytest.approx(
+        portfolio.realised() + portfolio.unrealised(engine), abs=1e-9)
+    assert portfolio.net_worth(engine) == pytest.approx(
+        portfolio.cash + portfolio.market_value(engine), abs=1e-9)
+    # And it is not trivially zero, which would satisfy both identities.
+    assert portfolio.realised() != 0.0
