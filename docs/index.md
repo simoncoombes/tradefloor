@@ -280,7 +280,7 @@ ex.untouched_moved()      # should be empty
 ```
 
 Arrival price, VWAP and fitted impact models are all proxies for a
-counterfactual that cannot be run on real data. Here it runs.
+counterfactual that cannot be run on real data. This one runs it.
 
 Two results to understand before reading a number:
 

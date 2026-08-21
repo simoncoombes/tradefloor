@@ -80,7 +80,7 @@ ex.partial_fills()      # what you asked for versus what you got
 ```
 
 Arrival price, VWAP and fitted impact models are all standing in for a
-counterfactual nobody can run on real data. Here it runs.
+counterfactual nobody can run on real data. This one runs it.
 
 ### You're stress-testing a strategy
 
@@ -109,10 +109,11 @@ genuinely dead — and you learned it for the price of some CPU.
 Regime detectors, event-attribution models, factor models. You can't score any
 of them on real data, because nobody knows the right answer.
 
-Here you do. The `truth` table gives one row per instrument per tick with every
-contribution to the move — mean reversion, momentum, crowd, news, order flow,
-short squeeze, noise — and the seven columns sum to the move with a residual
-around 1e-16. Check the label against the outcome instead of trusting it.
+This simulator does know, because it computed the answer before it drew the
+price. The `truth` table gives one row per instrument per tick with every
+contribution to that move: mean reversion, momentum, crowd, news, order flow,
+short squeeze, noise. The seven columns sum to the move with a residual around
+1e-16, so you can check a label against the outcome instead of trusting it.
 
 ```python
 truth = engine.truth()   # fundamental_value, anchor_price, mispricing_s, 7 factors
@@ -154,7 +155,7 @@ changing only how often a strategy rebalances:
 
 No fees are charged. That gap is spread and depth alone.
 
-**Results are columnar.** Five Arrow tables — bars, truth, macro, fills, book —
+**Results are columnar.** Five Arrow tables (bars, truth, macro, fills, book)
 read zero-copy by polars, pandas, pyarrow and duckdb, and the package depends
 on none of them. Runs stream a batch per day, so a hundred-seed sweep at tick
 grain never has to fit in memory.
