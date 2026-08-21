@@ -10,6 +10,10 @@ Two things you can do here that historical data will never let you do: run the
 same market twice with different decisions, and read the true value of every
 stock while you trade it.
 
+It's built to show you what breaks a strategy — bad sizing, execution cost, a
+rate shock it can't survive. It won't tell you what one earns, and
+[the last section](#what-it-is-bad-at) explains why.
+
 **Pre-release.** Everything below works and is tested. The API may move before 1.0.
 
 ```
@@ -161,9 +165,11 @@ about 3.3x on eight cores.
 
 ## What it is bad at
 
-**Don't use it to validate a strategy.** The price process comes from a known
-model, so anything fitting that model's structure will look brilliant and teach
-you nothing about real markets.
+**Good results here don't predict real returns.** The price process comes from
+a known model, so a strategy that happens to fit that model's structure will
+look brilliant and teach you nothing about real markets. A strategy that
+*fails* here has still told you something — it broke against a live order book
+under honest impact costs. Read the failures, not the P&L.
 
 **Momentum works here for the wrong reason.** Measured return autocorrelation
 is +0.219 at lag one where real equities sit near zero. That's the mispricing
