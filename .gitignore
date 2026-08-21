@@ -19,3 +19,11 @@ dist-spike/
 # Golden vectors: large parity fixtures synced from the reference
 # implementation. Not committed - see rust/sync-goldens.py.
 rust/goldens/
+
+# Build artefacts from `maturin develop`, which writes the compiled extension
+# and its debug symbols straight into the source tree. They are 2 MB, they
+# change on every rebuild, and a wheel is the only thing anyone should be
+# installing.
+python/pretium/*.pyd
+python/pretium/*.so
+python/pretium/*.pdb
