@@ -124,6 +124,19 @@ class TradingEnv(_Base):
                 low=-1.0, high=1.0, shape=(self.n,), dtype=_np.float64
             )
             # returns (n) + holdings (n) + cash fraction (1)
+            #
+            # Unbounded, and gymnasium's env_checker warns about it. The
+            # warning is right to ask and the answer is that no finite bound
+            # is true. A step is 65 ticks; the circuit breaker caps each tick
+            # at 25% of the previous close, so a step's log return is bounded
+            # only by 1.25**65 -- a number no policy should be told is the
+            # range. Cash as a fraction of net worth can go negative when
+            # levered and above one when net short.
+            #
+            # A bound the environment can exceed is worse than infinity, not
+            # better: wrappers that normalise against the space would silently
+            # emit out-of-range observations, and a clipping wrapper would
+            # discard real information. Infinity is the honest declaration.
             self.observation_space = spaces.Box(
                 low=-_np.inf, high=_np.inf, shape=(2 * self.n + 1,), dtype=_np.float64
             )

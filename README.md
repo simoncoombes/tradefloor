@@ -255,6 +255,22 @@ Coefficients ship as a named, versioned preset (`pt-v1`) rather than as
 constructor keywords, so two published results can be compared.
 `model_preset()` returns it.
 
+## A worked example
+
+`examples/research_workflow.py` runs the whole thing end to end in about ten
+seconds — universe, 20-seed sweep, five-agent evaluation, TCA, 234,000 rows of
+ground truth, then archives the run as JSON and replays it to identical prices.
+
+```
+python examples/research_workflow.py
+```
+
+It is run by the test suite, deliberately. Using the library the way a user
+would, rather than only running its unit tests, is what caught the two worst
+defects this project has had — a parallel sweep that hung forever in any
+notebook, and an order log that did not compare equal to itself after a JSON
+round trip. Both had green unit tests.
+
 ## Install
 
 ```
