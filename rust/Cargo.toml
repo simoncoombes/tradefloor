@@ -2,38 +2,51 @@
 name = "pretium"
 version = "0.0.0"
 edition = "2021"
-description = "Deterministic market simulation with a real limit order book. Placeholder release; under active development."
+description = "Deterministic market simulation with a real limit order book."
 license = "Apache-2.0"
 keywords = ["simulation", "finance", "market", "orderbook", "deterministic"]
 categories = ["simulation", "science"]
 readme = "README.md"
+# The golden vectors are 135 MB of parity fixtures. They are the test
+# contract, not library content, and must never ride along in a published
+# sdist -- excluded explicitly rather than trusted to a .gitignore.
+exclude = ["goldens/**", "_keep/**"]
 
 [lib]
 name = "pretium"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# abi3-py311: one wheel per platform covers CPython 3.11 and every later
-# version, so the release matrix is five wheels forever rather than five per
-# Python version. The floor is 3.11 rather than WP7's original "3.9+" sketch,
-# which is stale -- 3.9 is past EOL and SPEC 0 has already dropped 3.10.
-pyo3 = { version = "0.22", features = ["abi3-py311", "extension-module"] }
+libm = "0.2.16"
 
-# SPIKE ONLY -- a cross-repo relative path dependency.
+# Optional, and NOT carrying `extension-module` here.
 #
-# This is not a shippable arrangement: a published crate cannot carry a path
-# dependency, and this one reaches outside its own repository. It is here to
-# prove the PyO3/maturin toolchain end to end while the source-layout question
-# is still open (see the WP7 notes). Whatever that decision is -- vendoring a
-# scrubbed copy, moving the core, or a git dependency -- it replaces this line.
-mc-engine-core = { path = "../../mc-port/crates/mc-engine-core" }
+# `extension-module` tells the linker that Python symbols will be supplied by
+# the interpreter at load time. That is right for a wheel and fatal for
+# `cargo test`, which links a normal binary and would fail to resolve them.
+# So the feature is attached to `python` below, which maturin turns on and
+# `cargo test` leaves off.
+pyo3 = { version = "0.22", features = ["abi3-py311"], optional = true }
+
+[features]
+# abi3-py311: one wheel per platform covers CPython 3.11 and every later
+# version. The floor is 3.11 rather than WP7's "CPython 3.9+" sketch, which
+# is stale -- 3.9 is past EOL and SPEC 0 has dropped 3.10.
+python = ["dep:pyo3", "pyo3/extension-module"]
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Only to verify the golden vectors against index.json's SHA-256 manifest.
+# A partially regenerated or truncated vector set is otherwise a silent pass.
+sha2 = "0.10"
 
 # ============================================================================
-# Contractual, not tunable. Nothing here may trade accuracy for speed:
-# float reassociation or FMA contraction would silently produce a different
-# market on a different CPU, which is the exact failure `mul_add` is banned
-# for. No `-C target-cpu=native` in release builds -- wheels compile against
-# baseline target features.
+# Contractual, not tunable. Nothing here may trade accuracy for speed: float
+# reassociation or FMA contraction would silently produce a different market
+# on a different CPU, which is the exact failure `mul_add` is banned for. No
+# `-C target-cpu=native` in release builds -- wheels compile against baseline
+# target features.
 #
 # WARNING: Cargo honours `[profile.*]` only from the ROOT manifest. This crate
 # is its own root today, so this applies. If it ever becomes a workspace

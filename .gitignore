@@ -15,3 +15,8 @@ docs/
 # Spike artifacts
 dist-spike/
 .venv-spike/
+
+# Golden vectors: 135 MB of parity fixtures copied from mc-port.
+# NOT committed pending a decision (see HANDOFF.md) - tests need them
+# present locally; CI will need them from somewhere.
+rust/goldens/

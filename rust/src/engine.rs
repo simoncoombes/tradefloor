@@ -1,0 +1,1086 @@
+//! The engine — WP5. Where the port becomes something you can run.
+//!
+//! # What this owns, and what it deliberately does not
+//!
+//! It owns the seeded generator, the per-company price state, the economy and
+//! the central bank. That is all.
+//!
+//! Events, AI decisions, whale trades, corporate actions and earnings stay in
+//! the embedder and cross this boundary as **data** — news impulses and
+//! impact-queue entries, not behaviour. That split is not a simplification;
+//! it is what makes the boundary tractable. Whale events, for instance, reach
+//! the price only through the generic news channels, so there is nothing to
+//! port for them.
+//!
+//! # The stream is shared, and that is the hard part
+//!
+//! Every one of those TypeScript-side subsystems draws from the **same** MAIN
+//! PCG32 stream this engine owns. So an embedder cannot simply run its own
+//! generator alongside: the two would interleave differently and every price
+//! would diverge. [`Engine::draw_uniform`] and [`Engine::draw_normal`] exist
+//! for exactly that reason — the embedder asks THIS engine for its draws, so
+//! there is one stream with one position.
+//!
+//! That also means Box-Muller's spare cache is shared. An embedder that takes
+//! an odd number of normals leaves a spare waiting that this engine's next
+//! normal will consume, which is correct and is why the cache lives in
+//! `GameRng` rather than being reset per call.
+//!
+//! # Columnar access
+//!
+//! State is held internally as `Vec<TickCompany>` — array-of-structs — because
+//! that is what WP4's gated tick operates on, and re-shaping it would
+//! invalidate 18,720 verified values for a layout preference.
+//!
+//! The FFI surface is columnar instead ([`Engine::prices`],
+//! [`Engine::write_prices`]): one contiguous `f64` slice per field, which
+//! crosses a WASM boundary as a single view rather than 108 marshalled
+//! objects. Conversion happens when the embedder reads, not per tick, so the
+//! cost is paid once per boundary crossing rather than 390 times a day.
+
+use crate::economy::{
+    check_cycle_transition, update_central_bank, update_economy_daily, CentralBankState,
+    DailyInputs, EconomicShock, EconomyState,
+};
+use crate::market::{
+    close_day, get_market_status, intraday_fraction, reset_daily_prices, simulate_market_tick,
+    CloseInputs, GameTime, MarketStatus, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany,
+    TickInputs,
+};
+use crate::rng::{GameRng, Rng};
+
+/// The main stream's sequence, from `rng.ts:32`. Not 0 and not 1 — both are
+/// different streams from the same seed, and picking the wrong one produces a
+/// plausible market that matches nothing.
+pub const MAIN_STREAM: u32 = 99;
+
+/// What the embedder supplies for one tick.
+#[derive(Debug, Clone)]
+pub struct TickRequest<'a> {
+    pub time: GameTime,
+    /// Difficulty-driven noise multiplier.
+    pub volatility_multiplier: f64,
+    /// News reduced to the four fields the factor model reads.
+    pub news: &'a [NewsEvent],
+    pub news_impact_queue: &'a [NewsImpactEntry],
+    /// Aggregated pending order volume, keyed by ticker.
+    pub order_volumes: &'a [(String, OrderVolume)],
+}
+
+/// What one tick produced.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TickOutcome {
+    pub market_status: MarketStatus,
+    /// Indices of the companies that were active, in processing order.
+    pub active_indices: Vec<usize>,
+    /// Fair value per active company — the book's anchor, NOT a price.
+    pub fair_values: Vec<f64>,
+    pub volumes: Vec<f64>,
+    /// Draws consumed by this tick. Zero when the market was closed.
+    pub draws_consumed: usize,
+}
+
+/// What the embedder supplies at the close of a simulated day.
+#[derive(Debug, Clone)]
+pub struct DayCloseRequest<'a> {
+    /// Per company, the day's accumulated `randomNoise` from factor
+    /// attribution. `None` falls back to the day's total return.
+    pub daily_innovations: &'a [Option<f64>],
+    /// Per company, `sectorBaseDailyVariance(sector)`.
+    pub sector_base_variances: &'a [f64],
+}
+
+/// What the embedder supplies for the daily macro step.
+#[derive(Debug, Clone)]
+pub struct DayAdvanceRequest<'a> {
+    pub volatility: f64,
+    pub active_shocks: &'a [EconomicShock],
+    pub market_return_pct: f64,
+    pub game_day: i64,
+    /// Game timestamp in minutes, for the central bank's meeting calendar.
+    pub timestamp: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DayAdvanceOutcome {
+    pub phase_changed: bool,
+    pub meeting_held: bool,
+    pub draws_consumed: usize,
+}
+
+pub struct Engine {
+    rng: GameRng,
+    companies: Vec<TickCompany>,
+    economy: EconomyState,
+    central_bank: CentralBankState,
+    sector_keys: Vec<String>,
+    /// Cumulative MAIN-stream draws, including any the embedder took through
+    /// [`Engine::draw_uniform`]. The single most useful number for diagnosing
+    /// a cross-language divergence: if these differ, nothing downstream is
+    /// worth comparing.
+    draws: usize,
+}
+
+impl Engine {
+    /// Seed the MAIN stream and take ownership of the state.
+    ///
+    /// # Both orderings are CONTRACTUAL
+    ///
+    /// `companies` is an ordered SEQUENCE, never a set or a mapping. The tick
+    /// walks it in index order and draws per company as it goes, so reordering
+    /// the roster produces a different market from the same seed. A
+    /// well-meaning `sort_by(|a, b| a.ticker.cmp(&b.ticker))` anywhere upstream
+    /// is a silent, total divergence — nothing will fail, the numbers will just
+    /// be different ones.
+    ///
+    /// `sector_keys` must likewise be in `Object.keys(SECTOR_CONFIGS)` order:
+    /// one normal is drawn per key, per tick, in that order.
+    ///
+    /// Roster SIZE is contractual too, and for the same reason. Adding a
+    /// company does not append a name to an otherwise-unchanged market — draws
+    /// scale with `n`, so every subsequent draw shifts and the whole market
+    /// changes. A 30-name universe and a 100-name universe from one seed have
+    /// nothing to do with each other.
+    pub fn new(
+        seed: u32,
+        companies: Vec<TickCompany>,
+        economy: EconomyState,
+        central_bank: CentralBankState,
+        sector_keys: Vec<String>,
+    ) -> Self {
+        Self {
+            rng: GameRng::new(seed, MAIN_STREAM),
+            companies,
+            economy,
+            central_bank,
+            sector_keys,
+            draws: 0,
+        }
+    }
+
+    // ── Draw delegation ───────────────────────────────────────────────────
+
+    /// Take one uniform from the shared stream, on the embedder's behalf.
+    ///
+    /// The embedder's own subsystems — events, corporate actions, earnings —
+    /// draw from this same stream in the TypeScript. Routing them through here
+    /// keeps one stream with one position; running a second generator
+    /// alongside would interleave differently and diverge every price.
+    pub fn draw_uniform(&mut self) -> f64 {
+        self.draws += 1;
+        self.rng.next_f64()
+    }
+
+    /// Take one normal from the shared stream. See [`Engine::draw_uniform`];
+    /// note this also shares the Box-Muller spare.
+    pub fn draw_normal(&mut self) -> f64 {
+        self.draws += 1;
+        self.rng.next_normal()
+    }
+
+    /// Cumulative draws taken since construction.
+    pub fn draws_consumed(&self) -> usize {
+        self.draws
+    }
+
+    // ── The tick ──────────────────────────────────────────────────────────
+
+    /// Run one simulated minute.
+    ///
+    /// A closed market costs zero draws and changes nothing — the guard is
+    /// inside [`simulate_market_tick`] and precedes every draw site, which
+    /// matters because most of the clock is closed.
+    pub fn tick(&mut self, request: &TickRequest) -> TickOutcome {
+        // The generator is moved out, used, and moved back. `tick_with` takes
+        // `&mut self`, so it cannot also borrow `self.rng` — and swapping is
+        // clearer than duplicating the tick body for the two cases.
+        let mut rng = std::mem::replace(&mut self.rng, GameRng::new(0, MAIN_STREAM));
+        let mut counting = Counting {
+            inner: &mut rng,
+            count: 0,
+        };
+        let mut outcome = self.tick_with(request, &mut counting);
+        let consumed = counting.count;
+        self.rng = rng;
+        self.draws += consumed;
+        outcome.draws_consumed = consumed;
+        outcome
+    }
+
+    /// Run one simulated minute against an EXTERNAL draw source.
+    ///
+    /// This is what a replay harness needs: the engine's own generator cannot
+    /// reproduce a recorded TypeScript stream, because `next_normal` routes
+    /// through `cos` and diverges on 1.545% of draws. Feeding recorded draws
+    /// separates the arithmetic under test from the generator that is known to
+    /// differ.
+    ///
+    /// `draws_consumed` in the returned outcome is 0 here — the caller owns
+    /// the source and already knows what it handed over.
+    pub fn tick_with(&mut self, request: &TickRequest, rng: &mut impl Rng) -> TickOutcome {
+        let status = get_market_status(request.time);
+
+        let outcome = simulate_market_tick(
+            &mut self.companies,
+            &TickInputs {
+                economy: &self.economy,
+                market_status: status,
+                intraday_t: intraday_fraction(request.time),
+                volatility_multiplier: request.volatility_multiplier,
+                news: request.news,
+                news_impact_queue: request.news_impact_queue,
+                order_volumes: request.order_volumes,
+                sector_keys: &self.sector_keys,
+            },
+            rng,
+        );
+
+        TickOutcome {
+            market_status: status,
+            active_indices: outcome.active_indices,
+            fair_values: outcome.fair_values,
+            volumes: outcome.volumes,
+            draws_consumed: 0,
+        }
+    }
+
+    // ── Day boundaries ────────────────────────────────────────────────────
+
+    /// Market-open reset. Zero draws.
+    ///
+    /// This is what anchors the circuit-breaker band to today's open, which is
+    /// what makes it a SESSION band and leaves the overnight gap outside it by
+    /// design (D6).
+    pub fn open_market(&mut self) {
+        reset_daily_prices(&mut self.companies);
+    }
+
+    /// Close-of-day bookkeeping. Zero draws.
+    ///
+    /// Must run BEFORE any earnings shock the embedder applies that evening:
+    /// the momentum roll reads `s` as it stands at the close, and an earnings
+    /// gap applied first would be counted again as next-day herding. The
+    /// TypeScript's earnings path patches `sPrevClose` by the shock for the
+    /// same reason.
+    pub fn close_market(&mut self, request: &DayCloseRequest) {
+        assert_eq!(
+            request.daily_innovations.len(),
+            self.companies.len(),
+            "one innovation per company"
+        );
+        assert_eq!(
+            request.sector_base_variances.len(),
+            self.companies.len(),
+            "one sector base variance per company"
+        );
+        for (i, company) in self.companies.iter_mut().enumerate() {
+            close_day(
+                company,
+                &CloseInputs {
+                    daily_innovation: request.daily_innovations[i],
+                    sector_base_daily_variance: request.sector_base_variances[i],
+                },
+            );
+        }
+    }
+
+    /// The daily macro step: economy, cycle roll, then the central bank.
+    ///
+    /// The order is the TypeScript's and is load-bearing — the rates and VIX
+    /// the factor model reads on the first tick of a new day are already the
+    /// day's NEW values, not yesterday's.
+    pub fn advance_day(&mut self, request: &DayAdvanceRequest) -> DayAdvanceOutcome {
+        let mut rng = std::mem::replace(&mut self.rng, GameRng::new(0, MAIN_STREAM));
+        let mut counting = Counting {
+            inner: &mut rng,
+            count: 0,
+        };
+        let mut outcome = self.advance_day_with(request, &mut counting);
+        let consumed = counting.count;
+        self.rng = rng;
+        self.draws += consumed;
+        outcome.draws_consumed = consumed;
+        outcome
+    }
+
+    /// The daily macro step against an EXTERNAL draw source. See
+    /// [`Engine::tick_with`].
+    pub fn advance_day_with(
+        &mut self,
+        request: &DayAdvanceRequest,
+        rng: &mut impl Rng,
+    ) -> DayAdvanceOutcome {
+        let phase_before = self.economy.cycle_phase;
+
+        self.economy = update_economy_daily(
+            &self.economy,
+            &DailyInputs {
+                volatility: request.volatility,
+                active_shocks: request.active_shocks,
+                market_return_pct: request.market_return_pct,
+                game_day: request.game_day,
+            },
+            rng,
+        );
+        self.economy = check_cycle_transition(&self.economy, rng);
+
+        let meeting =
+            update_central_bank(&self.central_bank, &self.economy, request.timestamp, rng);
+        let meeting_held = meeting.decision.is_some();
+        self.central_bank = meeting.central_bank;
+        self.economy = meeting.economy;
+
+        DayAdvanceOutcome {
+            phase_changed: self.economy.cycle_phase != phase_before,
+            meeting_held,
+            draws_consumed: 0,
+        }
+    }
+
+    // ── Day-chunked stepping ──────────────────────────────────────────────
+
+    /// Run a whole session in one call, writing per-tick output into a
+    /// caller-owned buffer.
+    ///
+    /// # Why this is core rather than a wrapper convenience
+    ///
+    /// A caller looping over [`Engine::tick`] from Python crosses the FFI
+    /// boundary roughly 98,000 times per simulated year — and worse in
+    /// practice, because every attribute read on a returned object is another
+    /// crossing. No binding layer can fix that from the outside: if the only
+    /// advancement primitive is one tick, the loop is in the host language and
+    /// the crossings are unavoidable. So day-chunking lives here.
+    ///
+    /// # Nothing accumulates beyond one day
+    ///
+    /// Output goes into [`SessionBuffer`], which the caller sizes once and
+    /// drains between days. At tick grain a year of 100 names is ~9.8M rows
+    /// per column, so accumulating Rust-side and returning at the end does not
+    /// scale — one day is ~312 KB and is reused.
+    ///
+    /// Buffers are `f64` throughout with no `f32` option, deliberately: the
+    /// known-answer files and the cross-platform release gate hash these
+    /// buffers, so a half-precision path would be a silent parity break
+    /// dressed as a performance switch.
+    pub fn run_session(
+        &mut self,
+        request: &SessionRequest,
+        buffer: &mut SessionBuffer,
+    ) -> SessionOutcome {
+        buffer.resize(request.ticks, self.companies.len());
+
+        self.open_market();
+
+        let mut draws = 0usize;
+        let (mut hour, mut minute) = (request.start.hour, request.start.minute);
+        let mut halted_at = None;
+
+        for t in 0..request.ticks {
+            let outcome = self.tick(&TickRequest {
+                time: GameTime {
+                    hour,
+                    minute,
+                    day_of_week: request.start.day_of_week,
+                },
+                volatility_multiplier: request.volatility_multiplier,
+                news: request.news,
+                news_impact_queue: request.news_impact_queue,
+                order_volumes: request.order_volumes,
+            });
+            draws += outcome.draws_consumed;
+            buffer.write_tick(t, &self.companies);
+
+            if let Some(stop) = &request.stop {
+                if stop.triggered(t, &self.companies) {
+                    halted_at = Some(t);
+                    buffer.ticks_written = t + 1;
+                    break;
+                }
+            }
+
+            minute += 1;
+            if minute >= 60 {
+                minute = 0;
+                hour += 1;
+            }
+        }
+
+        if request.close_at_end && halted_at.is_none() {
+            self.close_market(&DayCloseRequest {
+                daily_innovations: request.daily_innovations,
+                sector_base_variances: request.sector_base_variances,
+            });
+        }
+
+        SessionOutcome {
+            draws_consumed: draws,
+            halted_at,
+        }
+    }
+
+    // ── State access ──────────────────────────────────────────────────────
+
+    pub fn economy(&self) -> &EconomyState {
+        &self.economy
+    }
+    pub fn central_bank(&self) -> &CentralBankState {
+        &self.central_bank
+    }
+    pub fn companies(&self) -> &[TickCompany] {
+        &self.companies
+    }
+    pub fn companies_mut(&mut self) -> &mut [TickCompany] {
+        &mut self.companies
+    }
+    pub fn len(&self) -> usize {
+        self.companies.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.companies.is_empty()
+    }
+
+    /// Columnar read of one field, for the FFI boundary.
+    ///
+    /// A single contiguous `f64` buffer crosses a WASM boundary as one view;
+    /// 108 marshalled objects do not. The `Vec` is built on demand rather than
+    /// maintained, because the embedder reads far less often than the tick
+    /// writes.
+    pub fn column(&self, field: PriceField) -> Vec<f64> {
+        self.companies
+            .iter()
+            .map(|c| match field {
+                PriceField::Price => c.stock.price,
+                PriceField::PreviousClose => c.stock.previous_close,
+                PriceField::Open => c.stock.open,
+                PriceField::High => c.stock.high,
+                PriceField::Low => c.stock.low,
+                PriceField::Volume => c.stock.volume,
+                PriceField::MarketCap => c.stock.market_cap,
+                PriceField::MispricingS => c.stock.mispricing_s.unwrap_or(f64::NAN),
+                PriceField::MakerInventory => c.stock.maker_inventory.unwrap_or(0.0),
+                PriceField::GarchVariance => c.stock.garch_variance,
+            })
+            .collect()
+    }
+
+    /// Convenience for the most-read column.
+    pub fn prices(&self) -> Vec<f64> {
+        self.column(PriceField::Price)
+    }
+
+    /// Overwrite prices from a columnar buffer.
+    ///
+    /// For the embedder to apply an effect this engine does not model — an
+    /// earnings gap, a corporate action. It does NOT recompute `s`, so a
+    /// caller changing the price must also decide what that means for the
+    /// mispricing, exactly as the TypeScript's earnings path does.
+    pub fn write_prices(&mut self, prices: &[f64]) {
+        assert_eq!(prices.len(), self.companies.len(), "one price per company");
+        for (company, &price) in self.companies.iter_mut().zip(prices) {
+            company.stock.price = price;
+            company.stock.market_cap = price * company.stock.shares_outstanding;
+        }
+    }
+}
+
+/// Fields exposed columnar-wise across the FFI boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PriceField {
+    Price,
+    PreviousClose,
+    Open,
+    High,
+    Low,
+    Volume,
+    MarketCap,
+    /// `NaN` for a company that has never ticked, since a column cannot carry
+    /// `None`. The embedder should read it as "unset", not as a number.
+    MispricingS,
+    MakerInventory,
+    GarchVariance,
+}
+
+/// Counts draws as they are taken.
+///
+/// The obvious alternative — clone the generator, replay uniforms until the
+/// clone catches up — does NOT work on a mixed stream, and the reason is worth
+/// recording because it looks like it should. `next_normal` is Box-Muller: it
+/// consumes two PCG steps and leaves a spare cached, and a later normal
+/// consumes zero. A probe pulling uniforms never reproduces that spare, so the
+/// two states are never equal and the search runs to its bound.
+///
+/// Counting at the call is exact, costs a `usize` increment, and does not care
+/// what kind of draw it was.
+struct Counting<'a> {
+    inner: &'a mut GameRng,
+    count: usize,
+}
+
+impl Rng for Counting<'_> {
+    fn next_f64(&mut self) -> f64 {
+        self.count += 1;
+        self.inner.next_f64()
+    }
+    fn next_normal(&mut self) -> f64 {
+        self.count += 1;
+        self.inner.next_normal()
+    }
+}
+
+/// What a session needs beyond the engine's own state.
+pub struct SessionRequest<'a> {
+    pub start: GameTime,
+    pub ticks: usize,
+    pub volatility_multiplier: f64,
+    pub news: &'a [NewsEvent],
+    pub news_impact_queue: &'a [NewsImpactEntry],
+    pub order_volumes: &'a [(String, OrderVolume)],
+    /// Run the close bookkeeping when the session finishes normally.
+    pub close_at_end: bool,
+    pub daily_innovations: &'a [Option<f64>],
+    pub sector_base_variances: &'a [f64],
+    /// Stop early when a condition is met, for event-driven advancement.
+    pub stop: Option<StopCondition>,
+}
+
+/// Why a session might end before its last tick.
+///
+/// Deliberately limited to what the ENGINE can decide from its own state.
+/// Stopping on a fill needs the order book and the caller's resting orders,
+/// neither of which this engine owns — that belongs with whoever owns order
+/// state, and inventing a half-version here would be worse than not having it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StopCondition {
+    /// A named company's price leaves a band. `None` on a side means unbounded.
+    PriceOutside {
+        company: usize,
+        below: Option<f64>,
+        above: Option<f64>,
+    },
+}
+
+impl StopCondition {
+    fn triggered(&self, _tick: usize, companies: &[TickCompany]) -> bool {
+        match *self {
+            StopCondition::PriceOutside {
+                company,
+                below,
+                above,
+            } => {
+                let Some(c) = companies.get(company) else {
+                    return false;
+                };
+                let price = c.stock.price;
+                below.is_some_and(|b| price < b) || above.is_some_and(|a| price > a)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SessionOutcome {
+    pub draws_consumed: usize,
+    /// `Some(tick)` when a [`StopCondition`] fired. The close is NOT run in
+    /// that case — the day is not over, the caller interrupted it.
+    pub halted_at: Option<usize>,
+}
+
+/// A reusable per-day columnar buffer.
+///
+/// Row-major, `tick * companies + company`, so one company's path is a strided
+/// read and one tick's cross-section is contiguous. The cross-section is the
+/// hot direction: emission is per tick.
+///
+/// `f64` only. See [`Engine::run_session`] for why there is no `f32` variant.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct SessionBuffer {
+    pub companies: usize,
+    /// How many ticks the last session actually wrote — less than capacity
+    /// when a [`StopCondition`] fired.
+    pub ticks_written: usize,
+    pub prices: Vec<f64>,
+    pub volumes: Vec<f64>,
+    pub mispricing_s: Vec<f64>,
+}
+
+impl SessionBuffer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn resize(&mut self, ticks: usize, companies: usize) {
+        let needed = ticks * companies;
+        if self.prices.len() != needed {
+            self.prices.resize(needed, 0.0);
+            self.volumes.resize(needed, 0.0);
+            self.mispricing_s.resize(needed, 0.0);
+        }
+        self.companies = companies;
+        self.ticks_written = ticks;
+    }
+
+    fn write_tick(&mut self, tick: usize, companies: &[TickCompany]) {
+        let base = tick * self.companies;
+        for (i, c) in companies.iter().enumerate() {
+            self.prices[base + i] = c.stock.price;
+            self.volumes[base + i] = c.stock.volume;
+            // NaN for a company that has never ticked — a column cannot carry
+            // `None`, and zero would be a real mispricing.
+            self.mispricing_s[base + i] = c.stock.mispricing_s.unwrap_or(f64::NAN);
+        }
+    }
+
+    /// One tick's cross-section, contiguous.
+    pub fn tick_prices(&self, tick: usize) -> &[f64] {
+        let base = tick * self.companies;
+        &self.prices[base..base + self.companies]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::economy::{
+        create_initial_central_bank_state, create_initial_economy_state, InitialEconomyOptions,
+    };
+    use crate::market::TickStock;
+
+    fn sectors() -> Vec<String> {
+        ["technology", "energy", "healthcare"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    fn company(id: &str, price: f64) -> TickCompany {
+        TickCompany {
+            id: id.to_string(),
+            ticker: id.to_string(),
+            sector: "technology".to_string(),
+            is_bankrupt: false,
+            is_public: true,
+            sector_volatility: Some(1.0),
+            sector_avg_pe: Some(32.0),
+            eps: Some(4.0),
+            book_value_per_share: Some(20.0),
+            revenue_growth: Some(0.1),
+            stock: TickStock {
+                price,
+                previous_close: price,
+                previous_tick_price: None,
+                open: price,
+                high: price,
+                low: price,
+                volume: 0.0,
+                avg_volume: 1e6,
+                shares_outstanding: 1e8,
+                market_cap: price * 1e8,
+                mispricing_s: None,
+                mispricing_s_prev_close: None,
+                mispricing_momentum: None,
+                maker_inventory: None,
+                garch_variance: 0.015 * 0.015,
+                last_daily_return: None,
+                beta: Some(1.0),
+                short_interest: 0.0,
+                float: 1e8,
+            },
+        }
+    }
+
+    fn engine(seed: u32) -> Engine {
+        Engine::new(
+            seed,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+        )
+    }
+
+    fn request(hour: i64, minute: i64) -> TickRequest<'static> {
+        TickRequest {
+            time: GameTime {
+                hour,
+                minute,
+                day_of_week: 3,
+            },
+            volatility_multiplier: 0.7,
+            news: &[],
+            news_impact_queue: &[],
+            order_volumes: &[],
+        }
+    }
+
+    #[test]
+    fn the_same_seed_produces_the_same_market() {
+        // The property the whole port exists to preserve.
+        let run = || {
+            let mut e = engine(4242);
+            e.open_market();
+            for m in 0..60 {
+                e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+            }
+            (e.prices(), e.draws_consumed())
+        };
+        let (a, da) = run();
+        let (b, db) = run();
+        assert_eq!(da, db, "draw counts must match");
+        for (i, (x, y)) in a.iter().zip(&b).enumerate() {
+            assert_eq!(x.to_bits(), y.to_bits(), "company {i}");
+        }
+    }
+
+    #[test]
+    fn different_seeds_produce_different_markets() {
+        // The companion assertion: reproducible-because-constant would pass
+        // the test above and be worthless.
+        let run = |seed| {
+            let mut e = engine(seed);
+            e.open_market();
+            for m in 0..60 {
+                e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+            }
+            e.prices()
+        };
+        assert_ne!(run(1)[0].to_bits(), run(2)[0].to_bits());
+    }
+
+    #[test]
+    fn a_closed_market_costs_nothing() {
+        let mut e = engine(7);
+        let before_prices = e.prices();
+        let out = e.tick(&TickRequest {
+            time: GameTime {
+                hour: 11,
+                minute: 0,
+                day_of_week: 6,
+            },
+            ..request(11, 0)
+        });
+        assert_eq!(out.market_status, MarketStatus::Closed);
+        assert_eq!(
+            out.draws_consumed, 0,
+            "a closed market must not advance the stream"
+        );
+        assert_eq!(e.draws_consumed(), 0);
+        assert_eq!(e.prices(), before_prices);
+    }
+
+    #[test]
+    fn the_draw_schedule_is_what_the_documentation_claims() {
+        // 1 market normal + one per sector + 2 per active company, plus 4 more
+        // each at settlement when the book runs.
+        let mut e = engine(11);
+        e.open_market();
+
+        let open = e.tick(&request(10, 0));
+        assert_eq!(open.market_status, MarketStatus::Open);
+        assert_eq!(open.draws_consumed, 1 + 3 + 2 * 3 + 4 * 3);
+
+        let extended = e.tick(&request(8, 0));
+        assert_eq!(extended.market_status, MarketStatus::PreMarket);
+        assert_eq!(
+            extended.draws_consumed,
+            1 + 3 + 2 * 3,
+            "extended hours must not settle through the book"
+        );
+    }
+
+    #[test]
+    fn an_inactive_company_costs_no_draws() {
+        let mut e = engine(13);
+        e.companies_mut()[1].is_bankrupt = true;
+        e.open_market();
+        let out = e.tick(&request(10, 0));
+        assert_eq!(out.active_indices, vec![0, 2]);
+        assert_eq!(out.draws_consumed, 1 + 3 + 2 * 2 + 4 * 2);
+    }
+
+    #[test]
+    fn embedder_draws_share_the_engines_stream() {
+        // The point of `draw_uniform`. An embedder running its own generator
+        // would interleave differently and diverge every price, so taking a
+        // draw here must move the market that follows it.
+        //
+        // Asserted across the ROSTER after several ticks, not on one name
+        // after one tick. Prints round to cents, so a sub-cent perturbation
+        // legitimately need not move a $100 stock within a single minute — an
+        // assertion that narrow would be demanding something the model does
+        // not promise. Measured: after one tick only the $220 name differs;
+        // by tick five all three do.
+        let run = |extra_draws: usize| {
+            let mut e = engine(99);
+            e.open_market();
+            for _ in 0..extra_draws {
+                e.draw_uniform();
+            }
+            for m in 0..5i64 {
+                e.tick(&request(10, m));
+            }
+            e.prices()
+        };
+        let without = run(0);
+        let with_draw = run(1);
+        assert!(
+            without
+                .iter()
+                .zip(&with_draw)
+                .any(|(a, b)| a.to_bits() != b.to_bits()),
+            "an embedder draw must shift the shared stream: {without:?} vs {with_draw:?}"
+        );
+    }
+
+    #[test]
+    fn the_cumulative_draw_count_includes_embedder_draws() {
+        let mut e = engine(5);
+        e.draw_uniform();
+        e.draw_normal();
+        assert_eq!(e.draws_consumed(), 2);
+        e.open_market();
+        let out = e.tick(&request(10, 0));
+        assert_eq!(e.draws_consumed(), 2 + out.draws_consumed);
+    }
+
+    #[test]
+    fn the_daily_step_runs_economy_then_cycle_then_the_bank() {
+        let mut e = engine(21);
+        let vix_before = e.economy().vix;
+        let out = e.advance_day(&DayAdvanceRequest {
+            volatility: 0.7,
+            active_shocks: &[],
+            market_return_pct: 0.0,
+            game_day: 1,
+            timestamp: 24 * 60,
+        });
+        assert!(out.draws_consumed > 0, "the daily macro step must draw");
+        assert_ne!(e.economy().vix, vix_before, "the economy must have stepped");
+    }
+
+    #[test]
+    fn the_open_reset_anchors_the_breaker_to_todays_open() {
+        let mut e = engine(3);
+        e.companies_mut()[0].stock.price = 137.0;
+        e.open_market();
+        assert_eq!(e.column(PriceField::PreviousClose)[0], 137.0);
+        assert_eq!(e.column(PriceField::Volume)[0], 0.0);
+    }
+
+    #[test]
+    fn the_close_rolls_momentum_and_takes_no_draws() {
+        let mut e = engine(17);
+        e.open_market();
+        for m in 0..10 {
+            e.tick(&request(10, m));
+        }
+        let before = e.draws_consumed();
+        e.close_market(&DayCloseRequest {
+            daily_innovations: &[None, None, None],
+            sector_base_variances: &[0.000225; 3],
+        });
+        assert_eq!(e.draws_consumed(), before, "the close must not draw");
+        // `s` has moved during the session, so the roll must record it.
+        assert!(e.companies()[0].stock.mispricing_momentum.is_some());
+    }
+
+    // ── Day-chunked stepping ──────────────────────────────────────────────
+
+    fn session<'a>(
+        ticks: usize,
+        innovations: &'a [Option<f64>],
+        variances: &'a [f64],
+    ) -> SessionRequest<'a> {
+        SessionRequest {
+            start: GameTime {
+                hour: 9,
+                minute: 30,
+                day_of_week: 3,
+            },
+            ticks,
+            volatility_multiplier: 0.7,
+            news: &[],
+            news_impact_queue: &[],
+            order_volumes: &[],
+            close_at_end: true,
+            daily_innovations: innovations,
+            sector_base_variances: variances,
+            stop: None,
+        }
+    }
+
+    #[test]
+    fn a_chunked_session_matches_driving_the_ticks_by_hand() {
+        // The whole point of `run_session` is that it is the SAME simulation,
+        // just without the boundary crossings. If it diverged from the manual
+        // loop it would be a second engine.
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+
+        let chunked = {
+            let mut e = engine(4242);
+            let mut buf = SessionBuffer::new();
+            e.run_session(&session(60, &innovations, &variances), &mut buf);
+            (e.prices(), e.draws_consumed())
+        };
+
+        let by_hand = {
+            let mut e = engine(4242);
+            e.open_market();
+            for m in 0..60i64 {
+                e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+            }
+            e.close_market(&DayCloseRequest {
+                daily_innovations: &innovations,
+                sector_base_variances: &variances,
+            });
+            (e.prices(), e.draws_consumed())
+        };
+
+        assert_eq!(chunked.1, by_hand.1, "draw counts must match");
+        for (i, (a, b)) in chunked.0.iter().zip(&by_hand.0).enumerate() {
+            assert_eq!(a.to_bits(), b.to_bits(), "company {i}");
+        }
+    }
+
+    #[test]
+    fn the_buffer_holds_every_tick_of_the_session() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let mut e = engine(11);
+        let mut buf = SessionBuffer::new();
+        e.run_session(&session(40, &innovations, &variances), &mut buf);
+
+        assert_eq!(buf.ticks_written, 40);
+        assert_eq!(buf.companies, 3);
+        assert_eq!(buf.prices.len(), 40 * 3);
+        // The last written cross-section is the engine's current state.
+        assert_eq!(buf.tick_prices(39), e.prices().as_slice());
+        assert!(buf.prices.iter().all(|p| p.is_finite() && *p > 0.0));
+    }
+
+    #[test]
+    fn the_buffer_is_reused_across_days_rather_than_growing() {
+        // Nothing accumulates Rust-side: a year of tick-grain output would be
+        // millions of rows, and the buffer is one day.
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let mut e = engine(7);
+        let mut buf = SessionBuffer::new();
+
+        for _ in 0..5 {
+            e.run_session(&session(30, &innovations, &variances), &mut buf);
+            assert_eq!(buf.prices.len(), 30 * 3, "the buffer grew across days");
+        }
+    }
+
+    #[test]
+    fn a_stop_condition_halts_the_session_and_leaves_the_day_open() {
+        // Event-driven advancement. The close must NOT run: the day is not
+        // over, the caller interrupted it, and running the close would roll
+        // momentum on a half-day.
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let mut e = engine(31337);
+        let mut buf = SessionBuffer::new();
+
+        let mut req = session(390, &innovations, &variances);
+        // A band tight enough that any movement trips it.
+        let start = e.prices()[0];
+        req.stop = Some(StopCondition::PriceOutside {
+            company: 0,
+            below: Some(start * 0.9999),
+            above: Some(start * 1.0001),
+        });
+
+        let out = e.run_session(&req, &mut buf);
+        assert!(out.halted_at.is_some(), "the stop condition never fired");
+        let halted = out.halted_at.unwrap();
+        assert!(
+            halted < 389,
+            "halted at the very end, so nothing was skipped"
+        );
+        assert_eq!(buf.ticks_written, halted + 1);
+        // The close did not run. Probed via `last_daily_return`, which ONLY
+        // `close_day` writes — `mispricing_momentum` would be the obvious
+        // check and is wrong, because the tick lazy-initialises it to
+        // Some(0.0) on a company that has never ticked.
+        assert!(
+            e.companies()[0].stock.last_daily_return.is_none(),
+            "the close ran on an interrupted day"
+        );
+    }
+
+    #[test]
+    fn a_stop_condition_that_never_fires_runs_the_whole_session() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let mut e = engine(5);
+        let mut buf = SessionBuffer::new();
+        let mut req = session(50, &innovations, &variances);
+        req.stop = Some(StopCondition::PriceOutside {
+            company: 0,
+            below: Some(0.01),
+            above: Some(1e9),
+        });
+        let out = e.run_session(&req, &mut buf);
+        assert_eq!(out.halted_at, None);
+        assert_eq!(buf.ticks_written, 50);
+    }
+
+    #[test]
+    fn the_session_reports_the_draws_it_consumed() {
+        let innovations = vec![None; 3];
+        let variances = vec![0.000225; 3];
+        let mut e = engine(13);
+        let mut buf = SessionBuffer::new();
+        let out = e.run_session(&session(10, &innovations, &variances), &mut buf);
+        // 10 open ticks at 1 + 3 sectors + 2 and 4 per company.
+        assert_eq!(out.draws_consumed, 10 * (1 + 3 + 2 * 3 + 4 * 3));
+        assert_eq!(e.draws_consumed(), out.draws_consumed);
+    }
+
+    #[test]
+    fn columns_are_aligned_with_the_company_order() {
+        let e = engine(1);
+        let prices = e.column(PriceField::Price);
+        assert_eq!(prices.len(), e.len());
+        for (i, c) in e.companies().iter().enumerate() {
+            assert_eq!(prices[i], c.stock.price);
+        }
+    }
+
+    #[test]
+    fn writing_prices_updates_market_cap_with_them() {
+        let mut e = engine(1);
+        e.write_prices(&[1.0, 2.0, 3.0]);
+        assert_eq!(e.prices(), vec![1.0, 2.0, 3.0]);
+        assert_eq!(e.column(PriceField::MarketCap)[0], 1.0 * 1e8);
+    }
+
+    #[test]
+    fn a_full_session_runs_and_stays_bounded() {
+        // 390 ticks with the day's boundaries, as an embedder would drive it.
+        let mut e = engine(31337);
+        e.open_market();
+        for m in 0..390i64 {
+            e.tick(&request(9 + (30 + m) / 60, (30 + m) % 60));
+        }
+        e.close_market(&DayCloseRequest {
+            daily_innovations: &[None; 3],
+            sector_base_variances: &[0.000225; 3],
+        });
+
+        for (i, price) in e.prices().iter().enumerate() {
+            assert!(
+                price.is_finite() && *price > 0.0,
+                "company {i} priced at {price}"
+            );
+            // The session breaker bounds every print against the open.
+            let open = e.companies()[i].stock.previous_close;
+            assert!(
+                *price <= open * 1.25 + 1e-9 && *price >= (open * 0.75).max(0.01) - 1e-9,
+                "company {i} escaped the session band: {price} against an open of {open}"
+            );
+        }
+    }
+}
