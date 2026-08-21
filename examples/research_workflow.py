@@ -129,6 +129,63 @@ def main() -> dict:
     assert not leaked, f"impact leaked into untraded names: {leaked}"
     print("     untouched instruments moved: none, as they must not")
 
+    # 4b. The book that made those costs. Impact here is not a formula applied
+    #     to a size -- it is depth being consumed, so it can be watched
+    #     happening. `sweep_cost` asks what an order WOULD pay before placing
+    #     it, and it reads the same book the fill does.
+    probe = pt.Engine(seed=7, universe=universe)
+    probe.open_market()
+    probe.run_session(9, 30, 3, 65)
+    ticker = universe[0].ticker
+    book = probe.book(ticker)
+    offered = book.depth("sell")
+    quoted = [(size, book.sweep_cost("buy", size)) for size in
+              (1e3, 1e4, 1e5, 5e6)]
+    report["book_walk"] = [q.average_price for _, q in quoted]
+    print(f"4b. the book for {ticker}: bid {book.best_bid:.2f} / ask "
+          f"{book.best_ask:.2f}, {offered:,.0f} shares offered")
+    for size, quote in quoted:
+        short = "" if quote.filled >= size else             f"  FILLED ONLY {quote.filled:,.0f}"
+        print(f"     buying {size:>10,.0f}: average {quote.average_price:.4f}"
+              f"  worst {quote.worst_price:.4f}{short}")
+
+    # A bigger order pays more per share, because it reaches further up the
+    # book. Asserted so that a change flattening the depth curve -- which would
+    # quietly make size free -- has to explain itself.
+    averages = [q.average_price for _, q in quoted]
+    assert averages == sorted(averages), f"a larger order paid less: {averages}"
+    assert averages[-1] > averages[0], (
+        "the largest order paid the same as the smallest; depth is not binding"
+    )
+
+    # Past the displayed depth the average price STOPS moving, and reading that
+    # as "size is free above here" is the trap. The order is not cheap, it is
+    # unfilled: every request beyond the book returns the same fill, capped at
+    # what was actually offered. A cost per share is meaningless without the
+    # quantity beside it.
+    beyond = book.sweep_cost("buy", 5e7)
+    report["saturates_at"] = beyond.filled
+    assert abs(beyond.filled - offered) < 1e-6, (
+        f"a 50m-share request filled {beyond.filled:,.0f} against "
+        f"{offered:,.0f} offered"
+    )
+    assert beyond.average_price == quoted[-1][1].average_price, (
+        "past saturation the average should stop moving"
+    )
+    print(f"     past {offered:,.0f} shares the price stops moving because the "
+          f"order stops filling")
+
+    # And the quote is not a separate model from the fill: what the portfolio
+    # actually pays is what the book said it would.
+    wallet = pt.Portfolio(cash=1e12)
+    wallet.stamp(0, 0, 0)
+    paid = wallet.execute(probe, ticker, 5e6)
+    report["quote_matches_fill"] = paid["price"] == quoted[-1][1].average_price
+    assert report["quote_matches_fill"], (
+        f"quoted {quoted[-1][1].average_price} and paid {paid['price']}"
+    )
+    print("     what the book quoted is what the portfolio paid, exactly")
+
     # 5. Ground truth for the same market. One row per instrument per tick,
     #    and the seven components sum to the change in mispricing — so the
     #    label can be checked rather than trusted.

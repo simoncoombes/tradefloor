@@ -110,3 +110,60 @@ def test_sizing_by_participation_is_what_makes_impact_comparable():
             consumed.append(min(flat_quantity, depth) / depth)
     # The same order eats wildly different fractions of different books.
     assert max(consumed) > 4 * min(consumed)
+
+
+# --------------------------------------------------------------------------
+# The quote and the fill are the same book
+# --------------------------------------------------------------------------
+
+
+def test_sweep_cost_predicts_exactly_what_the_portfolio_pays():
+    """Two surfaces read the same book, so they must not disagree.
+
+    `sweep_cost` is what a caller asks BEFORE trading -- what would this cost?
+    `Portfolio.execute` is what they actually pay. If those drifted apart, an
+    agent could size a trade against one number and be filled at another, and
+    every impact measurement built on the quote would be describing a market
+    nobody traded in.
+
+    Checked at sizes either side of the first level, so it covers both the
+    case that rests inside the touch and the case that walks the book.
+    """
+    universe = pretium.Universe.random(6, seed=5)
+    ticker = universe[0].ticker
+    walked = 0
+    for size in (1_000.0, 100_000.0, 5_000_000.0, 50_000_000.0):
+        engine = pretium.Engine(seed=1, universe=universe)
+        engine.open_market()
+        engine.run_session(9, 30, 3, 60)
+
+        quote = engine.book(ticker).sweep_cost("buy", size)
+        portfolio = pretium.Portfolio(cash=1e12)
+        portfolio.stamp(0, 0, 0)
+        fill = portfolio.execute(engine, ticker, size)
+
+        assert quote.average_price == pytest.approx(fill["price"], abs=1e-12)
+        assert quote.worst_price == pytest.approx(fill["worst_price"], abs=1e-12)
+        assert quote.filled == pytest.approx(fill["quantity"], abs=1e-9)
+        if quote.worst_price > quote.average_price:
+            walked += 1
+    assert walked, (
+        "no size walked past the touch, so this only compared the easy case"
+    )
+
+
+def test_walking_the_book_costs_more_than_resting_inside_it():
+    # The mechanism, stated as an ordering rather than a magnitude. A large
+    # order reaches further up the book and pays for it; that is impact
+    # emerging from depth rather than from a formula.
+    universe = pretium.Universe.random(6, seed=5)
+    engine = pretium.Engine(seed=1, universe=universe)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 60)
+    book = engine.book(universe[0].ticker)
+
+    small = book.sweep_cost("buy", 1_000.0)
+    large = book.sweep_cost("buy", 50_000_000.0)
+    assert small.average_price == small.worst_price, "a small buy left the touch"
+    assert large.average_price > small.average_price
+    assert large.worst_price > large.average_price, "the large buy did not walk"

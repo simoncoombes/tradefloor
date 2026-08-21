@@ -388,3 +388,32 @@ def test_the_snapshot_carries_the_open_flag():
     assert engine.state_snapshot()["market_open"] is True
     engine.close_market()
     assert engine.state_snapshot()["market_open"] is False
+
+
+def test_a_mid_day_checkpoint_is_exact_because_it_replays():
+    """The design argument in this module's docstring, checked.
+
+    `branch` snapshots state and had to learn about the per-day accumulators
+    the hard way. `Checkpoint` replays the order log, so there is no field to
+    forget: every input is re-applied and the accumulators rebuild themselves.
+
+    That is the reason the serialisable form is the log rather than the
+    snapshot, and it is asserted here rather than argued.
+    """
+    universe = pretium.Universe.random(6, seed=5)
+    count = len(universe)
+    engine = pretium.Engine(seed=1, universe=universe)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 60)
+
+    resumed = pretium.Checkpoint.of(engine, universe=universe,
+                                    seed=1).resume()
+    assert resumed.prices() == engine.prices()
+    assert _first(resumed, "random_noise", count) == _first(
+        engine, "random_noise", count), "the replay lost the day's attribution"
+
+    engine.run_session(10, 30, 3, 60)
+    resumed.run_session(10, 30, 3, 60)
+    engine.close_market()
+    resumed.close_market()
+    assert resumed.column("garch_variance") == engine.column("garch_variance")
