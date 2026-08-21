@@ -71,8 +71,8 @@ __all__ = [
     "ArrowStream", "Engine", "EngineBatch", "FairValue", "Fill", "GameRng", "Instrument", "Macro",
     "MatchResult", "MispricingState", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",
-    "SweepCost", "TickResult", "Universe", "ValidationError", "Counterfactual",
-    "counterfactual", "Portfolio", "Position", "Agent", "Observation",
+    "SweepCost", "TickResult", "Universe", "ValidationError", "FlowImpact",
+    "flow_impact", "Portfolio", "Position", "Agent", "Observation",
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
     "baselines", "reference_agents", "capture_ratio", "tca", "Execution",
     "Scenario", "run_scenario", "facts", "Checkpoint", "branch", "sweep",
@@ -284,7 +284,15 @@ def _run_one(args: tuple) -> Any:
     if collect == "attribution":
         # FACTOR_NAMES rather than Engine.FACTORS: same four names, but as
         # literals a checker can match against what attribution() accepts.
-        return {name: engine.attribution(name) for name in _harness.FACTOR_NAMES}
+        return {
+            # Stamped like the summary rows. This mode already returned a
+            # dict, so there was room; `prices` returns raw bytes and has
+            # none, which is why it is the one mode without provenance.
+            "seed": seed,
+            "universe_fingerprint": fingerprint,
+            "columns": {name: engine.attribution(name)
+                        for name in _harness.FACTOR_NAMES},
+        }
     if collect == "summary":
         return {
             "seed": seed,
@@ -427,11 +435,18 @@ def run_many(
 
 
 # --------------------------------------------------------------------------
-# Counterfactuals
+# Order-flow impact
 # --------------------------------------------------------------------------
 
-class Counterfactual:
+class FlowImpact:
     """What a synthetic order-flow imbalance did to the market.
+
+    Named for what it measures rather than for the category it belongs to.
+    It was called `Counterfactual`, which claimed the general concept while
+    doing one narrow part of it -- and the library now has three
+    counterfactuals (this, :func:`pretium.tca.analyse`, and
+    :func:`pretium.scenario.compare`), so the general name pointed at the
+    least general tool.
 
     .. note::
 
@@ -542,12 +557,12 @@ class Counterfactual:
     def __repr__(self) -> str:
         traded = self.traded()
         return (
-            f"Counterfactual(seed={self.seed}, traded={traded}, "
+            f"FlowImpact(seed={self.seed}, traded={traded}, "
             f"impact_bps={[round(self.cost_bps(t), 2) for t in traded]})"
         )
 
 
-def counterfactual(
+def flow_impact(
     *,
     seed: int,
     universe: Sequence[Instrument],
@@ -556,8 +571,8 @@ def counterfactual(
     days: int = 1,
     ticks: int = 390,
     start: tuple[int, int, int] = (9, 30, 3),
-) -> Counterfactual:
-    """Measure what a trader's own flow did to the market.
+) -> FlowImpact:
+    """Measure what an order-flow imbalance does to the market.
 
     Runs the same seed twice — once with ``order_flow`` and once without — and
     returns both worlds plus their difference.
@@ -590,7 +605,7 @@ def counterfactual(
     def unpack(buf):
         return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
 
-    return Counterfactual(
+    return FlowImpact(
         tickers=with_flow.tickers,
         baseline=unpack(without.prices()),
         actual=unpack(with_flow.prices()),

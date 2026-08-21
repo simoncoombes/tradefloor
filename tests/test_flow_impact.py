@@ -15,7 +15,7 @@ TRADED = UNIVERSE[0].ticker
 
 
 def test_a_buyer_moves_the_price_up_and_pays_for_it():
-    cf = pretium.counterfactual(
+    cf = pretium.flow_impact(
         seed=42, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
     )
     i = cf.tickers.index(TRADED)
@@ -27,7 +27,7 @@ def test_a_seller_moves_the_price_down_and_also_pays():
     # cost_bps is signed so positive always means worse for the trader.
     # Reporting raw impact and leaving the caller to reason about direction is
     # how sign errors reach published numbers.
-    cf = pretium.counterfactual(
+    cf = pretium.flow_impact(
         seed=42, universe=UNIVERSE, order_flow={TRADED: (0.0, 6e6)}, ticks=390
     )
     i = cf.tickers.index(TRADED)
@@ -43,7 +43,7 @@ def test_impact_is_isolated_to_the_names_actually_traded():
     followed. If that ever stopped being true, impact would be buried in a
     shifted market and this whole measurement would become an estimate.
     """
-    cf = pretium.counterfactual(
+    cf = pretium.flow_impact(
         seed=42, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
     )
     assert cf.untouched_moved() == []
@@ -83,10 +83,10 @@ def test_a_roster_edit_is_not_a_counterfactual():
 def test_bigger_size_costs_more():
     # Emergent, not modelled: a larger order pushes further because it applies
     # more pressure, not because a coefficient scales with size.
-    small = pretium.counterfactual(
+    small = pretium.flow_impact(
         seed=42, universe=UNIVERSE, order_flow={TRADED: (1e6, 0.0)}, ticks=390
     )
-    large = pretium.counterfactual(
+    large = pretium.flow_impact(
         seed=42, universe=UNIVERSE, order_flow={TRADED: (8e6, 0.0)}, ticks=390
     )
     assert large.cost_bps(TRADED) >= small.cost_bps(TRADED)
@@ -96,7 +96,7 @@ def test_the_two_worlds_differ_only_by_the_flow():
     # Baseline must be exactly the market that would have happened. If it were
     # not, the subtraction would be measuring the difference between two
     # unrelated runs.
-    cf = pretium.counterfactual(
+    cf = pretium.flow_impact(
         seed=7, universe=UNIVERSE, order_flow={TRADED: (2e6, 0.0)}, ticks=200
     )
     plain = pretium.Engine(seed=7, universe=UNIVERSE)
@@ -110,9 +110,9 @@ def test_the_two_worlds_differ_only_by_the_flow():
 
 
 def test_it_is_reproducible():
-    a = pretium.counterfactual(seed=9, universe=UNIVERSE,
+    a = pretium.flow_impact(seed=9, universe=UNIVERSE,
                                order_flow={TRADED: (3e6, 0.0)}, ticks=150)
-    b = pretium.counterfactual(seed=9, universe=UNIVERSE,
+    b = pretium.flow_impact(seed=9, universe=UNIVERSE,
                                order_flow={TRADED: (3e6, 0.0)}, ticks=150)
     assert a.impact == b.impact
 
@@ -120,7 +120,7 @@ def test_it_is_reproducible():
 def test_impact_bps_is_relative_so_names_are_comparable():
     # A penny on a $3 stock and a penny on a $600 stock are not the same
     # event, so currency impact alone is not comparable across a roster.
-    cf = pretium.counterfactual(
+    cf = pretium.flow_impact(
         seed=42, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
     )
     i = cf.tickers.index(TRADED)
@@ -131,4 +131,4 @@ def test_impact_bps_is_relative_so_names_are_comparable():
 
 def test_no_trading_is_refused():
     with pytest.raises(pretium.ValidationError, match="nothing to measure"):
-        pretium.counterfactual(seed=1, universe=UNIVERSE, order_flow={})
+        pretium.flow_impact(seed=1, universe=UNIVERSE, order_flow={})

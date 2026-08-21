@@ -86,7 +86,11 @@ def test_collect_modes():
 
     attribution = pretium.run_many([1], universe=UNIVERSE, ticks=50,
                                    collect="attribution")[0]
-    assert sorted(attribution) == sorted(pretium.Engine.FACTORS)
+    assert sorted(attribution["columns"]) == sorted(pretium.Engine.FACTORS)
+    # Provenance, like the summary rows. `prices` is the one mode without it:
+    # it returns raw bytes and has nowhere to put it.
+    assert attribution["universe_fingerprint"] == UNIVERSE.fingerprint
+    assert attribution["seed"] == 1
 
 
 def test_a_macro_state_reaches_every_worker():

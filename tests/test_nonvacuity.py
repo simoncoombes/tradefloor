@@ -63,7 +63,7 @@ def test_a_real_counterfactual_moves_the_traded_name():
     # The positive counterpart to "nothing else moved". If the flow were
     # silently dropped, nothing at all would move, and the no-leak assertion
     # would pass while comparing two identical worlds.
-    cf = pretium.counterfactual(
+    cf = pretium.flow_impact(
         seed=42, universe=UNIVERSE,
         order_flow={UNIVERSE[0].ticker: (6e6, 0.0)}, ticks=390,
     )

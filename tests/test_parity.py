@@ -22,9 +22,35 @@ import pretium
 
 GOLDENS = Path(__file__).resolve().parent.parent / "rust" / "goldens"
 
+# The goldens are NOT in this repository, and that is a decision rather than an
+# oversight. They are 135 MB, and they are produced by a reference
+# implementation that is not public -- so committing them would bloat the repo
+# permanently with fixtures nobody outside can regenerate or check.
+#
+# What IS public is the determinism contract: the known-answer digest, which
+# needs no fixtures and runs on every wheel target. Parity against the
+# reference is a development gate, not a user-facing guarantee.
+#
+# The hazard that leaves is a green run that verified nothing. Thirty-four
+# tests skipping still reports success, and "goldens absent" looks like a
+# tidy skip rather than the parity suite not having executed. So a gate that
+# claims to check parity sets PRETIUM_REQUIRE_GOLDENS=1 and gets a hard
+# failure instead of a quiet pass.
+import os
+
+_REQUIRED = os.environ.get("PRETIUM_REQUIRE_GOLDENS") == "1"
+
+if _REQUIRED and not GOLDENS.exists():
+    raise RuntimeError(
+        "PRETIUM_REQUIRE_GOLDENS=1 but rust/goldens is absent. The parity "
+        "suite would have skipped all 34 tests and reported success. Run "
+        "`python rust/sync-goldens.py` or unset the variable."
+    )
+
 pytestmark = pytest.mark.skipif(
     not GOLDENS.exists(),
-    reason="goldens absent - run `python rust/sync-goldens.py`",
+    reason="goldens absent - run `python rust/sync-goldens.py`, or set "
+           "PRETIUM_REQUIRE_GOLDENS=1 to make this a failure",
 )
 
 
