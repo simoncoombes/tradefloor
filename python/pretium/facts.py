@@ -11,13 +11,13 @@ not targets the model was tuned to hit; two of them are frank mismatches.
 
 ## What matches
 
-**Fat tails.** Excess kurtosis about **+4.1** across seeds, against roughly
+**Fat tails.** Excess kurtosis about **+5.9** across seeds, against roughly
 +3 to +10 for real daily equity returns. Extreme days are far more common than
 a normal distribution allows, which is the single most robust fact about asset
 returns and the one a Gaussian simulator gets wrong.
 
 **Volatility clustering, in the right direction.** The autocorrelation of
-absolute returns is about **+0.11** at lag one and stays positive at lag five.
+absolute returns is about **+0.10** at lag one and stays positive at lag five.
 Calm follows calm and turbulence follows turbulence, which is what the GARCH
 process is there to produce.
 
@@ -42,8 +42,8 @@ right. These numbers are measurements, not targets, and this is what that
 commitment costs when the two disagree.
 
 **Returns are positively autocorrelated, and real ones are not.** This is the
-big one. Measured at **+0.235** at lag one, in six seeds out of six, ranging
-only from +0.221 to +0.240. Real daily equity returns sit near zero and are if
+big one. Measured at **+0.219** at lag one, in six seeds out of six, ranging
+only from +0.203 to +0.262. Real daily equity returns sit near zero and are if
 anything slightly negative.
 
 That is a direct consequence of the AR(2) mispricing process: `s` has positive
@@ -60,7 +60,7 @@ ranks agents against each other rather than certifying real-world skill. If two
 agents differ mainly in how much serial correlation they exploit, their ranking
 here says very little about which is better anywhere else.
 
-**Volatility is high.** About **58% annualised**, against roughly 20% for large
+**Volatility is high.** About **53% annualised**, against roughly 20% for large
 caps. A generated universe is deliberately dispersed and skews small; treat
 absolute return figures as scaled up, and prefer ratios — capture against the
 oracle, shortfall in basis points — over raw percentages.
