@@ -232,12 +232,20 @@ magnitude slower, and is the one you want when the fork has to outlive the
 process. A snapshot is a *state*; a log is a *history*, and a published result
 cites the history because that is what someone else can re-run.
 
-One limit worth knowing: `restore_state` checks roster identity and order,
-which is all an engine knows — it holds no fundamentals. Tickers are generated
-positionally, so `Universe.random(40, seed=1)` and `Universe.random(40,
-seed=99)` share every name and share no earnings. Restoring across those two
-is accepted and gives right prices with wrong fair values. Supply the universe
-the snapshot came from.
+**Tickers are not identity.** They are generated positionally, so
+`Universe.random(40, seed=1)` and `Universe.random(40, seed=99)` share every
+name and share no earnings. Use `universe.fingerprint` — a sha256 over the
+roster's canonical form — anywhere you need to ask whether two universes are
+the same one.
+
+A `Checkpoint` records it and refuses to load against a roster that arrived
+changed, because restoring across two same-named universes gives right prices
+and wrong fair values: plausible in every visible way, wrong in the one that
+drives everything.
+
+The low-level `restore_state` cannot do that check — an engine holds no
+fundamentals, so it verifies roster order and size and nothing more. Prefer
+`branch` and `Checkpoint`, which have the universe and use it.
 
 ## Scenarios are paths, not settings
 
@@ -402,6 +410,8 @@ about 3.7% of shares outstanding, with roughly one name in eleven above the
 
 **Roster order is contractual.** The engine iterates instruments in index
 order and draws as it goes, so a re-sorted universe is a different market.
+`universe.fingerprint` covers order as well as content, so a re-sort changes
+the hash.
 
 ## Model coefficients
 

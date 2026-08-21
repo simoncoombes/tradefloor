@@ -150,6 +150,27 @@ class Universe(list):
             snapshot = _edgar.Snapshot.load(snapshot)
         return cls(_edgar.to_instruments(snapshot, **kwargs))
 
+    @property
+    def fingerprint(self) -> str:
+        """sha256 over the roster's canonical serialisation.
+
+        Identity for a universe, where the ticker list is not. Tickers are
+        generated positionally, so ``random(40, seed=1)`` and
+        ``random(40, seed=99)`` share every NAME and share no earnings,
+        sectors or share counts. Anything that checks "same universe?" by
+        comparing tickers is checking almost nothing.
+
+        Computed over the same field list ``to_json`` uses, with sorted keys
+        and no indentation, so the hash is a property of the CONTENT rather
+        than of formatting. A fingerprint that moved when a key order changed
+        would be useless as an identifier.
+        """
+        import hashlib
+
+        canonical = self.to_json(sort_keys=True, separators=(",", ":"),
+                                 indent=None)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
     def to_json(self, **kwargs: Any) -> str:
         """Serialise to JSON.
 
@@ -167,6 +188,8 @@ class Universe(list):
             ],
         }
         kwargs.setdefault("indent", 2)
+        if kwargs.get("indent") is None:
+            kwargs.pop("indent")
         return json.dumps(payload, **kwargs)
 
     @classmethod

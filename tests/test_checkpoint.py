@@ -232,3 +232,63 @@ def test_a_degenerate_branch_count_is_refused():
     engine, _ = mark(days=1)
     with pytest.raises(pretium.ValidationError, match="at least 1"):
         pretium.branch(engine, 0, universe=UNIVERSE, seed=5)
+
+
+# --------------------------------------------------------------------------
+# Universe identity
+# --------------------------------------------------------------------------
+
+
+def test_a_fingerprint_distinguishes_universes_that_tickers_cannot():
+    """The identity check that names cannot provide.
+
+    Tickers are generated positionally, so two universes from different seeds
+    share every name. Anything that asks "same universe?" by comparing tickers
+    is checking almost nothing -- which is exactly the hole found in
+    `restore_state`, where a substituted roster was accepted.
+    """
+    a = pretium.Universe.random(40, seed=1)
+    b = pretium.Universe.random(40, seed=99)
+    assert [i.ticker for i in a] == [i.ticker for i in b]
+    assert a.fingerprint != b.fingerprint
+
+
+def test_a_fingerprint_is_content_not_formatting():
+    universe = pretium.Universe.random(12, seed=4)
+    assert universe.fingerprint == pretium.Universe.random(12, seed=4).fingerprint
+    # Survives a JSON round trip, so a checkpoint written on one machine and
+    # read on another compares equal.
+    assert pretium.Universe.from_json(universe.to_json()).fingerprint == \
+        universe.fingerprint
+
+
+def test_a_checkpoint_refuses_a_universe_that_arrived_changed():
+    engine, point = mark(days=2)
+    payload = json.loads(point.to_json())
+    # Same names, different fundamentals -- the substitution the roster check
+    # cannot see.
+    other = pretium.Universe.random(len(UNIVERSE), seed=99)
+    payload["universe"] = json.loads(other.to_json())
+    with pytest.raises(pretium.ValidationError, match="fingerprint"):
+        pretium.Checkpoint.from_json(json.dumps(payload))
+
+
+def test_resuming_onto_a_supplied_roster_is_checked():
+    engine, point = mark(days=2)
+    # The right one works.
+    assert point.resume(universe=UNIVERSE).prices() == engine.prices()
+    # The same-named wrong one does not.
+    other = pretium.Universe.random(len(UNIVERSE), seed=99)
+    with pytest.raises(pretium.ValidationError, match="fingerprint"):
+        point.resume(universe=other)
+
+
+def test_an_older_checkpoint_without_a_fingerprint_still_loads():
+    # Absent means "written before this existed", not "mismatched". Refusing
+    # it would break every archive made last week to guard against a hazard
+    # those archives do not have.
+    engine, point = mark(days=2)
+    payload = json.loads(point.to_json())
+    del payload["universe_fingerprint"]
+    restored = pretium.Checkpoint.from_json(json.dumps(payload))
+    assert restored.resume().prices() == engine.prices()

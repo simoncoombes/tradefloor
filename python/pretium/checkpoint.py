@@ -85,6 +85,13 @@ class Checkpoint:
         self.macro = macro
         self.label = label
 
+    @property
+    def universe_fingerprint(self) -> str:
+        """Identity of the roster this checkpoint belongs to."""
+        from . import Universe
+
+        return Universe(self.universe).fingerprint
+
     @classmethod
     def of(cls, engine: Engine, *, universe: Sequence[Instrument], seed: int,
            macro: Macro | None = None, label: str = "") -> "Checkpoint":
@@ -99,15 +106,32 @@ class Checkpoint:
         return cls(seed=seed, universe=universe, log=engine.order_log,
                    macro=macro, label=label)
 
-    def resume(self) -> Engine:
+    def resume(self, *, universe: Sequence[Instrument] | None = None) -> Engine:
         """A fresh engine at this exact state.
 
         Replays the log, so it costs roughly what reaching the state cost the
         first time.
+
+        Pass ``universe`` to resume onto a roster you already hold rather than
+        the one carried in the checkpoint. It is checked against the recorded
+        fingerprint and refused on a mismatch -- tickers are generated
+        positionally, so two universes can share every name and no
+        fundamentals, and comparing names would be checking almost nothing.
         """
+        from . import Universe
         from .replay import replay
 
-        return replay(self.log, seed=self.seed, universe=self.universe,
+        roster = self.universe if universe is None else list(universe)
+        if universe is not None:
+            supplied = Universe(roster).fingerprint
+            if supplied != self.universe_fingerprint:
+                raise ValidationError(
+                    f"universe fingerprint {supplied[:12]}... does not match "
+                    f"this checkpoint's {self.universe_fingerprint[:12]}.... "
+                    "Restoring onto a different roster gives right prices and "
+                    "wrong fair values."
+                )
+        return replay(self.log, seed=self.seed, universe=roster,
                       macro=self.macro)
 
     def branch(self, count: int = 2) -> list[Engine]:
@@ -137,6 +161,7 @@ class Checkpoint:
             "label": self.label,
             "seed": self.seed,
             "universe": json.loads(Universe(self.universe).to_json()),
+            "universe_fingerprint": self.universe_fingerprint,
             "log": self.log,
         }
         if self.macro is not None:
@@ -162,12 +187,26 @@ class Checkpoint:
                 f"checkpoint schema {schema} is newer than this version "
                 "understands. Upgrade pretium rather than reading it partially."
             )
+        universe = Universe.from_json(json.dumps(payload["universe"]))
+        recorded = payload.get("universe_fingerprint")
+        if recorded is not None and recorded != universe.fingerprint:
+            # The universe travelled and arrived changed. Restoring anyway
+            # would give a market with the right prices and the wrong fair
+            # values -- plausible in every visible way, and wrong in the one
+            # that drives everything.
+            raise ValidationError(
+                "the universe in this checkpoint does not match its recorded "
+                f"fingerprint ({recorded[:12]}... vs "
+                f"{universe.fingerprint[:12]}...). The roster was edited or "
+                "rebuilt by a different generator version; the checkpoint no "
+                "longer describes the market it came from."
+            )
         macro = None
         if "macro" in payload:
             macro = Macro(**payload["macro"])
         return cls(
             seed=payload["seed"],
-            universe=Universe.from_json(json.dumps(payload["universe"])),
+            universe=universe,
             log=payload["log"],
             macro=macro,
             label=payload.get("label", ""),
