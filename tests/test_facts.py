@@ -65,8 +65,8 @@ def test_returns_are_positively_autocorrelated_and_real_ones_are_not():
 
     Pinned as a test because it is a KNOWN deviation that must stay documented.
     If it ever moves near zero the model changed and the caveat in
-    `pretium.facts` — that momentum is mechanically profitable here in a way it
-    is not in real markets — is no longer true and must come out.
+    `pretium.facts` -- that momentum is mechanically profitable here in a way it
+    is not in real markets -- is no longer true and must come out.
     """
     facts = measure(seed=3, universe=UNIVERSE, days=180)
     assert facts["return_acf1"] > 0.1
@@ -79,7 +79,7 @@ def test_the_autocorrelation_is_the_mispricing_process_showing_through():
     """The structural half of the claim, from the model's own function.
 
     `impulse_response` reports what the AR(2) mispricing process does to a
-    shock over time, and it does not decay monotonically — it RISES, to 1.284
+    shock over time, and it does not decay monotonically -- it RISES, to 1.284
     by day two, before reverting. A shock today is amplified tomorrow.
 
     That is positive serial correlation by construction, so the measured
@@ -110,6 +110,161 @@ def test_volatility_clustering_is_weaker_than_real_markets():
 def test_volatility_is_high_so_prefer_ratios_to_raw_percentages():
     facts = measure(seed=3, universe=UNIVERSE, days=180)
     assert compare_to_real_markets(facts)["annualised_vol_pct"]["direction"] == "above"
+
+
+# --------------------------------------------------------------------------
+# Dependence: how things move together, which is where this model is weakest
+# --------------------------------------------------------------------------
+#
+# The four statistics below were added after every realism gap found in this
+# project turned out to sit outside the four the module originally reported.
+# All four of those come from one instrument's price series taken on its own:
+# nothing looked across instruments and nothing looked between price and
+# volume, so a report that never left a single series kept passing while the
+# joint behaviour was wrong. These are the measurements that would have caught
+# it.
+
+
+def test_the_report_covers_dependence_and_not_only_marginals(facts):
+    # The blind spot in one assertion: a report of marginals alone cannot see
+    # the gaps this model actually has.
+    for key in ("cross_sectional_corr", "volume_abs_return_corr",
+                "leverage_effect", "volume_change_acf1"):
+        assert key in facts, key
+        assert facts[key] is not None, key
+    text = report(facts)
+    for label in pretium.facts.LABELS.values():
+        assert label in text, label
+
+
+def test_stocks_here_barely_move_together(facts):
+    """Cross-sectional correlation near zero, against +0.25 to +0.35 real.
+
+    The largest realism gap in the model, and it went undetected for as long
+    as it did because nothing measured it. The shared market factor carries a
+    few percent of a single name's variance, and that share IS the pairwise
+    correlation it can induce.
+
+    The cost of it: diversification works far better here than in any real
+    market, market beta barely exists, and an index built from these names is
+    smoother than a real one.
+    """
+    assert facts["cross_sectional_corr"] < 0.10
+    verdict = compare_to_real_markets(facts)["cross_sectional_corr"]
+    assert not verdict["matches"]
+    assert verdict["verdict"] == "too low"
+
+
+def test_volume_and_volatility_barely_move_together(facts):
+    # Real equity volume rises with volatility at +0.3 to +0.6. An execution
+    # algorithm tested here faces an easier problem than the one it was
+    # written for, because the volume surprise and the volatility surprise
+    # do not arrive together.
+    assert compare_to_real_markets(facts)["volume_abs_return_corr"]["verdict"] == "too low"
+
+
+def test_there_is_no_leverage_effect_and_a_symmetric_garch_is_why(facts):
+    """Bad news does not raise volatility more than good news here.
+
+    Absent BY CONSTRUCTION rather than by calibration: the variance process is
+    a symmetric GARCH(1,1), `omega + alpha * r^2 + beta * v`, and squaring the
+    return discards its sign. No symmetric GARCH can produce a leverage
+    effect. Reproducing one needs an asymmetric term -- GJR or EGARCH -- which
+    is a model change and not a coefficient to tune.
+    """
+    assert facts["leverage_effect"] > -0.10
+
+
+def test_an_absent_leverage_effect_reads_as_weak_against_a_negative_band(facts):
+    """The wording trap in the one statistic with a negative band.
+
+    A leverage effect of -0.01 against a band of -0.30 to -0.10 is numerically
+    ABOVE the band and semantically ABSENT. Reporting the numeric direction
+    would print "too high" for a missing effect, which states the opposite of
+    the finding. Pinned as a test because it is the kind of thing that reads
+    fine until someone acts on it.
+    """
+    verdict = compare_to_real_markets(facts)["leverage_effect"]
+    assert verdict["direction"] == "above"
+    assert verdict["verdict"] == "too weak"
+    assert "TOO WEAK" in report(facts)
+
+
+def test_volume_is_measured_in_changes_because_the_level_says_nothing():
+    """Why the reported statistic differences volume instead of using levels.
+
+    The LEVEL autocorrelation is dominated by a slowly varying level and reads
+    high whatever the daily dynamics are, so it cannot tell one model of
+    volume from another. The CHANGE autocorrelation can: it comes out near
+    -0.5 here, which is the signature of a smooth level plus independent daily
+    noise. Real volume shocks persist, so real markets sit near zero.
+
+    Both are measured here on the same series, and the gap between them is the
+    argument for differencing.
+    """
+    import statistics
+
+    import pyarrow as pa
+
+    from pretium.facts import _autocorrelation, _correlation, _daily_series
+
+    engine = pretium.Engine(seed=5, universe=UNIVERSE)
+    engine.run_days(120, record=True)
+    bars = pa.table(engine.bars(grain="day")).to_pydict()
+
+    levels = []
+    changes = []
+    for rows in _daily_series(bars).values():
+        volume = [row[2] for row in rows]
+        levels.append(_autocorrelation(volume, 1))
+        differenced = [
+            later / earlier - 1.0
+            for earlier, later in zip(volume, volume[1:])
+            if earlier > 0
+        ]
+        changes.append(_correlation(differenced[:-1], differenced[1:]))
+
+    assert statistics.median(levels) > 0.5
+    assert statistics.median(changes) < -0.2
+
+
+def test_the_bars_table_is_grouped_before_it_is_differenced():
+    """The trap that fails silently and returns a plausible number.
+
+    The daily bars table is DAY-major, so consecutive rows are different
+    instruments. Differencing it as it comes computes returns between
+    unrelated companies. Nothing raises, and the answer looks like a number.
+    """
+    import pyarrow as pa
+
+    from pretium.facts import _daily_series
+
+    engine = pretium.Engine(seed=5, universe=UNIVERSE)
+    engine.run_days(60, record=True)
+    bars = pa.table(engine.bars(grain="day")).to_pydict()
+
+    # The table really is day-major, or this test is guarding nothing.
+    identifiers = bars["instrument_id"]
+    assert identifiers[0] != identifiers[1]
+    assert len(set(identifiers[:len(UNIVERSE)])) == len(UNIVERSE)
+
+    # After grouping, each instrument's rows are its own and in day order.
+    for instrument, rows in _daily_series(bars).items():
+        days = [row[0] for row in rows]
+        assert days == sorted(days)
+        assert len(days) == len(set(days))
+
+
+def test_a_statistic_that_cannot_be_measured_is_absent_rather_than_zero():
+    # One instrument has no pairwise correlation. Zero would be a lie of
+    # exactly the shape the module warns about elsewhere: it is a real
+    # reading, and here it would land close to what the model actually scores.
+    facts = measure(seed=2, universe=pretium.Universe.random(1, seed=9), days=60)
+    assert facts["cross_sectional_corr"] is None
+    assert "cross_sectional_corr" not in compare_to_real_markets(facts)
+    assert "n/a" in report(facts)
+    # The other three are per-instrument and remain measurable.
+    assert facts["leverage_effect"] is not None
 
 
 # --------------------------------------------------------------------------
@@ -161,6 +316,6 @@ def test_the_report_names_the_mismatches_rather_than_scoring_them():
     # well against one it gets frankly wrong, and knowing WHICH is the whole
     # value of the exercise.
     text = report(measure(seed=3, universe=UNIVERSE, days=180))
-    assert "ABOVE" in text
+    assert "TOO HIGH" in text
     assert "matches" in text
     assert "momentum is mechanically" in text
