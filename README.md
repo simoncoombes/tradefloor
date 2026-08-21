@@ -2,11 +2,11 @@
 
 A market simulator you can run a strategy against. Rust core, Python API.
 
-You give it a seed and a set of companies. It runs a market forward — prices,
-a limit order book, fills, macro state — and your orders match against real
+Give it a seed and a set of companies. It runs a market forward — prices, a
+limit order book, fills, macro state — and your orders match against real
 depth, so trading moves the price the way it would anywhere else.
 
-Two things you can do here that you cannot do with historical data: run the
+Two things you can do here that historical data will never let you do: run the
 same market twice with different decisions, and read the true value of every
 stock while you trade it.
 
@@ -20,8 +20,6 @@ pip install pretium[arrow]       # + pyarrow
 
 Wheels are abi3, CPython 3.11+, no Rust toolchain needed.
 
-## Quick start
-
 ```python
 import pretium as pt
 
@@ -33,17 +31,104 @@ bars = engine.bars(grain="day")           # OHLCV, Arrow
 truth = engine.truth()                    # what drove every price move
 ```
 
-## Why you might want it
+## Who this is for
 
-### Same seed, same market, every machine
+### You're training an agent to trade
 
-Run it on your laptop, your CI box and a reviewer's Mac and get identical
-prices down to the last bit. The library carries its own implementation of
-`exp`, `log`, `sin` and `cos` instead of calling the platform's, which is what
+Historical data ignores you. Your agent can buy a million shares of a name that
+trades ten thousand a day, and the tape carries on exactly as it did in 2019.
+Whatever the agent learns about sizing is fiction.
+
+Here the market pushes back. Orders match against a book with price-time
+priority, so size costs money and the agent finds that out during training. And
+because every market comes from a seed, you get unlimited independent episodes
+instead of the same history over and over.
+
+```python
+from pretium.gym import TradingEnv
+
+env = TradingEnv(universe=universe, seed=42, days=20)
+obs, info = env.reset(seed=42)
+obs, reward, terminated, truncated, info = env.step(action)
+```
+
+Passes gymnasium's `env_checker`. Actions are target weights in `[-1, 1]`, so a
+policy doesn't have to learn each instrument's price range first. Reward is
+measured after the market moves, so it already includes the cost of the agent's
+own footprint.
+
+### You're building an execution algorithm
+
+TWAP, VWAP, POV, icebergs — the work is all in what happens between the
+decision and the fill, which is exactly what a replayed tape can't show you.
+
+You get queue position, partial fills, and a spread that widens under stress.
+You also get the number every TCA vendor approximates: run the same seed
+without your orders in it, and price every fill against the world where you
+never traded.
+
+```python
+ex = pt.tca.analyse(my_algo, seed=42, universe=universe, days=5)
+
+ex.shortfall_bps()      # what your footprint cost
+ex.by_step()            # where you paid it
+ex.partial_fills()      # what you asked for versus what you got
+```
+
+Arrival price, VWAP and fitted impact models are all standing in for a
+counterfactual nobody can run on real data. Here it runs.
+
+### You're stress-testing a strategy
+
+One history gives you one sample. A strategy that survived 2015–2025 survived
+*a* decade, and you can't run the other ones.
+
+Run it across a thousand seeded markets and watch where it breaks. Walk rates
+from 2.5% to 5% over fifteen days while it holds positions. Fork a market at
+day sixty and take two different paths from an identical state.
+
+```python
+shock = pt.Scenario.rate_shock(start=0.025, end=0.05, over=15)
+pt.evaluate(agents, seed=7, universe=universe, days=20, scenario=shock)
+
+ranking = pt.rank(lambda: pt.reference_agents(seed=3), seeds=range(12),
+                  universe=universe, days=10, workers=4)
+ranking.separation("momentum", "mean_reversion")   # 6-6, p = 1.0
+```
+
+Use it to kill strategies rather than to bless them. Something that dies under
+a rate shock, or whose edge evaporates once impact is charged honestly, is
+genuinely dead — and you learned it for the price of some CPU.
+
+### You're testing a model that claims to explain markets
+
+Regime detectors, event-attribution models, factor models. You can't score any
+of them on real data, because nobody knows the right answer.
+
+Here you do. The `truth` table gives one row per instrument per tick with every
+contribution to the move — mean reversion, momentum, crowd, news, order flow,
+short squeeze, noise — and the seven columns sum to the move with a residual
+around 1e-16. Check the label against the outcome instead of trusting it.
+
+```python
+truth = engine.truth()   # fundamental_value, anchor_price, mispricing_s, 7 factors
+```
+
+### You're teaching market microstructure
+
+A real matching engine your students can put orders into, with the answer key
+attached. They can watch a large order walk the book, then read exactly how
+much of the resulting move was their own flow.
+
+## Under the hood
+
+**Same seed, same market, on every machine.** Identical prices to the last bit
+on Linux, macOS and Windows, x86 and ARM alike. The library carries its own
+`exp`, `log`, `sin` and `cos` rather than calling the platform's, which is what
 normally makes float results drift between operating systems.
 
 Every release builds wheels for five targets, runs one fixed simulation inside
-each, and compares digests. If any two disagree, the release fails.
+each, and compares digests. Any disagreement fails the release.
 
 ```
 linux-x86_64     112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
@@ -53,29 +138,9 @@ macos-x86_64     112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff33
 windows-x86_64   112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
 ```
 
-### Labelled data
-
-The simulator computed every price, so it can tell you what moved it. The
-`truth` table gives one row per instrument per tick with each contribution to
-the move: mean reversion, momentum, crowd, news, order flow, short squeeze,
-noise.
-
-The seven columns sum to the move — residual around 1e-16 — so you can check a
-label against the outcome rather than trust it.
-
-```python
-truth = engine.truth()        # fundamental_value, anchor_price, mispricing_s, 7 factors
-```
-
-Useful if you are testing a regime detector, an event-attribution model, or
-anything where you need to know the answer to score the guess.
-
-### Your orders move the price
-
-Orders match against a book with price-time priority. A large order pays worse
-prices because it eats levels, not because a slippage formula charged it.
-
-Holding the signal and horizon fixed and changing only rebalance frequency:
+**Impact is emergent.** A large order pays worse prices because it ate levels,
+with no slippage coefficient anywhere. Holding the signal and horizon fixed and
+changing only how often a strategy rebalances:
 
 | rebalances per day | return |
 |---|---|
@@ -83,68 +148,31 @@ Holding the signal and horizon fixed and changing only rebalance frequency:
 | 6 | +30.9% |
 | 12 | −13.2% |
 
-No fees are charged anywhere. That is spread and depth alone.
+No fees are charged. That gap is spread and depth alone.
 
-### Run the world without you in it
+**Results are columnar.** Five Arrow tables — bars, truth, macro, fills, book —
+read zero-copy by polars, pandas, pyarrow and duckdb, and the package depends
+on none of them. Runs stream a batch per day, so a hundred-seed sweep at tick
+grain never has to fit in memory.
 
-Real TCA compares your fill to a proxy — arrival price, VWAP, a fitted impact
-model — because the price you would have got without trading is unobservable.
-Here you can just run it.
-
-```python
-ex = pt.tca.analyse(my_agent, seed=42, universe=universe, days=5)
-
-ex.shortfall_bps()      # what your footprint cost
-ex.by_step()            # where you paid it
-ex.partial_fills()      # check this before believing a low number
-```
-
-Every fill is priced against what that instrument did in the world where you
-never traded.
-
-## Comparing agents
-
-Run N agents through identical markets. No leakage, because the market never
-existed and nothing has read its history.
-
-```python
-scores = pt.evaluate({"momentum": Momentum(), "reversion": Reversion()},
-                     seed=2026, universe=universe, days=5, max_leverage=2.0)
-
-for s in pt.leaderboard(scores):
-    print(s.name, s.pnl, s.impact_bps)
-```
-
-Agents see prices, the book and their own positions. They do not see fair value
-or the attribution — inferring those is the job, and they are used for scoring
-on the other side of the wall.
-
-**Use more than one seed.** Across twelve markets, a single seed picks the top
-agent half the time. `rank` runs a set of seeds and reports a paired sign test
-so you can tell "wins more often" from "wins by more".
-
-```python
-ranking = pt.rank(lambda: pt.reference_agents(seed=3), seeds=range(12),
-                  universe=universe, days=10, workers=4)
-print(ranking.report())
-ranking.separation("momentum", "mean_reversion")   # 6-6, p = 1.0
-```
+**Fast enough to sweep.** A 252-day year over 100 instruments takes 27 seconds,
+and recording 9.8 million rows of ground truth adds 3%. Sweeps parallelise
+about 3.3x on eight cores.
 
 ## What it is bad at
 
-**Do not use it to validate a strategy.** The price process comes from a known
-model. Anything that fits the model's structure will look brilliant and teach
-you nothing about markets. Use it to kill strategies, size them, and test
-execution.
+**Don't use it to validate a strategy.** The price process comes from a known
+model, so anything fitting that model's structure will look brilliant and teach
+you nothing about real markets.
 
 **Momentum works here for the wrong reason.** Measured return autocorrelation
-is +0.219 at lag one; real equities sit near zero. That is the mispricing
-process showing through, and an agent trading it has an edge that will not
+is +0.219 at lag one where real equities sit near zero. That's the mispricing
+process showing through, and an agent trading it has an edge that won't
 transfer. `pt.facts.measure()` reports this and three other statistics against
 real ranges, including the ones that match.
 
 **Single venue, no latency, no strategic counterparties.** Orders arrive
-instantly, there is one book per name, and you trade against a market maker and
+instantly, there's one book per name, and you trade against a market maker and
 aggregate flow rather than agents that adapt to you.
 
 ## Documentation
