@@ -23,6 +23,8 @@ from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
 from .replay import replay
 from . import edgar
 from . import baselines
+from . import tca
+from .tca import Execution
 from .baselines import capture_ratio, reference_agents
 from ._core import (  # noqa: F401
     ArrowStream,
@@ -66,7 +68,7 @@ __all__ = [
     "SweepCost", "TickResult", "Universe", "ValidationError", "Counterfactual",
     "counterfactual", "Portfolio", "Position", "Agent", "Observation",
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
-    "baselines", "reference_agents", "capture_ratio",
+    "baselines", "reference_agents", "capture_ratio", "tca", "Execution",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
     "market_status", "model_preset", "run_many", "sector_daily_sigma", "sectors",

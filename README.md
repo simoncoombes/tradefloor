@@ -71,10 +71,31 @@ traded — your trading is part of why that price happened. Here both worlds are
 runnable.
 
 ```python
-cf = pt.counterfactual(seed=42, universe=universe,
-                       order_flow={"AAA": (6_000_000, 0)})
-cf.cost_bps("AAA")        # what your own footprint cost you
+ex = pt.tca.analyse(my_agent, seed=42, universe=universe, days=5)
+
+ex.shortfall_bps()        # what your own footprint cost you
+ex.by_step()              # where it was paid
+ex.untouched_moved()      # should be empty: nothing else moved
 ```
+
+Every fill is priced against what that instrument was doing in the world where
+you never traded. That is the benchmark real TCA cannot have — arrival price,
+VWAP and fitted impact models are all proxies standing in for a counterfactual
+nobody can run.
+
+Two results worth knowing before you read a number:
+
+**A round trip can show a negative shortfall.** Buying and holding costs
++16.7 bps on one measured example; buying and selling three steps later comes
+to −10.8 bps. Nothing is wrong — the entry pushed the price up, part of that
+persisted, and the exit sold into it. Shortfall answers *what did each
+execution cost*, not *did this strategy make money*; for the latter read `pnl`
+from `evaluate`. `by_step()` shows the entry paying and the exit recouping
+rather than netting them into one figure.
+
+**Check `partial_fills()` before believing a low cost.** A request for 4,856
+shares filled 483 — the whole displayed depth — and every larger request filled
+the same 483. The cheapest execution is the one that did not happen.
 
 ## Evaluating agents
 
