@@ -8,15 +8,16 @@ Measured on the reference agents over thirty instruments and ten days, twelve
 seeds:
 
     pooled capture over 12 seeds        per-seed range      wins
-        momentum         +0.561       [+0.075, +1.133]      6/12
-        mean_reversion   +0.302       [-0.361, +1.093]      6/12
-        random           +0.003       [-0.231, +0.116]      0/12
-        buy_and_hold     -0.072       [-0.518, +0.311]      0/12
+        momentum         +0.556       [-0.335, +1.903]      6/12
+        mean_reversion   -0.011       [-0.671, +0.751]      5/12
+        buy_and_hold     -0.056       [-0.516, +0.489]      1/12
+        random           -0.060       [-0.420, +0.109]      0/12
 
 **A single seed picks the top-ranked agent exactly half the time** — a coin
-flip, on a gap that looks like better than 2:1 in the aggregate. Momentum's
-own capture ranges from +0.075 to +1.133 depending only on which market it
-drew, and that range is printed next to the verdict for exactly that reason.
+flip, even though the leader's aggregate is the only positive number on the
+table. Momentum's own capture ranges from -0.335 to +1.903 depending only on
+which market it drew, and that range is printed next to the verdict for
+exactly that reason.
 
 So a leaderboard from one call to `evaluate` is a measurement of the seed at
 least as much as of the agents, and anything built on it — a benchmark, a
@@ -25,15 +26,19 @@ that.
 
 ## And the aggregate can overstate too, which is why `separation` exists
 
-That 2:1 gap does NOT establish that momentum is the better agent. Paired
-across the same twelve markets, momentum beats mean-reversion on six of them
-and loses on six: `p = 1.0`, no separation whatsoever. Momentum wins by MORE
-when it wins; it does not win more OFTEN, and no aggregate of returns can
-tell those apart.
+That gap does NOT establish that momentum is the better agent. Paired across
+the same twelve markets, momentum beats mean-reversion on seven and loses on
+five: `p = 0.77`, no separation worth the name. Momentum wins by MORE when it
+wins; it barely wins more OFTEN, and no aggregate of returns can tell those
+apart.
 
-Against buy-and-hold the same test reads 12–0, `p = 0.00049`. That is what a
-real difference looks like here, and the contrast is the point: two orderings
-that appear on the same table, one of them meaningless.
+Against random the same test reads 10–2, `p = 0.039`. That is what a real
+difference looks like here, and the contrast is the point: two orderings that
+appear on the same table, one of them meaningless.
+
+Note that even 10–2 is not `decisive` — that flag is reserved for a clean
+sweep, the one verdict that needs no distributional assumption at all. A
+small `p` and a clean sweep are different claims and the result reports both.
 
 Quote a capture with its separation, or the ranking is just a prettier
 version of the single-seed coin flip.

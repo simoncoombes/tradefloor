@@ -54,7 +54,8 @@ class Idle:
 def analyse(agent, **kwargs):
     kwargs.setdefault("days", 1)
     kwargs.setdefault("steps_per_day", 6)
-    return pretium.tca.analyse(agent, seed=2026, universe=UNIVERSE, **kwargs)
+    kwargs.setdefault("seed", 2026)
+    return pretium.tca.analyse(agent, universe=UNIVERSE, **kwargs)
 
 
 # --------------------------------------------------------------------------
@@ -144,6 +145,9 @@ def test_an_order_larger_than_the_book_fills_partially_and_says_so():
 # --------------------------------------------------------------------------
 
 
+SEEDS = (2026, 1, 2, 3, 4, 5, 7, 11)
+
+
 def test_a_round_trip_recoups_its_own_impact():
     """Buying then selling shows a NEGATIVE shortfall, and that is correct.
 
@@ -151,23 +155,49 @@ def test_a_round_trip_recoups_its_own_impact():
     sells into it. The agent really did transact at prices better than the
     untraded world offered on that leg.
 
-    Measured: +79.47 entering, -182.73 exiting, -103.26 net, against +79.47
-    for the same purchase held instead of sold.
+    Measured across eight seeds: the entry costs +79.47 on every one of them
+    -- it happens at step 0, before the worlds have had a chance to diverge --
+    and the exit recoups on six, by between -82 and -268.
+
+    Asserted as a MAJORITY rather than on one seed. It was pinned to seed 2026
+    and read "-182.73 exiting, -103.26 net"; when a stepped day was fixed to
+    stop re-opening the market at every step, seed 2026 became one of the two
+    that do not recoup and this test failed while the phenomenon it names was
+    unchanged. A single seed measures the seed.
     """
-    held = analyse(BuyOnce(0.01))
-    traded = analyse(RoundTrip(0.01))
-    assert held.shortfall() > 0
-    assert traded.shortfall() < 0
-    # The entry leg is the same trade in both, so it costs the same.
-    assert traded.by_step()[0][1] == pytest.approx(held.shortfall())
+    recouped = 0
+    for seed in SEEDS:
+        held = analyse(BuyOnce(0.01), seed=seed)
+        traded = analyse(RoundTrip(0.01), seed=seed)
+        # Structural, so it holds on every seed: a one-way buyer moved the
+        # price and never sold into it.
+        assert held.shortfall() > 0, f"seed {seed}"
+        # The entry leg is the same trade in both, so it costs the same.
+        assert traded.by_step()[0][1] == pytest.approx(held.shortfall())
+        if traded.shortfall() < 0:
+            recouped += 1
+    assert recouped >= len(SEEDS) // 2, (
+        f"only {recouped}/{len(SEEDS)} round trips recouped; impact has "
+        "stopped persisting to the exit"
+    )
 
 
 def test_by_step_shows_the_entry_paying_and_the_exit_recouping():
     # The netted total hides both halves. This is the accessor that does not.
-    steps = dict(analyse(RoundTrip(0.01)).by_step())
-    assert steps[0] > 0
-    assert steps[3] < 0
-    assert sum(steps.values()) == pytest.approx(analyse(RoundTrip(0.01)).shortfall())
+    #
+    # The entry always pays; the exit recoups on most seeds but not all, so
+    # that half is counted rather than asserted per seed.
+    favourable = 0
+    for seed in SEEDS:
+        execution = analyse(RoundTrip(0.01), seed=seed)
+        steps = dict(execution.by_step())
+        assert steps[0] > 0, f"seed {seed}: the entry did not cost anything"
+        assert sum(steps.values()) == pytest.approx(execution.shortfall())
+        if steps[3] < 0:
+            favourable += 1
+    assert favourable >= len(SEEDS) // 2, (
+        f"the exit leg was favourable on only {favourable}/{len(SEEDS)} seeds"
+    )
 
 
 def test_a_round_trip_leaves_almost_no_lasting_impact():

@@ -530,7 +530,9 @@ impl Engine {
     ) -> SessionOutcome {
         buffer.resize(request.ticks, self.companies.len());
 
-        self.open_market();
+        if request.reopen {
+            self.open_market();
+        }
 
         let mut draws = 0usize;
         let (mut hour, mut minute) = (request.start.hour, request.start.minute);
@@ -969,6 +971,30 @@ pub struct SessionRequest<'a> {
     pub order_volumes: &'a [(String, OrderVolume)],
     /// Run the close bookkeeping when the session finishes normally.
     pub close_at_end: bool,
+    /// Open the market before the first tick.
+    ///
+    /// True is the reference's behaviour and the right default: it runs one
+    /// session per day, so opening inside the session and opening the day are
+    /// the same act.
+    ///
+    /// They stop being the same act when a day is made of SEVERAL sessions,
+    /// which is what agent stepping does -- act, run some ticks, act again.
+    /// `open_market` resets the attribution accumulator and re-anchors the
+    /// daily open, so re-opening per step silently made both per-step:
+    ///
+    /// - `attribution` documents itself as per-DAY and was per-session. A
+    ///   large buy in step 0 of a six-step day moved the market -- the tape
+    ///   records it -- and `attribution("order_flow_impact")` read exactly
+    ///   zero at the close. An agent's own impact was erased from the ground
+    ///   truth that scores it.
+    /// - Worse, it is not only reporting. `close_at_end` feeds
+    ///   `attribution_column(random_noise)` to GARCH as the day's innovation,
+    ///   so a stepped day updated variance from the LAST STEP's noise rather
+    ///   than the day's.
+    ///
+    /// Set false for the second and later sessions of one day. A day of one
+    /// session is unaffected either way, which is why no parity vector moves.
+    pub reopen: bool,
     pub daily_innovations: &'a [Option<f64>],
     pub sector_base_variances: &'a [f64],
     /// Stop early when a condition is met, for event-driven advancement.
@@ -1359,6 +1385,10 @@ mod tests {
             news_impact_queue: &[],
             order_volumes: &[],
             close_at_end: true,
+            // These tests run one session per day, where opening inside the
+            // session and opening the day are the same act. True preserves
+            // exactly what they measured before `reopen` existed.
+            reopen: true,
             daily_innovations: innovations,
             sector_base_variances: variances,
             stop: None,

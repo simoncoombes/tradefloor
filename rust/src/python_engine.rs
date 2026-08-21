@@ -637,6 +637,13 @@ pub struct PyEngine {
     /// `prices()` meaning what it has always meant, and costs a copy per
     /// session that only a recording caller pays.
     day_buffer: DayBuffer,
+    /// Whether the market has been opened and not yet closed.
+    ///
+    /// Exists so a day is opened exactly ONCE however many sessions it is made
+    /// of. `Engine::run_session` used to open unconditionally, which made the
+    /// attribution accumulator and the daily open per-session; see
+    /// `SessionRequest::reopen`.
+    market_open: bool,
     recorded_macro: Vec<crate::python_arrow::MacroRow>,
     /// Recorded order-book depth. Empty unless a caller asks for it.
     recorded_book: Vec<crate::python_arrow::BookRow>,
@@ -681,6 +688,7 @@ impl PyEngine {
             ),
             buffer: SessionBuffer::new(),
             day_buffer: DayBuffer::default(),
+            market_open: false,
             tickers,
             recorded: Vec::new(),
             recorded_macro: Vec::new(),
@@ -695,6 +703,7 @@ impl PyEngine {
         // A new day's tape starts here. Without this, a run that never closed
         // would grow one unbounded "day".
         self.day_buffer.clear();
+        self.market_open = true;
         self.inner.open_market();
     }
 
@@ -861,6 +870,13 @@ impl PyEngine {
         // converted to Rust types above, and the engine and buffer are plain
         // data. That is the precondition for releasing it, not an optimisation
         // note.
+        // Open the day here if the caller has not, and exactly once however
+        // many sessions the day is made of. Letting `run_session` re-open made
+        // attribution and the daily anchor per-STEP; see
+        // `SessionRequest::reopen`.
+        if !self.market_open {
+            self.open_market();
+        }
         let inner = &mut self.inner;
         let buffer = &mut self.buffer;
         py.allow_threads(move || {
@@ -877,6 +893,7 @@ impl PyEngine {
                     news_impact_queue: &session_impacts,
                     order_volumes: &session_flow,
                     close_at_end,
+                    reopen: false,
                     daily_innovations: &innovations,
                     sector_base_variances: &variances,
                     stop: None,
@@ -1016,6 +1033,9 @@ impl PyEngine {
             })
             .collect();
 
+        if !self.market_open {
+            self.open_market();
+        }
         let outcome = self.inner.run_session(
             &SessionRequest {
                 start: GameTime { hour, minute, day_of_week },
@@ -1025,6 +1045,7 @@ impl PyEngine {
                 news_impact_queue: &[],
                 order_volumes: &[],
                 close_at_end: false,
+                reopen: false,
                 daily_innovations: &innovations,
                 sector_base_variances: &variances,
                 stop: Some(crate::engine::StopCondition::PriceOutside {
@@ -1056,6 +1077,8 @@ impl PyEngine {
     /// 3.20. Not a rounding difference -- a different quantity.
     fn close_market(&mut self) {
         self.log.push(crate::python_log::LogEntry::CloseMarket);
+        // The day is over, so the next session opens a new one.
+        self.market_open = false;
         // The engine's own accumulator, rather than a value the caller has to
         // supply and keep in step. A second copy of engine state on the
         // embedder's side is a divergence waiting for the first day the two

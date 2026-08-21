@@ -8,12 +8,18 @@ separates ground truth from commentary, and it is checkable, so it is checked.
 
 import math
 import statistics
+import struct
 
 import pytest
 
 pa = pytest.importorskip("pyarrow")
 
 import pretium
+
+
+def _f64(buf):
+    """Unpack a little-endian f64 buffer, the only shape the engine emits."""
+    return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
 
 
 # The seven, in schema order. Kept here as a literal rather than read from the
@@ -261,3 +267,98 @@ def test_the_dominant_factor_is_the_one_that_actually_moved_the_price():
     engine.open_market()
     engine.run_session(9, 30, 3, 90)
     assert _dominant_factor(engine) == "random_noise"
+
+
+# --------------------------------------------------------------------------
+# A day of many sessions is one day
+# --------------------------------------------------------------------------
+
+
+def test_attribution_covers_the_whole_day_not_the_last_step():
+    """`Engine::run_session` used to open the market every time it ran.
+
+    For the reference, which runs one session per day, opening inside the
+    session and opening the day are the same act. They stop being the same
+    when a day is made of several sessions -- which is exactly what agent
+    stepping does. `open_market` resets the attribution accumulator, so
+    attribution documented itself as per-DAY and was per-session.
+
+    The visible consequence: a large buy in step 0 of a six-step day moves the
+    market, the tape records it, and `attribution("order_flow_impact")` read
+    exactly zero at the close. The agent's own impact was erased from the
+    ground truth that scores it.
+    """
+    universe = pretium.Universe.random(6, seed=5)
+    engine = pretium.Engine(seed=3, universe=universe)
+    ticker = universe[0].ticker
+    engine.open_market()
+    for step in range(6):
+        hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
+        flow = ({ticker: (universe[0].avg_volume * 0.4, 0.0)}
+                if step == 0 else None)
+        engine.run_session(hour, minute, 3, 60, order_flow=flow)
+    engine.close_market()
+    engine.record(0)
+
+    total = sum(abs(x) for x in _f64(engine.attribution("order_flow_impact")))
+    assert total > 0, (
+        "the day traded and attribution reports no order-flow impact at all"
+    )
+
+
+def test_attribution_equals_the_tape_for_every_factor():
+    """The two ground-truth surfaces must describe the same window.
+
+    `truth` is per-tick and `attribution` is per-day, so summing one over a
+    day must give the other. This is the invariant that catches a day and a
+    session being confused for each other, in either direction, and it failed
+    in BOTH directions before: the tape held only the last session's ticks and
+    attribution held only the last session's total.
+    """
+    pa = pytest.importorskip("pyarrow")
+    pc = pytest.importorskip("pyarrow.compute")
+
+    universe = pretium.Universe.random(4, seed=5)
+    engine = pretium.Engine(seed=1, universe=universe)
+    engine.open_market()
+    for step in range(4):
+        hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
+        engine.run_session(hour, minute, 3, 60)
+    engine.close_market()
+    engine.record(0)
+
+    truth = pa.table(engine.truth())
+    rows = truth.filter(pc.equal(truth.column("instrument_id"), 0))
+    checked = 0
+    for factor in pretium.Engine.FACTORS:
+        if factor not in truth.column_names:
+            continue
+        recorded = _f64(engine.attribution(factor))[0]
+        tape = sum(v for v in rows.column(factor).to_pylist() if v is not None)
+        assert recorded == pytest.approx(tape, abs=1e-15), (
+            f"{factor}: attribution {recorded:+.6e} against a tape sum of "
+            f"{tape:+.6e}"
+        )
+        checked += 1
+    assert checked == 7, f"only {checked} factors compared"
+    # And at least one of them must be non-zero, or this compared zeros.
+    assert any(_f64(engine.attribution(f))[0] != 0.0
+               for f in pretium.Engine.FACTORS if f in truth.column_names)
+
+
+def test_a_single_session_day_is_unaffected():
+    """The parity guarantee. One session per day is what the reference does,
+    and opening once versus opening twice with no ticks between is the same
+    state -- so no golden vector moves. Asserted rather than reasoned."""
+    universe = pretium.Universe.random(4, seed=5)
+
+    explicit = pretium.Engine(seed=1, universe=universe)
+    explicit.open_market()
+    explicit.run_session(9, 30, 3, 120)
+    explicit.close_market()
+
+    implicit = pretium.Engine(seed=1, universe=universe)
+    implicit.run_session(9, 30, 3, 120)
+    implicit.close_market()
+
+    assert explicit.prices() == implicit.prices()

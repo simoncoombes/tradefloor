@@ -212,9 +212,18 @@ def test_replay_can_fail():
 
 
 def test_shortfall_can_be_both_signs():
-    # A shortfall stuck at zero would satisfy every loosely written inequality
-    # around it. Both directions are reachable, and which one you get is a
-    # fact about the trade rather than about the code.
+    """A shortfall stuck at zero would satisfy every loose inequality near it.
+
+    Both directions are reachable, and which one you get is a fact about the
+    trade rather than about the code.
+
+    Measured ACROSS SEEDS rather than on one. This test used to pin seed 2026,
+    where a round trip recouped; it stopped recouping there when a stepped day
+    was fixed to stop re-opening the market at every step, and the test failed
+    while the phenomenon it names was as true as ever -- 6 of 8 seeds still
+    recoup. Pinning one seed pins the seed, which is a lesson this repository
+    has now learned twice.
+    """
     class Buyer:
         def act(self, obs):
             ticker = obs.tickers[0]
@@ -229,12 +238,25 @@ def test_shortfall_can_be_both_signs():
                 return {ticker: -obs.position(ticker)}
             return {}
 
-    held = pretium.tca.analyse(Buyer(), seed=2026, universe=UNIVERSE, days=1,
-                               steps_per_day=6)
-    traded = pretium.tca.analyse(RoundTrip(), seed=2026, universe=UNIVERSE,
-                                 days=1, steps_per_day=6)
-    assert held.shortfall() > 0
-    assert traded.shortfall() < 0
+    positive = negative = 0
+    for seed in (2026, 1, 2, 3, 4, 5, 7, 11):
+        held = pretium.tca.analyse(Buyer(), seed=seed, universe=UNIVERSE,
+                                   days=1, steps_per_day=6)
+        traded = pretium.tca.analyse(RoundTrip(), seed=seed, universe=UNIVERSE,
+                                     days=1, steps_per_day=6)
+        # A one-way buyer always pays: they moved the price and never sold
+        # into it. That direction is structural, so it is asserted per seed.
+        assert held.shortfall() > 0, f"seed {seed}: a one-way buyer got paid"
+        positive += 1
+        if traded.shortfall() < 0:
+            negative += 1
+
+    assert positive, "no positive shortfall observed"
+    assert negative, (
+        "no round trip recouped on any seed -- either impact stopped "
+        "persisting or the exit leg stopped being priced against the "
+        "untraded world"
+    )
 
 
 def test_the_stylised_facts_are_not_all_within_range():

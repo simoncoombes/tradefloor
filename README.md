@@ -178,28 +178,29 @@ same momentum agent captures **27% over five days and 94% over sixty**.
 ### One seed ranks the seed, not the agents
 
 This is the sharpest edge in the whole harness, so it gets its own heading.
-Over twelve markets the reference agents rank momentum +0.561 and
-mean-reversion +0.302 — and **a single seed picks the top agent exactly half
-the time**. Momentum's own capture runs from +0.075 to +1.133 depending only
+Over twelve markets the reference agents rank momentum +0.556 and
+mean-reversion −0.011 — and **a single seed picks the top agent exactly half
+the time**. Momentum's own capture runs from −0.335 to +1.903 depending only
 on which market it drew.
 
 ```python
 ranking = pt.rank(lambda: pt.reference_agents(seed=3), seeds=range(12),
                   universe=universe, days=10, workers=4)
 print(ranking.report())
-ranking.separation("momentum", "mean_reversion")   # 6-6, p = 1.0
-ranking.separation("momentum", "buy_and_hold")     # 12-0, p = 0.00049
+ranking.separation("momentum", "mean_reversion")   # 7-5,  p = 0.77
+ranking.separation("momentum", "random")           # 10-2, p = 0.039
 ```
 
 `rank` takes a *factory* rather than built agents, because agents are stateful
 and reusing them would carry one seed's history into the next with no visible
 symptom.
 
-And the aggregate can overstate too. That 2:1 gap does not establish that
-momentum is better: paired across the same twelve markets it wins six and
-loses six, `p = 1.0`. It wins by more, not more often, and no average of
-returns can tell those apart — which is why `separation` reports a paired sign
-test alongside the number. Against buy-and-hold the same test reads 12–0.
+And the aggregate can overstate too. That gap does not establish that
+momentum is better: paired across the same twelve markets it wins seven and
+loses five, `p = 0.77`. It wins by more, not much more often, and no average
+of returns can tell those apart — which is why `separation` reports a paired
+sign test alongside the number. Against random the same test reads 10–2,
+`p = 0.039`.
 
 The headline figure pools numerators and denominators rather than averaging
 per-seed ratios. On a short horizon the Oracle sometimes earns almost nothing,

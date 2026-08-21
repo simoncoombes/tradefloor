@@ -190,6 +190,19 @@ impl PyEngineBatch {
                     news_impact_queue: &[],
                     order_volumes: &[],
                     close_at_end: false,
+                    // True here, unlike `Engine`, and deliberately.
+                    //
+                    // A batch has no day: it exposes `open_market` but no
+                    // `close_market`, no `record` and no attribution, so
+                    // "advance every member" is the whole contract. With no
+                    // day boundary to hang it on, session and day are the same
+                    // window, which is exactly what `reopen: true` means.
+                    //
+                    // Changing it would move batch prices -- `open_market`
+                    // re-anchors the daily open, so the circuit-breaker band
+                    // moves with it -- to fix a reporting bug this surface
+                    // cannot exhibit. See `SessionRequest::reopen`.
+                    reopen: true,
                     daily_innovations: &innovations,
                     sector_base_variances: &variances,
                     stop: None,

@@ -62,13 +62,19 @@ def test_the_oracle_sets_the_ceiling(scores):
 
 def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     ranked = [card.name for card in pretium.leaderboard(scores)]
-    # The top and bottom are the robust part; the middle two are separated by
-    # under half a percentage point and have swapped places twice now under
-    # model changes that left everything else intact. Pinned as a full order
-    # anyway, because a leaderboard IS an ordering -- but if this fails on a
-    # deliberate change, re-measure rather than assuming a regression.
-    assert ranked == ["oracle", "momentum", "buy_and_hold", "mean_reversion",
-                      "random"]
+    # The oracle on top is the robust part. The rest are separated by small
+    # margins and have now swapped three times under model changes that left
+    # everything else intact -- most recently when a stepped day stopped
+    # re-opening the market at every step, which moved mean-reversion from
+    # third to last on this seed (-1.09% against random's -0.15%).
+    #
+    # Pinned as a full order anyway, because a leaderboard IS an ordering and
+    # this is the canary for it changing. If it fails on a deliberate change,
+    # re-measure rather than assuming a regression -- and remember the order
+    # belongs to THIS seed. `pretium.rank` exists because one seed picks the
+    # top agent about half the time.
+    assert ranked == ["oracle", "momentum", "buy_and_hold", "random",
+                      "mean_reversion"]
 
 
 def test_random_trading_is_close_to_flat_over_a_short_run(scores):
@@ -357,9 +363,13 @@ def test_trading_more_often_loses_money_on_the_same_signal():
     Horizon held at exactly one day; only the rebalance frequency changes.
     Measured on seed 2026, 40 instruments, 30 days:
 
-        3 steps/day   +88.72%
-        6 steps/day   +30.89%
-       12 steps/day   -13.18%
+        3 steps/day   +49.71%
+        6 steps/day   +32.70%
+       12 steps/day    +0.18%
+
+    Re-measured after a stepped day stopped re-opening the market at every
+    step. The numbers moved and the shape did not, which is the point: this
+    asserts the ORDERING, and the ordering is the mechanism.
 
     Nothing charges a fee. The orders simply cross a real spread and consume
     real depth four times as often. This is the same mechanism that makes
@@ -373,9 +383,18 @@ def test_trading_more_often_loses_money_on_the_same_signal():
             days=30, steps_per_day=steps_per_day,
             ticks_per_step=390 // steps_per_day)
         returns.append(scores["m"].return_pct)
+    # The ORDERING is the mechanism and is asserted strictly.
     assert returns[0] > returns[1] > returns[2]
-    assert returns[0] > 50.0
-    assert returns[2] < 0.0
+    # The size matters too -- a monotone decline of a basis point would be
+    # technically ordered and mean nothing -- but it is asserted as a spread
+    # rather than as two absolute thresholds. Those were `> 50.0` and `< 0.0`
+    # against measured values of +49.71 and +0.18: a knife edge that failed on
+    # a change to something else entirely, which is a test measuring its own
+    # calibration rather than the model.
+    assert returns[0] - returns[2] > 25.0, (
+        f"quadrupling the trade rate cost only {returns[0] - returns[2]:.1f} "
+        "points; the impact model has stopped biting"
+    )
 
 
 def test_the_observation_carries_the_cadence():
