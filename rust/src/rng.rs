@@ -33,7 +33,7 @@
 //! this is what that looks like.
 //!
 //! The divergence is not a defect: it is the same finding as
-//! `docs/rust-port/DETERMINISM.md`, since Box-Muller routes through `cos` and
+//! the determinism notes, since Box-Muller routes through `cos` and
 //! Chrome, Firefox and Safari disagree about `cos`. There is no single browser
 //! answer to match. What was wrong was the claim, not the code.
 //!
@@ -119,7 +119,7 @@ impl Rng for GameRng {
 /// means a seed of `2^32` becomes `0` and a seed of `-1` becomes `4294967295`.
 /// Callers reaching this crate from Python or Rust will not naturally apply
 /// that, so it is applied here — otherwise the same nominal seed would produce
-/// different streams in the game and in the library, which is precisely the
+/// different streams in the simulation and in the library, which is precisely the
 /// class of divergence this port must not introduce.
 pub fn to_uint32(value: f64) -> u32 {
     if !value.is_finite() {
@@ -202,7 +202,7 @@ impl Pcg32 {
     }
 }
 
-/// The game-facing RNG: uniform, normal, ranged-int and boolean draws.
+/// The simulation-facing RNG: uniform, normal, ranged-int and boolean draws.
 ///
 /// `PartialEq` compares STREAM POSITION, including the Box-Muller spare.
 /// Tests use it to assert how many draws a function consumed, which for a
@@ -273,7 +273,7 @@ impl GameRng {
     ///
     /// This is a modulo-biased draw — values below `2^32 % range` are very
     /// slightly more likely. That bias is in the original and is reproduced
-    /// deliberately: removing it would change every stream in the game.
+    /// deliberately: removing it would change every stream in the simulation.
     pub fn next_int(&mut self, min: i64, max: i64) -> i64 {
         let range = max - min + 1;
         if range <= 0 {

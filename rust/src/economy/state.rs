@@ -5,11 +5,11 @@
 //!
 //! Only the fields the price-relevant chain reads or writes. `EconomyState`
 //! in the TypeScript is wider; the omissions are listed in
-//! `docs/rust-port/REMAINING-WORK.md` under WP3 and summarised here:
+//! the port notes under WP3 and summarised here:
 //!
 //! - **`derived` / `computeDerivedIndicators`** — a 70-field struct that
 //!   `updateEconomyDaily` recomputes on its last line and nothing in the
-//!   price loop reads (`SURFACE.md` §0). Verified to consume **zero** draws,
+//!   price loop reads (the surface audit §0). Verified to consume **zero** draws,
 //!   which is what makes leaving it out safe: an omission that shifted the
 //!   stream would not be an omission, it would be a divergence.
 //! - **`SECTOR_SENSITIVITIES` / `calculateSectorEconomicImpact`** — feeds
@@ -207,7 +207,7 @@ pub struct EconomyState {
     pub previous_day_market_return: f64,
     pub rolling_market_return_30d: f64,
     /// `economy.marketPE ?? 18` at the cycle-transition sites. Kept optional
-    /// because the game genuinely leaves it unset before the first market
+    /// because the reference implementation genuinely leaves it unset before the first market
     /// tick, and the `?? 18` there is a real fallback rather than a
     /// constructor default.
     pub market_pe: Option<f64>,

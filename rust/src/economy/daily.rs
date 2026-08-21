@@ -28,7 +28,7 @@
 //! The 10Y normal is **D5, decided**: keep it. Production takes zero draws
 //! there, but only because `??` short-circuits when WASM returns a value —
 //! an artefact of evaluation order, not a modelling choice. See
-//! `REMAINING-WORK.md`.
+//! the port notes.
 //!
 //! # WASM is absent by construction
 //!
@@ -712,7 +712,7 @@ pub fn update_economy_daily(
     new_state.rolling_market_return_30d = prev_30d + (inputs.market_return_pct - prev_30d) / 30.0;
 
     // `newState.derived = computeDerivedIndicators(newState)` sits here in
-    // the original. Deliberately not ported — out of scope per SURFACE.md §0,
+    // the original. Deliberately not ported — out of scope per the surface audit §0,
     // and verified to consume zero draws, which is what makes the omission
     // invisible to the stream.
 

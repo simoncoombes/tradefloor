@@ -9,7 +9,7 @@
 //! # Why the rule exists
 //!
 //! Two separate reasons, and the second is the one that would still apply if
-//! the game did not exist.
+//! the reference implementation did not exist.
 //!
 //! **1. Parity with V8.** Phase 0 found that Rust's `std` `cos` differs from
 //! V8's by 1 ULP on a real Box-Muller input. Since `price = fairValue x exp(s)`

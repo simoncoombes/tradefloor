@@ -21,7 +21,7 @@
 //! The generator's divergence stays measured in one place — `rng.rs` — rather
 //! than being rediscovered at every layer above it.
 //!
-//! Vectors: `docs/rust-port/goldens/economy-*.json`, from
+//! Vectors: `goldens/economy-*.json`, from
 //! `scripts/rust-port/economy-vectors.ts`, which **asserts** WASM was absent
 //! (decisions D1–D3 and D5 all select the JS formulas) rather than assuming it.
 

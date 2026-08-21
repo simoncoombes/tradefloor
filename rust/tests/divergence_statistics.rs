@@ -20,7 +20,8 @@
 //! same MARKET, in the sense a user of the library cares about. Same return
 //! distribution, same volatility, same correlation structure, same clustering.
 //! A backtest run against the Rust engine must reach the same conclusions as
-//! one run against the game, even though the two never print the same price.
+//! one run against the reference implementation, even though the two never
+//! print the same price.
 //!
 //! # The bounds are re-derived, not inherited
 //!

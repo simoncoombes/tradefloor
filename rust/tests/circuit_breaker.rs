@@ -2,7 +2,7 @@
 //!
 //! # The gap this closes
 //!
-//! `INVARIANTS.md` records 1.13 as **"CLAIMED, NOT DIRECTLY TESTED"**, and is
+//! the invariants notes records 1.13 as **"CLAIMED, NOT DIRECTLY TESTED"**, and is
 //! blunt about why that matters: the closest thing to a check in the
 //! TypeScript suite (`tests/unit/simulation.test.ts:895-944`) explicitly
 //! EXCLUDES any day whose move exceeds 40% before asserting the remaining days
@@ -32,7 +32,7 @@
 
 use pretium::economy::{create_initial_economy_state, InitialEconomyOptions};
 use pretium::market::{
-    simulate_market_tick, GameTime, MarketStatus, TickCompany, TickInputs, TickStock,
+    simulate_market_tick, MarketStatus, TickCompany, TickInputs, TickStock,
 };
 use pretium::rng::Rng;
 

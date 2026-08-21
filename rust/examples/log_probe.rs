@@ -1,4 +1,4 @@
-// Is libm::log the source of the breaker-path divergence? DETERMINISM.md's
+// Is libm::log the source of the breaker-path divergence? the determinism notes's
 // sweep put libm ahead of std on log, but "ahead" is not "exact".
 fn main() {
     let mut libm_vs_std = 0u32;

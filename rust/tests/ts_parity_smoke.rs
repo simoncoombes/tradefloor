@@ -6,7 +6,7 @@
 //! this crate must not ship.
 //!
 //! This is a SMOKE test, deliberately small. The exhaustive golden vectors are
-//! generated separately (see `docs/rust-port/goldens/`). The purpose here is to
+//! generated separately (see `goldens/`). The purpose here is to
 //! fail fast and loudly during development, before anyone waits on the full
 //! harness.
 //!

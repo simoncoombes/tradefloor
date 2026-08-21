@@ -1,12 +1,12 @@
-//! # Margin Call engine core
+//! # pretium - the engine core
 //!
 //! The price model, in Rust, compiled once and consumed twice: as WebAssembly
-//! inside the game, and as a Python extension module for backtesting.
+//! inside a browser, and as a Python extension module for backtesting.
 //!
 //! "Once" is the load-bearing word. A Rust implementation that runs only in
-//! Python while the game keeps its TypeScript one is not a port, it is a fork,
+//! Python while the browser keeps a TypeScript one is not a port, it is a fork,
 //! and two models that quietly disagree about the same prices is a worse
-//! outcome than having no Python bindings at all. See `docs/rust-port/PLAN.md`.
+//! outcome than having no Python bindings at all. See the port plan.
 //!
 //! ## The rule this crate is written under
 //!
@@ -37,6 +37,8 @@ pub mod microstructure;
 pub mod mispricing;
 pub mod order_book;
 pub mod rng;
+/// The twelve sectors and their model parameters.
+pub mod sectors;
 pub mod types;
 /// The single place a factor of 100 exists - see the module docs.
 pub mod units;

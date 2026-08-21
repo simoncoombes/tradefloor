@@ -33,7 +33,7 @@
 //! book-walking can settle a print beyond an already-clamped fair value, and
 //! because that print becomes the next tick's reference the overshoot
 //! compounded within a day. A breaker that bounds an unobservable reference
-//! and not the tape is not a breaker. See D6 in `REMAINING-WORK.md`.
+//! and not the tape is not a breaker. See D6 in the port notes.
 
 use crate::economy::EconomyState;
 use crate::fair_value::{compute_fair_value, CompanyValuationInputs, EconomyValuationInputs};

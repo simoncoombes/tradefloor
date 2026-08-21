@@ -51,7 +51,7 @@ const VOLUME_SCALE_MEAN: f64 = 1.4;
 /// `previousClose` is set from the price at the OPEN, not at the close. That
 /// is what makes the circuit-breaker band a session band: it is measured
 /// against where the name started today, so the overnight gap sits outside it
-/// by construction. See D6 in `REMAINING-WORK.md`.
+/// by construction. See D6 in the port notes.
 pub fn reset_daily_prices(companies: &mut [TickCompany]) {
     for company in companies.iter_mut() {
         let s = &mut company.stock;

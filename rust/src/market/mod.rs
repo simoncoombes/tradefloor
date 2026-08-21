@@ -39,7 +39,7 @@
 //! The overnight gap is left unclamped BY DESIGN. Real LULD bands apply
 //! during continuous trading, and earnings gaps arrive after the close and
 //! routinely exceed 25%. The residual outliers (4 of 2,160 runs, max 29.38%)
-//! are that gap and are not a defect. See `REMAINING-WORK.md` §D6.
+//! are that gap and are not a defect. See the port notes §D6.
 
 pub mod daily;
 pub mod factors;

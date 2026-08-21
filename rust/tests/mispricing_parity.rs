@@ -374,7 +374,7 @@ struct ApplyInput {
 #[test]
 fn apply_matches_including_its_exponential() {
     // The one Tier 2 function here. Its `exp` argument is clamped to
-    // [-0.9, 0.9], a narrow domain where `DETERMINISM.md` measured libm and
+    // [-0.9, 0.9], a narrow domain where the determinism notes measured libm and
     // V8 to agree — but "expected to agree" is not "verified to agree", which
     // is what this is. Any exception would be handled per §0.1's policy, by
     // documenting the specific input, NOT by loosening the comparator.

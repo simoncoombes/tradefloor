@@ -2,11 +2,11 @@
 //!
 //! # What this module is, and what it is NOT
 //!
-//! **It is not the model the game runs.** `mispricing.ts` has zero callers in
+//! **It is not the model the tick loop runs.** `mispricing.ts` has zero callers in
 //! `src/`: the shipping game uses a per-tick inline variant inside `market.ts`
 //! (WP4), which applies the same ideas at 1/390 of a day per tick and never
 //! calls through here. The TypeScript file's own header claims to own the live
-//! price model, and that claim is wrong — see `PLAN.md`, Phase 2 course
+//! price model, and that claim is wrong — see the port plan, Phase 2 course
 //! correction, item 4. It is deliberately not repeated above.
 //!
 //! What this module actually is: the **daily-step API for the Python library**

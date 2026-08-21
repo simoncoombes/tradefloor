@@ -1,6 +1,6 @@
 //! Python bindings, behind the `python` feature.
 //!
-//! Feature-gated so the WASM consumer and the game's build never compile
+//! Feature-gated so the WASM consumer's build never compiles
 //! PyO3. The same core serves both; only this file is Python-specific.
 
 use pyo3::prelude::*;

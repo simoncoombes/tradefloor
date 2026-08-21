@@ -3,7 +3,7 @@
 //! GARCH, session logic, the intraday curves and the index divisor maths.
 //! These carry no draws and no hidden state, so they are held to bit equality
 //! with one stated exception: the volume curve's `t^2.5` is a non-integer
-//! `pow`, the surface `DETERMINISM.md` §2 documents as differing from V8.
+//! `pow`, the surface the determinism notes §2 documents as differing from V8.
 //! Here it reaches **2 ULP on 25 of 391 points** — worse than the hazard
 //! function's 1 ULP on 1.29%, because the expression sums two `pow` terms so
 //! the error can compound. Bounded on BOTH axes, magnitude and count, from

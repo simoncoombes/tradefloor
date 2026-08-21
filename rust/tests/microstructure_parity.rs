@@ -11,7 +11,7 @@
 //!   reshuffled every later company sharing the stream. That failure is
 //!   invisible in the return value and catastrophic in aggregate.
 //!
-//! Vectors: `docs/rust-port/goldens/microstructure.json`, generated from the
+//! Vectors: `goldens/microstructure.json`, generated from the
 //! TypeScript by `scripts/rust-port/microstructure-vectors.ts`. Never
 //! regenerate them from Rust — that would make the port its own oracle.
 

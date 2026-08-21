@@ -7,7 +7,7 @@
 //! `fairValue.ts` contains **zero transcendental calls** — `Math.max` and
 //! ordinary arithmetic only. Every operation is exactly specified by IEEE-754,
 //! so unlike the mispricing path (where Chrome, Firefox and Safari disagree
-//! with each other about `Math.cos`; see `docs/rust-port/DETERMINISM.md`) this
+//! with each other about `Math.cos`; see the determinism notes) this
 //! module can and must be **bit-identical** to the TypeScript.
 //!
 //! `tests/fair_value_parity.rs` therefore gates on exact equality across 250

@@ -50,7 +50,7 @@ impl MarketStatus {
     }
 }
 
-/// The game clock fields this module reads.
+/// The simulation clock fields this module reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GameTime {
     pub hour: i64,
@@ -110,7 +110,7 @@ pub fn intraday_vol(t: f64) -> f64 {
 ///
 /// **Tier 2.** The `t^2.5` term is a non-integer exponent, which is the one
 /// `pow` surface where `libm` and V8 can differ by a ULP — the same surface
-/// documented in `DETERMINISM.md` §2 for `weibull_hazard`. The `(1-t)^3` term
+/// documented in the determinism notes §2 for `weibull_hazard`. The `(1-t)^3` term
 /// is integer and exact.
 ///
 /// Extended hours are a flat 0.3x rather than a curve, because there is no

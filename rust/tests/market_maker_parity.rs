@@ -5,7 +5,7 @@
 //! mismatch is a defect in the port rather than a rounding disagreement
 //! between engines.
 //!
-//! Vectors: `docs/rust-port/goldens/marketmaker.json`, generated from the
+//! Vectors: `goldens/marketmaker.json`, generated from the
 //! TypeScript by `scripts/rust-port/marketmaker-vectors.ts`. Never regenerate
 //! them from Rust — that would make the port its own oracle.
 

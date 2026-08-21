@@ -329,7 +329,7 @@ fn check_scenario(file: &str) {
         // Re-syncing makes this a test of each tick's arithmetic given the
         // same starting state, which is what the gate is for. The
         // accumulation is a property of the exception, already characterised
-        // in DETERMINISM.md, and hiding it inside a widening tolerance here
+        // in the determinism notes, and hiding it inside a widening tolerance here
         // would test neither thing well.
         for (i, want) in tick_doc["companies"].as_array().unwrap().iter().enumerate() {
             if let Some(w) = maybe(&want["mispricingS"]) {

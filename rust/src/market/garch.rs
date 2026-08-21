@@ -171,7 +171,7 @@ mod tests {
     fn the_bounds_are_applied_max_of_min_and_the_order_shows() {
         // With a non-positive base variance the ceiling falls below the
         // floor, and `max(min(x, hi), lo)` then returns `lo` for every input.
-        // Not reachable from the game, but it is what the original does and
+        // Not reachable from the live tick loop, but it is what the original does and
         // the two orderings disagree here.
         assert_eq!(update_garch_variance(0.01, 0.5, 0.0), 0.0);
         for v in [0.0, 0.001, 1.0] {
