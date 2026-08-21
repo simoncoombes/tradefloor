@@ -164,6 +164,11 @@ impl PyInstrument {
 }
 
 impl PyInstrument {
+    /// Shared with the batch surface.
+    pub fn to_core_public(&self, index: usize) -> TickCompany {
+        self.to_core(index)
+    }
+
     fn to_core(&self, index: usize) -> TickCompany {
         let sector = crate::sectors::by_key(&self.sector).expect("validated at construction");
         TickCompany {
@@ -414,6 +419,20 @@ impl PyEngine {
     }
 }
 
+/// Build the core economy from an optional macro state.
+///
+/// Shared between the single engine and the batch so the two cannot drift:
+/// a batch whose default macro differed from a single engine's would make
+/// `EngineBatch([s])` and `Engine(s)` different markets, silently.
+pub fn economy_from(
+    macro_state: Option<PyMacro>,
+) -> PyResult<crate::economy::EconomyState> {
+    Ok(match macro_state {
+        Some(m) => m.to_core(),
+        None => PyMacro::new(15.0, 0.025, None, 0.02, 0.0, 50.0, "expansion")?.to_core(),
+    })
+}
+
 impl PyMacro {
     fn to_core(&self) -> crate::economy::EconomyState {
         let mut e = create_initial_economy_state(&InitialEconomyOptions::default());
@@ -469,6 +488,11 @@ fn status_name(s: crate::market::MarketStatus) -> &'static str {
         AfterHours => "after_hours",
         Closed => "closed",
     }
+}
+
+/// Shared with the batch surface, which parses the same field names.
+pub fn parse_field_public(name: &str) -> PyResult<PriceField> {
+    parse_field(name)
 }
 
 fn parse_field(name: &str) -> PyResult<PriceField> {
@@ -536,10 +560,7 @@ impl PyEngine {
                 "universe is empty - an engine with no instruments has nothing to simulate",
             ));
         }
-        let economy = match macro_state {
-            Some(m) => m.to_core(),
-            None => PyMacro::new(15.0, 0.025, None, 0.02, 0.0, 50.0, "expansion")?.to_core(),
-        };
+        let economy = economy_from(macro_state)?;
         let companies: Vec<TickCompany> = universe
             .iter()
             .enumerate()

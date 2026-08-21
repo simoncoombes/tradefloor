@@ -131,6 +131,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::python_engine::PyInstrument>()?;
     m.add_class::<crate::python_engine::PyMacro>()?;
     m.add_class::<crate::python_engine::PyTickResult>()?;
+    m.add_class::<crate::python_batch::PyEngineBatch>()?;
     m.add_class::<crate::python_engine::PyNews>()?;
     m.add_class::<crate::python_engine::PyNewsImpact>()?;
     m.add_class::<crate::python_arrow::PyArrowStream>()?;

@@ -65,4 +65,8 @@ mod python_arrow;
 #[cfg(feature = "python")]
 mod python_log;
 
+/// Vectorised engines for sweeps and vector envs.
+#[cfg(feature = "python")]
+mod python_batch;
+
 pub use rng::{to_uint32, GameRng, Pcg32};

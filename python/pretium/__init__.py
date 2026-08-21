@@ -22,6 +22,7 @@ from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
 from .replay import replay
 from ._core import (  # noqa: F401
     Engine,
+    EngineBatch,
     FairValue,
     Fill,
     GameRng,
@@ -51,7 +52,7 @@ from ._core import (  # noqa: F401
 
 __version__ = _core.__version__
 __all__ = [
-    "Engine", "FairValue", "Fill", "GameRng", "Instrument", "Macro",
+    "Engine", "EngineBatch", "FairValue", "Fill", "GameRng", "Instrument", "Macro",
     "MatchResult", "MispricingState", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "Counterfactual",
