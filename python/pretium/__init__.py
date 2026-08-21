@@ -231,15 +231,23 @@ def _run_one(args: tuple) -> Any:
     workaround — a serialised universe is the same universe by construction
     (there is a test), and it means a worker rebuilds from a specification
     rather than depending on whatever a pickle happened to preserve.
+
+    A scenario crosses as its REALISED PATH, one dict per day, for the same
+    reason and one more: the workers are threads sharing an address space, so
+    handing them a driver that closed over mutable state would be a race
+    waiting to happen. A list of dicts cannot be.
     """
-    seed, universe_json, macro_kwargs, days, ticks, hour, minute, day_of_week, collect = args
+    (seed, universe_json, macro_kwargs, days, ticks, hour, minute, day_of_week,
+     collect, path) = args
     universe = Universe.from_json(universe_json)
     engine = Engine(
         seed=seed,
         universe=universe,
         macro_state=Macro(**macro_kwargs) if macro_kwargs is not None else None,
     )
-    for _ in range(days):
+    for day in range(days):
+        if path is not None:
+            engine.pin_macro(**path[day])
         engine.open_market()
         engine.run_session(hour, minute, day_of_week, ticks)
         engine.close_market()
@@ -272,6 +280,7 @@ def run_many(
     start: tuple[int, int, int] = (9, 30, 3),
     workers: int | None = None,
     collect: str = "prices",
+    scenario: Any = None,
 ) -> list[Any]:
     """Run one simulation per seed, in parallel, and return results in order.
 
@@ -340,8 +349,13 @@ def run_many(
         "cycle": macro.cycle,
     }
     hour, minute, day_of_week = start
+    # The scenario is passed as its REALISED PATH rather than as the object.
+    # A path is plain data, so a worker cannot be handed a driver that closes
+    # over shared state, and the sweep records exactly what it ran.
+    path = None if scenario is None else [scenario.at(d) for d in range(days)]
     payloads = [
-        (seed, universe_json, macro_kwargs, days, ticks, hour, minute, day_of_week, collect)
+        (seed, universe_json, macro_kwargs, days, ticks, hour, minute,
+         day_of_week, collect, path)
         for seed in seeds
     ]
 

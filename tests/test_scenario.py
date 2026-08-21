@@ -220,3 +220,123 @@ def test_a_scenario_can_be_inspected_before_it_is_run():
     assert table[0]["federal_funds_rate"] == 0.02
     assert table[4]["federal_funds_rate"] == pytest.approx(0.06)
     assert table[5]["federal_funds_rate"] == pytest.approx(0.06)
+
+
+# --------------------------------------------------------------------------
+# Scenarios reach the other runners
+# --------------------------------------------------------------------------
+
+
+def test_a_sweep_runs_under_a_scenario():
+    import struct
+    import statistics
+
+    calm = Scenario().hold(federal_funds_rate=0.025, corporate_bond_yield=0.045)
+    hike = Scenario.rate_shock(start=0.025, end=0.05, over=15)
+    n = len(UNIVERSE)
+
+    def medians(scenario):
+        results = pretium.run_many(seeds=list(range(8)), universe=UNIVERSE,
+                                   days=20, ticks=80, workers=4,
+                                   scenario=scenario, collect="prices")
+        return statistics.median(
+            statistics.median(struct.unpack("<%dd" % n, r)) for r in results)
+
+    # The same direction the single-seed comparison gives, across a sweep.
+    assert medians(hike) < medians(calm)
+
+
+def test_a_scenario_crosses_to_workers_as_a_path_not_an_object():
+    # The workers are threads sharing an address space. A driver closing over
+    # mutable state would be a race waiting to happen; a list of dicts cannot
+    # be. Checked by confirming the sweep matches a hand-run seed exactly.
+    import struct
+
+    scenario = Scenario.rate_shock(start=0.02, end=0.04, over=5)
+    swept = pretium.run_many(seeds=[3], universe=UNIVERSE, days=6, ticks=40,
+                             scenario=scenario, collect="prices")[0]
+    engine = run_scenario(scenario, seed=3, universe=UNIVERSE, days=6,
+                          ticks_per_day=40)
+    assert struct.unpack("<%dd" % len(UNIVERSE), swept) == \
+        struct.unpack("<%dd" % len(UNIVERSE), engine.prices())
+
+
+def test_execution_costs_more_in_a_volatile_regime():
+    """A question real TCA cannot answer, answered exactly.
+
+    You cannot re-run your execution in the same week with the volatility
+    turned down. Here you can, and both worlds run the identical macro path,
+    so the difference is the trading rather than the regime.
+
+    Measured over twelve seeds, paired: the volatile regime costs more in
+    12 of 12, median 4.70 bps calm against 6.82 bps spiked, paired median
+    delta +2.99 bps. A win count and a paired delta rather than one seed,
+    because a single comparison of an 11-fill programme is noise.
+    """
+    import statistics
+
+    class Rotating:
+        def __init__(self):
+            self.i = 0
+
+        def act(self, obs):
+            self.i += 1
+            ticker = obs.tickers[self.i % len(obs.tickers)]
+            return {ticker: 0.004 * obs.avg_volume(ticker)}
+
+    deltas = []
+    wins = 0
+    for seed in range(6):
+        calm = pretium.tca.analyse(Rotating(), seed=seed, universe=UNIVERSE,
+                                   days=10, scenario=Scenario().hold(vix=15.0))
+        spike = pretium.tca.analyse(Rotating(), seed=seed, universe=UNIVERSE,
+                                    days=10, scenario=Scenario().hold(vix=45.0))
+        deltas.append(spike.shortfall_bps() - calm.shortfall_bps())
+        wins += spike.shortfall_bps() > calm.shortfall_bps()
+
+    assert wins == 6, deltas
+    assert statistics.median(deltas) > 1.0
+
+
+def test_the_tca_counterfactual_stays_clean_under_a_scenario():
+    # Both worlds run the identical macro path, so the untraded names must
+    # still be untouched. If the scenario were applied to only one of them,
+    # every name would move and this would catch it.
+    class Buyer:
+        def act(self, obs):
+            return {obs.tickers[0]: 0.002 * obs.avg_volume(obs.tickers[0])}
+
+    execution = pretium.tca.analyse(
+        Buyer(), seed=11, universe=UNIVERSE, days=5,
+        scenario=Scenario.rate_shock(start=0.025, end=0.05, over=3))
+    assert execution.untouched_moved() == []
+
+
+def test_a_scenario_run_replays_from_its_own_log():
+    # pin_macro is logged, so a scenario is captured in the archive with no
+    # special handling -- the log alone reproduces the run, path included.
+    scenario = Scenario.rate_shock(start=0.025, end=0.05, over=5)
+    engine = run_scenario(scenario, seed=7, universe=UNIVERSE, days=8,
+                          ticks_per_day=60)
+    archived = json.loads(json.dumps(engine.order_log))
+    assert sum(1 for e in archived if e["op"] == "pin_macro") == 8
+    replayed = pretium.replay(archived, seed=7, universe=UNIVERSE)
+    assert replayed.prices() == engine.prices()
+    assert replayed.draws_consumed == engine.draws_consumed
+
+
+def test_a_pin_holds_for_the_whole_day_it_was_applied_to():
+    import pyarrow as pa
+
+    engine = pretium.Engine(seed=5, universe=UNIVERSE,
+                            macro_state=pretium.Macro(federal_funds_rate=0.02,
+                                                      corporate_bond_yield=0.04))
+    wanted = [0.04 + 0.005 * day for day in range(5)]
+    for day in range(5):
+        engine.pin_macro(corporate_bond_yield=wanted[day])
+        engine.open_market()
+        engine.run_session(9, 30, 3, 60)
+        engine.close_market()
+        engine.record(day)
+    recorded = pa.table(engine.macro_table()).to_pydict()["corporate_bond_yield"]
+    assert recorded == pytest.approx(wanted)

@@ -251,13 +251,19 @@ def analyse(
     cash: float = 1_000_000.0,
     max_leverage: float | None = 2.0,
     start: tuple[int, int, int] = (9, 30, 3),
+    scenario: Any = None,
 ) -> Execution:
     """Run an agent, then run the same market without it, and price the gap.
 
     The two runs differ in exactly one thing: whether the trader exists. Same
-    seed, same universe, same macro, same session length, same tick schedule.
-    Anything else that differed between them would surface as impact and be
-    wrong.
+    seed, same universe, same macro, same session length, same tick schedule,
+    and the same ``scenario`` if one is given. Anything else that differed
+    between them would surface as impact and be wrong.
+
+    Passing a ``scenario`` asks a question real TCA cannot: what did this
+    execution cost DURING a shock, against the same shock without it. Both
+    worlds run the identical macro path, so the difference is still the
+    trading and not the regime.
 
     Returns an :class:`Execution`. Its ``shortfall`` is the measurement real
     TCA cannot make, because the benchmark it compares against is a market
@@ -281,6 +287,8 @@ def analyse(
     actual_path: list[list[float]] = []
     step = 0
     for day in range(days):
+        if scenario is not None:
+            scenario.apply(engine, day)
         engine.open_market()
         for _ in range(steps_per_day):
             prices = _f64(engine.prices())
@@ -308,7 +316,9 @@ def analyse(
     # Run second, so an agent that raises does so before this work is spent.
     quiet = fresh()
     baseline_path: list[list[float]] = []
-    for _ in range(days):
+    for day in range(days):
+        if scenario is not None:
+            scenario.apply(quiet, day)
         quiet.open_market()
         for _ in range(steps_per_day):
             baseline_path.append(_f64(quiet.prices()))

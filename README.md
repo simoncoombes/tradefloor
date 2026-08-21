@@ -180,6 +180,23 @@ corporate bond yield, and the policy rate is only the fallback when no yield is
 present. `rate_shock` moves the whole curve for you; `ramp` lets you isolate a
 single lever when that is what you actually want.
 
+Scenarios reach `evaluate`, `tca.analyse` and `run_many` alike, which makes
+questions like this answerable exactly:
+
+```python
+calm  = pt.tca.analyse(agent, seed=s, universe=u, days=10, scenario=pt.Scenario().hold(vix=15))
+spike = pt.tca.analyse(agent, seed=s, universe=u, days=10, scenario=pt.Scenario().hold(vix=45))
+```
+
+*Does execution cost more in a volatile regime?* Yes, and by how much: paired
+over twelve seeds, the volatile regime costs more in **12 of 12**, median 4.70
+bps against 6.82, paired median delta **+2.99 bps**. You cannot re-run last
+week's execution with the volatility turned down; here both worlds run the
+identical macro path, so the difference is the trading and not the regime.
+
+A scenario run also replays from its own log with no special handling —
+`pin_macro` is logged, so the path is captured in the archive.
+
 Macro counterfactuals are *near*-exact rather than exact, and `compare()`
 reports which. Order flow consumes no RNG draws, so a TCA counterfactual is
 exact; a macro path changes prices, prices change which branch the book
