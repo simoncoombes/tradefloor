@@ -508,3 +508,57 @@ pub fn ohlc_batch(day: &RecordedDay, bucket: usize) -> Result<RecordBatch, Strin
     )
     .map_err(|e| e.to_string())
 }
+
+/// `book`: one row per (tick, instrument, side, level).
+///
+/// # Why this one is opt-in and the others are not
+///
+/// Arithmetic, not preference. A hundred names at 390 ticks with ten levels a
+/// side is 780,000 rows per day per side -- roughly 1.5 million rows daily
+/// against 39,000 for `bars`. Recording depth by default would make every run
+/// forty times more expensive to serve a question most runs never ask.
+///
+/// So the caller chooses when to snapshot and how deep. Nothing samples on
+/// their behalf, because a sampling rate baked into the engine is a modelling
+/// decision disguised as a default.
+///
+/// `side` is 0 for bids and 1 for asks. An integer rather than a string
+/// because it repeats on every row, and at these counts the difference is the
+/// difference between a column and a memory problem -- the same reason
+/// `instrument_id` is an index.
+pub fn book_schema() -> SchemaRef {
+    Arc::new(Schema::new(vec![
+        Field::new("day", DataType::UInt32, false),
+        Field::new("tick", DataType::UInt32, false),
+        Field::new("instrument_id", DataType::UInt32, false),
+        Field::new("side", DataType::UInt32, false),
+        Field::new("level", DataType::UInt32, false),
+        Field::new("price", DataType::Float64, false),
+        Field::new("size", DataType::Float64, false),
+    ]))
+}
+
+/// One row of recorded depth.
+#[derive(Debug, Clone, Copy)]
+pub struct BookRow {
+    pub day: u32,
+    pub tick: u32,
+    pub instrument_id: u32,
+    pub side: u32,
+    pub level: u32,
+    pub price: f64,
+    pub size: f64,
+}
+
+pub fn book_batch(rows: &[BookRow]) -> Result<RecordBatch, String> {
+    let columns: Vec<ArrayRef> = vec![
+        Arc::new(UInt32Array::from(rows.iter().map(|r| r.day).collect::<Vec<_>>())),
+        Arc::new(UInt32Array::from(rows.iter().map(|r| r.tick).collect::<Vec<_>>())),
+        Arc::new(UInt32Array::from(rows.iter().map(|r| r.instrument_id).collect::<Vec<_>>())),
+        Arc::new(UInt32Array::from(rows.iter().map(|r| r.side).collect::<Vec<_>>())),
+        Arc::new(UInt32Array::from(rows.iter().map(|r| r.level).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.price).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.size).collect::<Vec<_>>())),
+    ];
+    RecordBatch::try_new(book_schema(), columns).map_err(|e| e.to_string())
+}

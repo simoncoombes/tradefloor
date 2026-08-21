@@ -399,3 +399,116 @@ def test_conflicting_or_unknown_grain_is_refused():
         e.bars(grain="hourly")
     with pytest.raises(pretium.ValidationError, match="at least 1"):
         e.bars(minutes=0)
+
+
+# --------------------------------------------------------------------------
+# The book table
+# --------------------------------------------------------------------------
+
+def snapshotted(names=4, levels=5, shots=4):
+    u = pretium.Universe.random(names, seed=5)
+    e = pretium.Engine(seed=2026, universe=u)
+    e.open_market()
+    for i in range(shots):
+        e.run_session(9, 30 + i * 30, 3, 30)
+        e.snapshot_book(day=0, tick=i * 30, levels=levels)
+    return e, names, levels, shots
+
+
+def test_depth_is_opt_in_and_records_nothing_by_default():
+    """Arithmetic, not preference.
+
+    A hundred names at 390 ticks with ten levels a side is ~1.5 million rows
+    a day against 39,000 for bars. Recording it by default would make every
+    run forty times more expensive to answer a question most runs never ask.
+    """
+    u = pretium.Universe.random(3, seed=1)
+    e = pretium.Engine(seed=1, universe=u)
+    e.open_market()
+    e.run_session(9, 30, 3, 60)
+    assert e.recorded_book_rows == 0
+    assert pa.table(e.book_table()).num_rows == 0
+
+
+def test_a_snapshot_captures_both_sides_at_the_requested_depth():
+    e, names, levels, shots = snapshotted()
+    assert e.recorded_book_rows == shots * names * 2 * levels
+    assert pa.table(e.book_table()).num_rows == shots * names * 2 * levels
+
+
+def test_the_recorded_ladder_is_a_real_book():
+    # Bids descend from the best, asks ascend from it, and the two do not
+    # cross. A ladder that failed any of these would not be a book.
+    e, _, _, _ = snapshotted()
+    d = pa.table(e.book_table()).to_pydict()
+
+    def side(which):
+        rows = [(lv, p) for lv, p, i, sd, tk in
+                zip(d["level"], d["price"], d["instrument_id"], d["side"], d["tick"])
+                if i == 0 and sd == which and tk == 0]
+        return [p for _, p in sorted(rows)]
+
+    bids, asks = side(0), side(1)
+    assert all(a > b for a, b in zip(bids, bids[1:])), "bids must descend"
+    assert all(a < b for a, b in zip(asks, asks[1:])), "asks must ascend"
+    assert bids[0] < asks[0], "the book must not cross"
+
+
+def test_sizes_are_positive_and_f64():
+    e, _, _, _ = snapshotted()
+    table = pa.table(e.book_table())
+    assert table.schema.field("size").type == pa.float64()
+    assert table.schema.field("price").type == pa.float64()
+    assert all(s > 0 for s in table.to_pydict()["size"])
+
+
+def test_side_is_an_integer_because_it_repeats_on_every_row():
+    # Same reason instrument_id is an index: at these row counts a repeated
+    # string is the difference between a column and a memory problem.
+    e, _, _, _ = snapshotted()
+    table = pa.table(e.book_table())
+    assert pa.types.is_unsigned_integer(table.schema.field("side").type)
+    assert set(table.to_pydict()["side"]) == {0, 1}
+
+
+def test_book_joins_to_bars_on_instrument_and_tick():
+    e, _, _, _ = snapshotted()
+    e.record(0)
+    book = pa.table(e.book_table()).to_pydict()
+    bars = pa.table(e.bars()).to_pydict()
+    assert set(book["instrument_id"]) <= set(bars["instrument_id"])
+    assert set(book["day"]) <= set(bars["day"])
+
+
+def test_snapshotting_does_not_disturb_the_market():
+    """It reads state without changing it, and consumes no draws.
+
+    Which is also why it is not a replayable log entry: replaying a run
+    produces the same depth whether or not anyone looked at it.
+    """
+    def run(observe):
+        u = pretium.Universe.random(4, seed=5)
+        e = pretium.Engine(seed=2026, universe=u)
+        e.open_market()
+        for i in range(4):
+            e.run_session(9, 30 + i * 30, 3, 30)
+            if observe:
+                e.snapshot_book(day=0, tick=i * 30, levels=5)
+        return arr(e.prices()), e.draws_consumed, len(e.order_log)
+
+    watched, unwatched = run(True), run(False)
+    assert watched[0] == unwatched[0], "prices must not depend on being observed"
+    assert watched[1] == unwatched[1], "nor may the draw count"
+    assert watched[2] == unwatched[2], "and snapshots are not log entries"
+
+
+def test_zero_levels_is_refused():
+    e, _, _, _ = snapshotted()
+    with pytest.raises(pretium.ValidationError, match="at least 1"):
+        e.snapshot_book(levels=0)
+
+
+def test_clearing_a_recording_clears_depth_too():
+    e, _, _, _ = snapshotted()
+    e.clear_recording()
+    assert e.recorded_book_rows == 0

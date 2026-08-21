@@ -511,6 +511,8 @@ pub struct PyEngine {
     /// pull protocol the consumer drives.
     recorded: Vec<crate::python_arrow::RecordedDay>,
     recorded_macro: Vec<crate::python_arrow::MacroRow>,
+    /// Recorded order-book depth. Empty unless a caller asks for it.
+    recorded_book: Vec<crate::python_arrow::BookRow>,
     /// Every input that crossed into this engine, in order.
     ///
     /// Inputs only. Prices, attribution and draw counts are consequences,
@@ -557,6 +559,7 @@ impl PyEngine {
             tickers,
             recorded: Vec::new(),
             recorded_macro: Vec::new(),
+            recorded_book: Vec::new(),
             log: Vec::new(),
         })
     }
@@ -1125,6 +1128,7 @@ impl PyEngine {
     fn clear_recording(&mut self) {
         self.recorded.clear();
         self.recorded_macro.clear();
+        self.recorded_book.clear();
     }
 
     #[getter]
@@ -1305,6 +1309,76 @@ impl PyEngine {
             ValidationError::new_err(format!("no instrument at index {index}"))
         })?;
         Ok(crate::python_book::PyOrderBook::from_core(inner))
+    }
+
+    /// Capture current book depth for every instrument.
+    ///
+    /// # Opt-in, because the arithmetic demands it
+    ///
+    /// A hundred names at 390 ticks with ten levels a side is about 1.5
+    /// million rows a day, against 39,000 for `bars`. Recording depth by
+    /// default would make every run forty times more expensive to answer a
+    /// question most runs never ask.
+    ///
+    /// So the caller decides when and how deep. Nothing samples on their
+    /// behalf: a sampling rate baked into the engine would be a modelling
+    /// decision wearing the costume of a default, and two studies using
+    /// different rates would silently be measuring different things.
+    ///
+    /// This is NOT logged as a replayable input, and correctly so -- it reads
+    /// state without changing it, consumes no draws, and replaying a run
+    /// produces the same depth whether or not anyone looked.
+    #[pyo3(signature = (*, day = 0, tick = 0, levels = 10))]
+    fn snapshot_book(&mut self, day: u32, tick: u32, levels: usize) -> PyResult<usize> {
+        if levels == 0 {
+            return Err(ValidationError::new_err("levels must be at least 1"));
+        }
+        let before = self.recorded_book.len();
+        for index in 0..self.inner.len() {
+            let Some(book) = self.inner.book_for(index) else {
+                continue;
+            };
+            for (side_id, side) in [
+                (0u32, crate::order_book::Side::Buy),
+                (1u32, crate::order_book::Side::Sell),
+            ] {
+                for (level, entry) in book.price_levels(side, levels).iter().enumerate() {
+                    self.recorded_book.push(crate::python_arrow::BookRow {
+                        day,
+                        tick,
+                        instrument_id: index as u32,
+                        side: side_id,
+                        level: level as u32,
+                        price: entry.price,
+                        size: entry.quantity,
+                    });
+                }
+            }
+        }
+        Ok(self.recorded_book.len() - before)
+    }
+
+    /// The `book` table: recorded depth, one row per (tick, instrument, side,
+    /// level).
+    ///
+    /// `side` is 0 for bids and 1 for asks -- an integer rather than a string
+    /// because it repeats on every row, the same reason `instrument_id` is an
+    /// index.
+    ///
+    /// Empty unless `snapshot_book` was called.
+    fn book_table(&self) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let batch = crate::python_arrow::book_batch(&self.recorded_book)
+            .map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "book",
+            crate::python_arrow::book_schema(),
+            vec![batch],
+        ))
+    }
+
+    #[getter]
+    fn recorded_book_rows(&self) -> usize {
+        self.recorded_book.len()
     }
 
     /// Every input that crossed into this engine, in order.
