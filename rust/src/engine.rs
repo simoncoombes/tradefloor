@@ -823,6 +823,81 @@ impl Engine {
     /// Returns an error when the slice length does not match the roster.
     /// Silently writing a prefix would restore a market that was correct for
     /// the first N companies and stale for the rest.
+    /// Write the three fair-value inputs back onto the roster.
+    ///
+    /// [`Engine::set_column`] covers the STOCK fields -- price, variance,
+    /// inventory, the mispricing carry. These three live on the company
+    /// rather than the stock, and until now nothing could set them after
+    /// construction. That made them frozen for the life of an engine, which
+    /// is fine for a batch sweep and wrong for an embedder whose companies
+    /// report earnings: fair value is `eps * target_pe`, so a stale `eps` is
+    /// a company valued on the fundamentals it had on day one, for ever.
+    ///
+    /// NaN clears the field, matching `set_column` and the columnar contract
+    /// everywhere else -- zero is a real EPS (a company that broke exactly
+    /// even) and cannot double as the absent marker. `None` here is not
+    /// "unknown", it is what the valuation reads as "no earnings path", and
+    /// the two must stay distinguishable.
+    ///
+    /// Consumes no draws, so it cannot move the generator: a caller may sync
+    /// as often as it likes without changing the market's trajectory.
+    ///
+    /// Lengths are checked against the roster rather than truncated. Writing
+    /// a prefix would leave a market correct for its first companies and
+    /// stale for the rest -- the failure this method exists to end.
+    pub fn set_fundamentals(
+        &mut self,
+        eps: &[f64],
+        book_value_per_share: &[f64],
+        revenue_growth: &[f64],
+    ) -> Result<(), String> {
+        let n = self.companies.len();
+        for (name, len) in [
+            ("eps", eps.len()),
+            ("book_value_per_share", book_value_per_share.len()),
+            ("revenue_growth", revenue_growth.len()),
+        ] {
+            if len != n {
+                return Err(format!(
+                    "{name} has {len} values for {n} companies"
+                ));
+            }
+        }
+        fn optional(v: f64) -> Option<f64> {
+            if v.is_nan() {
+                None
+            } else {
+                Some(v)
+            }
+        }
+        for (i, company) in self.companies.iter_mut().enumerate() {
+            company.eps = optional(eps[i]);
+            company.book_value_per_share = optional(book_value_per_share[i]);
+            company.revenue_growth = optional(revenue_growth[i]);
+        }
+        Ok(())
+    }
+
+    /// The three fair-value inputs, NaN where absent.
+    ///
+    /// The read side of [`Engine::set_fundamentals`], so a caller can check
+    /// what the engine is actually valuing on rather than assuming its own
+    /// copy is what arrived.
+    pub fn fundamentals(&self) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+        let nan = f64::NAN;
+        (
+            self.companies.iter().map(|c| c.eps.unwrap_or(nan)).collect(),
+            self.companies
+                .iter()
+                .map(|c| c.book_value_per_share.unwrap_or(nan))
+                .collect(),
+            self.companies
+                .iter()
+                .map(|c| c.revenue_growth.unwrap_or(nan))
+                .collect(),
+        )
+    }
+
     pub fn set_column(&mut self, field: PriceField, values: &[f64]) -> Result<(), String> {
         if values.len() != self.companies.len() {
             return Err(format!(
@@ -1611,5 +1686,77 @@ mod tests {
                 "company {i} escaped the session band: {price} against an open of {open}"
             );
         }
+    }
+
+    #[test]
+    fn fundamentals_round_trip_including_the_absent_marker() {
+        let mut e = engine(7);
+        let n = e.len();
+        assert!(n >= 3);
+
+        e.set_fundamentals(
+            &[8.0, f64::NAN, 0.0],
+            &[25.0, 30.0, f64::NAN],
+            &[0.2, 0.3, 0.4],
+        )
+        .expect("one value per company");
+
+        let (eps, book, growth) = e.fundamentals();
+        assert_eq!(eps[0], 8.0);
+        assert!(eps[1].is_nan(), "NaN must survive as absent");
+        // Zero is a real EPS -- a company that broke exactly even -- and must
+        // NOT be confused with absent.
+        assert_eq!(eps[2], 0.0);
+        assert!(e.companies()[2].eps == Some(0.0));
+        assert!(e.companies()[1].eps.is_none());
+        assert_eq!(book[1], 30.0);
+        assert!(book[2].is_nan());
+        assert_eq!(growth[0], 0.2);
+    }
+
+    #[test]
+    fn a_length_mismatch_is_refused_rather_than_truncated() {
+        let mut e = engine(7);
+        let n = e.len();
+        assert!(e.set_fundamentals(&vec![1.0; n - 1], &vec![1.0; n], &vec![1.0; n]).is_err());
+        assert!(e.set_fundamentals(&vec![1.0; n], &vec![1.0; n + 1], &vec![1.0; n]).is_err());
+        assert!(e.set_fundamentals(&vec![1.0; n], &vec![1.0; n], &vec![1.0; n]).is_ok());
+    }
+
+    #[test]
+    fn stale_earnings_move_the_price_which_is_why_this_exists() {
+        // The claim the whole sync rests on: fair value is `eps * target_pe`,
+        // so an engine that never hears about an earnings revision prices the
+        // company on the fundamentals it was built with.
+        //
+        // Two identical engines, one told that every company doubled its
+        // earnings. If the prices came out the same, syncing fundamentals
+        // would be pointless work.
+        let mut stale = engine(11);
+        let mut fresh = engine(11);
+
+        let n = fresh.len();
+        let (eps, book, growth) = fresh.fundamentals();
+        let doubled: Vec<f64> = eps.iter().map(|v| v * 2.0).collect();
+        fresh
+            .set_fundamentals(&doubled, &book, &growth)
+            .expect("one value per company");
+
+        for e in [&mut stale, &mut fresh] {
+            e.open_market();
+            e.run_session(&session(60, &[None; 3], &[0.000225; 3]), &mut SessionBuffer::new());
+        }
+
+        let a = stale.prices();
+        let b = fresh.prices();
+        assert_eq!(a.len(), n);
+        assert!(
+            a.iter().zip(b.iter()).any(|(x, y)| x != y),
+            "doubling every company's earnings changed no price at all"
+        );
+        // And it is the RNG-free difference: both engines drew the same
+        // number of times, so the divergence is the valuation rather than a
+        // shifted stream.
+        assert_eq!(stale.draws_consumed(), fresh.draws_consumed());
     }
 }
