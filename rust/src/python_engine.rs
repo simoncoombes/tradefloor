@@ -1777,3 +1777,45 @@ pub fn sector_volatility(sector: &str) -> PyResult<f64> {
             ))
         })
 }
+
+/// A sector's long-run daily return standard deviation, as a fraction.
+///
+/// The real dispersion measure -- NOT the relative `volatility` multiplier,
+/// which is dimensionless and squaring it for a variance is a mistake the
+/// reference implementation made and had to fix.
+#[pyfunction]
+pub fn sector_daily_sigma(sector: &str) -> PyResult<f64> {
+    crate::sectors::by_key(sector)
+        .map(|s| s.daily_sigma)
+        .ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "unknown sector {sector:?}. Valid sectors: {}",
+                crate::sectors::keys().join(", ")
+            ))
+        })
+}
+
+/// Standard deviation of the daily mispricing process at rest.
+///
+/// A universe priced exactly at fair value starts with zero cross-sectional
+/// mispricing dispersion, so a strategy that harvests mispricing sees nothing
+/// until shocks accumulate -- on the order of one 60-day half-life. This is
+/// the width of the distribution such a universe would eventually reach, so a
+/// caller can start there instead of waiting.
+///
+/// Returns None for non-stationary parameters rather than a large finite
+/// number, which would be worse: it would be used.
+#[pyfunction]
+#[pyo3(signature = (innovation_sigma, *, phi = None, theta = None))]
+pub fn stationary_sigma(
+    innovation_sigma: f64,
+    phi: Option<f64>,
+    theta: Option<f64>,
+) -> PyResult<Option<f64>> {
+    if !innovation_sigma.is_finite() || innovation_sigma < 0.0 {
+        return Err(ValidationError::new_err(format!(
+            "innovation_sigma must be finite and not negative, got {innovation_sigma}"
+        )));
+    }
+    Ok(crate::mispricing::stationary_sigma(phi, theta, innovation_sigma))
+}

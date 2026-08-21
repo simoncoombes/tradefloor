@@ -139,6 +139,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(crate::python_engine::market_status, m)?)?;
     m.add_function(wrap_pyfunction!(crate::python_engine::random_instruments, m)?)?;
     m.add_function(wrap_pyfunction!(crate::python_engine::sector_volatility, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::python_engine::sector_daily_sigma, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::python_engine::stationary_sigma, m)?)?;
     m.add("ValidationError", m.py().get_type_bound::<ValidationError>())?;
     m.add(
         "OrderError",

@@ -47,7 +47,9 @@ from ._core import (  # noqa: F401
     impulse_response,
     market_status,
     model_preset,
+    sector_daily_sigma,
     sectors,
+    stationary_sigma,
     step_mispricing_daily,
 )
 
@@ -61,7 +63,8 @@ __all__ = [
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
-    "market_status", "model_preset", "run_many", "sectors", "step_mispricing_daily",
+    "market_status", "model_preset", "run_many", "sector_daily_sigma", "sectors",
+    "stationary_sigma", "step_mispricing_daily",
     "__version__",
 ]
 

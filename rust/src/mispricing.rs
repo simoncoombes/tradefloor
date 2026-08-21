@@ -545,3 +545,125 @@ mod tests {
         );
     }
 }
+
+/// Stationary variance of the daily `s` process, for a given innovation
+/// variance.
+///
+/// # The process in AR(2) form
+///
+/// The step is `s' = phi*s + theta*(s - s_prev) + e`, which collects to
+/// `s' = (phi + theta)*s - theta*s_prev + e`. So in the standard
+/// `x_t = a1*x_{t-1} + a2*x_{t-2} + e` form, `a1 = phi + theta` and
+/// `a2 = -theta`.
+///
+/// The stationary variance is then the textbook AR(2) result:
+///
+/// ```text
+///            sigma^2 * (1 - a2)
+/// gamma0 = ------------------------------
+///          (1 + a2) * ((1 - a2)^2 - a1^2)
+/// ```
+///
+/// # What it is for
+///
+/// A universe priced exactly at fair value starts with `s = 0` everywhere and
+/// therefore ZERO cross-sectional mispricing dispersion. Any strategy that
+/// harvests mispricing sees nothing until shocks accumulate -- on the order of
+/// one 60-day half-life. Drawing initial `s` from this distribution starts the
+/// universe where a long-running one would already be.
+///
+/// Returns `None` when the parameters are not stationary, rather than a
+/// negative variance dressed up as a number.
+pub fn stationary_variance(
+    phi: Option<f64>,
+    theta: Option<f64>,
+    innovation_variance: f64,
+) -> Option<f64> {
+    let phi = phi.unwrap_or(MISPRICING_PHI);
+    let theta = theta.unwrap_or(MOMENTUM_THETA);
+    let a1 = phi + theta;
+    let a2 = -theta;
+
+    let denominator = (1.0 + a2) * ((1.0 - a2) * (1.0 - a2) - a1 * a1);
+    if !(denominator > 0.0) || !innovation_variance.is_finite() || innovation_variance < 0.0 {
+        return None;
+    }
+    let gamma0 = innovation_variance * (1.0 - a2) / denominator;
+    if gamma0.is_finite() && gamma0 >= 0.0 {
+        Some(gamma0)
+    } else {
+        None
+    }
+}
+
+/// Stationary standard deviation, the form a caller actually wants.
+pub fn stationary_sigma(phi: Option<f64>, theta: Option<f64>, innovation_sigma: f64) -> Option<f64> {
+    stationary_variance(phi, theta, innovation_sigma * innovation_sigma)
+        .map(crate::mathx::sqrt)
+}
+
+#[cfg(test)]
+mod stationary_tests {
+    use super::*;
+    use crate::rng::GameRng;
+
+    /// The analytic value must match a long simulation, or the algebra is
+    /// decoration. Derived formulas are exactly the kind of thing that looks
+    /// right and is off by a factor.
+    #[test]
+    fn the_analytic_variance_matches_a_simulated_one() {
+        let sigma = 0.012;
+        let analytic = stationary_sigma(None, None, sigma).expect("stationary");
+
+        let mut rng = GameRng::new(4242, 99);
+        let mut state = MispricingState::default();
+        // Burn in past the transient before measuring.
+        for _ in 0..5_000 {
+            state = step_mispricing(
+                &state,
+                &MispricingInputs { innovation: rng.next_normal() * sigma, shock: 0.0 },
+            );
+        }
+        let (mut sum, mut sum_sq, n) = (0.0, 0.0, 400_000);
+        for _ in 0..n {
+            state = step_mispricing(
+                &state,
+                &MispricingInputs { innovation: rng.next_normal() * sigma, shock: 0.0 },
+            );
+            sum += state.s;
+            sum_sq += state.s * state.s;
+        }
+        let mean = sum / n as f64;
+        let simulated = crate::mathx::sqrt(sum_sq / n as f64 - mean * mean);
+
+        let ratio = simulated / analytic;
+        assert!(
+            ratio > 0.9 && ratio < 1.1,
+            "analytic {analytic:.6} vs simulated {simulated:.6} (ratio {ratio:.4})"
+        );
+    }
+
+    #[test]
+    fn a_bigger_innovation_gives_a_wider_distribution() {
+        let small = stationary_sigma(None, None, 0.005).unwrap();
+        let large = stationary_sigma(None, None, 0.020).unwrap();
+        // Linear in sigma: the process is linear, so scaling the input scales
+        // the output exactly.
+        assert!((large / small - 4.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn non_stationary_parameters_return_none_rather_than_a_number() {
+        // A unit root gives an infinite variance. Returning a large finite
+        // number would be worse than returning nothing: it would be used.
+        assert!(stationary_variance(Some(1.0), Some(0.0), 0.0001).is_none());
+        assert!(stationary_variance(Some(1.5), Some(0.25), 0.0001).is_none());
+    }
+
+    #[test]
+    fn the_shipped_parameters_are_stationary() {
+        assert!(stationary_sigma(None, None, 0.015).is_some());
+        let (a, b) = characteristic_root_moduli(None, None);
+        assert!(a < 1.0 && b < 1.0);
+    }
+}

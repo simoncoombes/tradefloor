@@ -47,7 +47,17 @@ import hashlib
 import json
 from typing import Any, Sequence
 
-from ._core import Instrument, ValidationError, fair_value, sectors
+from ._core import (
+    GameRng,
+    Instrument,
+    ValidationError,
+    apply_mispricing,
+    fair_value,
+    model_preset,
+    sector_daily_sigma,
+    sectors,
+    stationary_sigma,
+)
 
 # Bumped when a derivation or the SIC mapping changes. A snapshot records the
 # version that built it, because changing a derivation changes universes — the
@@ -58,6 +68,11 @@ LOADER_VERSION = 1
 # the snapshot rather than left as an absent field: a citable snapshot should
 # contain the numbers actually used, not a hole the engine fills invisibly.
 TURNOVER = 0.005
+
+# The stream initial mispricing is drawn from. Distinct from the market stream
+# and from universe generation, so seeding a universe's dispersion cannot
+# perturb the market it is built for -- the same isolation the generator has.
+MISPRICING_STREAM = 37
 
 
 def _beta_for(sector: str) -> float:
@@ -170,6 +185,8 @@ def to_instruments(
     federal_funds_rate: float = 0.025,
     corporate_bond_yield: float | None = None,
     qe_pe_boost: float = 0.0,
+    initial_s: str = "zero",
+    s_seed: int = 0,
 ) -> list[Instrument]:
     """Build instruments from a snapshot. Pure and reproducible.
 
@@ -186,11 +203,31 @@ def to_instruments(
     shocks accumulate — on the order of one 60-day half-life. Run a burn-in
     before handing control to an agent if that matters.
 
+    # initial_s="stationary" starts the universe where a long run would be
+
+    ``"zero"`` (the default) prices everything at fair value, which is honest
+    and has the cost above. ``"stationary"`` instead draws each company's
+    mispricing from the distribution the process settles into, so the universe
+    begins with realistic cross-sectional dispersion — around 19% for a
+    technology name and 6% for consumer staples, from each sector's own
+    long-run volatility.
+
+    That is not a fudge: it is the distribution the model itself implies, and
+    the width is computed from the AR(2) parameters rather than chosen. The
+    draw uses its own RNG stream, so seeding a universe's dispersion cannot
+    perturb the market it is built for.
+
     The macro arguments are the conditions the fair value is computed under.
     They must match the macro the engine then runs, or every company starts
     mispriced by the difference — which is a subtle way to get a universe
     nobody specified.
     """
+    if initial_s not in ("zero", "stationary"):
+        raise ValidationError(
+            f"initial_s must be \"zero\" or \"stationary\", got {initial_s!r}"
+        )
+    rng = GameRng(int(s_seed), MISPRICING_STREAM)
+    cap = model_preset()["mispricing_cap"]
     out: list[Instrument] = []
     for i, row in enumerate(snapshot.rows):
         missing = {"ticker", "sector", "eps", "shares_outstanding"} - set(row)
@@ -207,9 +244,25 @@ def to_instruments(
             book_value_per_share=row.get("book_value_per_share"),
         )
         shares = row["shares_outstanding"]
+
+        price = value.fair_value
+        if initial_s == "stationary":
+            width = stationary_sigma(sector_daily_sigma(row["sector"]))
+            if width is None:
+                # Non-stationary parameters cannot produce a distribution to
+                # draw from. Falling back to fair value is right: it is the
+                # documented default, not a guess.
+                pass
+            else:
+                s_value = rng.next_normal() * width
+                # Clamped to the model's own cap, so a tail draw cannot start
+                # a company outside the range the process can reach.
+                s_value = max(-cap, min(cap, s_value))
+                price = apply_mispricing(value.fair_value, s_value)
+
         out.append(Instrument(
             row["ticker"], row["sector"],
-            initial_price=value.fair_value,
+            initial_price=price,
             shares_outstanding=shares,
             eps=row["eps"],
             book_value_per_share=row.get("book_value_per_share"),

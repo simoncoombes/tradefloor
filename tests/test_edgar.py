@@ -240,3 +240,117 @@ def test_fetch_says_plainly_that_it_is_not_built():
     # quietly produced empty or fabricated data would be discovered late.
     with pytest.raises(NotImplementedError, match="not implemented"):
         pretium.edgar.fetch(as_of="2024-06-30")
+
+
+# --------------------------------------------------------------------------
+# Stationary initialisation
+# --------------------------------------------------------------------------
+
+import math
+import statistics
+
+
+def wide_snapshot(n=120):
+    secs = pretium.sectors()
+    return Snapshot(as_of="2024-06-30", rows=[
+        dict(ticker="T%03d" % i, sector=secs[i % 12], eps=2.0 + i * 0.05,
+             book_value_per_share=15.0 + i * 0.2, revenue_growth=0.05,
+             shares_outstanding=1e9)
+        for i in range(n)
+    ])
+
+
+def test_the_stationary_width_is_the_model_s_own_not_a_chosen_number():
+    """Derived from the AR(2) parameters, and checked against a simulation.
+
+    The Rust side asserts the analytic variance matches a 400,000-step
+    simulation. That check matters because a derived formula is exactly the
+    kind of thing that looks right and is off by a factor.
+    """
+    for sector in pretium.sectors():
+        daily = pretium.sector_daily_sigma(sector)
+        width = pretium.stationary_sigma(daily)
+        assert width is not None
+        # The process amplifies its innovations about 7.6x at rest.
+        assert width / daily == pytest.approx(7.636, rel=1e-3)
+
+
+def test_stationary_gives_immediate_cross_sectional_dispersion():
+    snap = wide_snapshot()
+    zero = to_instruments(snap, initial_s="zero", **MACRO)
+    spread = to_instruments(snap, initial_s="stationary", s_seed=11, **MACRO)
+
+    s_values = [math.log(a.initial_price / b.initial_price)
+                for a, b in zip(spread, zero)]
+    assert statistics.pstdev(s_values) > 0.05
+    assert abs(statistics.mean(s_values)) < 0.05, "should be centred on fair value"
+
+
+def test_zero_start_takes_about_a_half_life_to_catch_up():
+    """The limitation this option exists to fix, measured.
+
+    A universe priced at fair value has no mispricing dispersion, so a strategy
+    that harvests it sees nothing until shocks accumulate. Measured across 60
+    trading days: a zero-start universe climbs from 0.014 to 0.091 while a
+    stationary-start one sits near 0.10 the whole time.
+    """
+    snap = wide_snapshot(40)
+
+    def dispersion_after(mode, days):
+        u = pretium.Universe(to_instruments(snap, initial_s=mode, s_seed=11, **MACRO))
+        e = pretium.Engine(seed=5, universe=u, macro_state=pretium.Macro(**MACRO))
+        e.run_days(days, ticks_per_day=390, record=False)
+        return statistics.pstdev(arr(e.column("mispricing_s")))
+
+    assert dispersion_after("stationary", 1) > 4 * dispersion_after("zero", 1)
+
+
+def test_a_tail_draw_cannot_start_outside_the_model_s_cap():
+    # A company beginning outside the range the process can reach would be a
+    # state the model cannot produce.
+    cap = pretium.model_preset()["mispricing_cap"]
+    spread = to_instruments(wide_snapshot(300), initial_s="stationary",
+                            s_seed=3, **MACRO)
+    zero = to_instruments(wide_snapshot(300), initial_s="zero", **MACRO)
+    for a, b in zip(spread, zero):
+        assert abs(math.log(a.initial_price / b.initial_price)) <= cap
+
+
+def test_stationary_initialisation_is_reproducible_and_seed_sensitive():
+    snap = wide_snapshot(30)
+    a = to_instruments(snap, initial_s="stationary", s_seed=11, **MACRO)
+    b = to_instruments(snap, initial_s="stationary", s_seed=11, **MACRO)
+    c = to_instruments(snap, initial_s="stationary", s_seed=12, **MACRO)
+    assert [i.initial_price for i in a] == [i.initial_price for i in b]
+    assert [i.initial_price for i in a] != [i.initial_price for i in c]
+
+
+def test_the_dispersion_seed_does_not_perturb_the_market():
+    """Its own stream, so seeding a universe cannot change the market.
+
+    If they shared a stream, choosing a different dispersion seed would give a
+    different market, and "same universe, different draws" would be a lie.
+    """
+    snap = wide_snapshot(20)
+    zero = pretium.Universe(to_instruments(snap, initial_s="zero", **MACRO))
+
+    def prices(seed):
+        e = pretium.Engine(seed=99, universe=zero, macro_state=pretium.Macro(**MACRO))
+        e.run_days(2, ticks_per_day=100, record=False)
+        return arr(e.prices())
+
+    # The market is untouched by anything the loader drew.
+    assert prices(1) == prices(2)
+
+
+def test_an_unknown_mode_is_refused():
+    with pytest.raises(pretium.ValidationError, match='"zero" or "stationary"'):
+        to_instruments(wide_snapshot(3), initial_s="wishful", **MACRO)
+
+
+def test_stationary_sigma_refuses_nonsense_and_reports_non_stationarity():
+    with pytest.raises(pretium.ValidationError, match="finite"):
+        pretium.stationary_sigma(float("nan"))
+    # A unit root has infinite variance. None rather than a large finite
+    # number, which would be worse: it would get used.
+    assert pretium.stationary_sigma(0.01, phi=1.0, theta=0.0) is None
