@@ -1275,6 +1275,11 @@ impl PyEngine {
             prices: self.written(&self.buffer.prices).to_vec(),
             volumes: self.written(&self.buffer.volumes).to_vec(),
             mispricing: self.written(&self.buffer.mispricing_s).to_vec(),
+            fundamental: self.written(&self.buffer.fundamental).to_vec(),
+            anchor: self.written(&self.buffer.anchor).to_vec(),
+            components: std::array::from_fn(|k| {
+                self.written(&self.buffer.components[k]).to_vec()
+            }),
         });
         let e = self.inner.economy();
         self.recorded_macro.push(crate::python_arrow::MacroRow {
@@ -1337,7 +1342,13 @@ impl PyEngine {
                 instruments: self.buffer.companies,
                 prices: self.written(&self.buffer.prices).to_vec(),
                 volumes: self.written(&self.buffer.volumes).to_vec(),
+                // bars() reads neither, and cloning the ground-truth
+                // buffers to build a table that discards them would be pure
+                // copying. truth() has its own path below.
                 mispricing: Vec::new(),
+                fundamental: Vec::new(),
+                anchor: Vec::new(),
+                components: std::array::from_fn(|_| Vec::new()),
             }]
         } else {
             self.recorded.clone()
@@ -1415,6 +1426,9 @@ impl PyEngine {
                 self.buffer.ticks_written,
                 self.buffer.companies,
                 self.written(&self.buffer.mispricing_s),
+                self.written(&self.buffer.fundamental),
+                self.written(&self.buffer.anchor),
+                &std::array::from_fn(|k| self.written(&self.buffer.components[k]).to_vec()),
             )
             .map_err(crate::python_arrow::arrow_err)?]
         } else {
@@ -1422,7 +1436,13 @@ impl PyEngine {
             for d in &self.recorded {
                 out.push(
                     crate::python_arrow::truth_batch(
-                        d.day, d.ticks, d.instruments, &d.mispricing,
+                        d.day,
+                        d.ticks,
+                        d.instruments,
+                        &d.mispricing,
+                        &d.fundamental,
+                        &d.anchor,
+                        &d.components,
                     )
                     .map_err(crate::python_arrow::arrow_err)?,
                 );

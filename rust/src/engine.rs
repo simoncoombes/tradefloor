@@ -120,6 +120,21 @@ pub struct Engine {
     /// short_squeeze_effect, random_noise -- summed tick by tick and reset at
     /// `open_market`.
     attribution: Vec<[f64; 4]>,
+    /// This tick's ground truth, per company slot.
+    ///
+    /// `attribution` above sums across the day, which is what a scorer wants
+    /// and is useless as a dataset: it can say order flow moved a price today
+    /// but not WHEN, and a label that cannot be aligned to a bar is not a
+    /// label. The per-tick figures were computed and thrown away; these keep
+    /// them.
+    ///
+    /// Three different quantities that are easy to confuse, so they are named
+    /// apart: `fundamental` is the valuation, `anchor` is
+    /// `fundamental * exp(s)` -- the price the model wanted before the book
+    /// touched it -- and the printed price is what the book actually settled.
+    tick_components: Vec<[f64; 7]>,
+    tick_fundamental: Vec<f64>,
+    tick_anchor: Vec<f64>,
     /// Cumulative MAIN-stream draws, including any the embedder took through
     /// [`Engine::draw_uniform`]. The single most useful number for diagnosing
     /// a cross-language divergence: if these differ, nothing downstream is
@@ -161,6 +176,12 @@ impl Engine {
             economy,
             central_bank,
             attribution: vec![[0.0; 4]; companies_len],
+            tick_components: vec![[0.0; 7]; companies_len],
+            // NaN, not zero: a company that has never ticked has no valuation,
+            // and zero is a real one that would silently read as "worthless"
+            // rather than as "not yet computed".
+            tick_fundamental: vec![f64::NAN; companies_len],
+            tick_anchor: vec![f64::NAN; companies_len],
             sector_keys,
             draws: 0,
         }
@@ -249,12 +270,40 @@ impl Engine {
         // The raw decomposition is the ground truth; the scaling is a display
         // choice, and reproducing it here would bake a presentation decision
         // into the labelled dataset.
-        for (slot, f) in outcome.active_indices.iter().zip(outcome.factors.iter()) {
+        // Zeroed rather than left stale. A company that did not tick did not
+        // move, so every component contributed exactly zero to its `s` -- which
+        // is true, and keeps the columns summing to a Δs of zero. Carrying the
+        // previous tick's values forward would invent activity.
+        for slot in self.tick_components.iter_mut() {
+            *slot = [0.0; 7];
+        }
+        for (n, slot) in outcome.active_indices.iter().enumerate() {
+            let f = &outcome.factors[n];
             if let Some(acc) = self.attribution.get_mut(*slot) {
                 acc[0] += f.company_news;
                 acc[1] += f.order_flow_impact;
                 acc[2] += f.short_squeeze_effect;
                 acc[3] += f.random_noise;
+            }
+            if let (Some(row), Some(computed)) = (
+                self.tick_components.get_mut(*slot),
+                outcome.s_components.get(n),
+            ) {
+                *row = *computed;
+            }
+            // Levels, unlike contributions, PERSIST between ticks: a company
+            // that did not trade still has the valuation and anchor it last
+            // had, and blanking them would make the columns unusable for
+            // exactly the join they exist for.
+            if let Some(v) = outcome.fundamental_values.get(n) {
+                if let Some(slot_v) = self.tick_fundamental.get_mut(*slot) {
+                    *slot_v = *v;
+                }
+            }
+            if let Some(v) = outcome.fair_values.get(n) {
+                if let Some(slot_v) = self.tick_anchor.get_mut(*slot) {
+                    *slot_v = *v;
+                }
             }
         }
 
@@ -293,6 +342,24 @@ impl Engine {
         &self.attribution
     }
 
+    /// This tick's `s` decomposition per company slot, in
+    /// [`crate::market::factors::S_COMPONENT_KEYS`] order. Zero for a company
+    /// that did not tick.
+    pub fn tick_components(&self) -> &[[f64; 7]] {
+        &self.tick_components
+    }
+
+    /// The valuation each company was last measured at. NaN before its first
+    /// tick.
+    pub fn tick_fundamental(&self) -> &[f64] {
+        &self.tick_fundamental
+    }
+
+    /// The book anchor each company was last given: `fundamental * exp(s)`.
+    pub fn tick_anchor(&self) -> &[f64] {
+        &self.tick_anchor
+    }
+
     /// One attribution column across all companies, by index 0..4.
     pub fn attribution_column(&self, factor: usize) -> Vec<f64> {
         self.attribution
@@ -307,6 +374,12 @@ impl Engine {
         // run, which is when they would actually want it.
         self.attribution.clear();
         self.attribution.resize(self.companies.len(), [0.0; 4]);
+        self.tick_components.clear();
+        self.tick_components.resize(self.companies.len(), [0.0; 7]);
+        self.tick_fundamental.clear();
+        self.tick_fundamental.resize(self.companies.len(), f64::NAN);
+        self.tick_anchor.clear();
+        self.tick_anchor.resize(self.companies.len(), f64::NAN);
 
         reset_daily_prices(&mut self.companies);
     }
@@ -444,7 +517,13 @@ impl Engine {
                 order_volumes: request.order_volumes,
             });
             draws += outcome.draws_consumed;
-            buffer.write_tick(t, &self.companies);
+            buffer.write_tick(
+                t,
+                &self.companies,
+                &self.tick_components,
+                &self.tick_fundamental,
+                &self.tick_anchor,
+            );
 
             if let Some(stop) = &request.stop {
                 if stop.triggered(t, &self.companies) {
@@ -543,6 +622,9 @@ impl Engine {
     pub fn add_company(&mut self, company: TickCompany) -> usize {
         self.companies.push(company);
         self.attribution.push([0.0; 4]);
+        self.tick_components.push([0.0; 7]);
+        self.tick_fundamental.push(f64::NAN);
+        self.tick_anchor.push(f64::NAN);
         self.companies.len() - 1
     }
 
@@ -559,6 +641,15 @@ impl Engine {
     pub fn remove_company(&mut self, index: usize) -> Option<TickCompany> {
         if index >= self.companies.len() {
             return None;
+        }
+        if index < self.tick_components.len() {
+            self.tick_components.remove(index);
+        }
+        if index < self.tick_fundamental.len() {
+            self.tick_fundamental.remove(index);
+        }
+        if index < self.tick_anchor.len() {
+            self.tick_anchor.remove(index);
         }
         if index < self.attribution.len() {
             self.attribution.remove(index);
@@ -769,6 +860,13 @@ pub struct SessionBuffer {
     pub prices: Vec<f64>,
     pub volumes: Vec<f64>,
     pub mispricing_s: Vec<f64>,
+    pub fundamental: Vec<f64>,
+    pub anchor: Vec<f64>,
+    /// The seven component columns, each `ticks * companies`, in
+    /// `S_COMPONENT_KEYS` order. Seven flat buffers rather than one of
+    /// `[f64; 7]`, because each becomes an Arrow column and a column wants a
+    /// contiguous run of its own values.
+    pub components: [Vec<f64>; 7],
 }
 
 impl SessionBuffer {
@@ -782,12 +880,24 @@ impl SessionBuffer {
             self.prices.resize(needed, 0.0);
             self.volumes.resize(needed, 0.0);
             self.mispricing_s.resize(needed, 0.0);
+            self.fundamental.resize(needed, f64::NAN);
+            self.anchor.resize(needed, f64::NAN);
+            for column in self.components.iter_mut() {
+                column.resize(needed, 0.0);
+            }
         }
         self.companies = companies;
         self.ticks_written = ticks;
     }
 
-    fn write_tick(&mut self, tick: usize, companies: &[TickCompany]) {
+    fn write_tick(
+        &mut self,
+        tick: usize,
+        companies: &[TickCompany],
+        components: &[[f64; 7]],
+        fundamental: &[f64],
+        anchor: &[f64],
+    ) {
         let base = tick * self.companies;
         for (i, c) in companies.iter().enumerate() {
             self.prices[base + i] = c.stock.price;
@@ -795,6 +905,12 @@ impl SessionBuffer {
             // NaN for a company that has never ticked — a column cannot carry
             // `None`, and zero would be a real mispricing.
             self.mispricing_s[base + i] = c.stock.mispricing_s.unwrap_or(f64::NAN);
+            self.fundamental[base + i] = fundamental.get(i).copied().unwrap_or(f64::NAN);
+            self.anchor[base + i] = anchor.get(i).copied().unwrap_or(f64::NAN);
+            let row = components.get(i).copied().unwrap_or([0.0; 7]);
+            for (k, column) in self.components.iter_mut().enumerate() {
+                column[base + i] = row[k];
+            }
         }
     }
 

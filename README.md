@@ -26,11 +26,24 @@ transcendental maths rather than calling the platform's libm. Every release
 runs one fixed simulation on every wheel target and compares digests; no wheel
 ships that disagrees with the others.
 
-**It knows why every price moved.** The simulator computed the reasons, so it
-can report them: how much of a move was company news, order-flow pressure, a
-short squeeze, or noise. You can observe from history that a stock fell. You
-cannot observe that sixty per cent of the fall was order flow — no real dataset
-carries that column.
+**It knows why every price moved, and the reasons add up.** The simulator
+computed them, so it can report them — and the `truth` table carries one row
+per instrument per tick giving every contribution to that tick's mispricing:
+mean reversion, momentum, the crowd, company news, order-flow pressure, a
+short squeeze, and noise.
+
+They **sum to the move**, which is what makes it a dataset rather than a
+commentary. Difference `mispricing_s` across ticks, add the seven columns, and
+check the label against the outcome instead of trusting it. Measured residual:
+1e-16, which is float rounding.
+
+You can observe from history that a stock fell. You cannot observe that sixty
+per cent of the fall was order flow — no real dataset carries that column,
+because nobody knows.
+
+Three levels, kept apart because conflating them is easy and ruins the join:
+`fundamental_value` is the valuation, `anchor_price` is what the model wanted
+before the book touched it, and the printed price is what the book settled.
 
 **Market impact is emergent.** Orders match against a real book with
 price-time priority, so a large order pays worse prices because it *consumed
@@ -125,7 +138,7 @@ duckdb read them zero-copy — and the package depends on none of them.
 | table | grain |
 |---|---|
 | `bars` | tick, N-minute or daily OHLCV — downsampled in Rust |
-| `truth` | fair value and mispricing per instrument |
+| `truth` | why each price moved — valuation, mispricing, and a 7-way decomposition |
 | `macro` | the evolved macro state, per day |
 | `fills` | your executions, joinable to `bars` |
 | `book` | order-book depth — opt-in, because it is 40x the rows |

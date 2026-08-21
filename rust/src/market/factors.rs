@@ -31,6 +31,27 @@
 
 use crate::mathx;
 
+/// The components of one tick's change in `s`, in the order they are
+/// reported.
+///
+/// Declared here, beside the factors, so the Arrow schema and the tick that
+/// fills it cannot drift apart -- two hand-written orderings eventually
+/// disagree and the columns would silently swap.
+///
+/// The first three are the model's own dynamics; the last four are the shock
+/// factors. Together they account for `Δs` exactly, except where the `s` clamp
+/// or a circuit breaker binds -- and a consumer can see that, because the
+/// residual against `Δs` stops being zero.
+pub const S_COMPONENT_KEYS: [&str; 7] = [
+    "reversion",
+    "momentum",
+    "crowd_lean",
+    "company_news",
+    "order_flow_impact",
+    "short_squeeze_effect",
+    "random_noise",
+];
+
 /// Total impact coefficient for order flow, before the informed fraction.
 pub const ORDER_FLOW_COEFFICIENT: f64 = 50.0;
 

@@ -57,17 +57,62 @@ pub fn bars_schema() -> SchemaRef {
 
 /// `truth`: the labelled-dataset table.
 ///
-/// The distinguishing output. A historical dataset can tell you a price; it
-/// cannot tell you the fair value the price was deviating from, or how much of
-/// the move was order flow rather than noise. This can, because it computed
-/// them.
+/// The distinguishing output, and the reason it is worth building a simulator
+/// rather than downloading history. A historical dataset gives you a price. It
+/// cannot give you the fair value that price was deviating from, and it cannot
+/// give you how much of a move was company news rather than order-flow
+/// pressure rather than noise -- because nobody knows. Here the simulator
+/// computed each of those to produce the print, so it can report them.
+///
+/// One row per instrument per tick, joining to `bars` on
+/// `(day, tick, instrument_id)`, and carrying three kinds of column.
+///
+/// **Levels.** `fundamental_value` is the valuation -- earnings, sector
+/// anchor, rates -- with no mispricing in it. `anchor_price` is
+/// `fundamental_value * exp(mispricing_s)`: the price the model wanted before
+/// the order book touched it. The printed price in `bars` is what the book
+/// actually settled, so `close - anchor_price` isolates the microstructure and
+/// `mispricing_s` isolates the valuation gap. Three quantities that are easy
+/// to conflate, kept apart on purpose.
+///
+/// **The decomposition.** Seven columns, in `S_COMPONENT_KEYS` order, giving
+/// every contribution to this tick's change in `s`. `reversion`, `momentum`
+/// and `crowd_lean` are the model's own dynamics; `company_news`,
+/// `order_flow_impact`, `short_squeeze_effect` and `random_noise` are the
+/// shocks. They sum to `Δs`.
+///
+/// That they SUM is what makes this a dataset rather than a commentary. A
+/// consumer can difference `mispricing_s` across ticks, add the seven columns,
+/// and check the label against the outcome instead of trusting it. Where the
+/// residual is not zero, the `s` clamp or a circuit breaker bound -- which is
+/// itself worth seeing, and would be invisible in a summary.
+///
+/// Per TICK rather than per day, which is the whole point. The day-level
+/// accumulator behind `attribution()` can say order flow moved a price today;
+/// it cannot say when, and a label that cannot be aligned to a bar is not a
+/// label.
+///
+/// A company that did not tick has zeros across all seven: it did not move, so
+/// nothing contributed to it, and `Δs` was zero. The two level columns instead
+/// PERSIST from its last tick, because a valuation does not disappear when
+/// trading is quiet.
 pub fn truth_schema() -> SchemaRef {
-    Arc::new(Schema::new(vec![
+    let mut fields = vec![
         Field::new("day", DataType::UInt32, false),
         Field::new("tick", DataType::UInt32, false),
         Field::new("instrument_id", DataType::UInt32, false),
         Field::new("mispricing_s", DataType::Float64, false),
-    ]))
+        Field::new("fundamental_value", DataType::Float64, false),
+        Field::new("anchor_price", DataType::Float64, false),
+    ];
+    // Generated from the same constant the tick fills, so the schema cannot
+    // drift out of step with the data. Written out by hand in two places, the
+    // columns would eventually swap and every value would still look
+    // plausible.
+    for key in crate::market::factors::S_COMPONENT_KEYS {
+        fields.push(Field::new(key, DataType::Float64, false));
+    }
+    Arc::new(Schema::new(fields))
 }
 
 /// Build the `bars` batch from a session's row-major buffers.
@@ -110,18 +155,28 @@ pub fn bars_batch(
     RecordBatch::try_new(bars_schema(), columns).map_err(|e| e.to_string())
 }
 
-/// Build the `truth` batch from a session's mispricing buffer.
+/// Build the `truth` batch from a session's ground-truth buffers.
 pub fn truth_batch(
     day: u32,
     ticks: usize,
     instruments: usize,
     mispricing: &[f64],
+    fundamental: &[f64],
+    anchor: &[f64],
+    components: &[Vec<f64>; 7],
 ) -> Result<RecordBatch, String> {
     let rows = ticks * instruments;
-    if mispricing.len() < rows {
+    if mispricing.len() < rows || fundamental.len() < rows || anchor.len() < rows {
         return Err(format!(
             "buffer shorter than {ticks} ticks x {instruments} instruments"
         ));
+    }
+    for column in components.iter() {
+        if column.len() < rows {
+            return Err(format!(
+                "component buffer shorter than {ticks} ticks x {instruments} instruments"
+            ));
+        }
     }
 
     let mut day_col = Vec::with_capacity(rows);
@@ -135,12 +190,17 @@ pub fn truth_batch(
         }
     }
 
-    let columns: Vec<ArrayRef> = vec![
+    let mut columns: Vec<ArrayRef> = vec![
         Arc::new(UInt32Array::from(day_col)),
         Arc::new(UInt32Array::from(tick_col)),
         Arc::new(UInt32Array::from(id_col)),
         Arc::new(Float64Array::from(mispricing[..rows].to_vec())),
+        Arc::new(Float64Array::from(fundamental[..rows].to_vec())),
+        Arc::new(Float64Array::from(anchor[..rows].to_vec())),
     ];
+    for column in components.iter() {
+        columns.push(Arc::new(Float64Array::from(column[..rows].to_vec())));
+    }
     RecordBatch::try_new(truth_schema(), columns).map_err(|e| e.to_string())
 }
 
@@ -390,6 +450,9 @@ pub struct RecordedDay {
     pub prices: Vec<f64>,
     pub volumes: Vec<f64>,
     pub mispricing: Vec<f64>,
+    pub fundamental: Vec<f64>,
+    pub anchor: Vec<f64>,
+    pub components: [Vec<f64>; 7],
 }
 
 /// `bars` at a coarser grain: real OHLCV.

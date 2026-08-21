@@ -208,7 +208,24 @@ pub struct TickOutcome {
     /// Indices into the input slice, in the order the tick processed them.
     pub active_indices: Vec<usize>,
     /// Fair value per active company — the book's anchor, NOT a price.
+    ///
+    /// Named for its ROLE in phase 4. It is `fundamental_values * exp(s)`, so
+    /// it already contains the mispricing; the valuation itself is
+    /// `fundamental_values`. Dividing a print by this gives the
+    /// microstructure residual, not the mispricing.
     pub fair_values: Vec<f64>,
+    /// The valuation per active company, straight from `compute_fair_value` —
+    /// earnings, sector anchor, rates. No mispricing in it.
+    pub fundamental_values: Vec<f64>,
+    /// Every contribution to this tick's change in `s`, per active company, in
+    /// [`S_COMPONENT_KEYS`] order.
+    ///
+    /// The reason the whole library exists. `factors` below says what the four
+    /// shock drivers were; this says what each of them, plus the reversion and
+    /// the crowd, actually DID to the mispricing on this tick. They sum to
+    /// `Δs` -- so a consumer can verify the label against the outcome rather
+    /// than trusting it.
+    pub s_components: Vec<[f64; 7]>,
     /// Volume printed per active company.
     pub volumes: Vec<f64>,
     /// The live factor decomposition per active company, in `active_indices`
@@ -237,6 +254,8 @@ pub fn simulate_market_tick(
         return TickOutcome {
             active_indices: Vec::new(),
             fair_values: Vec::new(),
+            fundamental_values: Vec::new(),
+            s_components: Vec::new(),
             volumes: Vec::new(),
             factors: Vec::new(),
             shared_factors: SharedFactors {
@@ -373,6 +392,8 @@ pub fn simulate_market_tick(
     };
 
     let mut new_prices = vec![0.0; active_count];
+    let mut fundamentals = vec![f64::NAN; active_count];
+    let mut s_components = vec![[0.0f64; 7]; active_count];
     let mut crowd_leans = vec![0.0; active_count];
 
     for i in 0..active_count {
@@ -392,6 +413,40 @@ pub fn simulate_market_tick(
 
         let mut s_val = companies[idx].stock.mispricing_s.unwrap();
         let momentum = companies[idx].stock.mispricing_momentum.unwrap_or(0.0);
+        fundamentals[i] = fv;
+
+        // Each contribution recorded as it is applied, in the same spelling
+        // the update uses. Reported, never fed back: the update below is
+        // written exactly as the source writes it, because `s*phi` and
+        // `s + s*(phi-1)` round differently and the benched trajectories were
+        // produced by that spelling. Summing these to advance `s` instead
+        // would be a different market.
+        let raw = &all_factors[i];
+        let scale = 1.0 / 390.0;
+        s_components[i] = if open {
+            [
+                s_val * (S_PHI_TICK - 1.0),
+                (MOMENTUM_THETA * momentum) / 390.0,
+                crowd_lean(s_val, momentum) / 390.0,
+                raw.company_news * scale,
+                raw.order_flow_impact * scale,
+                raw.short_squeeze_effect * scale,
+                all_noises[i] * intraday_vol_mult,
+            ]
+        } else {
+            // Closed: no reversion, no crowd, and the squeeze term is not
+            // applied -- `all_drifts` dropped it. Zeros here are the honest
+            // report of that, not missing data.
+            [
+                0.0,
+                0.0,
+                0.0,
+                raw.company_news * scale,
+                raw.order_flow_impact * scale,
+                0.0,
+                all_noises[i],
+            ]
+        };
 
         if open {
             // The crowd reacts to the mispricing it can SEE — the pre-update
@@ -505,6 +560,8 @@ pub fn simulate_market_tick(
     TickOutcome {
         active_indices,
         fair_values: new_prices,
+        fundamental_values: fundamentals,
+        s_components,
         volumes,
         factors: all_factors,
         shared_factors: shared,
