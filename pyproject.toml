@@ -21,6 +21,11 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 
+[project.urls]
+Homepage = "https://simoncoombes.github.io/pretium"
+Repository = "https://github.com/simoncoombes/pretium"
+Documentation = "https://simoncoombes.github.io/pretium"
+
 [project.optional-dependencies]
 # The core package depends on NOTHING. These are for surfaces that genuinely
 # need them: the RL environment needs arrays, and the Arrow tables are read
