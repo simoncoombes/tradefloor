@@ -9,8 +9,8 @@ build/
 __pycache__/
 .venv/
 
-# Internal design docs — not for the public repo
-docs/
+# Internal design material lives in the private pretium-design repo,
+# never in this one. docs/ holds the public documentation.
 
 # Spike artifacts
 dist-spike/
