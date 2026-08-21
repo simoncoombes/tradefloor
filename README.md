@@ -2,10 +2,45 @@
 
 A deterministic market simulator with a real limit order book.
 
-**Pre-release.** The module-level API below is implemented and tested. The
-full engine — stepping a whole market through time — is not exposed yet.
+**Pre-release.** The API below is implemented and tested. Interfaces may move
+before 1.0.
 
-## What it does
+## A whole market
+
+```python
+import pretium as pt
+import numpy as np
+
+universe = [
+    pt.Instrument("ACME", "technology", initial_price=100.0,
+                  shares_outstanding=2.5e8, eps=4.10, revenue_growth=0.22),
+    pt.Instrument("UTIL", "utilities", initial_price=42.0,
+                  shares_outstanding=8.0e8, eps=3.10, revenue_growth=0.02),
+]
+
+eng = pt.Engine(
+    seed=42,
+    universe=universe,
+    macro_state=pt.Macro(vix=19.5, federal_funds_rate=0.0425, cycle="contraction"),
+)
+
+eng.open_market()
+eng.run_session(9, 30, day_of_week=3, ticks=390)   # a full trading day
+eng.close_market()
+
+prices = np.frombuffer(eng.session_prices(), dtype="<f8")
+prices = prices.reshape(eng.session_ticks_written, len(eng))
+```
+
+Columns come back as raw little-endian f64, which `numpy.frombuffer` adopts
+without copying. The session buffer is row-major — one tick's cross-section is
+contiguous — because emission is per tick.
+
+`run_session` is not an approximation of ticking: it produces bit-identical
+results to calling `tick()` in a loop, and there is a test asserting exactly
+that. It exists so a trading day costs one boundary crossing instead of 390.
+
+## The pieces, on their own
 
 ```python
 import pretium as pt

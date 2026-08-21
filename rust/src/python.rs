@@ -120,6 +120,11 @@ fn pretium(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::python_book::PyMatchResult>()?;
     m.add_class::<crate::python_book::PyPriceLevel>()?;
     m.add_class::<crate::python_book::PySweepCost>()?;
+    m.add_class::<crate::python_engine::PyEngine>()?;
+    m.add_class::<crate::python_engine::PyInstrument>()?;
+    m.add_class::<crate::python_engine::PyMacro>()?;
+    m.add_class::<crate::python_engine::PyTickResult>()?;
+    m.add_function(wrap_pyfunction!(crate::python_engine::market_status, m)?)?;
     m.add("ValidationError", m.py().get_type_bound::<ValidationError>())?;
     m.add(
         "OrderError",

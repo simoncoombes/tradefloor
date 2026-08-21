@@ -36,23 +36,46 @@ pub struct Sector {
     /// Anchor P/E, before rate and QE adjustment.
     pub avg_pe: f64,
     /// Spread volatility multiplier — `0.7 + 0.3 * volatility * beta`.
+    ///
+    /// DIMENSIONLESS and relative (0.6 to 1.3). This is not a volatility in
+    /// any unit, and deriving a variance from it is a mistake the reference
+    /// implementation actually made and had to fix: call sites once used
+    /// `(volatility / sqrt(252))^2` for the GARCH bounds, which is a different
+    /// quantity entirely. Use [`Sector::base_daily_variance`] for that.
     pub volatility: f64,
+    /// Long-run DAILY return standard deviation, as a fraction.
+    ///
+    /// The real dispersion measure: technology 2.5%/day, utilities 0.8%/day.
+    /// Squared, it is the long-run variance the GARCH floor and ceiling scale
+    /// from, and what a fresh company seeds `garch_variance` with.
+    pub daily_sigma: f64,
+}
+
+impl Sector {
+    /// Long-run daily variance — `daily_sigma^2`.
+    ///
+    /// The GARCH floor is 0.25x this and the ceiling 5x, so taking it from the
+    /// wrong field rescales every company's volatility bounds without
+    /// producing an obviously wrong number anywhere.
+    pub fn base_daily_variance(&self) -> f64 {
+        self.daily_sigma * self.daily_sigma
+    }
 }
 
 /// The twelve sectors, in contractual declaration order.
 pub const SECTORS: [Sector; 12] = [
-    Sector { key: "technology",             display_name: "Technology",             avg_pe: 32.0, volatility: 1.2 },
-    Sector { key: "financial_services",     display_name: "Financial Services",     avg_pe: 12.0, volatility: 1.1 },
-    Sector { key: "healthcare",             display_name: "Healthcare",             avg_pe: 24.0, volatility: 0.9 },
-    Sector { key: "energy",                 display_name: "Energy",                 avg_pe: 10.0, volatility: 1.3 },
-    Sector { key: "consumer_discretionary", display_name: "Consumer Discretionary", avg_pe: 20.0, volatility: 1.0 },
-    Sector { key: "consumer_staples",       display_name: "Consumer Staples",       avg_pe: 20.0, volatility: 0.7 },
-    Sector { key: "industrials",            display_name: "Industrials",            avg_pe: 17.0, volatility: 1.0 },
-    Sector { key: "materials",              display_name: "Materials",              avg_pe: 14.0, volatility: 1.2 },
-    Sector { key: "real_estate",            display_name: "Real Estate",            avg_pe: 35.0, volatility: 0.9 },
-    Sector { key: "utilities",              display_name: "Utilities",              avg_pe: 16.0, volatility: 0.6 },
-    Sector { key: "telecommunications",     display_name: "Telecommunications",     avg_pe: 14.0, volatility: 0.8 },
-    Sector { key: "transportation",         display_name: "Transportation",         avg_pe: 15.0, volatility: 1.1 },
+    Sector { key: "technology",             display_name: "Technology",             avg_pe: 32.0, volatility: 1.2 , daily_sigma: 0.025 },
+    Sector { key: "financial_services",     display_name: "Financial Services",     avg_pe: 12.0, volatility: 1.1 , daily_sigma: 0.015 },
+    Sector { key: "healthcare",             display_name: "Healthcare",             avg_pe: 24.0, volatility: 0.9 , daily_sigma: 0.018 },
+    Sector { key: "energy",                 display_name: "Energy",                 avg_pe: 10.0, volatility: 1.3 , daily_sigma: 0.015 },
+    Sector { key: "consumer_discretionary", display_name: "Consumer Discretionary", avg_pe: 20.0, volatility: 1.0 , daily_sigma: 0.018 },
+    Sector { key: "consumer_staples",       display_name: "Consumer Staples",       avg_pe: 20.0, volatility: 0.7 , daily_sigma: 0.008 },
+    Sector { key: "industrials",            display_name: "Industrials",            avg_pe: 17.0, volatility: 1.0 , daily_sigma: 0.015 },
+    Sector { key: "materials",              display_name: "Materials",              avg_pe: 14.0, volatility: 1.2 , daily_sigma: 0.015 },
+    Sector { key: "real_estate",            display_name: "Real Estate",            avg_pe: 35.0, volatility: 0.9 , daily_sigma: 0.008 },
+    Sector { key: "utilities",              display_name: "Utilities",              avg_pe: 16.0, volatility: 0.6 , daily_sigma: 0.008 },
+    Sector { key: "telecommunications",     display_name: "Telecommunications",     avg_pe: 14.0, volatility: 0.8 , daily_sigma: 0.01 },
+    Sector { key: "transportation",         display_name: "Transportation",         avg_pe: 15.0, volatility: 1.1 , daily_sigma: 0.015 },
 ];
 
 /// Look up a sector by key.

@@ -357,7 +357,7 @@ fn no_std_transcendentals_outside_mathx() {
         "std transcendentals or NaN-swallowing max/min found outside mathx.rs:
   {}
 
-         These break both V8 parity and cross-platform determinism.          See crates/mc-engine-core/src/mathx.rs.",
+         These break both V8 parity and cross-platform determinism.          See src/mathx.rs.",
         offenders.join("
   ")
     );

@@ -51,4 +51,8 @@ mod python;
 #[cfg(feature = "python")]
 mod python_book;
 
+/// Engine bindings - Layer 2.
+#[cfg(feature = "python")]
+mod python_engine;
+
 pub use rng::{to_uint32, GameRng, Pcg32};
