@@ -176,3 +176,64 @@ def test_seed_and_universe_are_not_in_the_log_and_must_be_supplied():
     assert not any("seed" in entry for entry in log)
     with pytest.raises(TypeError):
         pretium.replay(log)
+
+
+def test_the_log_round_trips_through_json_by_value():
+    """An archived experiment must compare equal to the run that produced it.
+
+    The log emitted order_flow as a tuple, and JSON has no tuples — it came
+    back a list, so ``log == json.loads(json.dumps(log))`` was False. Replay
+    worked either way, because PyO3 accepts any two-element sequence, which is
+    precisely why this would have gone unnoticed until someone diffed two
+    archived logs and found differences that were not there.
+
+    The README calls the log "archivable as data". This is that claim, checked.
+    """
+    import json
+
+    universe = pretium.Universe.random(6, seed=5)
+    engine = pretium.Engine(seed=99, universe=universe)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 30,
+                       order_flow={engine.tickers[0]: (5000.0, 0.0)},
+                       news=[pretium.News(ticker=engine.tickers[1],
+                                          price_impact=0.03)])
+    engine.tick(10, 0, 3, order_flow={engine.tickers[2]: (100.0, 200.0)})
+    engine.close_market()
+
+    log = engine.order_log
+    assert json.loads(json.dumps(log)) == log
+
+
+def test_a_log_that_has_been_through_json_replays_exactly():
+    import json
+
+    universe = pretium.Universe.random(6, seed=5)
+    engine = pretium.Engine(seed=99, universe=universe)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 30,
+                       order_flow={engine.tickers[0]: (5000.0, 0.0)})
+    engine.close_market()
+
+    archived = json.loads(json.dumps(engine.order_log))
+    replayed = pretium.replay(archived, seed=99, universe=universe)
+    assert replayed.prices() == engine.prices()
+    assert replayed.draws_consumed == engine.draws_consumed
+
+
+def test_a_log_replays_against_a_universe_rebuilt_from_its_own_json():
+    # The archival path in full: neither the log nor the universe is the
+    # in-memory object that produced the run. That is what "replayable without
+    # the code that produced it" has to mean.
+    import json
+
+    universe = pretium.Universe.random(8, seed=5)
+    engine = pretium.Engine(seed=42, universe=universe)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 40)
+    engine.close_market()
+
+    rebuilt = pretium.Universe.from_json(universe.to_json())
+    replayed = pretium.replay(json.loads(json.dumps(engine.order_log)),
+                              seed=42, universe=rebuilt)
+    assert replayed.prices() == engine.prices()

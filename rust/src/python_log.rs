@@ -102,7 +102,13 @@ fn news_to_py(py: Python<'_>, news: &[(Option<String>, Option<String>, f64)]) ->
 fn flow_to_py(py: Python<'_>, flow: &[(String, f64, f64)]) -> PyResult<PyObject> {
     let d = PyDict::new_bound(py);
     for (ticker, buy, sell) in flow {
-        d.set_item(ticker, (buy, sell))?;
+        // A LIST, not a tuple. The log's whole purpose is to be archived and
+        // replayed as data, and a tuple does not survive a JSON round trip --
+        // it comes back a list, so `log == json.loads(json.dumps(log))` was
+        // false and an archived experiment did not compare equal to the run
+        // that produced it. Replay worked either way, which is exactly why
+        // this would have gone unnoticed until someone diffed two logs.
+        d.set_item(ticker, PyList::new_bound(py, [*buy, *sell]))?;
     }
     Ok(d.into())
 }
