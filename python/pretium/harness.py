@@ -41,10 +41,19 @@ exercise trivial. They are used for SCORING, on the other side of the wall.
 from __future__ import annotations
 
 import struct
-from typing import Any, Callable, Protocol, Sequence
+from typing import Any, Literal, Protocol, Sequence
 
 from ._core import Engine, Instrument, Macro, OrderError, ValidationError
 from .portfolio import Portfolio
+
+
+# The four live factors, as literals a checker can match against
+# Engine.attribution's accepted values. Engine.FACTORS returns the same names
+# at runtime, but as plain strings.
+FACTOR_NAMES: tuple[
+    Literal["company_news"], Literal["order_flow_impact"],
+    Literal["short_squeeze_effect"], Literal["random_noise"],
+] = ("company_news", "order_flow_impact", "short_squeeze_effect", "random_noise")
 
 
 def _f64(buf: bytes) -> list[float]:
@@ -119,15 +128,36 @@ class Agent(Protocol):
 
 
 class Scorecard:
-    """One agent's result."""
+    """One agent's result.
+
+    Attributes are declared rather than assigned through a ``setattr`` loop.
+    The loop was shorter and made the class opaque: nothing could introspect
+    it, no checker could see a field, and a mistyped key would have set
+    nothing and read back ``None``.
+    """
 
     __slots__ = ("name", "pnl", "return_pct", "trades", "turnover", "impact_bps",
                  "max_leverage", "rejected", "explanations", "explanation_accuracy",
                  "final_net_worth", "errors")
 
-    def __init__(self, **kw):
-        for slot in self.__slots__:
-            setattr(self, slot, kw.get(slot))
+    def __init__(
+        self, *, name: str, pnl: float, return_pct: float, trades: int,
+        turnover: float, impact_bps: float, max_leverage: float, rejected: int,
+        explanations: list[tuple[str, str]], explanation_accuracy: float | None,
+        final_net_worth: float, errors: list[str],
+    ) -> None:
+        self.name = name
+        self.pnl = pnl
+        self.return_pct = return_pct
+        self.trades = trades
+        self.turnover = turnover
+        self.impact_bps = impact_bps
+        self.max_leverage = max_leverage
+        self.rejected = rejected
+        self.explanations = explanations
+        self.explanation_accuracy = explanation_accuracy
+        self.final_net_worth = final_net_worth
+        self.errors = errors
 
     def as_dict(self) -> dict[str, Any]:
         return {slot: getattr(self, slot) for slot in self.__slots__}
@@ -148,7 +178,7 @@ def _dominant_factor(engine: Engine) -> str | None:
     report a busy factor as an idle one.
     """
     best, best_size = None, 0.0
-    for name in Engine.FACTORS:
+    for name in FACTOR_NAMES:
         size = sum(abs(x) for x in _f64(engine.attribution(name)))
         if size > best_size:
             best, best_size = name, size

@@ -22,6 +22,7 @@ and whose footprint is invisible — profitable in a way no real trader could be
 from __future__ import annotations
 
 import struct
+from typing import Literal
 
 from . import _core
 from ._core import Engine, OrderError, ValidationError
@@ -113,7 +114,7 @@ class Portfolio:
                 f"quantity must be non-zero and finite, got {quantity}"
             )
 
-        side = "buy" if quantity > 0 else "sell"
+        side: Literal["buy", "sell"] = "buy" if quantity > 0 else "sell"
         size = abs(float(quantity))
         cost = engine.book(ticker).sweep_cost(side, size)
         if cost is None or cost.filled <= 0:

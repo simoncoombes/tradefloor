@@ -36,3 +36,7 @@ manifest-path = "rust/Cargo.toml"
 python-source = "python"
 module-name = "pretium._core"
 features = ["python"]
+# The stub file and the PEP 561 marker must be INSTALLED, not merely present
+# in the source tree. A stub that does not ship types nothing, and the failure
+# is silent -- a type checker just falls back to Any.
+include = ["python/pretium/py.typed", "python/pretium/_core.pyi"]

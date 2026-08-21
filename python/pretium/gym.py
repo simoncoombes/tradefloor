@@ -44,16 +44,21 @@ from ._core import Engine, Instrument, Macro, OrderError, ValidationError
 from .portfolio import Portfolio
 from .universe_util import as_universe
 
+# A name that is "a module or None", and a base class that is "Env or object",
+# are both things a type checker is right to object to -- and both are the
+# correct runtime shape for an optional dependency. Ignored with the reason
+# rather than contorting the runtime to satisfy the checker.
 try:  # pragma: no cover - exercised by the absence path, not the presence one
     import numpy as _np
 except ImportError:  # pragma: no cover
-    _np = None
+    _np = None  # type: ignore[assignment]
 
 try:  # pragma: no cover
     import gymnasium as _gym
-    _Base = _gym.Env
+
+    _Base: type = _gym.Env
 except ImportError:  # pragma: no cover
-    _gym = None
+    _gym = None  # type: ignore[assignment]
     _Base = object
 
 
@@ -79,7 +84,7 @@ class TradingEnv(_Base):
     magnitude; returns are stationary and comparable across instruments.
     """
 
-    metadata = {"render_modes": []}
+    metadata: dict[str, Any] = {"render_modes": []}
 
     def __init__(
         self,
@@ -208,6 +213,10 @@ class TradingEnv(_Base):
     # -- internals --------------------------------------------------------
 
     def _prices(self):
+        # Asserted rather than assumed: these helpers are only reachable after
+        # reset(), but nothing enforced that across a method boundary, and a
+        # helper called early would have failed on None with a worse message.
+        assert self.engine is not None, "engine not built - call reset()"
         import struct
         return _np.array(
             struct.unpack("<%dd" % self.n, self.engine.prices()), dtype=_np.float64
@@ -215,6 +224,7 @@ class TradingEnv(_Base):
 
     def _rebalance(self, weights) -> int:
         """Trade towards the target weights. Returns how many trades were refused."""
+        assert self.engine is not None and self.portfolio is not None
         prices = self._prices()
         worth = self.portfolio.net_worth(self.engine)
         rejected = 0
@@ -240,6 +250,7 @@ class TradingEnv(_Base):
         return rejected
 
     def _observe(self):
+        assert self.engine is not None and self.portfolio is not None
         prices = self._prices()
         # Log returns, not levels: a level says nothing without its history,
         # and the range across a roster spans two orders of magnitude.

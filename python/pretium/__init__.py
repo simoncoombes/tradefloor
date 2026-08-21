@@ -18,10 +18,12 @@ from typing import Any, Iterable, Sequence
 
 from . import _core
 from .portfolio import Portfolio, Position
+from . import harness as _harness
 from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
 from .replay import replay
 from . import edgar
 from ._core import (  # noqa: F401
+    ArrowStream,
     Engine,
     EngineBatch,
     FairValue,
@@ -55,7 +57,7 @@ from ._core import (  # noqa: F401
 
 __version__ = _core.__version__
 __all__ = [
-    "Engine", "EngineBatch", "FairValue", "Fill", "GameRng", "Instrument", "Macro",
+    "ArrowStream", "Engine", "EngineBatch", "FairValue", "Fill", "GameRng", "Instrument", "Macro",
     "MatchResult", "MispricingState", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "Counterfactual",
@@ -236,7 +238,9 @@ def _run_one(args: tuple) -> Any:
     if collect == "prices":
         return engine.prices()
     if collect == "attribution":
-        return {name: engine.attribution(name) for name in Engine.FACTORS}
+        # FACTOR_NAMES rather than Engine.FACTORS: same four names, but as
+        # literals a checker can match against what attribution() accepts.
+        return {name: engine.attribution(name) for name in _harness.FACTOR_NAMES}
     if collect == "summary":
         return {
             "seed": seed,
