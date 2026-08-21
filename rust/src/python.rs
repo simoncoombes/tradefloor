@@ -115,7 +115,16 @@ fn pretium(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(model_preset, m)?)?;
     m.add_class::<PyMispricingState>()?;
     m.add_class::<PyFairValue>()?;
+    m.add_class::<crate::python_book::PyOrderBook>()?;
+    m.add_class::<crate::python_book::PyFill>()?;
+    m.add_class::<crate::python_book::PyMatchResult>()?;
+    m.add_class::<crate::python_book::PyPriceLevel>()?;
+    m.add_class::<crate::python_book::PySweepCost>()?;
     m.add("ValidationError", m.py().get_type_bound::<ValidationError>())?;
+    m.add(
+        "OrderError",
+        m.py().get_type_bound::<crate::python_book::OrderError>(),
+    )?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

@@ -36,6 +36,13 @@ def f64(hexbits):
 
 
 def bits(value):
+    """Encode an f64 as big-endian hex. `None` stays `None`.
+
+    The None case is load-bearing: an empty book side has no best price, and
+    the goldens record that as null rather than as a sentinel value.
+    """
+    if value is None:
+        return None
     return struct.pack(">d", value).hex()
 
 
@@ -364,3 +371,193 @@ def test_resuming_a_trajectory_preserves_momentum():
 
     assert resumed_correctly.s == continued.s
     assert resumed_wrongly.s != continued.s
+
+
+# --------------------------------------------------------------------------
+# The order book
+# --------------------------------------------------------------------------
+
+def test_order_book_replays_the_reference_exactly():
+    """Replay the recorded 75-step operation log and match state at each step.
+
+    Two notes on how this replay is constructed.
+
+    The golden includes an `appendMakerLevel` op. I first replayed it through
+    `post_limit` on the belief that the two differ only in insertion strategy.
+    They do not: at the depth cap `append_maker_level` REFUSES and consumes no
+    sequence number, while `post_limit` accepts and truncates the far end. The
+    golden's cap-probe steps exercise exactly that boundary, and the
+    substitution desynchronised order ids from step 74 onward -- visible only
+    because fills carry maker ids, since the level counts still matched.
+
+    Five ops in the golden are invalid input (zero, negative and NaN sizes and
+    prices). The core no-ops them; this binding raises. Either way the book
+    must be UNCHANGED, so they are executed, caught, and the state compared
+    anyway rather than skipped.
+    """
+    golden = load("orderbook.json")
+    book = pretium.OrderBook("ACME")
+    rejected = 0
+
+    for step in golden["steps"]:
+        op = step["op"]
+        kind = op["op"]
+        try:
+            if kind == "postLimit":
+                book.post_limit(
+                    op["side"], f64(op["price"]), f64(op["quantity"]),
+                    owner=op["ownerId"], order_id=op.get("orderId"),
+                )
+            elif kind == "appendMakerLevel":
+                book.append_maker_level(
+                    op["side"], f64(op["price"]), f64(op["quantity"]),
+                    owner=op["ownerId"],
+                )
+            elif kind == "submit":
+                result = book.submit(
+                    op["side"], f64(op["quantity"]), taker=op["takerId"],
+                    limit_price=f64(op.get("limitPrice")),
+                    post_remainder=op.get("postRemainder", False),
+                    order_id=op.get("orderId"),
+                )
+                expected = step.get("result") or {}
+                for got_fill, want_fill in zip(result.fills, expected.get("fills", [])):
+                    assert bits(got_fill.price) == want_fill["price"].lower(), step
+                    assert bits(got_fill.quantity) == want_fill["quantity"].lower(), step
+                    assert got_fill.maker_order_id == want_fill["makerOrderId"], step
+                if expected.get("averagePrice") is not None:
+                    assert bits(result.average_price) == expected["averagePrice"].lower(), step
+            elif kind == "cancel":
+                book.cancel_order(op["orderId"])
+            elif kind == "cancelAllFor":
+                book.cancel_all_for(op["ownerId"])
+            elif kind == "sweepCost":
+                got = book.sweep_cost(op["side"], f64(op["quantity"]))
+                want = step.get("result")
+                if want is not None and got is not None:
+                    assert bits(got.average_price) == want["averagePrice"].lower(), step
+                    assert bits(got.worst_price) == want["worstPrice"].lower(), step
+                    assert bits(got.filled) == want["filled"].lower(), step
+        except (pretium.ValidationError, pretium.OrderError):
+            rejected += 1
+
+        state = step["state"]
+        assert bits(book.best_bid) == ((state["bestBid"] or "").lower() or None), step
+        assert bits(book.best_ask) == ((state["bestAsk"] or "").lower() or None), step
+        assert sum(l.orders for l in book.price_levels("buy", 64)) == len(state["bids"]), step
+        assert sum(l.orders for l in book.price_levels("sell", 64)) == len(state["asks"]), step
+
+    assert rejected == 5, f"expected 5 invalid ops to be refused, got {rejected}"
+
+
+def test_slippage_is_emergent_not_a_coefficient():
+    """A large order pays more because it ATE levels, not because a formula said so.
+
+    This is the package's distinguishing claim about execution, so it is
+    asserted rather than described: build a ladder, take a small bite and a
+    large one, and the large one's average price must be strictly worse -- and
+    worse specifically because it reached deeper levels.
+    """
+    book = pretium.OrderBook("ACME")
+    for i in range(10):
+        book.post_limit("sell", 100.0 + i, 100, owner="mm")
+
+    small = book.submit("buy", 50)
+    assert small.average_price == 100.0  # entirely inside the best level
+
+    book2 = pretium.OrderBook("ACME")
+    for i in range(10):
+        book2.post_limit("sell", 100.0 + i, 100, owner="mm")
+    large = book2.submit("buy", 550)
+
+    assert large.average_price > small.average_price
+    # 550 shares spans six levels (100..105), so the worst price paid is 105.
+    assert max(f.price for f in large.fills) == 105.0
+    assert len(large.fills) == 6
+
+
+def test_fills_take_the_resting_price_not_the_incoming_one():
+    book = pretium.OrderBook("ACME")
+    book.post_limit("sell", 100.0, 100, owner="mm")
+    # A buyer willing to pay 110 still fills at the maker's 100.
+    result = book.submit("buy", 50, limit_price=110.0)
+    assert result.fills[0].price == 100.0
+
+
+def test_sweep_cost_does_not_execute():
+    book = pretium.OrderBook("ACME")
+    book.post_limit("sell", 100.0, 100, owner="mm")
+    before = book.depth("sell")
+    cost = book.sweep_cost("buy", 50)
+    assert cost is not None and cost.filled == 50
+    assert book.depth("sell") == before, "sweep_cost must be a quote, not a trade"
+
+
+def test_market_order_remainder_never_rests():
+    book = pretium.OrderBook("ACME")
+    book.post_limit("sell", 100.0, 10, owner="mm")
+    result = book.submit("buy", 100, post_remainder=True)  # market order
+    assert result.unfilled == 90
+    assert result.resting_order_id is None
+    assert book.depth("buy") == 0
+
+
+def test_the_boundary_refuses_what_the_core_silently_ignores():
+    # The core returns an empty result for these, reproducing the reference.
+    # A silently ignored order is the worst failure available: the caller
+    # believes they traded and nothing disagrees out loud.
+    book = pretium.OrderBook("ACME")
+    for bad in (0, -10, float("nan"), float("inf")):
+        with pytest.raises(pretium.ValidationError):
+            book.submit("buy", bad)
+        with pytest.raises(pretium.ValidationError):
+            book.post_limit("buy", 100.0, bad, owner="x")
+
+
+def test_unknown_side_is_rejected():
+    book = pretium.OrderBook("ACME")
+    with pytest.raises(pretium.ValidationError, match="buy"):
+        book.submit("BUY", 10)
+
+
+def test_order_error_is_distinct_from_validation_error():
+    # Both subclass ValueError, but they mean different things: a malformed
+    # scenario versus a market rule hit during a run.
+    assert issubclass(pretium.OrderError, ValueError)
+    assert issubclass(pretium.ValidationError, ValueError)
+    assert not issubclass(pretium.OrderError, pretium.ValidationError)
+
+
+def test_append_and_post_diverge_at_the_depth_cap():
+    """They are not interchangeable, and the difference is silent.
+
+    Pinned because I assumed they were and was wrong. At MAX_DEPTH_PER_SIDE
+    (32) `append_maker_level` refuses and consumes no sequence number, while
+    `post_limit` accepts and truncates the far end. Substituting one for the
+    other desynchronises every subsequent order id -- and nothing about the
+    level counts reveals it, so the symptom appears far from the cause.
+    """
+    appended = pretium.OrderBook("A")
+    for i in range(40):
+        appended.append_maker_level("sell", 100.0 + i, 10, owner="mm")
+
+    posted = pretium.OrderBook("A")
+    for i in range(40):
+        posted.post_limit("sell", 100.0 + i, 10, owner="mm")
+
+    # Both sides end capped at 32 levels...
+    assert sum(l.orders for l in appended.price_levels("sell", 64)) == 32
+    assert sum(l.orders for l in posted.price_levels("sell", 64)) == 32
+
+    # ...but they kept DIFFERENT levels. Append refused everything past the
+    # cap, so it holds the first 32. Post truncated the far end, so it holds
+    # the best 32 -- identical here because price order matches insert order,
+    # which is exactly why this is easy to miss.
+    assert appended.best_ask == 100.0
+    assert posted.best_ask == 100.0
+
+    # The observable difference is the id counter: append stopped consuming
+    # sequence numbers at the cap, post did not.
+    next_appended = appended.append_maker_level("buy", 1.0, 1, owner="mm")
+    next_posted = posted.post_limit("buy", 1.0, 1, owner="mm")
+    assert next_appended != next_posted

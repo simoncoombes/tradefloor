@@ -47,4 +47,8 @@ pub mod units;
 #[cfg(feature = "python")]
 mod python;
 
+/// Order-book bindings, split out because `python` is already long.
+#[cfg(feature = "python")]
+mod python_book;
+
 pub use rng::{to_uint32, GameRng, Pcg32};
