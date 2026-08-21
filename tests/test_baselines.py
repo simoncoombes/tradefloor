@@ -405,6 +405,47 @@ def test_a_nonsense_lookback_days_is_refused():
 # --------------------------------------------------------------------------
 
 
+def test_only_agents_trading_the_oracles_own_signal_beat_it():
+    """The mechanism, not just the phenomenon.
+
+    Measured over 384 agent-seed pairs: mean-reversion beats the Oracle 31.2%
+    of the time, momentum 8.3%, and buy-and-hold and random never once in 192
+    pairs. That is the evidence that the edge is portfolio construction rather
+    than information -- the agents with no mispricing signal at all cannot
+    beat it, while the one that estimates the very quantity the Oracle reads
+    exactly beats it routinely.
+
+    Asserted as the ORDERING rather than as those rates, which belong to those
+    rosters. What must hold is that the mispricing traders beat it strictly
+    more often than the agents that do not trade mispricing.
+    """
+    mispricing_traders = 0
+    non_traders = 0
+    for useed in (3, 42):
+        universe = pretium.Universe.random(20, seed=useed)
+        for seed in range(4):
+            scores = pretium.evaluate(reference_agents(seed=3), seed=seed,
+                                      universe=universe, days=30)
+            ratios = capture_ratio(scores)
+            if not ratios:
+                continue
+            mispricing_traders += sum(
+                ratios[n] > 1.0 for n in ("mean_reversion", "momentum")
+                if n in ratios)
+            non_traders += sum(
+                ratios[n] > 1.0 for n in ("buy_and_hold", "random")
+                if n in ratios)
+    assert mispricing_traders > 0, (
+        "no mispricing trader beat the Oracle at all -- the demonstration is "
+        "vacuous and the rest of this test proves nothing"
+    )
+    assert non_traders < mispricing_traders, (
+        f"agents with no mispricing signal beat the Oracle {non_traders} "
+        f"times against {mispricing_traders} for those that trade it; the "
+        "documented mechanism does not hold"
+    )
+
+
 def test_an_agent_can_beat_the_oracle():
     """Pinned so nobody "fixes" it into an upper bound.
 

@@ -148,12 +148,28 @@ and fair value is precisely what is unobservable out there.
 It is a **reference, not an upper bound**, and the distinction is measured
 rather than asserted. The Oracle gets the same gross exposure and
 participation cap as every other baseline and spends them on a naive rule:
-equal weight across the ten most mispriced names. Agents beat it in about 9%
-of measured agent-seed pairs. Giving it the same information across three
-times as many names makes it *worse* (median P&L 110k → 70k); what makes it
-dominate is doubling its gross exposure. So at equal constraints it is
-capital-limited like everything else, and a capture ratio above 1.0 is a
-finding about portfolio construction rather than a broken denominator.
+equal weight across the ten most mispriced names. Over 384 agent-seed pairs
+agents beat it in 9.9% of them — and the breakdown is the interesting part:
+
+| agent | beats the Oracle |
+|---|---|
+| mean_reversion | 31.2% |
+| momentum | 8.3% |
+| buy_and_hold | 0.0% |
+| random | 0.0% |
+
+**Only agents trading the Oracle's own signal ever beat it.** The two that
+trade no mispricing signal never did, in 192 pairs. So the edge is not
+informational — mean-reversion knows strictly less than the Oracle and still
+out-earns it by concentrating better under the same gross. Giving the Oracle
+the same information across three times as many names makes it *worse*
+(median P&L 110k → 70k); what makes it dominate is doubling its gross
+exposure. At equal constraints it is capital-limited like everything else,
+and a capture ratio above 1.0 is a finding about portfolio construction.
+
+Because `top_k` moves the denominator substantially, a capture ratio is
+quoted against a *configuration*. Two ratios computed with different Oracle
+settings are not comparable.
 
 Quote the horizon with the ratio. Mispricing reverts on a 60-day half-life, so
 a short evaluation sees only the start of the convergence: on seed 2026 the

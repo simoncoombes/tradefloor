@@ -22,27 +22,40 @@ This needs saying first because the name invites the opposite reading, and I
 made that mistake in this file's own documentation for a week.
 
 The Oracle sees the true mispricing. It does not follow that nothing can beat
-it, and measurably things do: across eight seeds, momentum beat it twice and
-mean-reversion once — three of thirty-two agent-seed pairs, about 9%.
+it, and measurably things do. Across 384 agent-seed pairs — four rosters, two
+sizes, two horizons, six seeds each:
 
-That is not a defect in the Oracle. It is what happens when a perfectly
-informed trader is given the same capital constraint as everyone else and a
-naive rule for spending it. The default Oracle holds the ten most mispriced
-names at equal weight, gross 1.0, capped at 2% of ADV — exactly the budget the
-other baselines get. Perfect information does not make that the best portfolio
-you could build with a gross of 1.0, and an agent whose selection happens to
-suit the constraint better will out-earn it.
+    beat the Oracle       9.9% of all pairs      largest capture 4.96
 
-Measured, holding the market and the horizon fixed:
+        mean_reversion    30/96   31.2%
+        momentum           8/96    8.3%
+        buy_and_hold       0/96    0.0%
+        random             0/96    0.0%
+
+The breakdown is the whole story, and it is the opposite of what this file
+used to claim. It said an agent could beat the Oracle by trading a signal the
+Oracle ignores. **Only agents trading the Oracle's OWN signal ever beat it.**
+Mean-reversion — which is the mispricing trade, done by estimation instead of
+by revelation — beats it nearly a third of the time. Buy-and-hold and random,
+which trade no mispricing signal at all, never once beat it in 192 pairs.
+
+So the edge is not informational, it is in portfolio construction. The
+default Oracle holds the ten most mispriced names at equal weight, gross 1.0,
+capped at 2% of ADV — exactly the budget the other baselines get. Perfect
+information does not make equal-weight-top-five the best portfolio a gross of
+1.0 can buy, and an agent that concentrates better out-earns it while knowing
+strictly less.
+
+Two levers, measured, holding the market and horizon fixed:
 
     top_k=5,  gross=1.0  (default)   median P&L 109,983   beaten 3/8
     top_k=15, gross=1.0              median P&L  70,311   beaten 6/8
     top_k=15, gross=2.0              median P&L 157,548   beaten 0/8
 
-Spreading the same information across more names makes it WORSE, not better —
-each position shrinks and turnover rises. What makes it dominate is doubling
-the gross exposure, which is capital rather than information. At equal
-constraints the Oracle is capital-limited, like everything else.
+Spreading the same information across more names makes it WORSE, not better.
+What makes it dominate is doubling the gross exposure — capital, not
+information. At equal constraints the Oracle is capital-limited like
+everything else.
 
 So read a capture ratio as **P&L relative to a perfectly-informed reference
 portfolio under the same constraints**, not as a fraction of available alpha.
@@ -335,17 +348,39 @@ class Oracle:
     mispriced names. Agents beat it in about 9% of measured pairs, and that is
     a result rather than a fault.
 
-    Two further caveats, both worth knowing before quoting a capture ratio:
+    Three further caveats, all worth knowing before quoting a capture ratio:
 
-    **It is a ceiling under a horizon, not the maximum possible.** Mispricing
-    mean-reverts with a sixty-day half-life, so over a five-day evaluation most
-    of the edge it can see has not yet converged. Over a longer run the same
-    Oracle captures more. Quote the horizon with the ratio.
+    **Its height is a CHOICE, and ``top_k`` is the biggest lever on it.**
+    Measured on twenty instruments over thirty days, holding gross exposure
+    and the participation cap fixed at the values every other baseline gets:
 
-    **It is not an upper bound on every strategy.** A strategy trading a signal
-    the Oracle ignores — order-flow pressure, a squeeze — can beat it, and a
-    capture ratio above 1.0 is a finding rather than a bug. What it bounds is
-    the *mispricing* trade specifically.
+        top_k    1        2        3        5        8       12
+        P&L    621k     636k     298k     256k     164k     122k
+
+    The DIRECTION is robust -- P&L falls monotonically from ``top_k=3``
+    upward on every roster checked -- because at a fixed gross exposure,
+    diversifying dilutes the edge without relaxing the constraint. The
+    MAGNITUDE is not: on this roster concentrating into two names earns two
+    and a half times what five does, and on another it earns 8% more. Do not
+    carry the numbers above to a different universe; re-measure.
+
+    What follows either way is that **a capture ratio is quoted against a
+    configuration, not against a universal quantity**. Two ratios computed
+    with different ``top_k`` are not comparable, and neither is comparable to
+    a published number that did not state it.
+
+    **It is a reference under a horizon.** Mispricing mean-reverts with a
+    sixty-day half-life, so over a five-day evaluation most of the edge it can
+    see has not yet converged. Over a longer run the same Oracle captures
+    more. Quote the horizon with the ratio.
+
+    **It is not an upper bound on any strategy.** Measured over 384
+    agent-seed pairs, agents beat it in 9.9% of them -- but that number is
+    almost entirely mean-reversion, at 31.2%. Buy-and-hold and random never
+    beat it once in 192 pairs. Only agents trading the Oracle's own signal
+    beat the Oracle, by out-CONCENTRATING an equal-weight top-five under the
+    same gross, so a capture ratio above 1.0 is a finding about portfolio
+    construction rather than about information.
     """
 
     #: Marks an agent that sees past the observation wall. The harness does not
@@ -425,12 +460,16 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
     what a perfectly-informed reference earned in *that* market removes
     exactly that.
 
-    A ratio ABOVE 1.0 is legal and does occur, in roughly 9% of measured
-    agent-seed pairs. The Oracle is not an upper bound: it holds the same
-    gross exposure as everyone else and spends it on a naive equal-weight
-    rule, so an agent with a better portfolio under the same constraint
-    out-earns it. Treat that as a finding about portfolio construction, not
-    as a broken denominator.
+    A ratio ABOVE 1.0 is legal and does occur, in 9.9% of 384 measured
+    agent-seed pairs -- and in 31.2% of mean-reversion's. The Oracle is not an
+    upper bound: it holds the same gross exposure as everyone else and spends
+    it on a naive equal-weight rule, so an agent with a better portfolio under
+    the same constraint out-earns it. Treat that as a finding about portfolio
+    construction, not as a broken denominator.
+
+    The ratio is also only comparable across runs that used the SAME Oracle
+    configuration; ``top_k`` moves the denominator substantially. See
+    :class:`Oracle`.
 
     Returns an empty mapping when the Oracle lost money or is absent: a ratio
     against a negative denominator flips sign and would rank the worst agent
