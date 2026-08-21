@@ -140,20 +140,55 @@ scores = pt.evaluate(pt.reference_agents(), seed=2026, universe=universe, days=6
 pt.capture_ratio(scores)     # each agent's P&L as a fraction of the Oracle's
 ```
 
-The Oracle is not competing; it is a measuring instrument. It answers the
-question a real market cannot even be asked — *how much alpha was available at
-all* — because doing so requires observing fair value, and the gap between
-price and fair value is precisely what is unobservable out there.
+The Oracle is not competing; it is a measuring instrument. It answers a
+question a real market cannot even be asked — *how much was there to earn* —
+because answering it requires observing fair value, and the gap between price
+and fair value is precisely what is unobservable out there.
 
-That converts a bare number into a fraction. And it is a **real** ceiling, not
-an informational one: the Oracle's orders hit the same book as everyone
-else's, so past some participation the impact eats the edge. Perfect
-information does not buy unlimited size.
+It is a **reference, not an upper bound**, and the distinction is measured
+rather than asserted. The Oracle gets the same gross exposure and
+participation cap as every other baseline and spends them on a naive rule:
+equal weight across the ten most mispriced names. Agents beat it in about 9%
+of measured agent-seed pairs. Giving it the same information across three
+times as many names makes it *worse* (median P&L 110k → 70k); what makes it
+dominate is doubling its gross exposure. So at equal constraints it is
+capital-limited like everything else, and a capture ratio above 1.0 is a
+finding about portfolio construction rather than a broken denominator.
 
 Quote the horizon with the ratio. Mispricing reverts on a 60-day half-life, so
 a short evaluation sees only the start of the convergence: on seed 2026 the
-same momentum agent captures **27% of the ceiling over five days and 94% over
-sixty**.
+same momentum agent captures **27% over five days and 94% over sixty**.
+
+### One seed ranks the seed, not the agents
+
+This is the sharpest edge in the whole harness, so it gets its own heading.
+Over twelve markets the reference agents rank momentum +0.561 and
+mean-reversion +0.302 — and **a single seed picks the top agent exactly half
+the time**. Momentum's own capture runs from +0.075 to +1.133 depending only
+on which market it drew.
+
+```python
+ranking = pt.rank(lambda: pt.reference_agents(seed=3), seeds=range(12),
+                  universe=universe, days=10, workers=4)
+print(ranking.report())
+ranking.separation("momentum", "mean_reversion")   # 6-6, p = 1.0
+ranking.separation("momentum", "buy_and_hold")     # 12-0, p = 0.00049
+```
+
+`rank` takes a *factory* rather than built agents, because agents are stateful
+and reusing them would carry one seed's history into the next with no visible
+symptom.
+
+And the aggregate can overstate too. That 2:1 gap does not establish that
+momentum is better: paired across the same twelve markets it wins six and
+loses six, `p = 1.0`. It wins by more, not more often, and no average of
+returns can tell those apart — which is why `separation` reports a paired sign
+test alongside the number. Against buy-and-hold the same test reads 12–0.
+
+The headline figure pools numerators and denominators rather than averaging
+per-seed ratios. On a short horizon the Oracle sometimes earns almost nothing,
+and dividing by it produces a capture of **+14.4** that is true of its own seed
+and reorders the whole table when averaged in.
 
 **What this does not tell you:** whether an agent would trade real markets
 well. This is a model market with knowable structure, and a determined agent

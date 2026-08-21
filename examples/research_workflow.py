@@ -71,6 +71,45 @@ def main() -> dict:
     print(f"     capture vs the oracle: "
           f"{ {k: round(v, 3) for k, v in ratios.items()} }")
 
+    # ...and that table ranks the SEED at least as much as the agents. Twelve
+    # markets, and a single seed picks the top agent half the time. So the
+    # honest verdict is taken across seeds, paired so that each agent meets an
+    # identical market within every one of them.
+    #
+    # `rank` takes a factory rather than built agents: agents are stateful, and
+    # reusing them would carry seed 0's history into seed 1 invisibly.
+    mark = time.time()
+    ranking = pt.rank(lambda: reference_agents(seed=3), seeds=range(8),
+                      universe=universe, days=5, workers=8)
+    report["ranking"] = {r.name: r.pooled_capture for r in ranking.table()}
+    print(f"     ranked across 8 seeds in {time.time() - mark:.1f}s")
+    for line in ranking.report().splitlines()[1:]:
+        print(f"  {line}")
+
+    # The table has a winner. The statistics may not, and reporting only the
+    # first would be the same coin flip in nicer clothes. A paired sign test
+    # says whether the ordering is real.
+    first, second = ranking.table()[0], ranking.table()[1]
+    verdict = ranking.separation(first.name, second.name)
+    report["top_two_p"] = verdict["p_value"]
+    print(f"     {first.name} over {second.name}: {verdict['wins_a']}-"
+          f"{verdict['wins_b']} across seeds, p={verdict['p_value']:.3f}"
+          f"{'' if verdict['decisive'] else '  (not separated)'}")
+
+    # The spread of the leader across single seeds is wider than its whole
+    # margin over the runner-up. That is the finding, and it is asserted so
+    # that a change which quietly narrows the spread has to explain itself.
+    span = first.capture_range[1] - first.capture_range[0]
+    margin = first.pooled_capture - second.pooled_capture
+    report["span_exceeds_margin"] = span > margin
+    assert span > margin, (
+        f"per-seed spread {span:.3f} no longer exceeds the {margin:.3f} "
+        "margin between the top two -- if that is real, single-seed "
+        "evaluation just became defensible and this warning should change"
+    )
+    print(f"     one seed swings the leader by {span:.3f}, against a "
+          f"{margin:.3f} margin over second place")
+
     # 4. What did the winner's trading cost? Every fill priced against a market
     #    where it never traded — the benchmark real TCA cannot have.
     mark = time.time()

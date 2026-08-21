@@ -32,6 +32,7 @@ from .sweep import sweep
 from .scenario import Scenario, run_scenario
 from .tca import Execution
 from .baselines import capture_ratio, reference_agents
+from .ranking import AgentRecord, Ranking, rank
 from ._core import (  # noqa: F401
     ArrowStream,
     Engine,
@@ -75,6 +76,7 @@ __all__ = [
     "flow_impact", "Portfolio", "Position", "Agent", "Observation",
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
     "baselines", "reference_agents", "capture_ratio", "tca", "Execution",
+    "rank", "Ranking", "AgentRecord",
     "Scenario", "run_scenario", "facts", "Checkpoint", "branch", "sweep",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
