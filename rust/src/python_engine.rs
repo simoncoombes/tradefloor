@@ -59,7 +59,7 @@ fn f64_bytes(py: Python<'_>, values: &[f64]) -> Py<PyBytes> {
 /// inconsistent triple and the liquidity of a name would quietly disagree with
 /// its priced value. So price and shares are the inputs; market cap follows,
 /// and keeps following as price moves.
-#[pyclass(name = "Instrument", module = "pretium", get_all)]
+#[pyclass(name = "Instrument", module = "pretium._core", get_all)]
 #[derive(Debug, Clone)]
 pub struct PyInstrument {
     pub ticker: String,
@@ -214,7 +214,7 @@ impl PyInstrument {
 /// The macro state the price loop reads.
 ///
 /// Rates are FRACTIONAL here and converted once, in `to_core`.
-#[pyclass(name = "Macro", module = "pretium", get_all)]
+#[pyclass(name = "Macro", module = "pretium._core", get_all)]
 #[derive(Debug, Clone)]
 pub struct PyMacro {
     pub vix: f64,
@@ -328,7 +328,7 @@ impl PyMacro {
 }
 
 /// What one tick produced.
-#[pyclass(name = "TickResult", module = "pretium", frozen, get_all)]
+#[pyclass(name = "TickResult", module = "pretium._core", frozen, get_all)]
 #[derive(Debug, Clone)]
 pub struct PyTickResult {
     /// "open", "pre_market", "after_hours" or "closed".
@@ -381,7 +381,7 @@ fn parse_field(name: &str) -> PyResult<PriceField> {
 }
 
 /// A whole market, stepped through time.
-#[pyclass(name = "Engine", module = "pretium")]
+#[pyclass(name = "Engine", module = "pretium._core")]
 pub struct PyEngine {
     inner: Engine,
     buffer: SessionBuffer,
@@ -683,6 +683,120 @@ impl PyEngine {
         self.inner.draw_normal()
     }
 
+
+    /// The current macro state.
+    ///
+    /// Rates come back FRACTIONAL, matching what the constructor takes, so a
+    /// value read here can be written straight back without a conversion --
+    /// which is the whole point of having one denomination at the boundary.
+    #[getter]
+    fn macro_state(&self) -> PyMacro {
+        let e = self.inner.economy();
+        PyMacro {
+            vix: e.vix,
+            federal_funds_rate: crate::units::percent_to_fraction(e.federal_funds_rate),
+            corporate_bond_yield: Some(crate::units::percent_to_fraction(e.corporate_bond_yield)),
+            inflation_rate: crate::units::percent_to_fraction(e.inflation_rate),
+            qe_pe_boost: e.qe_pe_boost,
+            fear_greed_index: e.fear_greed_index,
+            cycle: cycle_name(e.cycle_phase).to_string(),
+        }
+    }
+
+    /// Pin one or more macro series to given values.
+    ///
+    /// # A scenario is a path, not a feature
+    ///
+    /// A rate shock is `federal_funds_rate` stepping 0.025 -> 0.05 over N
+    /// days, supplied day by day by whoever is running the study. It is NOT a
+    /// `rate_shock=True` flag. Every macro narrative worth expressing -- QE, a
+    /// hiking cycle, stagflation -- is a path over these fields, so the API
+    /// gives you the fields and refuses to grow named scenarios that are
+    /// paths in disguise.
+    ///
+    /// Only the named fields are written; everything else keeps evolving
+    /// endogenously. That is the "narrow write surface, generous read
+    /// surface" the design asks for: pinning the policy rate should not also
+    /// freeze inflation.
+    ///
+    /// Rates are FRACTIONAL, as everywhere else, and validated before being
+    /// converted.
+    #[pyo3(signature = (
+        *, vix = None, federal_funds_rate = None, corporate_bond_yield = None,
+        inflation_rate = None, qe_pe_boost = None, fear_greed_index = None,
+        cycle = None
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn pin_macro(
+        &mut self,
+        vix: Option<f64>,
+        federal_funds_rate: Option<f64>,
+        corporate_bond_yield: Option<f64>,
+        inflation_rate: Option<f64>,
+        qe_pe_boost: Option<f64>,
+        fear_greed_index: Option<f64>,
+        cycle: Option<String>,
+    ) -> PyResult<()> {
+        // Validate EVERYTHING before writing ANYTHING. A pin that applied the
+        // first three fields and then rejected the fourth would leave the
+        // scenario half-applied, and the run would continue on a macro state
+        // nobody asked for.
+        for (name, v) in [
+            ("federal_funds_rate", federal_funds_rate),
+            ("corporate_bond_yield", corporate_bond_yield),
+            ("inflation_rate", inflation_rate),
+        ] {
+            if let Some(v) = v {
+                crate::units::check_rate(name, v).map_err(ValidationError::new_err)?;
+            }
+        }
+        for (name, v) in [
+            ("vix", vix),
+            ("qe_pe_boost", qe_pe_boost),
+            ("fear_greed_index", fear_greed_index),
+        ] {
+            if let Some(v) = v {
+                if !v.is_finite() {
+                    return Err(ValidationError::new_err(format!(
+                        "{name} must be finite, got {v}"
+                    )));
+                }
+            }
+        }
+        let phase = match cycle.as_deref() {
+            Some(name) => Some(CyclePhase::from_name(name).ok_or_else(|| {
+                ValidationError::new_err(format!(
+                    "unknown cycle {name:?}. Valid: expansion, peak, contraction, trough, recovery"
+                ))
+            })?),
+            None => None,
+        };
+
+        let e = self.inner.economy_mut();
+        if let Some(v) = vix {
+            e.vix = v;
+        }
+        if let Some(v) = federal_funds_rate {
+            e.federal_funds_rate = crate::units::fraction_to_percent(v);
+        }
+        if let Some(v) = corporate_bond_yield {
+            e.corporate_bond_yield = crate::units::fraction_to_percent(v);
+        }
+        if let Some(v) = inflation_rate {
+            e.inflation_rate = crate::units::fraction_to_percent(v);
+        }
+        if let Some(v) = qe_pe_boost {
+            e.qe_pe_boost = v;
+        }
+        if let Some(v) = fear_greed_index {
+            e.fear_greed_index = v;
+        }
+        if let Some(p) = phase {
+            e.cycle_phase = p;
+        }
+        Ok(())
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "Engine({} instruments, draws={})",
@@ -707,4 +821,48 @@ pub fn market_status(hour: i64, minute: i64, day_of_week: i64) -> PyResult<Strin
         day_of_week,
     }))
     .to_string())
+}
+
+/// Generate `n` plausible instruments deterministically.
+///
+/// `seed` is the UNIVERSE seed and is independent of any simulation seed, so
+/// "same universe, different market draws" — the standard design for variance
+/// estimation — is expressible. Generation draws from its own stream and
+/// consumes nothing from an engine's.
+#[pyfunction]
+#[pyo3(signature = (n = 108, *, seed = 0))]
+pub fn random_instruments(n: usize, seed: u32) -> PyResult<Vec<PyInstrument>> {
+    if n == 0 {
+        return Err(ValidationError::new_err("n must be greater than zero"));
+    }
+    if n > 26 * 26 * 26 {
+        return Err(ValidationError::new_err(format!(
+            "n must be at most {} - tickers are three letters", 26 * 26 * 26
+        )));
+    }
+    Ok(crate::universe::random_universe(n, seed)
+        .into_iter()
+        .map(|g| PyInstrument {
+            ticker: g.ticker,
+            sector: g.sector.to_string(),
+            initial_price: g.initial_price,
+            shares_outstanding: g.shares_outstanding,
+            eps: Some(g.eps),
+            book_value_per_share: Some(g.book_value_per_share),
+            revenue_growth: Some(g.revenue_growth),
+            avg_volume: g.avg_volume,
+            beta: g.beta,
+            short_interest: 0.0,
+        })
+        .collect())
+}
+
+fn cycle_name(p: CyclePhase) -> &'static str {
+    match p {
+        CyclePhase::Expansion => "expansion",
+        CyclePhase::Peak => "peak",
+        CyclePhase::Contraction => "contraction",
+        CyclePhase::Trough => "trough",
+        CyclePhase::Recovery => "recovery",
+    }
 }

@@ -40,6 +40,8 @@ pub mod rng;
 /// The twelve sectors and their model parameters.
 pub mod sectors;
 pub mod types;
+/// Universe generation - plausible rosters, deterministically.
+pub mod universe;
 /// The single place a factor of 100 exists - see the module docs.
 pub mod units;
 

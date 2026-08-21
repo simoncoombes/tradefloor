@@ -1,0 +1,31 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pretium"
+version = "0.0.0"
+description = "Deterministic market simulation with a real limit order book."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Simon Coombes" }]
+keywords = ["simulation", "finance", "market", "orderbook", "deterministic", "backtesting"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Financial and Insurance Industry",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Rust",
+  "Topic :: Office/Business :: Financial :: Investment",
+  "Topic :: Scientific/Engineering",
+]
+
+[tool.maturin]
+manifest-path = "rust/Cargo.toml"
+# Mixed layout: the compiled extension is pretium._core and the Python package
+# in python/ wraps it. Keeps the public name `pretium` while leaving room for
+# pure-Python surface.
+python-source = "python"
+module-name = "pretium._core"
+features = ["python"]

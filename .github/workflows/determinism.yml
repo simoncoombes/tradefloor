@@ -59,7 +59,10 @@ jobs:
           # target-cpu=native. A build that let LLVM fuse a multiply-add on
           # one CPU family would be a different market on that CPU family,
           # which is the whole reason mul_add is banned in the source.
-          maturin build --release -m rust/Cargo.toml -F python --out dist
+          # pyproject.toml carries manifest-path, python-source and the
+          # feature, so the layout lives in one place rather than being repeated
+          # in every invocation.
+          maturin build --release --out dist
           python -m pip install --find-links dist --force-reinstall pretium
 
       - name: Run the known-answer simulation

@@ -26,7 +26,7 @@ use pyo3::prelude::*;
 /// all — a uniform drawn after one normal and after two normals is the same
 /// value. Draw accounting is therefore not one-uniform-per-value, which
 /// matters to anyone reasoning about where a stream is.
-#[pyclass(name = "GameRng", module = "pretium")]
+#[pyclass(name = "GameRng", module = "pretium._core")]
 pub struct PyGameRng {
     inner: crate::GameRng,
 }
@@ -72,7 +72,7 @@ impl PyGameRng {
 }
 
 pyo3::create_exception!(
-    pretium,
+    _core,
     ValidationError,
     pyo3::exceptions::PyValueError,
     "Raised when construction input is rejected at the boundary. Subclasses \
@@ -100,8 +100,15 @@ fn check_rate(name: &str, fraction: f64) -> PyResult<f64> {
     crate::units::check_rate(name, fraction).map_err(ValidationError::new_err)
 }
 
+/// The compiled extension.
+///
+/// Named `_core` because a Python package wraps it: `pretium/__init__.py`
+/// re-exports everything here and adds the parts that are better written in
+/// Python than in Rust -- JSON round-trips, and multiprocessing for seed
+/// sweeps. Forcing those into the extension would mean hand-rolling JSON
+/// escaping and reimplementing a process pool, both badly.
 #[pymodule]
-fn pretium(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGameRng>()?;
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(check_rate, m)?)?;
@@ -125,6 +132,7 @@ fn pretium(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::python_engine::PyMacro>()?;
     m.add_class::<crate::python_engine::PyTickResult>()?;
     m.add_function(wrap_pyfunction!(crate::python_engine::market_status, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::python_engine::random_instruments, m)?)?;
     m.add("ValidationError", m.py().get_type_bound::<ValidationError>())?;
     m.add(
         "OrderError",
@@ -139,7 +147,7 @@ fn pretium(m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// The decomposition is the point, not a debugging aid: the simulator knows
 /// the multiple it applied and why, which no historical-data backtest can
 /// tell you.
-#[pyclass(name = "FairValue", module = "pretium", frozen, get_all)]
+#[pyclass(name = "FairValue", module = "pretium._core", frozen, get_all)]
 #[derive(Debug, Clone, Copy)]
 pub struct PyFairValue {
     /// Fair value per share.
@@ -313,7 +321,7 @@ fn sectors() -> Vec<String> {
 /// yesterday's, which the momentum term needs. Immutable: a step returns a new
 /// state rather than mutating, so a trajectory is a list of values you can
 /// keep rather than a thing you have to copy defensively.
-#[pyclass(name = "MispricingState", module = "pretium", frozen, get_all)]
+#[pyclass(name = "MispricingState", module = "pretium._core", frozen, get_all)]
 #[derive(Debug, Clone, Copy)]
 pub struct PyMispricingState {
     /// Current log-mispricing.

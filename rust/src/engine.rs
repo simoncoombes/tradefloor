@@ -423,6 +423,23 @@ impl Engine {
     pub fn economy(&self) -> &EconomyState {
         &self.economy
     }
+
+    /// Mutable access to the macro state, for driving a scenario.
+    ///
+    /// A scenario is a PATH, not a feature: a rate shock is `federal_funds_rate`
+    /// stepping from 2.5 to 5 over N days, supplied by whoever is running the
+    /// study. Expressing that needs the embedder to be able to write the macro
+    /// state between days, which is what this is for.
+    ///
+    /// Writing it MID-SESSION is legal and is not checked, because the engine
+    /// cannot tell a deliberate intraday shock from a mistake. It is worth
+    /// knowing that the tick reads these fields as it goes, so a write between
+    /// two ticks of the same session takes effect immediately and for the rest
+    /// of that session — which is either exactly what was wanted or a
+    /// surprise, depending on who wrote it.
+    pub fn economy_mut(&mut self) -> &mut EconomyState {
+        &mut self.economy
+    }
     pub fn central_bank(&self) -> &CentralBankState {
         &self.central_bank
     }
