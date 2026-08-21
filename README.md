@@ -30,11 +30,11 @@ targets, runs one fixed simulation inside each, and compares digests; no wheel
 ships that disagrees with the others. The current run:
 
 ```
-linux-x86_64     4cdfb033b42a53c42d83155bf695a2805d53da58610e19c9d7da8c3f6bf0e3b8
-linux-aarch64    4cdfb033b42a53c42d83155bf695a2805d53da58610e19c9d7da8c3f6bf0e3b8
-macos-arm64      4cdfb033b42a53c42d83155bf695a2805d53da58610e19c9d7da8c3f6bf0e3b8
-macos-x86_64     4cdfb033b42a53c42d83155bf695a2805d53da58610e19c9d7da8c3f6bf0e3b8
-windows-x86_64   4cdfb033b42a53c42d83155bf695a2805d53da58610e19c9d7da8c3f6bf0e3b8
+linux-x86_64     112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
+linux-aarch64    112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
+macos-arm64      112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
+macos-x86_64     112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
+windows-x86_64   112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
 ```
 
 A missing target is not a pass — the gate fails on four of five, because a
