@@ -130,6 +130,19 @@ pub fn to_uint32(value: f64) -> u32 {
     modulo as u32
 }
 
+/// A generator's complete state, as plain numbers.
+///
+/// Exists so a simulation can be checkpointed without replaying it. The
+/// alternative -- recording a draw COUNT and fast-forwarding -- cannot express
+/// the cached Box-Muller spare, and would restore a generator that agreed on
+/// uniforms and disagreed on normals.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RngState {
+    pub state: u64,
+    pub increment: u64,
+    pub spare: Option<f64>,
+}
+
 /// PCG-XSH-RR with 64-bit state and 32-bit output.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pcg32 {
@@ -233,6 +246,41 @@ impl GameRng {
 
     pub fn next_f64(&mut self) -> f64 {
         self.pcg.next_f64()
+    }
+
+    /// The generator's complete observable state.
+    ///
+    /// Three numbers: the LCG state, its increment, and the cached Box-Muller
+    /// spare. That is ALL of it -- restore these and the next draw, and every
+    /// draw after it, is the one that would have come next.
+    ///
+    /// The spare is the part that is easy to forget and fatal to omit.
+    /// `next_normal` consumes two LCG steps and returns one value, keeping the
+    /// other; a snapshot of the LCG alone would restore a generator that
+    /// produces the right uniforms and the wrong normals, diverging on the
+    /// first `next_normal` and looking correct until then.
+    ///
+    /// It also means "advance by N draws" is not a well-defined restore
+    /// operation on this generator, which is why this is a state snapshot
+    /// rather than a jump-ahead: N draws map to N or N+1 LCG steps depending
+    /// on how the normals fell.
+    pub fn snapshot(&self) -> RngState {
+        RngState {
+            state: self.pcg.state,
+            increment: self.pcg.inc,
+            spare: self.spare,
+        }
+    }
+
+    /// Restore a generator to a snapshot. Exact, and O(1).
+    pub fn restore(state: RngState) -> Self {
+        Self {
+            pcg: Pcg32 {
+                state: state.state,
+                inc: state.increment,
+            },
+            spare: state.spare,
+        }
     }
 
     /// Box-Muller, caching the spare.
@@ -372,5 +420,93 @@ mod tests {
         assert_eq!(to_uint32(-1.9), 4294967295, "truncates, then wraps");
         assert_eq!(to_uint32(f64::NAN), 0);
         assert_eq!(to_uint32(f64::INFINITY), 0);
+    }
+}
+
+#[cfg(test)]
+mod snapshot_tests {
+    use super::*;
+
+    #[test]
+    fn a_restored_generator_continues_the_same_stream() {
+        let mut original = GameRng::new(42, 7);
+        for _ in 0..37 {
+            original.next_f64();
+        }
+        let mark = original.snapshot();
+        let expected: Vec<f64> = (0..20).map(|_| original.next_f64()).collect();
+
+        let mut restored = GameRng::restore(mark);
+        let actual: Vec<f64> = (0..20).map(|_| restored.next_f64()).collect();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn the_cached_spare_is_part_of_the_state() {
+        // The field a snapshot is most likely to omit, and the one that makes
+        // omission invisible: uniforms would still match, and only the first
+        // normal after the restore would differ.
+        let mut original = GameRng::new(11, 3);
+        // An ODD number of normals, so a spare is left cached.
+        original.next_normal();
+        assert!(original.snapshot().spare.is_some(), "expected a cached spare");
+
+        let mark = original.snapshot();
+        let expected = original.next_normal();
+        assert_eq!(GameRng::restore(mark).next_normal(), expected);
+
+        // And a snapshot that dropped the spare would diverge here -- shown
+        // rather than asserted about, so the test proves the field matters.
+        let mut without_spare = GameRng::restore(RngState {
+            spare: None,
+            ..mark
+        });
+        assert_ne!(without_spare.next_normal(), expected);
+    }
+
+    #[test]
+    fn a_snapshot_survives_a_mixed_stream() {
+        // Uniforms and normals interleaved is the real usage shape: the tick
+        // draws both, so a snapshot taken mid-tick must restore either kind.
+        let mut original = GameRng::new(5, 99);
+        for i in 0..25 {
+            if i % 3 == 0 {
+                original.next_normal();
+            } else {
+                original.next_f64();
+            }
+        }
+        let mark = original.snapshot();
+        let expected: Vec<f64> = (0..30)
+            .map(|i| {
+                if i % 2 == 0 {
+                    original.next_normal()
+                } else {
+                    original.next_f64()
+                }
+            })
+            .collect();
+
+        let mut restored = GameRng::restore(mark);
+        let actual: Vec<f64> = (0..30)
+            .map(|i| {
+                if i % 2 == 0 {
+                    restored.next_normal()
+                } else {
+                    restored.next_f64()
+                }
+            })
+            .collect();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn two_different_positions_do_not_snapshot_alike() {
+        // Otherwise every test above passes on a snapshot that captures
+        // nothing.
+        let mut rng = GameRng::new(1, 1);
+        let first = rng.snapshot();
+        rng.next_f64();
+        assert_ne!(first, rng.snapshot());
     }
 }

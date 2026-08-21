@@ -208,6 +208,29 @@ impl Engine {
     }
 
     /// Cumulative draws taken since construction.
+    /// The generator's exact position, as three numbers.
+    ///
+    /// The half of a checkpoint that cannot be reconstructed from the roster.
+    /// Every other piece of engine state -- prices, GARCH variance, maker
+    /// inventory, the mispricing carry -- is observable through `column()`, so
+    /// an embedder that persists its own instruments already has it. The
+    /// stream position is not observable that way, and without it a restored
+    /// market continues from a different sequence while looking correct.
+    pub fn rng_state(&self) -> crate::rng::RngState {
+        self.rng.snapshot()
+    }
+
+    /// Put the generator back to a captured position.
+    ///
+    /// Deliberately narrow: it restores the STREAM and nothing else. Company
+    /// state is the caller's to restore, because the caller is the one that
+    /// persisted it. A method that pretended to restore everything would have
+    /// to be kept in step with every field ever added to a company, and would
+    /// fail silently the first time it was not.
+    pub fn set_rng_state(&mut self, state: crate::rng::RngState) {
+        self.rng = GameRng::restore(state);
+    }
+
     pub fn draws_consumed(&self) -> usize {
         self.draws
     }
