@@ -498,8 +498,7 @@ pub struct PyEngine {
     /// grain for 100 names over a trading year is ~9.8 million rows per table;
     /// as one batch that is a memory problem, as 252 daily batches it is a
     /// pull protocol the consumer drives.
-    recorded_bars: Vec<arrow::array::RecordBatch>,
-    recorded_truth: Vec<arrow::array::RecordBatch>,
+    recorded: Vec<crate::python_arrow::RecordedDay>,
     recorded_macro: Vec<crate::python_arrow::MacroRow>,
 }
 
@@ -539,8 +538,7 @@ impl PyEngine {
             ),
             buffer: SessionBuffer::new(),
             tickers,
-            recorded_bars: Vec::new(),
-            recorded_truth: Vec::new(),
+            recorded: Vec::new(),
             recorded_macro: Vec::new(),
         })
     }
@@ -993,26 +991,22 @@ impl PyEngine {
     /// Explicit rather than automatic. The session buffer is reused, so
     /// anything not captured before the next `run_session` is gone -- but a
     /// caller who does not want a table should not pay to build one every
-    /// session. Call this once per day, after the session and before the
-    /// next.
+    /// session.
+    ///
+    /// The RAW buffers are kept rather than a finished batch. It costs the
+    /// same memory and it keeps grain a read-time decision: one recording can
+    /// answer tick, five-minute and daily questions. Re-running a day to
+    /// change its grain would be the alternative, and it is a much worse one.
     #[pyo3(signature = (day))]
     fn record(&mut self, day: u32) -> PyResult<()> {
-        let ticks = self.buffer.ticks_written;
-        let n = self.buffer.companies;
-        self.recorded_bars.push(
-            crate::python_arrow::bars_batch(
-                day, ticks, n,
-                self.written(&self.buffer.prices),
-                self.written(&self.buffer.volumes),
-            )
-            .map_err(crate::python_arrow::arrow_err)?,
-        );
-        self.recorded_truth.push(
-            crate::python_arrow::truth_batch(
-                day, ticks, n, self.written(&self.buffer.mispricing_s),
-            )
-            .map_err(crate::python_arrow::arrow_err)?,
-        );
+        self.recorded.push(crate::python_arrow::RecordedDay {
+            day,
+            ticks: self.buffer.ticks_written,
+            instruments: self.buffer.companies,
+            prices: self.written(&self.buffer.prices).to_vec(),
+            volumes: self.written(&self.buffer.volumes).to_vec(),
+            mispricing: self.written(&self.buffer.mispricing_s).to_vec(),
+        });
         let e = self.inner.economy();
         self.recorded_macro.push(crate::python_arrow::MacroRow {
             day,
@@ -1033,45 +1027,109 @@ impl PyEngine {
 
     /// Discard everything recorded so far.
     fn clear_recording(&mut self) {
-        self.recorded_bars.clear();
-        self.recorded_truth.clear();
+        self.recorded.clear();
         self.recorded_macro.clear();
     }
 
     #[getter]
     fn recorded_days(&self) -> usize {
-        self.recorded_bars.len()
+        self.recorded.len()
     }
 
-    /// The `bars` table: one row per (tick, instrument).
+    /// The `bars` table.
     ///
-    /// Returns every recorded day as a SEPARATE batch, so a consumer pulls
-    /// them one at a time rather than materialising a year at once. With
-    /// nothing recorded it falls back to the last session, which is the
-    /// convenient case for a single-day run.
+    /// Grain is chosen here, and downsampling happens in RUST rather than in
+    /// the consumer: bucketing ten million rows in Python to get two hundred
+    /// is the cost this surface exists to avoid.
     ///
-    /// `instrument_id` is a UInt32 index into `tickers`, not a repeated
-    /// string. At these row counts that is the difference between a column
-    /// and a memory problem.
-    #[pyo3(signature = (*, day = 0))]
-    fn bars(&self, day: u32) -> PyResult<crate::python_arrow::PyArrowStream> {
-        let batches = if self.recorded_bars.is_empty() {
-            vec![crate::python_arrow::bars_batch(
+    ///   `bars()`             tick grain: day, tick, instrument_id, close, volume
+    ///   `bars(minutes=5)`    five-minute OHLCV bars
+    ///   `bars(grain="day")`  one OHLCV bar per instrument per day
+    ///
+    /// The tick schema has no open/high/low because at tick grain a bar IS the
+    /// print and those columns would repeat close. Once ticks are bucketed
+    /// they carry real information, so the coarse schema is genuinely wider
+    /// rather than the same columns rearranged.
+    ///
+    /// Every recorded day is a separate batch, so a year streams rather than
+    /// materialising. With nothing recorded it falls back to the last session.
+    #[pyo3(signature = (*, day = 0, minutes = None, grain = None))]
+    fn bars(
+        &self,
+        day: u32,
+        minutes: Option<usize>,
+        grain: Option<&str>,
+    ) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let days: Vec<crate::python_arrow::RecordedDay> = if self.recorded.is_empty() {
+            vec![crate::python_arrow::RecordedDay {
                 day,
-                self.buffer.ticks_written,
-                self.buffer.companies,
-                self.written(&self.buffer.prices),
-                self.written(&self.buffer.volumes),
-            )
-            .map_err(crate::python_arrow::arrow_err)?]
+                ticks: self.buffer.ticks_written,
+                instruments: self.buffer.companies,
+                prices: self.written(&self.buffer.prices).to_vec(),
+                volumes: self.written(&self.buffer.volumes).to_vec(),
+                mispricing: Vec::new(),
+            }]
         } else {
-            self.recorded_bars.clone()
+            self.recorded.clone()
         };
-        Ok(crate::python_arrow::PyArrowStream::new(
-            "bars",
-            crate::python_arrow::bars_schema(),
-            batches,
-        ))
+
+        // `None` means tick grain, which uses the narrow schema.
+        let bucket = match (minutes, grain) {
+            (Some(_), Some(_)) => {
+                return Err(ValidationError::new_err(
+                    "pass either minutes or grain, not both",
+                ))
+            }
+            (Some(m), None) => {
+                if m == 0 {
+                    return Err(ValidationError::new_err("minutes must be at least 1"));
+                }
+                // One tick is one simulated minute, so the bucket is the
+                // minute count directly.
+                Some(m)
+            }
+            (None, Some("day")) => Some(usize::MAX),
+            (None, Some("tick")) | (None, None) => None,
+            (None, Some(other)) => {
+                return Err(ValidationError::new_err(format!(
+                    "unknown grain {other:?}. Valid: \"tick\", \"day\", or minutes=N"
+                )))
+            }
+        };
+
+        match bucket {
+            None => {
+                let mut batches = Vec::with_capacity(days.len());
+                for d in &days {
+                    batches.push(
+                        crate::python_arrow::bars_batch(
+                            d.day, d.ticks, d.instruments, &d.prices, &d.volumes,
+                        )
+                        .map_err(crate::python_arrow::arrow_err)?,
+                    );
+                }
+                Ok(crate::python_arrow::PyArrowStream::new(
+                    "bars",
+                    crate::python_arrow::bars_schema(),
+                    batches,
+                ))
+            }
+            Some(b) => {
+                let mut batches = Vec::with_capacity(days.len());
+                for d in &days {
+                    let size = if b == usize::MAX { core::cmp::max(d.ticks, 1) } else { b };
+                    batches.push(
+                        crate::python_arrow::ohlc_batch(d, size)
+                            .map_err(crate::python_arrow::arrow_err)?,
+                    );
+                }
+                Ok(crate::python_arrow::PyArrowStream::new(
+                    "bars",
+                    crate::python_arrow::ohlc_schema(),
+                    batches,
+                ))
+            }
+        }
     }
 
     /// The `truth` table: the labelled-dataset output.
@@ -1081,7 +1139,7 @@ impl PyEngine {
     /// knows what fair value was.
     #[pyo3(signature = (*, day = 0))]
     fn truth(&self, day: u32) -> PyResult<crate::python_arrow::PyArrowStream> {
-        let batches = if self.recorded_truth.is_empty() {
+        let batches = if self.recorded.is_empty() {
             vec![crate::python_arrow::truth_batch(
                 day,
                 self.buffer.ticks_written,
@@ -1090,7 +1148,16 @@ impl PyEngine {
             )
             .map_err(crate::python_arrow::arrow_err)?]
         } else {
-            self.recorded_truth.clone()
+            let mut out = Vec::with_capacity(self.recorded.len());
+            for d in &self.recorded {
+                out.push(
+                    crate::python_arrow::truth_batch(
+                        d.day, d.ticks, d.instruments, &d.mispricing,
+                    )
+                    .map_err(crate::python_arrow::arrow_err)?,
+                );
+            }
+            out
         };
         Ok(crate::python_arrow::PyArrowStream::new(
             "truth",

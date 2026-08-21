@@ -294,3 +294,108 @@ def test_an_untraded_roster_yields_an_empty_fills_table():
     e, _, _, _, _ = recorded()
     empty = pretium.Portfolio(cash=1e6)
     assert pa.table(empty.fills_table(e.tickers)).num_rows == 0
+
+
+# --------------------------------------------------------------------------
+# Downsampling
+# --------------------------------------------------------------------------
+
+def multiday(days=3, ticks=390, n=4):
+    u = pretium.Universe.random(n, seed=5)
+    e = pretium.Engine(seed=2026, universe=u)
+    for day in range(days):
+        e.open_market()
+        e.run_session(9, 30, 3, ticks)
+        e.close_market()
+        e.record(day)
+    return e, days, ticks, n
+
+
+def test_coarser_grain_produces_fewer_rows():
+    e, days, ticks, n = multiday()
+    assert pa.table(e.bars()).num_rows == days * ticks * n
+    assert pa.table(e.bars(minutes=5)).num_rows == days * (ticks // 5) * n
+    assert pa.table(e.bars(grain="day")).num_rows == days * n
+
+
+def test_the_coarse_schema_is_wider_because_ohlc_is_now_real():
+    """At tick grain a bar IS the print, so open/high/low would repeat close.
+
+    Once ticks are bucketed those columns carry real information, so the
+    coarse schema is genuinely wider rather than the same columns rearranged.
+    """
+    e, _, _, _ = multiday()
+    assert pa.table(e.bars()).column_names == [
+        "day", "tick", "instrument_id", "close", "volume"]
+    assert pa.table(e.bars(grain="day")).column_names == [
+        "day", "bar", "instrument_id", "open", "high", "low", "close", "volume"]
+
+
+def test_downsampled_bars_reconcile_with_the_ticks_they_came_from():
+    # The check that matters: a bucketing bug would produce plausible OHLC
+    # that simply is not what happened.
+    e, _, _, n = multiday()
+    tick = pa.table(e.bars()).to_pydict()
+    daily = pa.table(e.bars(grain="day")).to_pydict()
+
+    closes = [c for c, i, d in zip(tick["close"], tick["instrument_id"], tick["day"])
+              if i == 0 and d == 0]
+    volumes = [v for v, i, d in zip(tick["volume"], tick["instrument_id"], tick["day"])
+               if i == 0 and d == 0]
+
+    assert daily["open"][0] == closes[0]
+    assert daily["close"][0] == closes[-1]
+    assert daily["high"][0] == max(closes)
+    assert daily["low"][0] == min(closes)
+    assert daily["volume"][0] == pytest.approx(sum(volumes))
+
+
+def test_high_is_at_or_above_low_everywhere():
+    e, _, _, _ = multiday()
+    d = pa.table(e.bars(minutes=15)).to_pydict()
+    assert all(h >= l for h, l in zip(d["high"], d["low"]))
+    assert all(l <= o <= h for o, h, l in zip(d["open"], d["high"], d["low"]))
+    assert all(l <= c <= h for c, h, l in zip(d["close"], d["high"], d["low"]))
+
+
+def test_a_short_final_bucket_is_kept_not_dropped():
+    """Dropping a partial bar would silently discard the end of the session.
+
+    Including the close, which is the single most-used price in the table.
+    """
+    u = pretium.Universe.random(2, seed=1)
+    e = pretium.Engine(seed=1, universe=u)
+    e.open_market()
+    e.run_session(9, 30, 3, 47)     # not a multiple of 10
+    e.record(0)
+    d = pa.table(e.bars(minutes=10)).to_pydict()
+    assert len(set(d["bar"])) == 5, "four full buckets plus a short one"
+    tick_closes = [c for c, i in zip(pa.table(e.bars()).to_pydict()["close"],
+                                     pa.table(e.bars()).to_pydict()["instrument_id"])
+                   if i == 0]
+    last_bar_close = [c for c, b, i in zip(d["close"], d["bar"], d["instrument_id"])
+                      if b == 4 and i == 0][0]
+    assert last_bar_close == tick_closes[-1]
+
+
+def test_every_downsampled_column_is_f64():
+    e, _, _, _ = multiday()
+    for field in pa.table(e.bars(grain="day")).schema:
+        if field.name not in ("day", "bar", "instrument_id"):
+            assert field.type == pa.float64(), field.name
+
+
+def test_grain_still_streams_per_day():
+    e, days, _, _ = multiday()
+    assert e.bars(grain="day").num_batches == days
+    assert e.bars(minutes=5).num_batches == days
+
+
+def test_conflicting_or_unknown_grain_is_refused():
+    e, _, _, _ = multiday()
+    with pytest.raises(pretium.ValidationError, match="not both"):
+        e.bars(minutes=5, grain="day")
+    with pytest.raises(pretium.ValidationError, match="unknown grain"):
+        e.bars(grain="hourly")
+    with pytest.raises(pretium.ValidationError, match="at least 1"):
+        e.bars(minutes=0)

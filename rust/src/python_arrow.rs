@@ -376,3 +376,135 @@ pub fn fills_stream(
         .map_err(arrow_err)?;
     Ok(PyArrowStream::new("fills", fills_schema(), vec![batch]))
 }
+
+/// One recorded day, kept raw so grain stays a read-time decision.
+///
+/// Storing the buffers rather than a pre-built batch costs the same memory and
+/// buys the ability to ask for tick, N-minute or day bars from one recording.
+/// Building the batch is cheap; re-running the day to change grain is not.
+#[derive(Debug, Clone)]
+pub struct RecordedDay {
+    pub day: u32,
+    pub ticks: usize,
+    pub instruments: usize,
+    pub prices: Vec<f64>,
+    pub volumes: Vec<f64>,
+    pub mispricing: Vec<f64>,
+}
+
+/// `bars` at a coarser grain: real OHLCV.
+///
+/// At tick grain a bar is the print and open/high/low would simply repeat
+/// close, which is why the tick schema omits them. Once ticks are bucketed
+/// they carry real information, so the coarse schema is wider rather than the
+/// same columns downsampled.
+pub fn ohlc_schema() -> SchemaRef {
+    Arc::new(Schema::new(vec![
+        Field::new("day", DataType::UInt32, false),
+        Field::new("bar", DataType::UInt32, false),
+        Field::new("instrument_id", DataType::UInt32, false),
+        Field::new("open", DataType::Float64, false),
+        Field::new("high", DataType::Float64, false),
+        Field::new("low", DataType::Float64, false),
+        Field::new("close", DataType::Float64, false),
+        Field::new("volume", DataType::Float64, false),
+    ]))
+}
+
+/// Bucket one day's ticks into OHLCV bars.
+///
+/// `bucket` is ticks per bar; a bucket at or beyond the day's length produces
+/// exactly one bar, which is the day-grain case.
+///
+/// The final bucket is kept even when short. Dropping a partial bar would
+/// silently discard the end of every session whose length is not a multiple of
+/// the bucket — including the close, which is the single most-used price in
+/// the table.
+pub fn ohlc_batch(day: &RecordedDay, bucket: usize) -> Result<RecordBatch, String> {
+    if bucket == 0 {
+        return Err("bucket must be at least one tick".to_string());
+    }
+    let n = day.instruments;
+    if n == 0 || day.ticks == 0 {
+        return RecordBatch::try_new(
+            ohlc_schema(),
+            vec![
+                Arc::new(UInt32Array::from(Vec::<u32>::new())),
+                Arc::new(UInt32Array::from(Vec::<u32>::new())),
+                Arc::new(UInt32Array::from(Vec::<u32>::new())),
+                Arc::new(Float64Array::from(Vec::<f64>::new())),
+                Arc::new(Float64Array::from(Vec::<f64>::new())),
+                Arc::new(Float64Array::from(Vec::<f64>::new())),
+                Arc::new(Float64Array::from(Vec::<f64>::new())),
+                Arc::new(Float64Array::from(Vec::<f64>::new())),
+            ],
+        )
+        .map_err(|e| e.to_string());
+    }
+
+    let bars = day.ticks.div_ceil(bucket);
+    let rows = bars * n;
+    let (mut day_c, mut bar_c, mut id_c) = (
+        Vec::with_capacity(rows),
+        Vec::with_capacity(rows),
+        Vec::with_capacity(rows),
+    );
+    let (mut o, mut h, mut l, mut c, mut v) = (
+        Vec::with_capacity(rows),
+        Vec::with_capacity(rows),
+        Vec::with_capacity(rows),
+        Vec::with_capacity(rows),
+        Vec::with_capacity(rows),
+    );
+
+    for bar in 0..bars {
+        let first = bar * bucket;
+        let last = core::cmp::min(first + bucket, day.ticks);
+        for i in 0..n {
+            let mut open = f64::NAN;
+            let mut high = f64::NEG_INFINITY;
+            let mut low = f64::INFINITY;
+            let mut close = f64::NAN;
+            let mut volume = 0.0;
+            for t in first..last {
+                let price = day.prices[t * n + i];
+                if t == first {
+                    open = price;
+                }
+                // `>` and `<` rather than a max/min helper: NaN must not
+                // silently win a comparison and become the high of a bar.
+                if price > high {
+                    high = price;
+                }
+                if price < low {
+                    low = price;
+                }
+                close = price;
+                volume += day.volumes[t * n + i];
+            }
+            day_c.push(day.day);
+            bar_c.push(bar as u32);
+            id_c.push(i as u32);
+            o.push(open);
+            h.push(high);
+            l.push(low);
+            c.push(close);
+            v.push(volume);
+        }
+    }
+
+    RecordBatch::try_new(
+        ohlc_schema(),
+        vec![
+            Arc::new(UInt32Array::from(day_c)),
+            Arc::new(UInt32Array::from(bar_c)),
+            Arc::new(UInt32Array::from(id_c)),
+            Arc::new(Float64Array::from(o)),
+            Arc::new(Float64Array::from(h)),
+            Arc::new(Float64Array::from(l)),
+            Arc::new(Float64Array::from(c)),
+            Arc::new(Float64Array::from(v)),
+        ],
+    )
+    .map_err(|e| e.to_string())
+}
