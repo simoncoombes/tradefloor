@@ -61,4 +61,8 @@ mod python_engine;
 #[cfg(feature = "python")]
 mod python_arrow;
 
+/// The run log: every input, in order, sufficient to replay.
+#[cfg(feature = "python")]
+mod python_log;
+
 pub use rng::{to_uint32, GameRng, Pcg32};

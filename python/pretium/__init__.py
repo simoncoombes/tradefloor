@@ -19,6 +19,7 @@ from typing import Any, Iterable, Sequence
 from . import _core
 from .portfolio import Portfolio, Position
 from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
+from .replay import replay
 from ._core import (  # noqa: F401
     Engine,
     FairValue,
@@ -55,7 +56,7 @@ __all__ = [
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "Counterfactual",
     "counterfactual", "Portfolio", "Position", "Agent", "Observation",
-    "Scorecard", "evaluate", "leaderboard",
+    "Scorecard", "evaluate", "leaderboard", "replay",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
     "market_status", "model_preset", "run_many", "sectors", "step_mispricing_daily",

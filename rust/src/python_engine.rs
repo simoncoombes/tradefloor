@@ -297,6 +297,17 @@ impl PyEngine {
     /// a ticker and an index: ids carry the index a company had when it was
     /// created, which stops matching its position as soon as anything is
     /// delisted.
+    /// Reverse of `id_for`: the ticker an internal company id belongs to.
+    ///
+    /// The log carries tickers rather than ids on purpose. An id like `AAA-0`
+    /// is an implementation detail, and its embedded index stops matching the
+    /// company's position after any delisting -- so a log full of them would
+    /// be both opaque and, after a roster edit, misleading.
+    fn ticker_for_id(&self, id: &str) -> Option<String> {
+        let pos = self.inner.ids().iter().position(|i| i == id)?;
+        self.tickers.get(pos).cloned()
+    }
+
     fn id_for(&self, ticker: &str) -> Option<String> {
         let pos = self.tickers.iter().position(|t| t == ticker)?;
         self.inner.ids().get(pos).cloned()
@@ -500,6 +511,12 @@ pub struct PyEngine {
     /// pull protocol the consumer drives.
     recorded: Vec<crate::python_arrow::RecordedDay>,
     recorded_macro: Vec<crate::python_arrow::MacroRow>,
+    /// Every input that crossed into this engine, in order.
+    ///
+    /// Inputs only. Prices, attribution and draw counts are consequences,
+    /// and recording them would create a second source of truth that could
+    /// disagree with the first.
+    log: Vec<crate::python_log::LogEntry>,
 }
 
 #[pymethods]
@@ -540,11 +557,13 @@ impl PyEngine {
             tickers,
             recorded: Vec::new(),
             recorded_macro: Vec::new(),
+            log: Vec::new(),
         })
     }
 
     /// Roll the day's opening marks. Call once before the session's ticks.
     fn open_market(&mut self) {
+        self.log.push(crate::python_log::LogEntry::OpenMarket);
         self.inner.open_market();
     }
 
@@ -585,6 +604,26 @@ impl PyEngine {
         let news = self.build_news(news)?;
         let impacts = self.build_impacts(news_impacts)?;
         let flow = self.build_flow(order_flow)?;
+        // Logged AFTER validation, so a rejected call is not in the log.
+        // A log containing a call that never happened would replay into a
+        // different market than the one it claims to describe.
+        self.log.push(crate::python_log::LogEntry::Tick {
+            hour,
+            minute,
+            day_of_week,
+            volatility,
+            news: news
+                .iter()
+                .map(|n| {
+                    (
+                        n.company_id.as_deref().and_then(|i| self.ticker_for_id(i)),
+                        n.sector.clone(),
+                        n.price_impact.unwrap_or(0.0),
+                    )
+                })
+                .collect(),
+            flow: flow.iter().map(|(t, v)| (t.clone(), v.buy, v.sell)).collect(),
+        });
         let outcome: TickOutcome = self.inner.tick(&TickRequest {
             time: GameTime {
                 hour,
@@ -639,6 +678,28 @@ impl PyEngine {
         let session_news = self.build_news(news)?;
         let session_impacts = self.build_impacts(news_impacts)?;
         let session_flow = self.build_flow(order_flow)?;
+        self.log.push(crate::python_log::LogEntry::RunSession {
+            hour,
+            minute,
+            day_of_week,
+            ticks,
+            volatility,
+            close_at_end,
+            news: session_news
+                .iter()
+                .map(|n| {
+                    (
+                        n.company_id.as_deref().and_then(|i| self.ticker_for_id(i)),
+                        n.sector.clone(),
+                        n.price_impact.unwrap_or(0.0),
+                    )
+                })
+                .collect(),
+            flow: session_flow
+                .iter()
+                .map(|(t, v)| (t.clone(), v.buy, v.sell))
+                .collect(),
+        });
 
         let n = self.inner.len();
         let innovations: Vec<Option<f64>> = vec![None; n];
@@ -678,6 +739,7 @@ impl PyEngine {
 
     /// Run the close bookkeeping: GARCH update and the daily roll.
     fn close_market(&mut self) {
+        self.log.push(crate::python_log::LogEntry::CloseMarket);
         let n = self.inner.len();
         let innovations: Vec<Option<f64>> = vec![None; n];
         let variances: Vec<f64> = self
@@ -755,6 +817,18 @@ impl PyEngine {
     /// change, so one seed plus the same edits at the same ticks reproduces
     /// the same market exactly. Replay works; invariance was never available.
     fn list_instrument(&mut self, instrument: PyInstrument) -> usize {
+        self.log.push(crate::python_log::LogEntry::ListInstrument {
+            ticker: instrument.ticker.clone(),
+            sector: instrument.sector.clone(),
+            initial_price: instrument.initial_price,
+            shares_outstanding: instrument.shares_outstanding,
+            eps: instrument.eps,
+            book_value_per_share: instrument.book_value_per_share,
+            revenue_growth: instrument.revenue_growth,
+            avg_volume: instrument.avg_volume,
+            beta: instrument.beta,
+            short_interest: instrument.short_interest,
+        });
         let index = self.inner.len();
         let core = instrument.to_core(index);
         self.tickers.push(instrument.ticker.clone());
@@ -769,6 +843,7 @@ impl PyEngine {
         match self.inner.remove_company(index) {
             Some(c) => {
                 self.tickers.remove(index);
+                self.log.push(crate::python_log::LogEntry::Delist { index });
                 Ok(c.ticker)
             }
             None => Err(ValidationError::new_err(format!(
@@ -817,10 +892,12 @@ impl PyEngine {
     /// interleave differently and change every price, so anything that needs
     /// randomness alongside the simulation must draw from here.
     fn draw_uniform(&mut self) -> f64 {
+        self.log.push(crate::python_log::LogEntry::Draw { normal: false });
         self.inner.draw_uniform()
     }
 
     fn draw_normal(&mut self) -> f64 {
+        self.log.push(crate::python_log::LogEntry::Draw { normal: true });
         self.inner.draw_normal()
     }
 
@@ -913,6 +990,24 @@ impl PyEngine {
             None => None,
         };
 
+        let mut logged: Vec<(String, f64)> = Vec::new();
+        for (name, value) in [
+            ("vix", vix),
+            ("federal_funds_rate", federal_funds_rate),
+            ("corporate_bond_yield", corporate_bond_yield),
+            ("inflation_rate", inflation_rate),
+            ("qe_pe_boost", qe_pe_boost),
+            ("fear_greed_index", fear_greed_index),
+        ] {
+            if let Some(v) = value {
+                logged.push((name.to_string(), v));
+            }
+        }
+        self.log.push(crate::python_log::LogEntry::PinMacro {
+            fields: logged,
+            cycle: cycle.clone(),
+        });
+
         let e = self.inner.economy_mut();
         if let Some(v) = vix {
             e.vix = v;
@@ -999,6 +1094,7 @@ impl PyEngine {
     /// change its grain would be the alternative, and it is a much worse one.
     #[pyo3(signature = (day))]
     fn record(&mut self, day: u32) -> PyResult<()> {
+        self.log.push(crate::python_log::LogEntry::Record { day });
         self.recorded.push(crate::python_arrow::RecordedDay {
             day,
             ticks: self.buffer.ticks_written,
@@ -1209,6 +1305,27 @@ impl PyEngine {
             ValidationError::new_err(format!("no instrument at index {index}"))
         })?;
         Ok(crate::python_book::PyOrderBook::from_core(inner))
+    }
+
+    /// Every input that crossed into this engine, in order.
+    ///
+    /// # A seed alone does not reproduce a run
+    ///
+    /// It would, if nothing else varied. But the market an agent trades in
+    /// depends on the agent's own orders, so one seed with different flow is a
+    /// different market -- correctly. Reproducing a run means reproducing
+    /// every input, and this is that sequence.
+    ///
+    /// It records INPUTS only. Prices, attribution and draw counts are
+    /// consequences of replaying them, and logging those too would create a
+    /// second source of truth that could disagree with the first.
+    ///
+    /// Embedder draws are in here, which is easy to overlook: taking a uniform
+    /// between two ticks moves the shared stream, so a replay that skipped it
+    /// would produce a different market from the same log.
+    #[getter]
+    fn order_log(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+        self.log.iter().map(|e| e.to_py(py)).collect()
     }
 
     fn __repr__(&self) -> String {
