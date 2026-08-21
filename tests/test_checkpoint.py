@@ -128,3 +128,107 @@ def test_the_checkpoint_is_small_and_grows_with_history():
 def test_resuming_twice_gives_the_same_market():
     _, point = mark()
     assert point.resume().prices() == point.resume().prices()
+
+
+# --------------------------------------------------------------------------
+# The constant-time fork
+# --------------------------------------------------------------------------
+
+
+def test_branch_reaches_the_same_state_as_a_replay():
+    """Two routes to one point, and they must agree.
+
+    `branch` copies the engine's state; `Checkpoint.resume` replays its log.
+    If those disagreed, one of them would be silently reconstructing a
+    different market -- and prices alone would not show it, so the generator
+    position is checked too.
+    """
+    engine, point = mark(days=4)
+    fast, = pretium.branch(engine, 1, universe=UNIVERSE, seed=5)
+    slow = point.resume()
+
+    assert fast.prices() == engine.prices()
+    assert fast.prices() == slow.prices()
+    for field in ("garch_variance", "mispricing_s", "mispricing_momentum",
+                  "maker_inventory", "volume"):
+        assert fast.column(field) == slow.column(field), field
+    # And the generators continue identically, which prices would not reveal.
+    assert [fast.draw_normal() for _ in range(8)] == \
+           [slow.draw_normal() for _ in range(8)]
+
+
+def test_branches_from_a_snapshot_are_independent():
+    engine, _ = mark(days=3)
+    a, b = pretium.branch(engine, 2, universe=UNIVERSE, seed=5)
+    before = b.prices()
+    a.run_days(2, record=False)
+    assert b.prices() == before
+    assert a.prices() != before
+
+
+def test_a_snapshot_will_not_restore_onto_a_resized_roster():
+    # The columns are positional, so a roster of a different size or order
+    # would attach every value to the wrong instrument.
+    engine, _ = mark(days=2)
+    smaller = pretium.Universe.random(4, seed=2)
+    target = pretium.Engine(seed=5, universe=smaller)
+    with pytest.raises(pretium.ValidationError, match="roster"):
+        target.restore_state(engine.state_snapshot())
+
+
+def test_matching_tickers_do_not_mean_a_matching_universe():
+    """A real limit of the guard, asserted so nobody assumes otherwise.
+
+    Tickers are generated positionally, so `Universe.random(8, seed=2)` and
+    `Universe.random(8, seed=99)` share every name and share no fundamentals.
+    The engine holds no earnings or sectors, so it cannot tell them apart --
+    the check is on identity and ORDER, which is all it has.
+
+    Restoring across those two succeeds and produces a market with the right
+    prices and the wrong fair values. The caller must supply the universe the
+    snapshot came from. Documented on `restore_state` and pinned here, because
+    a guard people believe is stronger than it is is worse than no guard.
+    """
+    other = pretium.Universe.random(8, seed=99)
+    assert [i.ticker for i in other] == [i.ticker for i in UNIVERSE]
+    assert [i.eps for i in other] != [i.eps for i in UNIVERSE]
+
+    engine, _ = mark(days=2)
+    target = pretium.Engine(seed=5, universe=other)
+    target.restore_state(engine.state_snapshot())      # accepted
+    assert target.prices() == engine.prices()
+
+
+def test_a_snapshot_covers_every_column():
+    # Generated from COLUMN_FIELDS rather than listed, so a field added to the
+    # engine appears without anyone remembering. Asserted so that stays true.
+    engine, _ = mark(days=1)
+    snapshot = engine.state_snapshot()
+    for field in ("price", "previous_close", "previous_tick_price", "open",
+                  "high", "low", "volume", "avg_volume", "market_cap",
+                  "mispricing_s", "mispricing_s_prev_close",
+                  "mispricing_momentum", "last_daily_return",
+                  "maker_inventory", "garch_variance", "beta",
+                  "short_interest", "float_shares"):
+        assert field in snapshot["columns"], field
+    assert len(snapshot["rng"]) == 3
+
+
+def test_absence_survives_a_snapshot_round_trip():
+    # NaN means "unset" in both directions. A snapshot that stored NaN as a
+    # number would turn "no mispricing yet" into "a mispricing of NaN", and a
+    # snapshot that stored it as zero would turn it into a real value.
+    universe = pretium.Universe.random(4, seed=3)
+    fresh = pretium.Engine(seed=1, universe=universe)
+    restored, = pretium.branch(fresh, 1, universe=universe, seed=1)
+    import math
+    import struct
+    unset = struct.unpack("<%dd" % len(universe),
+                          restored.column("mispricing_s"))
+    assert all(math.isnan(v) for v in unset)
+
+
+def test_a_degenerate_branch_count_is_refused():
+    engine, _ = mark(days=1)
+    with pytest.raises(pretium.ValidationError, match="at least 1"):
+        pretium.branch(engine, 0, universe=UNIVERSE, seed=5)

@@ -219,11 +219,25 @@ A third counterfactual, distinct from the other two: `tca.analyse` asks what
 your trading cost, `scenario.compare` asks what a macro path did, and this asks
 what happens **next** from a state you have already reached and want to keep.
 
-Restoring is a replay, so it costs about what the original run cost —
-measured at 2.74s to restore a 60-day, 40-instrument run that took 2.63s to
-produce. There is no cheap state snapshot and the docstring says so. What you
-get instead is a checkpoint that is **data**: a few kilobytes of JSON that
-survive the process, the version and the machine.
+Two ways to fork, for different jobs:
+
+| | cost | survives the process |
+|---|---|---|
+| `pt.branch(engine, 2, ...)` | **< 1 ms** | no |
+| `Checkpoint.resume()` | 2.7 s | yes |
+
+`branch` copies the engine's state — every column plus the generator position
+— in constant time. `Checkpoint` replays the order log, three orders of
+magnitude slower, and is the one you want when the fork has to outlive the
+process. A snapshot is a *state*; a log is a *history*, and a published result
+cites the history because that is what someone else can re-run.
+
+One limit worth knowing: `restore_state` checks roster identity and order,
+which is all an engine knows — it holds no fundamentals. Tickers are generated
+positionally, so `Universe.random(40, seed=1)` and `Universe.random(40,
+seed=99)` share every name and share no earnings. Restoring across those two
+is accepted and gives right prices with wrong fair values. Supply the universe
+the snapshot came from.
 
 ## Scenarios are paths, not settings
 

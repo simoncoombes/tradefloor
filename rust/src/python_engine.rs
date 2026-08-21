@@ -26,6 +26,7 @@
 #![allow(unexpected_cfgs, clippy::useless_conversion)]
 
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use pyo3::types::PyBytes;
 
 use crate::economy::{create_initial_central_bank_state, create_initial_economy_state};
@@ -1320,6 +1321,109 @@ impl PyEngine {
                 ))
             })?;
         Ok(f64_bytes(py, &self.inner.attribution_column(index)))
+    }
+
+    /// Every column plus the generator position, as one dict.
+    ///
+    /// A market's complete state, in constant time. The alternative already
+    /// here -- replaying an order log -- costs what the original run cost,
+    /// measured at 1.04x on a sixty-day run.
+    ///
+    /// The columns are generated from `COLUMN_FIELDS`, not listed, so a field
+    /// added to the engine appears here without anyone remembering. That is
+    /// the same discipline the Rust side uses: `set_column` matches
+    /// exhaustively on `PriceField`, so a new variant fails to compile until
+    /// it is handled, and a snapshot cannot silently omit it.
+    ///
+    /// NOT a substitute for the order log. A snapshot reproduces a STATE; the
+    /// log reproduces a HISTORY, and a published result cites the second.
+    fn state_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let out = PyDict::new_bound(py);
+        let columns = PyDict::new_bound(py);
+        for name in COLUMN_FIELDS {
+            let field = parse_field(name)?;
+            columns.set_item(name, f64_bytes(py, &self.inner.column(field)))?;
+        }
+        out.set_item("columns", columns)?;
+        let rng = self.inner.rng_state();
+        // The two u64s as f64 bit patterns: a u64 does not survive a Python
+        // float, and this has to round-trip exactly rather than closely.
+        out.set_item(
+            "rng",
+            vec![
+                f64::from_bits(rng.state),
+                f64::from_bits(rng.increment),
+                rng.spare.unwrap_or(f64::NAN),
+            ],
+        )?;
+        out.set_item("tickers", self.inner.ids().to_vec())?;
+        Ok(out.into())
+    }
+
+    /// Put a market back to a captured state.
+    ///
+    /// Refuses a snapshot whose roster does not match this engine's, because
+    /// the columns are positional: writing them onto a re-ordered or
+    /// differently-sized roster would attach every price to the wrong company
+    /// and look entirely plausible.
+    ///
+    /// # Matching tickers do NOT mean a matching universe
+    ///
+    /// The check is on identity and order, which is all an engine knows -- it
+    /// holds no fundamentals. And tickers are generated positionally, so
+    /// `Universe.random(40, seed=1)` and `Universe.random(40, seed=99)` have
+    /// exactly the same names and entirely different earnings, sectors and
+    /// share counts.
+    ///
+    /// Restoring across those two would pass this check and produce a market
+    /// with the right prices and the wrong fair values. The caller must supply
+    /// the universe the snapshot came from; this guard catches a re-ordered or
+    /// resized roster, not a substituted one.
+    fn restore_state(&mut self, snapshot: &Bound<'_, PyDict>) -> PyResult<()> {
+        let tickers: Vec<String> = snapshot
+            .get_item("tickers")?
+            .ok_or_else(|| ValidationError::new_err("snapshot has no 'tickers'"))?
+            .extract()?;
+        if tickers != self.inner.ids() {
+            return Err(ValidationError::new_err(
+                "snapshot roster does not match this engine. Columns are                  positional, so restoring across rosters would attach every                  value to the wrong instrument.",
+            ));
+        }
+
+        let columns = snapshot
+            .get_item("columns")?
+            .ok_or_else(|| ValidationError::new_err("snapshot has no 'columns'"))?;
+        let columns = columns.downcast::<PyDict>()?;
+        for name in COLUMN_FIELDS {
+            let raw = columns.get_item(name)?.ok_or_else(|| {
+                ValidationError::new_err(format!("snapshot is missing column {name:?}"))
+            })?;
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_column(parse_field(name)?, &values)
+                .map_err(ValidationError::new_err)?;
+        }
+
+        let rng: Vec<f64> = snapshot
+            .get_item("rng")?
+            .ok_or_else(|| ValidationError::new_err("snapshot has no 'rng'"))?
+            .extract()?;
+        if rng.len() != 3 {
+            return Err(ValidationError::new_err(format!(
+                "rng must be 3 numbers (state, increment, spare), got {}",
+                rng.len()
+            )));
+        }
+        self.inner.set_rng_state(crate::rng::RngState {
+            state: rng[0].to_bits(),
+            increment: rng[1].to_bits(),
+            spare: if rng[2].is_nan() { None } else { Some(rng[2]) },
+        });
+        Ok(())
     }
 
     /// Capture the session just run, and the macro state, as one day.

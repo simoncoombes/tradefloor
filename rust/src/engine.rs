@@ -754,6 +754,81 @@ impl Engine {
     /// 108 marshalled objects do not. The `Vec` is built on demand rather than
     /// maintained, because the embedder reads far less often than the tick
     /// writes.
+    /// Write one column back onto the roster.
+    ///
+    /// The inverse of [`Engine::column`], and the second half of a
+    /// constant-time checkpoint: a saved market is its columns plus the
+    /// generator position, and until now only the reading direction existed.
+    ///
+    /// # The match is exhaustive on purpose
+    ///
+    /// Every branch is spelled out with no wildcard, so adding a variant to
+    /// [`PriceField`] fails to COMPILE until it is handled here. That is the
+    /// difference between this and the "restore everything" method the
+    /// docstring on `set_rng_state` warns against: the compiler keeps the two
+    /// directions in step rather than a reviewer remembering to.
+    ///
+    /// # NaN means absent, matching the read side
+    ///
+    /// The optional fields round-trip through NaN in both directions. Writing
+    /// a NaN clears the field rather than storing a NaN, so a column read out
+    /// and written back reproduces the original `Option` exactly -- including
+    /// the difference between "no mispricing yet" and "a mispricing of zero",
+    /// which are different markets.
+    ///
+    /// Returns an error when the slice length does not match the roster.
+    /// Silently writing a prefix would restore a market that was correct for
+    /// the first N companies and stale for the rest.
+    pub fn set_column(&mut self, field: PriceField, values: &[f64]) -> Result<(), String> {
+        if values.len() != self.companies.len() {
+            return Err(format!(
+                "expected {} values for {} companies, got {}",
+                self.companies.len(),
+                self.companies.len(),
+                values.len()
+            ));
+        }
+        // NaN in, `None` out. Zero is a real value for every optional field
+        // here, so it cannot double as the absent marker.
+        fn optional(v: f64) -> Option<f64> {
+            if v.is_nan() {
+                None
+            } else {
+                Some(v)
+            }
+        }
+        for (company, &value) in self.companies.iter_mut().zip(values) {
+            let stock = &mut company.stock;
+            match field {
+                PriceField::Price => stock.price = value,
+                PriceField::PreviousClose => stock.previous_close = value,
+                PriceField::Open => stock.open = value,
+                PriceField::High => stock.high = value,
+                PriceField::Low => stock.low = value,
+                PriceField::Volume => stock.volume = value,
+                PriceField::MarketCap => stock.market_cap = value,
+                PriceField::MispricingS => stock.mispricing_s = optional(value),
+                PriceField::MakerInventory => stock.maker_inventory = optional(value),
+                PriceField::GarchVariance => stock.garch_variance = value,
+                PriceField::PreviousTickPrice => {
+                    stock.previous_tick_price = optional(value)
+                }
+                PriceField::MispricingSPrevClose => {
+                    stock.mispricing_s_prev_close = optional(value)
+                }
+                PriceField::MispricingMomentum => {
+                    stock.mispricing_momentum = optional(value)
+                }
+                PriceField::LastDailyReturn => stock.last_daily_return = optional(value),
+                PriceField::AvgVolume => stock.avg_volume = value,
+                PriceField::Beta => stock.beta = optional(value),
+                PriceField::ShortInterest => stock.short_interest = value,
+                PriceField::FloatShares => stock.float = value,
+            }
+        }
+        Ok(())
+    }
+
     pub fn column(&self, field: PriceField) -> Vec<f64> {
         self.companies
             .iter()
