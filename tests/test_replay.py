@@ -237,3 +237,67 @@ def test_a_log_replays_against_a_universe_rebuilt_from_its_own_json():
     replayed = pretium.replay(json.loads(json.dumps(engine.order_log)),
                               seed=42, universe=rebuilt)
     assert replayed.prices() == engine.prices()
+
+
+# --------------------------------------------------------------------------
+# The log is a fixed point, and the convenience path is not a second path
+# --------------------------------------------------------------------------
+
+
+def test_replaying_a_log_produces_that_same_log():
+    """The invariant that catches an out-of-order log, and it caught one.
+
+    A log is the reproduction mechanism, so replaying it must be a fixed
+    point: feed the log in, get the same log out. Comparing PRICES alone is
+    not enough -- a log whose entries are in the wrong order can still
+    reproduce prices in the case where the mis-ordering happens not to matter,
+    and then fail silently in the case where it does.
+
+    It failed here. `run_session` opens the day when the caller has not, and
+    the auto-open was written into the log AFTER the session it preceded. The
+    log said "run a session, then open the market". Replaying it opened the
+    market in the middle of the day, and the prices came out different.
+    """
+    original = busy_run()
+    replayed = pretium.replay(original.order_log, seed=99, universe=UNIVERSE,
+                              macro=pretium.Macro(federal_funds_rate=0.03))
+    assert replayed.order_log == original.order_log
+
+
+def test_letting_run_session_open_the_day_replays_exactly():
+    # The path every other test in this file skips, because they all open the
+    # market by hand.
+    engine = pretium.Engine(seed=1, universe=UNIVERSE)
+    engine.run_session(9, 30, 3, 30)
+    engine.run_session(10, 0, 3, 30)
+    engine.close_market()
+
+    assert [entry["op"] for entry in engine.order_log] == [
+        "open_market", "run_session", "run_session", "close_market"
+    ], "the auto-open is not logged before the session it opened"
+
+    replayed = pretium.replay(engine.order_log, seed=1, universe=UNIVERSE)
+    assert arr(replayed.prices()) == arr(engine.prices())
+    assert replayed.order_log == engine.order_log
+
+
+def test_opening_the_day_by_hand_is_the_same_as_letting_it_happen():
+    """The convenience must be transparent, not a second code path.
+
+    If these differed, a user who called `open_market` and one who did not
+    would get different markets from the same seed -- and the log would not
+    say which they had.
+    """
+    auto = pretium.Engine(seed=1, universe=UNIVERSE)
+    auto.run_session(9, 30, 3, 30)
+    auto.run_session(10, 0, 3, 30)
+    auto.close_market()
+
+    explicit = pretium.Engine(seed=1, universe=UNIVERSE)
+    explicit.open_market()
+    explicit.run_session(9, 30, 3, 30)
+    explicit.run_session(10, 0, 3, 30)
+    explicit.close_market()
+
+    assert arr(auto.prices()) == arr(explicit.prices())
+    assert auto.order_log == explicit.order_log

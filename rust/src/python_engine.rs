@@ -819,6 +819,19 @@ impl PyEngine {
         let session_news = self.build_news(news)?;
         let session_impacts = self.build_impacts(news_impacts)?;
         let session_flow = self.build_flow(order_flow)?;
+        // Open the day here if the caller has not, and exactly once however
+        // many sessions the day is made of. Letting `run_session` re-open made
+        // attribution and the daily anchor per-STEP; see
+        // `SessionRequest::reopen`.
+        //
+        // BEFORE the session is logged, and that ordering is the whole point.
+        // `open_market` writes its own log entry, so auto-opening after the
+        // push recorded "run a session, then open the market" -- a log that
+        // replayed to different prices, because replaying it opened the market
+        // in the middle of the day instead of at the start.
+        if !self.market_open {
+            self.open_market();
+        }
         self.log.push(crate::python_log::LogEntry::RunSession {
             hour,
             minute,
@@ -870,13 +883,6 @@ impl PyEngine {
         // converted to Rust types above, and the engine and buffer are plain
         // data. That is the precondition for releasing it, not an optimisation
         // note.
-        // Open the day here if the caller has not, and exactly once however
-        // many sessions the day is made of. Letting `run_session` re-open made
-        // attribution and the daily anchor per-STEP; see
-        // `SessionRequest::reopen`.
-        if !self.market_open {
-            self.open_market();
-        }
         let inner = &mut self.inner;
         let buffer = &mut self.buffer;
         py.allow_threads(move || {
