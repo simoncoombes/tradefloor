@@ -16,7 +16,41 @@ These are the reference points that make a score readable, from the bottom up:
   anyone would try first?
 - **Oracle** — how much was available *at all*?
 
-## The Oracle is the interesting one, and it cheats on purpose
+## The Oracle is a reference strategy, NOT an upper bound
+
+This needs saying first because the name invites the opposite reading, and I
+made that mistake in this file's own documentation for a week.
+
+The Oracle sees the true mispricing. It does not follow that nothing can beat
+it, and measurably things do: across eight seeds, momentum beat it twice and
+mean-reversion once — three of thirty-two agent-seed pairs, about 9%.
+
+That is not a defect in the Oracle. It is what happens when a perfectly
+informed trader is given the same capital constraint as everyone else and a
+naive rule for spending it. The default Oracle holds the ten most mispriced
+names at equal weight, gross 1.0, capped at 2% of ADV — exactly the budget the
+other baselines get. Perfect information does not make that the best portfolio
+you could build with a gross of 1.0, and an agent whose selection happens to
+suit the constraint better will out-earn it.
+
+Measured, holding the market and the horizon fixed:
+
+    top_k=5,  gross=1.0  (default)   median P&L 109,983   beaten 3/8
+    top_k=15, gross=1.0              median P&L  70,311   beaten 6/8
+    top_k=15, gross=2.0              median P&L 157,548   beaten 0/8
+
+Spreading the same information across more names makes it WORSE, not better —
+each position shrinks and turnover rises. What makes it dominate is doubling
+the gross exposure, which is capital rather than information. At equal
+constraints the Oracle is capital-limited, like everything else.
+
+So read a capture ratio as **P&L relative to a perfectly-informed reference
+portfolio under the same constraints**, not as a fraction of available alpha.
+A ratio above 1.0 is a real result meaning the agent built a better portfolio
+than top-k-by-mispricing, and it is worth looking at rather than explaining
+away.
+
+## The Oracle cheats on purpose
 
 Every other agent sees what a trader sees: prices, the book, its own
 positions. The Oracle reads the mispricing directly out of the engine. It
@@ -295,7 +329,13 @@ class Oracle:
     Its P&L is the denominator that makes every other agent's readable. Report
     scores as a fraction of it, not as bare currency.
 
-    Two honest caveats, both worth knowing before quoting a capture ratio:
+    It is a REFERENCE, not a maximum -- see this module's docstring. It gets
+    the same gross exposure and participation cap as every other baseline, and
+    spends them on a naive rule: equal weight across the `top_k` most
+    mispriced names. Agents beat it in about 9% of measured pairs, and that is
+    a result rather than a fault.
+
+    Two further caveats, both worth knowing before quoting a capture ratio:
 
     **It is a ceiling under a horizon, not the maximum possible.** Mispricing
     mean-reverts with a sixty-day half-life, so over a five-day evaluation most
@@ -382,7 +422,15 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
 
     The number worth reporting. Raw P&L is not comparable across markets —
     a seed with more dispersion pays every strategy more — and dividing by
-    what perfect information earned in *that* market removes exactly that.
+    what a perfectly-informed reference earned in *that* market removes
+    exactly that.
+
+    A ratio ABOVE 1.0 is legal and does occur, in roughly 9% of measured
+    agent-seed pairs. The Oracle is not an upper bound: it holds the same
+    gross exposure as everyone else and spends it on a naive equal-weight
+    rule, so an agent with a better portfolio under the same constraint
+    out-earns it. Treat that as a finding about portfolio construction, not
+    as a broken denominator.
 
     Returns an empty mapping when the Oracle lost money or is absent: a ratio
     against a negative denominator flips sign and would rank the worst agent

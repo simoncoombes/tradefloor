@@ -57,7 +57,15 @@ def main() -> dict:
 
     # The number worth reporting. Raw P&L is not comparable across markets —
     # a seed with more dispersion pays every strategy more — and dividing by
-    # what perfect information earned in THAT market removes exactly that.
+    # what a perfectly-informed reference earned in THAT market removes
+    # exactly that.
+    #
+    # A ratio above 1.0 is legal and does happen, in roughly 9% of measured
+    # agent-seed pairs. The Oracle is not an upper bound: it gets the same
+    # gross exposure as everyone else and spends it on a naive equal-weight
+    # rule, so an agent with a better portfolio under the same constraint
+    # out-earns it. That is a finding about portfolio construction, not a
+    # broken denominator, so nothing here clamps it.
     ratios = capture_ratio(scores)
     report["capture"] = ratios
     print(f"     capture vs the oracle: "

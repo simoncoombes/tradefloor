@@ -5,6 +5,7 @@ or a ratio it is recording what the model actually does, so a change in the
 model shows up as a failing test rather than as a quietly different leaderboard.
 """
 
+import statistics
 import struct
 
 import pytest
@@ -397,3 +398,74 @@ def test_a_nonsense_lookback_days_is_refused():
         Momentum(lookback_days=0.0)
     with pytest.raises(ValueError, match="lookback_days"):
         MeanReversion(lookback_days=-1.0)
+
+
+# --------------------------------------------------------------------------
+# The Oracle is a reference, not a maximum
+# --------------------------------------------------------------------------
+
+
+def test_an_agent_can_beat_the_oracle():
+    """Pinned so nobody "fixes" it into an upper bound.
+
+    The Oracle sees the true mispricing, and it does not follow that nothing
+    can beat it. It gets the same gross exposure and participation cap as
+    every other baseline and spends them on a naive rule -- equal weight
+    across the top_k most mispriced names -- so an agent whose selection suits
+    the constraint better out-earns it.
+
+    Measured across eight seeds: momentum beat it twice and mean-reversion
+    once, three of thirty-two agent-seed pairs. This asserts the phenomenon
+    exists rather than a specific count, because the count is a property of
+    the seeds.
+    """
+    universe = pretium.Universe.random(30, seed=11)
+    beaten = 0
+    for seed in range(8):
+        scores = pretium.evaluate(reference_agents(seed=3), seed=seed,
+                                  universe=universe, days=10)
+        ceiling = scores["oracle"].pnl
+        if any(card.pnl > ceiling for name, card in scores.items()
+               if name != "oracle"):
+            beaten += 1
+    assert beaten > 0, (
+        "nothing beat the Oracle in eight seeds -- either the baselines got "
+        "worse or the Oracle stopped being a same-constraints reference"
+    )
+
+
+def test_the_oracle_is_capital_limited_not_information_limited():
+    """What actually raises the ceiling is gross exposure, not information.
+
+    Spreading the SAME perfect information across three times as many names
+    makes it worse -- each position shrinks and turnover rises. Doubling the
+    gross makes it dominate. That is the evidence for calling it a reference
+    portfolio rather than a maximum.
+    """
+    universe = pretium.Universe.random(30, seed=11)
+
+    def median_pnl(make_oracle):
+        pnls = []
+        for seed in range(4):
+            scores = pretium.evaluate({"o": make_oracle()}, seed=seed,
+                                      universe=universe, days=10)
+            pnls.append(scores["o"].pnl)
+        return statistics.median(pnls)
+
+    narrow = median_pnl(lambda: Oracle())
+    wide = median_pnl(lambda: Oracle(top_k=15))
+    levered = median_pnl(lambda: Oracle(top_k=15, gross=2.0))
+
+    assert wide < narrow, "spreading the same information should dilute it"
+    assert levered > narrow, "gross exposure is what raises the ceiling"
+
+
+def test_capture_ratio_reports_above_one_rather_than_clamping():
+    # A ratio above 1.0 is a finding about portfolio construction. Clamping it
+    # to 1.0 would hide the most interesting result the harness can produce.
+    class Card:
+        def __init__(self, pnl):
+            self.pnl = pnl
+
+    ratios = capture_ratio({"oracle": Card(100.0), "better": Card(150.0)})
+    assert ratios["better"] == pytest.approx(1.5)
