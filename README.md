@@ -182,6 +182,20 @@ real ranges, including the ones that match.
 instantly, there's one book per name, and you trade against a market maker and
 aggregate flow rather than agents that adapt to you.
 
+**There's no volatility knob.** VIX looks like one and isn't: it has no term
+in the variance process. Measured, a thirteenfold move in VIX changes
+annualised realised volatility by under one point, and below VIX 15 it changes
+nothing at all. What it moves is the quoted spread, and above VIX 40
+cross-sectional correlation. Use it to stress liquidity.
+[Scenarios](https://simoncoombes.github.io/pretium/scenarios.html) has the
+numbers.
+
+**The macro is exogenous.** It holds whatever initial conditions you gave it
+until you move it yourself. The engine carries a full Taylor/Phillips/Okun
+chain, but it isn't reachable from Python in this release, so nothing steps on
+its own and fair value is constant unless you drive it. Driving it works:
+`pin_macro` reprices exactly as designed.
+
 ## Documentation
 
 Full docs: [**simoncoombes.github.io/pretium**](https://simoncoombes.github.io/pretium/)
@@ -202,6 +216,19 @@ report, then archives the run as JSON and replays it to identical prices.
 
 The test suite runs it. Using the library the way a user would is what caught
 the two worst bugs this project has had, both of which had green unit tests.
+
+## Citing this
+
+`CITATION.cff` at the repository root carries the citation metadata in
+Citation File Format. GitHub renders it as a "Cite this repository" button and
+reference managers read it directly. There's no DOI yet - one hasn't been
+invented to fill the gap, and a Zenodo deposit is the next step.
+
+A citation identifies the software, not a run. A methods section needs both.
+What identifies a run is the seed, the universe fingerprint and how the
+universe was built, the macro initial conditions, the model preset name, and
+the archived order log - gathered with worked examples in
+[Reproducing a run](https://simoncoombes.github.io/pretium/reproducing-a-run.html).
 
 ## Licence
 

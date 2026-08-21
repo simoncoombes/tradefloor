@@ -31,4 +31,17 @@ outstanding, with roughly one name in eleven above the 20% squeeze threshold.
 
 **Coefficients ship as a preset.** `pt-v1`, named and versioned, rather than as
 constructor keywords, so two published results can be compared.
-`model_preset()` returns it.
+`model_preset()` returns it, and the returned values are folded into the
+known-answer digest and parity-tested against the reference implementation.
+
+What the dictionary carries is the mispricing and crowd model: the half-life,
+`phi`, `momentum_theta`, the mispricing and daily-shock caps, and the three
+crowd terms. Eight numbers, and every one of them live.
+
+**It is not a complete listing of the model's coefficients.** The GARCH
+parameters, the market and sector factor sigmas, and the order-flow
+coefficient are all live and none of them appear. Nor is there anything that
+forces the name `pt-v1` to change if one of the absent constants moves. So
+quote the preset name AND `pt.version()` when you publish - the version is
+what actually pins the build. See
+[Reproducing a run](reproducing-a-run.html).
