@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import struct
 
+from . import _core
 from ._core import Engine, OrderError, ValidationError
 
 
@@ -59,7 +60,7 @@ class Portfolio:
     """Cash, positions and P&L for one trader."""
 
     __slots__ = ("cash", "starting_cash", "positions", "_flow", "fills",
-                 "max_leverage")
+                 "max_leverage", "_stamp")
 
     def __init__(self, cash: float = 1_000_000.0,
                  *, max_leverage: float | None = None) -> None:
@@ -84,6 +85,7 @@ class Portfolio:
                 f"max_leverage must be finite and positive, got {max_leverage}"
             )
         self.max_leverage = max_leverage
+        self._stamp = (0, 0)
         self.cash = float(cash)
         self.starting_cash = float(cash)
         self.positions: dict[str, Position] = {}
@@ -149,6 +151,8 @@ class Portfolio:
             "notional": notional,
             "requested": float(quantity),
             "partial": size < abs(quantity),
+            "day": self._stamp[0],
+            "step": self._stamp[1],
         }
         self.fills.append(fill)
         return fill
@@ -280,6 +284,38 @@ class Portfolio:
     def clear_flow(self) -> None:
         """Forget accumulated flow, once it has been applied to a tick."""
         self._flow.clear()
+
+    def fills_table(self, tickers: list[str]):
+        """The fill log as an Arrow stream.
+
+        ``tickers`` is the roster, so fills carry an ``instrument_id`` index
+        rather than a repeated string -- and so this table joins to ``bars``
+        and ``truth`` on the same key rather than on text.
+
+        The join is the point: ``bars`` says where the price was, this says
+        where you were filled, and the gap between them is your execution
+        quality. Neither table can answer that alone.
+        """
+        index = {t: i for i, t in enumerate(tickers)}
+        rows = [f for f in self.fills if f["ticker"] in index]
+        return _core.fills_stream(
+            [int(f.get("day", 0)) for f in rows],
+            [int(f.get("step", 0)) for f in rows],
+            [index[f["ticker"]] for f in rows],
+            [f["quantity"] for f in rows],
+            [f["price"] for f in rows],
+            [f["worst_price"] for f in rows],
+            [f["notional"] for f in rows],
+        )
+
+    def stamp(self, day: int, step: int) -> None:
+        """Tag subsequent fills with a day and step.
+
+        Called by the harness between steps. Without it every fill would sit
+        at day zero and the fills table could not be joined to anything on
+        time, which is most of what it is for.
+        """
+        self._stamp = (int(day), int(step))
 
     def __repr__(self) -> str:
         held = {t: round(p.quantity, 2) for t, p in self.positions.items() if p.quantity}

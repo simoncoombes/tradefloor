@@ -131,3 +131,166 @@ def test_arrow_and_the_bytes_surface_never_disagree():
     e, _, _ = session()
     assert pa.table(e.bars(day=0)).to_pydict()["close"] == arr(e.session_prices())
     assert pa.table(e.bars(day=0)).to_pydict()["volume"] == arr(e.session_volumes())
+
+
+# --------------------------------------------------------------------------
+# Per-day streaming
+# --------------------------------------------------------------------------
+
+def recorded(days=4, ticks=60, n=6):
+    u = pretium.Universe.random(n, seed=5)
+    e = pretium.Engine(seed=2026, universe=u, macro_state=pretium.Macro(federal_funds_rate=0.03))
+    for day in range(days):
+        e.open_market()
+        e.run_session(9, 30, 3, ticks)
+        e.close_market()
+        e.pin_macro(federal_funds_rate=0.03 + day * 0.004)
+        e.record(day)
+    return e, u, days, ticks, n
+
+
+def test_each_recorded_day_is_its_own_batch():
+    """Streaming, not materialising.
+
+    One seed at tick grain for 100 names over a trading year is ~9.8 million
+    rows. As a single batch that is a memory problem; as 252 daily batches it
+    is a pull protocol the consumer drives.
+    """
+    e, _, days, ticks, n = recorded()
+    stream = e.bars()
+    assert stream.num_batches == days
+    assert stream.num_rows == days * ticks * n
+    assert pa.table(stream).num_rows == days * ticks * n
+
+
+def test_every_recorded_day_is_labelled():
+    e, _, days, _, _ = recorded()
+    assert sorted(set(pa.table(e.bars()).to_pydict()["day"])) == list(range(days))
+
+
+def test_recording_is_explicit_and_the_buffer_is_reused():
+    # The session buffer is overwritten every session, so anything not
+    # captured before the next run is gone. Recording is a choice a caller
+    # makes, and a caller who does not want a table pays nothing.
+    u = pretium.Universe.random(3, seed=1)
+    e = pretium.Engine(seed=1, universe=u)
+    e.open_market()
+    e.run_session(9, 30, 3, 50)
+    assert e.recorded_days == 0
+    # With nothing recorded, the table falls back to the last session.
+    assert pa.table(e.bars()).num_rows == 50 * 3
+
+    e.record(0)
+    e.run_session(9, 30, 3, 10)
+    assert e.recorded_days == 1
+    # Now it reports what was RECORDED, not the session since.
+    assert pa.table(e.bars()).num_rows == 50 * 3
+
+
+def test_clearing_a_recording_discards_it():
+    e, _, _, _, _ = recorded()
+    e.clear_recording()
+    assert e.recorded_days == 0
+
+
+# --------------------------------------------------------------------------
+# The macro table
+# --------------------------------------------------------------------------
+
+def test_macro_is_one_row_per_day_and_joins_on_the_same_key():
+    # Aligning a macro signal with prices should be a join, not a hand-rolled
+    # accumulation loop. That is the whole reason it is a table.
+    e, _, days, _, _ = recorded()
+    macro = pa.table(e.macro_table())
+    assert macro.num_rows == days
+    bars_days = set(pa.table(e.bars()).to_pydict()["day"])
+    assert set(macro.to_pydict()["day"]) == bars_days
+
+
+def test_macro_rates_come_back_fractional():
+    """The same denomination they went in as.
+
+    A results table reporting percent while the constructor takes fractions
+    would reintroduce the unit trap on the return journey -- and it would do
+    it silently, because both numbers are plausible.
+    """
+    e, _, _, _, _ = recorded()
+    path = pa.table(e.macro_table()).to_pydict()["federal_funds_rate"]
+    assert path == pytest.approx([0.030, 0.034, 0.038, 0.042])
+
+
+def test_macro_columns_are_all_f64():
+    e, _, _, _, _ = recorded()
+    for field in pa.table(e.macro_table()).schema:
+        if field.name != "day":
+            assert field.type == pa.float64(), field.name
+
+
+# --------------------------------------------------------------------------
+# The fills table
+# --------------------------------------------------------------------------
+
+def traded(days=3, steps=4, ticks=60):
+    u = pretium.Universe(sorted(pretium.Universe.random(8, seed=5),
+                                key=lambda i: i.avg_volume))
+    e = pretium.Engine(seed=2026, universe=u)
+    p = pretium.Portfolio(cash=50_000_000)
+    ticker = u[0].ticker
+    for day in range(days):
+        e.open_market()
+        for step in range(steps):
+            p.stamp(day, step)
+            size = u[0].avg_volume * 0.5
+            p.execute(e, ticker, size if step % 2 == 0 else -size)
+            e.run_session(9, 30, 3, ticks, order_flow=p.pending_flow())
+            p.clear_flow()
+        e.close_market()
+        e.record(day)
+    return e, p, days, steps
+
+
+def test_fills_records_every_execution():
+    e, p, days, steps = traded()
+    fills = pa.table(p.fills_table(e.tickers))
+    assert fills.num_rows == days * steps
+    assert fills.column_names == [
+        "day", "step", "instrument_id", "quantity", "price", "worst_price", "notional",
+    ]
+
+
+def test_fills_joins_to_bars_on_instrument_and_day():
+    # bars says where the price was; fills says where you were filled. The gap
+    # between them is execution quality, and neither table can answer that
+    # alone.
+    e, p, _, _ = traded()
+    fills = pa.table(p.fills_table(e.tickers)).to_pydict()
+    bars = pa.table(e.bars()).to_pydict()
+    assert set(fills["instrument_id"]) <= set(bars["instrument_id"])
+    assert set(fills["day"]) <= set(bars["day"])
+
+
+def test_fills_are_stamped_with_when_they_happened():
+    # Without a stamp every fill sits at day zero and the table cannot be
+    # joined on time, which is most of what it is for.
+    e, p, days, steps = traded()
+    fills = pa.table(p.fills_table(e.tickers)).to_pydict()
+    assert sorted(set(fills["day"])) == list(range(days))
+    assert sorted(set(fills["step"])) == list(range(steps))
+
+
+def test_fills_carry_the_worst_price_not_only_the_average():
+    # An average alone hides how far up the book an order reached, and that
+    # tail is what separates an order that was worked from one that was
+    # dumped.
+    e, p, _, _ = traded()
+    fills = pa.table(p.fills_table(e.tickers)).to_pydict()
+    buys = [(a, w) for a, w, q in
+            zip(fills["price"], fills["worst_price"], fills["quantity"]) if q > 0]
+    assert buys, "expected some buys"
+    assert all(w >= a for a, w in buys), "a buy's worst price is at or above its average"
+
+
+def test_an_untraded_roster_yields_an_empty_fills_table():
+    e, _, _, _, _ = recorded()
+    empty = pretium.Portfolio(cash=1e6)
+    assert pa.table(empty.fills_table(e.tickers)).num_rows == 0

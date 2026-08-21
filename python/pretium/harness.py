@@ -234,6 +234,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         for _ in range(steps_per_day):
             obs = Observation(step, day, tickers, _f64(engine.prices()),
                               portfolio, engine, adv)
+            portfolio.stamp(day, step)
             try:
                 orders = agent.act(obs) or {}
             except Exception as exc:                      # noqa: BLE001

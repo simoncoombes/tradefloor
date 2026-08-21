@@ -245,3 +245,134 @@ impl PyArrowStream {
 pub fn arrow_err(e: String) -> PyErr {
     ValidationError::new_err(e)
 }
+
+/// `macro`: one row per day, the evolved macro state.
+///
+/// Keyed by the same `day` as `bars` and `truth`, so aligning a macro signal
+/// with prices is a join rather than a hand-rolled accumulation loop. That is
+/// the whole reason it is a table at all instead of an accessor.
+///
+/// Rates are FRACTIONAL here, matching every other boundary in the package. A
+/// results table that reported percent while the constructor took fractions
+/// would be the unit trap reintroduced on the way out.
+pub fn macro_schema() -> SchemaRef {
+    Arc::new(Schema::new(vec![
+        Field::new("day", DataType::UInt32, false),
+        Field::new("vix", DataType::Float64, false),
+        Field::new("federal_funds_rate", DataType::Float64, false),
+        Field::new("corporate_bond_yield", DataType::Float64, false),
+        Field::new("inflation_rate", DataType::Float64, false),
+        Field::new("unemployment_rate", DataType::Float64, false),
+        Field::new("gdp_growth", DataType::Float64, false),
+        Field::new("qe_pe_boost", DataType::Float64, false),
+        Field::new("fear_greed_index", DataType::Float64, false),
+    ]))
+}
+
+/// One day of macro state, already converted to the fractional boundary.
+#[derive(Debug, Clone, Copy)]
+pub struct MacroRow {
+    pub day: u32,
+    pub vix: f64,
+    pub federal_funds_rate: f64,
+    pub corporate_bond_yield: f64,
+    pub inflation_rate: f64,
+    pub unemployment_rate: f64,
+    pub gdp_growth: f64,
+    pub qe_pe_boost: f64,
+    pub fear_greed_index: f64,
+}
+
+pub fn macro_batch(rows: &[MacroRow]) -> Result<RecordBatch, String> {
+    let columns: Vec<ArrayRef> = vec![
+        Arc::new(UInt32Array::from(rows.iter().map(|r| r.day).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.vix).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.federal_funds_rate).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.corporate_bond_yield).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.inflation_rate).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.unemployment_rate).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.gdp_growth).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.qe_pe_boost).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.fear_greed_index).collect::<Vec<_>>())),
+    ];
+    RecordBatch::try_new(macro_schema(), columns).map_err(|e| e.to_string())
+}
+
+/// `fills`: one row per execution.
+///
+/// The trader's own record, not the market's. It exists so a study can join
+/// what it DID against what the market did -- `bars` says where the price was,
+/// this says where you got filled, and the gap between them is your execution
+/// quality.
+///
+/// `worst_price` is carried alongside the average deliberately. An average
+/// alone hides how far up the book an order reached, and that tail is what
+/// separates a large order that was worked from one that was dumped.
+pub fn fills_schema() -> SchemaRef {
+    Arc::new(Schema::new(vec![
+        Field::new("day", DataType::UInt32, false),
+        Field::new("step", DataType::UInt32, false),
+        Field::new("instrument_id", DataType::UInt32, false),
+        Field::new("quantity", DataType::Float64, false),
+        Field::new("price", DataType::Float64, false),
+        Field::new("worst_price", DataType::Float64, false),
+        Field::new("notional", DataType::Float64, false),
+    ]))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn fills_batch(
+    day: Vec<u32>,
+    step: Vec<u32>,
+    instrument_id: Vec<u32>,
+    quantity: Vec<f64>,
+    price: Vec<f64>,
+    worst_price: Vec<f64>,
+    notional: Vec<f64>,
+) -> Result<RecordBatch, String> {
+    let n = day.len();
+    for (name, len) in [
+        ("step", step.len()),
+        ("instrument_id", instrument_id.len()),
+        ("quantity", quantity.len()),
+        ("price", price.len()),
+        ("worst_price", worst_price.len()),
+        ("notional", notional.len()),
+    ] {
+        if len != n {
+            return Err(format!("{name} has {len} rows, expected {n}"));
+        }
+    }
+    let columns: Vec<ArrayRef> = vec![
+        Arc::new(UInt32Array::from(day)),
+        Arc::new(UInt32Array::from(step)),
+        Arc::new(UInt32Array::from(instrument_id)),
+        Arc::new(Float64Array::from(quantity)),
+        Arc::new(Float64Array::from(price)),
+        Arc::new(Float64Array::from(worst_price)),
+        Arc::new(Float64Array::from(notional)),
+    ];
+    RecordBatch::try_new(fills_schema(), columns).map_err(|e| e.to_string())
+}
+
+/// Build a `fills` stream from parallel columns.
+///
+/// Takes columns rather than a list of row objects because that is the shape
+/// the data is already in on both sides, and marshalling a million small
+/// objects across the boundary to immediately transpose them would be the cost
+/// this whole surface exists to avoid.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+pub fn fills_stream(
+    day: Vec<u32>,
+    step: Vec<u32>,
+    instrument_id: Vec<u32>,
+    quantity: Vec<f64>,
+    price: Vec<f64>,
+    worst_price: Vec<f64>,
+    notional: Vec<f64>,
+) -> PyResult<PyArrowStream> {
+    let batch = fills_batch(day, step, instrument_id, quantity, price, worst_price, notional)
+        .map_err(arrow_err)?;
+    Ok(PyArrowStream::new("fills", fills_schema(), vec![batch]))
+}

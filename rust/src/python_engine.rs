@@ -487,6 +487,20 @@ pub struct PyEngine {
     inner: Engine,
     buffer: SessionBuffer,
     tickers: Vec<String>,
+    /// Recorded per-day batches.
+    ///
+    /// The session buffer is REUSED every session, so anything not captured
+    /// before the next `run_session` is gone. Recording is therefore explicit
+    /// rather than automatic: a caller who wants a multi-day table asks for
+    /// it, and a caller who does not pays neither the memory nor the copy.
+    ///
+    /// This is also what makes the results surface stream. One seed at tick
+    /// grain for 100 names over a trading year is ~9.8 million rows per table;
+    /// as one batch that is a memory problem, as 252 daily batches it is a
+    /// pull protocol the consumer drives.
+    recorded_bars: Vec<arrow::array::RecordBatch>,
+    recorded_truth: Vec<arrow::array::RecordBatch>,
+    recorded_macro: Vec<crate::python_arrow::MacroRow>,
 }
 
 #[pymethods]
@@ -525,6 +539,9 @@ impl PyEngine {
             ),
             buffer: SessionBuffer::new(),
             tickers,
+            recorded_bars: Vec::new(),
+            recorded_truth: Vec::new(),
+            recorded_macro: Vec::new(),
         })
     }
 
@@ -971,54 +988,128 @@ impl PyEngine {
         Ok(f64_bytes(py, &self.inner.attribution_column(index)))
     }
 
-    /// The last session's `bars` table, as an Arrow stream.
+    /// Capture the session just run, and the macro state, as one day.
     ///
-    /// One row per (tick, instrument): day, tick, instrument_id, close,
-    /// volume. Consume it with `polars.from_arrow`, `pyarrow.table` or duckdb
-    /// -- all of which read the C stream zero-copy, and none of which this
-    /// package depends on.
-    ///
-    /// `instrument_id` is an index into `tickers`, not a repeated string. At
-    /// the row counts this table reaches, that difference is the difference
-    /// between a column and a memory problem.
-    #[pyo3(signature = (*, day = 0))]
-    fn bars(&self, day: u32) -> PyResult<crate::python_arrow::PyArrowStream> {
+    /// Explicit rather than automatic. The session buffer is reused, so
+    /// anything not captured before the next `run_session` is gone -- but a
+    /// caller who does not want a table should not pay to build one every
+    /// session. Call this once per day, after the session and before the
+    /// next.
+    #[pyo3(signature = (day))]
+    fn record(&mut self, day: u32) -> PyResult<()> {
         let ticks = self.buffer.ticks_written;
         let n = self.buffer.companies;
-        let batch = crate::python_arrow::bars_batch(
+        self.recorded_bars.push(
+            crate::python_arrow::bars_batch(
+                day, ticks, n,
+                self.written(&self.buffer.prices),
+                self.written(&self.buffer.volumes),
+            )
+            .map_err(crate::python_arrow::arrow_err)?,
+        );
+        self.recorded_truth.push(
+            crate::python_arrow::truth_batch(
+                day, ticks, n, self.written(&self.buffer.mispricing_s),
+            )
+            .map_err(crate::python_arrow::arrow_err)?,
+        );
+        let e = self.inner.economy();
+        self.recorded_macro.push(crate::python_arrow::MacroRow {
             day,
-            ticks,
-            n,
-            self.written(&self.buffer.prices),
-            self.written(&self.buffer.volumes),
-        )
-        .map_err(crate::python_arrow::arrow_err)?;
+            vix: e.vix,
+            // Fractional on the way out, matching the way in. A results table
+            // reporting percent while the constructor takes fractions would
+            // reintroduce the unit trap on the return journey.
+            federal_funds_rate: crate::units::percent_to_fraction(e.federal_funds_rate),
+            corporate_bond_yield: crate::units::percent_to_fraction(e.corporate_bond_yield),
+            inflation_rate: crate::units::percent_to_fraction(e.inflation_rate),
+            unemployment_rate: crate::units::percent_to_fraction(e.unemployment_rate),
+            gdp_growth: crate::units::percent_to_fraction(e.gdp_growth),
+            qe_pe_boost: e.qe_pe_boost,
+            fear_greed_index: e.fear_greed_index,
+        });
+        Ok(())
+    }
+
+    /// Discard everything recorded so far.
+    fn clear_recording(&mut self) {
+        self.recorded_bars.clear();
+        self.recorded_truth.clear();
+        self.recorded_macro.clear();
+    }
+
+    #[getter]
+    fn recorded_days(&self) -> usize {
+        self.recorded_bars.len()
+    }
+
+    /// The `bars` table: one row per (tick, instrument).
+    ///
+    /// Returns every recorded day as a SEPARATE batch, so a consumer pulls
+    /// them one at a time rather than materialising a year at once. With
+    /// nothing recorded it falls back to the last session, which is the
+    /// convenient case for a single-day run.
+    ///
+    /// `instrument_id` is a UInt32 index into `tickers`, not a repeated
+    /// string. At these row counts that is the difference between a column
+    /// and a memory problem.
+    #[pyo3(signature = (*, day = 0))]
+    fn bars(&self, day: u32) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let batches = if self.recorded_bars.is_empty() {
+            vec![crate::python_arrow::bars_batch(
+                day,
+                self.buffer.ticks_written,
+                self.buffer.companies,
+                self.written(&self.buffer.prices),
+                self.written(&self.buffer.volumes),
+            )
+            .map_err(crate::python_arrow::arrow_err)?]
+        } else {
+            self.recorded_bars.clone()
+        };
         Ok(crate::python_arrow::PyArrowStream::new(
             "bars",
             crate::python_arrow::bars_schema(),
-            vec![batch],
+            batches,
         ))
     }
 
-    /// The last session's `truth` table, as an Arrow stream.
+    /// The `truth` table: the labelled-dataset output.
     ///
-    /// The labelled-dataset output: the log deviation from fair value that
-    /// produced each print. No historical dataset carries this column, because
-    /// no historical dataset knows what fair value was.
+    /// The log deviation from fair value that produced each print. No
+    /// historical dataset carries this column, because no historical dataset
+    /// knows what fair value was.
     #[pyo3(signature = (*, day = 0))]
     fn truth(&self, day: u32) -> PyResult<crate::python_arrow::PyArrowStream> {
-        let ticks = self.buffer.ticks_written;
-        let n = self.buffer.companies;
-        let batch = crate::python_arrow::truth_batch(
-            day,
-            ticks,
-            n,
-            self.written(&self.buffer.mispricing_s),
-        )
-        .map_err(crate::python_arrow::arrow_err)?;
+        let batches = if self.recorded_truth.is_empty() {
+            vec![crate::python_arrow::truth_batch(
+                day,
+                self.buffer.ticks_written,
+                self.buffer.companies,
+                self.written(&self.buffer.mispricing_s),
+            )
+            .map_err(crate::python_arrow::arrow_err)?]
+        } else {
+            self.recorded_truth.clone()
+        };
         Ok(crate::python_arrow::PyArrowStream::new(
             "truth",
             crate::python_arrow::truth_schema(),
+            batches,
+        ))
+    }
+
+    /// The `macro` table: one row per recorded day.
+    ///
+    /// Keyed by the same `day` as `bars` and `truth`, so aligning a macro
+    /// signal with prices is a join rather than a hand-rolled accumulation
+    /// loop. Rates are fractional, as everywhere else.
+    fn macro_table(&self) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let batch = crate::python_arrow::macro_batch(&self.recorded_macro)
+            .map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "macro",
+            crate::python_arrow::macro_schema(),
             vec![batch],
         ))
     }
