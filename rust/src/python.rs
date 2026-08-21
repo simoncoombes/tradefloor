@@ -20,9 +20,12 @@ use pyo3::prelude::*;
 /// streams, and importing the module draws nothing.
 ///
 /// The normal-draw path caches a Box-Muller spare, so the *parity* of how
-/// many normals have been drawn is part of the generator's state. Drawing a
-/// uniform between two normals therefore changes the second normal. This is
-/// deliberate and matches the reference implementation.
+/// many normals have been drawn is part of the generator's state: Box-Muller
+/// produces a PAIR from two uniforms and keeps the second. So two normals cost
+/// two uniform draws, not four, and the second one advances the stream not at
+/// all — a uniform drawn after one normal and after two normals is the same
+/// value. Draw accounting is therefore not one-uniform-per-value, which
+/// matters to anyone reasoning about where a stream is.
 #[pyclass(name = "GameRng", module = "pretium")]
 pub struct PyGameRng {
     inner: crate::GameRng,
@@ -72,9 +75,11 @@ pyo3::create_exception!(
     pretium,
     ValidationError,
     pyo3::exceptions::PyValueError,
-    "Raised when construction input is rejected at the boundary.
-
-     Subclasses ValueError, so `except ValueError` keeps working while the      specific type is available for callers who want it. The taxonomy is      deliberately tiny: a simulator that invents error types for every field      teaches users to catch Exception."
+    "Raised when construction input is rejected at the boundary. Subclasses \
+     ValueError, so `except ValueError` keeps working while the specific type \
+     is available to callers who want it. The taxonomy is deliberately tiny: \
+     a simulator that invents an error type per field teaches users to catch \
+     Exception, which catches the bugs too."
 );
 
 /// The package version.
@@ -102,6 +107,13 @@ fn pretium(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(check_rate, m)?)?;
     m.add_function(wrap_pyfunction!(fair_value, m)?)?;
     m.add_function(wrap_pyfunction!(sectors, m)?)?;
+    m.add_function(wrap_pyfunction!(step_mispricing_daily, m)?)?;
+    m.add_function(wrap_pyfunction!(apply_mispricing, m)?)?;
+    m.add_function(wrap_pyfunction!(characteristic_root_moduli, m)?)?;
+    m.add_function(wrap_pyfunction!(crowd_adjusted_root_moduli, m)?)?;
+    m.add_function(wrap_pyfunction!(impulse_response, m)?)?;
+    m.add_function(wrap_pyfunction!(model_preset, m)?)?;
+    m.add_class::<PyMispricingState>()?;
     m.add_class::<PyFairValue>()?;
     m.add("ValidationError", m.py().get_type_bound::<ValidationError>())?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
@@ -279,4 +291,174 @@ fn fair_value(
 #[pyfunction]
 fn sectors() -> Vec<String> {
     crate::sectors::keys().iter().map(|s| s.to_string()).collect()
+}
+
+/// The daily log-mispricing state.
+///
+/// `s` is the log deviation of price from fair value, and `s_prev` is
+/// yesterday's, which the momentum term needs. Immutable: a step returns a new
+/// state rather than mutating, so a trajectory is a list of values you can
+/// keep rather than a thing you have to copy defensively.
+#[pyclass(name = "MispricingState", module = "pretium", frozen, get_all)]
+#[derive(Debug, Clone, Copy)]
+pub struct PyMispricingState {
+    /// Current log-mispricing.
+    pub s: f64,
+    /// Previous day's value, the momentum term's other operand.
+    pub s_prev: f64,
+}
+
+#[pymethods]
+impl PyMispricingState {
+    /// Build a state.
+    ///
+    /// With `s_prev` omitted this is the ordinary constructor: the value is
+    /// clamped to the mispricing cap and `s_prev` is set equal to it, so a
+    /// fresh state has zero momentum.
+    ///
+    /// Passing `s_prev` builds the pair VERBATIM, without clamping. That is
+    /// for resuming a trajectory you already hold — mid-trajectory `s` and
+    /// `s_prev` genuinely differ, and that difference IS the momentum term.
+    /// Routing it through the clamping constructor would silently zero the
+    /// momentum and produce a different path from the one being resumed.
+    #[new]
+    #[pyo3(signature = (s = 0.0, s_prev = None))]
+    fn new(s: f64, s_prev: Option<f64>) -> PyResult<Self> {
+        for (name, v) in [("s", Some(s)), ("s_prev", s_prev)] {
+            if let Some(v) = v {
+                if !v.is_finite() {
+                    return Err(ValidationError::new_err(format!(
+                        "{name} must be finite, got {v}"
+                    )));
+                }
+            }
+        }
+        match s_prev {
+            // Verbatim: an out-of-cap value is preserved and propagates into
+            // s_prev exactly once, which is the reference behaviour.
+            Some(prev) => Ok(Self { s, s_prev: prev }),
+            None => {
+                let st = crate::mispricing::create_mispricing_state(s);
+                Ok(Self { s: st.s, s_prev: st.s_prev })
+            }
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!("MispricingState(s={}, s_prev={})", self.s, self.s_prev)
+    }
+}
+
+/// One DAILY step of the mispricing process.
+///
+/// # This is not the process the engine's tick loop runs
+///
+/// Said plainly because the two are easy to conflate and produce different
+/// trajectories. This function is the clean daily AR(2) step: a 60-day
+/// half-life decay, a momentum term in yesterday's change, and a shock, all
+/// applied once per day. The engine applies related ideas per TICK, at 1/390
+/// of a day, with crowd feedback the daily step does not have. They are
+/// different processes, not rounding variants of one another, and a
+/// trajectory from one will not reproduce a trajectory from the other.
+///
+/// The daily step is the library's public model because it is what can be
+/// characterised: its stationarity is provable in closed form via
+/// [`characteristic_root_moduli`], not merely observed by simulating and
+/// hoping. The tick variant is deliberately not exposed as a standalone
+/// function; it is reachable only by running the engine, which is where it
+/// belongs.
+///
+/// # Arguments
+///
+/// `innovation` is the GARCH-scaled, zero-mean daily innovation, already
+/// sized by the caller and NOT clamped. `shock` is the day's summed
+/// directional pressure -- news, net order flow, squeezes -- and IS clamped to
+/// the daily shock cap. That asymmetry is deliberate: noise is sized by the
+/// volatility model, whereas directional shocks are bounded so a single day
+/// cannot dominate.
+#[pyfunction]
+#[pyo3(signature = (state, *, innovation = 0.0, shock = 0.0))]
+fn step_mispricing_daily(
+    state: &PyMispricingState,
+    innovation: f64,
+    shock: f64,
+) -> PyResult<PyMispricingState> {
+    for (name, v) in [("innovation", innovation), ("shock", shock)] {
+        if !v.is_finite() {
+            return Err(ValidationError::new_err(format!(
+                "{name} must be finite, got {v}"
+            )));
+        }
+    }
+    let next = crate::mispricing::step_mispricing(
+        &crate::mispricing::MispricingState { s: state.s, s_prev: state.s_prev },
+        &crate::mispricing::MispricingInputs { innovation, shock },
+    );
+    Ok(PyMispricingState { s: next.s, s_prev: next.s_prev })
+}
+
+/// Price from fair value and mispricing: `fair_value * exp(s)`, floored.
+///
+/// The floor is a JavaScript-semantics max, so a NaN propagates rather than
+/// being silently replaced by the floor. A negative fair value survives the
+/// multiply and is then floored, so this never returns a negative price.
+#[pyfunction]
+fn apply_mispricing(fair_value: f64, s: f64) -> f64 {
+    crate::mispricing::apply_mispricing(fair_value, s)
+}
+
+/// Moduli of the AR(2) characteristic roots.
+///
+/// Both strictly inside the unit circle means the process is stationary --
+/// proven, not sampled. This is the analytic backbone of the claim that the
+/// daily model cannot wander off, and it is why the daily step is the public
+/// surface.
+#[pyfunction]
+#[pyo3(signature = (phi = None, theta = None))]
+fn characteristic_root_moduli(phi: Option<f64>, theta: Option<f64>) -> (f64, f64) {
+    crate::mispricing::characteristic_root_moduli(phi, theta)
+}
+
+/// The same, with the crowd-feedback term included.
+#[pyfunction]
+fn crowd_adjusted_root_moduli() -> (f64, f64) {
+    crate::mispricing::crowd_adjusted_root_moduli()
+}
+
+/// Impulse response of the daily process over `horizon_days`.
+#[pyfunction]
+#[pyo3(signature = (horizon_days, phi = None, theta = None))]
+fn impulse_response(horizon_days: i64, phi: Option<f64>, theta: Option<f64>) -> PyResult<Vec<f64>> {
+    if horizon_days < 0 {
+        return Err(ValidationError::new_err(format!(
+            "horizon_days must be >= 0, got {horizon_days}"
+        )));
+    }
+    Ok(crate::mispricing::impulse_response(horizon_days, phi, theta))
+}
+
+/// The model coefficients, as a named immutable preset.
+///
+/// Coefficients ship as a versioned preset rather than as constructor
+/// keywords so that two published results can be compared: "pt-v1" names an
+/// exact model, whereas forty tunable keyword arguments guarantee no two users
+/// ran the same one.
+///
+/// Only LIVE coefficients appear. A preset listing knobs wired to nothing
+/// would be a documentation lie of the kind this port has already had to
+/// correct once.
+#[pyfunction]
+fn model_preset(py: Python<'_>) -> PyResult<PyObject> {
+    use crate::mispricing as m;
+    let d = pyo3::types::PyDict::new_bound(py);
+    d.set_item("name", "pt-v1")?;
+    d.set_item("mispricing_half_life_days", m::MISPRICING_HALF_LIFE_DAYS)?;
+    d.set_item("mispricing_phi", m::MISPRICING_PHI)?;
+    d.set_item("momentum_theta", m::MOMENTUM_THETA)?;
+    d.set_item("mispricing_cap", m::MISPRICING_CAP)?;
+    d.set_item("daily_shock_cap", m::DAILY_SHOCK_CAP)?;
+    d.set_item("crowd_valuation_gain", m::CROWD_VALUATION_GAIN)?;
+    d.set_item("crowd_momentum_gain", m::CROWD_MOMENTUM_GAIN)?;
+    d.set_item("crowd_lean_cap", m::CROWD_LEAN_CAP)?;
+    Ok(d.into())
 }

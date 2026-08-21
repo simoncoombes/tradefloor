@@ -228,3 +228,139 @@ def test_sectors_are_the_twelve_in_declared_order():
     assert len(keys) == 12
     assert keys[0] == "technology"
     assert keys[-1] == "transportation"
+
+
+# --------------------------------------------------------------------------
+# The daily mispricing model
+# --------------------------------------------------------------------------
+
+def _series(field, n):
+    """Goldens store a constant series compressed. Handle both encodings."""
+    if isinstance(field, list):
+        return [f64(h) for h in field]
+    if isinstance(field, dict) and "constantBits" in field:
+        return [f64(field["constantBits"])] * field.get("length", n)
+    raise TypeError(f"unexpected series encoding: {type(field).__name__}")
+
+
+def test_daily_step_matches_the_reference_bit_for_bit():
+    """All 58,080 recorded step cases, including out-of-cap states.
+
+    These use independent `s` and `s_prev`, which is why the constructor
+    accepts both: mid-trajectory they genuinely differ, and that difference IS
+    the momentum term. Building them through the clamping constructor would
+    zero the momentum and quietly test a different process.
+    """
+    golden = load("mispricing-step-cases.json")
+    ix = {name: i for i, name in enumerate(golden["columns"])}
+    checked = 0
+
+    for row in golden["rows"]:
+        s, s_prev, innovation, shock = (
+            f64(row[ix[c]]) for c in ("inS", "inSPrev", "innovation", "shock")
+        )
+        if not all(math.isfinite(v) for v in (s, s_prev, innovation, shock)):
+            continue
+        got = pretium.step_mispricing_daily(
+            pretium.MispricingState(s, s_prev), innovation=innovation, shock=shock
+        )
+        assert bits(got.s) == row[ix["outS"]].lower(), row
+        assert bits(got.s_prev) == row[ix["outSPrev"]].lower(), row
+        checked += 1
+
+    assert checked > 50_000, f"only {checked} cases ran"
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["calm", "news-shocks", "garch-clustered", "extreme-clamped", "denormal-drift"],
+)
+def test_hundred_thousand_step_trajectories_do_not_drift(name):
+    """A long trajectory is the test a single step cannot be.
+
+    Per-step parity does not imply trajectory parity: a one-ULP disagreement
+    that recurs feeds its own successor, so drift compounds. Five scenarios,
+    100,000 steps each, every step checked -- including `denormal-drift`,
+    which pushes `s` into subnormal territory where the arithmetic is least
+    forgiving, and `extreme-clamped`, where the cap binds repeatedly.
+    """
+    golden = load(f"mispricing-trajectory-{name}.json")
+    expected = golden["outputSBits"]
+    n = len(expected)
+    innovations = _series(golden["innovations"], n)
+    shocks = _series(golden["shocks"], n)
+
+    state = pretium.MispricingState(f64(golden["trajectory"]["initialSInput"]["bits"]))
+    for i in range(n):
+        state = pretium.step_mispricing_daily(
+            state, innovation=innovations[i], shock=shocks[i]
+        )
+        if bits(state.s) != expected[i].lower():
+            pytest.fail(f"{name} diverged at step {i}: {bits(state.s)} != {expected[i]}")
+
+
+def test_model_constants_match_the_reference():
+    golden = load("mispricing-constants.json")["constants"]
+    preset = pretium.model_preset()
+    pairs = {
+        "MISPRICING_PHI": "mispricing_phi",
+        "MOMENTUM_THETA": "momentum_theta",
+        "MISPRICING_CAP": "mispricing_cap",
+        "DAILY_SHOCK_CAP": "daily_shock_cap",
+        "MISPRICING_HALF_LIFE_DAYS": "mispricing_half_life_days",
+    }
+    for golden_name, preset_key in pairs.items():
+        assert bits(preset[preset_key]) == golden[golden_name]["bits"].lower(), preset_key
+
+
+def test_the_preset_is_named_and_carries_only_live_coefficients():
+    preset = pretium.model_preset()
+    assert preset["name"] == "pt-v1"
+    # Dead coefficients must not appear. A preset listing knobs wired to
+    # nothing is a documentation lie, and this model has two such constants
+    # (mean-reversion) that belong to a discarded factor.
+    assert not any("mean_reversion" in k for k in preset)
+
+
+def test_the_daily_process_is_provably_stationary():
+    # The reason the daily step is the public model rather than the tick
+    # variant: this is provable in closed form, not merely observed.
+    moduli = pretium.characteristic_root_moduli()
+    assert len(moduli) == 2
+    assert all(m < 1.0 for m in moduli), moduli
+    # Crowd feedback must not push it outside the unit circle either.
+    assert all(m < 1.0 for m in pretium.crowd_adjusted_root_moduli())
+
+
+def test_impulse_response_decays():
+    ir = pretium.impulse_response(400)
+    assert ir[0] == 1.0
+    # Momentum makes it rise before it falls, so the assertion is about the
+    # tail, not monotonicity.
+    assert abs(ir[-1]) < abs(ir[0])
+    assert abs(ir[-1]) < 0.05
+
+
+def test_apply_mispricing_never_returns_a_negative_price():
+    assert pretium.apply_mispricing(-50.0, 0.1) > 0
+    assert pretium.apply_mispricing(0.0, 0.0) > 0
+
+
+def test_resuming_a_trajectory_preserves_momentum():
+    # The reason `s_prev` is constructible. Rebuilding a mid-trajectory state
+    # through the single-argument constructor zeroes the momentum term and
+    # produces a different path -- silently.
+    state = pretium.MispricingState(0.0)
+    for _ in range(5):
+        state = pretium.step_mispricing_daily(state, innovation=0.01)
+
+    resumed_correctly = pretium.step_mispricing_daily(
+        pretium.MispricingState(state.s, state.s_prev), innovation=0.01
+    )
+    resumed_wrongly = pretium.step_mispricing_daily(
+        pretium.MispricingState(state.s), innovation=0.01
+    )
+    continued = pretium.step_mispricing_daily(state, innovation=0.01)
+
+    assert resumed_correctly.s == continued.s
+    assert resumed_wrongly.s != continued.s
