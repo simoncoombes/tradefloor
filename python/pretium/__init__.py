@@ -293,7 +293,7 @@ def run_many(
     asserted by a test rather than assumed.
 
     ``collect`` chooses what comes back: ``"prices"`` (raw f64 bytes),
-    ``"attribution"`` (the four factor columns), or ``"summary"`` (prices,
+    ``"attribution"`` (the seven component columns), or ``"summary"`` (prices,
     draw count and tickers).
 
     # Workers are not free, and below a threshold they lose

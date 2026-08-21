@@ -114,12 +114,12 @@ pub struct Engine {
     economy: EconomyState,
     central_bank: CentralBankState,
     sector_keys: Vec<String>,
-    /// Per-company factor attribution, accumulated across the current day.
+    /// Per-company attribution, accumulated across the current day.
     ///
     /// Four entries per company -- company_news, order_flow_impact,
     /// short_squeeze_effect, random_noise -- summed tick by tick and reset at
     /// `open_market`.
-    attribution: Vec<[f64; 4]>,
+    attribution: Vec<[f64; 7]>,
     /// This tick's ground truth, per company slot.
     ///
     /// `attribution` above sums across the day, which is what a scorer wants
@@ -175,7 +175,7 @@ impl Engine {
             companies,
             economy,
             central_bank,
-            attribution: vec![[0.0; 4]; companies_len],
+            attribution: vec![[0.0; 7]; companies_len],
             tick_components: vec![[0.0; 7]; companies_len],
             // NaN, not zero: a company that has never ticked has no valuation,
             // and zero is a real one that would silently read as "worthless"
@@ -264,12 +264,20 @@ impl Engine {
             rng,
         );
 
-        // Accumulate attribution before the outcome is consumed. Raw factors
-        // as the tick computed them -- NOT the reference's scaled UI
-        // accumulator, which multiplies by the drift scale for presentation.
-        // The raw decomposition is the ground truth; the scaling is a display
-        // choice, and reproducing it here would bake a presentation decision
-        // into the labelled dataset.
+        // Accumulate the APPLIED contributions, which is the same quantity the
+        // `truth` table reports per tick -- so the day total of a column here
+        // equals that column summed over the day, and the two surfaces cannot
+        // disagree about what drove a price.
+        //
+        // It used to accumulate the RAW factors, and that was wrong in a way
+        // that mattered. The three drift factors are divided by 390 before
+        // they reach `s` and the noise term is multiplied by the intraday
+        // volatility curve, so raw sums overstate news, flow and squeeze by
+        // ~390x relative to noise. Anything ranking factors by magnitude --
+        // "was this agent right for the right reasons" -- therefore answered
+        // `company_news` on days that were overwhelmingly noise. Measured on
+        // one session: raw called it news at 6.0e0 against noise at 6.0e-2;
+        // applied calls it noise at 7.8e-1 against news at 1.5e-2.
         // Zeroed rather than left stale. A company that did not tick did not
         // move, so every component contributed exactly zero to its `s` -- which
         // is true, and keeps the columns summing to a Δs of zero. Carrying the
@@ -278,12 +286,13 @@ impl Engine {
             *slot = [0.0; 7];
         }
         for (n, slot) in outcome.active_indices.iter().enumerate() {
-            let f = &outcome.factors[n];
-            if let Some(acc) = self.attribution.get_mut(*slot) {
-                acc[0] += f.company_news;
-                acc[1] += f.order_flow_impact;
-                acc[2] += f.short_squeeze_effect;
-                acc[3] += f.random_noise;
+            if let (Some(acc), Some(computed)) = (
+                self.attribution.get_mut(*slot),
+                outcome.s_components.get(n),
+            ) {
+                for (k, value) in computed.iter().enumerate() {
+                    acc[k] += value;
+                }
             }
             if let (Some(row), Some(computed)) = (
                 self.tick_components.get_mut(*slot),
@@ -338,7 +347,7 @@ impl Engine {
     /// lie this port has already had to correct once. So the four live
     /// components are reported, and the squeeze is kept separate because it is
     /// genuinely a distinct mechanism.
-    pub fn attribution(&self) -> &[[f64; 4]] {
+    pub fn attribution(&self) -> &[[f64; 7]] {
         &self.attribution
     }
 
@@ -360,7 +369,7 @@ impl Engine {
         &self.tick_anchor
     }
 
-    /// One attribution column across all companies, by index 0..4.
+    /// One attribution column across all companies, by index 0..7.
     pub fn attribution_column(&self, factor: usize) -> Vec<f64> {
         self.attribution
             .iter()
@@ -373,7 +382,7 @@ impl Engine {
         // caller can still read yesterday's decomposition after the close has
         // run, which is when they would actually want it.
         self.attribution.clear();
-        self.attribution.resize(self.companies.len(), [0.0; 4]);
+        self.attribution.resize(self.companies.len(), [0.0; 7]);
         self.tick_components.clear();
         self.tick_components.resize(self.companies.len(), [0.0; 7]);
         self.tick_fundamental.clear();
@@ -621,7 +630,7 @@ impl Engine {
     /// ordering must establish it before the first tick.
     pub fn add_company(&mut self, company: TickCompany) -> usize {
         self.companies.push(company);
-        self.attribution.push([0.0; 4]);
+        self.attribution.push([0.0; 7]);
         self.tick_components.push([0.0; 7]);
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);

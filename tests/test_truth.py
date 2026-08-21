@@ -210,3 +210,54 @@ def test_recording_the_decomposition_does_not_change_the_market():
     assert quiet.draws_consumed == watched.draws_consumed
     baseline = json.loads((here / "known_answer.json").read_text(encoding="utf-8"))
     assert known_answer.known_answer_digest() == baseline["sha256"]
+
+
+# --------------------------------------------------------------------------
+# The two grains agree
+# --------------------------------------------------------------------------
+
+
+def test_the_day_attribution_is_the_truth_column_summed_over_the_day():
+    """`attribution()` and `truth` are one quantity at two grains.
+
+    They used to be two quantities with the same names. `attribution()` summed
+    the RAW factors, but the three drift factors are divided by 390 on their
+    way into `s` while noise is multiplied by the intraday volatility curve —
+    so raw sums overstated news, flow and squeeze by around 390x against
+    noise.
+
+    That was not cosmetic. `_dominant_factor` ranks these magnitudes to score
+    whether an agent was right for the right REASON, and on one measured
+    session raw called it `company_news` (6.0e0 against noise at 6.0e-2) where
+    applied calls it `random_noise` (7.8e-1 against news at 1.5e-2). The
+    scorer was systematically answering with a drift factor on days that were
+    almost entirely noise.
+    """
+    import struct
+
+    universe = pretium.Universe.random(6, seed=4)
+    engine = pretium.Engine(seed=11, universe=universe)
+    engine.open_market()
+    engine.run_session(9, 30, 3, 90)
+    engine.record(0)
+    table = pa.table(engine.truth()).to_pydict()
+
+    ids = table["instrument_id"]
+    for factor in pretium.Engine.FACTORS:
+        day_total = struct.unpack(
+            "<%dd" % len(universe), engine.attribution(factor)
+        )
+        for i in range(len(universe)):
+            column = sum(table[factor][k] for k in range(len(ids)) if ids[k] == i)
+            assert column == pytest.approx(day_total[i], abs=1e-15), (factor, i)
+
+
+def test_the_dominant_factor_is_the_one_that_actually_moved_the_price():
+    # A quiet session with no news and no order flow IS noise, and the scorer
+    # must say so. The old raw ranking named company_news here.
+    from pretium.harness import _dominant_factor
+
+    engine = pretium.Engine(seed=11, universe=pretium.Universe.random(6, seed=4))
+    engine.open_market()
+    engine.run_session(9, 30, 3, 90)
+    assert _dominant_factor(engine) == "random_noise"

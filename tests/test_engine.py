@@ -486,14 +486,22 @@ def test_attribution_names_the_cause_of_each_move():
     assert all(x != 0 for x in noise)
 
 
-def test_attribution_reports_four_live_factors_not_six():
-    # The reference declares six keys, but three belong to discarded factors
-    # and its shortSqueezeEffect is folded into orderFlowImpact for display.
-    # Reporting six would ship three columns of structural zeros -- the "knobs
-    # wired to nothing" lie this model has already had to correct once.
+def test_attribution_reports_every_component_that_moves_a_price():
+    # Four shocks and the three pieces of the model's own dynamics. No column
+    # is structurally zero -- the "knobs wired to nothing" lie this model has
+    # already had to correct once -- and none that moves a price is missing,
+    # which is the failure that made the old four-column version misrank.
     assert pretium.Engine.FACTORS == [
-        "company_news", "order_flow_impact", "short_squeeze_effect", "random_noise",
+        "reversion", "momentum", "crowd_lean",
+        "company_news", "order_flow_impact", "short_squeeze_effect",
+        "random_noise",
     ]
+
+
+def test_an_unknown_factor_names_the_valid_ones():
+    e = pretium.Engine(seed=1, universe=pretium.Universe.random(3, seed=1))
+    with pytest.raises(pretium.ValidationError, match="reversion"):
+        e.attribution("sentiment")
 
 
 def test_attribution_is_per_day_and_survives_the_close():

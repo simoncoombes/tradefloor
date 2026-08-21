@@ -26,7 +26,8 @@ MarketStatusName = Literal["open", "pre_market", "after_hours", "closed"]
 CycleName = Literal["expansion", "peak", "contraction", "trough", "recovery"]
 Grain = Literal["tick", "day"]
 FactorName = Literal[
-    "company_news", "order_flow_impact", "short_squeeze_effect", "random_noise"
+    "reversion", "momentum", "crowd_lean",
+    "company_news", "order_flow_impact", "short_squeeze_effect", "random_noise",
 ]
 
 class ValidationError(ValueError):

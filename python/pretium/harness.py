@@ -47,13 +47,21 @@ from ._core import Engine, Instrument, Macro, OrderError, ValidationError
 from .portfolio import Portfolio
 
 
-# The four live factors, as literals a checker can match against
+# The seven components, as literals a checker can match against
 # Engine.attribution's accepted values. Engine.FACTORS returns the same names
 # at runtime, but as plain strings.
+#
+# Three of them -- reversion, momentum, crowd_lean -- are the model's own
+# dynamics rather than shocks, and they are here because they genuinely move
+# prices. An "explanation" that could only ever name a shock would be unable
+# to say "nothing happened; it drifted back toward fair value", which is the
+# correct answer most of the time.
 FACTOR_NAMES: tuple[
+    Literal["reversion"], Literal["momentum"], Literal["crowd_lean"],
     Literal["company_news"], Literal["order_flow_impact"],
     Literal["short_squeeze_effect"], Literal["random_noise"],
-] = ("company_news", "order_flow_impact", "short_squeeze_effect", "random_noise")
+] = ("reversion", "momentum", "crowd_lean", "company_news",
+     "order_flow_impact", "short_squeeze_effect", "random_noise")
 
 
 def _f64(buf: bytes) -> list[float]:

@@ -1225,22 +1225,25 @@ impl PyEngine {
     /// Accumulated per DAY and reset at `open_market`, so a read after
     /// `close_market` still returns the day just finished.
     ///
-    /// # Four columns, not the reference's six
+    /// # Seven components, and the same seven the `truth` table carries
     ///
-    /// The reference declares six attribution keys. Three of them --
-    /// `earningsRevision`, `multipleChange`, `sentiment` -- belong to factors
-    /// the live flags discard, and its `shortSqueezeEffect` is folded into
-    /// `orderFlowImpact` for display rather than reported separately.
+    /// Four shocks -- `company_news`, `order_flow_impact`,
+    /// `short_squeeze_effect`, `random_noise` -- and the three pieces of the
+    /// model's own dynamics: `reversion`, `momentum`, `crowd_lean`. Together
+    /// they account for the day's change in `s`.
     ///
-    /// Reporting six here would ship three columns of structural zeros, which
-    /// is a documentation lie of exactly the kind this model has already had
-    /// to correct once. So the four live components are reported, with the
-    /// squeeze kept separate because it is a genuinely distinct mechanism.
+    /// This is the DAY grain of exactly what `truth` reports per tick, so
+    /// summing a `truth` column over a day reproduces the value here. Two
+    /// surfaces that disagreed about what drove a price would be worse than
+    /// either alone.
     ///
-    /// These are the RAW factors, not the reference's scaled display
-    /// accumulator: the decomposition is the ground truth, the scaling is a
-    /// presentation choice, and baking it in would put a display decision
-    /// inside the dataset.
+    /// These are the APPLIED contributions -- what each driver did to `s` --
+    /// not the raw factors before scaling. Raw was the earlier behaviour and
+    /// it was wrong: the drift factors are divided by 390 on their way into
+    /// `s` while noise is multiplied by the intraday volatility curve, so raw
+    /// sums overstate news, flow and squeeze by around 390x against noise.
+    /// Ranking raw magnitudes named `company_news` the dominant driver on
+    /// sessions that were almost entirely noise.
     fn attribution(&self, py: Python<'_>, factor: &str) -> PyResult<Py<PyBytes>> {
         let index = FACTOR_NAMES
             .iter()
@@ -1770,13 +1773,12 @@ impl PyNewsImpact {
 }
 
 
-/// The live factor decomposition, in reporting order.
-pub const FACTOR_NAMES: [&str; 4] = [
-    "company_news",
-    "order_flow_impact",
-    "short_squeeze_effect",
-    "random_noise",
-];
+/// The decomposition names, in reporting order.
+///
+/// An alias rather than a second list. Declared twice, the two orderings would
+/// eventually disagree and every column would still look plausible -- the
+/// `truth` schema is generated from the same constant for the same reason.
+pub const FACTOR_NAMES: [&str; 7] = crate::market::factors::S_COMPONENT_KEYS;
 
 /// A sector's relative volatility multiplier.
 ///
