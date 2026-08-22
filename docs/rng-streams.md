@@ -32,8 +32,10 @@ sequence for everyone after it. Three consumers hit exactly this wall:
   one event roll on the host side invalidated every seeded market
   trajectory.
 
-The split is part of the 2026-08 era boundary (`KAT_VERSION = 5`): every
-trajectory changed, once, and these three questions became answerable.
+The split landed inside the 2026-08 era boundary, regenerating the
+known-answer baseline — `KAT_VERSION = 5` at the split; the era's later
+model changes have since taken it to 8: every trajectory changed, once, and
+these three questions became answerable.
 
 ## The three streams
 

@@ -148,10 +148,12 @@ demands: a version bump, not a patch.
 ## Cadence is in the spec
 
 How often a strategy re-decides moves results more than any signal parameter:
-the measured rebalance table in `pretium.baselines` swings the same one-day
-signal from +88.7% to -13.2% purely by trading it more often. A strategy
-whose identity excluded that would not be identified — two runs of the same
-fingerprint could disagree in sign.
+the rebalance measurement behind `pretium.baselines` swings the same one-day
+signal from +97.5% at three decisions a day to +0.1% at twelve, purely by
+trading it more often (seed 2026, `Universe.random(40, seed=7)`, 30 days,
+measured at `a7994e2`). A strategy whose identity excluded that would not be
+identified — two runs of the same fingerprint could differ by the whole
+return.
 
 So `execution.cadence` is part of the spec, with two values:
 

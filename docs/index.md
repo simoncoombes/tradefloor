@@ -50,9 +50,11 @@ seed, and the four granularities you can step it at.
 **The same seed gives the same market on every machine.** Identical output to
 the last bit on Linux, macOS and Windows, x86 and ARM alike, because the
 library ships its own `exp`, `log`, `sin` and `cos` rather than calling the
-platform's. Every release builds wheels for five targets, runs one fixed
-simulation inside each, and compares digests. Any disagreement fails the
-release.
+platform's. The release gate builds wheels for five targets, runs one fixed
+simulation inside each, and compares digests, failing on any disagreement -
+measured green on all five targets at commit `ad91026`; the current
+baseline's digest has been reproduced on one platform so far. See
+[Reproducing a run](reproducing-a-run.html) for the by-commit record.
 
 **Orders move the price.** Matching runs against a real book with price-time
 priority, so a large order pays worse prices because it consumed levels, not
