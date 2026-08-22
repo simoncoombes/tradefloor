@@ -24,7 +24,18 @@ TRADED = UNIVERSE[0].ticker
 # before the 2026-08 market-factor recalibration re-rolled every trajectory
 # (at the old sigma, seed 6 already read -4 bps for a buyer). The direction
 # of the MECHANISM is asserted where it is visible: in the mean across seeds.
-IMPACT_SEEDS = range(1, 9)
+#
+# Eight seeds sufficed until the market-factor variance process joined the
+# era boundary. Its regimes rail violent days against the ±25% session
+# breaker, and a railed close ERASES the counterfactual (both worlds print
+# the bound, and `s` is re-derived from the clamped price in both) — so
+# some seeds now read exactly 0 and the per-seed spread widened. Measured
+# across seeds 1-32 at this flow: buy +1.72 mean (24 positive, 5 negative,
+# 3 railed to zero, sd 2.98), sell -2.46 (24 negative). The first eight
+# seeds happen to contain the worst of the draw (-0.57 buy mean), so the
+# mean is taken where the mechanism is visible at this noise level:
+# thirty-two seeds.
+IMPACT_SEEDS = range(1, 33)
 
 
 def _mean_impact_and_cost_bps(flow):
@@ -62,13 +73,19 @@ def test_impact_is_isolated_to_the_names_actually_traded():
     shifted market and this whole measurement would become an estimate.
     """
     cf = pretium.flow_impact(
-        seed=42, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
+        seed=5, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
     )
     assert cf.untouched_moved() == []
     # And the traded name DID move. Without this the assertion above passes
     # when the two worlds are accidentally identical -- flow silently dropped,
     # say -- because then nothing moved and nothing is untouched-and-moved.
     # "No leak" and "no effect at all" look the same from one direction only.
+    #
+    # Seed 5, not the 42 this used to pin: since the factor-variance change,
+    # a seed whose measurement day rails the session breaker reads exactly
+    # zero impact WITH the flow fully applied (the rail erases the
+    # counterfactual at the close; see IMPACT_SEEDS above), and 42 became
+    # such a seed. The guard needs a rail-free seed to mean what it says.
     assert cf.impact_bps[cf.tickers.index(TRADED)] != 0.0
 
 

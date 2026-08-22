@@ -1626,6 +1626,12 @@ impl PyEngine {
         )?;
         out.set_item("tick_anchor", f64_bytes(py, self.inner.tick_anchor()))?;
         out.set_item("market_open", self.market_open)?;
+        // The market factor's variance state: (variance, day_factor).
+        // Engine-level rather than per-company, so it has no column; a
+        // fork that lost it would re-open at the baseline factor sigma
+        // mid-regime and diverge from its parent at the next close.
+        let (market_variance, market_day_factor) = self.inner.market_variance_state();
+        out.set_item("market_variance", vec![market_variance, market_day_factor])?;
 
         // The macro chain's state. The chain advances at every close now, so
         // a fork that did not carry these would snap back to the initial
@@ -1798,6 +1804,20 @@ impl PyEngine {
             // on its next session, and re-anchors `previous_close` mid-day --
             // so it prices differently from the parent it forked from.
             self.market_open = flag.extract()?;
+        }
+        if let Some(raw) = snapshot.get_item("market_variance")? {
+            // The market factor's variance state. Optional like the other
+            // late-added keys: a snapshot written before the factor had a
+            // variance process described a market running at the baseline,
+            // and the fresh state this engine constructed IS the baseline.
+            let vals: Vec<f64> = raw.extract()?;
+            if vals.len() != 2 {
+                return Err(ValidationError::new_err(format!(
+                    "market_variance must be [variance, day_factor], got {} values",
+                    vals.len()
+                )));
+            }
+            self.inner.set_market_variance_state(vals[0], vals[1]);
         }
 
         // The macro chain's state. Optional for the same reason as the

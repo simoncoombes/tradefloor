@@ -193,8 +193,13 @@ pub fn calculate_live_factors(
     let sector_component = 0.5 * shared.sector(&company.sector);
 
     // `garchVariance` is in DAILY units; the tick needs per-tick sigma.
+    // `IDIO_SIGMA_SCALE` is the funding side of the market-factor variance
+    // reallocation: the factor's variance share was raised out of THIS
+    // term's budget, so total volatility holds still. At 1.0 the multiply
+    // is bit-inert.
     let daily_sigma = mathx::sqrt(mathx::max(company.garch_variance, 0.0001));
-    let idiosyncratic_sigma = daily_sigma / mathx::sqrt(390.0);
+    let idiosyncratic_sigma =
+        daily_sigma * super::factor_vol::IDIO_SIGMA_SCALE / mathx::sqrt(390.0);
 
     // DRAW SITE — here, before `crash_amplifier` is computed. The order is
     // contractual for the tape even though the two are independent.
@@ -207,11 +212,24 @@ pub fn calculate_live_factors(
     // scale, so the magnitude is normalised by the same scale.
     //
     // The normaliser is `MARKET_FACTOR_SIGMA` BY NAME, where the reference
-    // implementation inlined the value: "extreme" means beyond two standard
-    // deviations of the factor's own distribution, so the threshold must
-    // follow the sigma. With the literal kept, recalibrating the sigma would
-    // silently re-denominate this threshold in the old units — at 3x it
-    // would fire on half of all ticks instead of the designed ~5% tail.
+    // implementation inlined the value — the recalibration lesson stands:
+    // with a literal kept, recalibrating the sigma silently re-denominates
+    // this threshold in the old units.
+    //
+    // Since the factor's variance became conditional (`factor_vol`), the
+    // constant here is the BASELINE sigma, deliberately: "extreme" stays
+    // denominated in absolute units — the reference's own semantics — so a
+    // high-variance factor regime pushes MORE ticks past the threshold and
+    // the amplifier converts variance regimes into correlation regimes,
+    // which is what real crises do. The alternative (normalising by the
+    // conditional sigma, so the amplifier always fires on the same ~5%
+    // tail regardless of regime) was built and measured on the published
+    // panel: it costs 0.03 of volatility clustering (0.245 -> 0.216),
+    // 0.10 of excess kurtosis (3.14 -> 3.04) and 0.006 of correlation at
+    // the shipped constants (results/market-factor-vol-2026-08-22-*.json),
+    // and buys only the constancy of the firing rate. In a calm (floored)
+    // factor regime the threshold sits ~9 conditional sigmas out and the
+    // amplifier is silent, which is the other half of the same realism.
     let shock_magnitude = shared.market_factor.abs()
         / (crate::market::tick::MARKET_FACTOR_SIGMA / mathx::sqrt(390.0));
     let crash_amplifier = if shock_magnitude > 2.0 {
@@ -614,6 +632,35 @@ mod tests {
         // 4x the shock would be 4x the noise if linear; the amplifier makes
         // it more than that.
         assert!(amplified > linear * 4.0, "{amplified} vs {}", linear * 4.0);
+    }
+
+    #[test]
+    fn the_amplifier_is_denominated_in_absolute_units_so_regimes_move_its_rate() {
+        // The deliberate half of the crash amplifier's denomination since
+        // the factor-variance process: the threshold is 2x the BASELINE
+        // sigma in absolute units, so a tick that is ordinary for a
+        // crisis regime (1.5 conditional sigmas, but 3 baseline sigmas
+        // when the regime runs at twice baseline) IS amplified, and the
+        // same conditional multiple is amplified MORE in a hotter regime.
+        // That regime-dependence is the measured crisis-correlation
+        // channel, not a mis-denomination; see the comment at the
+        // amplifier for the panel cost of the constant-rate alternative.
+        let base_tick = crate::market::tick::MARKET_FACTOR_SIGMA / 390.0f64.sqrt();
+        let c = company();
+        let amplifier_at = |factor: f64| {
+            let mut s = shared();
+            s.market_factor = factor;
+            // Divide the market component back out to expose the
+            // amplifier itself: noise = beta*factor*amp with zero sector
+            // and (Fixed(0)) zero idiosyncratic terms.
+            factors(&c, &[], 0.0, &s).random_noise / s.market_factor
+        };
+        // 1.5 conditional sigmas of a 2x-baseline regime = 3 baseline
+        // sigmas: amplified.
+        assert!(amplifier_at(base_tick * 2.0 * 1.5) > 1.0);
+        // The same 1.5-conditional-sigma tick of a HALF-baseline (calm,
+        // floored) regime is nowhere near the absolute threshold: silent.
+        assert_eq!(amplifier_at(base_tick * 0.5 * 1.5), 1.0);
     }
 
     #[test]

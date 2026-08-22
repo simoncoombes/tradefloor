@@ -61,8 +61,8 @@ use crate::economy::{
 };
 use crate::market::{
     close_day, get_market_status, intraday_fraction, reset_daily_prices, simulate_market_tick,
-    AvgVolumePolicy, CloseInputs, GameTime, MarketStatus, NewsEvent, NewsImpactEntry, OrderVolume,
-    SettleDrawPolicy, TickCompany, TickInputs,
+    AvgVolumePolicy, CloseInputs, GameTime, MarketStatus, MarketVarianceState, NewsEvent,
+    NewsImpactEntry, OrderVolume, SettleDrawPolicy, TickCompany, TickInputs,
 };
 use crate::rng::{stream, GameRng, Rng, RngState};
 
@@ -194,6 +194,12 @@ pub struct Engine {
     tick_components: Vec<[f64; 7]>,
     tick_fundamental: Vec<f64>,
     tick_anchor: Vec<f64>,
+    /// The market factor's conditional-variance state
+    /// (`market::factor_vol`). Advanced at every close from the day's
+    /// accumulated factor — zero draws — and read by every generated tick
+    /// as the factor's sigma. Recorded-stream replay (`tick_with`)
+    /// bypasses it: that era's factor was constant-sigma.
+    market_vol: MarketVarianceState,
     /// Cumulative draws per stream, including any the embedder took through
     /// [`Engine::draw_uniform`]. The single most useful numbers for
     /// diagnosing a divergence: if these differ between two runs, nothing
@@ -244,6 +250,7 @@ impl Engine {
             // rather than as "not yet computed".
             tick_fundamental: vec![f64::NAN; companies_len],
             tick_anchor: vec![f64::NAN; companies_len],
+            market_vol: MarketVarianceState::new(),
             sector_keys,
             draws: StreamDraws::default(),
         }
@@ -371,6 +378,18 @@ impl Engine {
     ) -> TickOutcome {
         let status = get_market_status(request.time);
 
+        // The factor's sigma follows the draw policy because the two mark
+        // the same era boundary: the generated schedule belongs to the era
+        // whose market factor carries conditional volatility, while
+        // `FourOrZero` replays a RECORDED reference stream, and that era
+        // drew the factor at constant sigma. Replaying a tape through
+        // today's variance state would price recorded draws under dynamics
+        // the recording never had.
+        let market_sigma_daily = match settle_draws {
+            SettleDrawPolicy::FourAlways => self.market_vol.sigma_daily(),
+            SettleDrawPolicy::FourOrZero => crate::market::tick::MARKET_FACTOR_SIGMA,
+        };
+
         let outcome = simulate_market_tick(
             &mut self.companies,
             &TickInputs {
@@ -382,10 +401,17 @@ impl Engine {
                 news_impact_queue: request.news_impact_queue,
                 order_volumes: request.order_volumes,
                 sector_keys: &self.sector_keys,
+                market_sigma_daily,
                 settle_draws,
             },
             rng,
         );
+
+        // Accumulate the day's factor innovation for the close's variance
+        // update. A closed tick contributes exactly zero (the factor is
+        // not drawn), and the replay path accumulates harmlessly into
+        // state it never reads.
+        self.market_vol.accumulate(outcome.shared_factors.market_factor);
 
         // Accumulate the APPLIED contributions, which is the same quantity the
         // `truth` table reports per tick -- so the day total of a column here
@@ -534,6 +560,24 @@ impl Engine {
         Ok(())
     }
 
+    /// The market factor's variance state, for checkpoints:
+    /// `(variance, day_factor)`.
+    ///
+    /// Engine-level state with no column to live in: a fork that did not
+    /// carry it would re-open at the BASELINE factor sigma mid-regime and
+    /// close its first day on a truncated innovation — pricing differently
+    /// from the parent it forked from, the exact failure class
+    /// [`Engine::restore_day_state`] exists for.
+    pub fn market_variance_state(&self) -> (f64, f64) {
+        self.market_vol.snapshot()
+    }
+
+    /// Put the market factor's variance state back. See
+    /// [`Engine::market_variance_state`].
+    pub fn set_market_variance_state(&mut self, variance: f64, day_factor: f64) {
+        self.market_vol = MarketVarianceState::restore(variance, day_factor);
+    }
+
     /// One attribution column across all companies, by index 0..7.
     pub fn attribution_column(&self, factor: usize) -> Vec<f64> {
         self.attribution
@@ -554,6 +598,10 @@ impl Engine {
         self.tick_fundamental.resize(self.companies.len(), f64::NAN);
         self.tick_anchor.clear();
         self.tick_anchor.resize(self.companies.len(), f64::NAN);
+        // The factor-variance day accumulator is per-day state like the
+        // attribution above: an abandoned day must not leak its partial
+        // innovation into the next close's update.
+        self.market_vol.open_day();
 
         reset_daily_prices(&mut self.companies);
     }
@@ -586,6 +634,12 @@ impl Engine {
                 },
             );
         }
+        // The market factor's own close: its variance updates from the
+        // day's accumulated factor, beside the per-name GARCH updates
+        // above and with the same zero-draw discipline. The VIX read here
+        // is the day's TRADING value — the macro chain has not advanced
+        // yet, exactly as the per-name updates see the day they closed.
+        self.market_vol.close_day(self.economy.vix);
     }
 
     /// The daily macro step: economy, cycle roll, then the central bank.

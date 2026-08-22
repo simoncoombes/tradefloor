@@ -85,20 +85,32 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # Re-measured at the 2026-08 era boundary, on the fixture's new seed --
     # again when the RNG stream split joined that boundary, which re-dealt
     # every trajectory and dropped mean-reversion from third to last on
-    # this seed (-38,788 against random's -3,653) -- and again when the
+    # this seed (-38,788 against random's -3,653) -- again when the
     # GJR leverage recalibration joined the same boundary, which lifted
     # mean-reversion straight back to third (-1,758 against random's
-    # -3,617 and buy_and_hold's -9,172). The oracle and momentum have
-    # never swapped.
-    assert ranked == ["oracle", "momentum", "mean_reversion", "random",
-                      "buy_and_hold"]
+    # -3,617 and buy_and_hold's -9,172) -- and again when the
+    # market-factor variance process joined it, which swapped the bottom
+    # pair: random now pays the widest noise floor (-6,125 against
+    # buy_and_hold's -116, with mean_reversion third at +273). The oracle
+    # and momentum have never swapped.
+    assert ranked == ["oracle", "momentum", "mean_reversion",
+                      "buy_and_hold", "random"]
 
 
 def test_random_trading_is_close_to_flat_over_a_short_run(scores):
     # The noise floor really is a floor: a coin flip neither makes nor loses
     # much over five days, it just pays costs. Any strategy near this number
     # is measuring its own transaction costs.
-    assert abs(scores["random"].return_pct) < 0.5
+    #
+    # The bound was 0.5% before the market-factor variance process; it is
+    # 1.0% since, because a random book now carries market beta that no
+    # longer diversifies away -- the correlated share of every name is a
+    # third of its variance, so forty coin-flip positions keep a net
+    # exposure the factor's regimes move (measured -0.61% on this seed).
+    # The floor's meaning is relative anyway: an order of magnitude under
+    # the oracle's +8.78% on the same seed and horizon.
+    assert abs(scores["random"].return_pct) < 1.0
+    assert abs(scores["random"].return_pct) < 0.2 * scores["oracle"].return_pct
 
 
 def test_random_trading_bleeds_over_a_longer_run():
@@ -129,14 +141,18 @@ def test_a_capture_ratio_is_meaningless_without_its_horizon():
     The same agent, the same market, the same Oracle. Only the horizon
     changed, and the headline number moved by a third.
 
-    Re-measured twice now: after the harness began advancing its clock within
-    the day (27% and 94% before that change), and at the 2026-08 era boundary,
-    which also moved the test off seed 2026 -- on that seed momentum's
-    five-day tear inverted the gap (2.98 near against 1.47 far), the same
-    outlier behaviour that moved the module fixture. The GAP is the finding
-    and it survives on 3 of 4 probed seeds; the absolute numbers are a
-    property of this seed and this horizon pair, so the assertion below is on
-    the gap.
+    Re-measured three times now: after the harness began advancing its clock
+    within the day (27% and 94% before that change); at the 2026-08 era
+    boundary, which also moved the test off seed 2026 -- on that seed
+    momentum's five-day tear inverted the gap (2.98 near against 1.47 far),
+    the same outlier behaviour that moved the module fixture; and when the
+    market-factor variance process joined the same boundary, which re-dealt
+    the probe seeds to gaps of +0.162 / +0.325 / +1.266 / +0.223 (seeds 7,
+    11, 42, 99) -- the pinned seed became the marginal one, so the margin
+    asserted here came down from 0.2 while the finding itself (far > near,
+    4 of 4; a gap a headline number cannot ignore, 4 of 4 at 0.15) stands.
+    The absolute numbers are a property of this seed and this horizon pair,
+    so the assertion below is on the gap.
     """
     short = pretium.evaluate({"oracle": Oracle(), "momentum": Momentum()},
                              seed=7, universe=UNIVERSE, days=5)
@@ -148,7 +164,7 @@ def test_a_capture_ratio_is_meaningless_without_its_horizon():
     # A gap worth the warning, rather than a threshold on the near value. That
     # was `< 0.55` against a measured 0.677 once the clock started advancing:
     # a test calibrated to a number rather than to the effect it names.
-    assert far - near > 0.2, (
+    assert far - near > 0.15, (
         f"the horizon moved capture only from {near:.3f} to {far:.3f}; the "
         "caveat this test exists to justify is no longer warranted"
     )

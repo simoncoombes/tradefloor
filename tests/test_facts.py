@@ -153,26 +153,30 @@ def test_the_report_covers_dependence_and_not_only_marginals(facts):
         assert label in text, label
 
 
-def test_stocks_move_together_more_than_before_but_less_than_reality(facts):
-    """Cross-sectional correlation is a third of real, up from a tenth.
+def test_stocks_move_together_at_a_real_market_rate_since_the_factor_vol_change(facts):
+    """Cross-sectional correlation sits in the real band, and how it got
+    there matters more than that it did.
 
-    The largest realism gap in the model. The share of a name's variance the
-    shared market factor carries IS the pairwise correlation it can induce,
-    and before the 2026-08 recalibration that share put the measurement at
-    +0.026 against a real +0.25 to +0.35. The sigma sweep behind the
-    recalibration (tools/calibration/) tripled it — and showed the band
-    itself is unreachable by that constant: a Gaussian factor big enough to
-    reach +0.25 collapses kurtosis to a third of ITS band's floor and adds
-    seventeen points of annualised volatility. So both bounds here are
-    load-bearing: the floor pins the recalibration (a regression to the old
-    near-zero regime must fail), and the verdict pins the honesty (this is
-    still not a real market's correlation, and diversification still works
-    better here than it should).
+    This was the model's largest realism gap: +0.026 against a real +0.25
+    to +0.35 under the reference constants, and the sigma sweep proved the
+    band UNREACHABLE by the constant-sigma factor -- a Gaussian factor big
+    enough to reach +0.25 collapsed kurtosis to a third of its band's
+    floor (finding 14). The factor-variance process
+    (rust/src/market/factor_vol.rs) dissolved that trade: the factor's
+    share of every name's variance is now a fat-tailed regime rather than
+    an iid Gaussian dilutant, funded out of the idiosyncratic sigma, and
+    the six-seed published medians read correlation 0.260 WITH kurtosis
+    3.14 -- both in band together for the first time.
+
+    Both bounds stay load-bearing: the floor pins the calibration (a
+    regression toward the near-zero regime must fail), and the ceiling
+    pins the funding (correlation far above band would mean the factor's
+    share grew without being paid for). The fixture is one seed at 180
+    days, so the bounds are wider than the published six-seed medians.
     """
-    assert 0.04 < facts["cross_sectional_corr"] < 0.15
+    assert 0.15 < facts["cross_sectional_corr"] < 0.45
     verdict = compare_to_real_markets(facts)["cross_sectional_corr"]
-    assert not verdict["matches"]
-    assert verdict["verdict"] == "too low"
+    assert verdict["matches"] or verdict["direction"] == "above"
 
 
 def test_volume_and_volatility_arrive_together_since_the_volume_fix(facts):
@@ -190,36 +194,46 @@ def test_volume_and_volatility_arrive_together_since_the_volume_fix(facts):
     face is a volume shock that persists, which is the change-autocorrelation
     test below and the caveat that survives.
     """
-    verdict = compare_to_real_markets(facts)["volume_abs_return_corr"]
-    assert verdict["matches"]
+    # The floor is the claim; the ceiling is left to the published
+    # six-seed medians (0.584, in band at the factor-vol calibration),
+    # because a single 180-day seed can overshoot the band top now that
+    # factor-variance regimes couple volume to market-wide moves.
     assert facts["volume_abs_return_corr"] > 0.30
 
 
-def test_there_is_no_leverage_effect_and_a_symmetric_garch_is_why(facts):
-    """Bad news does not raise volatility more than good news here.
+def test_the_leverage_effect_is_real_since_the_gjr_term(facts):
+    """Bad news raises volatility more than good news, as it should.
 
-    Absent BY CONSTRUCTION rather than by calibration: the variance process is
-    a symmetric GARCH(1,1), `omega + alpha * r^2 + beta * v`, and squaring the
-    return discards its sign. No symmetric GARCH can produce a leverage
-    effect. Reproducing one needs an asymmetric term -- GJR or EGARCH -- which
-    is a model change and not a coefficient to tune.
+    The effect was absent BY CONSTRUCTION while the variance process was a
+    symmetric GARCH(1,1) -- squaring the return discards its sign -- and
+    this test used to pin that absence. The GJR asymmetry term (GAMMA =
+    0.34, garch.rs) made it real: the published six-seed median reads
+    -0.107, every seed negative, inside the real -0.30 to -0.10 band. The
+    factor-variance change leaves the mechanism intact (measured -0.094 at
+    its calibration); what this fixture pins is that the effect exists and
+    points the right way on a single seed, not band membership of a noisy
+    single-seed estimate.
     """
-    assert facts["leverage_effect"] > -0.10
+    assert facts["leverage_effect"] < -0.02
 
 
-def test_an_absent_leverage_effect_reads_as_weak_against_a_negative_band(facts):
+def test_a_weak_leverage_effect_would_read_as_weak_not_as_too_high():
     """The wording trap in the one statistic with a negative band.
 
     A leverage effect of -0.01 against a band of -0.30 to -0.10 is numerically
     ABOVE the band and semantically ABSENT. Reporting the numeric direction
     would print "too high" for a missing effect, which states the opposite of
-    the finding. Pinned as a test because it is the kind of thing that reads
-    fine until someone acts on it.
+    the finding. The live fixture no longer exercises the trap (the GJR term
+    made the effect real), so it is pinned on a synthetic panel instead --
+    the wording rule has to survive the statistic being healthy.
     """
-    verdict = compare_to_real_markets(facts)["leverage_effect"]
+    facts = measure(seed=3, universe=UNIVERSE, days=180)
+    weakened = dict(facts)
+    weakened["leverage_effect"] = -0.01
+    verdict = compare_to_real_markets(weakened)["leverage_effect"]
     assert verdict["direction"] == "above"
     assert verdict["verdict"] == "too weak"
-    assert "TOO WEAK" in report(facts)
+    assert "TOO WEAK" in report(weakened)
 
 
 def test_volume_is_measured_in_changes_because_the_level_says_nothing():
