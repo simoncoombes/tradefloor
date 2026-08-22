@@ -513,6 +513,30 @@ def test_rank_runs_the_model_and_the_ranking_records_it():
     assert CUSTOM.fingerprint in ranking.report()
 
 
+def test_a_state_snapshot_refuses_to_restore_across_models():
+    """The low-level fork path, guarded like the high-level ones. branch()
+    builds its engines from the parent's own model, but state_snapshot /
+    restore_state are public, and a custom run's state restored onto a
+    default-built engine would continue under pt-v1 with no symptom."""
+    parent = pretium.Engine(seed=11, universe=SMALL, model=CUSTOM)
+    parent.open_market()
+    parent.run_session(9, 30, 3, 20)
+    snapshot = parent.state_snapshot()
+    assert snapshot["model_fingerprint"] == CUSTOM.fingerprint
+
+    imposter = pretium.Engine(seed=11, universe=SMALL)
+    with pytest.raises(pretium.ValidationError, match="across models"):
+        imposter.restore_state(snapshot)
+
+    # A snapshot from before the fingerprint was recorded has no key and
+    # restores as it always did -- the caller vouches for the context,
+    # exactly as they do for the universe.
+    del snapshot["model_fingerprint"]
+    twin = pretium.Engine(seed=11, universe=SMALL, model=CUSTOM)
+    twin.restore_state(snapshot)
+    assert twin.prices() == parent.prices()
+
+
 def test_an_engine_batch_member_is_the_standalone_custom_engine():
     seeds = [7, 8]
     b = pretium.EngineBatch(seeds=seeds, universe=SMALL, model=CUSTOM)
