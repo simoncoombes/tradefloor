@@ -236,60 +236,71 @@ REAL_MARKETS = {
 }
 
 #: The across-seed standard deviation of each statistic at the shipped
-#: baseline (MARKET_FACTOR_SIGMA = 0.0075), from the post-RNG-split sweep
-#: re-run. It ships beside the bands because a band exit is only comparable
+#: preset. It ships beside the bands because a band exit is only comparable
 #: across statistics once it is priced in units of that statistic's own
-#: sampling noise: pooled volatility runs ~55 on a band of width 20 while
+#: sampling noise: pooled volatility runs ~40 on a band of width ~20 while
 #: every autocorrelation is measured in hundredths, and any comparison that
 #: ignores the scales silently becomes a comparison of volatility alone.
 #: `pretium.loss` consumes these as its diagonal weighting.
 #:
-#: Provenance, and the history behind the values. CALIBRATION.md section 6.1
-#: tabulates seed sds measured pre-stream-split (git_rev 7c2877e) -- and, it
-#: turns out, at the OLD baseline sigma of 0.003, the shipped value at
-#: measurement time; every entry of that table matches the pre-split sweep
-#: file's 0.003 point to the printed digit. The values here are re-derived at
-#: the CURRENT baseline (0.0075) from the post-split re-run, so two changes
-#: separate them from the document's table: the sigma recalibration and the
-#: RNG stream split. The full chain, sample sd over the same six seeds:
-#:
-#:   statistic              doc @0.003   pre-split @0.0075   here @0.0075
-#:   annualised vol %          0.87           0.888              0.878
-#:   excess kurtosis           0.39           0.317              0.248
-#:   return acf(1)             0.015          0.009              0.015
-#:   |return| acf(1)           0.013          0.016              0.017
-#:   cross-sectional corr      0.013          0.017              0.014
-#:   volume vs |return|        0.015          0.009              0.013
-#:   leverage                  0.022          0.021              0.014
-#:   volume change acf(1)      0.008          0.007              0.006
-#:
-#: A six-seed sd is itself noisy -- its relative sampling error is roughly
-#: 1/sqrt(2(n-1)) = 32% -- and no move in either step exceeds about 1.5 of
-#: those sigmas, so the table corroborates the sweep re-run's finding: the
-#: split re-dealt the draws without changing the process law. Phase 2 of the
-#: calibration programme re-estimates these on thirty seeds;
-#: `pretium.loss.seed_sd_from_panels` is the estimator, and the loss takes
-#: the result as a parameter rather than requiring an edit here.
+#: Provenance, and the history behind the values. These are measured on the
+#: CURRENT model (pt-v1) over THIRTY seeds (101-130), at the published
+#: method: `Universe.random(40, seed=111)`, 252 days, `measure()` per seed,
+#: sample (n-1) standard deviation. They are 2x to 8x LARGER than the
+#: six-seed values they replace (vol 0.878 -> 6.46, |r| acf(1) 0.0165 ->
+#: 0.0946, cross-sectional corr 0.0137 -> 0.1087), and the change is the
+#: model, not the seed count: under the factor-variance process, whether a
+#: seed's 252 days contain a market-variance regime is itself a per-seed
+#: random draw, so the panel statistics carry a regime-occurrence random
+#: effect the legacy constant-sigma factor did not have. Seed 114 is the
+#: visible case: 65.7% volatility and |r| acf(20) of 0.24 on the same
+#: protocol every other seed ran. The legacy values priced band exits in
+#: noise units 4-8x too small, which overstated every scaled distance the
+#: loss reported. A six-seed sd also carries ~32% relative sampling error
+#: (1/sqrt(2(n-1))) against ~13% at thirty seeds, and thirty matches the
+#: phase-2 instrument's protocol, so these scales and the instrument's
+#: Jacobian rows are directly comparable -- the independently measured
+#: seed_sd in tools/calibration/results/jacobian-pt-v1-2026-08-22-chunk1
+#: .json agrees with every overlapping entry here to six significant
+#: figures. The values are re-derivable in-repo (the engine is
+#: deterministic per seed); tests/test_loss.py pins them to a live
+#: re-measurement rather than to a committed artifact.
+#: `pretium.loss.seed_sd_from_panels` remains the estimator, and the loss
+#: takes a replacement as a parameter rather than requiring an edit here.
 SEED_SD = {
-    "annualised_vol_pct": 0.878001,
-    "excess_kurtosis": 0.24832,
-    "return_acf1": 0.0152672,
-    "abs_return_acf1": 0.0165008,
-    "cross_sectional_corr": 0.0137033,
-    "volume_abs_return_corr": 0.013005,
-    "leverage_effect": 0.0141133,
-    "volume_change_acf1": 0.00565191,
+    "annualised_vol_pct": 6.46066,
+    "excess_kurtosis": 1.17181,
+    "return_acf1": 0.0532019,
+    "abs_return_acf1": 0.0945748,
+    "abs_return_acf5": 0.0550538,
+    "abs_return_acf20": 0.0466668,
+    "cross_sectional_corr": 0.10875,
+    "volume_abs_return_corr": 0.0433524,
+    "leverage_effect": 0.0759765,
+    "volume_change_acf1": 0.0102341,
 }
 
 #: Where SEED_SD's values come from, carried as data so any consumer -- the
 #: loss report, a calibration manifest -- can quote it rather than assert it.
 SEED_SD_PROVENANCE = {
-    "source": "tools/calibration/results/"
-              "market-factor-sigma-2026-08-21-post-rng-split.json",
-    "git_rev": "ad91026",
-    "sweep_point": "MARKET_FACTOR_SIGMA = 0.0075 (the shipped baseline)",
-    "seeds": (1, 2, 3, 4, 5, 6),
+    "source": "re-measured on the shipped preset: facts.measure() on "
+              "Universe.random(40, seed=111), 252 days, seeds 101-130, "
+              "sample sd across seeds",
+    "date": "2026-08-22",
+    "model_fingerprint": "pt-v1",
+    "universe_fingerprint": "5d8de78b55aad752307740018791"
+                            "54c0f29aa8fc0c63f3c6a4ac791165ca7380",
+    "days": 252,
+    "seeds": tuple(range(101, 131)),
     "estimator": "sample standard deviation (n - 1) across seeds",
+    "cross_check": "agrees to six significant figures with the seed_sd of "
+                   "tools/calibration/results/"
+                   "jacobian-pt-v1-2026-08-22-chunk1.json, measured "
+                   "independently by the phase-2 instrument on the same "
+                   "thirty seeds",
+    "pinned_by": "tests/test_loss.py re-measures two of the thirty seeds "
+                 "live and re-derives the sd from the committed per-seed "
+                 "table",
 }
 
 #: The first two are MARGINAL: properties of one series taken on its own. The
