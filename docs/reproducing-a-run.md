@@ -75,9 +75,12 @@ hashes differently.
 
 ### 4. Macro initial conditions
 
-The macro state is exogenous and does not evolve on its own, so whatever you
-constructed the engine with is what held for the whole run unless a
-`pin_macro` moved it. Its seven fields are small enough to publish verbatim:
+The macro chain evolves endogenously from the initial conditions you
+construct the engine with: the day close advances the economy, and a
+`pin_macro` overrides a field from the day it lands. What identifies the run
+is the *initial* state, exactly as the seed identifies the noise - the
+realised path is reproduced by the replay, not published by hand. The seven
+fields are small enough to publish verbatim:
 
 ```python
 macro = pt.Macro(vix=15.0, federal_funds_rate=0.025,
@@ -183,24 +186,30 @@ component or a build whose trajectories have moved. See
 
 ## What the reproduction guarantees
 
-**Across machines -- measured once, not yet on this era.** The library carries
-its own `exp`, `log`, `sin` and `cos` rather than calling the platform's,
-specifically so builds on different operating systems can't drift apart in
-the low bits. Every release is meant to build wheels for five targets, run
-one fixed simulation inside each, and compare digests
-(`.github/workflows/determinism.yml`); any disagreement fails the release.
-That gate has not yet run against a tagged release.
+**Across machines -- measured on all five targets at one commit, one
+platform since.** The library carries its own `exp`, `log`, `sin` and `cos`
+rather than calling the platform's, specifically so builds on different
+operating systems can't drift apart in the low bits. Every release builds
+wheels for five targets, runs one fixed simulation inside each, and compares
+digests (`.github/workflows/determinism.yml`); any disagreement fails the
+release.
 
-What has actually been measured: at `a5afd1c` (known-answer v3), an
-independent build on Windows x86_64 and a second independent build on macOS
-arm64 produced the identical digest, `112fd73e...6eff337`. `0b4579d` moved
-every seed's trajectory -- the macro-chain and volume fixes -- and bumped the
-known-answer baseline to v4; that regeneration ran on macOS arm64, so the
-current baseline has one platform's confirmation behind it, not five, until
-the gate runs. Treat "the same seed gives the same market on any platform" as
-confirmed for one cross-platform pair on the prior era, and as engineering
-intent -- backed by a test that no platform-varying transcendental reaches the
-source (`rust/tests/mathx_parity.rs`) -- for the current one.
+That gate has run. At `ad91026` (known-answer v5, the RNG stream split), all
+five targets -- Linux x86_64 and aarch64, macOS arm64 and x86_64, Windows
+x86_64 -- produced the identical digest, `76983e65...3180eeb`. It has not yet
+run against a tagged release. An earlier two-platform record also stands: at
+`a5afd1c` (v3), independent Windows x86_64 and macOS arm64 builds agreed on
+`112fd73e...6eff337`.
+
+The baseline has moved since the five-target run. The era's model changes
+took the known-answer version from v5 to v6 (the GJR asymmetry term), v7
+(the market factor's conditional volatility) and v8 (that volatility's VIX
+coupling); the current digest, `1ee64998...fe3581c` at v8, was regenerated on
+macOS arm64 and has one platform's confirmation behind it until the gate runs
+again. Treat "the same seed gives the same market on any platform" as
+measured for all five targets at `ad91026`, and as engineering intent --
+backed by a test that no platform-varying transcendental reaches the source
+(`rust/tests/mathx_parity.rs`) -- for the current baseline.
 
 **Across versions, not at all.** A change to a coefficient, to the universe
 generator, or to the engine moves every seed's trajectory. This is why the
