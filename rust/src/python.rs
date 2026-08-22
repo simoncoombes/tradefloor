@@ -127,6 +127,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::python_book::PyMatchResult>()?;
     m.add_class::<crate::python_book::PyPriceLevel>()?;
     m.add_class::<crate::python_book::PySweepCost>()?;
+    m.add_class::<crate::python_params::PyModelParams>()?;
     m.add_class::<crate::python_engine::PyEngine>()?;
     m.add_class::<crate::python_engine::PyInstrument>()?;
     m.add_class::<crate::python_engine::PyMacro>()?;
@@ -477,9 +478,28 @@ fn impulse_response(horizon_days: i64, phi: Option<f64>, theta: Option<f64>) -> 
 /// Only LIVE coefficients appear. A preset listing knobs wired to nothing
 /// would be a documentation lie of the kind this port has already had to
 /// correct once.
+///
+/// # Frozen shape, by the KAT
+///
+/// This dict is the mispricing coefficient table it has always been, and
+/// its shape is LOAD-BEARING: `tests/known_answer.py` section 6 and
+/// `pretium.manifest.era_fingerprint` both hash every value in it, so
+/// growing it moves the committed v8 digest without a simulation change —
+/// exactly what the KAT versioning rule forbids. The FULL preset surface
+/// (CALIBRATION.md Appendix A) lives on `ModelParams.from_preset(name)`
+/// and `.to_dict()` instead; this function gains `name=` so a preset can
+/// be selected by the string an engine takes, and keeps its legacy shape
+/// until the next KAT bump carries the growth deliberately.
 #[pyfunction]
-fn model_preset(py: Python<'_>) -> PyResult<PyObject> {
+#[pyo3(signature = (name = "pt-v1"))]
+fn model_preset(py: Python<'_>, name: &str) -> PyResult<PyObject> {
     use crate::mispricing as m;
+    if crate::params::ModelParams::preset(name).is_none() {
+        return Err(ValidationError::new_err(format!(
+            "unknown model preset {name:?}. Shipped presets: {}",
+            crate::params::ModelParams::preset_names().join(", ")
+        )));
+    }
     let d = pyo3::types::PyDict::new_bound(py);
     d.set_item("name", "pt-v1")?;
     d.set_item("mispricing_half_life_days", m::MISPRICING_HALF_LIFE_DAYS)?;
