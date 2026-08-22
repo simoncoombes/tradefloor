@@ -25,6 +25,13 @@ reduction that never needed them resident.
 free speedup, so the default is 1. Seeds always arrive in seed order, never
 completion order.
 
-Parallelism is per seed and only per seed. The engine has one shared RNG stream
-across the market, the economy and the microstructure, so no decomposition
-within a single run preserves the draw schedule.
+Parallelism is per seed and only per seed. That survives the split of the
+engine's RNG into three per-domain substreams — market, economy, external, see
+[RNG streams](rng-streams.html) — because the split is by domain, not by unit
+of work. The market stream alone serves every draw in a tick — the market
+factor, each sector factor, per-company noise, volume, book settlement — in
+one fixed order across the whole roster, so no decomposition within a single
+run preserves the draw schedule. The economy's separate stream buys
+comparability, not concurrency: a pinned macro path no longer reshuffles the
+market's noise, but the day close still feeds the next day's pricing, so the
+domains run in sequence whatever their streams do.
