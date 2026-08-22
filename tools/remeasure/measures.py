@@ -98,6 +98,7 @@ def g_determinism(ctx: Ctx) -> dict:
         "facts_marginal": len(MARGINAL),
         "facts_dependence": len(REAL_MARKETS) - len(MARGINAL),
         "oracle_default_top_k": Oracle().top_k,
+        "preset_lacks_market_sigma": "market_factor_sigma" not in preset,
         "n_factors": len(pt.Engine.FACTORS),
         "evaluate_steps_default":
             inspect.signature(pt.evaluate).parameters["steps_per_day"].default,

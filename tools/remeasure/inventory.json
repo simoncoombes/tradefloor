@@ -2538,7 +2538,7 @@
   {
    "id": "repro.kat_historical",
    "file": "docs/reproducing-a-run.md",
-   "line": 180,
+   "line": 196,
    "label": "at a5afd1c two independent platform builds produced the identical digest (historical record)",
    "published": "112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337",
    "group": null,
@@ -2553,7 +2553,7 @@
   {
    "id": "repro.kat_era_version",
    "file": "docs/reproducing-a-run.md",
-   "line": 182,
+   "line": 198,
    "label": "'0b4579d ... bumped the known-answer baseline to v4' - named as the current era",
    "published": 4,
    "group": "determinism",
@@ -2564,6 +2564,63 @@
    "source": "stated",
    "method": "KAT_VERSION in tests/known_answer.py",
    "note": "ad91026 bumped it again to v5 when the RNG split regenerated the baseline; this paragraph and the README table are one era behind"
+  },
+  {
+   "id": "share.version",
+   "file": "docs/sharing-a-run.md",
+   "line": 67,
+   "label": "pt.version() stayed '0.1.0' across the era boundary",
+   "published": "0.1.0",
+   "group": "determinism",
+   "key": "version",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "pt.version()"
+  },
+  {
+   "id": "share.preset",
+   "file": "docs/sharing-a-run.md",
+   "line": 68,
+   "label": "and the preset stayed 'pt-v1'",
+   "published": "pt-v1",
+   "group": "determinism",
+   "key": "preset_name",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "pt.model_preset()['name']"
+  },
+  {
+   "id": "share.sigma_not_in_preset",
+   "file": "docs/sharing-a-run.md",
+   "line": 68,
+   "label": "'the recalibrated constant is not even in the preset dictionary'",
+   "published": true,
+   "group": "determinism",
+   "key": "preset_lacks_market_sigma",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "'market_factor_sigma' not in pt.model_preset()"
+  },
+  {
+   "id": "share.era_refusal",
+   "file": "docs/sharing-a-run.md",
+   "line": 73,
+   "label": "reproduce() recomputes the era fingerprint before replaying and refuses across an era boundary",
+   "published": true,
+   "group": null,
+   "key": null,
+   "compare": {
+    "kind": "none"
+   },
+   "source": "stated",
+   "status_override": "covered_by_tests",
+   "note": "asserted by tests/test_manifest.py (test_a_different_era_is_refused_before_anything_replays and neighbours)"
   },
   {
    "id": "tca.entry_cost",
