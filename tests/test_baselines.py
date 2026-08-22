@@ -460,21 +460,24 @@ def test_a_nonsense_lookback_days_is_refused():
 # --------------------------------------------------------------------------
 
 
-def test_only_agents_trading_the_oracles_own_signal_beat_it():
+def test_the_oracle_is_beaten_only_by_agents_that_trade_a_signal():
     """The mechanism, not just the phenomenon.
 
-    Measured over 384 agent-seed pairs: mean-reversion beats the Oracle 31.2%
-    of the time, momentum 8.3%, and buy-and-hold and random never once in 192
-    pairs. That is the evidence that the edge is portfolio construction rather
-    than information -- the agents with no mispricing signal at all cannot
-    beat it, while the one that estimates the very quantity the Oracle reads
-    exactly beats it routinely.
+    WHICH signal beats the Oracle is a property of the engine era, and it has
+    inverted once already: an earlier era measured mean-reversion beating it
+    in a third of its pairs and momentum almost never, while on this build
+    momentum is the only agent that ever does (4 of 12 markets on the grid
+    stated in the baselines module docstring). What has held in every era is
+    the boundary this test pins: buy-and-hold and random, which trade no
+    signal at all, never beat it -- out-earning a perfectly-informed
+    reference under equal constraints takes a better portfolio built from
+    SOME signal, and they have none.
 
-    Asserted as the ORDERING rather than as those rates, which belong to those
-    rosters. What must hold is that the mispricing traders beat it strictly
-    more often than the agents that do not trade mispricing.
+    Asserted as the ORDERING rather than as any era's rates, which belong to
+    their rosters. What must hold is that the signal traders beat it strictly
+    more often than the agents trading none.
     """
-    mispricing_traders = 0
+    signal_traders = 0
     non_traders = 0
     for useed in (3, 42):
         universe = pretium.Universe.random(20, seed=useed)
@@ -484,20 +487,20 @@ def test_only_agents_trading_the_oracles_own_signal_beat_it():
             ratios = capture_ratio(scores)
             if not ratios:
                 continue
-            mispricing_traders += sum(
+            signal_traders += sum(
                 ratios[n] > 1.0 for n in ("mean_reversion", "momentum")
                 if n in ratios)
             non_traders += sum(
                 ratios[n] > 1.0 for n in ("buy_and_hold", "random")
                 if n in ratios)
-    assert mispricing_traders > 0, (
-        "no mispricing trader beat the Oracle at all -- the demonstration is "
+    assert signal_traders > 0, (
+        "no signal trader beat the Oracle at all -- the demonstration is "
         "vacuous and the rest of this test proves nothing"
     )
-    assert non_traders < mispricing_traders, (
-        f"agents with no mispricing signal beat the Oracle {non_traders} "
-        f"times against {mispricing_traders} for those that trade it; the "
-        "documented mechanism does not hold"
+    assert non_traders < signal_traders, (
+        f"agents with no signal beat the Oracle {non_traders} times against "
+        f"{signal_traders} for those trading one; the documented mechanism "
+        "does not hold"
     )
 
 
