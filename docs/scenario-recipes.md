@@ -36,129 +36,29 @@ Every recipe below carries four things, and the order matters:
 Copy a recipe, change the numbers you disagree with, and the disagreement is
 now visible in your methods section instead of buried in a verb.
 
-## Before you compose anything: four silent conflicts
+## Before you compose anything: one trap and three rules
 
-Every one of these produces a plausible-looking result rather than an error,
-and three of the five recipes below are shaped the way they are specifically
-to avoid them. Read this section first. A composed timeline is exactly where
-they bite.
+Exactly one thing on this page can still hand you a plausible wrong answer
+without saying a word, and it is the first item below. The other three used to
+behave that way too; the `Scenario` surface now refuses each of them by name
+and says what to write instead, so they have stopped being traps and become
+rules. Read the rules anyway — they are what makes a composed timeline
+expressible at all, and every recipe below is shaped or sized by one of them.
 
-### 1. Two pins on the same field do not compose — the last one wins
-
-A `Scenario` holds **one driver per field**. Writing a second `step` or `ramp`
-for a field you have already pinned replaces the first one outright, and
-because `ramp` holds its `start` value for every day before `begin`, the
-replacement quietly back-fills the whole run:
-
-```python
-import pretium as pt
-from pretium import Scenario
-
-# INTENDED: calm until day 60, spike to 48, decay back to 18 by day 100.
-wrong = (Scenario("looks right, is not")
-         .step("vix", before=15.0, after=48.0, at=60)
-         .ramp("vix", start=48.0, end=18.0, over=40, begin=60))
-
-print([f"day {d}: {wrong.at(d)['vix']:.1f}" for d in (0, 30, 59, 60, 80, 100)])
-```
-
-```
-['day 0: 48.0', 'day 30: 48.0', 'day 59: 48.0', 'day 60: 48.0', 'day 80: 33.0', 'day 100: 18.0']
-```
-
-The market is in crisis from day zero. There is no error, no warning, and the
-back half of the path looks exactly as intended, which is what makes it
-expensive — the decay is right there in the output, so the path reads as
-correct until you check day zero.
-
-**Reversing the order does not fix it.** It breaks the other way:
-
-```python
-also_wrong = (Scenario()
-              .ramp("vix", start=48.0, end=18.0, over=40, begin=60)
-              .step("vix", before=15.0, after=48.0, at=60))
-
-print(f"day 0: {also_wrong.at(0)['vix']:.1f}   day 99: {also_wrong.at(99)['vix']:.1f}")
-```
-
-```
-day 0: 15.0   day 99: 48.0
-```
-
-Now the opening is right and the crisis never subsides. Neither ordering gives
-you a spike that decays, because no ordering can: two drivers on one field is
-not a thing a `Scenario` can hold.
-
-**The rule.** Composition is per field, and *within* a field it is last-write-wins.
-Chaining across *different* fields is completely safe and is what the surface is
-for. For more than one segment on a single field you have exactly two options:
-
-- a built-in shape that is already one driver — `Scenario.vix_shock` is a
-  step up followed by a linear decay, expressed as a single driver, which is
-  why recipe 3 uses it rather than hand-rolling the same path;
-- or build the realised path as data and load it through `Scenario.from_json`,
-  which is what recipe 5 does. This is the general escape hatch: any piecewise
-  path on any number of fields, with no conflict possible, because there is no
-  chaining involved.
-
-**And check before you run.** `Scenario.table(days)` exists for this. One
-glance at day zero catches every instance of this bug:
-
-```python
-for row in wrong.table(5):
-    print(row)
-```
-
-```
-{'day': 0, 'vix': 48.0}
-{'day': 1, 'vix': 48.0}
-{'day': 2, 'vix': 48.0}
-{'day': 3, 'vix': 48.0}
-{'day': 4, 'vix': 48.0}
-```
-
-### 2. `rate_shock` and `vix_shock` are constructors, not methods
-
-They are classmethods. They take no `self`, they build a fresh `Scenario`, and
-they look completely chainable:
-
-```python
-base = Scenario("base").hold(inflation_rate=0.06, fear_greed_index=20.0)
-chained = base.vix_shock(calm=15.0, peak=60.0, at=10, over=30)
-
-print("base drives:   ", base.fields)
-print("chained drives:", chained.fields)
-```
-
-```
-base drives:    ('fear_greed_index', 'inflation_rate')
-chained drives: ('vix',)
-```
-
-The inflation and sentiment pins are gone. `base` itself is not mutated —
-it is still intact, and that is the trap, because the object you keep is the
-one that lost the configuration. Anything written as
-`Scenario().hold(...).vix_shock(...)` silently discards the `hold`.
-
-Build the shape **first** and chain the extra fields onto it, which is safe
-because they are different fields:
-
-```python
-right = (Scenario.vix_shock(calm=15.0, peak=60.0, at=10, over=30)
-         .hold(inflation_rate=0.06, fear_greed_index=20.0))
-print(right.fields)
-```
-
-```
-('fear_greed_index', 'inflation_rate', 'vix')
-```
-
-### 3. The federal-funds trap: nothing transmits before day 45
+### The trap: nothing transmits before day 45
 
 A policy-only rate path moves nothing until the first central-bank meeting,
 because the corporate bond yield — the rate equities actually discount off —
 is only recomputed at meetings, and the first one is scheduled 45 days out.
 Then it transmits, hard.
+
+This is the one conflict on this page that no library check can catch, which
+is why it leads. The scenario is well-formed, the run is well-formed, and the
+answer is a confident zero that is arithmetically correct and analytically
+worthless. `compare()` refuses a shock that begins *after* the horizon ends
+(rule 3), but a shock that begins on day 5 of a 40-day run is inside the
+horizon by every test the library can apply. It simply has nothing to transmit
+through yet.
 
 This is documented in full on [Scenarios](scenarios.html), with the
 measurement: a policy-rate `ramp` from 2.5% to 5% over thirty days moves every
@@ -172,12 +72,191 @@ says so silently. Recipe 2 shows the same trap arriving through inflation
 rather than the policy rate, which is worth seeing because it is not the case
 the existing documentation warns about.
 
-### 4. `compare()` against its default baseline measures zero for a `hold`
+### Rule 1: pins on one field layer as consecutive segments
+
+A `Scenario` holds a *list* of pins per field, and they lie end to end:
+
+- each pin owns from its own start day until the next one begins;
+- the last pin owns the rest of the run, however long the run turns out to be;
+- the **first** pin also owns every day before its own start, which is what
+  keeps a lone `ramp` or `step` defined on day zero.
+
+```python
+import pretium as pt
+from pretium import Scenario
+
+# calm at 15, a jump to 48 on day 60, a plateau, then a decay to 22.
+segments = (Scenario("spike, plateau, decay")
+            .step("vix", before=15.0, after=48.0, at=60)
+            .ramp("vix", start=48.0, end=22.0, over=45, begin=75))
+
+for d in (0, 59, 60, 74, 75, 97, 120):
+    print(f"day {d:3d}: {segments.at(d)['vix']:.1f}")
+```
+
+```
+day   0: 15.0
+day  59: 15.0
+day  60: 48.0
+day  74: 48.0
+day  75: 48.0
+day  97: 35.3
+day 120: 22.0
+```
+
+All three clauses are visible there. The `step` is the first pin, so its
+`before=15.0` covers days 0 to 59. It owns days 60 to 74 as well — the plateau
+— because that is where the next pin begins. And the `ramp` does **not** hold
+its `start` value over the days before day 75, the way a lone ramp would:
+those days already belong to the step. A ramp's pre-`begin` hold is the
+first-pin clause, not a property of ramps.
+
+That last point is the one worth internalising, because it is what turns
+`hold` then `ramp` into a jump followed by a decay — the shape most macro
+episodes actually have.
+
+**Start days must strictly increase within a field.** The two other orderings
+are refused by name, with both calls reconstructed as you wrote them, because
+"two pins on 'vix'" is not something anybody can act on. Two pins beginning on
+the same day:
+
+```python
+import textwrap
+
+try:
+    (Scenario("looks right, is not")
+     .step("vix", before=15.0, after=48.0, at=60)
+     .ramp("vix", start=48.0, end=18.0, over=40, begin=60))
+except pt.ValidationError as exc:
+    print(textwrap.fill(str(exc), 76))
+```
+
+```
+two pins on 'vix' both begin on day 60: step('vix', before=15.0, after=48.0)
+at day 60 and ramp('vix', start=48.0, end=18.0, over=40) from day 60. Pins
+on one field layer as consecutive segments, so the first one's values from
+day 60 onward could never be reached -- one of these two calls would do
+nothing, silently. Say the level and the episode separately: .hold(vix=<the
+level before day 60>) then .ramp('vix', start=..., end=..., over=...,
+begin=60) -- a ramp starts AT its start value, so that is a jump on day 60
+and then the path.
+```
+
+Both calls claim day 60, so whichever was written first can never be read from
+day 60 onward: one of those two lines is dead code its author believes is
+running. The refusal's own advice is the form to reach for, and it is worth
+running:
+
+```python
+spike = (Scenario("spike and decay")
+         .hold(vix=15.0)
+         .ramp("vix", start=48.0, end=18.0, over=40, begin=60))
+
+print([f"day {d}: {spike.at(d)['vix']:.1f}" for d in (0, 30, 59, 60, 80, 100)])
+```
+
+```
+['day 0: 15.0', 'day 30: 15.0', 'day 59: 15.0', 'day 60: 48.0', 'day 80: 33.0', 'day 100: 18.0']
+```
+
+Calm until day 60, a jump to 48, a decay reaching 18 on day 100 — which is the
+path the two-pins-on-day-60 version was reaching for. The `hold` states the
+level and the `ramp` states the episode, each exactly once. Moving the ramp to
+`begin=61` composes as well and is a legitimate answer, but it buys the
+composition with a path one day out of step with the arithmetic you wrote;
+saying the level separately is the form that means what it says.
+
+The other refused ordering is a pin declared *after* one that begins later —
+`ramp(..., begin=75)` and then `step(..., at=60)`. That message says the pins
+`are out of order`, that they `must be declared in the order they happen`, and
+names the swap. Declared that way round the earlier pin would have to back-fill
+days the later one already owns, which is a whole run under the wrong path.
+
+**And check before you run.** `Scenario.table(days)` exists for this, and one
+glance at day zero is still the cheapest check on this page. It will not catch
+an ordering mistake any more — those raise — but it catches a `begin` off by a
+factor of ten, or a level you meant to change and did not:
+
+```python
+for row in spike.table(5):
+    print(row)
+```
+
+```
+{'day': 0, 'vix': 15.0}
+{'day': 1, 'vix': 15.0}
+{'day': 2, 'vix': 15.0}
+{'day': 3, 'vix': 15.0}
+{'day': 4, 'vix': 15.0}
+```
+
+### Rule 2: the shape constructors build a whole scenario
+
+`Scenario.rate_shock`, `Scenario.vix_shock`, `Scenario.vol_shock` and
+`Scenario.from_json` are constructors. Each returns a complete scenario, and
+each looks perfectly chainable, so `Scenario().hold(...).vix_shock(...)` reads
+like it adds a VIX leg to what you already had. It does not: the receiver
+would be discarded and you would get back a scenario driving only `vix`. That
+call is refused, naming the fields the receiver was driving and giving the
+composing form.
+
+Two forms compose. Build the shape **first** and chain the extra fields onto
+it, which is safe because they are different fields:
+
+```python
+right = (Scenario.vix_shock(calm=15.0, peak=60.0, at=10, over=30)
+         .hold(inflation_rate=0.06, fear_greed_index=20.0))
+print(right.fields)
+```
+
+```
+('fear_greed_index', 'inflation_rate', 'vix')
+```
+
+Or write the shape out, which is what rule 1 makes possible: `vix_shock` is a
+`hold` at the calm level followed by a `ramp` back down to it, and a ramp
+starting at its `start` value is the jump.
+
+```python
+same = (Scenario()
+        .hold(inflation_rate=0.06, fear_greed_index=20.0)
+        .hold(vix=15.0)
+        .ramp("vix", start=60.0, end=15.0, over=30, begin=10))
+print(same.table(120) == right.table(120))
+```
+
+```
+True
+```
+
+The constructors are convenience rather than capability. `rate_shock` is two
+ramps held apart by `credit_spread`; `vix_shock` is the two lines above. Use
+them where they say what you mean, and write the segments out where they do
+not.
+
+### Rule 3: `compare()` needs a scenario that moves
 
 `compare()` defaults to `baseline=Scenario().hold(**scenario.at(0))` — the
 scenario's own day-zero values held flat. That is the right default for a
 *path*, because it isolates the movement from the level it started at. For a
-scenario that is nothing but a level, it is the scenario itself:
+scenario that never moves inside the horizon it *is* the scenario, and every
+instrument comes back at exactly 0.00% by construction rather than by
+measurement. A clean, confident, entirely meaningless zero, which reads as
+"the shock did nothing" rather than as "no shock was applied". It is refused
+rather than reported.
+
+Three shapes reach that refusal and your next move differs:
+
+- a `hold`-only scenario, or a `step(field, ..., at=0)` whose day-zero value
+  is already the *after* value: there is no path to isolate, only a level, so
+  name the world **without** it and pass that as `baseline=`;
+- a shock whose start day falls at or after `days`: the path is real, but the
+  run ends before it begins. Run it longer — the message names the day the
+  shock starts and the run length it needs;
+- a scenario driving nothing at all.
+
+An explicit baseline that realises the same path as the scenario is refused on
+the same grounds: two runs of one world, differenced, is a zero either way.
 
 ```python
 from pretium.scenario import compare
@@ -185,21 +264,14 @@ from pretium.scenario import compare
 u = pt.Universe.random(20, seed=4)
 held = Scenario("held crisis").hold(vix=45.0)
 
-r = compare(held, seed=5, universe=u, days=30)
-print(f"default baseline: median {r['median_pct']:+.2f}%")
-
 r = compare(held, seed=5, universe=u, days=30,
             baseline=Scenario("calm").hold(vix=15.0))
 print(f"explicit baseline: median {r['median_pct']:+.2f}%")
 ```
 
 ```
-default baseline: median +0.00%
 explicit baseline: median +29.72%
 ```
-
-A clean, confident, entirely meaningless zero. The same applies to
-`step(field, ..., at=0)`, whose day-zero value is already the *after* value.
 
 **Whenever a recipe pins levels rather than paths, pass `baseline=`
 explicitly.** Recipe 4 does, and says so at the point of use.
@@ -217,8 +289,9 @@ and credit scenarios — which move fair value directionally — with
 ## How the measured effects below were produced
 
 Every "in this model" figure on this page was measured on engine commit
-`4b441c4`, pretium 0.1.0, and every one of them is an inventory row in the
-re-measurement harness under the group `recipes`:
+`9b485a0`, pretium 0.1.0, under the default model preset `pt-v1` — worth
+naming now that the build ships a second one — and every one of them is an
+inventory row in the re-measurement harness under the group `recipes`:
 
 ```
 .venv/bin/python tools/remeasure/remeasure.py --only recipes
@@ -309,7 +382,7 @@ difference is the macro path and nothing else.
 
 Note the horizon. At 120 days the run crosses two central-bank meetings; the
 same config measured at 40 days would report roughly nothing, for the reason
-in sharp edge 3.
+in the meeting trap.
 
 ## Recipe 2 — An inflation shock
 
@@ -358,8 +431,8 @@ engine's reaction function is not calibrated to the FOMC.
 
 ### What it measures in this model
 
-This recipe exists mainly to show that **sharp edge 3 is not about the policy
-rate.** `inflation_rate` never reaches fair value directly — the valuation
+This recipe exists mainly to show that **the meeting trap is not about the
+policy rate.** `inflation_rate` never reaches fair value directly — the valuation
 takes earnings, growth, the corporate bond yield, the policy rate and the QE
 multiple adjustment, and inflation is not among them. Inflation transmits only
 by steering the macro chain into a central-bank reaction, and that reaction
@@ -397,10 +470,12 @@ annualised vol: 61.76% calm -> 82.16% crisis
 cross-sectional corr: 0.493 -> 0.636
 ```
 
-Note the shape of the construction. `vix_shock` is used rather than a
-hand-written step-and-decay because it is a **single driver** — the only way
-to get a spike that subsides without tripping sharp edge 1. The credit leg
-chains on safely because `corporate_bond_yield` is a different field.
+Note the shape of the construction. `vix_shock` says "a spike that subsides"
+in one line, which is the only reason it is here: by rule 2 it is exactly
+`.hold(vix=18.0).ramp("vix", start=80.0, end=18.0, over=60, begin=20)`, and
+writing that instead changes nothing about the run. It has to come **first**,
+though, because it is a constructor. The credit leg chains on after it, safely,
+because `corporate_bond_yield` is a different field.
 
 ### What it is anchored on
 
@@ -454,8 +529,8 @@ so pushing `peak` from 80 to 120 buys almost nothing. Recipe 3 sits near the
 top of the usable range already.
 
 Measured on price instead, the same config reports a median **−8.29%** and a
-worst name at **−13.07%** on sim seed 5 — but per sharp edge 4, do not lean
-on that. The price consequence of a volatility regime is seed-dependent in
+worst name at **−13.07%** on sim seed 5 — but per the seed band under rule 3,
+do not lean on that. The price consequence of a volatility regime is seed-dependent in
 sign; the volatility and correlation numbers are the claim.
 
 ## Recipe 4 — A contraction regime
@@ -469,9 +544,10 @@ contraction = (Scenario("contraction")
                .hold(cycle="contraction")
                .step("fear_greed_index", before=50.0, after=25.0, at=5))
 
-# The baseline MUST be explicit here -- see sharp edge 4. `compare`'s default
-# would hold this scenario's own day-zero values, which for a hold-only
-# scenario is the scenario itself, and would report exactly zero.
+# The baseline MUST be explicit here -- see rule 3. `compare`'s default would
+# hold this scenario's own day-zero values, which for a scenario that is only
+# a level is the scenario itself, so calling it without a baseline raises
+# rather than reporting the zero it would otherwise measure.
 baseline = (Scenario("expansion baseline")
             .hold(cycle="expansion")
             .hold(fear_greed_index=50.0))
@@ -540,14 +616,19 @@ against the seed dispersion, and I did not measure a seed band for it.
 
 ## Recipe 5 — A compound episode
 
-This is the one where the surface earns itself, and where every sharp edge
-above is live at once. Four fields move on four different schedules, and one
-of them — the policy rate — needs two segments, which is precisely what
-chaining cannot express.
+This is the one where the surface earns itself. Four fields move on four
+different schedules, the policy rate takes three levels of its own, and the
+credit leg blows out and then retraces. Rule 1 means all of that is chainable
+— ten pins, in start-day order, four fields deep — and the equivalence is
+demonstrated below rather than asserted.
 
-The whole path is therefore built as data and loaded through
-`Scenario.from_json`. There is no chaining, so there is no conflict possible,
-and what you get back is the realised path itself:
+The path is nevertheless built as data and loaded through
+`Scenario.from_json`, for a reason that has nothing to do with what chaining
+can express. Every leg here is arithmetic: interpolations between dated
+levels, written once as a function you can read, change and diff. Ten
+chained calls say the same thing with the arithmetic spread across their
+arguments. And `from_json` reads whatever produced the numbers, so the same
+recipe works when the path comes out of a spreadsheet instead of a loop:
 
 ```python
 import json
@@ -619,6 +700,39 @@ for d in (0, 17, 30, 119, 500):
 119 {'corporate_bond_yield': 0.045, 'federal_funds_rate': 0.00125, 'qe_pe_boost': 0.1, 'vix': 18.0}
 500 {'corporate_bond_yield': 0.045, 'federal_funds_rate': 0.00125, 'qe_pe_boost': 0.1, 'vix': 18.0}
 ```
+
+### The same path, chained
+
+Rule 1 is easiest to believe on something this size, so here is the whole
+episode written as segments. Ten pins, four fields, each field's pins in
+start-day order, and a `hold` in front of every field that does not begin
+moving on day zero:
+
+```python
+chained = (Scenario("compound: chained")
+           .hold(vix=15.0)
+           .ramp("vix", start=82.0, end=18.0, over=45, begin=15)
+           .hold(federal_funds_rate=0.0155)
+           .step("federal_funds_rate", before=0.0155, after=0.01125, at=18)
+           .step("federal_funds_rate", before=0.01125, after=0.00125, at=28)
+           .hold(corporate_bond_yield=0.036)
+           .ramp("corporate_bond_yield", start=0.036, end=0.105, over=22, begin=18)
+           .ramp("corporate_bond_yield", start=0.105, end=0.045, over=50, begin=40)
+           .hold(qe_pe_boost=0.0)
+           .ramp("qe_pe_boost", start=0.0, end=0.10, over=30, begin=40))
+
+print(chained.table(120) == compound.table(120))
+```
+
+```
+True
+```
+
+Identical on all 120 days, so the two spellings are the same scenario and
+either would produce the figures below. Every `before=` on those two `step`
+calls is inert — the pin ahead of each one already owns the days it names —
+which is the segment rule stated in the least convenient possible way, and a
+good reason to prefer the `from_json` version for a path this long.
 
 ### What it is anchored on
 
