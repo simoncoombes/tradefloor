@@ -27,6 +27,7 @@ from . import baselines
 from . import tca
 from . import scenario as _scenario_mod
 from . import facts
+from . import loss
 from .checkpoint import Checkpoint, branch
 from .sweep import sweep
 from . import manifest
@@ -82,7 +83,7 @@ __all__ = [
     "baselines", "reference_agents", "capture_ratio", "tca", "Execution",
     "rank", "Ranking", "AgentRecord",
     "spec", "StrategySpec", "SPEC_VERSION",
-    "Scenario", "run_scenario", "facts", "Checkpoint", "branch", "sweep",
+    "Scenario", "run_scenario", "facts", "loss", "Checkpoint", "branch", "sweep",
     "manifest", "RunManifest",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
