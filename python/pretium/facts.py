@@ -8,23 +8,34 @@ conclusion will fail to transfer.
 
 So this measures, and the numbers below were produced by running it. An
 earlier era could add "they are not targets the model was tuned to hit";
-this one cannot -- four of the eight became calibration targets at the
-2026-08 era boundary -- so the disclosure of which four, and of how the
-held-out checks read, is part of the measurement now.
+this one cannot -- four of the panel's statistics became calibration
+targets at the 2026-08 era boundary -- so the disclosure of which, and of
+how the held-out checks read, is part of the measurement now. The bands
+themselves carry provenance since 2026-08-22 (`REAL_MARKETS_PROVENANCE`):
+the previous set was inherited, and a verdict against an unprovenanced
+band is the same defect as an unreproducible figure, one level up.
 
 ## The headline
 
-**At the published method, the way things move together now sits inside the
-real bands, and what still fails is scale and memory**: volatility runs
-high, returns trend where real ones do not, and volume shocks do not
-persist. That is the reverse of what this docstring said through the
-2026-08 era boundary -- the measured thesis then was "marginals right,
-dependence wrong", with cross-sectional correlation at +0.024 against a
-real +0.25 to +0.35. Three of the era's model changes (the GJR asymmetry
-term, conditional volatility on the shared market factor, that volatility's
-VIX coupling) were aimed at exactly those gaps and were CALIBRATED against
-the statistics this module reports, which changes how the in-band verdicts
-must be read -- see "Four of the eight were targets" below.
+**Against re-derived bands, five of the ten statistics are in band: the
+dependence structure mostly holds, and what fails is scale, trend, and
+where the clustering sits.** Volatility runs high, returns trend where
+real ones do not, volatility clustering is concentrated into short lags
+more strongly than a real year shows, and volume-change dynamics remain
+structural. Kurtosis, lag-20 clustering, cross-sectional correlation,
+volume against volatility, and the leverage effect are inside their
+bands.
+
+Two eras of caveats attach. First, the 2026-08 model changes (the GJR
+asymmetry term, conditional volatility on the shared market factor, that
+volatility's VIX coupling) were CALIBRATED against the statistics this
+module reports -- see "Which statistics were targets" below. Second, the
+BANDS themselves were re-derived on 2026-08-22: the previous bands were
+inherited without provenance, and re-deriving them from real data at this
+module's own method moved several verdicts in BOTH directions --
+clustering at lag one left its band, the leverage effect entered its
+band -- see "Where the bands come from" below. A verdict is a comparison
+of a measurement against a band, and both halves now carry provenance.
 
 Every figure below: `Universe.random(40, seed=111)` (fingerprint
 5d8de78b55aad752), 252 days, `measure()` per sim seed, median over seeds 1
@@ -35,47 +46,60 @@ superseded figures beside them are marked with the era they belonged to.
 
 **Stocks move together, and stop being diversifiable in a crisis.** Mean
 pairwise correlation of daily returns is **+0.257** (seed range +0.205 to
-+0.456), inside the real +0.25 to +0.35 for a calm market -- measured at
-+0.024 one era ago, the largest gap this module has ever carried. The
-mechanism that closed it: the shared market factor now carries its own
-conditional-variance process at a baseline sigma of 0.016 against the
-reference's 0.003, funded by scaling per-name idiosyncratic noise by 0.84
-rather than added on top. The crisis half is the VIX coupling: pinned VIX
-45 takes the same correlation to +0.68 (see `pretium.scenario`).
++0.456), inside the re-derived +0.08 to +0.56 -- a real decade's own
+calm-market spread, which the superseded +0.25/+0.35 band was narrower
+than -- and measured at +0.024 one era ago, the largest gap this module
+has ever carried. The mechanism that closed it: the shared market factor
+now carries its own conditional-variance process at a baseline sigma of
+0.016 against the reference's 0.003, funded by scaling per-name
+idiosyncratic noise by 0.84 rather than added on top. The crisis half is
+the VIX coupling: pinned VIX 45 takes the same correlation to +0.68 (see
+`pretium.scenario`); the real crisis reading is +0.63.
 
-**Fat tails survive the correlation.** Excess kurtosis **+3.1** (+2.4 to
-+5.7 across seeds), inside the real +3 to +10. Worth stating next to the
-correlation, because the pre-era model could have either but not both: a
-constant-sigma Gaussian factor diluted the GARCH tails in exact proportion
-to the correlation it induced. A factor whose variance is persistent and
-shock-driven is fat-tailed by variance mixing, so the correlated share now
-contributes kurtosis instead of spending it.
+**Fat tails survive the correlation -- at the thin end of a wide band.**
+Excess kurtosis is **+3.1** (+2.4 to +5.7 across seeds), inside the
+re-derived +1.6 to +41. The width is honest: a fourth moment on 252 days
+is noise-dominated, and one genuine single-name event (NVDA's +26%
+earnings day in 2016) put a real window at 36.7. Two readings follow.
+The old +3/+10 band claimed a precision the estimator does not have --
+its top sat below the real windows' MEDIAN of 11. And the model sits
+below every one of ten real windows (minimum 5.6): its pooled tails are
+thin for a real cross-section, just not provably outside a band this
+noisy a statistic can honestly carry.
 
-**Volatility clusters at real strength, and market-wide.** |return|
-autocorrelation at lag one is **+0.242** (+0.189 to +0.454), inside the
-real +0.15 to +0.35 -- it read +0.117, below band, one era ago. The memory
-is still short: +0.090 at lag five, gone by lag twenty (-0.006), where
-real clustering persists for months. The strength is real now; the
-persistence is not, so a volatility forecaster is still tested against a
-market with less to forecast than a real one.
+**Clustering's memory profile at lag twenty.** |return| autocorrelation
+at lag twenty is **-0.006** (-0.044 to +0.009), inside the re-derived
+-0.04 to +0.08. Read the band before the verdict: real WITHIN-YEAR
+lag-20 readings are themselves near zero (-0.015 to +0.059 across
+windows), so this row says the model matches real markets at the
+horizon the panel measures -- not that its volatility memory matches
+the long-sample fact that real clustering persists for months. It does
+not; a 252-day window simply cannot see that fact, in the model or in
+real data.
 
 **Volume arrives with volatility.** Volume against absolute return is
-**+0.585** (+0.541 to +0.655), inside the real +0.30 to +0.60. It read
-+0.105 before the era boundary: the `avg_volume` feedback compounded the
-level a percent-plus a day, and that trend swamped the covariation. The
-level is held now, and the per-tick channel -- volume scales with the size
-of the day's move by construction -- shows through.
+**+0.585** (+0.541 to +0.655), inside the re-derived +0.46 to +0.66 --
+the tightest band on the panel, because every real window of a decade
+reads 0.50 to 0.64. It read +0.105 before the era boundary: the
+`avg_volume` feedback compounded the level a percent-plus a day, and
+that trend swamped the covariation. The level is held now, and the
+per-tick channel -- volume scales with the size of the day's move by
+construction -- shows through.
 
-**The leverage effect exists, and is the weakest thing the era bought.**
-Today's
-signed return against tomorrow's absolute return is **-0.085**, just above
-(weaker than) the real -0.30 to -0.10, with the sign finally stable:
-negative on six seeds of six, range -0.181 to -0.031, where the symmetric
-pre-era GARCH could not hold the sign at all -- no symmetric variance
-process produces asymmetry at any coefficients, and the era added a GJR
-term instead. Mind the negative band when reading this row: a value ABOVE
-a negative band is an effect too WEAK, not too strong, which is why
-`_verdict` and `band_distance` below carry their own sign handling.
+**The leverage effect exists, and at the honest band it is in band.**
+Today's signed return against tomorrow's absolute return is **-0.085**,
+negative on six seeds of six (range -0.181 to -0.031), inside the
+re-derived -0.16 to 0.00. The superseded -0.30/-0.10 band demanded
+index-strength leverage from a per-name estimator: Bouchaud, Matacz and
+Potters measured the single-stock effect an order of magnitude weaker
+than the index effect, and real per-name windows read -0.11 to +0.01
+(median -0.04). The GJR term that made the sign stable remains real
+work -- a symmetric variance process produces no asymmetry at any
+coefficients -- but the "too weak" verdict this row carried was a
+verdict against the wrong band. Mind the sign when reading this row: a
+value ABOVE a band whose top is zero is an effect too WEAK, not too
+strong, which is why `_verdict` and `band_distance` below carry their
+own sign handling.
 
 ## What still fails, and what it costs you
 
@@ -94,48 +118,95 @@ ranks agents against each other rather than certifying real-world skill. If
 two agents differ mainly in how much serial correlation they exploit, their
 ranking here says very little about which is better anywhere else.
 
+**Volatility clustering is too strong at short lags for the horizon it
+is measured on.** |return| autocorrelation at lag one is **+0.242**
+(+0.189 to +0.454) against a re-derived within-year band of +0.02 to
++0.22, and at lag five **+0.090** against +0.02 to +0.09 -- outside by
+two parts in ten thousand, on the boundary at any noise scale, but
+strictly outside and reported as such. The lag-one verdict is a band
+correction, not a model change: the superseded +0.15/+0.35 band was the
+LONG-SAMPLE textbook value (S&P daily over 66 years reads ~0.3 at lag
+one), and a 252-day window measures a genuinely smaller quantity,
+because a year sits mostly inside one volatility regime. Real windows
+read 0.04 to 0.18. The era's calibration raised clustering toward the
+long-sample number at a within-year method, and against the honest band
+it overshot. Lag five was banded (2026-08-22) for a sharper reason:
+phase 2's instrument found a parameter corner with lag-one clustering
+comfortably in band and lag-five at -0.001 -- the lag-one statistic
+satisfied while the memory behind it is zero -- so every measured lag
+is now banded and the corner is priced.
+
 **Volatility is high.** About **41.5% annualised** (39% to 50% across
-seeds) against roughly 20% for large caps -- down from 53% pre-era,
-because the factor's variance was funded rather than added, and still
-above the band for a reason about how a universe is generated rather than
-about the price process: a generated roster is deliberately dispersed and
-skews small. Prefer ratios -- capture against the oracle, shortfall in
-basis points -- over raw percentages.
+seeds) against a re-derived band of 15 to 36 -- the calm-decade spread
+of a real 40-name large-cap cross-section, its ceiling extended to
+CLMX's since-1997 typical-stock 36%. Down from 53% pre-era, because the
+factor's variance was funded rather than added, and still above the
+band for a reason about how a universe is generated rather than about
+the price process: a generated roster is deliberately dispersed and
+skews small, which the mega-cap reference biases against, and the real
+crisis year read 45. Prefer ratios -- capture against the oracle,
+shortfall in basis points -- over raw percentages.
 
 **Volume shocks do not persist, by construction.** Volume CHANGES
-autocorrelate at **-0.446** (-0.454 to -0.425) where real ones sit near
-zero: daily volume is a held per-name level times bounded per-tick
-multipliers independent day to day, and the first difference of such a
-series autocorrelates near -0.5 as arithmetic. No constant reaches this
-row; it needs volume dynamics the engine does not model. Execution work is
-where it bites: VWAP and POV live or die on forecasting the day's volume,
-and the hard part in a real market is a volume surprise that keeps going
-and arrives with a volatility surprise. The arriving-together half is now
-present; the keeps-going half is absent, so a forecast here is never wrong
-twice running.
+autocorrelate at **-0.446** (-0.454 to -0.425) against a re-derived
+band of -0.32 to -0.20. The superseded band (-0.05 to +0.15) said real
+markets sit near zero here, and that was simply wrong at this
+estimator: every real window of a decade reads -0.22 to -0.30, because
+real daily volume is a persistent level plus large day-to-day noise,
+and differencing such a series is negatively autocorrelated. The band
+was relocated, not widened -- and the model is still outside it,
+because its volume noise is PURELY independent day to day and
+differencing that sits near -0.5 as arithmetic. The gap to real
+markets shrank from a mislocated 0.40 to a real 0.13, and it still
+needs volume dynamics the engine does not model. Execution work is
+where it bites: VWAP and POV live or die on forecasting the day's
+volume, and the hard part in a real market is a volume surprise that
+keeps going and arrives with a volatility surprise. The
+arriving-together half is now present; the keeps-going half is absent,
+so a forecast here is never wrong twice running.
 
-## Four of the eight were targets
+## Which statistics were targets
 
 The dependence rows stopped being pure measurements at the era boundary:
 the sweeps that chose the era's constants (`tools/calibration/`) scored
-candidates on these eight statistics, at this exact method -- this
-universe, these seeds, this horizon. Correlation, kurtosis, clustering and
-the leverage effect are calibrated quantities now; return autocorrelation,
-the volatility level and the volume-change autocorrelation were not
-targeted, and it shows -- they are the three still out of band. A
-statistic a model was tuned to hit is evidence about the tuning, not the
-model, so this docstring must not sound more confident than the held-out
-results: on fresh sim seeds (101-106) correlation slips to +0.225, just
-under the band floor; on five fresh 60-name universes the leverage effect
-halves to -0.04/-0.05; on 504 days the dependence structure holds and
-volatility drifts to 47.6%. In band at the published method, at the band
-edge -- on either side of it -- everywhere else. A conclusion that needs a
-dependence statistic deep inside its band should re-measure on its own
-universe and seeds rather than inherit these figures.
-`docs/how-realistic-is-this-market.md` carries the full held-out record
-with every method stated.
+candidates on the panel statistics, at this exact method -- this
+universe, these seeds, this horizon. Correlation, kurtosis, clustering
+at lag one and the leverage effect are calibrated quantities; return
+autocorrelation, the volatility level and the volume-change
+autocorrelation were not targeted. A statistic a model was tuned to hit
+is evidence about the tuning, not the model -- and the band
+re-derivation sharpened that reading in both directions. Clustering at
+lag one, a calibrated statistic, is now OUT of band: the calibration
+drove it toward the long-sample textbook value at a within-year method,
+which is what tuning toward an unprovenanced target looks like from the
+other side. And the held-out fragility this section used to report --
+correlation slipping under the floor on fresh seeds, leverage halving
+on fresh universes -- largely dissolves under honest bands: on thirty
+fresh seeds (101-130) every one of the ten verdicts is the SAME as on
+the published seeds, because verdicts that flipped on a re-measurement
+were a symptom of bands narrower than the statistic's own seed noise.
+A conclusion that needs a dependence statistic deep inside its band
+should still re-measure on its own universe and seeds rather than
+inherit these figures.
 
-## Why there are eight statistics and not four
+## Where the bands come from
+
+The bands were re-derived on 2026-08-22, because the previous set was
+inherited without provenance -- nobody could say which market, period,
+frequency or estimator "+0.25 to +0.35" described. Each band now
+carries its provenance as data in `REAL_MARKETS_PROVENANCE`: the
+empirical claim, the reference-panel windows (ten 252-day windows of 40
+US large caps, 2015-2025, measured with THIS module's estimators at
+THIS panel's method), the retrieved sources with what each actually
+measured, and any named judgement call. The derivation rule was fixed
+before any verdict was looked at; the two inward clamps it needed (the
+clustering floor, the leverage top) are named on their rows and decide
+no current verdict. One band is marked INDICATIVE (volume-change
+autocorrelation: own measurement only, no published figure for the
+estimator was recoverable). The full derivation record, window tables
+and verdict moves are in pretium-design/REALISM-BANDS.md.
+
+## Why there are ten statistics and not four
 
 The first four this module reported were chosen before anyone looked at
 dependence, and all four come from one instrument's price series taken on its
@@ -148,6 +219,10 @@ wrong.
 
 The four dependence statistics cost one function and no modelling decision, and
 they are the ones that say where a conclusion drawn here stops transferring.
+The last two, clustering at lags five and twenty, were promoted from
+measured-but-unbanded to banded when phase 2's instrument demonstrated the
+general lesson: any statistic that is measured but not banded is a hole an
+optimiser can walk through, and it found the lag-five hole unprompted.
 
 ## What the era closed, and what remains
 
@@ -184,7 +259,12 @@ What remains, and what each would take:
 - **The volatility level** is a property of the universe generator, not
   the price process, and would be recalibrated there.
 - **Volume dynamics** need a model -- persistent volume shocks -- not a
-  constant. Until then -0.45 is structural.
+  constant. Until then -0.45 is structural; the honest gap to real
+  markets is 0.13, not the 0.40 the mislocated band used to charge.
+- **Short-lag clustering strength** is the era's own overshoot: the
+  calibration pushed lag-one clustering toward a long-sample value at a
+  within-year method. Unwinding it is a re-run of the same sweeps
+  against the re-derived band, not a model change.
 
 ## What a measurement is for, when it disagrees with you
 
@@ -220,19 +300,261 @@ from typing import Any, Sequence
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
 from .universe_util import fingerprint_of
 
-#: What the same statistics look like for real daily equity returns, as
-#: reported in the empirical finance literature. Ranges rather than points,
-#: because they vary by market, period and universe -- and a single number
-#: would imply a precision nobody has.
+#: What the same statistics look like for real daily equity returns, at THIS
+#: module's own measurement method. Ranges rather than points, because they
+#: vary by market, period and universe -- and a single number would imply a
+#: precision nobody has. Every band was re-derived on 2026-08-22 from a
+#: reference panel of real markets measured with this module's own estimator
+#: functions, reconciled against the retrieved stylised-facts literature;
+#: `REAL_MARKETS_PROVENANCE` below carries, per band, what the empirical
+#: claim is and where each edge comes from. The bands these replaced were
+#: inherited without provenance, and re-derivation moved most of them --
+#: including relocating one (volume-change autocorrelation) whose old range
+#: did not contain ANY observed real-market reading at this estimator.
 REAL_MARKETS = {
-    "annualised_vol_pct": (15.0, 35.0),
-    "excess_kurtosis": (3.0, 10.0),
-    "return_acf1": (-0.05, 0.05),
-    "abs_return_acf1": (0.15, 0.35),
-    "cross_sectional_corr": (0.25, 0.35),
-    "volume_abs_return_corr": (0.30, 0.60),
-    "leverage_effect": (-0.30, -0.10),
-    "volume_change_acf1": (-0.05, 0.15),
+    "annualised_vol_pct": (15.0, 36.0),
+    "excess_kurtosis": (1.6, 41.0),
+    "return_acf1": (-0.08, 0.06),
+    "abs_return_acf1": (0.02, 0.22),
+    "abs_return_acf5": (0.02, 0.09),
+    "abs_return_acf20": (-0.04, 0.08),
+    "cross_sectional_corr": (0.08, 0.56),
+    "volume_abs_return_corr": (0.46, 0.66),
+    "leverage_effect": (-0.16, 0.00),
+    "volume_change_acf1": (-0.32, -0.20),
+}
+
+#: Where each band comes from, carried as data so a reader can ask the
+#: library rather than trust a docstring. The full derivation -- the window
+#: table, the retrieved sources with what each actually measured, and the
+#: verdict moves -- is recorded in pretium-design/REALISM-BANDS.md.
+#:
+#: The shared derivation, applied blind to every statistic before any
+#: verdict was looked at: the reference panel is 40 US large-cap stocks
+#: (Yahoo Finance daily bars, adjusted close for returns, reported volume),
+#: measured over ten consecutive 252-trading-day windows covering 2015-07
+#: to 2025-07 with THIS module's estimator functions at THIS panel's method
+#: (per-instrument medians, pooled marginals, mean pairwise correlation).
+#: The window straddling the COVID crash is excluded and reported beside
+#: each band as the crisis reading -- the panel measures a typical year,
+#: and this library measures crisis behaviour under pinned scenarios
+#: instead. Band = [min - s, max + s] over the nine remaining windows,
+#: where s is the across-window sd with the single most extreme window
+#: dropped (so one draw cannot inflate the noise scale it is priced in),
+#: edges rounded outward: two decimals for correlations, two significant
+#: figures otherwise. Literature reconciliation may move an edge OUTWARD
+#: to a retrieved, horizon-compatible value; the two INWARD clamps are
+#: named on their rows. "windows" is (min, median, max) over the nine.
+REAL_MARKETS_PROVENANCE = {
+    "annualised_vol_pct": {
+        "claim": "pooled across-name annualised daily vol of a 40-stock "
+                 "US large-cap cross-section over one year, 2015-2025",
+        "windows": (18.3, 25.9, 30.7),
+        "crisis_window": 45.3,
+        "sources": (
+            "Campbell, Lettau, Malkiel & Xu, NBER w29916 (2022): "
+            "value-weighted market/industry/idiosyncratic vol averaged "
+            "18%/14%/28% since 1997 (12%/9%/26% over 1962-1997), so a "
+            "typical stock's total annualised vol is ~36% since 1997, "
+            "~30% over 1962-1997, higher equal-weighted",
+        ),
+        "derivation": "floor from the windows; ceiling extended outward "
+                      "from the windows' 34 to CLMX's since-1997 "
+                      "typical-stock 36 (a crisis-inclusive average)",
+        "comparability": "argued: the reference roster is mega-cap while "
+                         "a generated roster is dispersed and skews small, "
+                         "which biases this band's ceiling LOW for the "
+                         "simulator's universe; CLMX equal-weighted runs "
+                         "higher but ships no comparable single figure",
+        "supersedes": (15.0, 35.0),
+    },
+    "excess_kurtosis": {
+        "claim": "excess kurtosis of the pooled standardised daily returns "
+                 "of a 40-stock US cross-section over one year",
+        "windows": (5.6, 11.1, 36.7),
+        "crisis_window": 11.4,
+        "sources": (
+            "Cont, Quantitative Finance 1 (2001), facts 2 and 4: heavy "
+            "tails with daily tail index 2-5, kurtosis decreasing with "
+            "aggregation; his Table 1 kurtosis figures (S&P futures ~16) "
+            "are 5-MINUTE increments and are NOT this band",
+            "own reference panel: the 36.7 window is a genuine single-name "
+            "event (NVDA +26% on 2016-11-11 earnings), not a data error",
+        ),
+        "derivation": "mechanical from the windows; wide because a "
+                      "fourth moment on 252 days is noise-dominated "
+                      "(Cont section 4.1 makes exactly this point)",
+        "comparability": "argued: pooling 40 names of unequal vol adds "
+                         "cross-name variance mixing to each name's own "
+                         "kurtosis, in the simulator and the reference "
+                         "panel alike; the old (3, 10) band's top sat "
+                         "BELOW the real windows' median of 11.1",
+        "supersedes": (3.0, 10.0),
+    },
+    "return_acf1": {
+        "claim": "median across names of the lag-1 autocorrelation of "
+                 "daily log returns over one year",
+        "windows": (-0.046, -0.006, 0.030),
+        "crisis_window": -0.244,
+        "sources": (
+            "Cont (2001), fact 1: linear autocorrelations insignificant "
+            "beyond ~20 minutes",
+            "Granger & Ding, J. Econometrics 73 (1996): S&P 500 daily "
+            "1928-1991, return acf small beyond the first two lags",
+            "CLMX w29916 (2022): firm-level daily autocorrelations near "
+            "zero in recent decades",
+        ),
+        "derivation": "mechanical from the windows",
+        "comparability": "direct",
+        "supersedes": (-0.05, 0.05),
+    },
+    "abs_return_acf1": {
+        "claim": "median across names of the lag-1 autocorrelation of "
+                 "daily |log return| WITHIN one 252-day window",
+        "windows": (0.039, 0.083, 0.176),
+        "crisis_window": 0.430,
+        "sources": (
+            "Granger & Ding (1996): S&P 500 daily 1928-1991 |r| acf "
+            "~0.3 at lag 1 -- a 17,054-day estimate of a long-memory "
+            "process, NOT a within-year value, and the reason the old "
+            "0.15-0.35 band does not describe this measurement",
+            "Cont (2001), facts 6 and 8: positive, decaying as a power "
+            "law with exponent 0.2-0.4",
+        ),
+        "derivation": "top mechanical from the windows; the mechanical "
+                      "floor (-0.003) is clamped INWARD to +0.02 because "
+                      "zero or negative clustering appears in no retrieved "
+                      "source and no observed window -- the clamp closes "
+                      "the zero-memory hole and decides no current verdict",
+        "comparability": "argued: within-window clustering is genuinely "
+                         "smaller than the long-sample textbook value, "
+                         "because a year sits mostly inside one volatility "
+                         "regime; the band is for THIS horizon",
+        "supersedes": (0.15, 0.35),
+    },
+    "abs_return_acf5": {
+        "claim": "median across names of the lag-5 autocorrelation of "
+                 "daily |log return| within one 252-day window",
+        "windows": (0.034, 0.046, 0.073),
+        "crisis_window": 0.343,
+        "sources": (
+            "own reference panel (primary)",
+            "Cont (2001), fact 8: power-law decay with exponent 0.2-0.4 "
+            "puts lag 5 at 0.52-0.72 of lag 1, consistent with the "
+            "windows' observed ratio ~0.45",
+        ),
+        "derivation": "mechanical from the windows",
+        "comparability": "argued as for lag 1; banded because phase 2's "
+                         "instrument found a parameter corner with lag-1 "
+                         "clustering in band and lag-5 at -0.001 -- lag-1 "
+                         "strength with no memory behind it -- so an "
+                         "unbanded lag 5 was a hole a search walks through",
+        "supersedes": None,
+    },
+    "abs_return_acf20": {
+        "claim": "median across names of the lag-20 autocorrelation of "
+                 "daily |log return| within one 252-day window",
+        "windows": (-0.015, 0.020, 0.059),
+        "crisis_window": 0.141,
+        "sources": (
+            "own reference panel (primary); real within-year lag-20 "
+            "readings are small and sometimes negative, so the "
+            "long-sample 'clustering persists for months' fact does not "
+            "band this horizon",
+        ),
+        "derivation": "mechanical from the windows",
+        "comparability": "argued as for lag 1",
+        "supersedes": None,
+    },
+    "cross_sectional_corr": {
+        "claim": "mean pairwise correlation of daily returns across a "
+                 "40-stock US large-cap roster over one year",
+        "windows": (0.169, 0.346, 0.477),
+        "crisis_window": 0.633,
+        "sources": (
+            "Preis, Kenett, Stanley, Helbing & Ben-Jacob, Sci. Rep. 2 "
+            "(2012): DJIA pairs, daily, 1939-2010 -- mean correlation "
+            "~0.19-0.27 in the calm regime (their regression intercepts), "
+            "rising sharply with market stress",
+            "CLMX w29916 (2022): average pairwise correlation higher "
+            "since the late 1990s, spiking in the GFC and COVID",
+        ),
+        "derivation": "mechanical from the windows",
+        "comparability": "direct; the old 0.25-0.35 band was narrower "
+                         "than one real decade's own spread -- real "
+                         "windows sat outside it on BOTH sides",
+        "supersedes": (0.25, 0.35),
+    },
+    "volume_abs_return_corr": {
+        "claim": "median across names of the Pearson correlation between "
+                 "daily share volume and same-day |log return| over one "
+                 "year, 2015-2025",
+        "windows": (0.502, 0.536, 0.617),
+        "crisis_window": 0.645,
+        "sources": (
+            "own reference panel (primary; remarkably tight, 0.50-0.64 "
+            "in every window including the crisis one)",
+            "Cont (2001), fact 10, and Podobnik, Horvatic, Petersen & "
+            "Stanley, PNAS 106 (2009): the positive volume-volatility "
+            "relation, qualitative",
+        ),
+        "derivation": "mechanical from the windows",
+        "comparability": "argued: the level is modern-US-market; the old "
+                         "0.30 floor may describe older markets but no "
+                         "source for it was recoverable",
+        "supersedes": (0.30, 0.60),
+    },
+    "leverage_effect": {
+        "claim": "median across names of the Pearson correlation between "
+                 "today's signed daily return and tomorrow's |return|, "
+                 "per name, over one year",
+        "windows": (-0.113, -0.042, 0.014),
+        "crisis_window": -0.128,
+        "sources": (
+            "Bouchaud, Matacz & Potters, PRL 87 (2001): 437 US stocks "
+            "daily 1990-2000; single-stock leverage amplitude A=1.9 in "
+            "their normalisation against A=18 for indices -- converted "
+            "to a per-name Pearson correlation this is order -0.01 to "
+            "-0.05, and the old -0.30/-0.10 band demanded index-strength "
+            "leverage from a single-name estimator",
+            "Cont (2001), fact 9: the sign, qualitative",
+        ),
+        "derivation": "floor mechanical from the windows; the mechanical "
+                      "top (+0.05) is clamped INWARD to 0.00 because "
+                      "every retrieved source agrees the effect's sign is "
+                      "negative -- a top above zero would certify a "
+                      "REVERSED leverage effect as real-market behaviour. "
+                      "The one positive window (+0.014) is 2020-21, the "
+                      "meme-stock year, within noise of zero",
+        "comparability": "argued: per-name Pearson at 252 days is a WEAK "
+                         "effect in real data; index-level and "
+                         "parametric-model magnitudes do not band it",
+        "supersedes": (-0.30, -0.10),
+    },
+    "volume_change_acf1": {
+        "claim": "median across names of the lag-1 autocorrelation of "
+                 "daily relative volume changes over one year",
+        "windows": (-0.296, -0.255, -0.221),
+        "crisis_window": -0.284,
+        "sources": (
+            "own reference panel ONLY -- no published figure for this "
+            "estimator was recoverable, so this band is INDICATIVE",
+            "Podobnik et al. (2009) analyse |volume change| and find it "
+            "long-range correlated with heavy (inverse-cubic) tails, but "
+            "publish no signed lag-1 autocorrelation",
+        ),
+        "derivation": "mechanical from the windows",
+        "comparability": "argued: the old band said real markets sit "
+                         "near zero here; every observed window reads "
+                         "-0.22 to -0.30, so the old band did not contain "
+                         "ANY real reading at this estimator. Real daily "
+                         "volume is a persistent level plus large "
+                         "day-to-day noise, and differencing such a "
+                         "series is negatively autocorrelated -- just "
+                         "not the -0.5 of PURE independent noise, "
+                         "because real volume shocks partly persist",
+        "supersedes": (-0.05, 0.15),
+    },
 }
 
 #: The across-seed standard deviation of each statistic at the shipped
@@ -317,6 +639,8 @@ LABELS = {
     "excess_kurtosis": "excess kurtosis",
     "return_acf1": "return acf(1)",
     "abs_return_acf1": "|return| acf(1)",
+    "abs_return_acf5": "|return| acf(5)",
+    "abs_return_acf20": "|return| acf(20)",
     "cross_sectional_corr": "cross-sectional corr",
     "volume_abs_return_corr": "volume vs |return|",
     "leverage_effect": "leverage, r vs |r+1|",
@@ -449,9 +773,9 @@ def _dependence(
         # Volume CHANGES, not levels. The level autocorrelation is dominated
         # by a slowly varying level and reads high whatever the dynamics, so
         # it cannot tell one model of volume from another. The change
-        # autocorrelation can: persistent volume shocks, which real markets
-        # have, keep it near zero, and a smooth level plus independent daily
-        # noise drives it toward -0.5.
+        # autocorrelation can: real markets, whose volume shocks partly
+        # persist, read about -0.25 here, and a smooth level plus PURELY
+        # independent daily noise drives it toward -0.5.
         changes = [
             later / earlier - 1.0
             for earlier, later in zip(instrument_volumes, instrument_volumes[1:])
@@ -476,9 +800,13 @@ def _dependence(
 def _verdict(value: float, low: float, high: float) -> str:
     """How one statistic reads against its band, in words.
 
-    A NEGATIVE band needs its own wording. A leverage effect of -0.01 against
-    a band of -0.30 to -0.10 is numerically above the band and semantically
-    absent, so reporting it as "too high" states the opposite of the finding.
+    A band whose top is at or below zero needs its own wording. A leverage
+    effect of +0.05 against a band of -0.16 to 0.00 is numerically above
+    the band and semantically absent (reversed, even), so reporting it as
+    "too high" would state the opposite of the finding; likewise a
+    volume-change autocorrelation of -0.45 against -0.32 to -0.20 is
+    numerically below its band and semantically mean-reversion that is too
+    STRONG, not "too low".
     """
     if low <= value <= high:
         return "matches"
@@ -492,15 +820,15 @@ def band_distance(value: float, low: float, high: float) -> float:
 
     Zero anywhere inside the band, including on either boundary, and the
     distance to the NEAREST edge outside it. Defined here, next to `_verdict`,
-    because the two share the hazard: on a band that is entirely negative --
-    leverage, -0.30 to -0.10 -- naive handling silently inverts. `_verdict`
-    solves the wording half (above a negative band is "too weak", and the
-    improving direction is DOWN); this solves the arithmetic half. The
-    specific failure this form exists to prevent is the one-sided
-    max(0, value - high), under which a leverage effect of -0.5 -- a large
-    OVERSHOOT past the strong edge -- would read as satisfying the band. The
-    two-sided form charges it low - value = 0.2, on the same footing as the
-    absent-effect exit on the weak side.
+    because the two share the hazard: on a band that sits at or below zero --
+    leverage, -0.16 to 0.00, or volume-change acf, -0.32 to -0.20 -- naive
+    handling silently inverts. `_verdict` solves the wording half (above such
+    a band is "too weak", and the improving direction is DOWN); this solves
+    the arithmetic half. The specific failure this form exists to prevent is
+    the one-sided max(0, value - high), under which a leverage effect of
+    -0.5 -- a large OVERSHOOT past the strong edge -- would read as
+    satisfying the band. The two-sided form charges it low - value = 0.34,
+    on the same footing as the absent-effect exit on the weak side.
 
     This is a distance on raw signed values; it does not know which side of a
     band is "weak", and does not need to. Direction and wording stay
@@ -521,9 +849,11 @@ def measure(
 ) -> dict[str, Any]:
     """Run a market and report its statistical properties.
 
-    Eight statistics against `REAL_MARKETS`: two marginal, describing one
-    return series on its own, and six dependence, describing how things move
-    together. The split is the finding, so `report` prints it in two sections.
+    Ten statistics against `REAL_MARKETS`: two marginal, describing one
+    return series on its own, and eight dependence, describing how things
+    move together -- across time, across stocks, with volume, and
+    asymmetrically with their own sign. The split is the finding, so
+    `report` prints it in two sections.
 
     ``model`` selects the coefficient set the market runs — a preset name or
     a :class:`pretium.ModelParams` — defaulting to the shipped preset. This

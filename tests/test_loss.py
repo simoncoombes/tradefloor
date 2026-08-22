@@ -1,7 +1,8 @@
 """The calibration objective: two-sided band distance, diagonally weighted.
 
-Half of this file exists for one statistic. The leverage effect's band is
-NEGATIVE (-0.30 to -0.10), and a one-sided max(0, value - high) distance
+Half of this file exists for the statistics whose bands sit at or below
+zero. The leverage effect's band is -0.16 to 0.00 and the volume-change
+band is -0.32 to -0.20, and a one-sided max(0, value - high) distance
 would score a leverage effect of -0.5 -- a large overshoot -- as satisfying
 the band. The two-sided form penalises it. The tests here put cases on both
 sides of that band, inside it, and on its boundaries, so a future refactor
@@ -10,7 +11,7 @@ inverting the search direction for one statistic while everything else
 passes.
 
 The other half pins the two deliberate choices in the loss: membership (the
-structurally unreachable statistics are reported but excluded, and promoting
+structurally unreachable statistic is reported but excluded, and promoting
 one is a one-tuple edit) and weighting (diagonal, in units of each
 statistic's own seed noise, with no unweighted path to fall back to).
 """
@@ -72,16 +73,18 @@ def facts():
 
 
 def test_the_leverage_band_penalises_both_exits():
-    """Both sides of a negative band are exits, and both are charged.
+    """Both sides of a non-positive band are exits, and both are charged.
 
-    -0.004 (the effect is absent) sits ABOVE the band and is 0.096 from the
-    weak edge; -0.5 (the effect is far too strong) sits BELOW it and is 0.2
-    from the strong edge. A loss that charges only one of them would tell a
-    search that overshooting is free, and the search would oblige.
+    +0.05 (the effect is reversed) sits ABOVE the band and is 0.05 from
+    the weak edge at 0.00; -0.5 (the effect is far too strong) sits BELOW
+    it and is 0.34 from the strong edge at -0.16. A loss that charges only
+    one of them would tell a search that overshooting is free, and the
+    search would oblige.
     """
     low, high = LEVERAGE_BAND
-    assert band_distance(-0.004, low, high) == pytest.approx(0.096)
-    assert band_distance(-0.5, low, high) == pytest.approx(0.2)
+    assert (low, high) == (-0.16, 0.00)
+    assert band_distance(+0.05, low, high) == pytest.approx(0.05)
+    assert band_distance(-0.5, low, high) == pytest.approx(0.34)
 
 
 def test_an_overshot_leverage_effect_is_not_scored_as_satisfying_the_band():
@@ -89,7 +92,7 @@ def test_an_overshot_leverage_effect_is_not_scored_as_satisfying_the_band():
 
     Under the one-sided refactor max(0, value - high), every value below
     high scores zero -- so -0.5 would read as inside a band whose strong
-    edge is -0.30, and the search direction for this statistic would invert
+    edge is -0.16, and the search direction for this statistic would invert
     while every other statistic's tests still passed. If this test fails,
     check `pretium.facts.band_distance` for exactly that form.
     """
@@ -100,14 +103,14 @@ def test_an_overshot_leverage_effect_is_not_scored_as_satisfying_the_band():
     assert (
         band_distance(-0.6, low, high)
         > band_distance(-0.5, low, high)
-        > band_distance(-0.35, low, high)
+        > band_distance(-0.25, low, high)
         > 0.0
     )
 
 
 def test_inside_the_leverage_band_and_on_its_boundaries_is_free():
     low, high = LEVERAGE_BAND
-    assert band_distance(-0.20, low, high) == 0.0
+    assert band_distance(-0.08, low, high) == 0.0
     # Boundaries are IN the band, matching _verdict's `low <= value <= high`.
     assert band_distance(low, low, high) == 0.0
     assert band_distance(high, low, high) == 0.0
@@ -145,15 +148,24 @@ def test_band_distance_agrees_with_the_verdict_wording_on_every_band():
 # --------------------------------------------------------------------------
 
 
-def test_the_loss_covers_six_statistics_and_reports_eight():
+def test_the_loss_covers_nine_statistics_and_reports_ten():
+    # Five live targets: lag-5 clustering joined when the instrument found
+    # the corner with in-band lag-1 clustering and zero memory behind it.
     assert set(LIVE_TARGETS) == {
-        "annualised_vol_pct", "return_acf1",
-        "abs_return_acf1", "cross_sectional_corr",
+        "annualised_vol_pct", "return_acf1", "abs_return_acf1",
+        "abs_return_acf5", "cross_sectional_corr",
     }
-    assert set(CONSTRAINTS) == {"excess_kurtosis", "volume_abs_return_corr"}
-    # The structurally unreachable pair, derived as the complement of the
-    # membership tuples so nothing else needs editing when one is promoted.
-    assert set(STRUCTURAL) == {"leverage_effect", "volume_change_acf1"}
+    # Four constraints: leverage joined when the re-derived band showed
+    # the GJR-backed model inside it, and lag-20 clustering joined so a
+    # measured statistic cannot be broken for free.
+    assert set(CONSTRAINTS) == {
+        "excess_kurtosis", "volume_abs_return_corr",
+        "leverage_effect", "abs_return_acf20",
+    }
+    # The structurally unreachable remainder, derived as the complement of
+    # the membership tuples so nothing else needs editing when one is
+    # promoted.
+    assert set(STRUCTURAL) == {"volume_change_acf1"}
     assert set(LIVE_TARGETS) | set(CONSTRAINTS) | set(STRUCTURAL) == set(
         REAL_MARKETS
     )
@@ -185,9 +197,10 @@ def test_structural_statistics_ride_along_but_cannot_steer():
     assert len(contributions) == len(LIVE_TARGETS) + len(CONSTRAINTS)
     assert result["loss"] == pytest.approx(sum(contributions))
 
-    # Now overshoot leverage to -0.5 on every panel: a catastrophic exit on
-    # the other side of its band. The loss must not move by any amount.
-    overshot = [dict(panel, leverage_effect=-0.5) for panel in panels]
+    # Now drive the volume-change autocorrelation to -0.9 on every panel:
+    # a catastrophic exit far past the strong edge of its band. The loss
+    # must not move by any amount.
+    overshot = [dict(panel, volume_change_acf1=-0.9) for panel in panels]
     assert band_distance_loss(overshot)["loss"] == result["loss"]
 
 
@@ -195,23 +208,27 @@ def test_structural_statistics_ride_along_but_cannot_steer():
 def test_promoting_a_structural_statistic_is_one_tuple(monkeypatch):
     """Appending a key to LIVE_TARGETS is the whole promotion.
 
-    The GJR asymmetry term is expected to make leverage reachable; when it
-    lands, this is the edit. Membership is consulted at call time, so the
-    simulated edit here exercises the real path rather than a copy of it.
+    The seam is no longer hypothetical -- the GJR term promoted leverage
+    to a constraint, and the lag-5 finding promoted abs_return_acf5 to a
+    live target -- so what this pins is that the seam still works on the
+    one structural row left, should volume dynamics ever be modelled.
+    Membership is consulted at call time, so the simulated edit here
+    exercises the real path rather than a copy of it.
     """
     monkeypatch.setattr(
         pretium.loss, "LIVE_TARGETS",
-        pretium.loss.LIVE_TARGETS + ("leverage_effect",),
+        pretium.loss.LIVE_TARGETS + ("volume_change_acf1",),
     )
     panels = baseline_panels()
     result = band_distance_loss(panels)
-    row = result["statistics"]["leverage_effect"]
+    row = result["statistics"]["volume_change_acf1"]
     assert row["role"] == "live target"
     assert row["contribution"] is not None and row["contribution"] > 0.0
-    # And with it live, the -0.5 overshoot now costs more than the absent
-    # effect does: the search direction the two-sided distance protects.
+    # And with it live, an overshoot far past the strong edge costs more
+    # than the baseline exit does: the search direction the two-sided
+    # distance protects.
     overshot = band_distance_loss(
-        [dict(panel, leverage_effect=-0.5) for panel in panels]
+        [dict(panel, volume_change_acf1=-0.9) for panel in panels]
     )
     assert overshot["loss"] > result["loss"]
 
@@ -223,10 +240,11 @@ def test_in_band_constraints_contribute_zero_until_a_candidate_breaks_them():
     for key in CONSTRAINTS:
         assert rows[key]["role"] == "constraint"
         assert rows[key]["contribution"] == 0.0
-    # Drive kurtosis under its floor of 3 -- the trade the sigma sweep
-    # showed correlation wants to make -- and the constraint pushes back.
+    # Drive kurtosis under its floor of 1.6 -- toward the Gaussian tails
+    # the sigma sweep showed correlation wants to trade for -- and the
+    # constraint pushes back.
     broken = band_distance_loss(
-        [dict(panel, excess_kurtosis=2.0) for panel in panels]
+        [dict(panel, excess_kurtosis=1.0) for panel in panels]
     )
     assert broken["statistics"]["excess_kurtosis"]["contribution"] > 0.0
     assert broken["loss"] > band_distance_loss(panels)["loss"]
@@ -254,12 +272,12 @@ def test_the_report_says_which_weighting_was_used():
 def test_noise_scaling_keeps_the_autocorrelations_in_the_objective():
     """The silent choice made loud: unweighted, this loss is a vol objective.
 
-    At the baseline, pooled volatility exits its band by ~22 points while
-    return acf(1) exits by ~0.21 -- so unweighted squared distances put
-    99.99% of the loss on volatility and the search would never feel an
-    autocorrelation move. In units of each statistic's own seed noise the
-    acf exits are of the same order as the vol exit, and this asserts they
-    carry a material share.
+    On these committed panels, pooled volatility exits its band by ~21
+    points while return acf(1) exits by ~0.20 -- so unweighted squared
+    distances put 99.99% of the loss on volatility and the search would
+    never feel an autocorrelation move. In units of each statistic's own
+    seed noise the acf exits are of the same order as the vol exit, and
+    this asserts they carry a material share.
     """
     result = band_distance_loss(baseline_panels())
     rows = result["statistics"]
@@ -300,10 +318,10 @@ def test_a_live_statistic_that_could_not_be_measured_refuses():
     # A structural statistic degrades instead: it was never in the sum, and
     # a reporting gap must not block the evaluation.
     panel["cross_sectional_corr"] = 0.30
-    panel["leverage_effect"] = None
+    panel["volume_change_acf1"] = None
     result = band_distance_loss(panel)
-    assert result["statistics"]["leverage_effect"]["measured"] is None
-    assert result["statistics"]["leverage_effect"]["contribution"] is None
+    assert result["statistics"]["volume_change_acf1"]["measured"] is None
+    assert result["statistics"]["volume_change_acf1"]["contribution"] is None
 
 
 # --------------------------------------------------------------------------
@@ -492,18 +510,18 @@ def test_the_panel_rows_carry_their_band_distances(facts):
         assert row["scaled_distance"] == pytest.approx(
             row["band_distance"] / SEED_SD[key]
         ), key
-    # The trap case: a leverage effect ABOVE its negative band must read
-    # "too weak" with its distance to the weak edge. The live fixture
-    # stopped exercising it -- the GJR term made the effect real, and at
-    # the factor-vol calibration this fixture measures inside the band --
-    # so the trap is pinned on a weakened copy of the same panel: the
-    # wording rule has to survive the statistic being healthy.
+    # The trap case: a leverage effect ABOVE its non-positive band must
+    # read "too weak" with its distance to the weak edge at 0.00. The live
+    # fixture stopped exercising it -- the GJR term made the effect real,
+    # and the re-derived band contains this fixture's reading -- so the
+    # trap is pinned on a weakened copy of the same panel: the wording
+    # rule has to survive the statistic being healthy.
     weakened = dict(facts)
-    weakened["leverage_effect"] = -0.01
+    weakened["leverage_effect"] = +0.05
     leverage = compare_to_real_markets(weakened)["leverage_effect"]
     assert leverage["verdict"] == "too weak"
     assert leverage["band_distance"] == pytest.approx(
-        -0.01 - LEVERAGE_BAND[1]
+        0.05 - LEVERAGE_BAND[1]
     )
 
 
