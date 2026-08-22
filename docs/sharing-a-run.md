@@ -84,11 +84,16 @@ fails with its key named — but none of them is trusted as the era.
 
 ## What a successful reproduction says about platforms
 
-Cross-OS bit-identity has been measured for exactly one platform pair on the
-prior era, and the five-target release gate has not yet run — see
-[Reproducing a run](reproducing-a-run.html) for the precise status. The
-manifest records the platform it was written on and claims nothing beyond
-that. What it offers is sharper than a claim: a successful `reproduce()` on
+Cross-OS bit-identity is measured by commit. The five-target release gate
+has run: at `ad91026` (known-answer v5, the RNG stream split), all five
+targets — Linux x86_64 and aarch64, macOS arm64 and x86_64, Windows
+x86_64 — produced the identical digest, `76983e65...3180eeb`, each also
+passing against the committed baseline. It has not yet run against a tagged
+release, and the current digest, `1ee64998...fe3581c` at v8, was regenerated
+on macOS arm64 and has one platform's confirmation behind it until the gate
+runs again — see [Reproducing a run](reproducing-a-run.html) for the full
+record. The manifest records the platform it was written on and claims
+nothing beyond that. What it offers is sharper than a claim: a successful `reproduce()` on
 a different machine **is** a cross-platform measurement for that run, made
 by the reader rather than promised by the library. A failure after every
 input and the era have verified is reported as exactly what it is — an
