@@ -397,12 +397,29 @@ def g_pin_macro(ctx: Ctx) -> dict:
 
 
 def g_fedfunds(ctx: Ctx) -> dict:
-    """scenarios.md: a policy-rate-only path moves prices by exactly 0.00%."""
+    """scenarios.md: a policy-rate-only path moves prices by exactly 0.00%
+    over 40 days, and a median around -4% once a 60-day run crosses the
+    central-bank meeting at day 45. The page names neither universe nor sim
+    seed; reconstructed as random(20,4), seed 5, from tests/test_scenario.py."""
     u = _u(20, 4)
-    result = compare(
-        Scenario().ramp("federal_funds_rate", start=0.025, end=0.05, over=30),
-        seed=5, universe=u, days=30)
-    return {"max_abs_move_pct": max(abs(x) for x in result["move_pct"])}
+    ramp = Scenario().ramp("federal_funds_rate", start=0.025, end=0.05, over=30)
+    r40 = compare(ramp, seed=5, universe=u, days=40)
+    r60 = compare(ramp, seed=5, universe=u, days=60)
+    return {
+        "max_abs_move_pct": max(abs(x) for x in r40["move_pct"]),
+        "meeting_median_pct": r60["median_pct"],
+    }
+
+
+def g_spec(ctx: Ctx) -> dict:
+    """docs/strategy-specs.md: the three fingerprints in the worked methods
+    section. The full momentum and oracle fingerprints are pinned in
+    tests/test_spec.py; the page prints their first eight hex characters."""
+    return {
+        "universe_fp8": pt.Universe.random(20, seed=7).fingerprint[:8],
+        "momentum_fp8": pt.StrategySpec.momentum().fingerprint[:8],
+        "oracle_fp8": pt.StrategySpec.oracle().fingerprint[:8],
+    }
 
 
 def g_vix(ctx: Ctx) -> dict:
@@ -667,16 +684,24 @@ def g_workflow(ctx: Ctx) -> dict:
     spec.loader.exec_module(mod)
     buf = io.StringIO()
     t0 = time.perf_counter()
-    with contextlib.redirect_stdout(buf):
-        report = mod.main()
+    try:
+        with contextlib.redirect_stdout(buf):
+            report = mod.main()
+        failed = None
+    except AssertionError as exc:
+        # The example asserts its own published findings; after an engine
+        # change a failed assert is a stale example, which is a result of
+        # this harness rather than a failure of it.
+        report, failed = {}, str(exc)
     wall = time.perf_counter() - t0
     return {
         "wall_s": wall,
-        "truth_rows": report["truth_rows"],
-        "sweep_seeds": report["sweep"],
-        "agents_evaluated": len(report["capture"]) + 1,  # + the oracle denominator
-        "asserts_passed": True,
-        "universe": report["universe"],
+        "truth_rows": report.get("truth_rows"),
+        "sweep_seeds": report.get("sweep"),
+        "agents_evaluated": (len(report["capture"]) + 1) if "capture" in report else None,
+        "asserts_passed": failed is None,
+        "assert_failure": failed,
+        "universe": report.get("universe"),
     }
 
 
@@ -696,6 +721,7 @@ GROUPS = {
     "macro_frozen": g_macro_frozen,
     "pin_macro": g_pin_macro,
     "fedfunds": g_fedfunds,
+    "spec": g_spec,
     "vix": g_vix,
     "tca_vix": g_tca_vix,
     "drawdiv": g_drawdiv,
