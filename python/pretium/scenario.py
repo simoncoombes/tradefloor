@@ -228,6 +228,13 @@ RATE_FIELDS = ("federal_funds_rate", "corporate_bond_yield", "inflation_rate")
 
 RATE_MIN, RATE_MAX = -0.05, 0.50
 
+#: The business-cycle phases the engine accepts. Duplicated from
+#: ``_core.CycleName`` so a misspelt phase is caught where it is WRITTEN
+#: rather than on the first ``apply``. The engine catches it either way, but
+#: a scenario built in one place and run in another reports the mistake at
+#: the run, which is the wrong end for a caller reading a traceback.
+CYCLES = ("expansion", "peak", "contraction", "trough", "recovery")
+
 
 def _check(field: str, value: Any) -> None:
     if field not in FIELDS:
@@ -235,6 +242,13 @@ def _check(field: str, value: Any) -> None:
             f"unknown macro field {field!r}. Valid: {', '.join(FIELDS)}"
         )
     if field == "cycle":
+        if isinstance(value, str) and value not in CYCLES:
+            raise ValidationError(
+                f"unknown cycle {value!r}. Valid: {', '.join(CYCLES)}. "
+                "A misspelt phase is the same failure a misspelt FIELD would "
+                "be, so it is refused where it is written rather than on the "
+                "first day of the run."
+            )
         return
     if field in RATE_FIELDS and isinstance(value, (int, float)):
         if not RATE_MIN <= value <= RATE_MAX:
@@ -551,7 +565,21 @@ class Scenario:
         The PATH rather than the recipe. A recipe is only citable while the
         constructor that built it keeps behaving the same way; the realised
         values are the scenario regardless of what any later version does.
+
+        ``days`` must be at least one. A zero-day document carries no path,
+        and :meth:`from_json` reading it back produced a scenario driving
+        NOTHING — a round trip that quietly discarded every field, and a
+        reproduced run that applied no pins at all.
         """
+        if days < 1:
+            raise ValidationError(
+                f"days must be at least 1 to serialise a scenario, got {days}. "
+                f"The serialised form is the realised PATH, so a zero-day "
+                f"document records no path -- reading it back would give a "
+                f"scenario driving nothing at all, in place of one driving "
+                f"{', '.join(self.fields) or 'nothing'}. Serialise the "
+                f"horizon the run actually uses."
+            )
         return json.dumps(
             {"schema": 1, "label": self._label, "days": days,
              "path": self.table(days)},
@@ -592,6 +620,17 @@ class Scenario:
                 f"scenario document says {days} days but carries "
                 f"{len(path) if isinstance(path, list) else 'no'} path rows. "
                 "An inconsistent path is a scenario nobody constructed."
+            )
+        if not path:
+            # An empty path used to load: the field loop never ran, and what
+            # came back drove nothing. A run reproduced from it would apply
+            # no pins and look like a scenario run.
+            raise ValidationError(
+                "scenario document carries an empty path, so it names no "
+                "fields and no days. Loading it would give a scenario that "
+                "drives nothing -- which runs, and produces a market under "
+                "no macro path at all, with nothing to distinguish it from "
+                "one that was pinned. Serialise at least one day."
             )
 
         fields: tuple[str, ...] | None = None
@@ -931,6 +970,26 @@ def compare(
         (a / b - 1.0) * 100.0 if b else float("nan")
         for a, b in zip(after, before)
     ]
+
+    # A zero baseline price makes that name's percentage move undefined, and
+    # a NaN in this list is not merely one bad row: `sorted` with a NaN is
+    # ordered arbitrarily and `min`/`max` return whichever value the
+    # comparison happened to start from, so median_pct, worst_pct and
+    # best_pct would ALL be quietly meaningless -- reported to two decimal
+    # places like any other result. Name the instrument instead.
+    undefined = [t for t, m in zip(shocked.tickers, moves) if m != m]
+    if undefined:
+        raise ValidationError(
+            f"{', '.join(undefined)} priced at zero in the baseline world, so "
+            f"the percentage move is undefined for "
+            f"{'them' if len(undefined) > 1 else 'it'}. A NaN here would not "
+            f"stay in one row: median_pct, worst_pct and best_pct are a sort "
+            f"and a min/max over this list, and all three are arbitrary once "
+            f"a NaN is in it. Compare on a universe whose names all carry a "
+            f"price, or read move_pct per instrument from two run_scenario "
+            f"calls."
+        )
+
     ordered = sorted(moves)
     middle = len(ordered) // 2
     median = (ordered[middle] if len(ordered) % 2
