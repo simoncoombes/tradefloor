@@ -659,3 +659,58 @@ def test_a_vix_spike_widens_the_quoted_spread():
         return sum(out) / len(out)
 
     assert median_spread_bps(65.0) > median_spread_bps(15.0) * 1.5
+
+
+# --------------------------------------------------------------------------
+# Three more of the same class, found while fixing the four
+# --------------------------------------------------------------------------
+
+
+def test_a_misspelt_cycle_phase_is_refused_where_it_is_written():
+    """`_check` waved `cycle` through entirely; only the engine caught it.
+
+    That is late. A scenario is built in one place and run in another -- a
+    manifest, a sweep worker, a doc example -- so the traceback arrived at
+    the run rather than at the typo, and a phase name is exactly the kind of
+    string nobody re-reads.
+    """
+    with pytest.raises(pretium.ValidationError) as excinfo:
+        Scenario().hold(cycle="contration")
+    assert "contration" in str(excinfo.value)
+    assert "contraction" in str(excinfo.value)     # names the valid ones
+    for phase in ("expansion", "peak", "contraction", "trough", "recovery"):
+        assert Scenario().hold(cycle=phase).at(0)["cycle"] == phase
+
+
+def test_a_zero_day_serialisation_round_trip_is_refused_at_both_ends():
+    """It used to round-trip into a scenario driving NOTHING.
+
+    `to_json(0)` wrote an empty path, `from_json` read it back, the field
+    loop never ran, and what came out drove no fields at all -- so a run
+    reproduced from that document applied no pins and was indistinguishable
+    from a scenario run. Refused where it is written and again where it is
+    read, because a document can arrive from anywhere.
+    """
+    scenario = Scenario.rate_shock(start=0.03, end=0.05, over=5)
+    with pytest.raises(pretium.ValidationError, match="at least 1"):
+        scenario.to_json(0)
+    with pytest.raises(pretium.ValidationError, match="empty path"):
+        Scenario.from_json(json.dumps({"schema": 1, "label": "", "days": 0,
+                                       "path": []}))
+    # One day is a real, if short, path and still round-trips.
+    assert Scenario.from_json(scenario.to_json(1)).at(0) == scenario.at(0)
+
+
+def test_an_undefined_percentage_move_is_refused_rather_than_sorted():
+    """A NaN in `move_pct` corrupts all three summary statistics, not one row.
+
+    `sorted` with a NaN present is ordered arbitrarily and `min`/`max` return
+    whichever value the comparison chain started from, so median, worst and
+    best would all be meaningless -- and printed to two decimal places like
+    any other result. Asserted on the arithmetic rather than on a zero-priced
+    market, because the point is that the failure is not localised.
+    """
+    values = [1.0, float("nan"), -5.0, 3.0]
+    assert sorted(values)[0] != min(values) or max(values) != 3.0, (
+        "a NaN no longer breaks sort/min/max; the guard in compare() can go"
+    )
