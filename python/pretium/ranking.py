@@ -4,19 +4,21 @@
 it is what makes a comparison exact, since all agents see the identical market
 — but it is the wrong unit of judgement, and the difference is not small.
 
-Measured on the reference agents over thirty instruments and ten days, twelve
-seeds:
+Measured on this build — the reference agents over
+``Universe.random(30, seed=11)``, ten days, sim seeds 0 through 11:
 
     pooled capture over 12 seeds        per-seed range      wins
-        momentum         +0.556       [-0.335, +1.903]      6/12
-        mean_reversion   -0.011       [-0.671, +0.751]      5/12
-        buy_and_hold     -0.056       [-0.516, +0.489]      1/12
-        random           -0.060       [-0.420, +0.109]      0/12
+        momentum         +0.773       [+0.007, +2.834]      9/12
+        buy_and_hold     +0.081       [-0.621, +0.592]      0/12
+        mean_reversion   -0.010       [-1.863, +0.980]      3/12
+        random           -0.037       [-0.305, +0.138]      0/12
 
-**A single seed picks the top-ranked agent exactly half the time** — a coin
-flip, even though the leader's aggregate is the only positive number on the
-table. Momentum's own capture ranges from -0.335 to +1.903 depending only on
-which market it drew, and that range is printed next to the verdict for
+**A single seed names the pooled leader nine times in twelve here, and still
+misreports the verdict.** The case for many seeds is not that one seed picks
+the wrong winner — it usually does not. It is that one seed cannot say what
+the winner is WORTH: momentum's own capture runs from +0.007 to +2.834
+depending only on which market it drew — a rounding error above nothing to
+nearly triple the Oracle — and that range is printed next to the verdict for
 exactly that reason.
 
 So a leaderboard from one call to `evaluate` is a measurement of the seed at
@@ -27,30 +29,37 @@ that.
 ## And the aggregate can overstate too, which is why `separation` exists
 
 That gap does NOT establish that momentum is the better agent. Paired across
-the same twelve markets, momentum beats mean-reversion on seven and loses on
-five: `p = 0.77`, no separation worth the name. Momentum wins by MORE when it
-wins; it barely wins more OFTEN, and no aggregate of returns can tell those
-apart.
+the same twelve markets, momentum beats mean-reversion on nine and loses on
+three: `p = 0.15`, no separation worth the name. Momentum wins by MORE when
+it wins; it does not win often enough for twelve paired trials to call the
+ordering real, and no aggregate of returns can tell those apart.
 
-Against random the same test reads 10–2, `p = 0.039`. That is what a real
+Against random the same test reads 11–1, `p = 0.006`. That is what a real
 difference looks like here, and the contrast is the point: two orderings that
 appear on the same table, one of them meaningless.
 
-Note that even 10–2 is not `decisive` — that flag is reserved for a clean
+A p-value also carries its seed window with it: the identical
+momentum-versus-mean-reversion test over seeds 12 to 23 reads 10–2 at
+`p = 0.039`. Twelve paired seeds is a small experiment — even a clean sweep
+only reaches p = 0.0005 — so one window's p is a single draw of a noisy
+statistic, and the honest quote names the seeds.
+
+Note that even 11–1 is not `decisive` — that flag is reserved for a clean
 sweep, the one verdict that needs no distributional assumption at all. A
 small `p` and a clean sweep are different claims and the result reports both.
 
 Quote a capture with its separation, or the ranking is just a prettier
-version of the single-seed coin flip.
+version of the single-seed verdict.
 
 ## The aggregate pools; it does not average ratios
 
 A capture ratio divides by what the reference earned in that market, which on
-a short horizon can be almost nothing. Measured at three days: one seed where
-the reference earned 0.16% of capital produced a capture ratio of **+14.4**,
-and a single value like that drags a median of ten far enough to reorder the
-whole table — at three days it promoted momentum over mean-reversion, which
-the pooled figure reverses.
+a short horizon can be almost nothing. Measured at three days on the same
+universe, sim seeds 0-9: the Oracle's per-seed P&L spans $10.6k to $36.8k,
+and against one thin denominator — 1.1% of the $1M book — mean-reversion's
+ratio is **+3.85**. A single value like that drags a median of ten far
+enough to reorder the whole table: ranked by median of ratios, momentum
+drops below buy-and-hold, which the pooled figure reverses.
 
 So the headline sums the numerators and the denominators instead. Each market
 is weighted by the opportunity that actually existed in it, a seed with
@@ -127,9 +136,10 @@ class AgentRecord:
         Pooled rather than averaged, and the difference is not cosmetic. A
         per-seed ratio divides by whatever the reference happened to earn in
         that market, which on a short horizon can be almost nothing --
-        measured, a seed where the reference earned 0.16% of capital produced
-        a capture ratio of **+14.4**, and one such seed drags a median of ten
-        far enough to reorder the table.
+        measured at three days on the grid in this module's docstring, a
+        seed where the reference earned 1.1% of capital produced a capture
+        ratio of **+3.85**, and one such seed drags a median of ten far
+        enough to reorder the table.
 
         Pooling weights each market by the opportunity that existed in it. A
         seed where nothing was there to earn contributes nearly nothing to the
@@ -208,8 +218,9 @@ class Ranking:
         self.records = records
         self.seeds = seeds
         #: What the reference earned on each seed, parallel to ``seeds``. This
-        #: is the denominator, and it varies by more than sixty-fold across
-        #: seeds on a short horizon -- which is exactly why the headline
+        #: is the denominator, and it varies several-fold across seeds --
+        #: measured $10.6k to $36.8k over ten three-day seeds on the grid in
+        #: this module's docstring -- which is exactly why the headline
         #: number pools rather than averages ratios.
         self.reference_pnls = reference_pnls
         #: Seeds where capture was not measurable because the reference did
