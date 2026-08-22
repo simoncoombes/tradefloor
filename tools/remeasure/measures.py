@@ -84,6 +84,11 @@ def g_determinism(ctx: Ctx) -> dict:
     reversed_u = pt.Universe(list(reversed(list(u))))
     preset = pt.model_preset()
 
+    # README's model-preset section: a nudged coefficient set fingerprints as
+    # custom-XXXXXXXX, never as the preset's name
+    custom = pt.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+    custom_fp = pt.Engine(seed=42, universe=_u(6, 7), model=custom).model_fingerprint
+
     from pretium.facts import MARGINAL, REAL_MARKETS
     return {
         "kat_digest": digest,
@@ -99,6 +104,7 @@ def g_determinism(ctx: Ctx) -> dict:
         "facts_marginal": len(MARGINAL),
         "facts_dependence": len(REAL_MARKETS) - len(MARGINAL),
         "oracle_default_top_k": Oracle().top_k,
+        "custom_model_fp": custom_fp,
         "preset_lacks_market_sigma": "market_factor_sigma" not in preset,
         "n_factors": len(pt.Engine.FACTORS),
         "evaluate_steps_default":

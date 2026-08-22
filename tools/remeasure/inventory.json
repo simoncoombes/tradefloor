@@ -4,7 +4,7 @@
   {
    "id": "readme.residual",
    "file": "README.md",
-   "line": 116,
+   "line": 129,
    "label": "seven factor columns sum to the move, residual around 1e-16",
    "published": 1e-16,
    "group": "truth_residual",
@@ -16,6 +16,78 @@
    },
    "source": "stated",
    "method": "median |diff(mispricing_s) - sum(7 factors)| per instrument per tick; random(20,11), seed 42, 5 days"
+  },
+  {
+   "id": "readme.env_checker",
+   "file": "README.md",
+   "line": 60,
+   "label": "TradingEnv passes gymnasium's env_checker",
+   "published": true,
+   "group": null,
+   "key": null,
+   "compare": {
+    "kind": "none"
+   },
+   "source": "stated",
+   "status_override": "covered_by_tests",
+   "note": "asserted by tests/test_gym.py when gymnasium is installed; the docs page carries the same claim (rl.env_checker)"
+  },
+  {
+   "id": "readme.tca_pinned",
+   "file": "README.md",
+   "line": 88,
+   "label": "pinning VIX in both worlds makes the subtraction byte-exact again",
+   "published": true,
+   "group": "tca_ripple",
+   "key": "pinned_empty",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "untouched_moved() empty under hold(vix=15.0) on the TCA page's ripple configuration; same measurement as tca.ripple_pinned_empty"
+  },
+  {
+   "id": "readme.single_seed_wins",
+   "file": "README.md",
+   "line": 115,
+   "label": "a single seed picks the pooled leader only five times in twelve",
+   "published": 5,
+   "group": "ranking",
+   "key": "momentum_wins",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the pooled leader's per-seed win count out of 12 on the stated grid"
+  },
+  {
+   "id": "readme.custom_model_fp",
+   "file": "README.md",
+   "line": 190,
+   "label": "a nudged garch_alpha fingerprints as custom-0c04c4ba, never pt-v1",
+   "published": "custom-0c04c4ba",
+   "group": "determinism",
+   "key": "custom_model_fp",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "Engine(model=ModelParams.from_preset('pt-v1', garch_alpha=0.12)).model_fingerprint"
+  },
+  {
+   "id": "readme.model_crn",
+   "file": "README.md",
+   "line": 195,
+   "label": "nothing settable changes how many draws are taken or in what order",
+   "published": true,
+   "group": null,
+   "key": null,
+   "compare": {
+    "kind": "none"
+   },
+   "source": "stated",
+   "status_override": "covered_by_tests",
+   "note": "asserted by tests/test_model_params.py: draws_consumed is identical across parameter vectors, the CRN guard that makes panel differences parameter effects"
   },
   {
    "id": "index.residual",
@@ -81,9 +153,9 @@
   {
    "id": "readme.kat_digest",
    "file": "README.md",
-   "line": 142,
-   "label": "release-gate digest measured at a5afd1c (v3) on Windows x86_64 and macOS arm64 - a historical record",
-   "published": "112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337",
+   "line": 212,
+   "label": "the by-commit table's a5afd1c row: v3, Windows x86_64 and macOS arm64, identical digest - a historical record",
+   "published": "112fd73e...6eff337",
    "group": null,
    "key": null,
    "compare": {
@@ -91,28 +163,56 @@
    },
    "source": "stated",
    "status_override": "not_harnessable",
-   "note": "pinned to commit a5afd1c and not re-measurable from the installed package; the current era's digest is pinned in tests/known_answer.json and checked by readme.kat_self_consistent"
+   "note": "pinned to commit a5afd1c and not re-measurable from the installed package; the current era's digest is checked by readme.kat_current_digest"
+  },
+  {
+   "id": "readme.kat_five_targets",
+   "file": "README.md",
+   "line": 213,
+   "label": "the table's ad91026 row: all five targets, identical digest 76983e65...3180eeb",
+   "published": "76983e65...3180eeb",
+   "group": null,
+   "key": null,
+   "compare": {
+    "kind": "none"
+   },
+   "source": "stated",
+   "status_override": "not_harnessable",
+   "note": "a historical record of the determinism gate's run at ad91026, pinned to that commit; see repro.kat_five_targets"
+  },
+  {
+   "id": "readme.kat_current_digest",
+   "file": "README.md",
+   "line": 214,
+   "label": "the current digest 1ee64998...fe3581c at v8",
+   "published": "1ee64998...fe3581c",
+   "group": "determinism",
+   "key": "kat_digest_elided",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "known_answer_digest() on this build, elided the way the table prints it"
   },
   {
    "id": "readme.kat_era_version",
    "file": "README.md",
-   "line": 143,
-   "label": "the README table's current-era row: known-answer v4 at 0b4579d",
-   "published": 4,
+   "line": 214,
+   "label": "the table's current-era row: known-answer v8 at 6e30497",
+   "published": 8,
    "group": "determinism",
    "key": "kat_version",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "KAT_VERSION in tests/known_answer.py",
-   "note": "ad91026 split the RNG and bumped the known-answer to v5 (rng-streams.md names the era); the table's current-era row is one era behind and needs a v5/ad91026 row"
+   "method": "KAT_VERSION in tests/known_answer.py"
   },
   {
    "id": "readme.kat_self_consistent",
    "file": "README.md",
-   "line": 143,
-   "label": "the current-era baseline is self-consistent on this platform",
+   "line": 214,
+   "label": "one platform's confirmation until the gate runs again: this build reproduces the pinned digest",
    "published": true,
    "group": "determinism",
    "key": "kat_matches_pinned",
@@ -123,56 +223,188 @@
    "method": "known_answer_digest() against the sha256 pinned in tests/known_answer.json"
   },
   {
+   "id": "readme.vix_daily",
+   "file": "README.md",
+   "line": 227,
+   "label": "VIX takes a new value every day over the 120-day macro-chain run",
+   "published": 120,
+   "group": "macro_chain",
+   "key": "vix_distinct",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "distinct vix values over run_days(120, record=True), random(20,11), sim seed 42 - the method the README states; the per-field counts live on core-concepts.md's rows"
+  },
+  {
+   "id": "readme.vix_vol_5",
+   "file": "README.md",
+   "line": 235,
+   "label": "49% annualised at VIX 5",
+   "published": 49,
+   "group": "vix",
+   "key": "vol_5",
+   "compare": {
+    "kind": "round",
+    "decimals": 0
+   },
+   "source": "stated",
+   "method": "facts.measure(seed=3, random(20,11), 120 days, hold(vix=5)) annualised_vol_pct; method stated on the README"
+  },
+  {
+   "id": "readme.vix_vol_15",
+   "file": "README.md",
+   "line": 235,
+   "label": "59% at 15",
+   "published": 59,
+   "group": "vix",
+   "key": "vol_15",
+   "compare": {
+    "kind": "round",
+    "decimals": 0
+   },
+   "source": "stated",
+   "method": "as readme.vix_vol_5 at VIX 15"
+  },
+  {
+   "id": "readme.vix_vol_45",
+   "file": "README.md",
+   "line": 235,
+   "label": "107% at 45",
+   "published": 107,
+   "group": "vix",
+   "key": "vol_45",
+   "compare": {
+    "kind": "round",
+    "decimals": 0
+   },
+   "source": "stated",
+   "method": "as readme.vix_vol_5 at VIX 45"
+  },
+  {
+   "id": "readme.vix_vol_65",
+   "file": "README.md",
+   "line": 235,
+   "label": "124% at 65",
+   "published": 124,
+   "group": "vix",
+   "key": "vol_65",
+   "compare": {
+    "kind": "round",
+    "decimals": 0
+   },
+   "source": "stated",
+   "method": "as readme.vix_vol_5 at VIX 65"
+  },
+  {
+   "id": "readme.crisis_threshold",
+   "file": "README.md",
+   "line": 237,
+   "label": "above VIX 25.5 the cross-section blends toward the market factor",
+   "published": 25.5,
+   "group": "consts",
+   "key": "crisis_vix_threshold",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "CRISIS_VIX_THRESHOLD in rust/src/economy/state.rs"
+  },
+  {
+   "id": "readme.vix_corr_calm",
+   "file": "README.md",
+   "line": 238,
+   "label": "mean pairwise correlation reads +0.27 calm",
+   "published": 0.27,
+   "group": "vix",
+   "key": "corr_15",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "facts.measure(seed=3, random(25,11), 120 days, hold(vix=V)) cross_sectional_corr; 25 names, horizon and seed stated on the README"
+  },
+  {
+   "id": "readme.vix_corr_45",
+   "file": "README.md",
+   "line": 238,
+   "label": "+0.68 at VIX 45",
+   "published": 0.68,
+   "group": "vix",
+   "key": "corr_45",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as readme.vix_corr_calm at VIX 45"
+  },
+  {
+   "id": "readme.vix_corr_65",
+   "file": "README.md",
+   "line": 238,
+   "label": "+0.76 at 65",
+   "published": 0.76,
+   "group": "vix",
+   "key": "corr_65",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as readme.vix_corr_calm at VIX 65"
+  },
+  {
    "id": "readme.rebalance_3",
    "file": "README.md",
-   "line": 157,
-   "label": "3 rebalances per day, return",
-   "published": 88.7,
+   "line": 252,
+   "label": "3 rebalances per day: +97.5%",
+   "published": 97.5,
    "group": "rebalance",
    "key": "ret_3",
    "compare": {
     "kind": "round",
     "decimals": 1
    },
-   "source": "reconstructed",
-   "method": "evaluate({'m': Momentum(lookback_days=1.0)}, seed=2026, universe=random(40,7), days=30, steps_per_day=3, ticks_per_step=130); method from baselines.py:254-261 and tests/test_baselines.py:370",
-   "note": "tests/test_baselines.py:376 records that these figures were re-measured after the stepped-day fix (80a0949) and moved to +49.71/+32.70/+0.18; the README still carries the pre-fix values"
+   "source": "stated",
+   "method": "evaluate({'m': Momentum(lookback_days=1.0)}, seed=2026, universe=random(40,7), days=30, steps_per_day=3, ticks_per_step=130); seed, universe and horizon now stated on the README"
   },
   {
    "id": "readme.rebalance_6",
    "file": "README.md",
-   "line": 158,
-   "label": "6 rebalances per day, return",
-   "published": 30.9,
+   "line": 253,
+   "label": "6 rebalances per day: +33.8%",
+   "published": 33.8,
    "group": "rebalance",
    "key": "ret_6",
    "compare": {
     "kind": "round",
     "decimals": 1
    },
-   "source": "reconstructed",
+   "source": "stated",
    "method": "as readme.rebalance_3 with steps_per_day=6, ticks_per_step=65"
   },
   {
    "id": "readme.rebalance_12",
    "file": "README.md",
-   "line": 159,
-   "label": "12 rebalances per day, return",
-   "published": -13.2,
+   "line": 254,
+   "label": "12 rebalances per day: +0.1%",
+   "published": 0.1,
    "group": "rebalance",
    "key": "ret_12",
    "compare": {
     "kind": "round",
     "decimals": 1
    },
-   "source": "reconstructed",
+   "source": "stated",
    "method": "as readme.rebalance_3 with steps_per_day=12, ticks_per_step=32"
   },
   {
    "id": "readme.t100",
    "file": "README.md",
-   "line": 168,
-   "label": "252-day year over 100 instruments takes 27 seconds",
+   "line": 263,
+   "label": "252-day year over 100 instruments: 27 seconds on the documentation's reference desktop",
    "published": 27.0,
    "group": "perf",
    "key": "t100",
@@ -180,30 +412,60 @@
     "kind": "timing"
    },
    "source": "stated",
-   "method": "Engine(seed=7, random(100,7)).run_days(252) wall clock; performance.md says absolutes are a rough guide, ratios portable"
+   "method": "Engine(seed=7, random(100,7)).run_days(252) wall clock; performance.md says absolutes are a rough guide, ratios portable",
+   "note": "machine-bound and load-bound: this laptop measures 7.1 s quiet (the committed dd718e7 baseline) and 16.8 s contended in the same week"
+  },
+  {
+   "id": "readme.t100_apple",
+   "file": "README.md",
+   "line": 264,
+   "label": "and under seven seconds on an Apple-silicon laptop",
+   "published": 7.0,
+   "group": "perf",
+   "key": "t100",
+   "compare": {
+    "kind": "timing"
+   },
+   "source": "stated",
+   "method": "the same 252x100 run as readme.t100",
+   "note": "machine- and load-bound: 7.1 s quiet on this laptop (dd718e7 baseline), 16.8 s contended; reported, never judged"
   },
   {
    "id": "readme.record_overhead",
    "file": "README.md",
-   "line": 169,
-   "label": "recording 9.8M rows of ground truth adds 3%",
-   "published": 3.0,
+   "line": 265,
+   "label": "recording 9.8M rows of ground truth costs less than wall-clock timing resolves (bound)",
+   "published": 4.0,
    "group": "perf",
    "key": "overhead_med",
    "compare": {
-    "kind": "band",
-    "abs": 1.0
+    "kind": "less_than"
    },
    "source": "stated",
    "method": "median per-pair overhead of 8 interleaved plain/recorded 252x100 runs with alternating within-pair order",
-   "note": "the point claim was demoted to a bound after a 32-pair interleaved study across two sessions: median about +1%, nearly half the pairs negative, so no wall-clock point resolves it on a working machine; performance.md and reading-results.md now publish 'a few percent at most' but the README still prints 'adds 3%', so this row stays MOVED until the README gets the same bound wording"
+   "note": "the README now carries the bound wording the 32-pair interleaved study demoted the old 'adds 3%' point to; operationalised like perf.overhead as median per-pair overhead under 4%"
+  },
+  {
+   "id": "readme.neg_pairs",
+   "file": "README.md",
+   "line": 267,
+   "label": "nearly half the interleaved pairs come out negative",
+   "published": 0.5,
+   "group": "perf",
+   "key": "neg_pair_frac",
+   "compare": {
+    "kind": "band",
+    "abs": 0.35
+   },
+   "source": "stated",
+   "method": "fraction of the 8 interleaved plain/recorded pairs whose recorded run was faster"
   },
   {
    "id": "readme.speedup",
    "file": "README.md",
-   "line": 170,
-   "label": "sweeps parallelise about 3.3x on eight cores",
-   "published": 3.3,
+   "line": 267,
+   "label": "sweeps parallelise 3-4x on eight cores",
+   "published": 3.5,
    "group": "perf",
    "key": "speedup",
    "compare": {
@@ -211,88 +473,205 @@
    },
    "source": "stated",
    "method": "run_many(8 seeds, 21 days, 100 instruments) workers=1 vs workers=8",
-   "note": "parallel speedup is a property of the measuring machine's core count and memory bandwidth, so it is reported rather than judged; re-measure on the published machine before editing"
+   "note": "parallel speedup is a property of the measuring machine's core count and memory bandwidth, so it is reported rather than judged; the printed 3-4x is a range and this row carries its midpoint"
   },
   {
    "id": "readme.return_acf",
    "file": "README.md",
-   "line": 181,
-   "label": "measured return autocorrelation +0.219 at lag one",
-   "published": 0.219,
+   "line": 281,
+   "label": "measured return autocorrelation +0.249 at lag one, median of six seeds at the published method",
+   "published": 0.249,
    "group": "realism_six",
    "key": "return_acf1_median",
    "compare": {
     "kind": "range",
     "decimals": 3,
-    "lo": 0.211,
-    "hi": 0.249
+    "lo": 0.237,
+    "hi": 0.443
    },
-   "source": "reconstructed",
-   "method": "median across seeds 1-6 of facts.measure(seed, random(40,111), 252 days) return_acf1",
-   "note": "the realism page (measured at e2aded1) publishes +0.233 for the same statistic; the README's +0.219 is the older four-statistic-era figure and disagrees with the page it links to"
+   "source": "stated",
+   "method": "median across seeds 1-6 of facts.measure(seed, random(40,111), 252 days) return_acf1; method now stated on the README"
   },
   {
    "id": "readme.facts_split",
    "file": "README.md",
-   "line": 184,
-   "label": "of the eight statistics, four are marginal and four are dependence",
-   "published": 4,
+   "line": 288,
+   "label": "of the eight statistics, two are marginal and six are dependence",
+   "published": 2,
    "group": "determinism",
    "key": "facts_marginal",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "note": "pretium.facts splits them 2 marginal / 6 dependence, and the realism page prints that split; the README sentence miscounts"
+   "method": "len(facts.MARGINAL)"
   },
   {
-   "id": "readme.vix_under_one_point",
+   "id": "readme.corr",
    "file": "README.md",
-   "line": 194,
-   "label": "thirteenfold VIX move changes realised vol by under one point",
-   "published": 1.0,
-   "group": "vix",
-   "key": "vol_range_max_delta",
+   "line": 290,
+   "label": "cross-sectional correlation +0.257 (real +0.25 to +0.35)",
+   "published": 0.257,
+   "group": "realism_six",
+   "key": "cross_sectional_corr_median",
    "compare": {
-    "kind": "less_than"
+    "kind": "range",
+    "decimals": 3,
+    "lo": 0.205,
+    "hi": 0.456
    },
    "source": "stated",
-   "method": "max minus min of annualised vol across VIX 5/15/45/65, random(20,11), 120 days, seed 3"
+   "method": "median across seeds 1-6 of facts.measure(seed, random(40,111), 252 days); the published method, stated on the README"
   },
   {
-   "id": "readme.vix_below_15",
+   "id": "readme.clustering",
    "file": "README.md",
-   "line": 194,
-   "label": "below VIX 15 a VIX change moves nothing at all",
+   "line": 291,
+   "label": "volatility clustering +0.242 (+0.15 to +0.35)",
+   "published": 0.242,
+   "group": "realism_six",
+   "key": "abs_return_acf1_median",
+   "compare": {
+    "kind": "range",
+    "decimals": 3,
+    "lo": 0.189,
+    "hi": 0.454
+   },
+   "source": "stated",
+   "method": "as readme.corr"
+  },
+  {
+   "id": "readme.volabs",
+   "file": "README.md",
+   "line": 291,
+   "label": "volume against |return| +0.585 (+0.30 to +0.60)",
+   "published": 0.585,
+   "group": "realism_six",
+   "key": "volume_abs_return_corr_median",
+   "compare": {
+    "kind": "range",
+    "decimals": 3,
+    "lo": 0.541,
+    "hi": 0.655
+   },
+   "source": "stated",
+   "method": "as readme.corr"
+  },
+  {
+   "id": "readme.kurtosis",
+   "file": "README.md",
+   "line": 292,
+   "label": "excess kurtosis +3.1 (+3 to +10)",
+   "published": 3.1,
+   "group": "realism_six",
+   "key": "excess_kurtosis_median",
+   "compare": {
+    "kind": "range",
+    "decimals": 1,
+    "lo": 2.4,
+    "hi": 5.7
+   },
+   "source": "stated",
+   "method": "as readme.corr"
+  },
+  {
+   "id": "readme.leverage",
+   "file": "README.md",
+   "line": 293,
+   "label": "a leverage effect at -0.085, just short of its -0.30 to -0.10 band",
+   "published": -0.085,
+   "group": "realism_six",
+   "key": "leverage_effect_median",
+   "compare": {
+    "kind": "range",
+    "decimals": 3,
+    "lo": -0.181,
+    "hi": -0.031
+   },
+   "source": "stated",
+   "method": "as readme.corr"
+  },
+  {
+   "id": "readme.leverage_sign",
+   "file": "README.md",
+   "line": 293,
+   "label": "the leverage effect holds its sign in six seeds of six",
    "published": true,
-   "group": "vix",
-   "key": "bit_identical_5_10_15",
+   "group": "realism_six",
+   "key": "leverage_all_negative",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "prices() byte-identical across hold(vix=5/10/15), 60 days, random(20,11), seed 3"
+   "method": "max of leverage_effect across the six seeds is below zero"
+  },
+  {
+   "id": "readme.held_corr",
+   "file": "README.md",
+   "line": 297,
+   "label": "held out, fresh sim seeds read correlation +0.225 against a +0.25 band floor",
+   "published": 0.225,
+   "group": "realism_heldout",
+   "key": "held_seeds_corr",
+   "compare": {
+    "kind": "round",
+    "decimals": 3
+   },
+   "source": "stated",
+   "method": "median over sim seeds 101-106 of facts.measure(random(40,111), 252 days); the realism page's held-out method"
+  },
+  {
+   "id": "readme.vol_level",
+   "file": "README.md",
+   "line": 306,
+   "label": "annualised volatility runs 41.5% against a real 15-35%",
+   "published": 41.5,
+   "group": "realism_six",
+   "key": "annualised_vol_pct_median",
+   "compare": {
+    "kind": "range",
+    "decimals": 1,
+    "lo": 39.0,
+    "hi": 50.0
+   },
+   "source": "stated",
+   "method": "as readme.corr"
+  },
+  {
+   "id": "readme.volchg",
+   "file": "README.md",
+   "line": 309,
+   "label": "volume changes autocorrelate at -0.45 where real ones sit near zero",
+   "published": -0.45,
+   "group": "realism_six",
+   "key": "volume_change_acf1_median",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as readme.corr"
   },
   {
    "id": "readme.separation_comment",
    "file": "README.md",
-   "line": 100,
-   "label": "separation('momentum','mean_reversion') comment: 7-5, p = 0.77",
+   "line": 113,
+   "label": "paired across the same twelve markets momentum wins only 7-5",
    "published": "7-5",
    "group": "ranking",
    "key": "sep_mom_mr",
    "compare": {
     "kind": "exact"
    },
-   "source": "reconstructed",
-   "method": "rank(reference_agents(seed=3) factory, seeds=range(12), universe=random(30,11), days=10) from tests/test_ranking.py",
-   "note": "cbd51ee re-measured this to 11-1, p = 0.006 on the agents page; the README comment still carries the pre-era 7-5, and its surrounding snippet builds random(108, seed=7) while the numbers come from the 30-instrument headline grid"
+   "source": "stated",
+   "method": "rank(reference_agents(seed=3) factory, seeds=range(12), universe=random(30,11), days=10).separation('momentum','mean_reversion'); the grid is stated in the prose",
+   "note": "the prose now states the same grid the agents page measures; the old stale snippet comment is gone"
   },
   {
    "id": "readme.separation_comment_p",
    "file": "README.md",
-   "line": 100,
-   "label": "the same comment's p = 0.77",
+   "line": 113,
+   "label": "p = 0.77 - a coin flip",
    "published": 0.77,
    "group": "ranking",
    "key": "sep_mom_mr_p",
@@ -301,15 +680,14 @@
     "decimals": 2
    },
    "source": "reconstructed",
-   "method": "as readme.separation_comment",
-   "note": "stale together with the 7-5; the agents page now measures 0.006"
+   "method": "as readme.separation_comment"
   },
   {
    "id": "readme.workflow_wall",
    "file": "README.md",
-   "line": 220,
-   "label": "worked example: fifteen seconds end to end",
-   "published": 15.0,
+   "line": 335,
+   "label": "worked example: seconds end to end - five, on an Apple-silicon laptop",
+   "published": 5.0,
    "group": "workflow",
    "key": "wall_s",
    "compare": {
@@ -321,7 +699,7 @@
   {
    "id": "readme.workflow_rows",
    "file": "README.md",
-   "line": 221,
+   "line": 337,
    "label": "worked example: 234,000 rows of ground truth",
    "published": 234000,
    "group": "workflow",
@@ -335,7 +713,7 @@
   {
    "id": "readme.workflow_sweep",
    "file": "README.md",
-   "line": 220,
+   "line": 336,
    "label": "worked example: 20-seed sweep",
    "published": 20,
    "group": "workflow",
@@ -349,7 +727,7 @@
   {
    "id": "readme.workflow_agents",
    "file": "README.md",
-   "line": 220,
+   "line": 336,
    "label": "worked example: five-agent evaluation",
    "published": 5,
    "group": "workflow",
@@ -3388,6 +3766,35 @@
    "note": "asserted by tests/test_manifest.py (test_a_different_era_is_refused_before_anything_replays and neighbours)"
   },
   {
+   "id": "share.kat_five_targets",
+   "file": "docs/sharing-a-run.md",
+   "line": 90,
+   "label": "the five-target gate has run: identical digest 76983e65...3180eeb at ad91026",
+   "published": "76983e65...3180eeb",
+   "group": null,
+   "key": null,
+   "compare": {
+    "kind": "none"
+   },
+   "source": "stated",
+   "status_override": "not_harnessable",
+   "note": "the page now states the by-commit record instead of 'the gate has not yet run'; the record is pinned to ad91026 - see repro.kat_five_targets"
+  },
+  {
+   "id": "share.kat_current_digest",
+   "file": "docs/sharing-a-run.md",
+   "line": 92,
+   "label": "the current digest, 1ee64998...fe3581c at v8, one platform so far",
+   "published": "1ee64998...fe3581c",
+   "group": "determinism",
+   "key": "kat_digest_elided",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "known_answer_digest() on this build, elided the way the page prints it"
+  },
+  {
    "id": "tca.entry_cost",
    "file": "docs/transaction-cost-analysis.md",
    "line": 30,
@@ -3731,6 +4138,20 @@
    "method": "100 x buffers_mb"
   },
   {
+   "id": "sweeps.three_streams",
+   "file": "docs/sweeps-and-parallelism.md",
+   "line": 29,
+   "label": "per-seed parallelism survives the split into three per-domain substreams",
+   "published": 3,
+   "group": "rng",
+   "key": "stream_count",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "len(Engine.draws_by_stream())"
+  },
+  {
    "id": "edgar.requests",
    "file": "docs/real-fundamentals-from-sec-edgar.md",
    "line": 26,
@@ -3865,7 +4286,7 @@
   {
    "id": "readme.workflow_asserts",
    "file": "README.md",
-   "line": 224,
+   "line": 341,
    "label": "the worked example's internal assertions all pass",
    "published": true,
    "group": "workflow",
@@ -3876,36 +4297,6 @@
    "source": "stated",
    "method": "run examples/research_workflow.py main(); it asserts its own published findings",
    "note": "after an engine change a failure here means the example script itself needs re-fitting, not just the prose"
-  },
-  {
-   "id": "readme.macro_exogenous",
-   "file": "README.md",
-   "line": 200,
-   "label": "'the macro is exogenous - it holds whatever initial conditions you gave it': macro fields take one distinct value unless driven",
-   "published": 1,
-   "group": "macro_frozen",
-   "key": "max_distinct_macro",
-   "compare": {
-    "kind": "exact"
-   },
-   "source": "stated",
-   "method": "run_days(120, record=True), distinct values per macro-table field; random(20,7), seed 42",
-   "note": "0b4579d made the macro chain run endogenously by default; this paragraph, and core-concepts.md's frozen-macro section, describe the previous era"
-  },
-  {
-   "id": "readme.fv_constant",
-   "file": "README.md",
-   "line": 203,
-   "label": "'fair value is constant unless you drive it'",
-   "published": 1,
-   "group": "macro_frozen",
-   "key": "max_distinct_fv",
-   "compare": {
-    "kind": "exact"
-   },
-   "source": "stated",
-   "method": "distinct fundamental_value per instrument over the same run",
-   "note": "see readme.macro_exogenous"
   }
  ]
 }
