@@ -361,6 +361,7 @@ def evaluate_panel(job: tuple) -> dict:
         "seed": seed,
         "seconds": elapsed,
         "draws_consumed": engine.draws_consumed,
+        "draws_by_stream": dict(engine.draws_by_stream()),
         "panel": numeric,
     }
 
@@ -376,32 +377,107 @@ def vector_key(overrides: dict[str, float]) -> str:
     return json.dumps(overrides, sort_keys=True)
 
 
-def assert_crn(results: list[dict]) -> dict[int, int]:
-    """The CRN guard: draws_consumed identical across vectors per seed.
+#: The stream whose draw count CRN actually rests on. See `crn_streams`.
+CRN_STREAM = "market"
 
-    Returns {seed: draws} on success; raises with the offending seed and
-    counts otherwise. A failure means some parameter moved the draw
-    schedule, which no preset member may (CALIBRATION.md §5.2) — and it
-    would make secants across that pair re-alignment noise rather than
-    parameter effects, which is exactly what this instrument exists not
-    to measure.
+
+def crn_streams(results: list[dict]) -> dict:
+    """Per-stream CRN analysis: what must not move, and what may.
+
+    The 2026-08 stream split gave the engine three generators, and it
+    made the §5.2 membership rule's operative quantity narrower than the
+    rule's wording. `Engine.draws_by_stream`'s own docstring states the
+    split's terms:
+
+      the MARKET stream's schedule is a pure function of (market status,
+      active roster, sector count) — nothing a preset can reach — so two
+      runs with equal `market` counts consumed, and therefore saw, an
+      identical market noise sequence;
+
+      the ECONOMY stream's count "genuinely varies with macro state (a
+      chain in contraction draws a shock the expansion never rolls)",
+      and macro state is driven by the market's realised volatility and
+      return, which every searched parameter moves.
+
+    So `draws_consumed` — the TOTAL — cannot be invariant under a
+    parameter change, and was never the right thing to assert. A guard on
+    the total reports a violation of §5.2 every time a vector is extreme
+    enough to reroute the macro chain, which is a real event about the
+    economy and says nothing about whether the two markets saw the same
+    noise. The market count is the sharp question, and it is the one this
+    function raises on.
+
+    Returns::
+
+        {"market": {seed: draws},
+         "economy_deviations": [...], "external_deviations": [...],
+         "total_deviations": [...]}
+
+    where each deviation names the seed, the reference and observed
+    counts, and the overrides that produced them. Economy and external
+    divergences are DATA, not failures: they are the documented coupling,
+    and a certificate that records them lets a reader see the macro chain
+    branch instead of inferring it from a silence.
+
+    Raises only when the market stream moves, which would make every
+    secant across that pair re-alignment noise rather than a parameter
+    effect — exactly what this instrument exists not to measure.
+
+    Rows measured before `evaluate_panel` recorded the split fall back to
+    asserting on the total, which is the older and stricter claim.
     """
-    by_seed: dict[int, dict[str, int]] = {}
+    split = all("draws_by_stream" in row for row in results)
+    by_seed: dict[int, dict[str, dict]] = {}
     for row in results:
-        by_seed.setdefault(row["seed"], {})[vector_key(row["overrides"])] = (
-            row["draws_consumed"]
-        )
-    out: dict[int, int] = {}
-    for seed, counts in sorted(by_seed.items()):
-        distinct = set(counts.values())
-        if len(distinct) != 1:
-            offenders = {k: v for k, v in counts.items()}
+        by_seed.setdefault(row["seed"], {})[vector_key(row["overrides"])] = row
+
+    market: dict[int, int] = {}
+    deviations: dict[str, list[dict]] = {
+        "economy_deviations": [], "external_deviations": [],
+        "total_deviations": [],
+    }
+    for seed, rows in sorted(by_seed.items()):
+        reference = next(iter(rows.values()))
+
+        def count(row: dict, stream: str) -> int:
+            if stream == "total" or not split:
+                return row["draws_consumed"]
+            return row["draws_by_stream"][stream]
+
+        guarded = CRN_STREAM if split else "total"
+        distinct = {key: count(row, guarded) for key, row in rows.items()}
+        if len(set(distinct.values())) != 1:
             raise AssertionError(
-                f"seed {seed}: draw counts differ across vectors — "
-                f"{offenders} — a parameter moved the draw schedule"
+                f"seed {seed}: {guarded} draw counts differ across vectors — "
+                f"{distinct} — a parameter moved the draw schedule"
             )
-        out[seed] = distinct.pop()
-    return out
+        market[seed] = next(iter(distinct.values()))
+
+        for stream, bucket in (("economy", "economy_deviations"),
+                               ("external", "external_deviations"),
+                               ("total", "total_deviations")):
+            if stream != "total" and not split:
+                continue
+            base = count(reference, stream)
+            for key, row in rows.items():
+                observed = count(row, stream)
+                if observed != base:
+                    deviations[bucket].append({
+                        "seed": seed, "stream": stream, "expected": base,
+                        "observed": observed, "delta": observed - base,
+                        "overrides": row["overrides"]})
+    return {"market": market, "guarded_stream": CRN_STREAM if split else
+            "total (per-stream counts unavailable)", **deviations}
+
+
+def assert_crn(results: list[dict]) -> dict[int, int]:
+    """The CRN guard, on the stream it actually rests on.
+
+    Thin wrapper over `crn_streams` for callers that only want the
+    {seed: draws} map and the assertion. See `crn_streams` for why the
+    market stream and not the total is the quantity §5.2's rule is about.
+    """
+    return crn_streams(results)["market"]
 
 
 def group_by_vector(results: list[dict]) -> dict[str, list[dict]]:

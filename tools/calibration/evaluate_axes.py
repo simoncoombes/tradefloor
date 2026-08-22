@@ -145,9 +145,20 @@ def main() -> None:
                     for seed in seeds]
             rows = lib.run_pool(jobs, args.workers)
             panel_runs += len(jobs)
-            lib.assert_crn(rows)
+            crn = lib.crn_streams(rows)
             panels = [r["panel"] for r in rows]
             breakdown = loss_mod.band_distance_loss(panels)
+            # How far inside its band each statistic sits, in its own seed
+            # noise. The band loss is flat inside the band and cannot see
+            # this; it is what decides whether a statistic survives a
+            # change of seeds, universe or horizon, so a tool whose whole
+            # job is comparing named vectors across those axes reports it.
+            for key, srow in breakdown["statistics"].items():
+                lo, hi = srow["band"]
+                sd = facts.SEED_SD.get(key)
+                m = srow["measured"]
+                srow["room_sd"] = (None if m is None or not sd
+                                   else min(m - lo, hi - m) / sd)
             boot = np.random.default_rng(20260822)
             spread = float("nan")
             if len(panels) > 2:
@@ -161,8 +172,14 @@ def main() -> None:
                 "universe": f"Universe.random({universe_n}, "
                             f"seed={universe_seed})",
                 "loss_real": breakdown["loss"],
+                "bands_used_for_every_verdict_here": "the TRUE bands "
+                                                     "(facts.REAL_MARKETS)",
                 "bootstrap_spread": spread,
                 "statistics": breakdown["statistics"],
+                "crn_guard": {"asserted_stream": lib.CRN_STREAM,
+                              "market": crn["market"],
+                              "economy_deviations":
+                                  crn["economy_deviations"]},
                 "panels": panels,
             }
             print(f"{name:<22} {axis:<18} L_real "
