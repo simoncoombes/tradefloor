@@ -167,12 +167,24 @@ of dicts will.
 
 ## What the reproduction guarantees
 
-**Across machines.** The same seed gives the same market on Linux, macOS and
-Windows, x86 and ARM alike, to the last bit. The library carries its own
-`exp`, `log`, `sin` and `cos` rather than calling the platform's, which is
-what normally makes float results drift between operating systems. Every
-release builds wheels for five targets, runs one fixed simulation inside each,
-and compares digests; any disagreement fails the release.
+**Across machines -- measured once, not yet on this era.** The library carries
+its own `exp`, `log`, `sin` and `cos` rather than calling the platform's,
+specifically so builds on different operating systems can't drift apart in
+the low bits. Every release is meant to build wheels for five targets, run
+one fixed simulation inside each, and compare digests
+(`.github/workflows/determinism.yml`); any disagreement fails the release.
+That gate has not yet run against a tagged release.
+
+What has actually been measured: at `a5afd1c` (known-answer v3), an
+independent build on Windows x86_64 and a second independent build on macOS
+arm64 produced the identical digest, `112fd73e...6eff337`. `0b4579d` moved
+every seed's trajectory -- the macro-chain and volume fixes -- and bumped the
+known-answer baseline to v4; that regeneration ran on macOS arm64, so the
+current baseline has one platform's confirmation behind it, not five, until
+the gate runs. Treat "the same seed gives the same market on any platform" as
+confirmed for one cross-platform pair on the prior era, and as engineering
+intent -- backed by a test that no platform-varying transcendental reaches the
+source (`rust/tests/mathx_parity.rs`) -- for the current one.
 
 **Across versions, not at all.** A change to a coefficient, to the universe
 generator, or to the engine moves every seed's trajectory. This is why the
