@@ -19,13 +19,46 @@
 //!
 //! # Measured over twenty days
 //!
-//! Prices bit-identical every day; cycle phases, transition days and meeting
+//! Measured 2026-08-20, v4-era crate against its matching v4 reference:
+//! prices bit-identical every day; cycle phases, transition days and meeting
 //! days all identical; GARCH variance identical. The unrounded `s` differs by
 //! ~1e-17 and does NOT grow — 6.9e-18 on day 0, 1.4e-17 on day 19 — because
 //! `s` mean-reverts at `S_PHI_TICK` rather than accumulating.
 //!
 //! The feedback paths in (1) are real but carry a perturbation thirteen orders
 //! of magnitude below a cent, so they never reach the tape.
+//!
+//! # How the engine is driven, since the 2026-08 stream split
+//!
+//! The reference recording is a pre-split artefact: ONE shared
+//! `GameRng(seed, 99)` threading the daily macro chain, the ticks and the
+//! settlement guards in program order, day after day. `Engine::advance_day()`
+//! and `Engine::tick()` no longer produce that schedule — they draw from
+//! private economy and market substreams, and settlement draws four
+//! unconditionally (`docs/rng-streams.md`). So this harness reconstructs the
+//! reference's era explicitly: one `GameRng(seed, MAIN_STREAM)` handed to
+//! `advance_day_with` and `tick_with` in the reference's order, which is
+//! bit-exactly the pre-split engine's own generative path — the Box-Muller
+//! spare carries across the macro/market boundary exactly as the shared
+//! stream carried it.
+//!
+//! That coupling is the point of preserving it HERE and the point of
+//! removing it from live runs: pre-split, a day whose macro chain drew one
+//! extra shock re-dealt every market draw after it — a categorical
+//! divergence this file's branch table would report as two different worlds.
+//! The engine's own schedule now makes that impossible by construction
+//! (`tests/stream_alignment.rs` and the engine tests assert it; the
+//! single-session `divergence` example demonstrates it). This example stays
+//! focused on the question only the reference can answer: does the
+//! cross-language plateau survive days of lifecycle feedback?
+//!
+//! As with the single-session example, the reference must be cut at THIS
+//! crate's model constants — the era recalibrated `MARKET_FACTOR_SIGMA` from
+//! the reference's 0.003 to 0.0075 and the crash-amplifier normaliser
+//! follows it by name. Vectors from an unpatched reference measure the
+//! recalibration, not the port (see `examples/divergence.rs`'s module docs
+//! for the regeneration requirements), and the v4 numbers above are pending
+//! re-measurement against a v5-matched reference.
 //!
 use std::fs;
 use std::path::PathBuf;
@@ -34,8 +67,9 @@ use pretium::economy::{
     create_initial_central_bank_state, create_initial_economy_state, CyclePhase,
     InitialEconomyOptions,
 };
-use pretium::engine::{DayAdvanceRequest, DayCloseRequest, Engine, TickRequest};
+use pretium::engine::{DayAdvanceRequest, DayCloseRequest, Engine, TickRequest, MAIN_STREAM};
 use pretium::market::{AvgVolumePolicy, GameTime, TickCompany, TickStock};
+use pretium::rng::GameRng;
 use serde_json::Value as Json;
 
 fn bits(hex: &str) -> f64 {
@@ -146,33 +180,43 @@ pub fn run(doc: &Json) -> Vec<DayResult> {
     let roster = companies.len();
 
     let mut engine = Engine::new(tick_seed, companies, economy, central_bank, sector_keys);
+    // The reference's single shared stream, reconstructed. Every draw of the
+    // run — macro chain and ticks alike — comes from this one generator, in
+    // the reference's order, because that is the era the tape was cut in.
+    let mut main = GameRng::new(tick_seed, MAIN_STREAM);
     let mut out = Vec::new();
 
     for day_doc in doc["days"].as_array().unwrap() {
         let day = day_doc["day"].as_i64().unwrap();
 
-        let advance = engine.advance_day(&DayAdvanceRequest {
-            volatility,
-            active_shocks: &[],
-            market_return_pct: 0.0,
-            game_day: day,
-            timestamp: day * 24 * 60,
-        });
+        let advance = engine.advance_day_with(
+            &DayAdvanceRequest {
+                volatility,
+                active_shocks: &[],
+                market_return_pct: 0.0,
+                game_day: day,
+                timestamp: day * 24 * 60,
+            },
+            &mut main,
+        );
 
         engine.open_market();
         let (mut hour, mut minute) = (9i64, 30i64);
         for _ in 0..ticks_per_day {
-            engine.tick(&TickRequest {
-                time: GameTime {
-                    hour,
-                    minute,
-                    day_of_week: 3,
+            engine.tick_with(
+                &TickRequest {
+                    time: GameTime {
+                        hour,
+                        minute,
+                        day_of_week: 3,
+                    },
+                    volatility_multiplier: volatility,
+                    news: &[],
+                    news_impact_queue: &[],
+                    order_volumes: &[],
                 },
-                volatility_multiplier: volatility,
-                news: &[],
-                news_impact_queue: &[],
-                order_volumes: &[],
-            });
+                &mut main,
+            );
             minute += 1;
             if minute >= 60 {
                 minute = 0;
@@ -231,6 +275,8 @@ fn main() {
         "  Multi-day divergence — Rust vs V8, own generators, {} days",
         results.len()
     );
+    println!("  (shared-stream replay: one GameRng(seed, MAIN_STREAM) through");
+    println!("   advance_day_with and tick_with, the reference's era)");
     println!();
 
     // Branches first: a divergence here is categorical, and reporting it after

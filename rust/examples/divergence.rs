@@ -12,9 +12,42 @@
 //! **1.586% of normals differ, first at draw 31, by 1 to 2 ULP** -- because
 //! `next_normal` is Box-Muller and routes through `cos`.
 //!
+//! # How the engine is driven, since the 2026-08 stream split
+//!
+//! The reference recording is a PRE-SPLIT artefact: one shared
+//! `GameRng(seed, 99)` feeding every consumer in program order, settlement
+//! drawing four uniforms or zero as its guards decided. `Engine::tick()` no
+//! longer produces that schedule -- it draws from a private market substream
+//! and settles on a fixed four-draw schedule (`docs/rng-streams.md`), a
+//! different era from the tape, and running it against the reference would
+//! compare two unrelated noise sequences.
+//!
+//! So the harness drives the reference's era explicitly: one
+//! `GameRng(seed, MAIN_STREAM)` fed through [`Engine::tick_with`], which
+//! consumes it in the shared-stream order, four-or-zero settlement included.
+//! That is bit-exactly what `engine.tick()` itself did before the split --
+//! same arithmetic, same draws, same order -- so the comparison still
+//! measures Rust-versus-V8 and nothing else.
+//!
+//! # The reference must be cut at THIS crate's model constants
+//!
+//! The same era boundary recalibrated `MARKET_FACTOR_SIGMA` away from the
+//! reference's inherited 0.003, to 0.0075 (`58837b3`). Vectors generated
+//! from an unpatched reference now diverge from this crate at the first
+//! tick, BY MODEL, and the curve would measure the recalibration rather
+//! than the port. Regenerating `goldens/divergence-reference.json` for this
+//! era means running the reference generator with its sigma patched to this
+//! crate's value AND its crash amplifier's inlined `0.003` normaliser moved
+//! with it -- this crate denominates that threshold in the sigma by name
+//! (`factors.rs`), and a reference left normalising by the old value would
+//! fire its amplifier on half of all ticks. That difference would wear this
+//! curve as a costume: exactly the class of harness artefact the retraction
+//! below exists to warn about.
+//!
 //! # The measured result: prices are bit-identical anyway
 //!
-//! That generator divergence does not reach the tape. Over a full session and
+//! Measured 2026-08-20, v4-era crate against its matching v4 reference. The
+//! generator divergence does not reach the tape. Over a full session and
 //! over twenty days with the daily lifecycle running:
 //!
 //! | | |
@@ -33,6 +66,12 @@
 //!    instead of accumulating, so twenty days of feedback through the close
 //!    leave it where it started.
 //!
+//! The 2026-08 era changed every trajectory, so the numbers above are
+//! pending re-measurement against a v5-matched reference. Both mechanisms
+//! are untouched by the era -- the grid and the mean reversion are what they
+//! were -- so the expected result is the same; the point of re-running this
+//! example is to confirm that rather than assume it.
+//!
 //! # An earlier version of this file reported a divergence curve. It was wrong.
 //!
 //! The reference generator called `resetDailyPrices(companies)` and DISCARDED
@@ -42,14 +81,28 @@
 //! a `cos` divergence curve reaching 0.07%. Fixed in `divergence-vectors.ts`.
 //! The curve was an artefact of the harness, not a property of the port.
 //!
+//! # The second table: what the split prevents
+//!
+//! The ULP story above is the divergence that REMAINS. The kind that used to
+//! dominate -- any draw-count change anywhere re-dealing every draw after
+//! it -- is structurally gone from the engine's own schedule, and this
+//! example now shows both sides of that line with one extra draw taken
+//! mid-session:
+//!
+//! - under the pre-split shared stream, that draw re-deals the market from
+//!   the tick it lands on: a categorical divergence, not a ULP one;
+//! - under the engine's own per-domain streams, the same draw comes from the
+//!   external stream and every price is bit-identical.
+//!
 use std::fs;
 use std::path::PathBuf;
 
 use pretium::economy::{
     create_initial_central_bank_state, create_initial_economy_state, InitialEconomyOptions,
 };
-use pretium::engine::{Engine, TickRequest};
+use pretium::engine::{Engine, TickRequest, MAIN_STREAM};
 use pretium::market::{GameTime, TickCompany, TickStock};
+use pretium::rng::GameRng;
 use serde_json::Value as Json;
 
 fn bits(hex: &str) -> f64 {
@@ -108,11 +161,20 @@ pub fn build_company(c: &Json) -> TickCompany {
     }
 }
 
-/// Run the Rust side with its own generator, returning prices per tick.
-pub fn run_rust(doc: &Json) -> Vec<Vec<f64>> {
+/// The engine plus the run parameters, built from the reference document's
+/// initial state. Shared by every driving mode below so the modes can only
+/// differ in how they draw, never in where they start.
+struct Setup {
+    engine: Engine,
+    seed: u32,
+    ticks: usize,
+    volatility: f64,
+}
+
+fn setup(doc: &Json) -> Setup {
     let spec = &doc["spec"];
-    let tick_seed = spec["tickSeed"].as_u64().unwrap() as u32;
-    let ticks = spec["ticks"].as_i64().unwrap();
+    let seed = spec["tickSeed"].as_u64().unwrap() as u32;
+    let ticks = spec["ticks"].as_i64().unwrap() as usize;
     let volatility = bits(spec["volatility"].as_str().unwrap());
 
     let sector_keys: Vec<String> =
@@ -133,30 +195,63 @@ pub fn run_rust(doc: &Json) -> Vec<Vec<f64>> {
         .map(build_company)
         .collect();
 
-    let mut engine = Engine::new(
-        tick_seed,
-        companies,
-        economy,
-        create_initial_central_bank_state(0),
-        sector_keys,
-    );
+    Setup {
+        engine: Engine::new(
+            seed,
+            companies,
+            economy,
+            create_initial_central_bank_state(0),
+            sector_keys,
+        ),
+        seed,
+        ticks,
+        volatility,
+    }
+}
+
+fn tick_request(hour: i64, minute: i64, volatility: f64) -> TickRequest<'static> {
+    TickRequest {
+        time: GameTime {
+            hour,
+            minute,
+            day_of_week: 3,
+        },
+        volatility_multiplier: volatility,
+        news: &[],
+        news_impact_queue: &[],
+        order_volumes: &[],
+    }
+}
+
+/// Drive the REFERENCE's era: one shared `GameRng(seed, MAIN_STREAM)` fed
+/// through `tick_with`, which consumes it in the pre-split shared-stream
+/// order, settlement's four-or-zero included. Bit-exactly what the pre-split
+/// engine's own `tick()` did, and the only schedule the TypeScript recording
+/// can be compared against.
+///
+/// `extra_draw_at`: before that tick, ONE uniform is taken from the shared
+/// stream -- reproducing what any embedder event roll, macro branch or other
+/// draw-count change did to the market before the split. `None` is the
+/// faithful replay.
+pub fn run_shared_stream(doc: &Json, extra_draw_at: Option<usize>) -> Vec<Vec<f64>> {
+    let Setup {
+        mut engine,
+        seed,
+        ticks,
+        volatility,
+    } = setup(doc);
+    let mut main = GameRng::new(seed, MAIN_STREAM);
+
     // The reference calls `resetDailyPrices` after re-seeding, before the loop.
     engine.open_market();
 
-    let mut out = Vec::with_capacity(ticks as usize);
+    let mut out = Vec::with_capacity(ticks);
     let (mut hour, mut minute) = (9i64, 30i64);
-    for _ in 0..ticks {
-        engine.tick(&TickRequest {
-            time: GameTime {
-                hour,
-                minute,
-                day_of_week: 3,
-            },
-            volatility_multiplier: volatility,
-            news: &[],
-            news_impact_queue: &[],
-            order_volumes: &[],
-        });
+    for t in 0..ticks {
+        if extra_draw_at == Some(t) {
+            main.next_f64();
+        }
+        engine.tick_with(&tick_request(hour, minute, volatility), &mut main);
         out.push(engine.prices());
         minute += 1;
         if minute >= 60 {
@@ -165,6 +260,44 @@ pub fn run_rust(doc: &Json) -> Vec<Vec<f64>> {
         }
     }
     out
+}
+
+/// Drive the engine's OWN era: `tick()` on its private market substream,
+/// with `extra_draw_at` taking the same extra uniform through the EXTERNAL
+/// stream instead. Not comparable to the reference -- a different era -- but
+/// comparable to ITSELF, which is the point: the perturbation that re-deals
+/// the shared-stream world must leave this one bit-identical.
+pub fn run_own_streams(doc: &Json, extra_draw_at: Option<usize>) -> Vec<Vec<f64>> {
+    let Setup {
+        mut engine,
+        seed: _,
+        ticks,
+        volatility,
+    } = setup(doc);
+
+    engine.open_market();
+
+    let mut out = Vec::with_capacity(ticks);
+    let (mut hour, mut minute) = (9i64, 30i64);
+    for t in 0..ticks {
+        if extra_draw_at == Some(t) {
+            engine.draw_uniform();
+        }
+        engine.tick(&tick_request(hour, minute, volatility));
+        out.push(engine.prices());
+        minute += 1;
+        if minute >= 60 {
+            minute = 0;
+            hour += 1;
+        }
+    }
+    out
+}
+
+/// Run the Rust side against the reference: the shared-stream replay, no
+/// perturbation. This is the harness `divergence_statistics.rs` imports.
+pub fn run_rust(doc: &Json) -> Vec<Vec<f64>> {
+    run_shared_stream(doc, None)
 }
 
 pub fn reference_prices(doc: &Json) -> Vec<Vec<f64>> {
@@ -236,6 +369,7 @@ fn main() {
 
     println!();
     println!("  Cross-language divergence — Rust vs V8, same seed, own generators");
+    println!("  (shared-stream replay: tick_with from one GameRng(seed, MAIN_STREAM))");
     println!("  {} ticks x {roster} companies", errors.len());
     println!();
     match first_divergence {
@@ -282,7 +416,72 @@ fn main() {
     } else {
         println!("  Read this as a budget, not a defect. There is no single browser");
         println!("  answer to match - Chrome, Firefox and Safari disagree about `cos`");
-        println!("  with each other.");
+        println!("  with each other. A LARGE divergence here is a different story:");
+        println!("  check the reference was cut at this crate's model constants");
+        println!("  (MARKET_FACTOR_SIGMA and the amplifier normaliser - module docs)");
+        println!("  before reading it as a property of the port.");
     }
+
+    // ── What the split prevents ───────────────────────────────────────────
+    //
+    // One extra draw, taken a third of the way into the session. Before the
+    // split that is what ANY draw-count change anywhere -- an embedder event
+    // roll, a macro branch, a settlement guard flipping -- did to the market:
+    // every subsequent draw shifted. Since the split the same draw comes from
+    // the external stream and the market's sequence cannot move.
+    let perturb = errors.len() / 3;
+    let shared_bumped = run_shared_stream(&doc, Some(perturb));
+    let own_base = run_own_streams(&doc, None);
+    let own_bumped = run_own_streams(&doc, Some(perturb));
+
+    let shared_vs = tick_errors(&shared_bumped, &rust);
+    let own_vs = tick_errors(&own_bumped, &own_base);
+
+    println!();
+    println!("  What the 2026-08 stream split prevents");
+    println!("  One extra draw taken before tick {perturb} — an embedder event roll, say:");
+    println!();
+    match shared_vs.iter().position(|e| e.exact < e.total) {
+        Some(t) => {
+            let end = shared_vs.last().unwrap();
+            println!("    pre-split shared stream:  every draw after it shifts — first");
+            println!("                              divergence at tick {t}; at the close");
+            println!(
+                "                              {}/{} prices differ, max rel err {:.3e}",
+                end.total - end.exact,
+                end.total,
+                end.max
+            );
+        }
+        None => {
+            // The extra draw re-deals every subsequent normal, so identical
+            // prices here would mean the shared stream is not actually being
+            // consumed — a harness bug, and this example measures its harness.
+            println!("    pre-split shared stream:  NO divergence — the perturbation did");
+            println!("                              not reach the draws. Harness bug; do");
+            println!("                              not read the table above until fixed.");
+        }
+    }
+    match own_vs.iter().position(|e| e.exact < e.total) {
+        None => {
+            println!(
+                "    per-domain streams:       prices BIT-IDENTICAL, all {} ticks x {roster}",
+                own_vs.len()
+            );
+            println!("                              names — the external stream cannot");
+            println!("                              move the market's sequence.");
+        }
+        Some(t) => {
+            println!("    per-domain streams:       DIVERGED at tick {t}. That breaks the");
+            println!("                              stream-isolation contract in");
+            println!("                              docs/rng-streams.md — a finding, not");
+            println!("                              a harness artefact. Report it.");
+        }
+    }
+    println!();
+    println!("  The table above is the divergence that remains — 1-2 ULP at the");
+    println!("  generator, absorbed by the cent grid. This one is the divergence");
+    println!("  that used to dominate, and the engine now prevents it by");
+    println!("  construction rather than measuring it after the fact.");
     println!();
 }
