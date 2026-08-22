@@ -15,17 +15,22 @@ shock = pt.Scenario.rate_shock(start=0.025, end=0.05, over=15)
 pt.evaluate(agents, seed=7, universe=universe, days=20, scenario=shock)
 ```
 
-Measured on seed 7 - same market, same agents, only the macro path differs:
+Measured on the reference agents (`pt.reference_agents(seed=3)`) over
+`Universe.random(20, seed=4)`, seed 7, 20 days - calm is the same call with no
+scenario. Same market, same agents, only the macro path differs:
 
 | agent | calm | hiked | delta |
 |---|---|---|---|
-| buy_and_hold | +3.51% | -0.87% | -4.37 |
-| momentum | -2.36% | -0.63% | +1.73 |
-| oracle | +20.86% | +20.91% | +0.05 |
+| buy_and_hold | -6.11% | -9.87% | -3.76 |
+| momentum | -0.68% | -2.55% | -1.87 |
+| oracle | +18.21% | +16.06% | -2.15 |
 
-Buy-and-hold is long-only and holds through the repricing. Momentum gains
-because it can rotate. The Oracle is untouched because it trades mispricing,
-and the shock moves fair value along with price.
+Nobody escapes the walk. Buy-and-hold is long-only, holds through the
+repricing, and loses the most. Momentum and the Oracle can trade around it and
+each give up about two points. The Oracle stays far ahead in both worlds
+because it trades mispricing, and the shock moves fair value along with
+price - but holding positions through a repricing still costs it, so its edge
+survives the shock where its level does not.
 
 **One trap.** Pinning `federal_funds_rate` alone does nothing until the first
 central-bank meeting - measured at exactly 0.00% across twenty instruments
