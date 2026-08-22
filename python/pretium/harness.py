@@ -499,10 +499,11 @@ def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard
     .. warning::
 
        This ranks the seed at least as much as the agents, and the effect is
-       not subtle. Measured on the reference agents over twelve markets, a
-       single seed picks the top-ranked agent **exactly half the time**, and
-       the leader's capture ratio ranges from +0.075 to +1.133 depending only
-       on which market it drew.
+       not subtle. Measured on the reference agents over twelve ten-day
+       markets on ``Universe.random(30, seed=11)``, a single seed usually
+       NAMES the across-seed leader — nine times in twelve — but what it
+       says that leader is worth ranges from a capture of +0.007 to +2.834
+       depending only on which market it drew.
 
        Use this to read one market. To rank agents, use :func:`pretium.rank`,
        which takes the verdict across seeds and reports a paired sign test
