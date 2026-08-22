@@ -37,7 +37,8 @@ def test_the_research_workflow_runs_and_its_assertions_hold():
     )
     assert result.returncode == 0, result.stdout + result.stderr
     for expected in ("universe:", "swept", "evaluated", "shortfall",
-                     "untouched instruments moved: none",
+                     "untouched instruments moved:",
+                     "under a pinned VIX: none, byte-exact",
                      "ground truth:", "replayed it to identical prices"):
         assert expected in result.stdout, (expected, result.stdout)
 

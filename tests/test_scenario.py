@@ -87,14 +87,45 @@ def test_a_bigger_hike_hurts_more():
     assert large["median_pct"] < small["median_pct"]
 
 
-def test_a_vix_shock_moves_dispersion_more_than_level():
-    # A stress episode is not direction. The median barely moves; the tails do.
-    result = run(Scenario.vix_shock(calm=15.0, peak=45.0, at=10, over=20))
-    assert abs(result["median_pct"]) < 0.1
-    # The tails move where the median does not: measured -0.25% worst against
-    # +0.53% best, a spread twenty times the median shift.
-    assert result["best_pct"] - result["worst_pct"] > 10 * abs(result["median_pct"])
-    assert result["worst_pct"] < 0.0
+def test_a_vix_shock_raises_realised_volatility():
+    """The claim the 2026-08 coupling made true, pinned from the tests.
+
+    This test replaces one asserting a vix_shock moves dispersion more than
+    level -- which held exactly while VIX had no volatility channel, and
+    stopped holding the day it gained one: the spike now scales the shared
+    factor's variance, so the same market draws produce amplified factor
+    moves and the median is whatever the shocked window's draws happened to
+    sum to (measured +0.87% at seed 5, against <0.1% before the coupling).
+    Direction is seed luck; the variance rise is the mechanism, so the
+    variance rise is what gets asserted. Measured pooled close-to-close
+    vol, shocked over flat on identical draws: 1.23x at seed 3, 1.25x at
+    seed 5, 1.17x at seed 7.
+    """
+    import math
+    import statistics
+    import pyarrow as pa
+
+    def pooled_vol(scenario, seed):
+        engine = run_scenario(scenario, seed=seed, universe=UNIVERSE, days=40,
+                              ticks_per_day=80, record=True)
+        bars = pa.table(engine.bars(grain="day")).to_pydict()
+        series = {}
+        for ticker, close in zip(bars["instrument_id"], bars["close"]):
+            series.setdefault(ticker, []).append(close)
+        returns = []
+        for closes in series.values():
+            returns += [math.log(closes[i + 1] / closes[i])
+                        for i in range(len(closes) - 1)]
+        return statistics.pstdev(returns)
+
+    shock = Scenario.vix_shock(calm=15.0, peak=45.0, at=10, over=20)
+    flat = Scenario().hold(vix=15.0)
+    for seed in (3, 5, 7):
+        ratio = pooled_vol(shock, seed) / pooled_vol(flat, seed)
+        assert ratio > 1.05, (
+            f"seed {seed}: a spike to VIX 45 must raise realised volatility "
+            f"over the flat run on identical draws, got x{ratio:.3f}"
+        )
 
 
 # --------------------------------------------------------------------------
@@ -294,12 +325,16 @@ def test_execution_costs_more_in_a_volatile_regime():
     turned down. Here you can, and both worlds run the identical macro path,
     so the difference is the trading rather than the regime.
 
-    Measured over twelve seeds, paired: the volatile regime costs more in
-    11 of 12, paired median delta +0.77 bps. A win count and a paired delta
+    Measured over sixteen seeds, paired: the volatile regime costs more in
+    13 of 16, paired median delta +0.63 bps. A win count and a paired delta
     rather than one seed, because a single comparison of an 11-fill programme
-    is noise -- and 11 of 12 rather than 12 of 12 is why. On the previous
-    universe generator this read 12 of 12 at +2.99 bps; the effect is robust
-    in direction and not in magnitude, so the assertion is on direction.
+    is noise. The seed count doubled (8 -> 16) and the required majority
+    loosened when the VIX coupling landed: a VIX 45 regime is now genuinely
+    volatile rather than merely wide-spread, and a rotating programme in a
+    high-variance market can luck into favourable fills (seed 2 reads -2.84
+    bps), so unanimity was never going to survive the regime becoming real.
+    The effect is robust in direction and not in magnitude, so the assertion
+    is on direction.
     """
     import statistics
 
@@ -314,7 +349,7 @@ def test_execution_costs_more_in_a_volatile_regime():
 
     deltas = []
     wins = 0
-    for seed in range(8):
+    for seed in range(16):
         calm = pretium.tca.analyse(Rotating(), seed=seed, universe=UNIVERSE,
                                    days=10, scenario=Scenario().hold(vix=15.0))
         spike = pretium.tca.analyse(Rotating(), seed=seed, universe=UNIVERSE,
@@ -323,9 +358,10 @@ def test_execution_costs_more_in_a_volatile_regime():
         wins += spike.shortfall_bps() > calm.shortfall_bps()
 
     # A strong majority, not unanimity. Requiring every seed to agree would
-    # be pinning noise, and it would fail on a generator change that left the
-    # effect intact -- which is exactly what happened.
-    assert wins >= 7, deltas
+    # be pinning noise, and it would fail on a change that left the effect
+    # intact -- which has now happened twice (the universe generator, then
+    # the volatility coupling).
+    assert wins >= 11, deltas
     assert statistics.median(deltas) > 0.2
 
 
@@ -376,7 +412,7 @@ def test_a_pin_holds_for_the_whole_day_it_was_applied_to():
 
 
 # --------------------------------------------------------------------------
-# The rename: VIX is a liquidity and correlation lever, not a volatility one
+# The rename, and the coupling that later made the old name true again
 # --------------------------------------------------------------------------
 
 
@@ -390,19 +426,32 @@ def test_vol_shock_still_works_and_says_it_is_deprecated():
     assert old.to_json(40) == new.to_json(40)
 
 
-def test_vix_at_or_below_fifteen_is_inert():
-    """Not "weak" -- inert, and worth a test because the docs now say so.
+def test_a_low_vix_calms_the_market_from_the_second_day_on_the_same_draws():
+    """The inertness claim, inverted by the coupling -- and pinned again.
 
-    Below VIX 15 the spread multiplier floors at 1.0 and the correlation blend
-    (VIX > 40) has not started, so there is no channel left. Measured:
-    identical prices to the last bit.
+    This test used to assert VIX 5 and VIX 15 produce bit-identical prices,
+    because below 15 the spread multiplier floored at 1.0 and the correlation
+    blend had not started -- there was no channel left. The 2026-08 coupling
+    added one: every close feeds the day's VIX into the market factor's
+    variance target, so a sub-15 pin is now a CALMING lever rather than a
+    no-op. The divergence starts exactly at the second day -- day one trades
+    at the fresh baseline state and only the first close reads the pin --
+    and the draw schedule does not move at all, because the target reads
+    macro state rather than drawing anything: same market noise, different
+    variance, different prices.
     """
+    day_one_calm = run_scenario(Scenario().hold(vix=15.0), seed=3,
+                                universe=UNIVERSE, days=1)
+    day_one_low = run_scenario(Scenario().hold(vix=5.0), seed=3,
+                               universe=UNIVERSE, days=1)
+    assert day_one_calm.prices() == day_one_low.prices()
+
     calm = run_scenario(Scenario().hold(vix=15.0), seed=3,
                         universe=UNIVERSE, days=4)
-    panic_free = run_scenario(Scenario().hold(vix=5.0), seed=3,
-                              universe=UNIVERSE, days=4)
-    assert calm.prices() == panic_free.prices()
-    assert calm.draws_consumed == panic_free.draws_consumed
+    low = run_scenario(Scenario().hold(vix=5.0), seed=3,
+                       universe=UNIVERSE, days=4)
+    assert calm.prices() != low.prices()
+    assert calm.draws_consumed == low.draws_consumed
 
 
 def test_a_vix_spike_widens_the_quoted_spread():

@@ -52,62 +52,75 @@ equally would tell a cross-sectional strategy nothing.
 
 ## What a VIX path actually moves
 
-Worth reading before reaching for :meth:`Scenario.vix_shock`, because the name
-VIX carries an assumption from everywhere else in finance that does not hold
-here. In this model VIX does not enter the variance process at all. The GARCH
-recursion is ``omega + alpha * r^2 + beta * v`` with a sector-relative clamp,
-and there is no VIX term in it or in the noise magnitude.
+For most of this model's history the honest answer was "not volatility",
+this section said so, and tests pinned it. That changed in the 2026-08 era:
+the shared market factor carries its own conditional-variance process, and
+its reversion target is now proportional to VIX squared — VIX read as the
+factor's implied volatility, anchored so that VIX 15 (the endogenous mean)
+reproduces the autonomous process exactly. The coupling was measured before
+it was switched on, and this section was rewritten in the same change that
+switched it, because the old claims were load-bearing.
 
-What VIX does reach:
+What VIX reaches now:
 
-1. The quoted bid-ask, through a spread multiplier
+1. **The market factor's variance target** — the volatility channel. Each
+   close feeds the day's VIX into the factor's GARCH reversion target as
+   ``(vix / 15)^2``. The per-name idiosyncratic GARCH still has no VIX
+   term: what VIX scales is the SHARED component of every return, which is
+   why a crisis VIX is simultaneously a volatility regime and a
+   correlation regime.
+2. The quoted bid-ask, through a spread multiplier
    ``1 + max(0, (vix - 15) / 30)``.
-2. Cross-sectional correlation, but only above VIX 40, where idiosyncratic
-   sector factors blend toward the market factor, up to 0.8.
-3. Credit spreads in the daily economy step. Since the macro chain runs
+3. Cross-sectional correlation above VIX 25.5 (the crisis threshold since
+   the 2026-08 re-site; it was a dead ``vix > 40`` before), where
+   idiosyncratic sector factors blend toward the market factor, up to 0.8.
+4. Credit spreads in the daily economy step. Since the macro chain runs
    endogenously this channel is LIVE from Python: the corporate spread
    carries a VIX term and is recomputed at central-bank meetings, the first
    of which sits at day 45.
 
 Measured on this build — ``Universe.random(20, seed=11)``, 120 days, sim
-seed 3 — annualised realised volatility:
+seed 3, pinned through the scenario API — annualised realised volatility:
 
-    VIX  5    63.93%
-    VIX 15    64.04%   (the default)
-    VIX 45    64.82%
-    VIX 65    67.19%
+    VIX  5     49.48%
+    VIX 15     58.76%   (the anchor; bit-identical to the uncoupled model)
+    VIX 45    107.07%
+    VIX 65    124.31%
 
-A thirteenfold move in VIX moves realised volatility about three points, or
-5% of itself. Below VIX 15 the tick-level channels are closed — the spread
-multiplier floors at 1.0 and the correlation blend has not started — and
-VIX 5, VIX 10 and VIX 15 produce BIT-IDENTICAL prices over 40 days on 20
-instruments. They no longer do over 60: once a run crosses the first
-central-bank meeting at day 45, channel 3 reprices the corporate yield off
-a VIX that differs, so even a sub-15 pin diverges past that horizon.
+A thirteenfold move in VIX now moves realised volatility by a factor of
+2.5. Sub-15 pins are live too — a low VIX CALMS the factor, where before
+the coupling it changed nothing at all. VIX 5, 10 and 15 produce identical
+prices only for the first day (the first close is where a pin first enters
+the variance target); from the second day they diverge. The response to a
+held pin saturates: the factor's variance is clamped at 8x its baseline,
+so above VIX ~42 a harder pin buys almost no additional factor variance —
+quadratic inside the plausible band, flat beyond it.
 
-What does move at the tick. Mean quoted spread across
-``Universe.random(25, seed=11)`` after five days, sim seed 3:
+Mean quoted spread across ``Universe.random(25, seed=11)`` after five days,
+sim seed 3:
 
-    VIX  5    11.57 bps
-    VIX 15    11.57 bps
-    VIX 25    14.38 bps
-    VIX 45    18.67 bps
-    VIX 65    24.88 bps
+    VIX  5    11.17 bps
+    VIX 15    11.52 bps
+    VIX 25    13.92 bps
+    VIX 45    18.87 bps
+    VIX 65    25.89 bps
 
-The correlation channel is real but smaller than the name suggests. Mean
+(The multiplier still floors at 1.0 below VIX 15; the small 5-vs-15 gap is
+the variance channel moving prices, not the spread rule.)
+
+The correlation channel is no longer smaller than the name suggests. Mean
 pairwise correlation of daily log returns, the same 25 names over 120 days,
-300 pairs: +0.108 at VIX 15, +0.122 at VIX 45, +0.159 at VIX 65. The calm
-baseline belongs to the market factor (sigma 0.0075 since the 2026-08
-recalibration); the blend above 40 acts on SECTOR factors, whose sigma is
-0.002, so a crisis-level VIX adds about half again to correlation and
-diversification keeps working at VIX 65. The realism documentation has the
-arithmetic.
+300 pairs: +0.269 at VIX 15, +0.678 at VIX 45, +0.759 at VIX 65. A
+high-variance factor regime IS a high-correlation regime, and at crisis
+VIX diversification genuinely stops working — which is what real crises
+do, and what this model could not produce before the coupling.
 
-**The bid-ask is the channel that genuinely moves.** In practice this is a
-liquidity and spread stress variable. It does not answer what happens when
-volatility triples: nothing in this model raises realised volatility, and that
-limitation is stated here rather than left for a user to discover after
-publishing.
+So a VIX path now answers both stress questions: what an execution
+algorithm does when spreads widen, and what a strategy does when
+volatility triples and every name starts moving together. What it still
+does not do is move any single name's IDIOSYNCRATIC variance — sizing a
+pin to a target per-name volatility goes through the factor's share, not
+one-for-one.
 
 ## The macro counterfactual is exact on the market stream — and says so
 
@@ -396,23 +409,29 @@ class Scenario:
     @classmethod
     def vix_shock(cls, *, calm: float = 15.0, peak: float = 45.0,
                   at: int = 10, over: int = 20) -> "Scenario":
-        """A VIX spike that decays back. Mostly, a spread widening.
+        """A VIX spike that decays back: a volatility, correlation and
+        spread stress in one, which is what a real one is.
 
         Up as a step, down as a ramp, because that is the shape a stress
         episode has: it arrives at once and subsides slowly.
 
-        **This does not raise realised volatility.** VIX has no term in the
-        variance process here. What a spike does is widen the quoted bid-ask,
-        and above VIX 40 pull idiosyncratic returns a little toward the
-        market factor. Measured on ``Universe.random(20, seed=11)`` over 120
-        days, sim seed 3: taking the peak from 45 to 80 moves annualised
-        realised volatility from 63.96% to 64.57%, against a no-scenario
-        baseline of 63.99%. This module's docstring sets out the three
-        channels and what each one is worth.
+        **This raises realised volatility** — since the 2026-08 coupling of
+        the market factor's variance target to VIX, and not before, which
+        is why this docstring once said the opposite and was right then.
+        Measured on ``Universe.random(20, seed=11)`` over 120 days, sim
+        seed 3: the default spike to 45 moves annualised realised
+        volatility from a no-scenario 58.17% to 67.01%, a peak of 80 to
+        74.57%, and volatility clustering RISES with it (|r| acf(1) 0.334
+        to 0.357 and 0.378) — where the pre-coupling model measurably
+        moved clustering the wrong way. The spike also widens the quoted
+        bid-ask and, above VIX 25.5, pulls returns toward the market
+        factor. This module's docstring sets out the four channels and
+        what each one is worth.
 
-        Use it for a liquidity and spread stress. No lever in this model raises
-        realised volatility, and this one was renamed because its old name
-        claimed otherwise.
+        A held crisis level is a harder stress than a decaying spike:
+        ``Scenario().hold(vix=65.0)`` reads 124% annualised on the same
+        method, against this constructor's 67%. Use the hold form to ask
+        what a strategy survives when the stress does not subside.
         """
         def driver(day: int) -> float:
             if day < at:
@@ -428,19 +447,24 @@ class Scenario:
     @classmethod
     def vol_shock(cls, *, calm: float = 15.0, peak: float = 45.0,
                   at: int = 10, over: int = 20) -> "Scenario":
-        """Deprecated alias for :meth:`vix_shock`. Same path, honest name.
+        """Deprecated alias for :meth:`vix_shock`. Same path, same results.
 
-        The old name said "volatility shock" about a lever that moves VIX, and
-        VIX does not drive realised volatility in this model. The path is
-        unchanged, so a run under this name reproduces exactly; only the
-        ``label`` differs, because the serialised path now carries the name
-        that describes it.
+        History with a twist: the constructor was renamed when it was
+        measured that VIX did not drive realised volatility, so "vol_shock"
+        was a name making a false claim. The 2026-08 coupling then wired
+        VIX into the market factor's variance target, which made the OLD
+        name accurate again — but the rename stands. :meth:`vix_shock`
+        names the lever (the path it drives is a VIX path), which stays
+        true under any future model change, where a name promising an
+        effect has already been wrong once. The path is unchanged, so a
+        run under this name reproduces exactly; only the ``label``
+        differs, because the serialised path carries the honest name.
         """
         warnings.warn(
-            "Scenario.vol_shock is deprecated; use Scenario.vix_shock. It "
-            "drives VIX, and VIX in this model is a liquidity and correlation "
-            "variable with no term in the variance process. The path is "
-            "identical, so results do not change.",
+            "Scenario.vol_shock is deprecated; use Scenario.vix_shock. Both "
+            "drive the same VIX path -- which, since the 2026-08 coupling, "
+            "does raise realised volatility -- so results do not change; "
+            "only the honest name survives.",
             DeprecationWarning,
             stacklevel=2,
         )
