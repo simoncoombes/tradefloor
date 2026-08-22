@@ -587,17 +587,31 @@ class RunManifest:
     def _model_for_replay(self) -> ModelParams | None:
         """The model the run was recorded under, rebuilt for the replay.
 
-        ``None`` for a shipped preset (the engine's default) — including
+        ``None`` only for the preset the engine defaults to — including
         every manifest written before the model dict carried the full
-        surface. A ``custom-`` model is rebuilt from the embedded values;
-        :meth:`_check_era` has already verified this build can run it and
-        that the values still match their recorded fingerprint.
+        surface. A ``custom-`` model is rebuilt from the embedded values,
+        and a NAMED preset that is not the default is looked up by name;
+        :meth:`_check_era` has already verified this build ships it, can
+        run it, and that its values still match their recorded
+        fingerprint.
+
+        The second case is why this is not "not custom, therefore None".
+        With more than one shipped preset in the table, returning ``None``
+        for a name the engine does not default to would replay the run
+        under a different model and report success — the exact
+        substitution the model fingerprint exists to make impossible,
+        reached by way of a shortcut that was correct only while the table
+        had one row.
         """
         theirs = (self._doc["written_by"].get("model") or {})
         name = theirs.get("name")
-        if name is None or not str(name).startswith("custom-"):
+        if name is None:
             return None
-        return ModelParams.from_dict(theirs)
+        if str(name).startswith("custom-"):
+            return ModelParams.from_dict(theirs)
+        if name == model_preset()["name"]:
+            return None
+        return ModelParams.from_preset(name)
 
     def _check_era(self) -> None:
         wrote = self._doc["written_by"]
@@ -623,13 +637,21 @@ class RunManifest:
                     "model the manifest does not describe."
                 )
         else:
-            ours = dict(model_preset())
-            if name != ours.get("name"):
+            # The named preset the manifest ran, NOT this build's default.
+            # While the table had one row those were the same thing; with
+            # two they are not, and comparing a pt-v2 manifest against
+            # pt-v1's coefficients would refuse a run this build can
+            # reproduce perfectly, for a reason that is not true.
+            try:
+                ours = dict(model_preset(name)) if name else {}
+            except ValidationError:
+                ours = {}
+            if not ours or name != ours.get("name"):
                 raise ValidationError(
-                    f"this manifest ran model preset {name!r}; "
-                    f"this build ships {ours.get('name')!r}. The coefficients "
-                    "are the model, so the run cannot be checked here — "
-                    "reproduce it on a build that ships the preset it ran."
+                    f"this manifest ran model preset {name!r}, which this "
+                    "build does not ship. The coefficients are the model, "
+                    "so the run cannot be checked here — reproduce it on a "
+                    "build that ships the preset it ran."
                 )
             # Compare where both sides carry a value. The intersection
             # rather than the union, deliberately: an older manifest

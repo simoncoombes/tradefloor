@@ -65,7 +65,8 @@ def main() -> None:
         after = cert["axes"]["candidate"][axis]
         print(f"\n**{label}** — L_real "
               f"{before['loss_real']:.3f} -> {after['loss_real']:.3f}\n")
-        print("| statistic | band | role | pt-v1 | pt-v2 | pt-v1 | pt-v2 |")
+        print("| statistic | band | role | pt-v1 | pt-v2 | verdict pt-v1 "
+              "| verdict pt-v2 |")
         print("|---|---|---|---|---|---|---|")
         for key in keys:
             b, a = before["statistics"][key], after["statistics"][key]

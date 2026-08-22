@@ -30,13 +30,30 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--certificate", required=True)
     parser.add_argument("--name", default="pt_v2")
+    parser.add_argument("--vector", default=None,
+                        help="for an evaluate_axes.py certificate: which "
+                             "named vector to emit")
     args = parser.parse_args()
 
     with open(args.certificate, encoding="utf-8") as handle:
         cert = json.load(handle)
 
-    moves = sorted(cert["moves"], key=lambda m: m["parameter"])
-    moved = [m for m in moves if m["candidate"] != m["pt_v1"]]
+    if args.vector:
+        # An evaluate_axes.py certificate: named vectors, each carrying the
+        # full override set and its moves against pt-v1. The shipped vector
+        # is not always the search's own optimum — see CALIBRATION-PTV2.md
+        # on the band-edge margin — so the emitter reads whichever vector
+        # the report names rather than assuming.
+        row = cert["vectors"][args.vector]
+        moves = sorted(
+            ({"parameter": key, "pt_v1": value["pt_v1"],
+              "candidate": value["value"]}
+             for key, value in row["moves"].items()),
+            key=lambda m: m["parameter"])
+        moved = [m for m in moves if m["candidate"] != m["pt_v1"]]
+    else:
+        moves = sorted(cert["moves"], key=lambda m: m["parameter"])
+        moved = [m for m in moves if m["candidate"] != m["pt_v1"]]
 
     print(f"    pub const fn {args.name}() -> ModelParams {{")
     print("        let mut p = ModelParams::pt_v1();")

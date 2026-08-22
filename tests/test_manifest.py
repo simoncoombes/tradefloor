@@ -188,6 +188,38 @@ def test_a_different_preset_name_is_refused():
         pretium.RunManifest.from_json(text).reproduce()
 
 
+def test_a_run_under_a_shipped_non_default_preset_reproduces_under_it():
+    """A second preset in the table must reproduce as itself, not as the
+    default.
+
+    The path this guards is the one that opened the moment `pt-v2` joined
+    `preset_names()`: the manifest records a NAME rather than a `custom-`
+    dictionary, so a replay that reads "not custom, therefore the engine's
+    default" runs a different model and reports success — the substitution
+    the model fingerprint exists to prevent, reached through a shortcut
+    that was correct only while the table had one row. Both halves are
+    asserted, because either alone would pass under the bug: the era gate
+    must not refuse the run, and the market must come back bit-identical.
+    """
+    macro = pretium.Macro(**MACRO_KWARGS)
+    shock = Scenario.rate_shock(start=0.03, end=0.05, over=2)
+    engine = pretium.Engine(seed=42, universe=UNIVERSE, macro_state=macro,
+                            model="pt-v2")
+    for day in range(3):
+        shock.apply(engine, day)
+        engine.open_market()
+        engine.run_session(9, 30, 3, 78)
+        engine.close_market()
+    assert engine.model_fingerprint == "pt-v2"
+
+    text = manifest_of(engine, macro, shock).to_json()
+    assert json.loads(text)["written_by"]["model"]["name"] == "pt-v2"
+
+    rebuilt = pretium.RunManifest.from_json(text).reproduce()
+    assert rebuilt.model_fingerprint == "pt-v2"
+    assert rebuilt.prices() == engine.prices()
+
+
 def test_a_legacy_manifest_naming_a_different_preset_is_refused():
     # A manifest written BEFORE the model fingerprint joined `fingerprints`
     # carries only the dict; renaming that must still refuse, at the era
