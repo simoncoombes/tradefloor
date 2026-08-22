@@ -72,6 +72,7 @@ def _median(xs):
 # ---------------------------------------------------------------------------
 
 def g_determinism(ctx: Ctx) -> dict:
+    import inspect
     spec = importlib.util.spec_from_file_location(
         "known_answer", ctx.root / "tests" / "known_answer.py")
     ka = importlib.util.module_from_spec(spec)
@@ -87,6 +88,8 @@ def g_determinism(ctx: Ctx) -> dict:
     return {
         "kat_digest": digest,
         "kat_digest_pinned": pinned["sha256"],
+        "kat_matches_pinned": digest == pinned["sha256"],
+        "kat_version": ka.KAT_VERSION,
         "version": pt.version(),
         "preset_name": preset["name"],
         "preset_keys": len([k for k in preset if k != "name"]),
@@ -95,6 +98,9 @@ def g_determinism(ctx: Ctx) -> dict:
         "facts_marginal": len(MARGINAL),
         "facts_dependence": len(REAL_MARKETS) - len(MARGINAL),
         "oracle_default_top_k": Oracle().top_k,
+        "n_factors": len(pt.Engine.FACTORS),
+        "evaluate_steps_default":
+            inspect.signature(pt.evaluate).parameters["steps_per_day"].default,
     }
 
 
@@ -109,8 +115,18 @@ def g_consts(ctx: Ctx) -> dict:
         return float(m.group(1)) if m else float("nan")
 
     market_sigma = const(tick_rs, "MARKET_FACTOR_SIGMA")
+    sector_factor_sigma = const(tick_rs, "SECTOR_FACTOR_SIGMA")
     alpha = const(garch_rs, "ALPHA")
     beta = const(garch_rs, "BETA")
+
+    # Mispricing reversion half-life, from the AR coefficient the engine
+    # actually uses (S_PHI_TICK is stored as exact bits).
+    import math
+    m = re.search(r"const S_PHI_TICK: f64 = f64::from_bits\(0x([0-9A-Fa-f_]+)\)",
+                  tick_rs)
+    phi = struct.unpack("<d", struct.pack("<Q", int(m.group(1).replace("_", ""),
+                                                   16)))[0] if m else float("nan")
+    half_life_days = math.log(0.5) / math.log(phi) / 390.0
 
     sigmas = sorted(pt.sector_daily_sigma(s) for s in pt.sectors())
     spread_formula = bool(re.search(r"vix[^\n]*15[^\n]*30", micro_rs)
@@ -129,9 +145,15 @@ def g_consts(ctx: Ctx) -> dict:
 
     return {
         "market_factor_sigma": market_sigma,
+        "sector_factor_sigma": sector_factor_sigma,
         "sector_sigma_min": sigmas[0],
         "sector_sigma_max": sigmas[-1],
         "sector_sigma_median": _median(sigmas),
+        # the realism page derives the shared factor's variance share from the
+        # printed constants; this recomputes it from the *measured* ones, so a
+        # recalibrated sigma moves this row instead of silently passing
+        "market_share_pct": (market_sigma / _median(sigmas)) ** 2 * 100.0,
+        "reversion_half_life_days": half_life_days,
         "garch_persistence": alpha + beta,
         "spread_formula_present": spread_formula,
         "impulse_day2": pt.impulse_response(3)[2],
@@ -150,9 +172,10 @@ def g_arith(ctx: Ctx) -> dict:
         "crossings_per_year": 252 * 390,               # "about 98,000"
         "crossings_five_fields": 252 * 390 * 5,        # "roughly 500,000"
         "workflow_truth_rows": 10 * 390 * 60,          # "234,000 rows"
-        "market_share_of_variance_pct": (0.003 / 0.015) ** 2 * 100.0,  # "about 4%"
         "sigma_for_corr_030": 0.65 * 0.015,            # "roughly 0.0098"
         "llm_calls_default_run": 20,                   # one per day, 20 days
+        "clean_sweep_p": 2.0 * 0.5 ** 12,              # "even a clean sweep only reaches p = 0.0005"
+        "perf_row_gap_s": 28.2 - 27.4,                 # "the 0.8s between the two rows"
     }
 
 
@@ -243,20 +266,24 @@ def g_rebalance(ctx: Ctx) -> dict:
 
 
 def g_horizon(ctx: Ctx) -> dict:
-    """agents-and-evaluation: momentum captures 27% at 5 days, 94% at 60."""
+    """agents-and-evaluation horizon bullet: on seed 2026 over random(40,7)
+    the Oracle makes $21k in five days and $568k in sixty, and the same
+    momentum agent captures 2.98 against the first denominator and 1.47
+    against the second. Method stated on the page."""
     u = _u(40, 7)
     out = {}
     for days in (5, 60):
         scores = pt.evaluate(reference_agents(seed=3), seed=2026,
                              universe=u, days=days)
         out[f"capture_{days}d"] = capture_ratio(scores).get("momentum")
+        out[f"oracle_pnl_{days}d"] = scores["oracle"].pnl
     return out
 
 
 def g_oracle_config(ctx: Ctx) -> dict:
-    """agents-and-evaluation: Oracle median P&L 110k -> 70k when top_k 5 -> 15.
-    Universe reconstructed from tests/test_baselines.py (random(30, seed=11));
-    eight seeds per the docstring at python/pretium/baselines.py:51-53."""
+    """agents-and-evaluation: Oracle median P&L $87k -> $71k when top_k 5 -> 15,
+    'on the ranking grid below at ten days ... over sim seeds 0-7'. Grid stated
+    on the page: random(30, seed=11), ten days, evaluate defaults."""
     u = _u(30, 11)
 
     def median_pnl(make):
@@ -273,20 +300,35 @@ def g_oracle_config(ctx: Ctx) -> dict:
 
 
 def g_ranking(ctx: Ctx) -> dict:
-    """The headline ranking figures. Universe pinned by tests/test_ranking.py
-    (HEADLINE = random(30, seed=11)); twelve seeds, ten days."""
+    """The twelve-market ranking figures on agents-and-evaluation. Grid stated
+    on the page: random(30, seed=11), seeds 0-11, ten days; plus the seeds
+    12-23 comparison window and the three-day seeds 0-9 companion study."""
     u = _u(30, 11)
-    rk = pt.rank(lambda: reference_agents(seed=3), seeds=range(12),
+    factory = lambda: reference_agents(seed=3)  # noqa: E731
+    rk = pt.rank(factory, seeds=range(12),
                  universe=u, days=10, workers=min(4, ctx.workers))
     records = {r.name: r for r in rk.table()}
     mom, mr = records["momentum"], records["mean_reversion"]
     sep_mr = rk.separation("momentum", "mean_reversion")
     sep_rand = rk.separation("momentum", "random")
 
-    # three-day companion figure: the +14.4 per-seed capture outlier
-    rk3 = pt.rank(lambda: reference_agents(seed=3), seeds=range(10),
+    # the beats-the-Oracle table: paired per-seed P&L against the reference
+    beats = {name: sum(1 for pnl, ref in zip(records[name].pnls,
+                                             rk.reference_pnls) if pnl > ref)
+             for name in ("momentum", "mean_reversion", "buy_and_hold",
+                          "random")}
+
+    # the second twelve-seed window (seeds 12-23): same test, different verdict
+    rk_b = pt.rank(factory, seeds=range(12, 24),
+                   universe=u, days=10, workers=min(4, ctx.workers))
+    sep_mr_b = rk_b.separation("momentum", "mean_reversion")
+
+    # three-day companion study, seeds 0-9: the reference P&L span, the pooled
+    # mean-reversion figure, and mean-reversion's ratio on the thinnest market
+    rk3 = pt.rank(factory, seeds=range(10),
                   universe=u, days=3, workers=min(4, ctx.workers))
-    max3 = max((c for r in rk3.table() for c in r.measured), default=None)
+    mr3 = {r.name: r for r in rk3.table()}["mean_reversion"]
+    thin = min(range(len(rk3.reference_pnls)), key=rk3.reference_pnls.__getitem__)
 
     return {
         "pooled_momentum": mom.pooled_capture,
@@ -299,7 +341,16 @@ def g_ranking(ctx: Ctx) -> dict:
         "sep_mom_mr_p": sep_mr["p_value"],
         "sep_mom_rand": f"{sep_rand['wins_a']}-{sep_rand['wins_b']}",
         "sep_mom_rand_p": sep_rand["p_value"],
-        "capture_3d_max": max3,
+        "beat12_momentum": beats["momentum"],
+        "beat12_mean_reversion": beats["mean_reversion"],
+        "beat12_buy_and_hold": beats["buy_and_hold"],
+        "beat12_random": beats["random"],
+        "sep_mom_mr_b": f"{sep_mr_b['wins_a']}-{sep_mr_b['wins_b']}",
+        "sep_mom_mr_b_p": sep_mr_b["p_value"],
+        "oracle_pnl_3d_min": min(rk3.reference_pnls),
+        "oracle_pnl_3d_max": max(rk3.reference_pnls),
+        "pooled_mr_3d": mr3.pooled_capture,
+        "mr_capture_thinnest": mr3.captures[thin],
     }
 
 
@@ -334,6 +385,79 @@ def g_llm_leaderboard(ctx: Ctx) -> dict:
         "momentum_pnl": m.pnl,
         "momentum_impact": m.impact_bps,
         "momentum_why_is_blank": m.explanation_accuracy is None,
+    }
+
+
+def g_llm_impact(ctx: Ctx) -> dict:
+    """an-llm-agent: why the impact column went blank. Across seeds 2020-2031
+    at the leaderboard's exact configuration, the oracle's twenty-day impact
+    spans -181 to +577 bps and is positive in only 8 of 12 seeds; momentum's
+    flips sign the same way; over three days both are positive in 12 of 12.
+    Method stated on the page."""
+    u = _u(12, 7)
+
+    def one(seed):
+        s20 = pt.evaluate(reference_agents(seed=3), seed=seed, universe=u,
+                          days=20, max_leverage=2.0)
+        s3 = pt.evaluate(reference_agents(seed=3), seed=seed, universe=u,
+                         days=3, max_leverage=2.0)
+        return (s20["oracle"].impact_bps, s20["momentum"].impact_bps,
+                s3["oracle"].impact_bps, s3["momentum"].impact_bps)
+
+    with ThreadPoolExecutor(max_workers=min(6, ctx.workers)) as pool:
+        rows = list(pool.map(one, range(2020, 2032)))
+    o20 = [r[0] for r in rows]
+    m20 = [r[1] for r in rows]
+    o3 = [r[2] for r in rows]
+    m3 = [r[3] for r in rows]
+    return {
+        "oracle_imp20_min": min(o20),
+        "oracle_imp20_max": max(o20),
+        "oracle_imp20_pos": sum(1 for x in o20 if x > 0),
+        "mom_imp20_flips": min(m20) < 0 < max(m20),
+        "imp3_pos_min": min(sum(1 for x in o3 if x > 0),
+                            sum(1 for x in m3 if x > 0)),
+    }
+
+
+# ---------------------------------------------------------------------------
+# RNG streams
+# ---------------------------------------------------------------------------
+
+def g_rng(ctx: Ctx) -> dict:
+    """docs/rng-streams.md: three substreams, a nine-number snapshot, the
+    market stream's schedule a pure function of the tick schedule, and the
+    refusal of pre-split snapshots."""
+    u = _u(20, 7)
+    a = pt.Engine(seed=42, universe=u)
+    a.run_days(2)
+    streams = a.draws_by_stream()
+
+    # No macro value can move the market stream's position: pin mid-run and
+    # compare per-stream draw counts against the unpinned twin.
+    b = pt.Engine(seed=42, universe=u)
+    b.run_days(1)
+    b.pin_macro(corporate_bond_yield=0.09)
+    b.run_days(1)
+    market_independent = (a.draws_by_stream()["market"]
+                          == b.draws_by_stream()["market"])
+
+    snap = a.state_snapshot()
+    presplit = dict(snap)
+    presplit["rng"] = list(snap["rng"])[:3]
+    fresh = pt.Engine(seed=42, universe=u)
+    try:
+        fresh.restore_state(presplit)
+        refused = False
+    except Exception:
+        refused = True
+
+    return {
+        "stream_count": len(streams),
+        "stream_names": ",".join(streams),
+        "rng_snapshot_len": len(snap["rng"]),
+        "market_sched_independent": market_independent,
+        "presplit_snapshot_refused": refused,
     }
 
 
@@ -587,13 +711,20 @@ def g_universe_stats(ctx: Ctx) -> dict:
 
 def g_perf(ctx: Ctx) -> dict:
     """docs/performance.md. Absolute times are machine-bound; the page says to
-    treat ratios as portable, so the ratios are the comparable outputs."""
+    treat ratios as portable, so the ratios are the comparable outputs.
+
+    The recording overhead is NOT resolvable as a point by wall-clock timing
+    on a working machine: measured across two sessions it came out -5.43%,
+    -0.48% and +0.96% as a min-of-3 point, and a 32-pair interleaved study
+    put the true value near +1% with nearly half the pairs negative. So the
+    overhead here is the MEDIAN of eight interleaved pairs with alternating
+    within-pair order, and the inventory judges it against a band or a bound,
+    never at printed precision. Expect the median to straddle zero."""
     u10 = _u(10, 7)
     u100 = _u(100, 7)
 
     def best_of(n, fn):
-        """Minimum of n runs: the page's 3% recording overhead is smaller
-        than cold-start noise, so single timings cannot resolve it."""
+        """Minimum of n runs: single timings carry cold-start noise."""
         return min(_timed(fn) for _ in range(n))
 
     def _timed(fn):
@@ -603,11 +734,12 @@ def g_perf(ctx: Ctx) -> dict:
 
     pt.Engine(seed=7, universe=u10).run_days(30)  # warm-up
 
-    t10 = best_of(2, lambda: pt.Engine(seed=7, universe=u10).run_days(252))
+    t10 = best_of(3, lambda: pt.Engine(seed=7, universe=u10).run_days(252))
 
     # Row count from one untimed recorded run, released before any timing
     # starts: a recorded engine holds ~1 GB of raw buffers, and keeping one
-    # alive puts memory pressure on every timing that follows it.
+    # alive puts memory pressure on every timing that follows it. It also
+    # warms the recording path before the paired timings below.
     e = pt.Engine(seed=7, universe=u100)
     e.run_days(252, record=True)
     truth_rows = pa.table(e.truth()).num_rows
@@ -620,13 +752,19 @@ def g_perf(ctx: Ctx) -> dict:
         engine = pt.Engine(seed=7, universe=u100)
         engine.run_days(252, record=True)
 
-    # Interleaved so thermal or background drift hits both configurations
-    # alike; the overhead being measured is smaller than cold-start noise.
-    plains, recs = [], []
-    for _ in range(3):
-        plains.append(_timed(plain))
-        recs.append(_timed(recorded))
-    t100, t100_rec = min(plains), min(recs)
+    # Eight interleaved pairs, alternating within-pair order, so thermal or
+    # background drift hits both configurations alike and any slow monotonic
+    # drift cancels across pairs instead of biasing one side.
+    pairs = []
+    for i in range(8):
+        if i % 2 == 0:
+            tp, tr = _timed(plain), _timed(recorded)
+        else:
+            tr, tp = _timed(recorded), _timed(plain)
+        pairs.append((tp, tr))
+    overheads = [(tr / tp - 1.0) * 100.0 for tp, tr in pairs]
+    t100 = min(tp for tp, _ in pairs)
+    t100_rec = min(tr for _, tr in pairs)
 
     t0 = time.perf_counter()
     pt.run_many(seeds=range(8), universe=u100, days=21, workers=1)
@@ -641,7 +779,9 @@ def g_perf(ctx: Ctx) -> dict:
         "t_sweep_serial": t_serial, "t_sweep_8w": t_8w,
         "truth_rows": truth_rows,
         "scale_ratio": t100 / t10,
-        "overhead_pct": (t100_rec / t100 - 1.0) * 100.0,
+        "overhead_med": _median(overheads),
+        "neg_pair_frac": sum(1 for o in overheads if o < 0) / len(overheads),
+        "overhead_pairs": [round(o, 3) for o in overheads],
         "speedup": t_serial / t_8w,
     }
 
@@ -718,6 +858,8 @@ GROUPS = {
     "ranking": g_ranking,
     "scenario_leaderboard": g_scenario_leaderboard,
     "llm_leaderboard": g_llm_leaderboard,
+    "llm_impact": g_llm_impact,
+    "rng": g_rng,
     "macro_frozen": g_macro_frozen,
     "pin_macro": g_pin_macro,
     "fedfunds": g_fedfunds,

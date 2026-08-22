@@ -122,6 +122,8 @@ def _fmt(v) -> str:
     if isinstance(v, float):
         if v != 0 and abs(v) < 1e-3:
             return f"{v:.3g}"
+        if abs(v) >= 10000:
+            return f"{v:,.0f}"  # P&L-scale: 90,250, never 9.025e+04
         return f"{v:,.4g}" if abs(v) >= 1000 else f"{v:.4g}"
     if isinstance(v, int):
         return f"{v:,}"
