@@ -126,7 +126,7 @@ Three checks, each with its method, all at commit `a7994e2`.
 **Fresh seeds, same universe.** Sim seeds 101 to 106 over the same
 `random(40, seed=111)`, 252 days: cross-sectional correlation **+0.225**,
 against a band floor of +0.25. Kurtosis +3.67, clustering +0.202 and volume
-vs \|return\| +0.546 all hold in band; leverage reads -0.071, a shade weaker
+vs \|return\| +0.546 all hold in band; leverage reads -0.070, a shade weaker
 than the published -0.085. Correlation is the one that slips out, by 0.025 -
 just under two of its own across-seed standard deviations.
 
