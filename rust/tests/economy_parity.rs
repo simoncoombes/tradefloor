@@ -24,6 +24,22 @@
 //! Vectors: `goldens/economy-*.json`, from
 //! `scripts/rust-port/economy-vectors.ts`, which **asserts** WASM was absent
 //! (decisions D1–D3 and D5 all select the JS formulas) rather than assuming it.
+//!
+//! # Status under the 2026-08 fork (D-P1)
+//!
+//! All eight tests still pass against the committed corpus — the economy is
+//! a faithful port and remains gated. An in-flight stream is lowering a
+//! crisis trigger in `economy/`, which sits on `update_economy_daily`'s
+//! path: when it lands, expect whichever TRAJECTORY scenarios drive their
+//! recorded VIX/GDP across the moved threshold to fail on the first such
+//! day — the fork arriving, not a port regression. A trajectory that keeps
+//! passing simply never enters the trigger band, and its parity gate stays
+//! true for the region it visits: retire only what actually fails, case by
+//! case, the way `market_tick_parity.rs` did. The tier-1 islands (initial
+//! state, cycle probability, the central-bank sweep) do not run the daily
+//! step and should survive — if one of THOSE fails instead, the trigger
+//! landed somewhere other than the daily path and the classification in
+//! `sync-goldens.py` needs correcting, not just this file.
 
 use std::fs;
 use std::path::PathBuf;

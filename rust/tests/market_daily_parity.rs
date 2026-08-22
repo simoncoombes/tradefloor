@@ -18,6 +18,20 @@
 //! go stale silently if `transitions.ts` changes. Nothing here detects that;
 //! the mitigation is the source lines recorded in the generator so a reviewer
 //! can diff them.
+//!
+//! # Status under the 2026-08 fork (D-P1)
+//!
+//! Still passing against the committed corpus — the close bookkeeping is a
+//! faithful port and remains gated. One assertion is living on borrowed
+//! time: the `garchVariance` comparisons route through
+//! `update_garch_variance`, where an in-flight stream is adding a GJR
+//! asymmetry term. When that lands, expect the garchVariance assertions
+//! (and, if parameters are retuned, the chains from day 0) to fail — the
+//! fork arriving, not a port regression. Retire those ASSERTIONS then,
+//! not this file: the momentum roll, `lastDailyReturn`, `sPrevClose`, the
+//! avgVolume EMA and the resets share no path with any announced
+//! divergence and stay gated. `market_islands_parity.rs` carries the
+//! measured detail on which GARCH cases fail under which shape of change.
 
 use std::fs;
 use std::path::PathBuf;

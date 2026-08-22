@@ -13,6 +13,23 @@
 //! consumed by the tick would surface as an unexplained price divergence four
 //! layers up, and the tick has enough of its own failure modes without
 //! inheriting these.
+//!
+//! # Status under the 2026-08 fork (D-P1)
+//!
+//! Everything here still passes against the committed corpus — these islands
+//! are faithful ports and remain gated. But `garch_matches_bit_for_bit` sits
+//! directly on a path an in-flight stream is diverging: a GJR asymmetry term
+//! is landing in `garch.rs`. When it does, the GARCH cases here will fail —
+//! read that as the fork arriving, not as a port regression, and retire them
+//! the way `market_tick_parity.rs` retired its scenarios: reasoned header,
+//! `#[ignore]` naming the cause, coverage replaced by gates that say what
+//! they gate. One measured detail for whoever does it: the four recorded
+//! `garchChains` drive only non-negative returns, so under a pure
+//! asymmetry term (extra weight on NEGATIVE innovations, parameters
+//! otherwise untouched) the chains and the non-negative point cases would
+//! keep passing and only negative-return cases fail; if everything fails
+//! including the chains, the parameters were retuned too. The sessions,
+//! curves and index tests share no path with any announced divergence.
 
 use std::fs;
 use std::path::PathBuf;

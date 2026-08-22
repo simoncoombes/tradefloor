@@ -1,14 +1,65 @@
 #!/usr/bin/env python3
-"""Sync the golden vectors from the reference checkout, and verify them.
+"""Verify the golden vectors, or (historically) sync them from the reference.
 
-The goldens are the parity contract: they are produced by the reference
-implementation's generators, which import that implementation directly and
-therefore live with it rather than here. This script is the seam between where
-they are produced and where they are consumed.
+The goldens are produced by the reference implementation's generators, which
+import that implementation directly and therefore lived with it rather than
+here. Since dd718e7 the corpus is committed at `goldens/` (D-G2), so the
+live use of this script is `--verify`; the sync direction remains for the
+machine that can still reach a reference checkout.
 
-Point it at the reference checkout with PRETIUM_GOLDENS_SRC, or pass --from.
+WHAT THE GOLDENS GATE -- narrowed 2026-08-21 (D-P1)
+---------------------------------------------------
 
-Two rules it enforces, both learned the hard way:
+The goldens were once the whole parity contract: proof that this crate
+reproduces the reference bit-for-bit. That claim is now deliberately
+narrower, because this crate diverged from the reference on modelling
+grounds and is the model of record (D-P2): the fork is not a defect and is
+not ported back. Goldens gate the subsystems that remain faithful ports,
+and that set is enumerable:
+
+Still gated, bit-for-bit (measured on this corpus, 2026-08-21):
+  - mathx-v8.json ............ V8 comparison report + determinism pin
+  - fairvalue.json ........... fair value / target PE
+  - marketmaker.json ......... quotes, ladders, inventory fills
+  - orderbook.json ........... the matching program replay
+  - microstructure.json ...... spreads, books, settlement + draw counts
+  - mispricing-*.json (12) ... constants, step, apply, roots, trajectories
+  - market-islands.json ...... GARCH update, sessions, curves, index maths
+  - market-daily.json ........ close bookkeeping, incl. the ReferenceEma arm
+  - economy-*.json (7) ....... tier-1 islands and the five macro trajectories
+  - sector anchors ........... the lib-level sectors gate
+  - market-tick-closed-weekend.json, plus the draw-schedule arithmetic
+    asserted across all market-tick-*.json (corpus self-checks)
+
+Forked -- parity RETIRED, tests kept as runnable divergence records:
+  - market-tick-*.json, all eight non-closed scenarios, and
+    thirty-day-{calm,eventful}.json: the market-factor path.
+    MARKET_FACTOR_SIGMA moved 0.003 -> 0.0075 (with its crash-amplifier
+    normaliser denominated in it), so replaying reference draws through the
+    new constant diverges at the first open tick. Retired under #[ignore]
+    in market_tick_parity.rs / thirty_day_parity.rs; `cargo test --
+    --ignored` reproduces the measured divergence, and those tests are
+    EXPECTED to fail there.
+  - divergence-reference.json / divergence-multiday.json: same fork, same
+    cause (the examples and divergence_statistics measure it at mean 1.24%
+    over a session); their disposition belongs to the examples' owners.
+
+Expected to fork next (in-flight engine streams, noted so their failures
+are read as the fork landing, not as port regressions): a GJR asymmetry
+term in garch.rs will take the GARCH cases in market-islands.json and the
+garchVariance assertions in market-daily.json; a lowered crisis trigger in
+economy/ will take whichever economy trajectories cross the moved
+threshold (the tier-1 islands should survive); the market-factor variance
+process in tick.rs lands on an already-retired surface. When one of those
+suites goes red, retire the affected cases the same way -- reasoned header,
+#[ignore] with the cause, coverage replaced by a gate that says what it
+actually gates -- rather than deleting or widening.
+
+Regression coverage for retired surfaces lives in tests/tick_regression.rs
+and is labelled for what it is: self-anchored, gating regression and
+reproducibility, never correctness.
+
+Two rules this script enforces, both learned the hard way:
 
 1. **Verify against index.json's SHA-256 manifest, always.** A partially
    copied or truncated vector set is otherwise a silent pass -- the tests read
@@ -16,15 +67,17 @@ Two rules it enforces, both learned the hard way:
    exactly how that happens.
 
 2. **Never sync in the other direction.** The goldens come FROM the reference
-   implementation and are the thing this crate is checked against.
-   Regenerating them from this crate would make the tests self-confirming:
-   they would assert that the crate agrees with itself, and pass forever
-   regardless of correctness.
+   implementation. Regenerating them from this crate would make the surviving
+   parity gates self-confirming -- asserting the crate agrees with itself,
+   passing forever regardless of correctness -- and would destroy the retired
+   suites' value as records of the measured divergence. D-P1 also forecloses
+   regenerating from a constants-patched reference: the fork is not ported
+   back, in either direction.
 
 Usage:
+    python sync-goldens.py --verify   # the live use: verify what is here
     PRETIUM_GOLDENS_SRC=/path/to/reference/goldens python sync-goldens.py
     python sync-goldens.py --from /path/to/goldens
-    python sync-goldens.py --verify   # verify what is already here
 """
 
 import hashlib
