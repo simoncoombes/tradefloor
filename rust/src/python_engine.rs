@@ -2140,10 +2140,17 @@ impl PyEngine {
     ///
     /// # Opt-in, because the arithmetic demands it
     ///
-    /// A hundred names at 390 ticks with ten levels a side is about 1.5
-    /// million rows a day, against 39,000 for `bars`. Recording depth by
-    /// default would make every run forty times more expensive to answer a
+    /// One snapshot is ten levels a side, both sides: 20 rows per (tick,
+    /// instrument) against one `bars` row. A hundred names at 390 ticks is
+    /// 780,000 rows a day, against 39,000 for `bars`. Recording depth by
+    /// default would make every run twenty times more expensive to answer a
     /// question most runs never ask.
+    ///
+    /// The multiplier is the book's structure, not the `levels` argument:
+    /// the maker quotes `BOOK_LEVELS = 10` a side (microstructure.rs), and
+    /// `price_levels()` can only return what the book holds, so asking for
+    /// `levels = 20` records the same 20 rows per name. Measured: six
+    /// instruments, one snapshot, 120 rows at levels 10 and 20 alike.
     ///
     /// So the caller decides when and how deep. Nothing samples on their
     /// behalf: a sampling rate baked into the engine would be a modelling
