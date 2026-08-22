@@ -312,3 +312,92 @@ def test_the_clock_wraps_rather_than_running_past_midnight():
     # Saturday into the middle of a five-day evaluation.
     assert session_clock((23, 30, 3), 1, 60) == (0, 30, 3)
     assert session_clock((9, 30, 3), 30, 60) == (15, 30, 3)
+
+
+# --------------------------------------------------------------------------
+# `step` counts the run; `step_of_day` counts the day
+# --------------------------------------------------------------------------
+
+
+class OncePerDay:
+    """The guard people actually mean, written the way that works."""
+
+    def __init__(self):
+        self.fired = []
+
+    def act(self, obs):
+        if not obs.is_first_step_of_day:
+            return {}
+        self.fired.append((obs.day, obs.step, obs.step_of_day))
+        return {obs.tickers[0]: 100.0}
+
+
+class OnceAndNeverAgain:
+    """The same guard written against `step`, which is a once-a-RUN guard."""
+
+    def __init__(self):
+        self.fired = []
+
+    def act(self, obs):
+        if obs.step != 0:
+            return {}
+        self.fired.append((obs.day, obs.step))
+        return {obs.tickers[0]: 100.0}
+
+
+def test_step_counts_the_whole_run_and_step_of_day_counts_the_day():
+    """The trap, pinned as behaviour so the two indices cannot be confused.
+
+    `obs.step` is a running index over every decision point in the
+    evaluation. At six steps a day, day 1 begins at step 6 -- so a guard
+    written as `obs.step != 0` fires once in the entire run, produces a
+    scorecard with no errors, and looks exactly like an agent that considered
+    the market and declined. Nothing in the result says otherwise, which is
+    why the within-day index has to be askable rather than derivable.
+    """
+    daily, once = OncePerDay(), OnceAndNeverAgain()
+    pretium.evaluate({"daily": daily, "once": once}, seed=3,
+                     universe=UNIVERSE, days=4, steps_per_day=6)
+
+    # The correct guard fires on every day, and its step numbers show why the
+    # naive one does not: only day zero starts at step zero.
+    assert daily.fired == [(0, 0, 0), (1, 6, 0), (2, 12, 0), (3, 18, 0)]
+    # The naive guard fires once in four days -- silently, with no error.
+    assert once.fired == [(0, 0)]
+
+
+def test_the_within_day_helpers_agree_with_the_harness_own_arithmetic():
+    """`step_of_day` is the expression the harness uses for the clock.
+
+    Derived rather than stored, so it cannot drift from `step` and
+    `steps_per_day` -- and asserted against `session_clock`, which is the
+    consumer that has always had to compute it.
+    """
+    from pretium.harness import Observation, session_clock
+
+    steps_per_day = 6
+    for step in range(steps_per_day * 3):
+        obs = Observation(step, step // steps_per_day, ["A"], [1.0], None,
+                          None, [1.0], steps_per_day)
+        assert obs.step_of_day == step % steps_per_day
+        assert obs.is_first_step_of_day == (obs.step_of_day == 0)
+        assert obs.is_last_step_of_day == (obs.step_of_day == steps_per_day - 1)
+        assert session_clock((9, 30, 3), obs.step_of_day, 65) == \
+            session_clock((9, 30, 3), step % steps_per_day, 65)
+
+    # A single-step day makes every step both the first and the last, which
+    # is the correct answer rather than an edge case to guard.
+    solo = Observation(4, 4, ["A"], [1.0], None, None, [1.0], 1)
+    assert solo.step_of_day == 0
+    assert solo.is_first_step_of_day and solo.is_last_step_of_day
+
+
+def test_the_observation_repr_says_which_index_is_which():
+    """Where the trap is usually discovered -- or missed."""
+    from pretium.harness import Observation
+
+    text = repr(Observation(7, 1, ["A", "B"], [1.0, 2.0], None, None,
+                            [1.0, 2.0], 6))
+    assert "day=1" in text
+    assert "step_of_day=1/6" in text
+    assert "step=7 of run" in text

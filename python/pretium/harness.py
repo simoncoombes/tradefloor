@@ -81,6 +81,34 @@ class Observation:
     Deliberately narrow. Everything here is something a real trader could
     observe: prices, the book, their own position. Nothing here is something
     only the simulator knows.
+
+    ## ``step`` counts the WHOLE RUN, not the day
+
+    It is a running index over every decision point in the evaluation, so at
+    the harness default of six steps a day, day 1 begins at ``step == 6`` and
+    day 3 at ``step == 18``. Only day zero starts at zero.
+
+    That has cost people real runs. ``if obs.step != 0: return {}`` reads like
+    a once-a-day guard and is a once-a-RUN guard: the agent trades on the
+    first step of day zero and never again, produces a scorecard with
+    ``trades=1`` and an empty ``errors`` list, and looks exactly like an agent
+    that considered the market and declined. Nothing in the result says
+    otherwise.
+
+    The library cannot refuse that, because it is arithmetic on an integer
+    and there is no call to intercept — so the answer is to make the
+    within-day index a thing you can ASK for rather than a thing you have to
+    derive. Use :attr:`step_of_day`, or the two predicates:
+
+    ```python
+    if not obs.is_first_step_of_day:
+        return {}                     # once a day, correctly
+    ```
+
+    ``step`` itself stays a run-wide counter: it is what makes an
+    observation's position in the run unambiguous, it is what the fills table
+    stamps, and changing its meaning would silently re-time every agent
+    already written against it — the same defect in a new place.
     """
 
     __slots__ = ("step", "day", "tickers", "prices", "portfolio", "engine",
@@ -88,6 +116,8 @@ class Observation:
 
     def __init__(self, step, day, tickers, prices, portfolio, engine, adv,
                  steps_per_day=1):
+        # Run-wide, NOT within-day. See the class docstring: `step_of_day` is
+        # the one that resets, and is what a per-day guard wants.
         self.step = step
         self.day = day
         # Exposed because an agent reasoning about a HORIZON needs it and
@@ -100,6 +130,36 @@ class Observation:
         self.portfolio = portfolio
         self.engine = engine
         self._adv = adv
+
+    @property
+    def step_of_day(self) -> int:
+        """This step's index WITHIN the day: 0 at every open.
+
+        The value ``obs.step`` is usually mistaken for. Derived rather than
+        stored so it cannot disagree with ``step`` and ``steps_per_day``,
+        which is the same expression the harness itself uses to advance the
+        session clock and to stamp fills.
+        """
+        return self.step % self.steps_per_day
+
+    @property
+    def is_first_step_of_day(self) -> bool:
+        """True on the day's opening decision point.
+
+        The once-a-day guard, spelled so it cannot be confused with
+        once-a-run: ``if not obs.is_first_step_of_day: return {}``.
+        """
+        return self.step_of_day == 0
+
+    @property
+    def is_last_step_of_day(self) -> bool:
+        """True on the day's final decision point, before the close.
+
+        The other half of a daily cadence: flattening or rebalancing into the
+        close is a different decision from the one at the open, and both need
+        a name that does not depend on the caller knowing ``steps_per_day``.
+        """
+        return self.step_of_day == self.steps_per_day - 1
 
     def price(self, ticker: str) -> float:
         return self.prices[self.tickers.index(ticker)]
@@ -130,7 +190,13 @@ class Observation:
         return held.quantity if held else 0.0
 
     def __repr__(self) -> str:
-        return f"Observation(step={self.step}, day={self.day}, n={len(self.tickers)})"
+        # `step` is printed as "N of M" so that anyone who prints an
+        # observation while debugging a per-day guard sees immediately that it
+        # counts the run rather than the day -- which is the point at which
+        # the trap is usually discovered, or missed.
+        return (f"Observation(day={self.day}, "
+                f"step_of_day={self.step_of_day}/{self.steps_per_day}, "
+                f"step={self.step} of run, n={len(self.tickers)})")
 
 
 class Agent(Protocol):
