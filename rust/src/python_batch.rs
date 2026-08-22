@@ -78,12 +78,18 @@ impl PyEngineBatch {
     /// Seeds must be distinct. Two members with the same seed would be the
     /// same market twice, which is almost always a mistake in a sweep and is
     /// silent if allowed: the results look like two samples and are one.
+    ///
+    /// `model` selects the coefficient set, exactly as on `Engine`: one
+    /// model for every member, because a batch is N seeds of the same
+    /// market and members under different models would be a comparison of
+    /// models presented as a comparison of seeds.
     #[new]
-    #[pyo3(signature = (*, seeds, universe, macro_state = None))]
+    #[pyo3(signature = (*, seeds, universe, macro_state = None, model = None))]
     fn new(
         seeds: Vec<u32>,
         universe: Vec<crate::python_engine::PyInstrument>,
         macro_state: Option<crate::python_engine::PyMacro>,
+        model: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
         if seeds.is_empty() {
             return Err(ValidationError::new_err("no seeds given"));
@@ -101,6 +107,7 @@ impl PyEngineBatch {
             ));
         }
 
+        let params = crate::python_engine::model_params_from(model)?;
         let economy = crate::python_engine::economy_from(macro_state)?;
         let companies: Vec<TickCompany> = universe
             .iter()
@@ -113,12 +120,13 @@ impl PyEngineBatch {
         let engines = seeds
             .iter()
             .map(|seed| {
-                Engine::new(
+                Engine::with_params(
                     *seed,
                     companies.clone(),
                     economy.clone(),
                     create_initial_central_bank_state(0),
                     sector_keys.clone(),
+                    params.clone(),
                 )
             })
             .collect::<Vec<_>>();
@@ -263,6 +271,22 @@ impl PyEngineBatch {
     #[getter]
     fn draws_consumed(&self) -> Vec<usize> {
         self.engines.iter().map(|e| e.draws_consumed()).collect()
+    }
+
+    /// The honest name of the model every member runs: a shipped preset's
+    /// name, or `custom-XXXXXXXX`. One value, not one per member — the
+    /// constructor builds every engine from the same coefficient set.
+    #[getter]
+    fn model_fingerprint(&self) -> String {
+        self.engines[0].params().fingerprint()
+    }
+
+    /// The model every member runs, as a `ModelParams`.
+    #[getter]
+    fn model(&self) -> crate::python_params::PyModelParams {
+        crate::python_params::PyModelParams {
+            inner: self.engines[0].params().clone(),
+        }
     }
 
     #[getter]

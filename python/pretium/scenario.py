@@ -167,7 +167,7 @@ import json
 import warnings
 from typing import Any, Callable, Sequence
 
-from ._core import Engine, Instrument, Macro, ValidationError
+from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
 
 #: The macro fields a scenario may drive. Anything else is a typo, and a typo
 #: that silently did nothing would be the same class of failure this module
@@ -481,17 +481,23 @@ def run_scenario(
     ticks_per_day: int = 390,
     start: tuple[int, int, int] = (9, 30, 3),
     record: bool = False,
+    model: str | ModelParams | None = None,
 ) -> Engine:
     """Run a market under a macro path. Returns the finished engine.
 
     The scenario is applied at the START of each day, before that day's
     session, so day zero is already under the path rather than under whatever
     the engine was constructed with.
+
+    ``model`` selects the coefficient set — a preset name or a
+    :class:`pretium.ModelParams`, defaulting to the shipped preset. The
+    returned engine reports it as ``model_fingerprint``, like any other.
     """
     if days < 1:
         raise ValidationError("days must be at least 1")
     hour, minute, day_of_week = start
-    engine = Engine(seed=seed, universe=universe, macro_state=macro)
+    engine = Engine(seed=seed, universe=universe, macro_state=macro,
+                    model=model)
     for day in range(days):
         scenario.apply(engine, day)
         engine.open_market()
@@ -524,6 +530,12 @@ def compare(
     ``baseline`` defaults to holding the scenario's fields at their day-zero
     values, which is the right comparison: it isolates the PATH rather than
     conflating it with the level the path started from.
+
+    Keyword arguments — ``model=`` among them — pass through to
+    :func:`run_scenario` and apply to BOTH worlds, because a shocked world
+    differenced against a baseline under a different coefficient set would
+    measure the model gap dressed up as the scenario's effect. The result
+    records ``model_fingerprint``.
     """
     import struct
 
@@ -571,6 +583,9 @@ def compare(
         "seed": seed,
         "days": days,
         "scenario": repr(scenario),
+        # Both worlds ran it, so one value names the model for the whole
+        # comparison -- the same provenance rule as Scorecard's.
+        "model_fingerprint": shocked.model_fingerprint,
         "draws": shocked.draws_consumed,
         "draw_delta": delta,
         "exact": delta == 0,

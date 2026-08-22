@@ -355,3 +355,180 @@ def test_replay_accepts_the_model_and_reproduces_the_custom_run():
     # reason the manifest must carry the coefficients.
     wrong = pretium.replay(engine.order_log, seed=42, universe=UNIVERSE)
     assert market_state(wrong) != market_state(engine)
+
+
+# -- property 5: every runner passes the model through ----------------------
+#
+# Phase 1 threaded `model=` into Engine, evaluate, replay, Checkpoint and
+# fork, and named the rest as follow-ups. These tests close the list. The
+# failure mode they guard against is specific and silent: a caller who
+# built a custom ModelParams and handed it to a runner that ignored it
+# would get the shipped market back, labelled with their intent — a wrong
+# answer that looks right. Every runner must therefore (a) run the model,
+# shown by the trajectory moving against the default, and (b) say so,
+# wherever its result carries provenance at all.
+
+#: One perturbation, shared by the whole section. market_factor_sigma is
+#: the loudest single lever (it scales the shared component of every
+#: return), so any runner that quietly dropped the model fails fast.
+CUSTOM = pretium.ModelParams.from_preset("pt-v1", market_factor_sigma=0.03)
+
+SMALL = pretium.Universe.random(6, seed=2)
+
+
+class _Idle:
+    def act(self, obs):
+        return {}
+
+
+class _BuyFirst:
+    def __init__(self):
+        self.done = False
+
+    def act(self, obs):
+        if self.done:
+            return {}
+        self.done = True
+        ticker = obs.tickers[0]
+        return {ticker: 0.01 * obs.avg_volume(ticker)}
+
+
+def test_facts_measure_runs_the_model_and_names_it():
+    """The seam the calibration search evaluates through: the panel at a
+    candidate vector is measure(model=candidate), and the row it returns
+    names the vector it measured."""
+    kwargs = dict(seed=1, universe=SMALL, days=35)
+    default = pretium.facts.measure(**kwargs)
+    custom = pretium.facts.measure(**kwargs, model=CUSTOM)
+    assert default["model_fingerprint"] == "pt-v1"
+    assert custom["model_fingerprint"] == CUSTOM.fingerprint
+    # The statistics were measured on the custom market, not merely
+    # relabelled: tripling the factor sigma moves pooled volatility.
+    assert custom["annualised_vol_pct"] != default["annualised_vol_pct"]
+    # And the shipped default is untouched by the parameter existing.
+    assert pretium.facts.measure(**kwargs, model="pt-v1") == default
+
+
+def test_tca_analyse_runs_the_model_in_both_worlds():
+    kwargs = dict(seed=5, universe=SMALL, days=1, steps_per_day=2,
+                  ticks_per_step=10)
+    default = pretium.tca.analyse(_BuyFirst(), **kwargs)
+    custom = pretium.tca.analyse(_BuyFirst(), **kwargs, model=CUSTOM)
+    assert default.model_fingerprint == "pt-v1"
+    assert custom.model_fingerprint == CUSTOM.fingerprint
+    assert custom.as_dict()["model_fingerprint"] == CUSTOM.fingerprint
+    # The custom model is a different market...
+    assert custom.baseline_final != default.baseline_final
+    # ...but BOTH of its worlds ran it, so the counterfactual is still
+    # clean: on one day nothing untraded can move under any model.
+    assert custom.untouched_moved() == []
+
+
+def test_run_scenario_and_compare_run_the_model():
+    scenario = pretium.Scenario(label="flat").hold(vix=15.0)
+    kwargs = dict(seed=3, universe=SMALL, days=1, ticks_per_day=30)
+    default = pretium.run_scenario(scenario, **kwargs)
+    custom = pretium.run_scenario(scenario, **kwargs, model=CUSTOM)
+    assert default.model_fingerprint == "pt-v1"
+    assert custom.model_fingerprint == CUSTOM.fingerprint
+    assert custom.prices() != default.prices()
+
+    from pretium.scenario import compare
+
+    result = compare(
+        pretium.Scenario.vix_shock(calm=15.0, peak=45.0, at=0, over=2),
+        seed=3, universe=SMALL, days=3, model=CUSTOM)
+    assert result["model_fingerprint"] == CUSTOM.fingerprint
+    # The membership rule holds through the runner: a model changes what
+    # the draws are multiplied into, never the schedule, so the comparison
+    # stays exact under a custom model too.
+    assert result["exact"] is True
+
+
+def test_run_many_runs_the_model_and_stamps_every_row():
+    kwargs = dict(universe=SMALL, days=1, ticks=30, collect="summary")
+    default = pretium.run_many([1, 2], **kwargs)
+    custom = pretium.run_many([1, 2], **kwargs, model=CUSTOM)
+    for row in default:
+        assert row["model_fingerprint"] == "pt-v1"
+    for before, after in zip(default, custom):
+        assert after["model_fingerprint"] == CUSTOM.fingerprint
+        assert after["prices"] != before["prices"]
+        # The CRN guard, through the runner: same seed, same schedule.
+        assert after["draws_consumed"] == before["draws_consumed"]
+    # The model survives the crossing into worker threads.
+    threaded = pretium.run_many([1, 2], **kwargs, model=CUSTOM, workers=2)
+    assert [r["prices"] for r in threaded] == [r["prices"] for r in custom]
+
+
+def test_sweep_runs_the_model():
+    import pyarrow as pa
+
+    def closes(model=None):
+        ((_, table),) = pretium.sweep([9], universe=SMALL, days=1,
+                                      ticks_per_day=30, model=model)
+        return pa.table(table).to_pydict()["close"]
+
+    assert closes(CUSTOM) != closes()
+
+
+def test_flow_impact_runs_the_model_in_both_worlds():
+    flow = {SMALL[0].ticker: (50_000.0, 0.0)}
+    kwargs = dict(seed=4, universe=SMALL, order_flow=flow, ticks=30)
+    default = pretium.flow_impact(**kwargs)
+    custom = pretium.flow_impact(**kwargs, model=CUSTOM)
+    assert custom.baseline != default.baseline
+    # One day, both worlds under the one model: nothing untraded moves.
+    assert custom.untouched_moved() == []
+
+
+def test_the_gym_env_runs_the_model_and_reports_it_at_reset():
+    numpy = pytest.importorskip("numpy")
+    from pretium.gym import TradingEnv
+
+    kwargs = dict(universe=SMALL, seed=6, days=1, steps_per_day=1,
+                  ticks_per_step=10)
+    default = TradingEnv(**kwargs)
+    _, info = default.reset()
+    assert info["model_fingerprint"] == "pt-v1"
+    custom = TradingEnv(**kwargs, model=CUSTOM)
+    _, info = custom.reset()
+    assert info["model_fingerprint"] == CUSTOM.fingerprint
+    assert custom.engine.model_fingerprint == CUSTOM.fingerprint
+    hold = numpy.zeros(len(SMALL))
+    obs_default = default.step(hold)[0]
+    obs_custom = custom.step(hold)[0]
+    # Same seed, different coefficients: the episode is a different market.
+    assert not numpy.array_equal(obs_default, obs_custom)
+
+
+def test_rank_runs_the_model_and_the_ranking_records_it():
+    kwargs = dict(seeds=[1], universe=SMALL, days=1, steps_per_day=1,
+                  ticks_per_step=10)
+    default = pretium.rank(lambda: {"idle": _Idle()}, **kwargs)
+    assert default.model_fingerprint == "pt-v1"
+    ranking = pretium.rank(lambda: {"idle": _Idle()}, **kwargs, model=CUSTOM)
+    assert ranking.model_fingerprint == CUSTOM.fingerprint
+    assert ranking.as_dict()["model_fingerprint"] == CUSTOM.fingerprint
+    assert CUSTOM.fingerprint in ranking.report()
+
+
+def test_an_engine_batch_member_is_the_standalone_custom_engine():
+    seeds = [7, 8]
+    b = pretium.EngineBatch(seeds=seeds, universe=SMALL, model=CUSTOM)
+    assert b.model_fingerprint == CUSTOM.fingerprint
+    assert b.model == CUSTOM
+    b.open_market()
+    b.run_session(9, 30, 3, 30)
+    rows = struct.unpack("<%dd" % (len(seeds) * len(SMALL)), b.prices())
+    for i, seed in enumerate(seeds):
+        alone = pretium.Engine(seed=seed, universe=SMALL, model=CUSTOM)
+        alone.open_market()
+        alone.run_session(9, 30, 3, 30)
+        expected = struct.unpack("<%dd" % len(SMALL), alone.prices())
+        assert rows[i * len(SMALL):(i + 1) * len(SMALL)] == expected, seed
+
+    assert pretium.EngineBatch(seeds=seeds,
+                               universe=SMALL).model_fingerprint == "pt-v1"
+    with pytest.raises(pretium.ValidationError, match="model must be"):
+        pretium.EngineBatch(seeds=seeds, universe=SMALL, model=0.12)

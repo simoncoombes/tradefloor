@@ -43,7 +43,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Iterator, Sequence
 
-from ._core import Engine, Instrument, Macro, ValidationError
+from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
 from .universe_util import as_universe
 
 #: What a sweep can stream. Both are per-day batched by the engine, so a
@@ -52,9 +52,10 @@ COLLECT = ("bars", "truth", "macro")
 
 
 def _run_one(seed, universe, macro, days, ticks_per_day, start, scenario,
-             collect, grain, minutes):
+             collect, grain, minutes, model):
     hour, minute, day_of_week = start
-    engine = Engine(seed=seed, universe=universe, macro_state=macro)
+    engine = Engine(seed=seed, universe=universe, macro_state=macro,
+                    model=model)
     for day in range(days):
         if scenario is not None:
             scenario.apply(engine, day)
@@ -84,6 +85,7 @@ def sweep(
     minutes: int | None = None,
     start: tuple[int, int, int] = (9, 30, 3),
     workers: int = 1,
+    model: str | ModelParams | None = None,
 ) -> Iterator[tuple[int, Any]]:
     """Yield ``(seed, table)`` for each seed, one at a time.
 
@@ -92,6 +94,13 @@ def sweep(
 
     Peak memory is ``workers`` engines, not ``len(seeds)``. Keeping the tables
     — ``list(sweep(...))`` — puts it all back.
+
+    ``model`` selects the coefficient set — a preset name or a
+    :class:`pretium.ModelParams` — and every seed runs it, for the reason
+    :func:`pretium.run_many` gives: a sweep is many draws of one market.
+    The tables carry no provenance columns (they never have; the engine is
+    dropped as each yields), so a caller sweeping a custom model should
+    record ``model.fingerprint`` beside whatever it keeps.
     """
     seeds = list(seeds)
     if not seeds:
@@ -107,7 +116,7 @@ def sweep(
 
     roster = as_universe(universe)
     args = (roster, macro, days, ticks_per_day, start, scenario, collect,
-            grain, minutes)
+            grain, minutes, model)
 
     if workers == 1:
         for seed in seeds:
