@@ -80,6 +80,31 @@
 //! reads "recalibrated era versus inherited era", not "Rust versus V8".
 //! The v4-era measurements quoted above are pending re-confirmation against
 //! a v5-matched reference; the mechanisms they rest on are unchanged.
+//!
+//! # Four gates retired, because that regeneration is now foreclosed
+//!
+//! The paragraph above was written expecting the vectors to be re-cut at this
+//! crate's constants. D-P2 removed that option: the one-way rule in
+//! `sync-goldens.py` now bars regenerating from a constants-PATCHED reference
+//! as well as from this crate. Patching the reference to agree and then
+//! recording it is self-confirmation by a longer route — the vectors would
+//! assert that the crate agrees with a copy of its own calibration.
+//!
+//! So the four gates that read the price LEVEL cannot pass again, and are
+//! retired with `#[ignore]` rather than deleted, on the same terms as
+//! `market_tick_parity` (D-P1): the bodies stay intact so the divergence
+//! remains reproducible under `--ignored`, and each is EXPECTED to fail. A
+//! retired test here that PASSES means someone regenerated the corpus from a
+//! constants-matched source, which D-P2 forbids — treat it as an incident,
+//! not a fix.
+//!
+//! `the_divergence_does_not_compound_without_limit` and
+//! `the_reference_was_generated_without_wasm` are kept live and still pass.
+//! That is not an accident of which gates happened to survive: the first
+//! asserts a RELATIVE property — that error does not grow without bound —
+//! which a level shift in a shared factor leaves untouched, and the second
+//! reads the corpus's provenance rather than its numbers. Between them they
+//! are what remains checkable against an inherited-era reference.
 
 use serde_json::Value as Json;
 
@@ -166,6 +191,7 @@ fn runs() -> Runs {
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1/D-P2): reference recorded at sigma 0.003, model moved to 0.0075 and regeneration is foreclosed; expected to FAIL under --ignored"]
 fn the_divergence_is_bounded_over_a_session() {
     // The headline number. Derived, not inherited: sized against the 7.2e-4
     // mean / 2.9e-3 max curve after 390 ticks — since RETRACTED, see the
@@ -240,6 +266,7 @@ fn the_divergence_does_not_compound_without_limit() {
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1/D-P2): reference recorded at sigma 0.003, model moved to 0.0075 and regeneration is foreclosed; expected to FAIL under --ignored"]
 fn return_distributions_agree() {
     // Same first two moments per company. A user backtesting a strategy is
     // reading these, not individual prints.
@@ -283,6 +310,7 @@ fn return_distributions_agree() {
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1/D-P2): reference recorded at sigma 0.003, model moved to 0.0075 and regeneration is foreclosed; expected to FAIL under --ignored"]
 fn volatility_clustering_agrees() {
     // INVARIANTS 2.7/5.5 across the language boundary. GARCH exists to make
     // volatility cluster; if the two engines disagreed about the
@@ -339,6 +367,7 @@ fn volatility_clustering_agrees() {
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1/D-P2): reference recorded at sigma 0.003, model moved to 0.0075 and regeneration is foreclosed; expected to FAIL under --ignored"]
 fn the_cross_sectional_correlation_structure_agrees() {
     // The shared market factor is what makes 30 names move together rather
     // than independently. If the port loaded beta wrongly or misapplied the
