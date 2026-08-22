@@ -52,11 +52,17 @@ import pretium
 # avg_volume no longer feeds back on itself (the reference's EMA
 # compounded without bound). Both change every seed's trajectory.
 #
-# v5: same era boundary, third change. MARKET_FACTOR_SIGMA recalibrated
-# from the reference's 0.003 (cross-sectional correlation 0.02 against a
-# real 0.25-0.35, design findings 7-9); the sweep behind the chosen value
-# is tools/calibration/sweep_market_factor_sigma.py. Changes every
-# trajectory, hence the new baseline.
+# v5: same era boundary, third and fourth changes, one bump. First,
+# MARKET_FACTOR_SIGMA recalibrated from the reference's 0.003
+# (cross-sectional correlation 0.02 against a real 0.25-0.35, design
+# findings 7-9); the sweep behind the chosen value is
+# tools/calibration/sweep_market_factor_sigma.py. Second, the RNG stream
+# split: the engine now derives three independent substreams (market,
+# economy, external) from the root seed instead of running everything off
+# GameRng(seed, 99), and settlement's four uniforms are drawn
+# unconditionally per active company per open tick. Each changes every
+# trajectory; the direct GameRng section below moves for neither, because
+# the Layer-1 generator API is untouched.
 KAT_VERSION = 5
 
 SEED = 20260820

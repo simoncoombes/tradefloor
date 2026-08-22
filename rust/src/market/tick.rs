@@ -220,6 +220,33 @@ pub struct NewsImpactEntry {
     pub reversal_phase: bool,
 }
 
+/// How settlement consumes its four uniforms — the 2026-08 era's fixed
+/// schedule, or the reference's conditional one.
+///
+/// `settle_price_through_book` takes four draws or zero, and WHICH of the
+/// two depends on price-and-state guards: a volume that floors to zero, an
+/// empty book. That made the draw schedule a function of the trajectory —
+/// any perturbation that flipped one settle guard (a trade's impact, a
+/// macro path moving a price) shifted every subsequent draw for every
+/// consumer, which is exactly the coupling the counterfactual surfaces
+/// (`tca`, `scenario.compare`) exist to avoid. It was measured at zero on
+/// current builds and observed at -4 draws on an older one: real, rare,
+/// and impossible to rule out while the consumption is conditional.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettleDrawPolicy {
+    /// Four uniforms are drawn per active company on every open tick,
+    /// whether or not the settle uses them. The draw schedule becomes a
+    /// pure function of (market status, active set, sector count) — no
+    /// price, no macro value, no order flow can move it. This is the
+    /// era's generated schedule and what `Engine::tick` uses.
+    FourAlways,
+    /// Four or zero, exactly as the guards decide — the reference's
+    /// schedule. For replaying a RECORDED stream, where the tape holds
+    /// precisely the draws the reference consumed and drawing four
+    /// unconditionally would misalign it.
+    FourOrZero,
+}
+
 /// Everything the tick needs that is not a company.
 #[derive(Debug, Clone)]
 pub struct TickInputs<'a> {
@@ -235,6 +262,9 @@ pub struct TickInputs<'a> {
     /// Sector keys in the order `SECTOR_CONFIGS` enumerates them. The ORDER
     /// is contractual: one normal is drawn per key, in this order.
     pub sector_keys: &'a [String],
+    /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
+    /// reference stream.
+    pub settle_draws: SettleDrawPolicy,
 }
 
 /// What one tick produced, beyond the mutations applied to the companies.
@@ -549,19 +579,34 @@ pub fn simulate_market_tick(
 
         let mut new_price = fair_value;
         if open {
-            // DRAW SITE: four uniforms, or zero on an early return.
+            // DRAW SITE: four uniforms. Under `FourAlways` they are drawn
+            // HERE, unconditionally, and the settle is served from the
+            // buffer — an early return leaves drawn values unused rather
+            // than draws untaken, so the stream's position cannot depend on
+            // which guard fired. Under `FourOrZero` the settle draws
+            // lazily from the shared source, four or zero, matching what a
+            // recorded reference stream actually holds.
+            let mut predrawn = match inputs.settle_draws {
+                SettleDrawPolicy::FourAlways => Some(PredrawnUniforms::new([
+                    rng.next_f64(),
+                    rng.next_f64(),
+                    rng.next_f64(),
+                    rng.next_f64(),
+                ])),
+                SettleDrawPolicy::FourOrZero => None,
+            };
             let micro = companies[idx].micro_view(companies[idx].stock.price);
-            let settled = settle_price_through_book(
-                &micro,
-                fair_value,
-                volume,
-                &SettleOptions {
-                    vix: economy.vix,
-                    difficulty: None,
-                    flow_lean: Some(crowd_leans[i]),
-                },
-                rng,
-            );
+            let options = SettleOptions {
+                vix: economy.vix,
+                difficulty: None,
+                flow_lean: Some(crowd_leans[i]),
+            };
+            let settled = match predrawn.as_mut() {
+                Some(buffer) => {
+                    settle_price_through_book(&micro, fair_value, volume, &options, buffer)
+                }
+                None => settle_price_through_book(&micro, fair_value, volume, &options, rng),
+            };
             new_price = settled.price;
 
             // Breaker #2 — the PRINT. See the module header for why this one
@@ -607,6 +652,38 @@ fn clamp_s(s: f64) -> f64 {
     // `Math.max(-CAP, Math.min(CAP, s))` — the min/max spelling, not the
     // ternary, matching the source.
     mathx::max(-MISPRICING_CAP, mathx::min(MISPRICING_CAP, s))
+}
+
+/// Serves settlement's four pre-drawn uniforms under
+/// [`SettleDrawPolicy::FourAlways`].
+///
+/// Overrunning the budget panics rather than wrapping or re-drawing: the
+/// settle's four-draw ceiling is a hard contract
+/// (`microstructure::settle_price_through_book`), and a fifth request means
+/// that contract broke — silently serving anything would convert a schedule
+/// bug into a plausible-looking different market. `next_normal` panics for
+/// the same reason: settlement draws uniforms only, and a normal request
+/// here is a routing error, not a need.
+struct PredrawnUniforms {
+    draws: [f64; 4],
+    at: usize,
+}
+
+impl PredrawnUniforms {
+    fn new(draws: [f64; 4]) -> Self {
+        Self { draws, at: 0 }
+    }
+}
+
+impl Rng for PredrawnUniforms {
+    fn next_f64(&mut self) -> f64 {
+        let value = self.draws[self.at];
+        self.at += 1;
+        value
+    }
+    fn next_normal(&mut self) -> f64 {
+        unreachable!("settlement draws uniforms only; a normal request here is a routing bug")
+    }
 }
 
 #[cfg(test)]

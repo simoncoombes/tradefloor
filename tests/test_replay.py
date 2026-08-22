@@ -117,22 +117,42 @@ def test_the_log_records_inputs_not_outputs():
         assert not (set(entry) & forbidden), entry
 
 
-def test_embedder_draws_are_recorded_because_they_move_the_stream():
-    # Easy to overlook: taking a uniform between two ticks shifts every later
-    # draw, so a replay that skipped it would produce a different market from
-    # the same log.
+def test_embedder_draws_are_recorded_because_they_move_the_external_stream():
+    # Before the stream split this test asserted the opposite market claim:
+    # one embedder uniform shifted every later engine draw, so a replay that
+    # dropped it produced a different market. The split removed exactly that
+    # coupling — the market half here is the cutover consumer's guarantee.
+    #
+    # The draws stay in the log anyway, because the log reproduces a HISTORY
+    # and the embedder's own randomness is part of it: a replay that skipped
+    # a recorded draw would hand the embedder different values from the
+    # EXTERNAL stream afterwards, and any decision built on them would
+    # diverge from the run the log claims to reproduce.
     e = pretium.Engine(seed=1, universe=UNIVERSE)
     e.open_market()
     e.draw_uniform()
     e.run_session(9, 30, 3, 30)
     with_draw = arr(e.prices())
+    next_external = e.draw_uniform()
 
     log = e.order_log
     assert any(x["op"] == "draw_uniform" for x in log)
 
     without = [x for x in log if x["op"] != "draw_uniform"]
-    assert arr(pretium.replay(log, seed=1, universe=UNIVERSE).prices()) == with_draw
-    assert arr(pretium.replay(without, seed=1, universe=UNIVERSE).prices()) != with_draw
+    # log[:-1]: everything up to, not including, the probe draw taken above.
+    replayed = pretium.replay(log[:-1], seed=1, universe=UNIVERSE)
+    skipped = pretium.replay(without, seed=1, universe=UNIVERSE)
+
+    # The market is bit-identical whether or not the draw is replayed: the
+    # embedder's consumption lives on its own stream now.
+    assert arr(replayed.prices()) == with_draw
+    assert arr(skipped.prices()) == with_draw
+
+    # But the external stream's position is not: the faithful replay hands
+    # back the same next value as the original run, the skipping one does
+    # not. That is why the log keeps recording draws.
+    assert replayed.draw_uniform() == next_external
+    assert skipped.draw_uniform() != next_external
 
 
 def test_the_log_carries_tickers_not_internal_ids():

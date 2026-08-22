@@ -237,6 +237,10 @@ fn check_scenario(file: &str) {
                 news_impact_queue: &[],
                 order_volumes: &[],
                 sector_keys: &sector_keys,
+                // Replaying a RECORDED reference stream: the tape holds the
+                // draws the reference consumed, four-or-zero at settlement,
+                // and `ScriptedRng::finish` asserts exact consumption.
+                settle_draws: SettleDrawPolicy::FourOrZero,
             },
             &mut rng,
         );

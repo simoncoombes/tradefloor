@@ -1330,14 +1330,35 @@ impl PyEngine {
         self.tickers.clone()
     }
 
-    /// Cumulative draws taken from the engine's stream.
+    /// Cumulative draws across all three engine streams.
     ///
-    /// Two runs that agree here consumed the generator identically, which is
+    /// Two runs that agree here consumed the generators identically, which is
     /// the precondition for their prices agreeing. Diagnostic: it reports
-    /// alignment, it does not enforce it.
+    /// alignment, it does not enforce it. The per-stream split is
+    /// `draws_by_stream()`, and since the 2026-08 stream split THAT is the
+    /// sharper question: two runs whose `market` counts agree saw the same
+    /// market noise even if their macro chains branched apart.
     #[getter]
     fn draws_consumed(&self) -> usize {
         self.inner.draws_consumed()
+    }
+
+    /// Cumulative draws per stream: `{"market": n, "economy": n, "external": n}`.
+    ///
+    /// The market stream's schedule is a pure function of (market status,
+    /// active roster, sector count), so equal `market` counts between two
+    /// runs of the same tick schedule mean the two markets consumed — and
+    /// therefore saw — an identical noise sequence. The economy stream's
+    /// count genuinely varies with macro state (a chain in contraction
+    /// draws a shock the expansion never rolls), which is why it is
+    /// reported separately instead of polluting the market comparison.
+    fn draws_by_stream<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let draws = self.inner.draws_by_stream();
+        let out = PyDict::new_bound(py);
+        out.set_item("market", draws.market)?;
+        out.set_item("economy", draws.economy)?;
+        out.set_item("external", draws.external)?;
+        Ok(out)
     }
 
     #[getter]
@@ -1349,11 +1370,13 @@ impl PyEngine {
         self.inner.len()
     }
 
-    /// Take one uniform from the engine's own stream.
+    /// Take one uniform from the engine's EXTERNAL stream.
     ///
-    /// For a caller's own subsystems. Drawing from a SEPARATE generator would
-    /// interleave differently and change every price, so anything that needs
-    /// randomness alongside the simulation must draw from here.
+    /// For a caller's own subsystems. The draws are derived from the same
+    /// root seed — reproducible run to run — but live on their own
+    /// substream, so taking one (or a thousand) leaves the market's noise
+    /// sequence bit-identical. A caller that varies how much it draws no
+    /// longer invalidates every seeded trajectory it computed before.
     fn draw_uniform(&mut self) -> f64 {
         self.log.push(crate::python_log::LogEntry::Draw { normal: false });
         self.inner.draw_uniform()
@@ -1570,16 +1593,19 @@ impl PyEngine {
         }
         out.set_item("columns", columns)?;
         let rng = self.inner.rng_state();
-        // The two u64s as f64 bit patterns: a u64 does not survive a Python
-        // float, and this has to round-trip exactly rather than closely.
-        out.set_item(
-            "rng",
-            vec![
-                f64::from_bits(rng.state),
-                f64::from_bits(rng.increment),
-                rng.spare.unwrap_or(f64::NAN),
-            ],
-        )?;
+        // Three streams, three numbers each — (state, increment, spare) for
+        // market, economy, external, in that order. The u64s ride as f64 bit
+        // patterns: a u64 does not survive a Python float, and this has to
+        // round-trip exactly rather than closely. Nine numbers rather than a
+        // nested structure so a pre-split snapshot (three numbers) is
+        // unmistakable at a glance and on restore.
+        let mut rng_out = Vec::with_capacity(9);
+        for s in [rng.market, rng.economy, rng.external] {
+            rng_out.push(f64::from_bits(s.state));
+            rng_out.push(f64::from_bits(s.increment));
+            rng_out.push(s.spare.unwrap_or(f64::NAN));
+        }
+        out.set_item("rng", rng_out)?;
         out.set_item("tickers", self.inner.ids().to_vec())?;
         // The per-DAY accumulators. The columns above are per-company state;
         // these live beside them and were missing, which made a mid-day fork
@@ -1705,16 +1731,39 @@ impl PyEngine {
             .get_item("rng")?
             .ok_or_else(|| ValidationError::new_err("snapshot has no 'rng'"))?
             .extract()?;
-        if rng.len() != 3 {
+        if rng.len() == 3 {
+            // A pre-split snapshot carries ONE stream where this engine has
+            // three. Guessing at the other two would restore a market that
+            // looks right and silently draws different macro and embedder
+            // sequences — and the trajectory it froze belongs to the old
+            // era anyway, so it cannot be continued bit-exactly here.
+            return Err(ValidationError::new_err(
+                "this snapshot predates the RNG stream split (3 rng numbers, \
+                 expected 9). It froze a single-stream market that this \
+                 version cannot continue bit-exactly; re-run it under the \
+                 version that wrote it, or re-simulate from the seed.",
+            ));
+        }
+        if rng.len() != 9 {
             return Err(ValidationError::new_err(format!(
-                "rng must be 3 numbers (state, increment, spare), got {}",
+                "rng must be 9 numbers, (state, increment, spare) for the \
+                 market, economy and external streams, got {}",
                 rng.len()
             )));
         }
-        self.inner.set_rng_state(crate::rng::RngState {
-            state: rng[0].to_bits(),
-            increment: rng[1].to_bits(),
-            spare: if rng[2].is_nan() { None } else { Some(rng[2]) },
+        let stream = |at: usize| crate::rng::RngState {
+            state: rng[at].to_bits(),
+            increment: rng[at + 1].to_bits(),
+            spare: if rng[at + 2].is_nan() {
+                None
+            } else {
+                Some(rng[at + 2])
+            },
+        };
+        self.inner.set_rng_state(crate::engine::EngineRngState {
+            market: stream(0),
+            economy: stream(3),
+            external: stream(6),
         });
 
         // The per-day accumulators. Absent from a snapshot written before
@@ -2170,9 +2219,10 @@ impl PyEngine {
     /// consequences of replaying them, and logging those too would create a
     /// second source of truth that could disagree with the first.
     ///
-    /// Embedder draws are in here, which is easy to overlook: taking a uniform
-    /// between two ticks moves the shared stream, so a replay that skipped it
-    /// would produce a different market from the same log.
+    /// Embedder draws are in here, which is easy to overlook: they move the
+    /// EXTERNAL stream, so a replay that skipped one would hand the embedder
+    /// different values than the run it claims to reproduce — the market
+    /// itself no longer depends on them since the stream split.
     #[getter]
     fn order_log(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
         self.log.iter().map(|e| e.to_py(py)).collect()

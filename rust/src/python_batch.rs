@@ -19,10 +19,13 @@
 //!
 //! # Per seed is the only safe boundary
 //!
-//! Each engine owns its own generator, so members cannot interact. That is not
-//! a simplification: the engine uses one shared RNG stream across market,
-//! economy and microstructure, with the Box-Muller spare cached on it, so
-//! there is no decomposition WITHIN a run that preserves the draw schedule.
+//! Each engine owns its own generators, so members cannot interact. The
+//! stream split gave a run three per-domain substreams (market, economy,
+//! external), but WITHIN each stream the schedule is still strictly
+//! sequential — every company settling on a tick draws from the market
+//! stream in roster order, with the Box-Muller spare cached on it — so
+//! there is still no decomposition within a run that preserves the draw
+//! schedule.
 //!
 //! It follows that whether the batch advances its members on one thread or
 //! eight is unobservable in the output. That is the only parallelism this

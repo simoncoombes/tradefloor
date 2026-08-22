@@ -9,8 +9,8 @@
 //!
 //! A seed therefore reproduces a run only if you also reproduce every input:
 //! the sessions, the news, the flow, the macro pins, the roster edits, and any
-//! draws the embedder took from the shared stream. That whole sequence is the
-//! specification of a run, and this is it.
+//! draws the embedder took from the external stream. That whole sequence is
+//! the specification of a run, and this is it.
 //!
 //! # What it is for
 //!
@@ -73,12 +73,14 @@ pub enum LogEntry {
     Delist {
         index: usize,
     },
-    /// A draw the embedder took from the shared stream.
+    /// A draw the embedder took from the EXTERNAL stream.
     ///
-    /// Recorded because it MOVES THE STREAM. An embedder that takes a uniform
-    /// between two ticks shifts every later draw, so a replay that skipped it
-    /// would produce a different market from the same log — which is the one
-    /// thing a log must never do.
+    /// Recorded because it MOVES THAT STREAM. Since the stream split it can
+    /// no longer move the market — that is the cutover guarantee — but the
+    /// embedder's own randomness is still part of the run's history: a
+    /// replay that skipped a recorded draw would hand the embedder different
+    /// values afterwards, and any decision built on them would diverge from
+    /// the run the log claims to reproduce.
     Draw {
         normal: bool,
     },
