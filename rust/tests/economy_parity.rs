@@ -40,6 +40,33 @@
 //! step and should survive — if one of THOSE fails instead, the trigger
 //! landed somewhere other than the daily path and the classification in
 //! `sync-goldens.py` needs correcting, not just this file.
+//!
+//! # Partially RETIRED, 2026-08-21 (crisis trigger)
+//!
+//! The forecast above arrived. `CRISIS_VIX_THRESHOLD` re-sited the gold
+//! crisis premium and the USD safe-haven drift from the reference's
+//! `vix > 30` — a level no recorded trajectory crosses (hardest: 29.09,
+//! and "active-shocks" OPENS at exactly 30.00, sitting on the strict
+//! threshold without firing it) — down to 25.5, where the endogenous
+//! distribution actually goes. Three trajectories cross 25.5 and are
+//! retired under `#[ignore]`: active-shocks (opening state), calm-
+//! expansion (day 306), volatile-contraction (day 16). `cargo test
+//! --test economy_parity -- --ignored` replays them and each is EXPECTED
+//! to fail on the first day its opening VIX exceeds 25.5, in usdIndex —
+//! plus goldPrice when that day's opening GDP growth is below -1.
+//!
+//! Their coverage is replaced by
+//! `retired_trajectories_match_until_the_crisis_gates_fork`, which gates
+//! what is still true: bit-parity strictly before the first crossing
+//! day, an intact draw schedule THROUGH the fork day (the gates take no
+//! draws), the divergence confined to exactly the two gated fields, and
+//! each field off from the reference by precisely the gate term
+//! `(vix - 25.5) * slope` (to within one floating-point reassociation
+//! of the day's sum, bounded at 1e-9 — a millionfold below the smallest
+//! gate term the vectors produce).
+//!
+//! stagflation (recorded VIX ceiling 25.44) and no-central-bank (16.51)
+//! never enter the band and remain FULL bit-parity gates.
 
 use std::fs;
 use std::path::PathBuf;
@@ -401,7 +428,26 @@ fn shock_kind(name: &str) -> ShockKind {
     }
 }
 
+/// How far a trajectory is held to the reference.
+#[derive(Clone, Copy, PartialEq)]
+enum TrajectoryMode {
+    /// Bit-parity over the whole recorded trajectory, no tolerance.
+    FullParity,
+    /// Bit-parity until the crisis gates fork: the first day whose OPENING
+    /// state has `vix > CRISIS_VIX_THRESHOLD` is where this port's re-sited
+    /// gates fire and the reference's `vix > 30` gates do not. Assert full
+    /// parity strictly before that day; at the fork day assert the draw
+    /// schedule still replays exactly, the divergence is confined to
+    /// usdIndex/goldPrice, and each is off by precisely the gate term. Stop
+    /// there — beyond it the two are simulating different economies.
+    UntilCrisisFork,
+}
+
 fn check_trajectory(file: &str) {
+    check_trajectory_mode(file, TrajectoryMode::FullParity);
+}
+
+fn check_trajectory_mode(file: &str, mode: TrajectoryMode) {
     let doc = load(file);
     assert_js_oracle(&doc, file);
 
@@ -437,9 +483,18 @@ fn check_trajectory(file: &str) {
 
     let mut first_divergence: Option<i64> = None;
 
+    let mut forked = false;
     for day_doc in doc["days"].as_array().expect("days") {
         let day = day_doc["day"].as_i64().unwrap();
         let market_return = bits(day_doc["marketReturn"].as_str().unwrap());
+
+        // The gates read the OPENING state; parity has held to this point, so
+        // this port's opening state IS the reference's and the fork day can be
+        // recognised from it.
+        let crisis_fork_day =
+            mode == TrajectoryMode::UntilCrisisFork && economy.vix > CRISIS_VIX_THRESHOLD;
+        let vix_open = economy.vix;
+        let gdp_open = economy.gdp_growth;
 
         let shocks: Vec<EconomicShock> = day_doc["shocks"]
             .as_array()
@@ -569,6 +624,59 @@ fn check_trajectory(file: &str) {
             &day_doc["economy"],
         );
 
+        if crisis_fork_day {
+            // Everything the whole day pipeline recorded — draw-schedule
+            // complaints included, since ScriptedRng problems land in the
+            // same vec — must be one of the two gated fields. The gates take
+            // no draws, so a schedule complaint here IS a defect.
+            let fork: Vec<String> = problems.split_off(before);
+            for problem in &fork {
+                assert!(
+                    problem.contains(".usdIndex") || problem.contains(".goldPrice"),
+                    "{file} day {day}: the crisis fork touched more than the gated fields:\n  {problem}"
+                );
+            }
+            assert!(
+                !fork.is_empty(),
+                "{file} day {day}: opening VIX {vix_open} is above the threshold but nothing \
+                 diverged — the re-sited gates did not fire"
+            );
+
+            // The reference's own gates sit at `vix > 30`; none of these
+            // vectors ever exceeds it, so the reference term is zero and the
+            // full fork is this port's gate term. If a regenerated vector
+            // ever crosses 30 this arithmetic stops holding — fail loudly
+            // rather than compare the wrong quantity.
+            assert!(
+                vix_open <= 30.0,
+                "{file} day {day}: opening VIX {vix_open} fires the reference's own gate; \
+                 this fork gate only knows the band (25.5, 30]"
+            );
+            let usd_ts = bits(day_doc["economy"]["usdIndex"].as_str().unwrap());
+            let expected_usd = (vix_open - CRISIS_VIX_THRESHOLD) * 0.05;
+            let got_usd = economy.usd_index - usd_ts;
+            assert!(
+                (got_usd - expected_usd).abs() < 1e-9,
+                "{file} day {day}: usdIndex forked by {got_usd}, expected the safe-haven \
+                 term {expected_usd}"
+            );
+            let gold_ts = bits(day_doc["economy"]["goldPrice"].as_str().unwrap());
+            let expected_gold = if gdp_open < -1.0 {
+                (gdp_open.abs() + (vix_open - CRISIS_VIX_THRESHOLD) * 0.15).min(5.0)
+            } else {
+                0.0
+            };
+            let got_gold = economy.gold_price - gold_ts;
+            assert!(
+                (got_gold - expected_gold).abs() < 1e-9,
+                "{file} day {day}: goldPrice forked by {got_gold}, expected the crisis \
+                 premium {expected_gold}"
+            );
+
+            forked = true;
+            break;
+        }
+
         if problems.len() > before && first_divergence.is_none() {
             first_divergence = Some(day);
         }
@@ -577,6 +685,19 @@ fn check_trajectory(file: &str) {
         if first_divergence.is_some() {
             break;
         }
+    }
+
+    if mode == TrajectoryMode::UntilCrisisFork {
+        // The pre-fork segment must be clean parity; report() panics with the
+        // real mismatches if it is not.
+        report(file, problems, checked);
+        assert!(
+            forked,
+            "{file}: no opening state ever exceeded CRISIS_VIX_THRESHOLD — this vector \
+             belongs back in the full-parity set, not behind this gate"
+        );
+        println!("{file}: parity held to the crisis fork, and the fork is the gate terms");
+        return;
     }
 
     if let Some(day) = first_divergence {
@@ -593,28 +714,48 @@ fn check_trajectory(file: &str) {
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (crisis trigger): reference gates gold/USD at VIX 30, model moved to CRISIS_VIX_THRESHOLD 25.5; expected to fail on day 306, the first opening VIX above 25.5, under --ignored"]
 fn trajectory_calm_expansion() {
     check_trajectory("economy-trajectory-calm-expansion.json");
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (crisis trigger): reference gates gold/USD at VIX 30, model moved to CRISIS_VIX_THRESHOLD 25.5; expected to fail on day 16, the first opening VIX above 25.5, under --ignored"]
 fn trajectory_volatile_contraction() {
     check_trajectory("economy-trajectory-volatile-contraction.json");
 }
 
+// Still a FULL parity gate: the recorded trajectory's VIX ceiling is 25.44,
+// below CRISIS_VIX_THRESHOLD, so the re-sited gates never fire on it.
 #[test]
 fn trajectory_stagflation() {
     check_trajectory("economy-trajectory-stagflation.json");
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (crisis trigger): reference gates gold/USD at VIX 30, model moved to CRISIS_VIX_THRESHOLD 25.5; expected to fail on day 0 — the scenario OPENS at VIX 30.00 — under --ignored"]
 fn trajectory_active_shocks() {
     check_trajectory("economy-trajectory-active-shocks.json");
 }
 
+// Still a FULL parity gate: recorded VIX ceiling 16.51.
 #[test]
 fn trajectory_no_central_bank() {
     check_trajectory("economy-trajectory-no-central-bank.json");
+}
+
+/// The replacement gate for the three retired trajectories: what is still
+/// true of them, held to the same bit standard. See the header's
+/// "Partially RETIRED" section.
+#[test]
+fn retired_trajectories_match_until_the_crisis_gates_fork() {
+    for file in [
+        "economy-trajectory-active-shocks.json",
+        "economy-trajectory-calm-expansion.json",
+        "economy-trajectory-volatile-contraction.json",
+    ] {
+        check_trajectory_mode(file, TrajectoryMode::UntilCrisisFork);
+    }
 }
 
 // ── The central bank, swept directly ──────────────────────────────────────
