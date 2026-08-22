@@ -56,6 +56,30 @@
 //! `cos` is further out. They are kept at their original width, but they are
 //! now honestly described as headroom rather than as a margin over a
 //! measurement that never happened.
+//!
+//! # The 2026-08 era boundary, and what this file compares since it
+//!
+//! The stream split made `Engine::tick()`'s own schedule a different era
+//! from the reference recording: a private market substream, settlement
+//! drawing four unconditionally. Run generatively against the pre-split
+//! tape, that is two unrelated noise sequences and every gate here would
+//! fail while measuring nothing. So the shared harness now drives the
+//! REFERENCE's era explicitly — one `GameRng(seed, MAIN_STREAM)` through
+//! `tick_with`, the shared-stream order with four-or-zero settlement, which
+//! is bit-exactly the pre-split engine's generative path. These statistics
+//! therefore still compare language against language, not era against era.
+//! The split's own guarantees — that a draw in one domain cannot move
+//! another's — have their own tests (`stream_alignment.rs`, the engine
+//! tests) and are deliberately not re-asserted here.
+//!
+//! The same era recalibrated `MARKET_FACTOR_SIGMA` from the reference's
+//! 0.003 to 0.0075. The reference vectors must be cut at THIS crate's
+//! constants (see `examples/divergence.rs`'s module docs for what the
+//! regeneration must patch); against an unpatched reference the correlation
+//! gate below fails for a model reason, not a port reason, and the failure
+//! reads "recalibrated era versus inherited era", not "Rust versus V8".
+//! The v4-era measurements quoted above are pending re-confirmation against
+//! a v5-matched reference; the mechanisms they rest on are unchanged.
 
 use serde_json::Value as Json;
 
@@ -143,11 +167,12 @@ fn runs() -> Runs {
 
 #[test]
 fn the_divergence_is_bounded_over_a_session() {
-    // The headline number. Derived, not inherited: the measurement is 7.2e-4
-    // mean / 2.9e-3 max after 390 ticks, so 1% is roughly an order of
-    // magnitude of headroom. If a real regression lands — a wrong coefficient,
-    // a dropped term — it moves prices by percent, not by basis points, and
-    // clears this comfortably.
+    // The headline number. Derived, not inherited: sized against the 7.2e-4
+    // mean / 2.9e-3 max curve after 390 ticks — since RETRACTED, see the
+    // header; the true divergence measured zero — so 1% is headroom, not a
+    // margin. If a real regression lands — a wrong coefficient, a dropped
+    // term — it moves prices by percent, not by basis points, and clears
+    // this comfortably.
     const MEAN_BOUND: f64 = 0.01;
     const MAX_BOUND: f64 = 0.05;
 
@@ -330,6 +355,11 @@ fn the_cross_sectional_correlation_structure_agrees() {
     //     1 tick   0.005      15 ticks  0.023
     //     5 ticks  0.011      30 ticks  0.042
     //                         65 ticks  0.104
+    //
+    // (Measured at the pre-recalibration MARKET_FACTOR_SIGMA of 0.003; the
+    // 2026-08 recalibration to 0.0075 raises every row, which only
+    // strengthens the horizon argument — the shared factor accumulates
+    // faster while the settlement noise does not.)
     //
     // The correlation is real; it just needs a horizon over which the shared
     // factor accumulates and the settlement noise averages out. Testing at one
