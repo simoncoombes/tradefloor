@@ -1,0 +1,1417 @@
+{
+ "constants": "GAMMA, ALPHA, BETA (rust/src/market/garch.rs)",
+ "date": "2026-08-21",
+ "git_rev": "ee24f01-dirty",
+ "sweep": {
+  "g0.00-a0.09-b0.90": {
+   "coefficients": {
+    "alpha": 0.09,
+    "beta": 0.9,
+    "gamma": 0.0
+   },
+   "method": {
+    "days": 252,
+    "panel": "pretium.facts.measure, per seed",
+    "pin_days": 120,
+    "pin_vix": [
+     15.0,
+     45.0,
+     65.0
+    ],
+    "seeds": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ],
+    "universe": "Universe.random(40, seed=111)"
+   },
+   "panels": {
+    "1": {
+     "abs_return_acf1": 0.10974016951819224,
+     "abs_return_acf20": -0.006629009554859093,
+     "abs_return_acf5": 0.04165953066556631,
+     "annualised_vol_pct": 56.283037442528205,
+     "cross_sectional_corr": 0.11130144782269175,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 2.7466330596636883,
+     "instruments": 40,
+     "leverage_effect": -0.025430861226607884,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 49.02855153422722,
+     "return_acf1": 0.2538217459234542,
+     "seed": 1,
+     "skew": -0.06283444193141784,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5370194226512393,
+     "volume_change_acf1": -0.45896619630838
+    },
+    "2": {
+     "abs_return_acf1": 0.12820602876638115,
+     "abs_return_acf20": 0.021490520547834763,
+     "abs_return_acf5": 0.05549617275106411,
+     "annualised_vol_pct": 58.000171185304104,
+     "cross_sectional_corr": 0.07587334087793804,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.035850233720538,
+     "instruments": 40,
+     "leverage_effect": -0.02737784750090557,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 47.280640430837636,
+     "return_acf1": 0.2609677488177061,
+     "seed": 2,
+     "skew": -0.05704627346858743,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5089400206332183,
+     "volume_change_acf1": -0.4697701280333678
+    },
+    "3": {
+     "abs_return_acf1": 0.10856197154295583,
+     "abs_return_acf20": 0.00558244969231979,
+     "abs_return_acf5": 0.05173630155792424,
+     "annualised_vol_pct": 57.514931032625704,
+     "cross_sectional_corr": 0.08731451299955721,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.131748825499427,
+     "instruments": 40,
+     "leverage_effect": -0.011755964551185813,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 45.505872145947436,
+     "return_acf1": 0.2585297705337699,
+     "seed": 3,
+     "skew": -0.02434924766516036,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5113246119383589,
+     "volume_change_acf1": -0.4572151824376124
+    },
+    "4": {
+     "abs_return_acf1": 0.12046840114781923,
+     "abs_return_acf20": 0.02948265828095958,
+     "abs_return_acf5": 0.03858614740747738,
+     "annualised_vol_pct": 56.32909769089503,
+     "cross_sectional_corr": 0.07986415363489592,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.1614728923904316,
+     "instruments": 40,
+     "leverage_effect": 0.005792071525338552,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 46.962291429131234,
+     "return_acf1": 0.25682009194028094,
+     "seed": 4,
+     "skew": 0.06054313626988639,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5074406690567492,
+     "volume_change_acf1": -0.4593530970700983
+    },
+    "5": {
+     "abs_return_acf1": 0.15238102400754577,
+     "abs_return_acf20": 0.0028778918604931312,
+     "abs_return_acf5": 0.04974173284699453,
+     "annualised_vol_pct": 55.82128374769194,
+     "cross_sectional_corr": 0.07483121533257944,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.5185097662563996,
+     "instruments": 40,
+     "leverage_effect": -0.024839653912064788,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 44.17595490837614,
+     "return_acf1": 0.24711458787137375,
+     "seed": 5,
+     "skew": 0.04068950035164865,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.4997536739838101,
+     "volume_change_acf1": -0.4556174572214407
+    },
+    "6": {
+     "abs_return_acf1": 0.13392038668556328,
+     "abs_return_acf20": 0.007093897838247559,
+     "abs_return_acf5": 0.03548646827312079,
+     "annualised_vol_pct": 57.52987240692416,
+     "cross_sectional_corr": 0.09205281581176933,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.0813800233384674,
+     "instruments": 40,
+     "leverage_effect": -0.03256280833615754,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 47.00637309894755,
+     "return_acf1": 0.2909726871546224,
+     "seed": 6,
+     "skew": -0.10398512044119446,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5057035537101142,
+     "volume_change_acf1": -0.4667558028356589
+    }
+   },
+   "pinned_vix": {
+    "15.0": {
+     "1": {
+      "annualised_vol_pct": 54.38272587304327,
+      "cross_sectional_corr": 0.10912891564371122
+     },
+     "2": {
+      "annualised_vol_pct": 56.248483530327086,
+      "cross_sectional_corr": 0.07536822229516392
+     },
+     "3": {
+      "annualised_vol_pct": 55.88887116525198,
+      "cross_sectional_corr": 0.0913353548777057
+     },
+     "4": {
+      "annualised_vol_pct": 55.76713952764545,
+      "cross_sectional_corr": 0.08106310731879621
+     },
+     "5": {
+      "annualised_vol_pct": 53.490370172969484,
+      "cross_sectional_corr": 0.09079104874537783
+     },
+     "6": {
+      "annualised_vol_pct": 56.07883887208074,
+      "cross_sectional_corr": 0.1031098944472448
+     }
+    },
+    "45.0": {
+     "1": {
+      "annualised_vol_pct": 54.968704402706614,
+      "cross_sectional_corr": 0.11861324045325158
+     },
+     "2": {
+      "annualised_vol_pct": 57.31679554580554,
+      "cross_sectional_corr": 0.0843405647414022
+     },
+     "3": {
+      "annualised_vol_pct": 56.77878858880767,
+      "cross_sectional_corr": 0.10344534063376966
+     },
+     "4": {
+      "annualised_vol_pct": 56.46828379576452,
+      "cross_sectional_corr": 0.08968114198827569
+     },
+     "5": {
+      "annualised_vol_pct": 54.306699451843265,
+      "cross_sectional_corr": 0.10218902769663768
+     },
+     "6": {
+      "annualised_vol_pct": 56.679324858727874,
+      "cross_sectional_corr": 0.11353569618775963
+     }
+    },
+    "65.0": {
+     "1": {
+      "annualised_vol_pct": 57.78156673758805,
+      "cross_sectional_corr": 0.15947782691500714
+     },
+     "2": {
+      "annualised_vol_pct": 60.08188284614761,
+      "cross_sectional_corr": 0.12271557446707237
+     },
+     "3": {
+      "annualised_vol_pct": 59.55367629105164,
+      "cross_sectional_corr": 0.13948315248885032
+     },
+     "4": {
+      "annualised_vol_pct": 58.398486641520705,
+      "cross_sectional_corr": 0.12582018325877295
+     },
+     "5": {
+      "annualised_vol_pct": 56.7873071006059,
+      "cross_sectional_corr": 0.138616053570705
+     },
+     "6": {
+      "annualised_vol_pct": 59.71497735453084,
+      "cross_sectional_corr": 0.15696944818847758
+     }
+    }
+   },
+   "trajectory_fingerprint": "eb93e47065b2e0ba"
+  },
+  "g0.04-a0.07-b0.90": {
+   "coefficients": {
+    "alpha": 0.07,
+    "beta": 0.9,
+    "gamma": 0.04
+   },
+   "method": {
+    "days": 252,
+    "panel": "pretium.facts.measure, per seed",
+    "pin_days": 120,
+    "pin_vix": [
+     15.0,
+     45.0,
+     65.0
+    ],
+    "seeds": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ],
+    "universe": "Universe.random(40, seed=111)"
+   },
+   "panels": {
+    "1": {
+     "abs_return_acf1": 0.1136771454637092,
+     "abs_return_acf20": 0.00702760126754921,
+     "abs_return_acf5": 0.03783157851137425,
+     "annualised_vol_pct": 56.07636723417214,
+     "cross_sectional_corr": 0.1099892952775256,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 2.7612356990039837,
+     "instruments": 40,
+     "leverage_effect": -0.034514817506324756,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 48.65086362896102,
+     "return_acf1": 0.2559569867559831,
+     "seed": 1,
+     "skew": -0.06173956874333121,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5380131086518631,
+     "volume_change_acf1": -0.4534844670952101
+    },
+    "2": {
+     "abs_return_acf1": 0.13720090453739237,
+     "abs_return_acf20": 0.015821532613767522,
+     "abs_return_acf5": 0.048129546743583634,
+     "annualised_vol_pct": 57.63993047846255,
+     "cross_sectional_corr": 0.07556691642053427,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.016292546340603,
+     "instruments": 40,
+     "leverage_effect": -0.035667662218081576,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 47.37357359974848,
+     "return_acf1": 0.26530751726705204,
+     "seed": 2,
+     "skew": -0.05892811982616357,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.4984861657894518,
+     "volume_change_acf1": -0.4686414353517154
+    },
+    "3": {
+     "abs_return_acf1": 0.11621942156100039,
+     "abs_return_acf20": 0.010049325999451568,
+     "abs_return_acf5": 0.04815907892832136,
+     "annualised_vol_pct": 57.37701718474704,
+     "cross_sectional_corr": 0.08669480371939413,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.1084642984576716,
+     "instruments": 40,
+     "leverage_effect": -0.022114252292742796,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 45.28389964152204,
+     "return_acf1": 0.2601780330639888,
+     "seed": 3,
+     "skew": -0.02197921095851923,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5132566004278163,
+     "volume_change_acf1": -0.44983294281186315
+    },
+    "4": {
+     "abs_return_acf1": 0.1264099812800523,
+     "abs_return_acf20": 0.030227376955130548,
+     "abs_return_acf5": 0.042644987766331216,
+     "annualised_vol_pct": 56.476341194108635,
+     "cross_sectional_corr": 0.07915494297811163,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.157678948646276,
+     "instruments": 40,
+     "leverage_effect": -0.0026655172755605597,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 46.625232143383826,
+     "return_acf1": 0.2561143287097071,
+     "seed": 4,
+     "skew": 0.04763594618107278,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.505025896120854,
+     "volume_change_acf1": -0.4572373795743085
+    },
+    "5": {
+     "abs_return_acf1": 0.1484897515998615,
+     "abs_return_acf20": 0.0053778210820813735,
+     "abs_return_acf5": 0.04456253362565435,
+     "annualised_vol_pct": 55.57063135164103,
+     "cross_sectional_corr": 0.07578010630792405,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.494097653182056,
+     "instruments": 40,
+     "leverage_effect": -0.03975881950768424,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 44.11518324109973,
+     "return_acf1": 0.25510167661504457,
+     "seed": 5,
+     "skew": 0.04784459169435617,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5040482489859631,
+     "volume_change_acf1": -0.4624449842631056
+    },
+    "6": {
+     "abs_return_acf1": 0.13841555277059206,
+     "abs_return_acf20": 0.008299718601406915,
+     "abs_return_acf5": 0.03330618103267065,
+     "annualised_vol_pct": 57.25614857068747,
+     "cross_sectional_corr": 0.09284944002508498,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.0730737803868635,
+     "instruments": 40,
+     "leverage_effect": -0.030559416420076764,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 46.899216253419574,
+     "return_acf1": 0.2977249686121833,
+     "seed": 6,
+     "skew": -0.11493773083190388,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5171985468057184,
+     "volume_change_acf1": -0.4676134964583074
+    }
+   },
+   "pinned_vix": {
+    "15.0": {
+     "1": {
+      "annualised_vol_pct": 53.957098657314226,
+      "cross_sectional_corr": 0.10855833704086423
+     },
+     "2": {
+      "annualised_vol_pct": 55.90263389869096,
+      "cross_sectional_corr": 0.0730635393006566
+     },
+     "3": {
+      "annualised_vol_pct": 55.57996957163043,
+      "cross_sectional_corr": 0.08963558502941082
+     },
+     "4": {
+      "annualised_vol_pct": 56.09556362183682,
+      "cross_sectional_corr": 0.07881648454676837
+     },
+     "5": {
+      "annualised_vol_pct": 53.087381672854136,
+      "cross_sectional_corr": 0.09246252728784565
+     },
+     "6": {
+      "annualised_vol_pct": 55.64845874117144,
+      "cross_sectional_corr": 0.1045599042365036
+     }
+    },
+    "45.0": {
+     "1": {
+      "annualised_vol_pct": 54.661918544052156,
+      "cross_sectional_corr": 0.11957697161960269
+     },
+     "2": {
+      "annualised_vol_pct": 57.10390928261907,
+      "cross_sectional_corr": 0.08330793634888843
+     },
+     "3": {
+      "annualised_vol_pct": 56.57071708011491,
+      "cross_sectional_corr": 0.10011230825550758
+     },
+     "4": {
+      "annualised_vol_pct": 56.619171533238536,
+      "cross_sectional_corr": 0.08926589982891159
+     },
+     "5": {
+      "annualised_vol_pct": 53.98618550928004,
+      "cross_sectional_corr": 0.10484008778201473
+     },
+     "6": {
+      "annualised_vol_pct": 56.164641177352706,
+      "cross_sectional_corr": 0.1163910003275629
+     }
+    },
+    "65.0": {
+     "1": {
+      "annualised_vol_pct": 57.47890880682521,
+      "cross_sectional_corr": 0.15928484686889144
+     },
+     "2": {
+      "annualised_vol_pct": 59.9186808783032,
+      "cross_sectional_corr": 0.11977481563477219
+     },
+     "3": {
+      "annualised_vol_pct": 59.07476193545161,
+      "cross_sectional_corr": 0.13962070680644265
+     },
+     "4": {
+      "annualised_vol_pct": 58.62288012756955,
+      "cross_sectional_corr": 0.12427589698572845
+     },
+     "5": {
+      "annualised_vol_pct": 56.543257592040696,
+      "cross_sectional_corr": 0.14178144849550728
+     },
+     "6": {
+      "annualised_vol_pct": 59.064016403433314,
+      "cross_sectional_corr": 0.16022857228908052
+     }
+    }
+   },
+   "trajectory_fingerprint": "0faf34d853c95de1"
+  },
+  "g0.08-a0.05-b0.90": {
+   "coefficients": {
+    "alpha": 0.05,
+    "beta": 0.9,
+    "gamma": 0.08
+   },
+   "method": {
+    "days": 252,
+    "panel": "pretium.facts.measure, per seed",
+    "pin_days": 120,
+    "pin_vix": [
+     15.0,
+     45.0,
+     65.0
+    ],
+    "seeds": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ],
+    "universe": "Universe.random(40, seed=111)"
+   },
+   "panels": {
+    "1": {
+     "abs_return_acf1": 0.11558241041968607,
+     "abs_return_acf20": 0.007728895156065122,
+     "abs_return_acf5": 0.04676060284573517,
+     "annualised_vol_pct": 55.41258653120421,
+     "cross_sectional_corr": 0.10934080989588033,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 2.7666583370400692,
+     "instruments": 40,
+     "leverage_effect": -0.03321469173504579,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 47.66823952162107,
+     "return_acf1": 0.2527555237185118,
+     "seed": 1,
+     "skew": -0.05910851661751613,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5360407159294349,
+     "volume_change_acf1": -0.4548523147748106
+    },
+    "2": {
+     "abs_return_acf1": 0.13418171278029514,
+     "abs_return_acf20": 0.019874736164856115,
+     "abs_return_acf5": 0.06184320978600924,
+     "annualised_vol_pct": 56.74001778061806,
+     "cross_sectional_corr": 0.07691118589237715,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.0258943015221647,
+     "instruments": 40,
+     "leverage_effect": -0.04088947140612831,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 46.443519221190016,
+     "return_acf1": 0.2622732835579723,
+     "seed": 2,
+     "skew": -0.05669536183166582,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5158511388337386,
+     "volume_change_acf1": -0.4735995606298477
+    },
+    "3": {
+     "abs_return_acf1": 0.11250184227456762,
+     "abs_return_acf20": 0.00595984842686873,
+     "abs_return_acf5": 0.0629202733372283,
+     "annualised_vol_pct": 56.80258237760803,
+     "cross_sectional_corr": 0.08752642608388454,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.1161766723962536,
+     "instruments": 40,
+     "leverage_effect": -0.03427487938455538,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 45.882228375427545,
+     "return_acf1": 0.25506639063871694,
+     "seed": 3,
+     "skew": -0.027733504597506873,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5241720693724936,
+     "volume_change_acf1": -0.4564942462698475
+    },
+    "4": {
+     "abs_return_acf1": 0.131425039506643,
+     "abs_return_acf20": 0.03069129101032255,
+     "abs_return_acf5": 0.04777313755139212,
+     "annualised_vol_pct": 56.047829521904546,
+     "cross_sectional_corr": 0.07905978725009186,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.183398464342993,
+     "instruments": 40,
+     "leverage_effect": -0.01579935844155076,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 46.71350476017561,
+     "return_acf1": 0.2505020982804298,
+     "seed": 4,
+     "skew": 0.03524692053631947,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5136269008586063,
+     "volume_change_acf1": -0.4572526548157151
+    },
+    "5": {
+     "abs_return_acf1": 0.1435461306798944,
+     "abs_return_acf20": 0.014472893549936375,
+     "abs_return_acf5": 0.047285416422906186,
+     "annualised_vol_pct": 54.85280055313929,
+     "cross_sectional_corr": 0.07846848520094683,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.5242442914850285,
+     "instruments": 40,
+     "leverage_effect": -0.04738076138017841,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 43.193310113108524,
+     "return_acf1": 0.25930292474070893,
+     "seed": 5,
+     "skew": 0.05041453128006272,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5072098177151385,
+     "volume_change_acf1": -0.46749466082579955
+    },
+    "6": {
+     "abs_return_acf1": 0.14352736090596224,
+     "abs_return_acf20": 0.014918924099777641,
+     "abs_return_acf5": 0.033092558889524955,
+     "annualised_vol_pct": 56.5519945226438,
+     "cross_sectional_corr": 0.09396812614225443,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.019936002107986,
+     "instruments": 40,
+     "leverage_effect": -0.039433223521505446,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 46.430119637085426,
+     "return_acf1": 0.29360051085754313,
+     "seed": 6,
+     "skew": -0.12201180534393656,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5196498346044371,
+     "volume_change_acf1": -0.46705603175803556
+    }
+   },
+   "pinned_vix": {
+    "15.0": {
+     "1": {
+      "annualised_vol_pct": 52.808830115442916,
+      "cross_sectional_corr": 0.1108855590776483
+     },
+     "2": {
+      "annualised_vol_pct": 55.148288360473444,
+      "cross_sectional_corr": 0.07271900040448291
+     },
+     "3": {
+      "annualised_vol_pct": 54.78968866289785,
+      "cross_sectional_corr": 0.09042520441596695
+     },
+     "4": {
+      "annualised_vol_pct": 55.72459077011154,
+      "cross_sectional_corr": 0.080963616525934
+     },
+     "5": {
+      "annualised_vol_pct": 52.26402510260043,
+      "cross_sectional_corr": 0.09530287508008364
+     },
+     "6": {
+      "annualised_vol_pct": 54.795723142108365,
+      "cross_sectional_corr": 0.10830034264339644
+     }
+    },
+    "45.0": {
+     "1": {
+      "annualised_vol_pct": 53.49290417064175,
+      "cross_sectional_corr": 0.12130931561337646
+     },
+     "2": {
+      "annualised_vol_pct": 56.3222729757905,
+      "cross_sectional_corr": 0.08433070210117001
+     },
+     "3": {
+      "annualised_vol_pct": 55.70631184135434,
+      "cross_sectional_corr": 0.10147724860188613
+     },
+     "4": {
+      "annualised_vol_pct": 56.2642237600014,
+      "cross_sectional_corr": 0.08940083904074063
+     },
+     "5": {
+      "annualised_vol_pct": 53.14138391907779,
+      "cross_sectional_corr": 0.10675537565108979
+     },
+     "6": {
+      "annualised_vol_pct": 55.39746380754092,
+      "cross_sectional_corr": 0.12082895035866759
+     }
+    },
+    "65.0": {
+     "1": {
+      "annualised_vol_pct": 56.418107060158306,
+      "cross_sectional_corr": 0.16397520575314298
+     },
+     "2": {
+      "annualised_vol_pct": 59.13107211631782,
+      "cross_sectional_corr": 0.11930664527294006
+     },
+     "3": {
+      "annualised_vol_pct": 58.553362534402,
+      "cross_sectional_corr": 0.13872403056716165
+     },
+     "4": {
+      "annualised_vol_pct": 58.32692813219702,
+      "cross_sectional_corr": 0.12499467430367837
+     },
+     "5": {
+      "annualised_vol_pct": 55.954818773366746,
+      "cross_sectional_corr": 0.1444159616959299
+     },
+     "6": {
+      "annualised_vol_pct": 58.14490643256498,
+      "cross_sectional_corr": 0.1657939786520304
+     }
+    }
+   },
+   "trajectory_fingerprint": "2eaabb4ec5ff3458"
+  },
+  "g0.12-a0.03-b0.90": {
+   "coefficients": {
+    "alpha": 0.03,
+    "beta": 0.9,
+    "gamma": 0.12
+   },
+   "method": {
+    "days": 252,
+    "panel": "pretium.facts.measure, per seed",
+    "pin_days": 120,
+    "pin_vix": [
+     15.0,
+     45.0,
+     65.0
+    ],
+    "seeds": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ],
+    "universe": "Universe.random(40, seed=111)"
+   },
+   "panels": {
+    "1": {
+     "abs_return_acf1": 0.1323737021623257,
+     "abs_return_acf20": 0.00580979127043318,
+     "abs_return_acf5": 0.0617151194499035,
+     "annualised_vol_pct": 54.172460635276835,
+     "cross_sectional_corr": 0.11052493464949271,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 2.754810692205772,
+     "instruments": 40,
+     "leverage_effect": -0.05531414737814914,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 45.37448282020803,
+     "return_acf1": 0.2507256992497657,
+     "seed": 1,
+     "skew": -0.05365044751659312,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5404358907501821,
+     "volume_change_acf1": -0.4551536296738905
+    },
+    "2": {
+     "abs_return_acf1": 0.14205226577026567,
+     "abs_return_acf20": 0.022967554217253106,
+     "abs_return_acf5": 0.05885752129579024,
+     "annualised_vol_pct": 55.28324624777603,
+     "cross_sectional_corr": 0.07924383129717001,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.051231955198112,
+     "instruments": 40,
+     "leverage_effect": -0.049741020878484435,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 45.40726598428259,
+     "return_acf1": 0.2593160094526768,
+     "seed": 2,
+     "skew": -0.06017417201466683,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5159459961954592,
+     "volume_change_acf1": -0.4658296254224684
+    },
+    "3": {
+     "abs_return_acf1": 0.11756349308348918,
+     "abs_return_acf20": 0.007881321256949517,
+     "abs_return_acf5": 0.05065365559311866,
+     "annualised_vol_pct": 55.51700669366505,
+     "cross_sectional_corr": 0.08922074341089305,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.1392275264210783,
+     "instruments": 40,
+     "leverage_effect": -0.054034981721411884,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 45.559752184758125,
+     "return_acf1": 0.2510889588574542,
+     "seed": 3,
+     "skew": -0.03818051956058421,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.533358612478274,
+     "volume_change_acf1": -0.46036960039698016
+    },
+    "4": {
+     "abs_return_acf1": 0.1341525072603777,
+     "abs_return_acf20": 0.02593822844518265,
+     "abs_return_acf5": 0.05924828298806842,
+     "annualised_vol_pct": 54.77545863716027,
+     "cross_sectional_corr": 0.08086726684367816,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.2108019087285244,
+     "instruments": 40,
+     "leverage_effect": -0.02906521026299534,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 46.770861031018896,
+     "return_acf1": 0.2544329912819802,
+     "seed": 4,
+     "skew": -0.004501957986167223,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5236043858999084,
+     "volume_change_acf1": -0.4568794132717865
+    },
+    "5": {
+     "abs_return_acf1": 0.14326207572235602,
+     "abs_return_acf20": 0.027559876168202702,
+     "abs_return_acf5": 0.04339945879284529,
+     "annualised_vol_pct": 53.591971839896914,
+     "cross_sectional_corr": 0.08068632008842334,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.59904168419442,
+     "instruments": 40,
+     "leverage_effect": -0.06149593725231668,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 42.414152679704976,
+     "return_acf1": 0.2603936671689381,
+     "seed": 5,
+     "skew": 0.054227108283054964,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5218375565410687,
+     "volume_change_acf1": -0.46828501973755365
+    },
+    "6": {
+     "abs_return_acf1": 0.15316866187905936,
+     "abs_return_acf20": 0.027238360972719325,
+     "abs_return_acf5": 0.043188752529446615,
+     "annualised_vol_pct": 55.16731632068056,
+     "cross_sectional_corr": 0.0967860836562797,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.005192175338893,
+     "instruments": 40,
+     "leverage_effect": -0.05091571352579984,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 45.07721694800423,
+     "return_acf1": 0.2862426475392091,
+     "seed": 6,
+     "skew": -0.1252492937883539,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5192162179698012,
+     "volume_change_acf1": -0.4687109987721515
+    }
+   },
+   "pinned_vix": {
+    "15.0": {
+     "1": {
+      "annualised_vol_pct": 51.12350751642681,
+      "cross_sectional_corr": 0.11368292312160506
+     },
+     "2": {
+      "annualised_vol_pct": 54.05591644521445,
+      "cross_sectional_corr": 0.07335410915720544
+     },
+     "3": {
+      "annualised_vol_pct": 53.39802443824851,
+      "cross_sectional_corr": 0.0915916105567831
+     },
+     "4": {
+      "annualised_vol_pct": 54.38323443557177,
+      "cross_sectional_corr": 0.08206083331208983
+     },
+     "5": {
+      "annualised_vol_pct": 50.92270552332939,
+      "cross_sectional_corr": 0.09776509802893073
+     },
+     "6": {
+      "annualised_vol_pct": 53.48572027107353,
+      "cross_sectional_corr": 0.11213535620579115
+     }
+    },
+    "45.0": {
+     "1": {
+      "annualised_vol_pct": 51.792098840218046,
+      "cross_sectional_corr": 0.12310137508118034
+     },
+     "2": {
+      "annualised_vol_pct": 55.18756046922125,
+      "cross_sectional_corr": 0.08431338944567908
+     },
+     "3": {
+      "annualised_vol_pct": 54.29057335239236,
+      "cross_sectional_corr": 0.10367905327905651
+     },
+     "4": {
+      "annualised_vol_pct": 55.035325228699165,
+      "cross_sectional_corr": 0.09371447856746344
+     },
+     "5": {
+      "annualised_vol_pct": 51.76026351623989,
+      "cross_sectional_corr": 0.1121705000731904
+     },
+     "6": {
+      "annualised_vol_pct": 54.061050161422145,
+      "cross_sectional_corr": 0.12725845486101292
+     }
+    },
+    "65.0": {
+     "1": {
+      "annualised_vol_pct": 54.68973948742173,
+      "cross_sectional_corr": 0.16802892979131726
+     },
+     "2": {
+      "annualised_vol_pct": 58.2264805816196,
+      "cross_sectional_corr": 0.12178012234463206
+     },
+     "3": {
+      "annualised_vol_pct": 57.18312835715737,
+      "cross_sectional_corr": 0.142151370987308
+     },
+     "4": {
+      "annualised_vol_pct": 57.02239461369476,
+      "cross_sectional_corr": 0.12983674750439414
+     },
+     "5": {
+      "annualised_vol_pct": 54.41961391249552,
+      "cross_sectional_corr": 0.15150007411590452
+     },
+     "6": {
+      "annualised_vol_pct": 56.69732845948911,
+      "cross_sectional_corr": 0.17328764854120746
+     }
+    }
+   },
+   "trajectory_fingerprint": "b8a0bbd666f27f84"
+  },
+  "g0.16-a0.01-b0.90": {
+   "coefficients": {
+    "alpha": 0.01,
+    "beta": 0.9,
+    "gamma": 0.16
+   },
+   "method": {
+    "days": 252,
+    "panel": "pretium.facts.measure, per seed",
+    "pin_days": 120,
+    "pin_vix": [
+     15.0,
+     45.0,
+     65.0
+    ],
+    "seeds": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ],
+    "universe": "Universe.random(40, seed=111)"
+   },
+   "panels": {
+    "1": {
+     "abs_return_acf1": 0.13795479314508047,
+     "abs_return_acf20": 0.009993444836637475,
+     "abs_return_acf5": 0.06023157294350916,
+     "annualised_vol_pct": 51.935424455450665,
+     "cross_sectional_corr": 0.11311982916573707,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 2.659662337727064,
+     "instruments": 40,
+     "leverage_effect": -0.05640479119802676,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 44.15475259090006,
+     "return_acf1": 0.25356903476482784,
+     "seed": 1,
+     "skew": -0.08577329233243083,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5397891884704984,
+     "volume_change_acf1": -0.4458452136502645
+    },
+    "2": {
+     "abs_return_acf1": 0.15182476673325476,
+     "abs_return_acf20": 0.037331539118591585,
+     "abs_return_acf5": 0.07636897172964054,
+     "annualised_vol_pct": 52.88377103503007,
+     "cross_sectional_corr": 0.0838804395326617,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.2620681990924894,
+     "instruments": 40,
+     "leverage_effect": -0.06820627653764252,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 43.58797696640615,
+     "return_acf1": 0.2663980304350234,
+     "seed": 2,
+     "skew": -0.08344863818598282,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5255788491470444,
+     "volume_change_acf1": -0.4651019870668943
+    },
+    "3": {
+     "abs_return_acf1": 0.12313174663285503,
+     "abs_return_acf20": 0.005807514586078183,
+     "abs_return_acf5": 0.04463811425082845,
+     "annualised_vol_pct": 52.84861992432622,
+     "cross_sectional_corr": 0.09340880522723327,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.1832608864034375,
+     "instruments": 40,
+     "leverage_effect": -0.0540287641713798,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 43.73574809796997,
+     "return_acf1": 0.25253019528033466,
+     "seed": 3,
+     "skew": -0.06391342629519903,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5487402602629856,
+     "volume_change_acf1": -0.45392361274264287
+    },
+    "4": {
+     "abs_return_acf1": 0.13795660439658736,
+     "abs_return_acf20": 0.03255654001013245,
+     "abs_return_acf5": 0.05520264763973409,
+     "annualised_vol_pct": 52.33840894081758,
+     "cross_sectional_corr": 0.08453528500195825,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.1744180059123863,
+     "instruments": 40,
+     "leverage_effect": -0.028104807336342824,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 45.87216201625916,
+     "return_acf1": 0.2591434041418066,
+     "seed": 4,
+     "skew": -0.03632429852896834,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.528459940210461,
+     "volume_change_acf1": -0.45253611980855113
+    },
+    "5": {
+     "abs_return_acf1": 0.15579690020760234,
+     "abs_return_acf20": 0.019695173754110208,
+     "abs_return_acf5": 0.05907234057139661,
+     "annualised_vol_pct": 51.33068964239244,
+     "cross_sectional_corr": 0.08628133420965141,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.7298866125171193,
+     "instruments": 40,
+     "leverage_effect": -0.07244468925664688,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 39.427316384496294,
+     "return_acf1": 0.25359407354847485,
+     "seed": 5,
+     "skew": 0.06712948260889687,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5353266176937852,
+     "volume_change_acf1": -0.47189565366281694
+    },
+    "6": {
+     "abs_return_acf1": 0.14744664091541307,
+     "abs_return_acf20": 0.023065493309593347,
+     "abs_return_acf5": 0.05254636429214701,
+     "annualised_vol_pct": 52.85680834198612,
+     "cross_sectional_corr": 0.10028677492241729,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 2.9977155939754754,
+     "instruments": 40,
+     "leverage_effect": -0.06526605777644835,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 43.404341454239685,
+     "return_acf1": 0.28936320894343354,
+     "seed": 6,
+     "skew": -0.12046961029681115,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.519137850192628,
+     "volume_change_acf1": -0.4593842841880722
+    }
+   },
+   "pinned_vix": {
+    "15.0": {
+     "1": {
+      "annualised_vol_pct": 48.78103857188879,
+      "cross_sectional_corr": 0.1178602872951036
+     },
+     "2": {
+      "annualised_vol_pct": 51.94367675857154,
+      "cross_sectional_corr": 0.07614172608892274
+     },
+     "3": {
+      "annualised_vol_pct": 51.28208375190171,
+      "cross_sectional_corr": 0.09502772323530717
+     },
+     "4": {
+      "annualised_vol_pct": 51.955663756158955,
+      "cross_sectional_corr": 0.08570512081886615
+     },
+     "5": {
+      "annualised_vol_pct": 48.83758021940836,
+      "cross_sectional_corr": 0.10464420803950533
+     },
+     "6": {
+      "annualised_vol_pct": 51.24018983743811,
+      "cross_sectional_corr": 0.11825755597154895
+     }
+    },
+    "45.0": {
+     "1": {
+      "annualised_vol_pct": 49.411050202790115,
+      "cross_sectional_corr": 0.13028328001564143
+     },
+     "2": {
+      "annualised_vol_pct": 53.2288006084635,
+      "cross_sectional_corr": 0.0879378497708795
+     },
+     "3": {
+      "annualised_vol_pct": 52.165705879658894,
+      "cross_sectional_corr": 0.10634511165031592
+     },
+     "4": {
+      "annualised_vol_pct": 52.66442861181443,
+      "cross_sectional_corr": 0.09793075126121309
+     },
+     "5": {
+      "annualised_vol_pct": 49.68728399210167,
+      "cross_sectional_corr": 0.11983646436889127
+     },
+     "6": {
+      "annualised_vol_pct": 51.83632307663903,
+      "cross_sectional_corr": 0.13416295177875145
+     }
+    },
+    "65.0": {
+     "1": {
+      "annualised_vol_pct": 52.382026742207266,
+      "cross_sectional_corr": 0.1770096096932237
+     },
+     "2": {
+      "annualised_vol_pct": 56.268749897317285,
+      "cross_sectional_corr": 0.12902404326340058
+     },
+     "3": {
+      "annualised_vol_pct": 55.265199806461915,
+      "cross_sectional_corr": 0.14628158319407067
+     },
+     "4": {
+      "annualised_vol_pct": 54.827429090775205,
+      "cross_sectional_corr": 0.13487521590337
+     },
+     "5": {
+      "annualised_vol_pct": 52.53952139379957,
+      "cross_sectional_corr": 0.1632105014452281
+     },
+     "6": {
+      "annualised_vol_pct": 54.38823409495376,
+      "cross_sectional_corr": 0.1856328718921386
+     }
+    }
+   },
+   "trajectory_fingerprint": "90bbbd3609f10c9b"
+  },
+  "g0.18-a0.00-b0.90": {
+   "coefficients": {
+    "alpha": 0.0,
+    "beta": 0.9,
+    "gamma": 0.18
+   },
+   "method": {
+    "days": 252,
+    "panel": "pretium.facts.measure, per seed",
+    "pin_days": 120,
+    "pin_vix": [
+     15.0,
+     45.0,
+     65.0
+    ],
+    "seeds": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ],
+    "universe": "Universe.random(40, seed=111)"
+   },
+   "panels": {
+    "1": {
+     "abs_return_acf1": 0.14241009794937143,
+     "abs_return_acf20": 0.010788214891418717,
+     "abs_return_acf5": 0.07096539922148767,
+     "annualised_vol_pct": 50.388347795776355,
+     "cross_sectional_corr": 0.11677547033087066,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 2.6848646234848914,
+     "instruments": 40,
+     "leverage_effect": -0.06860297655156658,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 43.38517065329405,
+     "return_acf1": 0.24889169400067523,
+     "seed": 1,
+     "skew": -0.11304787807632237,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5472789424978441,
+     "volume_change_acf1": -0.4417340404452694
+    },
+    "2": {
+     "abs_return_acf1": 0.15100072830496566,
+     "abs_return_acf20": 0.03459565041353534,
+     "abs_return_acf5": 0.07347942593343128,
+     "annualised_vol_pct": 51.334574653388685,
+     "cross_sectional_corr": 0.08681175949854371,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.328573609983393,
+     "instruments": 40,
+     "leverage_effect": -0.07717839722558896,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 42.63251910423196,
+     "return_acf1": 0.2583039547302448,
+     "seed": 2,
+     "skew": -0.09864204033231283,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5356035502512699,
+     "volume_change_acf1": -0.45979947516127495
+    },
+    "3": {
+     "abs_return_acf1": 0.1254663348981884,
+     "abs_return_acf20": 0.010571532070192242,
+     "abs_return_acf5": 0.062429206929229965,
+     "annualised_vol_pct": 51.20884972158915,
+     "cross_sectional_corr": 0.09557949905606988,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.3124925100237785,
+     "instruments": 40,
+     "leverage_effect": -0.07122644988381535,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 42.131344981017975,
+     "return_acf1": 0.24870350847754458,
+     "seed": 3,
+     "skew": -0.10161624472936433,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5525833309358653,
+     "volume_change_acf1": -0.45517290720676007
+    },
+    "4": {
+     "abs_return_acf1": 0.14341381997188504,
+     "abs_return_acf20": 0.03804198977788231,
+     "abs_return_acf5": 0.05467047196163169,
+     "annualised_vol_pct": 50.71600339445909,
+     "cross_sectional_corr": 0.08771169714195054,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.207205851753023,
+     "instruments": 40,
+     "leverage_effect": -0.04450616278210416,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 44.9978119788115,
+     "return_acf1": 0.2672007499447354,
+     "seed": 4,
+     "skew": -0.05848963533231739,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5277222376726807,
+     "volume_change_acf1": -0.4511448935807706
+    },
+    "5": {
+     "abs_return_acf1": 0.16276935539674714,
+     "abs_return_acf20": 0.029250387090807344,
+     "abs_return_acf5": 0.06855918891180494,
+     "annualised_vol_pct": 49.896636078520466,
+     "cross_sectional_corr": 0.0890532234307617,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 3.749463659252771,
+     "instruments": 40,
+     "leverage_effect": -0.08136376058911066,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 38.35855340607708,
+     "return_acf1": 0.25325864046250535,
+     "seed": 5,
+     "skew": 0.06334220168517196,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.54231593629486,
+     "volume_change_acf1": -0.47178658570088805
+    },
+    "6": {
+     "abs_return_acf1": 0.1530573027302255,
+     "abs_return_acf20": 0.019220402254385732,
+     "abs_return_acf5": 0.052049693174862244,
+     "annualised_vol_pct": 51.18415317284807,
+     "cross_sectional_corr": 0.10488523975954327,
+     "days": 252,
+     "dependence_instruments": 40,
+     "dependence_observations": 251,
+     "excess_kurtosis": 2.884271671873888,
+     "instruments": 40,
+     "leverage_effect": -0.06350613233778715,
+     "observations": 10040,
+     "per_instrument_vol_median_pct": 41.84538645890826,
+     "return_acf1": 0.2875161025144545,
+     "seed": 6,
+     "skew": -0.12954902709996327,
+     "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380",
+     "volume_abs_return_corr": 0.5207598341975492,
+     "volume_change_acf1": -0.4666864256093711
+    }
+   },
+   "pinned_vix": {
+    "15.0": {
+     "1": {
+      "annualised_vol_pct": 47.45750714301305,
+      "cross_sectional_corr": 0.1208621795889732
+     },
+     "2": {
+      "annualised_vol_pct": 50.723271427879766,
+      "cross_sectional_corr": 0.07970320528051211
+     },
+     "3": {
+      "annualised_vol_pct": 50.0465937160372,
+      "cross_sectional_corr": 0.09658208247797438
+     },
+     "4": {
+      "annualised_vol_pct": 50.199279992378884,
+      "cross_sectional_corr": 0.08924612743116239
+     },
+     "5": {
+      "annualised_vol_pct": 47.52962793157991,
+      "cross_sectional_corr": 0.1089257356685061
+     },
+     "6": {
+      "annualised_vol_pct": 49.867323655285816,
+      "cross_sectional_corr": 0.12336061839061481
+     }
+    },
+    "45.0": {
+     "1": {
+      "annualised_vol_pct": 48.01899177287042,
+      "cross_sectional_corr": 0.13248527681546024
+     },
+     "2": {
+      "annualised_vol_pct": 52.0817844323907,
+      "cross_sectional_corr": 0.0905132697695317
+     },
+     "3": {
+      "annualised_vol_pct": 51.109856019214284,
+      "cross_sectional_corr": 0.10974330237183857
+     },
+     "4": {
+      "annualised_vol_pct": 50.88603980591483,
+      "cross_sectional_corr": 0.09924829891912437
+     },
+     "5": {
+      "annualised_vol_pct": 48.35743604154146,
+      "cross_sectional_corr": 0.12293372591049008
+     },
+     "6": {
+      "annualised_vol_pct": 50.35049349407673,
+      "cross_sectional_corr": 0.138922416773155
+     }
+    },
+    "65.0": {
+     "1": {
+      "annualised_vol_pct": 50.86522871194694,
+      "cross_sectional_corr": 0.18391504418313456
+     },
+     "2": {
+      "annualised_vol_pct": 55.028676035871186,
+      "cross_sectional_corr": 0.1320919813605346
+     },
+     "3": {
+      "annualised_vol_pct": 54.3218645471269,
+      "cross_sectional_corr": 0.15033950541826366
+     },
+     "4": {
+      "annualised_vol_pct": 53.35706109084638,
+      "cross_sectional_corr": 0.14131572928766659
+     },
+     "5": {
+      "annualised_vol_pct": 51.186813422921965,
+      "cross_sectional_corr": 0.16926708773098328
+     },
+     "6": {
+      "annualised_vol_pct": 52.87998021599676,
+      "cross_sectional_corr": 0.1931384663144823
+     }
+    }
+   },
+   "trajectory_fingerprint": "cf08638ee62776b5"
+  }
+ }
+}
