@@ -66,9 +66,11 @@ pub const S_PHI_TICK: f64 = f64::from_bits(0x3FEF_FFC1_E138_5E9E);
 /// unconditional anchor of the factor's variance process
 /// ([`super::factor_vol`]), not the sigma of any given day. The tick
 /// draws at the CONDITIONAL sigma the engine passes in
-/// ([`TickInputs::market_sigma_daily`]); this constant is where that
-/// process reverts to, the unit its floor and ceiling are multiples of,
-/// and the absolute denomination of the crash amplifier's threshold
+/// ([`TickInputs::market_sigma_daily`]); this constant is the anchor the
+/// process reverts to — scaled by (VIX/15)² since the coupling decision,
+/// so it is the exact reversion level when VIX sits at its endogenous
+/// mean — the unit its floor and ceiling are multiples of, and the
+/// absolute denomination of the crash amplifier's threshold
 /// (`factors.rs`).
 ///
 /// **History, in three measured acts.** The reference implementation says

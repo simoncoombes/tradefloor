@@ -48,9 +48,11 @@
 //!
 //! where ε is the day's accumulated market factor — the sum of the tick
 //! draws, whose conditional variance over a 390-tick session is exactly
-//! `v` — and `target` is the baseline variance, VIX-scaled iff
-//! [`MARKET_VOL_VIX_COUPLING`] is non-zero (it ships at zero; the
-//! measured decision is on the constant).
+//! `v` — and `target` is the baseline variance scaled by (VIX/anchor)²:
+//! VIX read as the factor's implied volatility, per
+//! [`MARKET_VOL_VIX_COUPLING`]. The coupling ships ON (1.0) — the era
+//! decision that closed finding 6's open question; the constant's doc
+//! carries the measurement and the argument.
 //!
 //! # Draw schedule: ZERO new draws
 //!
@@ -151,9 +153,10 @@ pub const MARKET_VOL_FLOOR_MULTIPLE: f64 = 0.05;
 /// to 1 (target fully proportional to VIX², i.e. VIX read as the
 /// factor's implied volatility).
 ///
-/// **Ships at zero; the decision is measured, and the measurement is
-/// committed.** Finding 6 left "should VIX drive the variance process?"
-/// open. Both variants were measured at the shipped constants
+/// **Ships at 1.0 — coupled. This is the era decision that closed
+/// finding 6's open question ("should VIX drive the variance
+/// process?"), taken on the committed measurement rather than on the
+/// name.** Both variants were measured at the shipped constants
 /// (`results/market-factor-vol-2026-08-22-stageJ-coupled.json` beside
 /// the autonomous stage results):
 ///
@@ -161,24 +164,34 @@ pub const MARKET_VOL_FLOOR_MULTIPLE: f64 = 0.05;
 ///   indistinguishable — correlation 0.253 vs 0.254, kurtosis 3.03 vs
 ///   3.04, clustering 0.214 vs 0.216 — because endogenous VIX spans only
 ///   ~13–21 (measured mean 15.1, hard ceiling 26.57), a mild variance
-///   modulation the process's own innovations dwarf.
+///   modulation the process's own innovations dwarf. Coupling therefore
+///   costs the in-band panel nothing.
 /// - Under PINNED crisis VIX they are different models: coupled reaches
 ///   crisis correlation 0.664 at VIX 45 and 0.727 at VIX 65 — the real
 ///   crisis band (0.6+) this model has never reached by any other
 ///   mechanism — against 0.365/0.361 autonomous, with crisis volatility
-///   82–99% annualised, peak-crisis-realistic for a HELD pin at those
-///   levels.
+///   82–99% annualised for a HELD pin at those levels.
 ///
-/// Zero ships anyway because non-zero would falsify shipped
-/// documentation this change does not own: `pretium.scenario`'s "What a
-/// VIX path actually moves" and `docs/scenarios.md`'s "VIX does not
-/// drive volatility" are load-bearing, tested claims, and a constant
-/// that silently inverts them is a documentation lie regardless of what
-/// it buys. Flipping this to 1.0 is a one-constant era decision for the
-/// model owner, its case measured and committed; it must land together
-/// with those documentation rewrites, a KAT bump, and a re-run of the
-/// factor-vol sweep's coupled row.
-pub const MARKET_VOL_VIX_COUPLING: f64 = 0.0;
+/// **The coupling is undamped, and the ceiling is why that is safe.**
+/// The unclamped stationary variance of the recursion equals its target,
+/// so a held pin saturates the state at the ceiling once
+/// (VIX/anchor)² > `MARKET_VOL_CEILING_MULTIPLE` — above VIX ≈ 42 the
+/// response is flat, and a pinned VIX 100 buys essentially the VIX-65
+/// market, not a quadratically more violent one. Inside the plausible
+/// band the response is quadratic, which is what reading VIX as implied
+/// volatility means; a damping factor would make the model realise less
+/// volatility than its own implied level says, re-creating in softer
+/// form the exact falsehood the coupling removes. A test pins the
+/// saturation arithmetic so a recalibration that moves the anchor or the
+/// ceiling revisits this argument deliberately.
+///
+/// The flip landed together with what it falsified: `pretium.scenario`'s
+/// "What a VIX path actually moves" and `docs/scenarios.md`'s "VIX does
+/// not drive volatility" were rewritten in the same change, their tests
+/// re-grounded, and the KAT bumped — a constant that silently inverted
+/// shipped documentation would have been a lie regardless of what it
+/// bought.
+pub const MARKET_VOL_VIX_COUPLING: f64 = 1.0;
 
 /// The VIX level at which a coupled target equals the baseline variance.
 ///
@@ -214,9 +227,14 @@ pub const IDIO_SIGMA_SCALE: f64 = 0.84;
 pub fn update_market_variance(current_variance: f64, day_factor: f64, vix: f64) -> f64 {
     let base = MARKET_FACTOR_SIGMA * MARKET_FACTOR_SIGMA;
     // The reversion target: baseline variance, VIX-scaled when coupled.
-    // At coupling 0 the parenthesised blend is exactly 1.0 and
-    // `base * 1.0` is bit-identical to `base`, so the autonomous process
-    // carries no arithmetic residue of the coupling machinery.
+    // The blend form is kept even at coupling 1.0 because the constant is
+    // the calibration seam the sweep patches; the evaluation order is
+    // contractual. Two exactness properties anchor it: at coupling 0 the
+    // parenthesised blend is exactly 1.0 and `base * 1.0` is `base` to
+    // the bit (the autonomous branch stays measurable with no arithmetic
+    // residue), and at `vix == MARKET_VOL_VIX_ANCHOR` the ratio is
+    // exactly 1.0 at any coupling, so an anchor-level VIX reproduces the
+    // autonomous update bit-for-bit — tests pin both.
     let vix_ratio = vix / MARKET_VOL_VIX_ANCHOR;
     let target = base
         * (1.0 - MARKET_VOL_VIX_COUPLING + MARKET_VOL_VIX_COUPLING * (vix_ratio * vix_ratio));
@@ -434,32 +452,82 @@ mod tests {
     }
 
     #[test]
-    fn the_shipped_coupling_is_zero_so_vix_does_not_move_the_target() {
-        // The measured decision, pinned: VIX 5 and VIX 65 must produce
-        // bit-identical updates while MARKET_VOL_VIX_COUPLING is 0. If
-        // this fails, the coupling was turned on -- which the committed
-        // measurement supports ONLY as a deliberate era decision landing
-        // together with the scenario/docs rewrites it falsifies and a
-        // re-run of the sweep's coupled row; see the constant's doc.
-        assert_eq!(MARKET_VOL_VIX_COUPLING, 0.0);
+    fn the_shipped_coupling_is_on_so_vix_moves_the_variance_target() {
+        // The era decision, pinned from the other side: this test's
+        // predecessor asserted VIX 5 and VIX 65 produce bit-identical
+        // updates while the coupling shipped at zero. The flip that
+        // closed finding 6's open question inverts it -- a crisis VIX
+        // must now pull tomorrow's factor variance ABOVE what a calm VIX
+        // leaves, at every innovation. If this fails, the coupling was
+        // turned back off, which un-answers a question the era answered
+        // by measurement and re-falsifies the scenario/docs claims that
+        // were rewritten to match; see the constant's doc.
+        assert_eq!(MARKET_VOL_VIX_COUPLING, 1.0);
         for eps in [0.0, 0.01, 0.04] {
             let calm = update_market_variance(BASE * 2.0, eps, 5.0);
             let crisis = update_market_variance(BASE * 2.0, eps, 65.0);
-            assert_eq!(calm.to_bits(), crisis.to_bits(), "eps {eps}");
+            assert!(
+                crisis > calm,
+                "eps {eps}: VIX 65 must raise the variance target above VIX 5, \
+                 got {crisis} vs {calm}"
+            );
         }
     }
 
     #[test]
-    fn a_coupled_target_would_scale_with_vix_squared_and_stay_clamped() {
-        // The machinery the measured decision left switched OFF still has
-        // to be correct, because the constant is the calibration seam the
-        // sweep patches and the owner may flip. Exercised via the
-        // explicit-target form.
+    fn an_anchor_level_vix_reproduces_the_autonomous_update_to_the_bit() {
+        // The coupling is a pure modulation around the anchor: at
+        // VIX == MARKET_VOL_VIX_ANCHOR the ratio is exactly 1.0, the
+        // blend is exactly 1.0 at ANY coupling, and the update must equal
+        // the explicit-target form at the baseline bit-for-bit. This is
+        // what keeps the coupling question separated from a level change
+        // -- the same isolation the anchor's own doc argues.
+        for (v, eps) in [(BASE, 0.0), (BASE * 2.0, 0.01), (BASE * 0.5, 0.04)] {
+            let coupled = update_market_variance(v, eps, MARKET_VOL_VIX_ANCHOR);
+            let autonomous = update_toward(v, eps, BASE);
+            assert_eq!(coupled.to_bits(), autonomous.to_bits(), "v {v} eps {eps}");
+        }
+    }
+
+    #[test]
+    fn a_held_crisis_pin_saturates_at_the_ceiling_so_the_response_is_flat_above_it() {
+        // The damping argument, as arithmetic. The unclamped stationary
+        // variance of the recursion equals its target, so once
+        // (VIX/anchor)^2 exceeds the ceiling multiple the state pins at
+        // the ceiling and the response to a harder pin is FLAT: a held
+        // VIX 45 and a held VIX 100 bound the factor identically, and the
+        // measured 82-99% crisis volatility is a ceiling regime, not the
+        // start of a quadratic ramp. The coupling ships undamped BECAUSE
+        // this holds; if the anchor or the ceiling moves, this test drags
+        // the saturation point back into view.
+        let saturation_vix = MARKET_VOL_VIX_ANCHOR * mathx::sqrt(MARKET_VOL_CEILING_MULTIPLE);
+        assert!(
+            saturation_vix < 45.0,
+            "saturation at VIX {saturation_vix}: a held VIX 45 no longer pins the \
+             ceiling, so the held-pin volatility argument needs re-measuring"
+        );
+        // And the state genuinely cannot exceed the ceiling under the
+        // hardest coupled pin, however hard the innovations drive it.
+        let mut v = BASE;
+        for _ in 0..300 {
+            v = update_market_variance(v, 3.0 * mathx::sqrt(v), 100.0);
+            assert!(v <= BASE * MARKET_VOL_CEILING_MULTIPLE * 1.000001);
+        }
+        assert!(
+            v >= BASE * MARKET_VOL_CEILING_MULTIPLE * 0.999999,
+            "a relentless VIX-100 pin should hold the state at the ceiling, got {} x base",
+            v / BASE
+        );
+    }
+
+    #[test]
+    fn a_coupled_target_scales_with_vix_squared_and_stays_clamped() {
+        // The seam form the sweep patches, exercised explicitly: a larger
+        // target raises the update, and a crisis-sized target cannot push
+        // the state past the ceiling that bounds the process everywhere.
         let anchored = update_toward(BASE, 0.0, BASE);
         let doubled = update_toward(BASE, 0.0, BASE * 4.0);
         assert!(doubled > anchored);
-        // And a crisis-sized target cannot push the state past the
-        // ceiling that bounds the autonomous process too.
         let extreme = update_toward(BASE * MARKET_VOL_CEILING_MULTIPLE, 0.06, BASE * 20.0);
         assert!(extreme <= BASE * MARKET_VOL_CEILING_MULTIPLE * 1.000001);
     }
