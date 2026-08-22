@@ -36,11 +36,12 @@ above 10x it is capped and flat again, and between them it scales — both
 constants live in ``order_imbalance`` in ``rust/src/market/factors.rs``. In
 practice an ``analyse`` run hits a harder bound first: the book caps the
 fill at the displayed depth, and identical fills mean identical flow and
-identical numbers. Measured on this build — the first name of
-``Universe.random(20, seed=7)``, sim seed 2026, one six-step day — requests
-of 20x and 100x the average minute volume both fill the same 483 shares and
-land exactly the same 260.02 bps of end-of-run impact. The response is
-linear in what actually fills, not in what you ask for.
+identical numbers. Measured on this build — ``analyse`` with a single
+first-step buy of the first name of ``Universe.random(20, seed=7)``, sim
+seed 2026, one six-step day, ``impact_bps`` on that name — requests of 20x
+and 100x the average minute volume (498 and 2,490 shares) both fill the
+same 483 shares and land exactly the same 201.52 bps of end-of-run impact.
+The response is linear in what actually fills, not in what you ask for.
 
 ## What the number means
 
@@ -56,15 +57,22 @@ into published numbers.
 ## This is an execution measure, not a strategy P&L, and a round trip shows why
 
 Measured on this build — the first instrument of ``Universe.random(20,
-seed=7)``, sim seed 2026, one six-step day, trading 1% of ADV: buying 97
-shares and holding costs **+16.71 bps**. Buying the same 97 shares and
-selling them three steps later comes to **-13.57 bps** — a gain, and not a
-quirk of the seed: the round trip ends negative on seven of the eight seeds
-the test suite measures.
+seed=7)``, one six-step day, buying 1% of ADV (97 shares) at the first
+step: holding costs **+16.71 bps**, identically on every one of the eight
+suite seeds (2026, 1, 2, 3, 4, 5, 7, 11), because the entry lands at step
+zero, before the two worlds can diverge. Selling the same 97 shares three
+steps later ends anywhere between **-13.25 and +5.76 bps** across those
+seeds — negative on six of the eight, median -8.4. An earlier version of
+this docstring quoted a single round-trip figure (-13.57, at sim seed
+2026, pre-GJR); that same seed now reads +5.76, and the sign genuinely
+flips with the seed, so the seed range is the honest number where the
+entry gets one figure.
 
-Nothing is wrong. The entry pushed the price up, part of that impact persisted,
-and the exit sold into it. The agent really did transact at prices better than
-the untraded world offered, on that leg.
+Nothing is wrong where the round trip comes back negative. The entry pushed
+the price up, part of that impact persisted, and the exit sold into it — on
+that leg the agent really did transact at prices better than the untraded
+world offered. How much impact survives three steps is the market's call,
+which is why this is quoted as a range.
 
 What it means is that shortfall answers "what did each execution cost against a
 market where I never traded", which is the execution desk's question. It does
@@ -225,10 +233,29 @@ class Execution:
     def moved(self) -> dict[str, float]:
         """Every instrument whose final price differs, in bps.
 
-        Includes names the trader never touched. Those should be absent, and
-        this exists to check rather than to assume: order flow consumes no RNG
-        draws, so the untraded names follow byte-identical paths. Anything
-        here that was not traded means something leaked between the worlds.
+        Includes names the trader never touched — and since the 2026-08 VIX
+        coupling those are no longer guaranteed absent. Order flow still
+        consumes no RNG draws, so an untraded name sees byte-identical
+        noise; what remains is one non-noise channel, the market being
+        afraid of the trading: the fear gauge reacts same-day to the
+        cap-weighted market return, VIX sets the shared factor's variance
+        target, and the nudge reaches every name's volatility two closes
+        later. Measured on this build — ``analyse(Momentum(), seed=7,
+        universe=Universe.random(60, seed=11), days=10)``, defaults
+        otherwise: 46 names traded, two of the fourteen untouched moved, by
+        -6.6 and +3.2 bps, against a 13.0 bps median ``|impact_bps|``
+        across the traded names that moved. Three bounds keep the channel
+        readable: it is small next to direct impact; it is intermittent,
+        because the VIX reaction clamps the market return at +/-0.03%
+        (``rust/src/economy/daily.rs``), so a day whose close saturates the
+        clamp in both worlds passes nothing; and a one-day analysis is
+        structurally immune, its final prices predating the first repriced
+        variance target — which is why ``test_tca.py`` can still assert
+        emptiness there. When the untouched names must be byte-exact, pin
+        VIX in both worlds — ``scenario=Scenario().hold(vix=15.0)`` —
+        verified empty on the ten-day run above. Anything here that was not
+        traded and survives a pinned VIX means something genuinely leaked
+        between the worlds.
         """
         out = {}
         for i, ticker in enumerate(self.tickers):
@@ -237,6 +264,12 @@ class Execution:
         return out
 
     def untouched_moved(self) -> list[str]:
+        """Names the trader never touched whose final price still differs.
+
+        Empty on a one-day analysis and under a pinned VIX; on a multi-day
+        run a small remainder is the fear-gauge channel, not a leak. See
+        :meth:`moved` for the measurement and the bounds.
+        """
         traded = {f["ticker"] for f in self.fills}
         return sorted(t for t in self.moved() if t not in traded)
 

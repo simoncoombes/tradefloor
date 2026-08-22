@@ -270,20 +270,25 @@ class _Trend:
 
     ## Rebalancing more often costs more than the signal is worth
 
-    Measured on this build — ``Momentum(lookback_days=1.0)``, seed 2026,
-    ``Universe.random(40, seed=7)``, 30 days, ``ticks_per_step`` scaled to
-    keep 390 ticks a day — holding the horizon at exactly one day and
-    varying only how often the agent rebalances:
+    Measured on this build — ``evaluate({'m': Momentum(lookback_days=1.0)},
+    seed=2026, universe=Universe.random(40, seed=7), days=30,
+    steps_per_day=S, ticks_per_step=T)``, reading ``return_pct`` — holding
+    the horizon at one day and varying only how often the agent rebalances.
+    ``T`` approximates a 390-tick day per cadence (3x130 and 6x65 are
+    exact; 12 does not divide 390, so that row runs 12x32 = 384 ticks):
 
-        3 steps/day, lookback 3    +103.13%
-        6 steps/day, lookback 6     +59.33%
-       12 steps/day, lookback 12    +24.08%
+        3 steps/day x 130 ticks, lookback 3     +97.45%
+        6 steps/day x  65 ticks, lookback 6     +33.84%
+       12 steps/day x  32 ticks, lookback 12     +0.10%
 
-    The same signal over the same horizon earns a quarter as much when
-    traded four times as often. Nothing charges a fee: the orders simply
-    cross a real spread and consume real depth more times. This is the
-    impact model making "trade more" expensive on its own, which is the
-    same mechanism that makes "trade bigger" expensive.
+    The same signal over the same horizon earns a third as much when traded
+    twice as often, and essentially nothing when traded four times as
+    often. Nothing charges a fee: the orders simply cross a real spread and
+    consume real depth more times. This is the impact model making "trade
+    more" expensive on its own, which is the same mechanism that makes
+    "trade bigger" expensive. (An earlier docstring read +103.13, +59.33
+    and +24.08 here — measured pre-GJR; re-measure after any engine change
+    rather than carrying these forward.)
     """
 
     sign = 1.0

@@ -560,21 +560,34 @@ class FlowImpact:
     def untouched_moved(self) -> list[str]:
         """Instruments the trader did not touch, whose price still moved.
 
-        Normally EMPTY, and the reason is what makes this measurement clean:
-        order flow consumes no draws. It is an input to the factor
-        calculation, not a call on the generator, so adding flow to one name
-        leaves the shared draw schedule byte-identical and every other name
-        follows exactly the path it would have followed.
+        EMPTY on a one-day run, and the reason is what makes this
+        measurement clean: order flow consumes no draws. It is an input to
+        the factor calculation, not a call on the generator, so adding flow
+        to one name leaves the shared draw schedule byte-identical and
+        every other name sees exactly the noise it would have seen.
 
         Measured, not assumed: a 390-tick session consumes 19,110 draws with
         or without flow. (Adding an INSTRUMENT is a different matter and does
         shift the schedule -- 4,900 draws at six names against 5,500 at seven
         -- which is why a roster edit is not a counterfactual.)
 
-        So impact is exactly attributable to the names traded, rather than
-        being a signal buried in a shifted market. This accessor exists to
-        prove that rather than to explain it away: a non-empty result means
-        something leaked, and is worth investigating.
+        Over several DAYS one non-noise channel qualifies the emptiness,
+        since the 2026-08 VIX coupling: flow that moves the cap-weighted
+        market return moves the same-day VIX, VIX sets the shared factor's
+        variance target, and untraded names feel it two closes later.
+        Intermittent -- the VIX reaction clamps the market return at
+        +/-0.03% -- but real: measured on this build, flow of 200,000
+        shares against the first name of ``Universe.random(20, seed=7)``
+        run for ten days leaks nothing at sim seeds 2026 and 7 and moves
+        one untouched name +22.8 bps at sim seed 11. Pin VIX in both
+        worlds to restore byte-exactness; ``pretium.tca``'s ``moved()``
+        docstring carries the full measurement of the channel.
+
+        So on a one-day run impact is exactly attributable to the names
+        traded, and on a longer one it is attributable up to the fear
+        gauge. This accessor exists to prove that rather than to explain
+        it away: a result a pinned VIX does not empty means something
+        leaked, and is worth investigating.
         """
         touched = set(self._flow)
         return [

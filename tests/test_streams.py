@@ -6,9 +6,15 @@ cannot shift any other domain's sequence. The derivation contract lives in
 ``docs/rng-streams.md`` and is pinned by the Rust suite; these tests assert
 what the three consumers who asked for the split actually get:
 
-- the TCA counterfactual: order flow leaves untouched names bit-identical
-  (asserted in ``test_tca.py``; the guard-flip mechanics are demonstrated
-  in ``rust/tests/stream_alignment.rs``),
+- the TCA counterfactual: order flow consumes no market draws, so on a
+  one-day analysis untouched names stay bit-identical (asserted in
+  ``test_tca.py``; the guard-flip mechanics are demonstrated in
+  ``rust/tests/stream_alignment.rs``). Over more days the draws are still
+  identical but the 2026-08 VIX coupling opens a non-noise channel —
+  trading moves the same-day VIX, VIX sets the factor's variance target
+  two closes later — so the byte-identical guarantee is qualified: small
+  next to direct impact, and restored exactly under a pinned VIX. The
+  measurement lives in ``pretium.tca``'s ``moved()`` docstring,
 - pinned-versus-baseline macro comparison: two macro paths, one market
   noise sequence,
 - cutover: an embedder's own draws never move the market.
