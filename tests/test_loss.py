@@ -41,8 +41,10 @@ from pretium.loss import (
 LEVERAGE_BAND = REAL_MARKETS["leverage_effect"]
 
 # The committed post-split sweep re-run: per-seed panels at the shipped
-# MARKET_FACTOR_SIGMA, the measurement SEED_SD was derived from. Reading it
-# here is what makes the shipped constants reproducible rather than asserted.
+# MARKET_FACTOR_SIGMA. The shipped SEED_SD is no longer derived from this
+# file (it is re-measured on thirty seeds and pinned by live re-measurement
+# below); these panels remain the fixed realistic panel set the membership
+# and weighting tests exercise the loss on.
 RESULTS = (
     Path(__file__).resolve().parent.parent
     / "tools" / "calibration" / "results"
@@ -242,7 +244,9 @@ def test_the_report_says_which_weighting_was_used():
     # is in force must be readable off the result, not inferred from code.
     result = band_distance_loss(baseline_panels())
     assert result["weighting"] == "diagonal"
-    assert result["seed_sd_provenance"]["git_rev"] == "ad91026"
+    provenance = result["seed_sd_provenance"]
+    assert provenance["seeds"] == tuple(range(101, 131))
+    assert provenance["model_fingerprint"] == "pt-v1"
     assert result["panels"] == 6
 
 
@@ -307,21 +311,132 @@ def test_a_live_statistic_that_could_not_be_measured_refuses():
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not RESULTS.exists(), reason="sweep results not present")
-def test_the_shipped_seed_sds_are_reproducible_from_the_committed_sweep():
-    """SEED_SD is a measurement, and this recomputes it from its source.
+# The thirty per-seed panels SEED_SD was measured from: pt-v1,
+# Universe.random(40, seed=111), 252 days, seeds 101-130 (the phase-2
+# instrument's protocol, so these scales and its Jacobian rows are directly
+# comparable). Committed as data, to ten significant figures, so the sd can
+# be re-derived here without thirty engine runs per test session; the live
+# re-measurement below is what keeps the table honest.
+THIRTY_SEED_PANELS = {
+    "seeds": tuple(range(101, 131)),
+    "annualised_vol_pct": [
+        38.18632944, 42.79428246, 37.91946902, 53.26710913, 36.21848504,
+        38.23974831, 40.53503957, 49.15559974, 43.70283337, 47.48908576,
+        40.503218, 40.17077358, 39.99539251, 65.69412721, 52.16308466,
+        45.44135654, 37.32625251, 42.0924504, 37.09347366, 40.39357768,
+        47.90369479, 39.54153506, 35.77346285, 37.52072273, 46.73692305,
+        48.49823281, 44.01975476, 38.50315844, 42.05540329, 49.11686486],
+    "excess_kurtosis": [
+        3.638843155, 2.750206646, 3.691982928, 6.549814813, 2.470930107,
+        4.526603422, 3.424621754, 3.56712604, 4.33710213, 6.247684829,
+        3.506726237, 2.932622762, 2.628140385, 4.965934606, 5.299448644,
+        4.304005924, 3.327437839, 2.647639729, 3.32097945, 2.404438587,
+        6.154611528, 2.966467248, 3.552254561, 3.987744621, 3.903208315,
+        3.743228875, 2.441780311, 3.406791305, 3.421337918, 5.845891151],
+    "return_acf1": [
+        0.2313842053, 0.2108137332, 0.2442806969, 0.4195189844,
+        0.2166049096, 0.1509738007, 0.2521637997, 0.3435540496,
+        0.2100231826, 0.264854019, 0.2142301908, 0.288296022,
+        0.2105850166, 0.2707716984, 0.2415494118, 0.2238868696,
+        0.2000519669, 0.2824383265, 0.2383527516, 0.2614362834,
+        0.2504151408, 0.2276572148, 0.2346179263, 0.2419919832,
+        0.1672991594, 0.2690075897, 0.2966667889, 0.258518836,
+        0.2944942237, 0.3423054977],
+    "abs_return_acf1": [
+        0.1958030428, 0.2018404476, 0.2016135035, 0.4342557239,
+        0.1928664511, 0.247745566, 0.286715099, 0.3624894922,
+        0.3451480597, 0.3872881988, 0.1870995103, 0.2871876458,
+        0.20782846, 0.4884397791, 0.3905846166, 0.3529686417,
+        0.172915549, 0.2274189582, 0.1812526882, 0.2101670658,
+        0.4126292712, 0.1744352137, 0.1633961125, 0.1786627806,
+        0.3246564945, 0.272913713, 0.258270428, 0.2124093481,
+        0.2360955857, 0.4240123276],
+    "abs_return_acf5": [
+        0.07774000724, 0.09282183288, 0.07900680123, 0.1710625647,
+        0.09151436655, 0.08120008499, 0.1689304333, 0.2217903545,
+        0.1107904803, 0.1357089124, 0.1322602624, 0.1377420353,
+        0.09472076948, 0.2864417876, 0.1162430886, 0.06046582111,
+        0.07204755802, 0.08775470148, 0.07632578027, 0.06190197311,
+        0.07935966715, 0.08978491717, 0.07043920142, 0.0805173092,
+        0.2485882562, 0.143019528, 0.08825796906, 0.1035297665,
+        0.1277739877, 0.1151940511],
+    "abs_return_acf20": [
+        -0.0006382519934, 0.01622618614, 0.01078156949, 0.01133892274,
+        0.01626228872, 0.03238826332, 0.005455395667, 0.08436165458,
+        -0.01162986262, 0.03151713055, 0.02583235513, 0.006155429226,
+        0.01679272317, 0.2432212627, 0.03359856818, 0.001587083811,
+        0.03236807214, 0.01712817226, 0.02725002042, -0.005413980642,
+        0.01421954004, -0.0002625477135, -0.01024764318, -0.001841854129,
+        0.01209027048, -0.001659122215, -0.02316631288, -0.007009005858,
+        0.001692402256, 0.007146197969],
+    "cross_sectional_corr": [
+        0.2060100205, 0.2177915368, 0.2372357545, 0.5094375301,
+        0.2075391909, 0.2327121855, 0.2859591948, 0.4126752568,
+        0.3516239979, 0.4049271085, 0.2450341758, 0.3297689326,
+        0.2353676072, 0.6094568434, 0.4706936069, 0.3879955449,
+        0.207093535, 0.2543545418, 0.1882087146, 0.2740375392,
+        0.4081702826, 0.2162303014, 0.1932920766, 0.2107149697,
+        0.3963129908, 0.3763463048, 0.2994668093, 0.2239769851,
+        0.2755966892, 0.4373563567],
+    "volume_abs_return_corr": [
+        0.5393955165, 0.5329923867, 0.5466777216, 0.6555727095,
+        0.5448657956, 0.5629431505, 0.6078316678, 0.6275541649,
+        0.6139085997, 0.6117802256, 0.5678888058, 0.627548682,
+        0.5596018978, 0.7081447219, 0.6665751576, 0.605969972,
+        0.5494346141, 0.5485762944, 0.5623274173, 0.5612633445,
+        0.598294934, 0.5554788398, 0.5682736471, 0.5563002011,
+        0.6077100054, 0.629320838, 0.5781123674, 0.5500933134,
+        0.5672240227, 0.6371868647],
+    "leverage_effect": [
+        -0.05375339193, -0.0347317908, -0.07161572446, -0.09693569254,
+        -0.06928597907, -0.09611163537, -0.1318609868, 0.06024649991,
+        0.02211485756, -0.06761333579, -0.06803516368, 0.02751296276,
+        -0.05766917908, 0.1312723149, 0.06302306272, -0.01091343115,
+        -0.08783164932, -0.0984120263, -0.06775374452, -0.1342227912,
+        -0.2503385533, -0.1267541439, -0.07732706389, -0.06924930498,
+        0.02158365617, -0.09922276958, -0.1125201214, -0.104548374,
+        -0.02255939527, 0.05535548513],
+    "volume_change_acf1": [
+        -0.4398052046, -0.4541903519, -0.4525321339, -0.4467006431,
+        -0.4526913981, -0.4681299565, -0.4524711848, -0.4546922165,
+        -0.42430572, -0.4464246704, -0.4440773052, -0.4673796964,
+        -0.4459517493, -0.4477442446, -0.4599886679, -0.4406453228,
+        -0.4348848643, -0.4448791891, -0.4506027005, -0.4511965671,
+        -0.4381135315, -0.4582469152, -0.4477784396, -0.4465225235,
+        -0.4755706407, -0.4503070863, -0.4447755028, -0.4492209396,
+        -0.4600876586, -0.4571319669],
+}
 
-    The shipped values come from the post-RNG-split re-run at the shipped
-    sigma -- NOT from CALIBRATION.md's table, which was measured pre-split
-    and, per the provenance note in facts.py, at the old 0.003 baseline.
-    If this fails, either the results file changed (re-derive and update
-    SEED_SD and its provenance note together) or SEED_SD was edited by hand
-    (do not: it is not a tuning knob).
+
+def test_the_shipped_seed_sds_are_reproducible_by_re_measurement():
+    """SEED_SD is a measurement, and this recomputes it from its protocol.
+
+    The engine is deterministic per seed, so the provenance can be pinned
+    to live re-measurement rather than to a committed artifact: two of the
+    thirty seeds are re-run end to end here (the cheapest check that the
+    model, the universe and the estimator are still the ones the constants
+    were measured on -- a changed coefficient or RNG stream fails the
+    panel comparison before it could silently reprice the loss), and the
+    shipped sd is re-derived from the committed per-seed table those live
+    panels must match. If this fails, the model or measurement changed:
+    re-measure all thirty seeds and update SEED_SD, its provenance and
+    this table together. Do not edit SEED_SD by hand: it is not a tuning
+    knob.
     """
-    derived = seed_sd_from_panels(baseline_panels())
-    assert set(derived) == set(SEED_SD)
-    for key, value in SEED_SD.items():
-        assert derived[key] == pytest.approx(value, rel=1e-4), key
+    import statistics as st
+
+    universe = pretium.Universe.random(40, seed=111)
+    for seed in (101, 130):
+        position = THIRTY_SEED_PANELS["seeds"].index(seed)
+        panel = measure(seed=seed, universe=universe, days=252)
+        assert panel["model_fingerprint"] == "pt-v1"
+        for key in SEED_SD:
+            assert panel[key] == pytest.approx(
+                THIRTY_SEED_PANELS[key][position], rel=1e-6, abs=1e-9
+            ), (seed, key)
+    for key, shipped in SEED_SD.items():
+        derived = st.stdev(THIRTY_SEED_PANELS[key])
+        assert derived == pytest.approx(shipped, rel=1e-4), key
 
 
 def test_substituting_the_seed_sds_is_a_parameter_not_an_edit():
