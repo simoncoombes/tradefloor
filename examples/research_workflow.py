@@ -120,14 +120,45 @@ def main() -> dict:
     print(f"     partial fills: {len(execution.partial_fills())}  "
           f"(a cheap execution that did not happen is not a cheap execution)")
 
-    # Nothing the trader did not touch should have moved. Order flow consumes
-    # no draws, so the untraded names follow byte-identical paths — this is
-    # the assertion that the subtraction was clean, not an explanation of why
-    # it might not be.
+    # Nothing the trader did not touch should have moved through the MARKET:
+    # order flow consumes no draws, so the untraded names see identical
+    # noise. Since the 2026-08 VIX coupling one indirect channel is open on
+    # purpose — the fear gauge reacts same-day to the cap-weighted market
+    # return, and VIX now reprices the shared factor's variance — so a
+    # trader whose flow moves the market return nudges every name's
+    # volatility two closes later. Measured here: two untraded names move,
+    # by -6.5 and +3.2 bps against a 13 bps median direct impact. That is
+    # the market being afraid of your trading, which is a cost, not a leak
+    # in the subtraction — and it must stay well under the direct impact it
+    # rides beside, which is asserted.
     leaked = execution.untouched_moved()
     report["leaked"] = leaked
-    assert not leaked, f"impact leaked into untraded names: {leaked}"
-    print("     untouched instruments moved: none, as they must not")
+    traded_names = {fill["ticker"] for fill in execution.fills}
+    direct = sorted(
+        abs(bps) for name, bps in execution.moved().items()
+        if name in traded_names
+    )
+    median_direct = direct[len(direct) // 2]
+    for name in leaked:
+        assert abs(execution.impact_bps(name)) < median_direct, (
+            f"macro feedback on {name} ({execution.impact_bps(name):+.2f} bps) "
+            f"rivals direct impact ({median_direct:.2f} bps median) -- "
+            "that is no longer a fear ripple"
+        )
+    print(f"     untouched instruments moved: {len(leaked)}, all through the "
+          "fear gauge, all small against direct impact")
+
+    # And with VIX pinned the macro channel is closed, so the subtraction is
+    # byte-exact — the guarantee the RNG stream split actually makes, now
+    # demonstrated at the boundary where it holds.
+    pinned = pt.tca.analyse(Momentum(), seed=7, universe=universe, days=10,
+                            scenario=pt.Scenario().hold(vix=15.0))
+    report["leaked_pinned"] = pinned.untouched_moved()
+    assert not report["leaked_pinned"], (
+        f"impact leaked into untraded names under a pinned VIX: "
+        f"{report['leaked_pinned']}"
+    )
+    print("     under a pinned VIX: none, byte-exact, as they must be")
 
     # 4b. The book that made those costs. Impact here is not a formula applied
     #     to a size -- it is depth being consumed, so it can be watched

@@ -40,48 +40,71 @@ discount off the corporate bond yield, so a short policy-only study sees
 nothing, silently. `rate_shock` moves the whole curve for an immediate
 repricing; `ramp` isolates a single lever when that is what you want.
 
-## The second trap: VIX does not drive volatility
+## The second trap, retired: VIX drives volatility now
 
-`Scenario.vix_shock` was called `vol_shock` until it was measured. The old name
-still works and warns; the path it produces is unchanged.
+This page used to state, in bold, that VIX does not drive volatility — and it
+was true, measured, and tested when it said so. The 2026-08 era coupled the
+market factor's conditional-variance process to VIX after measuring both
+variants, and this section was rewritten in the same change that flipped the
+constant, because a page that quietly stops saying something is worse than
+one that never said it.
 
-**There is no VIX term in the variance process.** The GARCH recursion is
-`omega + alpha * r^2 + beta * v` with a sector-relative clamp, and neither it
-nor the noise magnitude reads VIX. Annualised realised volatility, measured on
-20 instruments over 120 days, seed 3:
+**VIX is the market factor's implied volatility.** The factor's variance
+reverts to a target proportional to `(vix / 15)^2`, anchored so that VIX 15 —
+the endogenous mean — reproduces the uncoupled process exactly. The per-name
+GARCH recursion (`omega + alpha * r^2 + beta * v`) still has no VIX term:
+what VIX scales is the shared component of every return, so a crisis VIX is a
+volatility regime and a correlation regime at once, which is what a real
+crisis is. Annualised realised volatility, measured on 20 instruments over
+120 days, seed 3, pinned through the scenario API:
 
 | VIX | annualised realised vol |
 |---|---|
-| 5 | 58.05% |
-| 15 (default) | 58.05% |
-| 45 | 58.22% |
-| 65 | 58.92% |
+| 5 | 49.48% |
+| 15 (the anchor) | 58.76% |
+| 45 | 107.07% |
+| 65 | 124.31% |
 
-A thirteenfold move in VIX changes realised volatility by under one point.
-Below VIX 15 it changes nothing at all: VIX 5, 10 and 15 produce bit-identical
-prices over 60 days, because the spread multiplier floors at 1.0 and the
-correlation blend has not started.
+A thirteenfold move in VIX moves realised volatility by a factor of 2.5, and
+a sub-15 pin now calms the market rather than doing nothing. VIX 5, 10 and 15
+produce identical prices only for the first day — the first close is where a
+pin first enters the variance target — and diverge from the second. (An
+earlier version of this page claimed bit-identity over 60 days; even before
+the coupling that had quietly become false at day 45, where the first
+central-bank meeting reprices the corporate yield off a VIX-bearing spread.)
 
-Here VIX is a **liquidity and spread** variable. Three channels:
+The response to a held pin saturates. The factor's variance is clamped at 8x
+its baseline for reasons independent of the coupling (the clamp carries the
+process's fourth moment), so above VIX ~42 a harder pin buys almost no
+additional factor variance: quadratic inside the plausible band, flat beyond.
+A researcher pinning VIX 65 for a year gets a market realising roughly twice
+its calm volatility with crisis-level correlation — 2008 sustained, not a
+numerical blow-up.
 
-1. **Quoted bid-ask**, through a multiplier `1 + max(0, (vix - 15) / 30)`.
-   Mean quoted spread across 25 instruments after five days: 12.17 bps at VIX
-   15, 14.72 at 25, 20.05 at 45, 28.41 at 65. This is the channel that
-   genuinely moves.
-2. **Cross-sectional correlation above VIX 40**, where sector factors blend
-   toward the market factor. Mean pairwise correlation of daily log returns
-   over 300 pairs: +0.022 at VIX 15, +0.023 at 45, +0.041 at 65. The blend is
-   correct in construction and close to invisible in output, because it acts
-   on sector factors with sigma 0.002 against per-stock noise running 0.008 to
-   0.025. Diversification keeps working at VIX 65. See
+Four channels:
+
+1. **The factor's variance target**, above. The channel that answers "what
+   happens when volatility triples" — and, through the same mechanism,
+   the crisis-correlation channel.
+2. **Quoted bid-ask**, through a multiplier `1 + max(0, (vix - 15) / 30)`.
+   Mean quoted spread across 25 instruments after five days: 11.52 bps at VIX
+   15, 13.92 at 25, 18.87 at 45, 25.89 at 65.
+3. **Cross-sectional correlation above VIX 25.5** (the crisis threshold since
+   the 2026-08 re-site; the old `vix > 40` trigger sat above the endogenous
+   ceiling and could never fire), where sector factors blend toward the
+   market factor. Together with channel 1, mean pairwise correlation of daily
+   log returns over 300 pairs: +0.269 at VIX 15, +0.678 at 45, +0.759 at 65.
+   Diversification genuinely stops working at crisis VIX. See
    [How realistic is this market](how-realistic-is-this-market.html).
-3. **Credit spreads** in the daily economy step, which is not reachable from
-   Python in this release. See [Core concepts](core-concepts.html).
+4. **Credit spreads** in the daily economy step, recomputed at central-bank
+   meetings (the first sits at day 45), so a VIX path also reprices the
+   yield equities discount off — at meeting cadence. See
+   [Core concepts](core-concepts.html).
 
-So use a VIX path to ask what an execution algorithm does when spreads widen.
-Do not use it to ask what happens when volatility triples, and do not expect
-much from the correlation channel. Nothing in this model raises realised
-volatility, and that limitation is stated rather than papered over.
+So a VIX path stresses execution and strategy at once: spreads widen,
+volatility rises, and the cross-section starts moving together. What it does
+not move is any single name's idiosyncratic variance — VIX sizes the shared
+factor's share, not each name's own noise.
 
 ## Scenarios reach every entry point
 
@@ -95,20 +118,30 @@ spike = pt.tca.analyse(agent, seed=s, universe=u, days=10,
 Does execution cost more when VIX is high? Measured with `BuyAndHold` over
 `Universe.random(20, seed=11)`, ten days, seeds 1 to 12: the VIX 45 regime
 costs more in 12 of 12, median shortfall 11.69 bps against 6.06, paired median
-delta +5.62 bps. That is the spread channel, and it is the channel a VIX
-scenario is good for.
+delta +5.62 bps. That is mostly the spread channel — `BuyAndHold` trades on
+day one, before a pin has reached the variance process — and the figures
+re-verified bit-for-bit after the volatility coupling for exactly that
+reason. An agent trading through the following days pays the volatility
+channel too.
 
 `evaluate`, `tca.analyse` and `run_many` all take `scenario=`.
 
-Macro counterfactuals are near-exact rather than exact, and `compare()` reports
-which. Order flow consumes no RNG draws, so a TCA counterfactual is exact. A
-macro path changes prices, prices change which branch the book settlement
-takes, and that branch draws either four uniforms or none. Re-measured on this
-build over 20 instruments and 40 days, the divergence is zero in every
-comparison run: four scenarios at seed 3, and three of them repeated across
-seeds 1 to 8. An older build recorded a delta of -4 in 425,600 draws, which is
-where the mechanism was identified. The mechanism has not been removed, so
-`compare()` still reports `draw_delta` rather than asserting it away.
+Macro counterfactuals are exact on the market stream, and `compare()` reports
+it. Before the 2026-08 RNG stream split this paragraph said "near-exact": a
+macro path changed prices, prices changed which settlement branch drew four
+uniforms, and the shared draw schedule could shift — an older build measured
+-4 in 425,600 draws. The split removed that mechanism: settlement's uniforms
+are drawn unconditionally, and the market stream's schedule is a pure
+function of (market status, active roster, sector count), so two runs under
+different macro paths see identical market noise, draw for draw. The VIX
+volatility coupling preserves this — the variance target reads macro state
+already evolved, never a new draw. `compare()` reports `draw_delta` from the
+market stream rather than asserting zero: a non-zero delta means the scenario
+changed the market's own draw schedule (a halt, a delisting, a roster
+change), and the result compares two structurally different markets, which is
+worth surfacing rather than averaging away. Measured at zero across every
+comparison on this build: four scenarios at seed 3, three of them repeated
+across seeds 1 to 8.
 
 `pin_macro` is logged, so a scenario run replays from its own log with no
 special handling.

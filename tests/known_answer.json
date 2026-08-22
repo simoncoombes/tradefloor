@@ -1,9 +1,9 @@
 {
   "bytes": 16920,
   "days": 250,
-  "katVersion": 7,
+  "katVersion": 8,
   "kind": "pretium.known-answer",
   "note": "Cross-platform determinism gate. Every wheel target must produce this digest. A mismatch WITHOUT a katVersion bump means a platform disagreed.",
   "seed": 20260820,
-  "sha256": "1c38471d311bd3fe2b061756bbdcd9ed997c4bd183ffabec43076eb360ccfaf7"
+  "sha256": "1ee649982b504faa61942737b75504b13a6b391e4b646aba25bd9ff8ffe3581c"
 }

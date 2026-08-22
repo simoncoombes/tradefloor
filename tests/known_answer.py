@@ -96,7 +96,26 @@ import pretium
 # the BASELINE sigma by name, so factor-variance regimes raise its firing
 # rate -- the measured crisis-correlation channel. Every trajectory
 # changes; the direct GameRng section below does not move.
-KAT_VERSION = 7
+#
+# v8: same era boundary, seventh change, one constant. The market
+# factor's variance target is now coupled to VIX
+# (MARKET_VOL_VIX_COUPLING 0.0 -> 1.0 in rust/src/market/factor_vol.rs):
+# the reversion target scales by (VIX/15)^2, VIX read as the factor's
+# implied volatility and anchored at the endogenous mean. This is the
+# era decision that closed design finding 6's open question -- the v7
+# process was built with the coupling measured and deliberately OFF,
+# because flipping it silently would have falsified the tested claims
+# in pretium.scenario and docs/scenarios.md that VIX does not drive
+# volatility; those claims were rewritten in the change that flipped
+# it. Endogenously the coupled panel is statistically indistinguishable
+# from v7's (correlation 0.257 vs 0.260, kurtosis 3.11 vs 3.14); under
+# a pinned crisis VIX it reaches crisis correlation 0.712/0.779 at VIX
+# 45/65, the real crisis band nothing else has touched. Zero new
+# draws, so the trajectory change is arithmetic only: every close's
+# target now carries the day's VIX, and the KAT macro starts in
+# contraction at VIX 19.5, so every session past the first close
+# moves. The direct GameRng section below does not.
+KAT_VERSION = 8
 
 SEED = 20260820
 DAYS = 250
