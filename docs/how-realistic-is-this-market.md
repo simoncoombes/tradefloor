@@ -194,6 +194,13 @@ variance processes alone could never produce - the factor's share of every
 name used to be iid by construction and actively diluted the clustering the
 GARCH made.
 
+The memory is still short, and that is the part to carry into a volatility
+study. Real clustering decays near-hyperbolically and persists for months;
+here it reads +0.090 at lag five and is gone by lag twenty (-0.006, same
+method). The strength at lag one is real now; the persistence is not, so a
+strategy whose edge is a volatility forecast more than a few weeks out is
+still being tested against a market with less to forecast than a real one.
+
 **Volume arrives with volatility.** Volume correlates with absolute return at
 +0.585 against a real +0.30 to +0.60. It measured +0.105 before the era
 boundary: the average-volume feedback compounded the volume level a
