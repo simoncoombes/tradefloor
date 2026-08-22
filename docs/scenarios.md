@@ -21,23 +21,27 @@ scenario. Same market, same agents, only the macro path differs:
 
 | agent | calm | hiked | delta |
 |---|---|---|---|
-| buy_and_hold | -6.11% | -9.87% | -3.76 |
-| momentum | -0.68% | -2.55% | -1.87 |
-| oracle | +18.21% | +16.06% | -2.15 |
+| buy_and_hold | -7.16% | -10.75% | -3.59 |
+| momentum | -1.17% | -3.52% | -2.36 |
+| oracle | +11.11% | +8.70% | -2.41 |
 
-Nobody escapes the walk. Buy-and-hold is long-only, holds through the
-repricing, and loses the most. Momentum and the Oracle can trade around it and
-each give up about two points. The Oracle stays far ahead in both worlds
-because it trades mispricing, and the shock moves fair value along with
-price - but holding positions through a repricing still costs it, so its edge
-survives the shock where its level does not.
+Nobody escapes the walk here. Buy-and-hold is long-only, holds through the
+repricing, and loses the most. Momentum and the Oracle can trade around it
+and each give up about two and a half points. The Oracle stays far ahead in
+both worlds because it trades mispricing, and the shock moves fair value
+along with price - but holding positions through a repricing still costs it,
+so its edge survives the shock where its level does not. The sizes are the
+seed's, as ever: across sim seeds 5 to 9 buy-and-hold gives up 3.4 to 4.7
+points and never escapes, while momentum's give-up spans -5.1 to +0.5 - on
+one seed in five it trades around the shock entirely.
 
 **One trap.** Pinning `federal_funds_rate` alone does nothing until the first
-central-bank meeting - measured at exactly 0.00% across twenty instruments
-over 40 days, and a median -3.99% once a 60-day run crosses the meeting at
-day 45, where the corporate yield is recomputed off the 10Y. Equities
-discount off the corporate bond yield, so a short policy-only study sees
-nothing, silently. `rate_shock` moves the whole curve for an immediate
+central-bank meeting - a policy-rate `ramp` from 2.5% to 5% over thirty days
+(`Universe.random(20, seed=4)`, sim seed 5) moves every price by exactly
+0.00% over 40 days, and a median -4.29% once a 60-day run crosses the
+meeting at day 45, where the corporate yield is recomputed off the 10Y.
+Equities discount off the corporate bond yield, so a short policy-only study
+sees nothing, silently. `rate_shock` moves the whole curve for an immediate
 repricing; `ramp` isolates a single lever when that is what you want.
 
 ## The second trap, retired: VIX drives volatility now
@@ -55,8 +59,9 @@ the endogenous mean — reproduces the uncoupled process exactly. The per-name
 GARCH recursion (`omega + alpha * r^2 + beta * v`) still has no VIX term:
 what VIX scales is the shared component of every return, so a crisis VIX is a
 volatility regime and a correlation regime at once, which is what a real
-crisis is. Annualised realised volatility, measured on 20 instruments over
-120 days, seed 3, pinned through the scenario API:
+crisis is. Annualised realised volatility, measured over
+`Universe.random(20, seed=11)`, 120 days, sim seed 3, pinned through the
+scenario API:
 
 | VIX | annualised realised vol |
 |---|---|
@@ -68,7 +73,9 @@ crisis is. Annualised realised volatility, measured on 20 instruments over
 A thirteenfold move in VIX moves realised volatility by a factor of 2.5, and
 a sub-15 pin now calms the market rather than doing nothing. VIX 5, 10 and 15
 produce identical prices only for the first day — the first close is where a
-pin first enters the variance target — and diverge from the second. (An
+pin first enters the variance target — and diverge from the second:
+re-measured on the same universe at sim seed 3, day one's closes are
+bit-identical across all three pins and day two's differ for every pair. (An
 earlier version of this page claimed bit-identity over 60 days; even before
 the coupling that had quietly become false at day 45, where the first
 central-bank meeting reprices the corporate yield off a VIX-bearing spread.)
@@ -87,13 +94,14 @@ Four channels:
    happens when volatility triples" — and, through the same mechanism,
    the crisis-correlation channel.
 2. **Quoted bid-ask**, through a multiplier `1 + max(0, (vix - 15) / 30)`.
-   Mean quoted spread across 25 instruments after five days: 11.52 bps at VIX
-   15, 13.92 at 25, 18.87 at 45, 25.89 at 65.
+   Mean quoted spread across `Universe.random(25, seed=11)` after five days,
+   sim seed 3: 11.52 bps at VIX 15, 13.92 at 25, 18.87 at 45, 25.89 at 65.
 3. **Cross-sectional correlation above VIX 25.5** (the crisis threshold since
    the 2026-08 re-site; the old `vix > 40` trigger sat above the endogenous
    ceiling and could never fire), where sector factors blend toward the
    market factor. Together with channel 1, mean pairwise correlation of daily
-   log returns over 300 pairs: +0.269 at VIX 15, +0.678 at 45, +0.759 at 65.
+   log returns over the same 25-name universe's 300 pairs, 120 days, sim
+   seed 3: +0.269 at VIX 15, +0.678 at 45, +0.759 at 65.
    Diversification genuinely stops working at crisis VIX. See
    [How realistic is this market](how-realistic-is-this-market.html).
 4. **Credit spreads** in the daily economy step, recomputed at central-bank
@@ -122,7 +130,10 @@ delta +5.62 bps. That is mostly the spread channel — `BuyAndHold` trades on
 day one, before a pin has reached the variance process — and the figures
 re-verified bit-for-bit after the volatility coupling for exactly that
 reason. An agent trading through the following days pays the volatility
-channel too.
+channel too. A pinned VIX also closes the one macro feedback channel the
+TCA counterfactual now has — see
+[Transaction cost analysis](transaction-cost-analysis.html) for the
+boundary and its measurement.
 
 `evaluate`, `tca.analyse` and `run_many` all take `scenario=`.
 
