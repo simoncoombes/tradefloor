@@ -320,18 +320,25 @@ def evaluate_panel(job: tuple) -> dict:
     model = pretium.ModelParams.from_preset("pt-v1", **overrides)
     universe = pretium.Universe.random(universe_n, seed=universe_seed)
 
+    # The seam the header's caveat was waiting for: `facts.measure` takes
+    # `model=` now, so the vector goes in through the library's own
+    # argument and no symbol is substituted to deliver it. The Engine
+    # substitution that remains does one thing the public surface still
+    # does not expose — hand back the engine so `draws_consumed` can be
+    # read for the CRN guard — and it adds nothing to the call.
     engines: list = []
     original = facts.Engine
 
-    def engine_with_model(**kwargs):
-        engine = original(model=model, **kwargs)
+    def engine_capture(**kwargs):
+        engine = original(**kwargs)
         engines.append(engine)
         return engine
 
     started = time.perf_counter()
-    facts.Engine = engine_with_model
+    facts.Engine = engine_capture
     try:
-        panel = facts.measure(seed=seed, universe=universe, days=days)
+        panel = facts.measure(seed=seed, universe=universe, days=days,
+                              model=model)
     finally:
         facts.Engine = original
     elapsed = time.perf_counter() - started
@@ -339,7 +346,10 @@ def evaluate_panel(job: tuple) -> dict:
     engine = engines[0]
     assert engine.model_fingerprint == model.fingerprint, (
         "the engine ran a different model than the vector asked for — "
-        "the shim failed, and recording this panel would mislabel it"
+        "recording this panel would mislabel it"
+    )
+    assert panel["model_fingerprint"] == model.fingerprint, (
+        "the panel reports a different model than the vector asked for"
     )
     numeric = {
         key: value for key, value in panel.items()
