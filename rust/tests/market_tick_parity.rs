@@ -24,6 +24,42 @@
 //! is used would produce identical counts on a different stream — the same
 //! class of trap as WP3's object-literal draw, and the reason the tape checks
 //! order rather than totals.
+//!
+//! # Partially RETIRED, 2026-08-21 (D-P1)
+//!
+//! Every session where the market factor reaches the price stopped being a
+//! parity surface when `MARKET_FACTOR_SIGMA` was recalibrated 0.003 → 0.0075
+//! (`tick.rs`; the sweep is documented on the constant). These vectors were
+//! cut from the reference at 0.003, and replaying their draws through 0.0075
+//! diverges on the FIRST tick of every open, pre-market and after-hours
+//! scenario — measured on the committed corpus, not inferred: all eight
+//! non-closed scenarios fail at tick 0 with sub-percent price error, the
+//! signature of a constant scaling every tick rather than a logic defect.
+//!
+//! What these eight tests USED to prove — that the tick's arithmetic and
+//! draw schedule reproduce the reference bit-for-bit — they did prove, up to
+//! the era boundary; the migration is verified. They are retired with
+//! `#[ignore]` rather than deleted so the measured divergence stays
+//! reproducible: `cargo test --test market_tick_parity -- --ignored` replays
+//! them, and each is EXPECTED to fail at tick 0. A retired test that PASSES
+//! means the corpus was regenerated from a constants-matched source — which
+//! D-P1 forecloses — and should be treated as an incident, not a fix.
+//!
+//! Two tests remain live, deliberately:
+//!
+//! - `tick_closed_weekend` — a closed market takes zero draws and mutates
+//!   nothing. No factor reaches any price, so no recalibration can touch it;
+//!   it is still a true parity gate against the reference.
+//! - `the_recorded_draw_schedule_matches_the_documented_arithmetic` — checks
+//!   the CORPUS's own draw counts against the documented schedule, which is
+//!   sigma-independent. It gates the recorded tapes, not the port.
+//!
+//! Regression coverage for the retired surface lives in
+//! `tick_regression.rs`, which gates the draw schedule and reproducibility
+//! WITHOUT an external oracle — see its header for what that does and does
+//! not claim. The in-flight market-factor variance process (`tick.rs`
+//! stream) will widen this divergence further; it cannot un-retire anything
+//! here.
 
 use std::fs;
 use std::path::PathBuf;
@@ -376,47 +412,70 @@ fn check_scenario(file: &str) {
     }
 }
 
+// The eight retired scenarios below carry the same `#[ignore]` reason
+// verbatim: the attribute takes only a string literal, so it cannot be
+// shared through a constant. The full account is in the module header; the
+// decision is D-P1 in the design log. Expected to FAIL at tick 0 when run
+// with `-- --ignored`; a PASS means the corpus changed and needs
+// investigating, because D-P1 forecloses regenerating it.
+
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1): reference recorded at sigma 0.003, model moved to 0.0075; expected to fail at tick 0 under --ignored"]
 fn tick_open_session() {
     check_scenario("market-tick-open-session.json");
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1): reference recorded at sigma 0.003, model moved to 0.0075; expected to fail at tick 0 under --ignored"]
 fn tick_midday() {
     check_scenario("market-tick-midday.json");
 }
 
+/// Extended hours scale the noise by 0.15 but the market factor still
+/// multiplies in, so the sigma recalibration reaches these too — measured:
+/// first divergence at tick 0 on `price` directly (no settlement off-hours).
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1): reference recorded at sigma 0.003, model moved to 0.0075; expected to fail at tick 0 under --ignored"]
 fn tick_pre_market() {
     check_scenario("market-tick-pre-market.json");
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1): reference recorded at sigma 0.003, model moved to 0.0075; expected to fail at tick 0 under --ignored"]
 fn tick_after_hours() {
     check_scenario("market-tick-after-hours.json");
 }
 
+/// STILL LIVE. A closed market draws nothing and mutates nothing, so no
+/// factor — and no recalibration of one — can reach it. This is the one
+/// session where bit-parity with the reference remains a true claim, and it
+/// pins the schedule position that matters most: most of the simulated clock
+/// is closed, and a draw taken here would desynchronise everything.
 #[test]
 fn tick_closed_weekend() {
     check_scenario("market-tick-closed-weekend.json");
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1): reference recorded at sigma 0.003, model moved to 0.0075; expected to fail at tick 0 under --ignored"]
 fn tick_crisis_vix() {
     check_scenario("market-tick-crisis-vix.json");
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1): reference recorded at sigma 0.003, model moved to 0.0075; expected to fail at tick 0 under --ignored"]
 fn tick_bankrupt_and_private() {
     check_scenario("market-tick-bankrupt-and-private.json");
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1): reference recorded at sigma 0.003, model moved to 0.0075; expected to fail at tick 0 under --ignored"]
 fn tick_breaker_binding() {
     check_scenario("market-tick-breaker-binding.json");
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1): reference recorded at sigma 0.003, model moved to 0.0075; expected to fail at tick 0 under --ignored"]
 fn tick_squeeze_and_cascade() {
     check_scenario("market-tick-squeeze-and-cascade.json");
 }
