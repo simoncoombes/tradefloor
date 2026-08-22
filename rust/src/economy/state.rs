@@ -47,6 +47,32 @@ pub const GOLD_MEAN_REVERSION: f64 = 0.002;
 pub const VIX_MEAN_REVERSION: f64 = 0.12;
 pub const FISCAL_MULTIPLIER: f64 = 0.30;
 
+/// The VIX level above which crisis-gated behaviour engages: the gold
+/// crisis premium and the USD safe-haven drift (`daily.rs`), and — once
+/// its owning change lands — the correlation blend in `market/tick.rs`.
+///
+/// **Decided deviation from the reference**, which gates these at
+/// inline literals of 30 (economy) and 40 (the blend). Endogenous VIX
+/// cannot reach either: the daily target tops out near 26 without
+/// exogenous shocks, and the Python surface never supplies shocks
+/// (`python_engine.rs`: `active_shocks: &[]`), so under default
+/// operation every crisis gate was dead code. Measured across 12 seeds
+/// by 2,520 days (`tools/calibration/results/vix-endogenous-long-
+/// 2026-08-21.json`): median 16.5, P90 25.3, hard ceiling 26.57, zero
+/// days above 30 or 40 in 42,336 across both envelopes — and the
+/// reference's own recorded trajectories agree (max 29.09 across all
+/// five economy goldens, so the 30-gates never fire in the vectors
+/// either).
+///
+/// 25.5 is the P94 of the long-run endogenous distribution: 5.7% of
+/// days cross, all of them in contraction or trough (28% of contraction
+/// days), every 10-year seed crosses, and no 252-day expansion-start
+/// window does (48/48 stay below 24.4). That is "rare and real" in this
+/// model's own units — the analogue of the 5-6% of real trading days
+/// with VIX above 30 — rather than a level chosen for its real-world
+/// name and unreachable in-model.
+pub const CRISIS_VIX_THRESHOLD: f64 = 25.5;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CyclePhase {
     Expansion,
