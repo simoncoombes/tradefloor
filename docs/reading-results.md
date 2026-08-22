@@ -32,4 +32,6 @@ same.
 
 Results stream one batch per day. Grain is a read-time decision - the raw
 buffers are kept and Arrow batches are built on read - which is why recording
-ground truth costs about 3% rather than doubling the run.
+ground truth costs a few percent at most rather than doubling the run.
+[Performance](performance.html) has the measurement; the overhead is below
+what wall-clock timing resolves.
