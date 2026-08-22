@@ -159,6 +159,7 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
             // sigma at all.
             market_sigma_daily: MARKET_FACTOR_SIGMA,
             settle_draws: SettleDrawPolicy::FourAlways,
+                params: &pretium::params::PT_V1,
         },
         &mut rng,
     );

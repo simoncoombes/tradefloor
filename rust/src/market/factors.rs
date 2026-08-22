@@ -55,6 +55,24 @@ pub const S_COMPONENT_KEYS: [&str; 7] = [
 /// Total impact coefficient for order flow, before the informed fraction.
 pub const ORDER_FLOW_COEFFICIENT: f64 = 50.0;
 
+/// Weight of a sector-scoped news event on a name in that sector.
+///
+/// A §5.4 promotion: previously the inline `* 0.5` below. Named so the
+/// preset can carry it and a recalibration cannot leave an unnamed copy
+/// behind (the finding-14 lesson).
+pub const NEWS_SECTOR_WEIGHT: f64 = 0.5;
+
+/// Weight of a market-wide news event on every name. A §5.4 promotion.
+pub const NEWS_MARKET_WEIGHT: f64 = 0.3;
+
+/// Market-shock magnitude, in BASELINE factor sigmas, above which the crash
+/// amplifier fires. A §5.4 promotion of the inline `2.0`.
+pub const CRASH_AMPLIFIER_THRESHOLD: f64 = 2.0;
+
+/// Extra market loading per baseline sigma beyond the threshold. A §5.4
+/// promotion of the inline `0.2`.
+pub const CRASH_AMPLIFIER_SLOPE: f64 = 0.2;
+
 /// The share of order-flow impact that is PERMANENT.
 ///
 /// The coefficient above was calibrated to represent both the temporary and
@@ -149,12 +167,18 @@ pub fn cap_size_multiplier(market_cap: f64) -> f64 {
 /// tick is not one of them — it always supplies them. Both branches take one
 /// normal draw, so this narrowing cannot change the draw COUNT; it removes a
 /// path the live model never takes.
+///
+/// `params` carries the coefficients that used to be read as consts here
+/// (the runtime seam, CALIBRATION.md §5.3). Passing
+/// [`crate::params::PT_V1`] reproduces the const build bit for bit: same
+/// values, same operations, same order.
 pub fn calculate_live_factors(
     company: &FactorCompany,
     news: &[NewsEvent],
     order_imbalance: f64,
     volatility_multiplier: f64,
     shared: &SharedFactors,
+    params: &crate::params::ModelParams,
     rng: &mut impl crate::rng::Rng,
 ) -> LiveFactors {
     // ── News ──────────────────────────────────────────────────────────────
@@ -169,9 +193,9 @@ pub fn calculate_live_factors(
         } else if event.sector.as_deref() == Some(company.sector.as_str())
             && event.company_id.is_none()
         {
-            company_news += impact * 0.5;
+            company_news += impact * params.news_sector_weight;
         } else if event.company_id.is_none() && event.sector.is_none() {
-            company_news += impact * 0.3;
+            company_news += impact * params.news_market_weight;
         }
     }
 
@@ -182,8 +206,10 @@ pub fn calculate_live_factors(
     let avg_daily_volume = mathx::max(company.avg_volume, company.shares_outstanding * 0.005);
     // Per-minute volume, floored so a thin name cannot produce unbounded impact.
     let liquidity_factor = 1.0 / mathx::max(avg_daily_volume / 390.0, 100.0);
-    let order_flow_impact =
-        order_imbalance * liquidity_factor * ORDER_FLOW_COEFFICIENT * INFORMED_FLOW_FRACTION;
+    let order_flow_impact = order_imbalance
+        * liquidity_factor
+        * params.order_flow_coefficient
+        * params.informed_flow_fraction;
 
     // ── Noise ─────────────────────────────────────────────────────────────
     let beta = company.beta.unwrap_or(1.0);
@@ -198,8 +224,7 @@ pub fn calculate_live_factors(
     // term's budget, so total volatility holds still. At 1.0 the multiply
     // is bit-inert.
     let daily_sigma = mathx::sqrt(mathx::max(company.garch_variance, 0.0001));
-    let idiosyncratic_sigma =
-        daily_sigma * super::factor_vol::IDIO_SIGMA_SCALE / mathx::sqrt(390.0);
+    let idiosyncratic_sigma = daily_sigma * params.idio_sigma_scale / mathx::sqrt(390.0);
 
     // DRAW SITE — here, before `crash_amplifier` is computed. The order is
     // contractual for the tape even though the two are independent.
@@ -230,10 +255,10 @@ pub fn calculate_live_factors(
     // and buys only the constancy of the firing rate. In a calm (floored)
     // factor regime the threshold sits ~9 conditional sigmas out and the
     // amplifier is silent, which is the other half of the same realism.
-    let shock_magnitude = shared.market_factor.abs()
-        / (crate::market::tick::MARKET_FACTOR_SIGMA / mathx::sqrt(390.0));
-    let crash_amplifier = if shock_magnitude > 2.0 {
-        1.0 + (shock_magnitude - 2.0) * 0.2
+    let shock_magnitude =
+        shared.market_factor.abs() / (params.market_factor_sigma / mathx::sqrt(390.0));
+    let crash_amplifier = if shock_magnitude > params.crash_amplifier_threshold {
+        1.0 + (shock_magnitude - params.crash_amplifier_threshold) * params.crash_amplifier_slope
     } else {
         1.0
     };
@@ -372,7 +397,7 @@ mod tests {
         imbalance: f64,
         s: &SharedFactors,
     ) -> LiveFactors {
-        calculate_live_factors(c, news, imbalance, 1.0, s, &mut Fixed(0.0))
+        calculate_live_factors(c, news, imbalance, 1.0, s, &crate::params::PT_V1, &mut Fixed(0.0))
     }
 
     #[test]
@@ -394,7 +419,7 @@ mod tests {
                 c.last_daily_return = Some(daily_return);
                 c.short_interest = short_interest;
                 let mut rng = Counting(0);
-                calculate_live_factors(&c, &[], 0.5, 1.0, &shared(), &mut rng);
+                calculate_live_factors(&c, &[], 0.5, 1.0, &shared(), &crate::params::PT_V1, &mut rng);
                 assert_eq!(rng.0, 1, "return {daily_return}, si {short_interest}");
             }
         }
@@ -675,9 +700,9 @@ mod tests {
         let mut mega = company();
         mega.market_cap = 100e9;
         let mut rng = Fixed(1.0);
-        let s = calculate_live_factors(&small, &[], 0.0, 1.0, &shared(), &mut rng).random_noise;
+        let s = calculate_live_factors(&small, &[], 0.0, 1.0, &shared(), &crate::params::PT_V1, &mut rng).random_noise;
         let mut rng = Fixed(1.0);
-        let m = calculate_live_factors(&mega, &[], 0.0, 1.0, &shared(), &mut rng).random_noise;
+        let m = calculate_live_factors(&mega, &[], 0.0, 1.0, &shared(), &crate::params::PT_V1, &mut rng).random_noise;
         assert!(s > m, "small-cap noise {s} should exceed mega-cap {m}");
     }
 
@@ -688,7 +713,7 @@ mod tests {
         let mut c = company();
         c.garch_variance = 0.0;
         let mut rng = Fixed(1.0);
-        let out = calculate_live_factors(&c, &[], 0.0, 1.0, &shared(), &mut rng).random_noise;
+        let out = calculate_live_factors(&c, &[], 0.0, 1.0, &shared(), &crate::params::PT_V1, &mut rng).random_noise;
         assert!(out > 0.0, "noise collapsed to {out}");
     }
 }

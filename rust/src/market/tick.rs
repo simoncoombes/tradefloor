@@ -39,7 +39,8 @@ use crate::economy::EconomyState;
 use crate::fair_value::{compute_fair_value, CompanyValuationInputs, EconomyValuationInputs};
 use crate::mathx;
 use crate::microstructure::{settle_price_through_book, CompanyMicrostructure, SettleOptions};
-use crate::mispricing::{crowd_lean, MISPRICING_CAP, MOMENTUM_THETA};
+use crate::mispricing::crowd_lean_with;
+use crate::params::ModelParams;
 use crate::rng::Rng;
 
 use super::factors::{
@@ -108,6 +109,31 @@ pub const S_PHI_TICK: f64 = f64::from_bits(0x3FEF_FFC1_E138_5E9E);
 pub const MARKET_FACTOR_SIGMA: f64 = 0.016;
 /// Standard deviation of a shared sector factor, at DAILY scale.
 pub const SECTOR_FACTOR_SIGMA: f64 = 0.002;
+
+/// VIX points past `CRISIS_VIX_THRESHOLD` over which the sector→market
+/// blend ramps to 1.0 (before [`CRISIS_BLEND_CAP`] truncates it).
+///
+/// A §5.4 promotion of the inline `/1.4`: the ramp is half of what makes
+/// the re-sited crisis trigger MEAN something — the blend saturates by
+/// VIX ≈ 26.6, the ceiling of what the macro chain can produce.
+pub const CRISIS_BLEND_RAMP: f64 = 1.4;
+
+/// Ceiling of the crisis correlation blend. A §5.4 promotion of the
+/// inline `0.8`: even in a full crisis, sector factors keep 20% of their
+/// own identity.
+pub const CRISIS_BLEND_CAP: f64 = 0.8;
+
+/// The session circuit breaker, as a fraction of the day's open (±25%).
+///
+/// A §5.4 promotion of the inline `1.25`/`0.75` pair. A GUARD, not a
+/// knob: it is a worst-case guarantee backed by invariant tests, and it
+/// is applied twice per tick — to the model price and to the settled
+/// print — which is why the params carry it as the derived band
+/// multipliers, computed once (§5.3).
+pub const PRICE_BREAKER_FRACTION: f64 = 0.25;
+
+/// Absolute cap on any model price. A guard (the reference's `50000`).
+pub const PRICE_HARD_CAP: f64 = 50_000.0;
 
 /// The mutable stock state a tick reads and writes.
 #[derive(Debug, Clone, PartialEq)]
@@ -283,6 +309,11 @@ pub struct TickInputs<'a> {
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
+    /// The model coefficients (the runtime seam, CALIBRATION.md §5). The
+    /// engine passes its own; a caller building `TickInputs` directly
+    /// passes [`crate::params::PT_V1`] for the shipped model, which is
+    /// bit-identical to the const build.
+    pub params: &'a ModelParams,
 }
 
 /// What one tick produced, beyond the mutations applied to the companies.
@@ -352,6 +383,7 @@ pub fn simulate_market_tick(
     let tick_scale = 1.0 / mathx::sqrt(390.0);
     let economy = inputs.economy;
     let open = inputs.market_status == MarketStatus::Open;
+    let p = inputs.params;
 
     // ── Shared factors: 1 normal, then one per sector ─────────────────────
     // Drawn at PER-TICK scale directly, so the noise is not divided by 390
@@ -378,14 +410,17 @@ pub fn simulate_market_tick(
     // cap by VIX ≈ 26.6, the ceiling of what the macro chain can produce,
     // instead of asking for a VIX of 64 that cannot exist.
     let vix_correlation_spike = if economy.vix > crate::economy::CRISIS_VIX_THRESHOLD {
-        mathx::min(0.8, (economy.vix - crate::economy::CRISIS_VIX_THRESHOLD) / 1.4)
+        mathx::min(
+            p.crisis_blend_cap,
+            (economy.vix - crate::economy::CRISIS_VIX_THRESHOLD) / p.crisis_blend_ramp,
+        )
     } else {
         0.0
     };
 
     let mut sector_factors = Vec::with_capacity(inputs.sector_keys.len());
     for sector in inputs.sector_keys {
-        let idiosyncratic = rng.next_normal() * SECTOR_FACTOR_SIGMA * tick_scale;
+        let idiosyncratic = rng.next_normal() * p.sector_factor_sigma * tick_scale;
         sector_factors.push((
             sector.clone(),
             idiosyncratic * (1.0 - vix_correlation_spike) + market_factor * vix_correlation_spike,
@@ -428,6 +463,7 @@ pub fn simulate_market_tick(
             imbalance,
             inputs.volatility_multiplier,
             &shared,
+            p,
             rng,
         );
 
@@ -505,7 +541,7 @@ pub fn simulate_market_tick(
         // so enabling the model — or loading an old save — causes no level
         // jump.
         if companies[idx].stock.mispricing_s.is_none() {
-            let s0 = clamp_s(mathx::log(mathx::max(0.01, current_prices[i]) / fv));
+            let s0 = clamp_s(p, mathx::log(mathx::max(0.01, current_prices[i]) / fv));
             companies[idx].stock.mispricing_s = Some(s0);
             companies[idx].stock.mispricing_s_prev_close = Some(s0);
             companies[idx].stock.mispricing_momentum = Some(0.0);
@@ -525,9 +561,9 @@ pub fn simulate_market_tick(
         let scale = 1.0 / 390.0;
         s_components[i] = if open {
             [
-                s_val * (S_PHI_TICK - 1.0),
-                (MOMENTUM_THETA * momentum) / 390.0,
-                crowd_lean(s_val, momentum) / 390.0,
+                s_val * (p.s_phi_tick - 1.0),
+                (p.momentum_theta * momentum) / 390.0,
+                crowd_lean_with(p, s_val, momentum) / 390.0,
                 raw.company_news * scale,
                 raw.order_flow_impact * scale,
                 raw.short_squeeze_effect * scale,
@@ -551,34 +587,36 @@ pub fn simulate_market_tick(
         if open {
             // The crowd reacts to the mispricing it can SEE — the pre-update
             // state — so there is no same-tick feedback loop.
-            let lean = crowd_lean(s_val, momentum);
+            let lean = crowd_lean_with(p, s_val, momentum);
             crowd_leans[i] = lean;
             // Written exactly as the source writes it. `s*φ` and
             // `s + s*(φ-1)` round differently, and the benched trajectories
             // were produced by this spelling.
-            s_val = s_val * S_PHI_TICK
-                + (MOMENTUM_THETA * momentum) / 390.0
+            s_val = s_val * p.s_phi_tick
+                + (p.momentum_theta * momentum) / 390.0
                 + lean / 390.0
                 + all_drifts[i]
                 + all_noises[i] * intraday_vol_mult;
         } else {
             s_val = s_val + all_drifts[i] + all_noises[i];
         }
-        s_val = clamp_s(s_val);
+        s_val = clamp_s(p, s_val);
 
         let mut new_price = mathx::max(0.01, fv * mathx::exp(s_val));
 
         // Breaker #1 — the MODEL price. If it binds, `s` is re-derived from
-        // the clamped price so state and price stay consistent.
-        let max_price = previous_closes[i] * 1.25;
-        let min_price = mathx::max(previous_closes[i] * 0.75, 0.01);
+        // the clamped price so state and price stay consistent. The band
+        // multipliers are derived ONCE, in the params constructor (§5.3),
+        // never per call site.
+        let max_price = previous_closes[i] * p.breaker_up;
+        let min_price = mathx::max(previous_closes[i] * p.breaker_down, 0.01);
         if new_price > max_price || new_price < min_price {
             new_price = mathx::max(min_price, mathx::min(max_price, new_price));
-            s_val = clamp_s(mathx::log(new_price / fv));
+            s_val = clamp_s(p, mathx::log(new_price / fv));
         }
 
         companies[idx].stock.mispricing_s = Some(s_val);
-        new_prices[i] = mathx::min(new_price, 50000.0);
+        new_prices[i] = mathx::min(new_price, p.price_hard_cap);
     }
 
     // ── Phase 3: volume ───────────────────────────────────────────────────
@@ -646,8 +684,8 @@ pub fn simulate_market_tick(
 
             // Breaker #2 — the PRINT. See the module header for why this one
             // is the load-bearing clamp.
-            let print_max = previous_closes[i] * 1.25;
-            let print_min = mathx::max(previous_closes[i] * 0.75, 0.01);
+            let print_max = previous_closes[i] * p.breaker_up;
+            let print_min = mathx::max(previous_closes[i] * p.breaker_down, 0.01);
             if new_price > print_max || new_price < print_min {
                 new_price = mathx::max(print_min, mathx::min(print_max, new_price));
             }
@@ -683,10 +721,10 @@ pub fn simulate_market_tick(
     }
 }
 
-fn clamp_s(s: f64) -> f64 {
+fn clamp_s(params: &ModelParams, s: f64) -> f64 {
     // `Math.max(-CAP, Math.min(CAP, s))` — the min/max spelling, not the
     // ternary, matching the source.
-    mathx::max(-MISPRICING_CAP, mathx::min(MISPRICING_CAP, s))
+    mathx::max(-params.mispricing_cap, mathx::min(params.mispricing_cap, s))
 }
 
 /// Serves settlement's four pre-drawn uniforms under

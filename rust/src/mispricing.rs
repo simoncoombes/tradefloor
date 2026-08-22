@@ -163,10 +163,17 @@ pub fn apply_mispricing(fair_value: f64, s: f64) -> f64 {
 /// * `s` — current log-mispricing.
 /// * `momentum` — previous day's change in `s`.
 pub fn crowd_lean(s: f64, momentum: f64) -> f64 {
-    // The unary minus binds to the CONSTANT, so `s = -0` gives `+0` here
+    crowd_lean_with(&crate::params::PT_V1, s, momentum)
+}
+
+/// [`crowd_lean`] under explicit model parameters (the runtime seam,
+/// CALIBRATION.md §5.3). At [`crate::params::PT_V1`] this is the shipped
+/// arithmetic bit for bit: same values, same operations, same order.
+pub fn crowd_lean_with(params: &crate::params::ModelParams, s: f64, momentum: f64) -> f64 {
+    // The unary minus binds to the GAIN, so `s = -0` gives `+0` here
     // rather than `-0`. Rust's precedence matches JavaScript's.
-    let lean = -CROWD_VALUATION_GAIN * s + CROWD_MOMENTUM_GAIN * momentum;
-    clamp(lean, -CROWD_LEAN_CAP, CROWD_LEAN_CAP)
+    let lean = -params.crowd_valuation_gain * s + params.crowd_momentum_gain * momentum;
+    clamp(lean, -params.crowd_lean_cap, params.crowd_lean_cap)
 }
 
 /// AR(2) characteristic-root moduli with the crowd folded in.

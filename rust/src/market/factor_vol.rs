@@ -110,6 +110,7 @@
 
 use crate::mathx;
 
+#[cfg(test)]
 use super::tick::MARKET_FACTOR_SIGMA;
 
 /// Weight on the day's squared factor innovation — the surprise term.
@@ -225,7 +226,20 @@ pub const IDIO_SIGMA_SCALE: f64 = 0.84;
 /// per-tick draws); `vix` is the macro VIX at the close. Pure and
 /// draw-free.
 pub fn update_market_variance(current_variance: f64, day_factor: f64, vix: f64) -> f64 {
-    let base = MARKET_FACTOR_SIGMA * MARKET_FACTOR_SIGMA;
+    update_market_variance_with(&crate::params::PT_V1, current_variance, day_factor, vix)
+}
+
+/// [`update_market_variance`] under explicit model parameters (the runtime
+/// seam, CALIBRATION.md §5.3). At [`crate::params::PT_V1`] this is the
+/// shipped arithmetic bit for bit: same values, same operations, same
+/// order — the constants above remain the definition of the preset.
+pub fn update_market_variance_with(
+    params: &crate::params::ModelParams,
+    current_variance: f64,
+    day_factor: f64,
+    vix: f64,
+) -> f64 {
+    let base = params.market_factor_sigma * params.market_factor_sigma;
     // The reversion target: baseline variance, VIX-scaled when coupled.
     // The blend form is kept even at coupling 1.0 because the constant is
     // the calibration seam the sweep patches; the evaluation order is
@@ -235,28 +249,44 @@ pub fn update_market_variance(current_variance: f64, day_factor: f64, vix: f64) 
     // residue), and at `vix == MARKET_VOL_VIX_ANCHOR` the ratio is
     // exactly 1.0 at any coupling, so an anchor-level VIX reproduces the
     // autonomous update bit-for-bit — tests pin both.
-    let vix_ratio = vix / MARKET_VOL_VIX_ANCHOR;
+    let vix_ratio = vix / params.market_vol_vix_anchor;
     let target = base
-        * (1.0 - MARKET_VOL_VIX_COUPLING + MARKET_VOL_VIX_COUPLING * (vix_ratio * vix_ratio));
-    update_toward(current_variance, day_factor, target)
+        * (1.0 - params.market_vol_vix_coupling
+            + params.market_vol_vix_coupling * (vix_ratio * vix_ratio));
+    update_toward_with(params, current_variance, day_factor, target)
 }
 
 /// The GARCH step against an explicit target, so the coupling decision is
 /// testable on both branches without recompiling a constant.
+#[cfg(test)]
 fn update_toward(current_variance: f64, day_factor: f64, target_variance: f64) -> f64 {
-    let base = MARKET_FACTOR_SIGMA * MARKET_FACTOR_SIGMA;
-    let omega = (1.0 - MARKET_VOL_ALPHA - MARKET_VOL_BETA) * target_variance;
+    update_toward_with(
+        &crate::params::PT_V1,
+        current_variance,
+        day_factor,
+        target_variance,
+    )
+}
+
+fn update_toward_with(
+    params: &crate::params::ModelParams,
+    current_variance: f64,
+    day_factor: f64,
+    target_variance: f64,
+) -> f64 {
+    let base = params.market_factor_sigma * params.market_factor_sigma;
+    let omega = (1.0 - params.market_vol_alpha - params.market_vol_beta) * target_variance;
     let new_var = omega
-        + MARKET_VOL_ALPHA * day_factor * day_factor
-        + MARKET_VOL_BETA * current_variance;
+        + params.market_vol_alpha * day_factor * day_factor
+        + params.market_vol_beta * current_variance;
     // `max(min(x, ceiling), floor)` — the same bound order as
     // `garch.rs`, which is contractual there because it is visible when
     // the bounds cross. The bounds here are multiples of a positive
     // compile-time constant so they cannot cross, but two spellings of
     // one idiom in one codebase is how the next reader gets it wrong.
     mathx::max(
-        mathx::min(new_var, base * MARKET_VOL_CEILING_MULTIPLE),
-        base * MARKET_VOL_FLOOR_MULTIPLE,
+        mathx::min(new_var, base * params.market_vol_ceiling_multiple),
+        base * params.market_vol_floor_multiple,
     )
 }
 
@@ -284,8 +314,16 @@ impl MarketVarianceState {
     /// the conditional process is bit-identical to the constant-sigma
     /// model at the same baseline.
     pub fn new() -> Self {
+        Self::new_with(&crate::params::PT_V1)
+    }
+
+    /// A fresh state at a given preset's baseline. See [`Self::new`]; the
+    /// day-one bit-identity property holds for any baseline, because
+    /// `sqrt(x*x)` returns `x`'s bits for any positive finite `x` whose
+    /// square neither overflows nor underflows.
+    pub fn new_with(params: &crate::params::ModelParams) -> Self {
         Self {
-            variance: MARKET_FACTOR_SIGMA * MARKET_FACTOR_SIGMA,
+            variance: params.market_factor_sigma * params.market_factor_sigma,
             day_factor: 0.0,
         }
     }
@@ -312,7 +350,15 @@ impl MarketVarianceState {
     /// once; a second close before any tick sees a zero innovation, which
     /// is the same quiet-day decay the per-name GARCH exhibits.
     pub fn close_day(&mut self, vix: f64) {
-        self.variance = update_market_variance(self.variance, self.day_factor, vix);
+        self.close_day_with(&crate::params::PT_V1, vix);
+    }
+
+    /// [`Self::close_day`] under explicit model parameters. What the engine
+    /// calls; at [`crate::params::PT_V1`] it is the shipped update bit for
+    /// bit.
+    pub fn close_day_with(&mut self, params: &crate::params::ModelParams, vix: f64) {
+        self.variance =
+            update_market_variance_with(params, self.variance, self.day_factor, vix);
         self.day_factor = 0.0;
     }
 
