@@ -6,107 +6,134 @@ to know which properties of real markets this model reproduces and which it
 does not, and the second list is the one that matters, because that is where a
 conclusion will fail to transfer.
 
-So this measures, and the numbers below were produced by running it. They are
-not targets the model was tuned to hit; most of them are frank mismatches.
+So this measures, and the numbers below were produced by running it. An
+earlier era could add "they are not targets the model was tuned to hit";
+this one cannot -- four of the eight became calibration targets at the
+2026-08 era boundary -- so the disclosure of which four, and of how the
+held-out checks read, is part of the measurement now.
 
 ## The headline
 
-**This model gets the SHAPE of a return series right and the way things move
-TOGETHER wrong.** Fat tails land inside the real band; volatility runs high,
-for a reason about how a universe is generated rather than about the price
-process. Almost everything about how things move together comes out weaker
-than a real market: across stocks, across time within volatility, and between
-the sign of a return and the volatility that follows it. The one dependence
-that comes out too strong is return autocorrelation, and that is the
-mispricing process showing through. Volume moving with returns is the single
-dependence the 2026-08 engine fixes brought into the real band, and the volume
-paragraph below says how.
+**At the published method, the way things move together now sits inside the
+real bands, and what still fails is scale and memory**: volatility runs
+high, returns trend where real ones do not, and volume shocks do not
+persist. That is the reverse of what this docstring said through the
+2026-08 era boundary -- the measured thesis then was "marginals right,
+dependence wrong", with cross-sectional correlation at +0.024 against a
+real +0.25 to +0.35. Three of the era's model changes (the GJR asymmetry
+term, conditional volatility on the shared market factor, that volatility's
+VIX coupling) were aimed at exactly those gaps and were CALIBRATED against
+the statistics this module reports, which changes how the in-band verdicts
+must be read -- see "Four of the eight were targets" below.
 
-Every figure below: `Universe.random(40, seed=111)`, 252 days, median over
-seeds 1 to 6, at commit e2aded1 -- except the volume paragraph, which names
-the 2026-08 era boundary that superseded it. Re-measured across that boundary
-with the same method, the other figures come back inside their seed ranges;
-volume against absolute return is the one that moved.
+Every figure below: `Universe.random(40, seed=111)` (fingerprint
+5d8de78b55aad752), 252 days, `measure()` per sim seed, median over seeds 1
+to 6 -- re-measured at known-answer v8 (era digest 1ee64998...), where the
+superseded figures beside them are marked with the era they belonged to.
 
-## What matches
+## What lands
 
-**Fat tails.** Excess kurtosis **+4.0**, inside the +3 to +10 of real daily
-equity returns in all six seeds. Extreme days are far more common than a normal
-distribution allows, which is the single most robust fact about asset returns
-and the one a Gaussian simulator gets wrong.
+**Stocks move together, and stop being diversifiable in a crisis.** Mean
+pairwise correlation of daily returns is **+0.257** (seed range +0.205 to
++0.456), inside the real +0.25 to +0.35 for a calm market -- measured at
++0.024 one era ago, the largest gap this module has ever carried. The
+mechanism that closed it: the shared market factor now carries its own
+conditional-variance process at a baseline sigma of 0.016 against the
+reference's 0.003, funded by scaling per-name idiosyncratic noise by 0.84
+rather than added on top. The crisis half is the VIX coupling: pinned VIX
+45 takes the same correlation to +0.68 (see `pretium.scenario`).
 
-**Volatility clustering, in the right direction.** The autocorrelation of
-absolute returns is **+0.117** at lag one and stays positive at lag five. Calm
-follows calm and turbulence follows turbulence, which is what the GARCH process
-is there to produce. Its strength is a separate question, below.
+**Fat tails survive the correlation.** Excess kurtosis **+3.1** (+2.4 to
++5.7 across seeds), inside the real +3 to +10. Worth stating next to the
+correlation, because the pre-era model could have either but not both: a
+constant-sigma Gaussian factor diluted the GARCH tails in exact proportion
+to the correlation it induced. A factor whose variance is persistent and
+shock-driven is fat-tailed by variance mixing, so the correlated share now
+contributes kurtosis instead of spending it.
 
-## What does not match, and what it costs you
+**Volatility clusters at real strength, and market-wide.** |return|
+autocorrelation at lag one is **+0.242** (+0.189 to +0.454), inside the
+real +0.15 to +0.35 -- it read +0.117, below band, one era ago. The memory
+is still short: +0.090 at lag five, gone by lag twenty (-0.006), where
+real clustering persists for months. The strength is real now; the
+persistence is not, so a volatility forecaster is still tested against a
+market with less to forecast than a real one.
 
-**Stocks barely move together.** Mean pairwise correlation of daily returns is
-**+0.024**, against +0.25 to +0.35 for real equities in a calm market and +0.6
-and above in a crisis. The largest gap here, and arithmetic rather than
-mystery: the shared market factor has sigma 0.003 a day against a sector daily
-sigma of 0.008 to 0.025, so it carries a few percent of a typical name's
-variance, and that share is the correlation it can induce. Diversification
-works far better here than in any real market, and market beta barely exists.
+**Volume arrives with volatility.** Volume against absolute return is
+**+0.585** (+0.541 to +0.655), inside the real +0.30 to +0.60. It read
++0.105 before the era boundary: the `avg_volume` feedback compounded the
+level a percent-plus a day, and that trend swamped the covariation. The
+level is held now, and the per-tick channel -- volume scales with the size
+of the day's move by construction -- shows through.
 
-**Volatility clustering is too weak and decays too fast.** Real markets show
-+0.15 to +0.35 at lag one with a slow, near-hyperbolic decay that persists for
-months. Here it is +0.117 and largely gone by lag twenty. A strategy whose edge
-is volatility forecasting will look worse here than it should.
+**The leverage effect exists, and is the weakest thing the era bought.**
+Today's
+signed return against tomorrow's absolute return is **-0.085**, just above
+(weaker than) the real -0.30 to -0.10, with the sign finally stable:
+negative on six seeds of six, range -0.181 to -0.031, where the symmetric
+pre-era GARCH could not hold the sign at all -- no symmetric variance
+process produces asymmetry at any coefficients, and the era added a GJR
+term instead. Mind the negative band when reading this row: a value ABOVE
+a negative band is an effect too WEAK, not too strong, which is why
+`_verdict` and `band_distance` below carry their own sign handling.
 
-**Volume arrives with volatility now, but volume shocks still do not
-persist.** Volume correlates with absolute return at **+0.511**, inside the
-real +0.30 to +0.60 -- measured after the 2026-08 era boundary, same method,
-seeds 1 to 6 ranging +0.499 to +0.537. Before it this figure read **+0.105**:
-the `avg_volume` feedback compounded the volume level a percent-plus a day,
-and that trend swamped the day-to-day covariation with returns. Removing the
-feedback let the per-tick channel show through, because per-tick volume scales
-with the size of the day's move by construction. Volume CHANGES still
-autocorrelate at **-0.463** where real ones sit near zero, which is the
-signature of a held level plus independent daily noise rather than of
-persistent volume shocks. (The LEVEL autocorrelation read +0.9 off the old
-compounding trend and reads about +0.1 off the held level -- neither says
-anything about the daily dynamics, which is why the statistic differences.)
+## What still fails, and what it costs you
 
-Execution work is where that bites, more narrowly than before: VWAP and POV
-live or die on forecasting the day's volume, and the hard part in a real
-market is a volume surprise that keeps going and arrives with a volatility
-surprise. The arriving-together half is now present; the keeps-going half is
-still absent, so a forecast here is never wrong twice running.
+**Returns are positively autocorrelated, and real ones are not.** Measured
+at **+0.249** at lag one (+0.237 to +0.443), in six seeds of six, against
+a real band around zero. The AR(2) mispricing process showing through --
+untouched by the era boundary, and none of the era's sweeps targeted it.
+It has a consequence you must carry into any conclusion drawn here:
 
-**There is no leverage effect.** Today's signed return against tomorrow's
-absolute return measures **-0.004**, against a real -0.30 to -0.10, and across
-six seeds its sign is not even reliably negative. Absent by construction rather
-than by calibration: the variance process is a symmetric GARCH(1,1),
-`omega + alpha * r^2 + beta * v`, and squaring the return discards its sign. No
-symmetric GARCH can produce a leverage effect at any coefficients. Reproducing
-one needs an asymmetric term, GJR or EGARCH, which is a model change and not a
-calibration.
-
-**Returns are positively autocorrelated, and real ones are not.** This is the
-one dependence that is too STRONG. Measured at **+0.233** at lag one, in six
-seeds out of six, ranging only from +0.211 to +0.249. Real daily equity returns
-sit near zero and are if anything slightly negative.
-
-That is a direct consequence of the AR(2) mispricing process: `s` has positive
-short-run persistence, so a move today makes a move the same way tomorrow more
-likely. It is the model rather than a bug, and it has a consequence you must
-carry into any conclusion drawn here:
-
-> **Momentum is mechanically profitable in this market in a way it is not in
-> real markets.** An agent that trades serial correlation has an edge here that
-> is an artefact of the process, not a skill that transfers.
+> **Momentum is mechanically profitable in this market in a way it is not
+> in real markets.** An agent that trades serial correlation has an edge
+> here that is an artefact of the process, not a skill that transfers.
 
 This is the specific mechanism behind the general warning that this harness
-ranks agents against each other rather than certifying real-world skill. If two
-agents differ mainly in how much serial correlation they exploit, their ranking
-here says very little about which is better anywhere else.
+ranks agents against each other rather than certifying real-world skill. If
+two agents differ mainly in how much serial correlation they exploit, their
+ranking here says very little about which is better anywhere else.
 
-**Volatility is high.** About **53% annualised**, against roughly 20% for large
-caps. A generated universe is deliberately dispersed and skews small; treat
-absolute return figures as scaled up, and prefer ratios -- capture against the
-oracle, shortfall in basis points -- over raw percentages.
+**Volatility is high.** About **41.5% annualised** (39% to 50% across
+seeds) against roughly 20% for large caps -- down from 53% pre-era,
+because the factor's variance was funded rather than added, and still
+above the band for a reason about how a universe is generated rather than
+about the price process: a generated roster is deliberately dispersed and
+skews small. Prefer ratios -- capture against the oracle, shortfall in
+basis points -- over raw percentages.
+
+**Volume shocks do not persist, by construction.** Volume CHANGES
+autocorrelate at **-0.446** (-0.454 to -0.425) where real ones sit near
+zero: daily volume is a held per-name level times bounded per-tick
+multipliers independent day to day, and the first difference of such a
+series autocorrelates near -0.5 as arithmetic. No constant reaches this
+row; it needs volume dynamics the engine does not model. Execution work is
+where it bites: VWAP and POV live or die on forecasting the day's volume,
+and the hard part in a real market is a volume surprise that keeps going
+and arrives with a volatility surprise. The arriving-together half is now
+present; the keeps-going half is absent, so a forecast here is never wrong
+twice running.
+
+## Four of the eight were targets
+
+The dependence rows stopped being pure measurements at the era boundary:
+the sweeps that chose the era's constants (`tools/calibration/`) scored
+candidates on these eight statistics, at this exact method -- this
+universe, these seeds, this horizon. Correlation, kurtosis, clustering and
+the leverage effect are calibrated quantities now; return autocorrelation,
+the volatility level and the volume-change autocorrelation were not
+targeted, and it shows -- they are the three still out of band. A
+statistic a model was tuned to hit is evidence about the tuning, not the
+model, so this docstring must not sound more confident than the held-out
+results: on fresh sim seeds (101-106) correlation slips to +0.225, just
+under the band floor; on five fresh 60-name universes the leverage effect
+halves to -0.04/-0.05; on 504 days the dependence structure holds and
+volatility drifts to 47.6%. In band at the published method, at the band
+edge -- on either side of it -- everywhere else. A conclusion that needs a
+dependence statistic deep inside its band should re-measure on its own
+universe and seeds rather than inherit these figures.
+`docs/how-realistic-is-this-market.md` carries the full held-out record
+with every method stated.
 
 ## Why there are eight statistics and not four
 
@@ -122,44 +149,42 @@ wrong.
 The four dependence statistics cost one function and no modelling decision, and
 they are the ones that say where a conclusion drawn here stops transferring.
 
-## Can the mismatches be fixed? Measured, and the answer is a decision
+## What the era closed, and what remains
 
-Investigated with the intent of correcting them rather than defending them.
-"Unfixed" and "unfixable here" are different states, and these figures come
-from that earlier work rather than from the run above.
+An earlier version of this section asked "can the mismatches be fixed?"
+and answered that each was a decision about diverging from the reference
+implementation. The 2026-08 era took those decisions -- argued, gated
+divergence, each with its sweep committed under `tools/calibration/` --
+and the record of which gap needed which KIND of change is worth keeping:
 
-**The return autocorrelation CAN be fixed, and the price is the port.** It
-comes from the herding term in the mispricing process, `MOMENTUM_THETA = 0.25`.
-Lowering it to 0.05 brings the AR(2) impulse response at lag two from 1.284 to
-1.029 and the measured autocorrelation from **+0.219 to +0.034 -- inside the
-real-market band**, with volatility and kurtosis essentially unchanged.
+- **Cross-sectional correlation** was proven unreachable by the factor's
+  constant sigma (the band arrived only where kurtosis had collapsed) and
+  was closed by a model change: conditional volatility on the factor,
+  funded from the idiosyncratic side.
+- **Clustering** resisted every calibration lever -- persistence already
+  at the reference's 0.99, and raising the variance ceiling bought +0.016
+  of clustering for twenty points of volatility -- and was closed by the
+  same factor process, which is what market-wide clustering needed.
+- **Volume against volatility** was closed by removing the average-volume
+  feedback that compounded the level and buried the covariation.
+- **The leverage effect** was absent at any coefficients of a symmetric
+  GARCH and was closed structurally, by the GJR term.
 
-It also fails seven parity tests, including the one that asserts the model
-constants match the reference implementation. These constants are not this
-library's to choose: it is a PORT, and its coefficients are the reference's
-coefficients. Changing one makes it a fork and invalidates the entire golden
-corpus. That is a product decision about whether the two implementations may
-diverge, and it cannot be taken from inside a stylised-fact report. The lever
-is one constant when that decision is made.
+What remains, and what each would take:
 
-**The cross-sectional correlation is the same class of decision.** Reaching a
-realistic +0.30 needs a market factor around 0.65x the stock sigma, roughly
-0.0098 for a 1.5%-a-day name, against the 0.0030 in the source. Calibration,
-and the port's calibration to make.
-
-**The clustering resists every lever available.** Persistence is not the
-problem: `ALPHA + BETA` is 0.99, which is what real equity GARCH shows. The
-variance is clamped to between 0.25x and 5x its sector base, and that clamp
-binds 16.4% of the time -- 13.9% at the ceiling, which truncates exactly the
-high-volatility days where clustering is most visible. Raising the ceiling to
-10x lifts clustering only from +0.096 to +0.112, still below the real band,
-while pushing annualised volatility from 52.7% to 72%. Lowering
-`MOMENTUM_THETA` makes clustering worse, so the two mismatches are coupled
-through the same term and cannot both be improved by moving it.
-
-**The leverage effect is not a calibration at all.** A symmetric variance
-process has no coefficient that produces asymmetry, so it is a modelling
-redesign, under the same port constraint.
+- **Return autocorrelation is one constant away, and the constant stays
+  unpulled.** `MOMENTUM_THETA` from 0.25 to 0.05 measured +0.034 --
+  inside the band -- with volatility and kurtosis essentially unchanged.
+  That counterfactual was measured on the PRE-era model and has not been
+  re-run; the mechanism it names is untouched. It remains a decision
+  about the mispricing process itself (the herding term is load-bearing
+  for the model's identity), not a calibration detail -- though
+  `ModelParams.from_preset("pt-v1", momentum_theta=...)` now lets anyone
+  measure the counterfactual without a rebuild, honestly fingerprinted.
+- **The volatility level** is a property of the universe generator, not
+  the price process, and would be recalibrated there.
+- **Volume dynamics** need a model -- persistent volume shocks -- not a
+  constant. Until then -0.45 is structural.
 
 ## What a measurement is for, when it disagrees with you
 
@@ -173,8 +198,10 @@ to +0.10.
 The fix stayed anyway. It is what the model specifies, and the alternative is
 keeping a bug because it happened to score better on a statistic, which is how
 a model gets tuned toward its own report card instead of toward being right.
-These numbers are measurements rather than targets, and this is what that
-commitment costs when the two disagree.
+When this was recorded these numbers were measurements rather than targets;
+four of them have since BECOME targets -- the calibration the era boundary
+performed, disclosed above -- which is why the held-out checks exist: they
+are where the report card stops being the thing that was tuned.
 
 ## Re-measure after any change
 
