@@ -52,7 +52,7 @@ use pretium::economy::{
 use pretium::engine::{DayAdvanceRequest, DayCloseRequest, Engine, PriceField, TickRequest};
 use pretium::market::{
     simulate_market_tick, AvgVolumePolicy, GameTime, MarketStatus, SettleDrawPolicy, TickCompany,
-    TickInputs, TickStock,
+    TickInputs, TickStock, MARKET_FACTOR_SIGMA,
 };
 use pretium::rng::Rng;
 
@@ -154,6 +154,10 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
             news_impact_queue: &[],
             order_volumes: &[],
             sector_keys: &keys,
+            // The constant-sigma baseline: this harness probes the draw
+            // schedule, which must not depend on the factor's conditional
+            // sigma at all.
+            market_sigma_daily: MARKET_FACTOR_SIGMA,
             settle_draws: SettleDrawPolicy::FourAlways,
         },
         &mut rng,

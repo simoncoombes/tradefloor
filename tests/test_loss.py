@@ -377,12 +377,18 @@ def test_the_panel_rows_carry_their_band_distances(facts):
         assert row["scaled_distance"] == pytest.approx(
             row["band_distance"] / SEED_SD[key]
         ), key
-    # The trap case, on a real measurement: leverage is absent here, above
-    # a negative band, and its distance is to the weak edge.
-    leverage = rows["leverage_effect"]
+    # The trap case: a leverage effect ABOVE its negative band must read
+    # "too weak" with its distance to the weak edge. The live fixture
+    # stopped exercising it -- the GJR term made the effect real, and at
+    # the factor-vol calibration this fixture measures inside the band --
+    # so the trap is pinned on a weakened copy of the same panel: the
+    # wording rule has to survive the statistic being healthy.
+    weakened = dict(facts)
+    weakened["leverage_effect"] = -0.01
+    leverage = compare_to_real_markets(weakened)["leverage_effect"]
     assert leverage["verdict"] == "too weak"
     assert leverage["band_distance"] == pytest.approx(
-        leverage["measured"] - LEVERAGE_BAND[1]
+        -0.01 - LEVERAGE_BAND[1]
     )
 
 

@@ -61,51 +61,49 @@ use super::hours::{intraday_vol, intraday_volume, MarketStatus};
 /// not a guarantee, and the bits are the contract.
 pub const S_PHI_TICK: f64 = f64::from_bits(0x3FEF_FFC1_E138_5E9E);
 
-/// Standard deviation of the shared market factor, at DAILY scale.
+/// BASELINE standard deviation of the shared market factor, at DAILY
+/// scale — since the factor-variance change of the 2026-08 era, the
+/// unconditional anchor of the factor's variance process
+/// ([`super::factor_vol`]), not the sigma of any given day. The tick
+/// draws at the CONDITIONAL sigma the engine passes in
+/// ([`TickInputs::market_sigma_daily`]); this constant is where that
+/// process reverts to, the unit its floor and ceiling are multiples of,
+/// and the absolute denomination of the crash amplifier's threshold
+/// (`factors.rs`).
 ///
-/// **Recalibrated at the 2026-08 era boundary; the reference implementation
-/// says 0.003.** That value put a few percent of a typical name's variance
-/// in the shared factor, and that share IS the pairwise correlation it can
-/// induce: measured cross-sectional correlation was 0.026 against a real
-/// 0.25 to 0.35 (design findings 7-9). An argued divergence from source, of
-/// the same class as the `avg_volume` hold: the defect is upstream too.
+/// **History, in three measured acts.** The reference implementation says
+/// 0.003, which put a few percent of a typical name's variance in the
+/// shared factor and produced cross-sectional correlation of 0.026
+/// against a real 0.25-0.35 (findings 7-9). The first recalibration swept
+/// the constant (`tools/calibration/sweep_market_factor_sigma.py`) and
+/// proved the band UNREACHABLE by it: the factor was Gaussian at constant
+/// sigma, so its correlation contribution was its variance share, and
+/// every point of share Gaussian-diluted the GARCH tails — the band
+/// arrived only at sigma 0.021, where excess kurtosis had collapsed to
+/// 1.26 against a floor of 3 (finding 14). 0.0075 shipped as the largest
+/// value whose median kurtosis stayed in band, and finding 14 named the
+/// escape: give the factor its own fat-tailed conditional volatility,
+/// funded from the idiosyncratic side. `factor_vol.rs` is that change,
+/// and it alters what this constant buys — a conditional factor
+/// CONTRIBUTES kurtosis and market-wide clustering instead of spending
+/// them, so the baseline can sit where correlation needs it.
 ///
-/// **The value comes from a sweep, not a hand-tune** —
-/// `tools/calibration/sweep_market_factor_sigma.py`, whose committed output
-/// (`tools/calibration/results/`) measures the full realism panel at eight
-/// sigmas across six seeds. What it shows, six-seed medians, 40 names,
-/// 252 days:
+/// **0.016 comes from the factor-vol sweep**
+/// (`tools/calibration/sweep_market_factor_vol.py`, committed results
+/// `results/market-factor-vol-2026-08-2*.json`), chosen JOINTLY with
+/// `IDIO_SIGMA_SCALE` = 0.84 — the funding side, which is why total
+/// volatility FELL (48.3% -> 41.8% pooled) while the factor's share of it
+/// roughly tripled. At the shipped vector, six-seed medians on the
+/// published method: correlation 0.260 and excess kurtosis 3.14, both
+/// inside their real bands for the first time in this model's history,
+/// with volatility clustering 0.245 (in band) and the leverage effect
+/// intact at -0.094. The finding-14 trade was dissolved by the process,
+/// not re-positioned along the same curve.
 ///
-/// | sigma  | pairwise corr | excess kurtosis | pooled ann. vol |
-/// |--------|---------------|-----------------|-----------------|
-/// | 0.003  | 0.026         | 4.25            | 53.7%           |
-/// | 0.0075 | 0.089         | 3.24            | 57.2%           |
-/// | 0.010  | 0.122         | 2.64            | 59.8%           |
-/// | 0.021  | 0.274         | 1.26            | 71.2%           |
-///
-/// Correlation scales with the factor's variance share, and the factor is
-/// GAUSSIAN with constant sigma: every point of correlation bought this way
-/// dilutes the GARCH-driven fat tails and adds realised volatility that is
-/// already above band. The real-market correlation band is reachable only
-/// at 0.021, where kurtosis — the one marginal this model got right — has
-/// collapsed to a third of the real band's floor. 0.0075 is the largest
-/// value at which median kurtosis stays inside the real 3-10, and it
-/// triples the correlation. Closing the rest of the gap is not a
-/// calibration: it needs the factor to carry its own fat-tailed conditional
-/// volatility, funded by variance moved OUT of the idiosyncratic GARCH
-/// rather than added on top.
-///
-/// **Re-confirmed after the RNG stream split** (same era boundary; the
-/// split changed every trajectory, so the sweep was re-run on the same
-/// grid, seeds and method — `results/market-factor-sigma-2026-08-21-
-/// post-rng-split.json`). Median kurtosis at 0.0075 is 3.11 (was 3.24),
-/// still the largest grid value inside the band, with 0.010 at 2.52; the
-/// whole table moved by well under seed noise, so the split re-dealt the
-/// draws without changing how variance is shared. The value stands.
-///
-/// Change this only by re-running the sweep; a test pins the value to make
-/// that deliberate.
-pub const MARKET_FACTOR_SIGMA: f64 = 0.0075;
+/// Change this only by re-running the factor-vol sweep, and only TOGETHER
+/// with `IDIO_SIGMA_SCALE` and the `factor_vol.rs` shape; a test pins the
+/// value to make that deliberate.
+pub const MARKET_FACTOR_SIGMA: f64 = 0.016;
 /// Standard deviation of a shared sector factor, at DAILY scale.
 pub const SECTOR_FACTOR_SIGMA: f64 = 0.002;
 
@@ -270,6 +268,16 @@ pub struct TickInputs<'a> {
     /// Sector keys in the order `SECTOR_CONFIGS` enumerates them. The ORDER
     /// is contractual: one normal is drawn per key, in this order.
     pub sector_keys: &'a [String],
+    /// Today's market-factor sigma at DAILY scale — the conditional level
+    /// of the factor's variance process ([`super::factor_vol`]), fixed for
+    /// the whole session at the previous close's update.
+    ///
+    /// The engine passes its `MarketVarianceState`'s current sigma on the
+    /// generated schedule, and the constant [`MARKET_FACTOR_SIGMA`] when
+    /// replaying a recorded reference stream, whose era drew the factor at
+    /// constant sigma. A caller building `TickInputs` directly and wanting
+    /// the old constant-sigma behaviour passes the constant.
+    pub market_sigma_daily: f64,
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
@@ -345,13 +353,30 @@ pub fn simulate_market_tick(
 
     // ── Shared factors: 1 normal, then one per sector ─────────────────────
     // Drawn at PER-TICK scale directly, so the noise is not divided by 390
-    // again later.
-    let market_factor = rng.next_normal() * MARKET_FACTOR_SIGMA * tick_scale;
+    // again later. The sigma is the CONDITIONAL level from the factor's
+    // variance process, not the constant; when the caller passes the
+    // baseline (`MARKET_FACTOR_SIGMA`) this line is bit-identical to the
+    // constant-sigma era's spelling, association included.
+    let market_factor = rng.next_normal() * inputs.market_sigma_daily * tick_scale;
 
-    // Crisis correlation: above VIX 40 sector factors blend toward the market
-    // factor, so diversification stops working exactly when it is most wanted.
-    let vix_correlation_spike = if economy.vix > 40.0 {
-        mathx::min(0.8, (economy.vix - 40.0) / 30.0)
+    // Crisis correlation: above the crisis threshold, sector factors blend
+    // toward the market factor, so diversification stops working exactly
+    // when it is most wanted.
+    //
+    // Re-sited at the 2026-08 era boundary, in step with the economy's
+    // crisis gates. The reference's trigger was `vix > 40` with a `/30`
+    // ramp, and both halves were dead: endogenous VIX has a measured hard
+    // ceiling of 26.57 (zero days above 30 in 42,336; the reference's own
+    // economy goldens top out at 29.09, so the gates never fired upstream
+    // either), and even a pinned VIX at the old trigger bought a blend of
+    // at most 0.25 by the ramp. `CRISIS_VIX_THRESHOLD` (25.5, the P94 of
+    // the long-run endogenous distribution — rare and real in this
+    // model's own units) makes the trigger reachable, and the /1.4 ramp
+    // makes crossing it MEAN something: the blend saturates at its 0.8
+    // cap by VIX ≈ 26.6, the ceiling of what the macro chain can produce,
+    // instead of asking for a VIX of 64 that cannot exist.
+    let vix_correlation_spike = if economy.vix > crate::economy::CRISIS_VIX_THRESHOLD {
+        mathx::min(0.8, (economy.vix - crate::economy::CRISIS_VIX_THRESHOLD) / 1.4)
     } else {
         0.0
     };
@@ -706,14 +731,17 @@ mod tests {
     #[test]
     fn market_factor_sigma_is_the_2026_08_sweep_calibration() {
         // Not a tautology: a gate. This constant is the measured answer of
-        // `tools/calibration/sweep_market_factor_sigma.py`, and the doc
-        // comment on it records the trade it sits on — correlation against
-        // kurtosis and realised volatility. Moving it by hand un-measures
-        // it; whoever fails this test should re-run the sweep (one command)
-        // and update the constant, its documentation and this pin together.
-        // The sweep must also be re-run after any change that re-orders RNG
-        // draws, because that re-rolls every statistic the value rests on.
-        assert_eq!(MARKET_FACTOR_SIGMA, 0.0075);
+        // `tools/calibration/sweep_market_factor_vol.py` — the BASELINE of
+        // the factor's variance process, chosen jointly with
+        // `IDIO_SIGMA_SCALE` and the `factor_vol.rs` shape; the doc
+        // comment on it records what the vector bought (correlation and
+        // kurtosis in band together). Moving it by hand un-measures it;
+        // whoever fails this test should re-run the sweep (one command)
+        // and update the constant, its documentation and this pin
+        // together. The sweep must also be re-run after any change that
+        // re-orders RNG draws, because that re-rolls every statistic the
+        // value rests on.
+        assert_eq!(MARKET_FACTOR_SIGMA, 0.016);
     }
 
     #[test]

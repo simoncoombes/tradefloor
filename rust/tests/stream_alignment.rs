@@ -27,7 +27,7 @@
 use pretium::economy::{create_initial_economy_state, InitialEconomyOptions};
 use pretium::market::{
     reset_daily_prices, simulate_market_tick, MarketStatus, OrderVolume, SettleDrawPolicy,
-    TickCompany, TickInputs, TickStock,
+    TickCompany, TickInputs, TickStock, MARKET_FACTOR_SIGMA,
 };
 use pretium::rng::{GameRng, Rng};
 
@@ -130,6 +130,9 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
                 news_impact_queue: &[],
                 order_volumes: &order_volumes,
                 sector_keys: &sector_keys,
+                // The constant-sigma baseline: these tests predate the factor's
+                // variance process and pin behaviour at its baseline level.
+                market_sigma_daily: MARKET_FACTOR_SIGMA,
                 settle_draws: policy,
             },
             &mut rng,

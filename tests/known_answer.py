@@ -75,7 +75,28 @@ import pretium
 # the chosen point is the seventeen-point sweep in
 # tools/calibration/results/gjr-gamma-2026-08-21.json. It changes every
 # trajectory; the direct GameRng section below does not move.
-KAT_VERSION = 6
+#
+# v7: same era boundary, sixth change, three parts, one bump. First, the
+# shared market factor gains its own conditional-variance process
+# (rust/src/market/factor_vol.rs): a daily GARCH(1,1) on the factor's
+# accumulated innovation, consuming zero draws, so the factor's sigma is
+# a regime rather than the constant it was -- the escape finding 14
+# named from the correlation-for-kurtosis trade it measured. Its baseline
+# MARKET_FACTOR_SIGMA moves 0.0075 -> 0.016, funded by IDIO_SIGMA_SCALE
+# 0.84 on the per-name idiosyncratic sigma, so total volatility falls
+# while the correlated share triples; the sweep behind the vector is
+# tools/calibration/sweep_market_factor_vol.py, results committed. At
+# the shipped point, cross-sectional correlation (0.260) and excess
+# kurtosis (3.14) sit inside their real bands together for the first
+# time. Second, the crisis-correlation blend in tick.rs is re-sited from
+# the dead `vix > 40` / `/30` ramp to CRISIS_VIX_THRESHOLD (25.5) with a
+# /1.4 ramp, in step with the economy's re-sited crisis gates: endogenous
+# VIX has a measured hard ceiling of 26.57, so the old trigger could
+# never fire. Third, the crash amplifier's threshold stays denominated in
+# the BASELINE sigma by name, so factor-variance regimes raise its firing
+# rate -- the measured crisis-correlation channel. Every trajectory
+# changes; the direct GameRng section below does not move.
+KAT_VERSION = 7
 
 SEED = 20260820
 DAYS = 250

@@ -33,6 +33,7 @@
 use pretium::economy::{create_initial_economy_state, InitialEconomyOptions};
 use pretium::market::{
     simulate_market_tick, MarketStatus, SettleDrawPolicy, TickCompany, TickInputs, TickStock,
+    MARKET_FACTOR_SIGMA,
 };
 use pretium::rng::Rng;
 
@@ -108,6 +109,9 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
             news_impact_queue: &[],
             order_volumes: &[],
             sector_keys: &sectors(),
+            // The constant-sigma baseline: these tests predate the factor's
+            // variance process and pin behaviour at its baseline level.
+            market_sigma_daily: MARKET_FACTOR_SIGMA,
             settle_draws: SettleDrawPolicy::FourAlways,
         },
         &mut rng,
@@ -227,6 +231,9 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                     news_impact_queue: &[],
                     order_volumes: &[],
                     sector_keys: &sectors(),
+                    // The constant-sigma baseline: these tests predate the factor's
+                    // variance process and pin behaviour at its baseline level.
+                    market_sigma_daily: MARKET_FACTOR_SIGMA,
                     settle_draws: SettleDrawPolicy::FourAlways,
                 },
                 &mut rng,
@@ -260,6 +267,9 @@ fn the_band_holds_in_extended_hours_too() {
                     news_impact_queue: &[],
                     order_volumes: &[],
                     sector_keys: &sectors(),
+                    // The constant-sigma baseline: these tests predate the factor's
+                    // variance process and pin behaviour at its baseline level.
+                    market_sigma_daily: MARKET_FACTOR_SIGMA,
                     settle_draws: SettleDrawPolicy::FourAlways,
                 },
                 &mut rng,
@@ -303,6 +313,9 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                     news_impact_queue: &[],
                     order_volumes: &[],
                     sector_keys: &sectors(),
+                    // The constant-sigma baseline: these tests predate the factor's
+                    // variance process and pin behaviour at its baseline level.
+                    market_sigma_daily: MARKET_FACTOR_SIGMA,
                     settle_draws: SettleDrawPolicy::FourAlways,
                 },
                 &mut rng,

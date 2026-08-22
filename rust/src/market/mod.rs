@@ -47,6 +47,7 @@
 //! are that gap and are not a defect. See the port notes §D6.
 
 pub mod daily;
+pub mod factor_vol;
 pub mod factors;
 pub mod garch;
 pub mod hours;
@@ -54,6 +55,7 @@ pub mod index_value;
 pub mod tick;
 
 pub use daily::{close_day, close_day_all, reset_daily_prices, AvgVolumePolicy, CloseInputs};
+pub use factor_vol::{update_market_variance, MarketVarianceState};
 pub use factors::{
     calculate_live_factors, order_imbalance, FactorCompany, LiveFactors, NewsEvent, SharedFactors,
 };
@@ -65,5 +67,5 @@ pub use hours::{
 pub use index_value::{calculate_market_index, IndexConstituent, IndexValue};
 pub use tick::{
     simulate_market_tick, NewsImpactEntry, OrderVolume, SettleDrawPolicy, TickCompany, TickInputs,
-    TickOutcome, TickStock, S_PHI_TICK,
+    TickOutcome, TickStock, MARKET_FACTOR_SIGMA, S_PHI_TICK,
 };

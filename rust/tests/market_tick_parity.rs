@@ -276,6 +276,9 @@ fn check_scenario(file: &str) {
                 // Replaying a RECORDED reference stream: the tape holds the
                 // draws the reference consumed, four-or-zero at settlement,
                 // and `ScriptedRng::finish` asserts exact consumption.
+                // The constant-sigma baseline: these tests predate the factor's
+                // variance process and pin behaviour at its baseline level.
+                market_sigma_daily: MARKET_FACTOR_SIGMA,
                 settle_draws: SettleDrawPolicy::FourOrZero,
             },
             &mut rng,
