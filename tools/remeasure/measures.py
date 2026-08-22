@@ -32,7 +32,7 @@ from pathlib import Path
 import pretium as pt
 import pyarrow as pa
 from pretium.baselines import BuyAndHold, Momentum, Oracle, capture_ratio, reference_agents
-from pretium.scenario import Scenario, compare, run_scenario
+from pretium.scenario import Scenario, compare
 
 
 @dataclass
@@ -87,6 +87,7 @@ def g_determinism(ctx: Ctx) -> dict:
     from pretium.facts import MARGINAL, REAL_MARKETS
     return {
         "kat_digest": digest,
+        "kat_digest_elided": f"{digest[:8]}...{digest[-7:]}",
         "kat_digest_pinned": pinned["sha256"],
         "kat_matches_pinned": digest == pinned["sha256"],
         "kat_version": ka.KAT_VERSION,
@@ -109,6 +110,8 @@ def g_consts(ctx: Ctx) -> dict:
     """Claims that are constants in the source or derivable from the API."""
     tick_rs = (ctx.root / "rust" / "src" / "market" / "tick.rs").read_text()
     garch_rs = (ctx.root / "rust" / "src" / "market" / "garch.rs").read_text()
+    fvol_rs = (ctx.root / "rust" / "src" / "market" / "factor_vol.rs").read_text()
+    econ_rs = (ctx.root / "rust" / "src" / "economy" / "state.rs").read_text()
     micro_rs = (ctx.root / "rust" / "src" / "microstructure.rs").read_text()
 
     def const(text: str, name: str) -> float:
@@ -116,9 +119,11 @@ def g_consts(ctx: Ctx) -> dict:
         return float(m.group(1)) if m else float("nan")
 
     market_sigma = const(tick_rs, "MARKET_FACTOR_SIGMA")
-    sector_factor_sigma = const(tick_rs, "SECTOR_FACTOR_SIGMA")
     alpha = const(garch_rs, "ALPHA")
     beta = const(garch_rs, "BETA")
+    gamma = const(garch_rs, "GAMMA")
+    fvol_alpha = const(fvol_rs, "MARKET_VOL_ALPHA")
+    fvol_beta = const(fvol_rs, "MARKET_VOL_BETA")
 
     # Mispricing reversion half-life, from the AR coefficient the engine
     # actually uses (S_PHI_TICK is stored as exact bits).
@@ -129,7 +134,6 @@ def g_consts(ctx: Ctx) -> dict:
                                                    16)))[0] if m else float("nan")
     half_life_days = math.log(0.5) / math.log(phi) / 390.0
 
-    sigmas = sorted(pt.sector_daily_sigma(s) for s in pt.sectors())
     spread_formula = bool(re.search(r"vix[^\n]*15[^\n]*30", micro_rs)
                           or "(vix - 15.0) / 30.0" in micro_rs)
 
@@ -146,16 +150,18 @@ def g_consts(ctx: Ctx) -> dict:
 
     return {
         "market_factor_sigma": market_sigma,
-        "sector_factor_sigma": sector_factor_sigma,
-        "sector_sigma_min": sigmas[0],
-        "sector_sigma_max": sigmas[-1],
-        "sector_sigma_median": _median(sigmas),
-        # the realism page derives the shared factor's variance share from the
-        # printed constants; this recomputes it from the *measured* ones, so a
-        # recalibrated sigma moves this row instead of silently passing
-        "market_share_pct": (market_sigma / _median(sigmas)) ** 2 * 100.0,
         "reversion_half_life_days": half_life_days,
-        "garch_persistence": alpha + beta,
+        # the realism page publishes the GJR form of the per-name persistence
+        "garch_persistence": alpha + beta + gamma / 2.0,
+        "gjr_alpha": alpha,
+        "gjr_gamma": gamma,
+        "gjr_neg_passthrough": alpha + gamma,
+        # the market factor's own variance process (factor_vol.rs): the
+        # realism page publishes its shock half-life in days
+        "factor_halflife_days": math.log(0.5) / math.log(fvol_alpha + fvol_beta),
+        "factor_vol_ceiling_multiple": const(fvol_rs, "MARKET_VOL_CEILING_MULTIPLE"),
+        "idio_sigma_scale": const(fvol_rs, "IDIO_SIGMA_SCALE"),
+        "crisis_vix_threshold": const(econ_rs, "CRISIS_VIX_THRESHOLD"),
         "spread_formula_present": spread_formula,
         "impulse_day2": pt.impulse_response(3)[2],
         "truth_cols": truth_cols,
@@ -173,7 +179,6 @@ def g_arith(ctx: Ctx) -> dict:
         "crossings_per_year": 252 * 390,               # "about 98,000"
         "crossings_five_fields": 252 * 390 * 5,        # "roughly 500,000"
         "workflow_truth_rows": 10 * 390 * 60,          # "234,000 rows"
-        "sigma_for_corr_030": 0.65 * 0.015,            # "roughly 0.0098"
         "llm_calls_default_run": 20,                   # one per day, 20 days
         "clean_sweep_p": 2.0 * 0.5 ** 12,              # "even a clean sweep only reaches p = 0.0005"
         "perf_row_gap_s": 28.2 - 27.4,                 # "the 0.8s between the two rows"
@@ -241,11 +246,67 @@ def g_realism_six(ctx: Ctx) -> dict:
         runs = list(pool.map(one, range(1, 7)))
 
     out: dict = {}
-    for key in _REALISM_KEYS + ["abs_return_acf20"]:
+    for key in _REALISM_KEYS + ["abs_return_acf5", "abs_return_acf20"]:
         values = [r[key] for r in runs]
         out[f"{key}_median"] = _median(values)
         out[f"{key}_lo"] = min(values)
         out[f"{key}_hi"] = max(values)
+    # the realism page: "the sign is stable: negative in six seeds of six"
+    out["leverage_all_negative"] = out["leverage_effect_hi"] < 0
+    return out
+
+
+def g_realism_heldout(ctx: Ctx) -> dict:
+    """The realism page's held-out section: the three checks the 2026-08
+    calibration never scored, each with the method the page states.
+
+    1. Fresh sim seeds 101-106 over the published random(40, 111), 252 days.
+    2. Five fresh 60-name universes (seeds 1, 7, 11, 42, 222), each the
+       median over sim seeds 1-6 at 252 days; the page publishes the range
+       of the five per-universe medians.
+    3. The published universe over 504 days, seeds 1-6."""
+    u40 = _u(*_REALISM_UNIVERSE)
+
+    def batch(universe, seeds, days):
+        def one(seed):
+            return pt.facts.measure(seed=seed, universe=universe, days=days)
+        with ThreadPoolExecutor(max_workers=min(6, ctx.workers)) as pool:
+            return list(pool.map(one, seeds))
+
+    def med(runs, key):
+        return _median([r[key] for r in runs])
+
+    out: dict = {}
+
+    fresh = batch(u40, range(101, 107), 252)
+    out.update({
+        "held_seeds_corr": med(fresh, "cross_sectional_corr"),
+        "held_seeds_kurt": med(fresh, "excess_kurtosis"),
+        "held_seeds_clust": med(fresh, "abs_return_acf1"),
+        "held_seeds_volabs": med(fresh, "volume_abs_return_corr"),
+        "held_seeds_lev": med(fresh, "leverage_effect"),
+    })
+
+    per_universe: dict[str, list[float]] = defaultdict(list)
+    for k in (1, 7, 11, 42, 222):
+        runs = batch(_u(60, k), range(1, 7), 252)
+        for key, name in (("cross_sectional_corr", "corr"),
+                          ("excess_kurtosis", "kurt"),
+                          ("abs_return_acf1", "clust"),
+                          ("leverage_effect", "lev")):
+            per_universe[name].append(med(runs, key))
+    for name, meds in per_universe.items():
+        out[f"held_uni_{name}_lo"] = min(meds)
+        out[f"held_uni_{name}_hi"] = max(meds)
+
+    long = batch(u40, range(1, 7), 504)
+    out.update({
+        "held_long_corr": med(long, "cross_sectional_corr"),
+        "held_long_kurt": med(long, "excess_kurtosis"),
+        "held_long_clust": med(long, "abs_return_acf1"),
+        "held_long_lev": med(long, "leverage_effect"),
+        "held_long_vol": med(long, "annualised_vol_pct"),
+    })
     return out
 
 
@@ -319,6 +380,18 @@ def g_ranking(ctx: Ctx) -> dict:
              for name in ("momentum", "mean_reversion", "buy_and_hold",
                           "random")}
 
+    # the prose behind the table: mean-reversion's one win is barely above
+    # 1.0, buy-and-hold's is the largest per-seed capture on the whole grid
+    def beat_captures(name):
+        return [pnl / ref for pnl, ref in zip(records[name].pnls,
+                                              rk.reference_pnls) if pnl > ref]
+    grid_max = max(pnl / ref
+                   for name in ("momentum", "mean_reversion", "buy_and_hold",
+                                "random")
+                   for pnl, ref in zip(records[name].pnls, rk.reference_pnls))
+    mr_beat = max(beat_captures("mean_reversion"), default=float("nan"))
+    bh_beat = max(beat_captures("buy_and_hold"), default=float("nan"))
+
     # the second twelve-seed window (seeds 12-23): same test, different verdict
     rk_b = pt.rank(factory, seeds=range(12, 24),
                    universe=u, days=10, workers=min(4, ctx.workers))
@@ -331,12 +404,25 @@ def g_ranking(ctx: Ctx) -> dict:
     mr3 = {r.name: r for r in rk3.table()}["mean_reversion"]
     thin = min(range(len(rk3.reference_pnls)), key=rk3.reference_pnls.__getitem__)
 
+    # "every ratio above 1.0 it posts sits on one of the four thinnest
+    # denominators", and averaging the ten ratios instead of pooling them
+    # would read +0.61
+    thin4 = set(sorted(range(len(rk3.reference_pnls)),
+                       key=rk3.reference_pnls.__getitem__)[:4])
+    gt1 = {i for i, c in enumerate(mr3.captures) if c > 1.0}
+
     return {
+        "mr_beat_capture": mr_beat,
+        "bh_beat_capture": bh_beat,
+        "bh_beat_is_grid_max": bh_beat == grid_max,
+        "mr3_gt1_all_on_4_thinnest": bool(gt1) and gt1 <= thin4,
+        "mr3_mean_of_ratios": sum(mr3.captures) / len(mr3.captures),
         "pooled_momentum": mom.pooled_capture,
         "pooled_mean_reversion": mr.pooled_capture,
         "momentum_capture_lo": mom.capture_range[0],
         "momentum_capture_hi": mom.capture_range[1],
         "momentum_wins": mom.wins,
+        "mr_wins": mr.wins,
         "seeds": len(rk.seeds) if hasattr(rk, "seeds") else 12,
         "sep_mom_mr": f"{sep_mr['wins_a']}-{sep_mr['wins_b']}",
         "sep_mom_mr_p": sep_mr["p_value"],
@@ -356,18 +442,45 @@ def g_ranking(ctx: Ctx) -> dict:
 
 
 def g_scenario_leaderboard(ctx: Ctx) -> dict:
-    """docs/scenarios.md seed-7 calm/hiked table. The page does not name the
-    universe; reconstructed as random(20, seed=4) from tests/test_scenario.py."""
+    """docs/scenarios.md seed-7 calm/hiked table, method stated on the page
+    since the stream-AB rewrite (reference_agents(seed=3), random(20,4),
+    seed 7, 20 days), plus the page's sim-seed 5-9 band: buy-and-hold never
+    escapes the walk, momentum escapes it on one seed in five."""
     u = _u(20, 4)
     shock = Scenario.rate_shock(start=0.025, end=0.05, over=15)
-    calm = pt.evaluate(reference_agents(seed=3), seed=7, universe=u, days=20)
-    hiked = pt.evaluate(reference_agents(seed=3), seed=7, universe=u, days=20,
-                        scenario=shock)
+
+    def pair(seed):
+        calm = pt.evaluate(reference_agents(seed=3), seed=seed, universe=u,
+                           days=20)
+        hiked = pt.evaluate(reference_agents(seed=3), seed=seed, universe=u,
+                            days=20, scenario=shock)
+        return calm, hiked
+
+    with ThreadPoolExecutor(max_workers=min(6, ctx.workers)) as pool:
+        results = dict(zip((7, 5, 6, 8, 9),
+                           pool.map(pair, (7, 5, 6, 8, 9))))
+
+    calm, hiked = results[7]
     out = {}
     for name in ("buy_and_hold", "momentum", "oracle"):
         out[f"{name}_calm"] = calm[name].return_pct
         out[f"{name}_hiked"] = hiked[name].return_pct
         out[f"{name}_delta"] = hiked[name].return_pct - calm[name].return_pct
+
+    bh_deltas, mom_deltas = [], []
+    for seed in range(5, 10):
+        c, h = results[seed]
+        bh_deltas.append(h["buy_and_hold"].return_pct
+                         - c["buy_and_hold"].return_pct)
+        mom_deltas.append(h["momentum"].return_pct - c["momentum"].return_pct)
+    out.update({
+        "bh_seedband_lo": min(bh_deltas),
+        "bh_seedband_hi": max(bh_deltas),
+        "bh_escapes": sum(1 for d in bh_deltas if d > 0),
+        "mom_seedband_lo": min(mom_deltas),
+        "mom_seedband_hi": max(mom_deltas),
+        "mom_escapes": sum(1 for d in mom_deltas if d > 0),
+    })
     return out
 
 
@@ -392,32 +505,33 @@ def g_llm_leaderboard(ctx: Ctx) -> dict:
 def g_llm_impact(ctx: Ctx) -> dict:
     """an-llm-agent: why the impact column went blank. Across seeds 2020-2031
     at the leaderboard's exact configuration, the oracle's twenty-day impact
-    spans -181 to +577 bps and is positive in only 8 of 12 seeds; momentum's
-    flips sign the same way; over three days both are positive in 12 of 12.
-    Method stated on the page."""
+    spans -235 to +470 bps and is positive in only 7 of 12 seeds; momentum's
+    flips sign the same way; over two days both agents are positive in 12 of
+    12; by day three the oracle's sign already belongs to the seed (8 of 12,
+    span -29 to +90 bps). Method stated on the page."""
     u = _u(12, 7)
 
     def one(seed):
-        s20 = pt.evaluate(reference_agents(seed=3), seed=seed, universe=u,
-                          days=20, max_leverage=2.0)
-        s3 = pt.evaluate(reference_agents(seed=3), seed=seed, universe=u,
-                         days=3, max_leverage=2.0)
-        return (s20["oracle"].impact_bps, s20["momentum"].impact_bps,
-                s3["oracle"].impact_bps, s3["momentum"].impact_bps)
+        out = []
+        for days in (20, 3, 2):
+            s = pt.evaluate(reference_agents(seed=3), seed=seed, universe=u,
+                            days=days, max_leverage=2.0)
+            out += [s["oracle"].impact_bps, s["momentum"].impact_bps]
+        return out
 
     with ThreadPoolExecutor(max_workers=min(6, ctx.workers)) as pool:
         rows = list(pool.map(one, range(2020, 2032)))
-    o20 = [r[0] for r in rows]
-    m20 = [r[1] for r in rows]
-    o3 = [r[2] for r in rows]
-    m3 = [r[3] for r in rows]
+    o20, m20, o3, m3, o2, m2 = (list(col) for col in zip(*rows))
     return {
         "oracle_imp20_min": min(o20),
         "oracle_imp20_max": max(o20),
         "oracle_imp20_pos": sum(1 for x in o20 if x > 0),
         "mom_imp20_flips": min(m20) < 0 < max(m20),
-        "imp3_pos_min": min(sum(1 for x in o3 if x > 0),
-                            sum(1 for x in m3 if x > 0)),
+        "imp2_pos_min": min(sum(1 for x in o2 if x > 0),
+                            sum(1 for x in m2 if x > 0)),
+        "imp3_oracle_pos": sum(1 for x in o3 if x > 0),
+        "imp3_oracle_min": min(o3),
+        "imp3_oracle_max": max(o3),
     }
 
 
@@ -466,24 +580,43 @@ def g_rng(ctx: Ctx) -> dict:
 # macro and scenarios
 # ---------------------------------------------------------------------------
 
-def g_macro_frozen(ctx: Ctx) -> dict:
-    """core-concepts: over run_days(120) every macro field takes one distinct
-    value and fundamental_value takes one distinct value per instrument."""
-    u = _u(20, 7)
+def g_macro_chain(ctx: Ctx) -> dict:
+    """core-concepts: the macro chain runs endogenously by default. Over
+    run_days(120) on random(20, seed=11), sim seed 42, VIX takes a new value
+    every day, the policy-driven fields step at the meeting calendar
+    (federal_funds_rate 2 distinct values, corporate_bond_yield 3,
+    inflation_rate 4, gdp_growth 6), and fundamental_value takes 3 distinct
+    values per instrument (repricing at the day-45 and day-96 meetings)
+    except the book-valued loss-maker, which never reprices."""
+    u = _u(20, 11)
     e = pt.Engine(seed=42, universe=u)
     e.run_days(120, record=True)
     macro = pa.table(e.macro_table()).to_pydict()
-    fields = ["vix", "federal_funds_rate", "corporate_bond_yield",
-              "inflation_rate", "unemployment_rate", "gdp_growth",
-              "qe_pe_boost", "fear_greed_index"]
-    max_macro = max(len(set(macro[f])) for f in fields)
     t = pa.table(e.truth()).to_pydict()
+
     per: dict[int, set] = defaultdict(set)
-    for i, fv in zip(t["instrument_id"], t["fundamental_value"]):
-        per[i].add(fv)
+    reprice_days: set[int] = set()
+    last: dict[int, float] = {}
+    order = sorted(range(len(t["instrument_id"])),
+                   key=lambda i: (t["instrument_id"][i], t["day"][i],
+                                  t["tick"][i]))
+    for i in order:
+        inst, fv = t["instrument_id"][i], t["fundamental_value"][i]
+        per[inst].add(fv)
+        if inst in last and fv != last[inst]:
+            reprice_days.add(t["day"][i])
+        last[inst] = fv
+    counts = sorted(len(s) for s in per.values())
+
     return {
-        "max_distinct_macro": max_macro,
-        "max_distinct_fv": max(len(s) for s in per.values()),
+        "vix_distinct": len(set(macro["vix"])),
+        "fed_distinct": len(set(macro["federal_funds_rate"])),
+        "cby_distinct": len(set(macro["corporate_bond_yield"])),
+        "inflation_distinct": len(set(macro["inflation_rate"])),
+        "gdp_distinct": len(set(macro["gdp_growth"])),
+        "fv_distinct_repricer": counts[-1],
+        "fv_distinct_lossmaker": counts[0],
+        "reprice_days": ",".join(str(d) for d in sorted(reprice_days)),
         "default_cby": round(macro["corporate_bond_yield"][0], 6),
     }
 
@@ -511,9 +644,10 @@ def _run_days_recorded_from(engine, start: int, stop: int) -> None:
 def g_pin_macro(ctx: Ctx) -> dict:
     """core-concepts: pinning the corporate bond yield reprices 19 of 20 and
     the twentieth is a loss-maker; pinning the policy rate reprices none.
-    Universe reconstructed as random(20, seed=7) (one loss-maker, as stated;
-    random(20, seed=11) reproduces the same counts)."""
-    u = _u(20, 7)
+    Measured on random(20, seed=11), the universe the page's macro-chain run
+    names ("the loss-maker above"); the pin lands at day 2, well before the
+    first meeting, so the endogenous chain cannot confound the counts."""
+    u = _u(20, 11)
     return {
         "loss_makers": sum(1 for i in u if i.eps <= 0),
         "repriced_corp": _repriced_after(u, {"corporate_bond_yield": 0.09}),
@@ -523,9 +657,9 @@ def g_pin_macro(ctx: Ctx) -> dict:
 
 def g_fedfunds(ctx: Ctx) -> dict:
     """scenarios.md: a policy-rate-only path moves prices by exactly 0.00%
-    over 40 days, and a median around -4% once a 60-day run crosses the
-    central-bank meeting at day 45. The page names neither universe nor sim
-    seed; reconstructed as random(20,4), seed 5, from tests/test_scenario.py."""
+    over 40 days, and a median -4.29% once a 60-day run crosses the
+    central-bank meeting at day 45. Method stated on the page since the
+    stream-AB rewrite: ramp 2.5%->5% over 30 days, random(20,4), sim seed 5."""
     u = _u(20, 4)
     ramp = Scenario().ramp("federal_funds_rate", start=0.025, end=0.05, over=30)
     r40 = compare(ramp, seed=5, universe=u, days=40)
@@ -548,9 +682,12 @@ def g_spec(ctx: Ctx) -> dict:
 
 
 def g_vix(ctx: Ctx) -> dict:
-    """scenarios.md VIX tables. Volatility over random(20, seed=11), spreads
-    over random(25, seed=11) (both reconstructed; VIX 15 reproduces the
-    published value exactly on each), correlation over random(25, seed=11)."""
+    """scenarios.md VIX tables, methods stated on the page since the
+    stream-AB rewrite: volatility over random(20, seed=11), spreads and
+    correlation over random(25, seed=11), sim seed 3. The realism page
+    quotes the same pinned-VIX correlations. Also the bit-identity boundary:
+    VIX 5/10/15 closes are identical on day one and diverge for every pair
+    from day two."""
     u20 = _u(20, 11)
     u25 = _u(25, 11)
     out: dict = {}
@@ -574,6 +711,8 @@ def g_vix(ctx: Ctx) -> dict:
             out[f"corr_{vix}"] = c
     out["vol_range_max_delta"] = max(out[f"vol_{v}"] for v in (5, 15, 45, 65)) \
         - min(out[f"vol_{v}"] for v in (5, 15, 45, 65))
+    # "a thirteenfold move in VIX moves realised volatility by a factor of 2.5"
+    out["vol_ratio_65_5"] = out["vol_65"] / out["vol_5"]
 
     def spread(vix):
         e = pt.Engine(seed=3, universe=u25)
@@ -594,13 +733,22 @@ def g_vix(ctx: Ctx) -> dict:
     for vix in (15, 25, 45, 65):
         out[f"spread_{vix}"] = spread(vix)
 
-    def prices60(vix):
-        e = run_scenario(Scenario().hold(vix=float(vix)), seed=3,
-                         universe=u20, days=60)
-        return e.prices()
+    def daily_closes(vix, days=2):
+        e = pt.Engine(seed=3, universe=u20)
+        sc = Scenario().hold(vix=float(vix))
+        closes = []
+        for day in range(days):
+            sc.apply(e, day)
+            e.open_market()
+            e.run_session(9, 30, 3, 390)
+            e.close_market()
+            closes.append(e.prices())
+        return closes
 
-    p5, p10, p15 = (prices60(v) for v in (5, 10, 15))
-    out["bit_identical_5_10_15"] = p5 == p10 == p15
+    c5, c10, c15 = (daily_closes(v) for v in (5, 10, 15))
+    out["bit_day1_identical"] = c5[0] == c10[0] == c15[0]
+    out["bit_day2_all_pairs_differ"] = (c5[1] != c10[1] and c5[1] != c15[1]
+                                        and c10[1] != c15[1])
     return out
 
 
@@ -625,6 +773,139 @@ def g_tca_vix(ctx: Ctx) -> dict:
         "median_lo": _median(los),
         "median_hi": _median(his),
         "paired_median_delta": _median([hi - lo for lo, hi in pairs]),
+    }
+
+
+class _BuyOnce:
+    """Buy one name at a fraction of its ADV on the first step, then hold.
+    Mirrors tests/test_tca.py's BuyOnce, the configuration the TCA page's
+    worked figures state."""
+
+    def __init__(self, participation=0.01, index=0):
+        self.participation = participation
+        self.index = index
+        self.done = False
+
+    def act(self, obs):
+        if self.done:
+            return {}
+        self.done = True
+        ticker = obs.tickers[self.index]
+        return {ticker: self.participation * obs.avg_volume(ticker)}
+
+
+class _RoundTrip:
+    """Buy on step 0, close the whole position on step 3 (tests/test_tca.py)."""
+
+    def __init__(self, participation=0.01):
+        self.participation = participation
+
+    def act(self, obs):
+        ticker = obs.tickers[0]
+        if obs.step == 0:
+            return {ticker: self.participation * obs.avg_volume(ticker)}
+        if obs.step == 3:
+            return {ticker: -obs.position(ticker)}
+        return {}
+
+
+_TCA_SEEDS = (2026, 1, 2, 3, 4, 5, 7, 11)
+
+
+def g_tca_example(ctx: Ctx) -> dict:
+    """transaction-cost-analysis.md's worked figures, method stated on the
+    page: the first name of Universe.random(20, seed=7) (ADV 9,713 shares),
+    one six-step day. Entry: 97 shares (1% ADV) at the first step costs
+    +16.71 bps on every seed measured. Round trip (sell three steps later):
+    a seed range, -13.3 to +5.8 bps over sim seeds 2026,1,2,3,4,5,7,11,
+    negative on 6 of 8, median -8.4. Partial fill: a request for 4,856
+    shares (half ADV, sim seed 2026) fills 483 - the whole displayed
+    depth - and requests of 9,713 and 48,563 fill the same 483, on every
+    seed measured."""
+    u = _u(20, 7)
+
+    def analyse(agent, seed):
+        return pt.tca.analyse(agent, universe=u, days=1, steps_per_day=6,
+                              seed=seed)
+
+    def one(seed):
+        entry = analyse(_BuyOnce(0.01), seed).shortfall_bps()
+        rt = analyse(_RoundTrip(0.01), seed).shortfall_bps()
+        half = analyse(_BuyOnce(0.5), seed).partial_fills()
+        opening_fill = half[0]["quantity"] if half else None
+        return entry, rt, opening_fill
+
+    with ThreadPoolExecutor(max_workers=min(8, ctx.workers)) as pool:
+        rows = dict(zip(_TCA_SEEDS, pool.map(one, _TCA_SEEDS)))
+
+    entries = [rows[s][0] for s in _TCA_SEEDS]
+    rts = [rows[s][1] for s in _TCA_SEEDS]
+    fills = [rows[s][2] for s in _TCA_SEEDS]
+
+    # the saturation claim: half ADV, full ADV and 5x ADV all fill the same
+    # shares at sim seed 2026
+    sizes = {}
+    for part in (0.5, 1.0, 5.0):
+        pf = analyse(_BuyOnce(part), 2026).partial_fills()
+        sizes[part] = (round(pf[0]["requested"]), pf[0]["quantity"]) \
+            if pf else (None, None)
+
+    return {
+        "first_adv": round(u[0].avg_volume),
+        "entry_bps": rows[2026][0],
+        "entry_all_equal": len(set(entries)) == 1,
+        "rt_median": _median(rts),
+        "rt_lo": min(rts),
+        "rt_hi": max(rts),
+        "rt_neg": sum(1 for r in rts if r < 0),
+        "fill_half_requested": sizes[0.5][0],
+        "fill_half": sizes[0.5][1],
+        "fills_saturate": len({q for _, q in sizes.values()}) == 1,
+        "fill_seed_invariant": len(set(fills)) == 1,
+    }
+
+
+def g_tca_ripple(ctx: Ctx) -> dict:
+    """transaction-cost-analysis.md's macro boundary, method stated on the
+    page: Momentum() over Universe.random(60, seed=11), sim seed 7, ten
+    days. The agent trades 46 names; 2 of the 14 untouched names move (-6.5
+    and +3.2 bps) against a 13.0 bps median direct impact; the same
+    configuration over two, three or four days leaks nothing; pinning VIX
+    returns untouched_moved() to empty, byte-exact. Mirrors the assertions
+    examples/research_workflow.py runs every time."""
+    u = _u(60, 11)
+
+    def analyse(days, scenario=None):
+        return pt.tca.analyse(Momentum(), seed=7, universe=u, days=days,
+                              scenario=scenario)
+
+    jobs = {
+        "full": lambda: analyse(10),
+        "pinned": lambda: analyse(10, Scenario().hold(vix=15.0)),
+        "d2": lambda: analyse(2),
+        "d3": lambda: analyse(3),
+        "d4": lambda: analyse(4),
+    }
+    with ThreadPoolExecutor(max_workers=min(5, ctx.workers)) as pool:
+        done = dict(zip(jobs, pool.map(lambda f: f(), jobs.values())))
+
+    ex = done["full"]
+    traded = {f["ticker"] for f in ex.fills}
+    leaked = ex.untouched_moved()
+    leak_bps = sorted(ex.impact_bps(t) for t in leaked)
+    direct = sorted(abs(bps) for name, bps in ex.moved().items()
+                    if name in traded)
+
+    return {
+        "traded_names": len(traded),
+        "untouched_names": len(u) - len(traded),
+        "leaked_count": len(leaked),
+        "leak_min_bps": leak_bps[0] if leak_bps else None,
+        "leak_max_bps": leak_bps[-1] if leak_bps else None,
+        "direct_median_bps": direct[len(direct) // 2] if direct else None,
+        "short_horizon_no_leak": all(not done[k].untouched_moved()
+                                     for k in ("d2", "d3", "d4")),
+        "pinned_empty": done["pinned"].untouched_moved() == [],
     }
 
 
@@ -789,9 +1070,13 @@ def g_perf(ctx: Ctx) -> dict:
 
 def g_fork(ctx: Ctx) -> dict:
     """forking-a-simulation.md: branch < 1 ms, Checkpoint.resume seconds.
-    The page does not say what run length the 2.7 s was measured over; this
-    measures a 30-day run and compares the branch/resume ratio, which is the
-    claim's portable part (three orders of magnitude)."""
+    The page does not say what run length the 2.7 s was measured over;
+    replay cost scales with the order log, so the absolute is doubly
+    machine- and method-bound. This measures the 30-day run that reproduces
+    the page's branch/resume ratio - the claim's portable part (three
+    orders of magnitude, judged as a band on log10) - and reports the
+    resume wall clock the way every other wall clock is reported: as
+    machine_bound, never judged at printed precision."""
     import math
     u = _u(20, 11)
     e = pt.Engine(seed=42, universe=u)
@@ -853,6 +1138,7 @@ GROUPS = {
     "truth_residual": g_truth_residual,
     "realism_sample": g_realism_sample,
     "realism_six": g_realism_six,
+    "realism_heldout": g_realism_heldout,
     "rebalance": g_rebalance,
     "horizon": g_horizon,
     "oracle_config": g_oracle_config,
@@ -861,12 +1147,14 @@ GROUPS = {
     "llm_leaderboard": g_llm_leaderboard,
     "llm_impact": g_llm_impact,
     "rng": g_rng,
-    "macro_frozen": g_macro_frozen,
+    "macro_chain": g_macro_chain,
     "pin_macro": g_pin_macro,
     "fedfunds": g_fedfunds,
     "spec": g_spec,
     "vix": g_vix,
     "tca_vix": g_tca_vix,
+    "tca_example": g_tca_example,
+    "tca_ripple": g_tca_ripple,
     "drawdiv": g_drawdiv,
     "replay": g_replay,
     "universe_stats": g_universe_stats,
