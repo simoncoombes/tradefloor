@@ -1177,9 +1177,10 @@ def _r2_inflation_shock() -> Scenario:
 def _r3_liquidity_crisis() -> Scenario:
     """Recipe 3: a liquidity crisis of the 2008 shape.
 
-    Two fields, so chaining is safe: the VIX spike comes from the built-in
-    shape (one driver, therefore no self-conflict) and the credit leg is a
-    ramp on a DIFFERENT field.
+    The VIX spike comes from the built-in shape and the credit leg is a ramp
+    on a DIFFERENT field. `vix_shock` is a constructor, so it has to come
+    first; the page also claims it is exactly a `hold` and a `ramp`, which
+    `rule2_vix_shock_is_hold_then_ramp` measures.
     """
     return (Scenario.vix_shock(calm=18.0, peak=80.0, at=20, over=60)
             .ramp("corporate_bond_yield", start=0.055, end=0.095,
@@ -1195,8 +1196,8 @@ def _r4_contraction() -> Scenario:
 
 def _r4_baseline() -> Scenario:
     """Recipe 4's baseline, which MUST be passed explicitly: `compare`'s
-    default is `hold(**scenario.at(0))`, and for a hold-only scenario that is
-    the scenario itself, so the default measures exactly zero."""
+    default is `hold(**scenario.at(0))`, and for a scenario that is only a
+    level that is the scenario itself, so the default call is refused."""
     return (Scenario("expansion baseline")
             .hold(cycle="expansion")
             .hold(fear_greed_index=50.0))
@@ -1205,11 +1206,12 @@ def _r4_baseline() -> Scenario:
 def _r5_compound_path(days: int = 120) -> Scenario:
     """Recipe 5: a compound episode of the 2020 shape.
 
-    Four fields on four different schedules, one of which (the policy rate)
-    needs TWO segments. Two pins on one field silently collapse to the last
-    one written, so the whole path is built as data and loaded through
-    `from_json` -- the one form that expresses an arbitrary piecewise path on
-    a single field without a self-conflict.
+    Four fields on four different schedules, the policy rate taking three
+    levels of its own. Chaining expresses this since pins layer as segments
+    -- `_r5_compound_chained` is the same path written that way, and
+    `r5_chained_matches_loaded` measures the two against each other -- but
+    the recipe builds it as data because every leg is arithmetic, which
+    reads better as a function than as ten chained calls.
     """
     rows = []
     for d in range(days):
@@ -1245,11 +1247,69 @@ def _r5_compound_path(days: int = 120) -> Scenario:
          "days": days, "path": rows}))
 
 
+def _r5_compound_chained() -> Scenario:
+    """Recipe 5's path written as chained segments instead of loaded data.
+
+    Ten pins across four fields, each field's pins in strictly increasing
+    start-day order, with a `hold` in front of every field that does not
+    begin moving on day zero. The page publishes the claim that this and
+    `_r5_compound_path()` are the same scenario, which is the segment rule
+    stated on something big enough for the statement to mean anything.
+    """
+    return (Scenario("compound: chained")
+            .hold(vix=15.0)
+            .ramp("vix", start=82.0, end=18.0, over=45, begin=15)
+            .hold(federal_funds_rate=0.0155)
+            .step("federal_funds_rate", before=0.0155, after=0.01125, at=18)
+            .step("federal_funds_rate", before=0.01125, after=0.00125, at=28)
+            .hold(corporate_bond_yield=0.036)
+            .ramp("corporate_bond_yield", start=0.036, end=0.105,
+                  over=22, begin=18)
+            .ramp("corporate_bond_yield", start=0.105, end=0.045,
+                  over=50, begin=40)
+            .hold(qe_pe_boost=0.0)
+            .ramp("qe_pe_boost", start=0.0, end=0.10, over=30, begin=40))
+
+
+def _refusal(call) -> str | None:
+    """The `ValidationError` message ``call`` raises, or None if it returns.
+
+    The page's rules are claims about what the surface REFUSES, and a claim
+    that something raises is only worth pinning if it also pins why: a call
+    that started raising for an unrelated reason would keep a bare
+    "it raised" row green while the page's explanation went stale. So the
+    message comes back and the callers below assert on what is in it.
+    """
+    try:
+        call()
+    except pt.ValidationError as exc:
+        return str(exc)
+    return None
+
+
+def _refuses(call, *phrases: str) -> bool:
+    """True if ``call`` is refused AND the refusal contains every phrase.
+
+    The phrases are the ones the page quotes or paraphrases, so this is the
+    structural form of "the page's account of this refusal is still true".
+    """
+    message = _refusal(call)
+    return message is not None and all(p in message for p in phrases)
+
+
 def g_recipes(ctx: Ctx) -> dict:
-    """docs/scenario-recipes.md: every measured effect, plus the four silent
-    conflicts the page warns about, pinned as structural claims so that a
-    future engine fix flags the warning as stale rather than leaving the page
-    frightening readers about behaviour that no longer exists.
+    """docs/scenario-recipes.md: every measured effect, plus the composition
+    rules the page teaches, pinned as structural claims so that a future
+    change to the `Scenario` surface flags the page rather than leaving it
+    describing behaviour the library no longer has.
+
+    That mechanism has fired once already and is worth the note. The page
+    used to warn about four silent conflicts and three of them were pinned
+    here; PR #39 composed one and refused the other two, the three rows went
+    red, and the page was rewritten around what the surface does now. Rows
+    that pin a MODEL of the surface, rather than a number it produces, are
+    the only ones that can do that -- every measured figure below reproduces
+    unchanged across that fix.
 
     Price effects use `Universe.random(20, seed=4)` at sim seed 5 and
     volatility effects `Universe.random(20, seed=11)` at sim seed 3 -- the
@@ -1329,36 +1389,124 @@ def g_recipes(ctx: Ctx) -> dict:
     out["r5_vol_pct"] = got["r5_vol"]["annualised_vol_pct"]
     out["r5_exact"] = got["r5_price"]["exact"]
 
-    # -- the silent conflicts, pinned as behaviour --------------------------
-    # Edge 1: a step then a decay ramp on the SAME field. The ramp wins and
-    # back-fills day zero with its start value, so the run opens in crisis.
-    e1 = (Scenario()
-          .step("vix", before=15.0, after=48.0, at=60)
-          .ramp("vix", start=48.0, end=18.0, over=40, begin=60))
-    out["edge1_day0_vix"] = e1.at(0)["vix"]
-    out["edge1_fields"] = len(e1.fields)
+    # -- the composition rules, pinned as behaviour -------------------------
+    #
+    # These rows exist for the same reason the trap rows they replace did.
+    # The page teaches a model of the `Scenario` surface, and a model is the
+    # half of a document that no measured figure can catch going stale: the
+    # numbers below would all still reproduce under a surface that had
+    # quietly stopped refusing anything. So each rule the page states is a
+    # structural claim here, and the refusals are pinned by what their
+    # messages SAY rather than by the bare fact that they raise -- see
+    # `_refuses`. Three of these rows replace rows that pinned the opposite
+    # behaviour and fired when PR #39 fixed it, which is the mechanism
+    # working, and the reason to keep paying for it.
 
-    # Edge 1 reversed: writing them the other way round does NOT fix it. The
-    # step wins, the decay is discarded, and the crisis never subsides.
-    e1r = (Scenario()
-           .ramp("vix", start=48.0, end=18.0, over=40, begin=60)
-           .step("vix", before=15.0, after=48.0, at=60))
-    out["edge1_reverse_day0_vix"] = e1r.at(0)["vix"]
-    out["edge1_reverse_day99_vix"] = e1r.at(99)["vix"]
+    # Rule 1, clause by clause, on the page's three-segment example. The
+    # step is the FIRST pin, so it owns day 0 (before its own start) and
+    # days 60-74 (until the next pin begins); the ramp owns the rest.
+    segments = (Scenario("spike, plateau, decay")
+                .step("vix", before=15.0, after=48.0, at=60)
+                .ramp("vix", start=48.0, end=22.0, over=45, begin=75))
+    out["rule1_seg_day0"] = segments.at(0)["vix"]
+    out["rule1_seg_day60"] = segments.at(60)["vix"]
+    out["rule1_seg_day74"] = segments.at(74)["vix"]
+    out["rule1_seg_day97"] = segments.at(97)["vix"]
+    out["rule1_seg_day120"] = segments.at(120)["vix"]
 
-    # Edge 2: the shape constructors are classmethods. Calling one on a
-    # configured scenario returns a NEW scenario driving only its own field.
+    # The page's own step-then-decay example, in the form the same-day
+    # refusal advises: `hold` states the level, `ramp` states the episode,
+    # and a ramp starting AT its start value makes day 60 the jump.
+    spike = (Scenario("spike and decay")
+             .hold(vix=15.0)
+             .ramp("vix", start=48.0, end=18.0, over=40, begin=60))
+    out["rule1_example_day0"] = spike.at(0)["vix"]
+    out["rule1_example_day30"] = spike.at(30)["vix"]
+    out["rule1_example_day59"] = spike.at(59)["vix"]
+    out["rule1_example_day60"] = spike.at(60)["vix"]
+    out["rule1_example_day80"] = spike.at(80)["vix"]
+    out["rule1_example_day100"] = spike.at(100)["vix"]
+    out["rule1_table_day0"] = spike.table(5)[0]["vix"]
+
+    # The two refused orderings. The page prints the same-day message in
+    # full, so the message itself is the published figure -- reword it and
+    # the page is stale, which is exactly what should be reported.
+    out["rule1_same_day_message"] = _refusal(
+        lambda: (Scenario("looks right, is not")
+                 .step("vix", before=15.0, after=48.0, at=60)
+                 .ramp("vix", start=48.0, end=18.0, over=40, begin=60)))
+    # ...and the reverse of that pair is the same conflict, so it is refused
+    # too. The old rows here measured the two orderings failing in two
+    # different wrong ways; there is now one rule and it is symmetric.
+    out["rule1_same_day_reversed_refused"] = _refuses(
+        lambda: (Scenario()
+                 .ramp("vix", start=48.0, end=18.0, over=40, begin=60)
+                 .step("vix", before=15.0, after=48.0, at=60)),
+        "both begin on day 60")
+    out["rule1_out_of_order_refused"] = _refuses(
+        lambda: (Scenario()
+                 .ramp("vix", start=48.0, end=22.0, over=45, begin=75)
+                 .step("vix", before=15.0, after=48.0, at=60)),
+        "are out of order", "must be declared in the order they happen")
+
+    # Rule 2: the shape constructors build a whole scenario, and calling one
+    # on a configured instance is refused rather than silently discarding
+    # the receiver. The refusal names the receiver's fields, which is the
+    # part of it the page describes.
     base = Scenario("base").hold(inflation_rate=0.06, fear_greed_index=20.0)
-    chained = base.vix_shock(calm=15.0, peak=60.0, at=10, over=30)
-    out["edge2_base_fields"] = len(base.fields)
-    out["edge2_chained_fields"] = ",".join(chained.fields)
-    out["edge2_chained_is_base"] = chained is base
+    out["rule2_vix_shock_on_instance_refused"] = _refuses(
+        lambda: base.vix_shock(calm=15.0, peak=60.0, at=10, over=30),
+        "is a CONSTRUCTOR, not a step",
+        "drives fear_greed_index, inflation_rate")
+    out["rule2_rate_shock_on_instance_refused"] = _refuses(
+        lambda: base.rate_shock(start=0.025, end=0.05, over=30),
+        "is a CONSTRUCTOR, not a step")
+    out["rule2_from_json_on_instance_refused"] = _refuses(
+        lambda: base.from_json("{}"), "is a CONSTRUCTOR, not a step")
+    out["rule2_base_intact"] = ",".join(base.fields)
 
-    # Edge 4: compare()'s default baseline is hold(**scenario.at(0)), which
-    # for a hold-only scenario IS the scenario -- a clean, wrong zero.
+    # The composing form, and the page's claim that the constructors are
+    # convenience rather than capability: both shapes are writable as pins
+    # now that pins layer, and the hand-written versions are the same paths.
+    right = (Scenario.vix_shock(calm=15.0, peak=60.0, at=10, over=30)
+             .hold(inflation_rate=0.06, fear_greed_index=20.0))
+    out["rule2_right_fields"] = ",".join(right.fields)
+    out["rule2_vix_shock_is_hold_then_ramp"] = right.table(120) == (
+        Scenario()
+        .hold(inflation_rate=0.06, fear_greed_index=20.0)
+        .hold(vix=15.0)
+        .ramp("vix", start=60.0, end=15.0, over=30, begin=10)).table(120)
+    out["rule2_rate_shock_is_two_ramps"] = (
+        _r1_hiking_cycle().table(120) == (
+            Scenario()
+            .ramp("federal_funds_rate", start=0.00125, end=0.0538, over=90)
+            .ramp("corporate_bond_yield", start=0.02125, end=0.0738,
+                  over=90)).table(120))
+
+    # Rule 3: compare()'s default baseline is hold(**scenario.at(0)), which
+    # for a path that never moves inside the horizon IS the scenario. All
+    # four shapes that reach that are refused; the page lists three of them
+    # and the fourth is an explicit baseline realising the same path.
     held = Scenario("held crisis").hold(vix=45.0)
-    out["edge4_default_median_pct"] = price(held, 30)["median_pct"]
-    out["edge4_explicit_median_pct"] = price(
+    out["rule3_hold_only_refused"] = _refuses(
+        lambda: price(held, 30), "is CONSTANT over all 30 days")
+    out["rule3_step_at_zero_refused"] = _refuses(
+        lambda: price(Scenario("step at zero")
+                      .step("vix", before=15.0, after=45.0, at=0), 30),
+        "is CONSTANT over all 30 days")
+    out["rule3_after_horizon_refused"] = _refuses(
+        lambda: price(Scenario("late")
+                      .ramp("federal_funds_rate", start=0.025, end=0.05,
+                            over=30, begin=60), 40),
+        "begins on or after day 40", "Run at least 61 days")
+    out["rule3_empty_refused"] = _refuses(
+        lambda: price(Scenario("nothing"), 30), "it drives no fields at all")
+    out["rule3_same_path_baseline_refused"] = _refuses(
+        lambda: price(held, 30, Scenario("also held").hold(vix=45.0)),
+        "would difference two identical worlds")
+
+    # The explicit baseline the page tells readers to pass instead.
+    out["rule3_explicit_median_pct"] = price(
         held, 30, Scenario("calm").hold(vix=15.0))["median_pct"]
 
     # ...and why a PRICE delta is the wrong measure for a volatility
@@ -1372,12 +1520,14 @@ def g_recipes(ctx: Ctx) -> dict:
 
     with ThreadPoolExecutor(max_workers=min(8, ctx.workers)) as pool:
         band = list(pool.map(vix_delta, range(1, 9)))
-    out["edge4_seedband_lo"] = min(band)
-    out["edge4_seedband_hi"] = max(band)
-    out["edge4_seedband_negative"] = sum(1 for x in band if x < 0)
+    out["rule3_seedband_lo"] = min(band)
+    out["rule3_seedband_hi"] = max(band)
+    out["rule3_seedband_negative"] = sum(1 for x in band if x < 0)
 
-    # The from_json escape hatch the compound recipe rests on: an arbitrary
-    # piecewise path on ONE field, holding its final value past the horizon.
+    # The from_json path the compound recipe rests on: an arbitrary
+    # piecewise path on any number of fields, holding its final values past
+    # the horizon -- and, since pins layer, reproducible by chaining, which
+    # is the claim recipe 5 now makes in place of "chaining cannot do this".
     p = _r5_compound_path()
     out["r5_day0_vix"] = p.at(0)["vix"]
     out["r5_day17_vix"] = round(p.at(17)["vix"], 5)
@@ -1385,6 +1535,8 @@ def g_recipes(ctx: Ctx) -> dict:
     out["r5_day17_ff"] = p.at(17)["federal_funds_rate"]
     out["r5_day30_ff"] = p.at(30)["federal_funds_rate"]
     out["r5_beyond_horizon_ff"] = p.at(500)["federal_funds_rate"]
+    out["r5_chained_matches_loaded"] = (
+        _r5_compound_chained().table(120) == p.table(120))
     return out
 
 
