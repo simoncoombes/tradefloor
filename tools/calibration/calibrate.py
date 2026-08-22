@@ -1,0 +1,937 @@
+"""The calibration search: a penalised band-distance fit, as a citable run.
+
+CALIBRATION.md §6 (the loss), §7 (the optimiser), §8 (overfitting control)
+and §9 (citability), built on the phase-1 runtime seam and the phase-2
+instrument. Where `falsify.py` asks "can this model class reach these
+statistics at all", this tool asks the calibration question: **what is the
+smallest move from the shipped preset that brings the live targets into
+band without pushing a constraint out** — and it answers with a named
+candidate preset, a certificate, and the deviation/realism frontier that
+prices the answer.
+
+Four things make it a different tool from `falsify.py` rather than a flag
+on it, and each is a decision the report has to defend:
+
+**The objective is the shipped one, regularised.** `L_real` comes from
+`pretium.loss.band_distance_loss` — the library's own function, with the
+library's own `LIVE_TARGETS`/`CONSTRAINTS` membership and the library's
+own `SEED_SD` — so the number the search minimises is the number a reader
+can recompute from the wheel. On top of it sits §6.3's penalty,
+`lambda * sum_j dev_j^2`, with `dev_j` in log units for scale parameters
+and raw units for bounded shares and multiples. A falsification wants
+`lambda = 0` (best case for the model class); a calibration wants the
+penalty load-bearing, because an unregularised fit forks the model
+everywhere at once and nobody can say what any move bought.
+
+**The box is §6.3's, not the falsifier's.** `instrumentlib.default_box`
+opens a bounded share to its whole natural range, which is right for an
+emptiness certificate and wrong here: §6.3 asks for ~[1/4x, 4x] per
+parameter "so the model's fixed literals retain their meaning".
+`calibration_box` applies that rule to every class. One consequence is
+worth naming in advance rather than discovering later: phase 2's
+degenerate corner (`garch_alpha` 0.424, twenty-one times the shipped
+0.02, lag-5 memory at -0.001) is outside this box by construction. That
+is the intended behaviour of a calibration box and NOT the reason the
+corner is rejected — the lag-5 band prices it now, and
+`--degeneracy-probe` re-measures it here so the certificate carries the
+check rather than citing one.
+
+**The seed protocol is two-tier.** §8 fixes the training set at seeds
+101-130. Ranking a thousand candidates on thirty seeds each is thirty
+thousand panel runs; ranking them on a systematic ten-seed subset and
+confirming on all thirty is a fifth of that for the same answer, because
+common random numbers make small-seed *comparisons* meaningful in a way
+they are not in a noisy simulator. The subset's offsets against the
+thirty-seed baseline are measured before the search and recorded in the
+certificate, so the reader can see what the shortcut cost.
+
+**The frontier is free.** Every evaluated vector carries its `L_real` and
+its squared deviation, so the (deviation, realism) Pareto frontier over
+the whole run is computable from the cache without one extra panel. §6.3
+calls that frontier the deliverable; here it costs nothing, and the
+operating point is chosen on it in the open.
+
+Usage:
+
+    .venv/bin/python tools/calibration/calibrate.py \
+        --params spectrum8 --lambda 10 \
+        --out results/calibrate-pt-v2-$(date +%F).json
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import statistics
+import time
+
+import numpy as np
+
+import instrumentlib as lib
+from falsify import cma_es, compass_polish
+
+#: The searched set, taken from phase 2's MEASURED identifiability
+#: spectrum (CALIBRATION-RESULTS.md §5) rather than from §3.9's
+#: argued-parameter-by-parameter list, which that measurement corrected in
+#: both directions. Column norms are in seed-sds per deviation unit at
+#: pt-v1, from `results/identifiability-pt-v1-2026-08-22.json`.
+#:
+#: In, because they are the strongly identified directions:
+#:   garch_alpha 31.6, market_vol_alpha 29.0, garch_beta 23.3,
+#:   market_vol_beta 22.1, market_vol_vix_coupling 20.7,
+#:   momentum_theta 18.3, garch_gamma 11.2, idio_sigma_scale 10.2.
+#:
+#: Out, and each for a stated reason:
+#:   price_breaker_fraction (8.3) and mispricing_cap (4.6) are GUARDS —
+#:     §5.2's warning, confirmed with a rate by the SVD: they are visible,
+#:     so a loss allowed to touch them will spend them, buying kurtosis by
+#:     widening a circuit breaker rather than by making the market
+#:     heavier-tailed. Excluded because they are hazards, not because they
+#:     are inert.
+#:   market_factor_sigma (4.1), market_vol_vix_anchor (3.8),
+#:     garch_floor_multiple (2.5), crowd_momentum_gain (2.0),
+#:     garch_omega (1.6) are weak-but-real. With the panel constraining
+#:     about five effective directions, adding a sixth-to-tenth weak
+#:     column buys resolution the data does not have; finding 14 also put
+#:     market_factor_sigma's trade on record (correlation bought with
+#:     kurtosis at a fixed rate) and correlation is in band with room on
+#:     both sides, so there is nothing for it to buy.
+#:   garch_ceiling_multiple (0.41) and sector_factor_sigma (0.28) are the
+#:     two §3.9 listed as searchable and the SVD found effectively
+#:     unidentified at pt-v1 — the last singular direction of the
+#:     searched-9 submatrix, 0.079, is these two against each other.
+#:   the nine exactly-zero columns (informed_flow_fraction,
+#:     crowd_lean_cap, news_market_weight, news_sector_weight,
+#:     order_flow_coefficient, price_hard_cap, market_vol_floor_multiple,
+#:     crisis_blend_ramp, crisis_blend_cap) are invisible to this panel as
+#:     a theorem about the run, not an estimate: bit-identical panels
+#:     across all thirty seeds under perturbation.
+SPECTRUM_8 = (
+    "garch_alpha",
+    "market_vol_alpha",
+    "garch_beta",
+    "market_vol_beta",
+    "market_vol_vix_coupling",
+    "momentum_theta",
+    "garch_gamma",
+    "idio_sigma_scale",
+)
+
+#: The measured column norms, carried so the certificate states the
+#: spectrum it took its search space from rather than citing it.
+COLUMN_NORMS = {
+    "garch_alpha": 31.6, "market_vol_alpha": 29.0, "garch_beta": 23.3,
+    "market_vol_beta": 22.1, "market_vol_vix_coupling": 20.7,
+    "momentum_theta": 18.3, "garch_gamma": 11.2, "idio_sigma_scale": 10.2,
+    "price_breaker_fraction": 8.3, "mispricing_cap": 4.6,
+    "market_factor_sigma": 4.1, "market_vol_vix_anchor": 3.8,
+    "garch_floor_multiple": 2.5, "crowd_momentum_gain": 2.0,
+    "garch_omega": 1.6, "garch_ceiling_multiple": 0.41,
+    "sector_factor_sigma": 0.28,
+}
+
+#: Every third training seed. A systematic sample of §8's training set,
+#: not a hand-picked one; its per-statistic offsets against the full
+#: thirty are measured before the search runs and recorded.
+SEARCH_SEEDS = tuple(range(101, 131, 3))
+
+PENALTY_SCALE = 1e3
+
+
+class BudgetExhausted(Exception):
+    """Raised when the panel-run budget is spent; stages stop, cleanly."""
+
+
+def calibration_box(name: str, ship: float) -> tuple[float, float]:
+    """§6.3's box: ~[1/4x, 4x] of the shipped value, in raw units.
+
+    Intersected with the parameter's hard range where it has one. This is
+    deliberately tighter than `instrumentlib.default_box`, which opens a
+    bounded share to (0, 0.999) because an emptiness certificate has to
+    search the whole model class. A calibration is asking a different
+    question — how far must this constant move — and a box that lets a
+    constant move twenty-fold is not asking it.
+    """
+    spec = lib.PARAM_SPECS[name]
+    lo, hi = ship / 4.0, ship * 4.0
+    if spec["kind"] == "abs":
+        hard = spec.get("hard_range", (0.0, 0.999))
+        lo, hi = max(lo, hard[0]), min(hi, hard[1])
+    return lo, hi
+
+
+def deviation(name: str, value: float, ship: float) -> float:
+    """§6.3's deviation: log for scale parameters, raw for bounded ones."""
+    if lib.PARAM_SPECS[name]["kind"] == "log":
+        return math.log(value / ship)
+    return value - ship
+
+
+class DevSpace:
+    """Search coordinates: §6.3 deviations from pt-v1, box-normalised.
+
+    The same shape as `falsify.DevSpace` and deliberately a separate class
+    rather than a flag on it: that one is a committed part of three
+    published certificates, its box rule is the one an emptiness claim
+    needs, and re-pointing it at a different box to save thirty lines
+    would silently re-scope certificates already in the record.
+
+    One change beyond the box, and it is not cosmetic. §6.3's deviation
+    units are comparable *as a penalty* — that is what the log/raw split
+    buys — but they are not comparable as a SEARCH geometry: at pt-v1 the
+    box is ±0.06 deviation units wide for `garch_alpha` and ±1.4 for
+    `idio_sigma_scale`, twenty-three fold. A CMA-ES with one scalar step
+    size and an identity initial covariance over those coordinates spends
+    its whole budget clipped against the narrow faces of the box. So the
+    search coordinate is the deviation divided by the half-width of that
+    parameter's own box: x = 0 is still pt-v1 exactly, one unit of x is
+    the same fraction of the searchable range in every direction, and the
+    penalty and the reported deviations are computed from the raw values
+    as §6.3 defines them, untouched by the rescaling.
+    """
+
+    def __init__(self, params: list[str], ship: dict[str, float]) -> None:
+        self.params = params
+        self.ship = ship
+        self.center = np.array([ship[name] for name in params])
+        self.kinds = [lib.PARAM_SPECS[name]["kind"] for name in params]
+        self.box = {name: calibration_box(name, ship[name]) for name in params}
+        lo, hi = [], []
+        for name, value in zip(params, self.center):
+            box_lo, box_hi = self.box[name]
+            if lib.PARAM_SPECS[name]["kind"] == "log":
+                lo.append(math.log(box_lo / value))
+                hi.append(math.log(box_hi / value))
+            else:
+                lo.append(box_lo - value)
+                hi.append(box_hi - value)
+        self.dev_lo = np.array(lo)
+        self.dev_hi = np.array(hi)
+        #: half-width of each parameter's box, in its own deviation units
+        self.scale = (self.dev_hi - self.dev_lo) / 2.0
+        self.lo = self.dev_lo / self.scale
+        self.hi = self.dev_hi / self.scale
+
+    def to_raw(self, u: np.ndarray) -> dict[str, float]:
+        out = {}
+        for name, kind, center, scale, x in zip(self.params, self.kinds,
+                                                self.center, self.scale, u):
+            du = float(x) * scale
+            out[name] = float(center * math.exp(du) if kind == "log"
+                              else center + du)
+        return out
+
+    def repair(self, u: np.ndarray) -> tuple[np.ndarray, float]:
+        """Clip into the box and onto §6.3's stationarity set.
+
+        Returns (repaired coordinates, squared repair distance). The
+        distance is the search penalty, so leaning on the repair costs
+        something and the interior is preferred.
+        """
+        v = np.clip(u, self.lo, self.hi)
+        raw = self.to_raw(v)
+
+        def get(name: str) -> float:
+            return raw.get(name, self.ship[name])
+
+        def put(name: str, value: float) -> None:
+            if name in raw:
+                raw[name] = value
+
+        a, b, g = get("garch_alpha"), get("garch_beta"), get("garch_gamma")
+        s = a + b + g / 2.0
+        if s >= 0.999:
+            f = 0.998 / s
+            put("garch_alpha", a * f)
+            put("garch_beta", b * f)
+            put("garch_gamma", g * f)
+        ma, mb = get("market_vol_alpha"), get("market_vol_beta")
+        if ma + mb >= 0.999:
+            f = 0.998 / (ma + mb)
+            put("market_vol_alpha", ma * f)
+            put("market_vol_beta", mb * f)
+        for ceiling, floor in (("garch_ceiling_multiple",
+                                "garch_floor_multiple"),
+                               ("market_vol_ceiling_multiple",
+                                "market_vol_floor_multiple")):
+            if get(ceiling) <= get(floor):
+                put(floor, get(ceiling) * 0.5)
+
+        repaired = np.array([
+            (math.log(raw[name] / center) if kind == "log"
+             else raw[name] - center) / scale
+            for name, kind, center, scale in zip(self.params, self.kinds,
+                                                 self.center, self.scale)])
+        bad = lib.feasibility_violation(raw, self.ship)
+        if bad:
+            raise AssertionError(f"repair failed to reach feasibility: {bad}")
+        return repaired, float(np.sum((repaired - u) ** 2))
+
+    def squared_deviation(self, raw: dict[str, float]) -> float:
+        """§6.3's penalty term for a vector expressed as overrides on pt-v1.
+
+        A missing key means "not overridden", which is deviation zero —
+        and it is not a hypothetical: the baseline vector is the empty
+        dict, it sits in the same cache as every candidate, and it is
+        the leftmost point of the frontier this function computes.
+        """
+        return sum(deviation(name, raw.get(name, self.ship[name]),
+                             self.ship[name]) ** 2
+                   for name in self.params)
+
+
+class Evaluator:
+    """Candidate -> penalised loss on a named seed set, memoised and capped.
+
+    The cache is keyed by (vector, seed set), so the ten-seed ranking pass
+    and the thirty-seed confirmation pass are different objectives with
+    different caches and neither can silently answer for the other. The
+    budget counts PANEL RUNS — one (vector, seed) pair — because that is
+    what costs wall clock; §7.2's unit is a six-seed vector, so the cap is
+    expressed in both and the certificate reports both.
+    """
+
+    def __init__(self, workers: int, budget_panel_runs: int,
+                 days: int = lib.PANEL_DAYS,
+                 universe_n: int = lib.PANEL_UNIVERSE_N,
+                 universe_seed: int = lib.PANEL_UNIVERSE_SEED) -> None:
+        self.workers = workers
+        self.hard_budget = budget_panel_runs
+        self.budget = budget_panel_runs
+        self.reserved = 0
+        self.days = days
+        self.universe_n = universe_n
+        self.universe_seed = universe_seed
+        self.cache: dict[tuple[str, str], dict] = {}
+        self.panel_runs = 0
+        self.vector_evaluations = 0
+        self.draws_reference: dict[int, int] = {}
+        self.crn_deviations: list[dict] = []
+        self.history: list[dict] = []
+
+    def remaining(self) -> int:
+        return self.budget - self.panel_runs
+
+    def reserve(self, runs: int) -> None:
+        """Hold `runs` back from the stages that come before the reserve.
+
+        The exploratory stages are the greedy ones — a compass polish runs
+        each step until no probe improves, and it has no idea a
+        confirmation pass on thirty seeds is queued behind it. Without a
+        reserve the last stages can be starved by the first ones, which is
+        the worst possible way to spend a budget: everything measured on
+        the cheap proxy and nothing on the objective the verdict is read
+        on. `release()` hands the reserve back when they start.
+        """
+        self.reserved = runs
+        self.budget = self.hard_budget - runs
+
+    def release(self) -> None:
+        self.reserved = 0
+        self.budget = self.hard_budget
+
+    def progress(self, stage: str, extra: str = "") -> str:
+        return (f"[{self.panel_runs:>5}/{self.budget} runs, "
+                f"{self.vector_evaluations:>4} vectors] {stage}{extra}")
+
+    def batch(self, raws: list[dict[str, float]], seeds: tuple[int, ...],
+              stage: str) -> list[dict]:
+        tag = ",".join(str(s) for s in seeds)
+        pending, seen = [], set()
+        for raw in raws:
+            key = (lib.vector_key(raw), tag)
+            if key not in self.cache and key not in seen:
+                seen.add(key)
+                pending.append((raw, key))
+        if pending:
+            need = len(pending) * len(seeds)
+            if self.panel_runs + need > self.budget:
+                affordable = max(0, (self.remaining()) // len(seeds))
+                if affordable == 0:
+                    raise BudgetExhausted(
+                        f"{self.panel_runs} panel runs spent of "
+                        f"{self.budget}; {len(pending)} candidates unpriced")
+                pending = pending[:affordable]
+            jobs, labels = [], []
+            for raw, key in pending:
+                for seed in seeds:
+                    jobs.append((raw, seed, self.days, self.universe_n,
+                                 self.universe_seed))
+                    labels.append(key)
+            results = lib.run_pool(jobs, self.workers)
+            self.panel_runs += len(jobs)
+            self.vector_evaluations += len(pending)
+            by_key: dict[tuple[str, str], list[dict]] = {}
+            for row, key in zip(results, labels):
+                by_key.setdefault(key, []).append(row)
+                self.draws_reference.setdefault(row["seed"],
+                                                row["draws_consumed"])
+                if row["draws_consumed"] != self.draws_reference[row["seed"]]:
+                    # The CRN guard. Recorded rather than fatal, as in
+                    # falsify.py: a vector that moved the draw schedule
+                    # still has a valid panel LEVEL, which is all the loss
+                    # reads — but every comparison against it is
+                    # re-alignment noise, so the certificate has to say it
+                    # happened. None was observed in any committed run.
+                    self.crn_deviations.append(
+                        {"stage": stage, "seed": row["seed"],
+                         "expected": self.draws_reference[row["seed"]],
+                         "observed": row["draws_consumed"],
+                         "overrides": row["overrides"]})
+            for key, rows in by_key.items():
+                panels = [r["panel"] for r in rows]
+                self.cache[key] = self._score(panels, rows[0]["overrides"],
+                                              seeds, stage)
+        out = []
+        for raw in raws:
+            key = (lib.vector_key(raw), tag)
+            if key not in self.cache:
+                raise BudgetExhausted("budget spent mid-batch")
+            out.append(self.cache[key])
+        return out
+
+    def _score(self, panels: list[dict], overrides: dict[str, float],
+               seeds: tuple[int, ...], stage: str) -> dict:
+        from pretium.loss import band_distance_loss
+
+        breakdown = band_distance_loss(panels)
+        medians = {key: statistics.median(p[key] for p in panels)
+                   for key in panels[0]}
+        row = {
+            "overrides": overrides,
+            "loss_real": breakdown["loss"],
+            "statistics": {k: {kk: vv for kk, vv in v.items()
+                               if kk != "band"}
+                           for k, v in breakdown["statistics"].items()},
+            "medians": medians,
+            "seeds": list(seeds),
+            "stage": stage,
+        }
+        self.history.append({"stage": stage, "seeds": len(seeds),
+                             "overrides": overrides,
+                             "loss_real": breakdown["loss"]})
+        return row
+
+
+def penalised(row: dict, space: DevSpace, lam: float) -> float:
+    return row["loss_real"] + lam * space.squared_deviation(row["overrides"])
+
+
+def pareto_frontier(rows: list[dict], space: DevSpace) -> list[dict]:
+    """The (deviation, realism) frontier over every vector ever evaluated.
+
+    §6.3 calls this the deliverable: "deviation from the reference against
+    realism achieved, with the parameter movements listed at each point".
+    It costs nothing here — both coordinates are already on every cached
+    row — and the operating point is then chosen on a curve rather than
+    asserted.
+    """
+    points = sorted(
+        ({"squared_deviation": space.squared_deviation(r["overrides"]),
+          "loss_real": r["loss_real"], "overrides": r["overrides"]}
+         for r in rows),
+        key=lambda p: (p["squared_deviation"], p["loss_real"]))
+    out: list[dict] = []
+    best = float("inf")
+    for point in points:
+        if point["loss_real"] < best - 1e-12:
+            best = point["loss_real"]
+            out.append(point)
+    return out
+
+
+def panel_rows(row: dict) -> list[str]:
+    lines = []
+    for key, stat in row["statistics"].items():
+        scaled = stat["scaled"]
+        lines.append(
+            f"  {key:<24} {stat['measured']:+10.4f}  {stat['role']:<12}"
+            f" d={stat['distance']:.4f}"
+            + (f"  {scaled:.3f} sd" if scaled is not None else ""))
+    return lines
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--params", default="spectrum8")
+    parser.add_argument("--lambda", dest="lam", type=float, default=10.0)
+    parser.add_argument("--lambda-frontier", default="0,1,3,10,30,100")
+    parser.add_argument("--search-seeds", default=None)
+    parser.add_argument("--train-seeds", default=None)
+    parser.add_argument("--holdout-seeds", default="1,2,3,4,5,6")
+    parser.add_argument("--holdout-universe", default="60:222")
+    parser.add_argument("--holdout-days", type=int, default=504)
+    parser.add_argument("--holdout-days-seeds", default="101,104,107")
+    parser.add_argument("--screen", type=int, default=48)
+    parser.add_argument("--population", type=int, default=12)
+    parser.add_argument("--generations", type=int, default=26)
+    parser.add_argument("--cma-seed", type=int, default=20260822)
+    parser.add_argument("--sigma0", type=float, default=0.35,
+                        help="in box-half-width units (see DevSpace)")
+    parser.add_argument("--compass-steps", default="0.2,0.1,0.05")
+    parser.add_argument("--confirm-steps", default="0.05,0.025")
+    parser.add_argument("--shrink-lambda", dest="shrink_lam", type=float,
+                        default=100.0,
+                        help="the penalty for the shrink stage — large "
+                             "enough that a parameter keeps a move only "
+                             "if the statistics paid for it")
+    parser.add_argument("--shrink-steps", default="0.1,0.05,0.025")
+    parser.add_argument("--budget-panel-runs", type=int, default=6600,
+                        help="hard cap on SEARCH; 6600 = 1100 six-seed "
+                             "vectors in §7.2's unit, leaving the "
+                             "validation axes inside a 1200 total")
+    parser.add_argument("--reserve-panel-runs", type=int, default=2600,
+                        help="held back from the exploratory stages for "
+                             "the thirty-seed confirmation and shrink")
+    parser.add_argument("--degeneracy-probe", action="store_true",
+                        help="re-measure phase 2's zero-memory corner here")
+    parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--out", required=True)
+    args = parser.parse_args()
+
+    import pretium.facts as facts
+    import pretium.loss as loss_mod
+
+    ship = lib.shipped_values()
+    if args.params == "spectrum8":
+        params = list(SPECTRUM_8)
+    elif args.params == "searched9":
+        params = list(lib.SEARCHED_9)
+    else:
+        params = [p for p in args.params.split(",") if p]
+    search_seeds = (tuple(int(s) for s in args.search_seeds.split(","))
+                    if args.search_seeds else SEARCH_SEEDS)
+    train_seeds = (tuple(int(s) for s in args.train_seeds.split(","))
+                   if args.train_seeds else lib.TRAIN_SEEDS)
+    holdout_seeds = tuple(int(s) for s in args.holdout_seeds.split(","))
+    hu_n, hu_seed = (int(x) for x in args.holdout_universe.split(":"))
+
+    space = DevSpace(params, ship)
+    ev = Evaluator(args.workers, args.budget_panel_runs)
+    started = time.perf_counter()
+    trace: list[dict] = []
+
+    def say(text: str) -> None:
+        print(f"[{time.perf_counter() - started:7.0f}s "
+              f"{ev.panel_runs:>5}/{ev.budget}] {text}", flush=True)
+
+    # ── Stage 0: the baseline, on both seed tiers ────────────────────────
+    base_search = ev.batch([{}], search_seeds, "baseline")[0]
+    base_train = ev.batch([{}], train_seeds, "baseline")[0]
+    subset_offsets = {
+        key: base_search["medians"][key] - base_train["medians"][key]
+        for key in facts.REAL_MARKETS
+    }
+    say(f"pt-v1 L_real: {base_train['loss_real']:.4f} on {len(train_seeds)} "
+        f"train seeds, {base_search['loss_real']:.4f} on the "
+        f"{len(search_seeds)}-seed search subset")
+    for line in panel_rows(base_train):
+        print(line)
+
+    # The confirmation and shrink stages run on thirty seeds and cost three
+    # times what a search-subset sweep costs; they are also the only stages
+    # whose output the verdict is read from. They get their budget first.
+    ev.reserve(args.reserve_panel_runs)
+
+    # ── Stage 1: Latin-hypercube screening ───────────────────────────────
+    rng = np.random.default_rng(args.cma_seed)
+    n = len(params)
+    lhs = np.empty((args.screen, n))
+    for j in range(n):
+        perm = rng.permutation(args.screen)
+        lhs[:, j] = (space.lo[j] + (perm + rng.random(args.screen))
+                     / args.screen * (space.hi[j] - space.lo[j]))
+
+    # The best FEASIBLE point seen anywhere, tracked outside the
+    # optimisers. Two reasons, both learned the hard way in the smoke
+    # run: the imported CMA-ES seeds its incumbent at +inf and so can
+    # report a "best" worse than the point it started from, and a stage
+    # that hits the budget guard mid-sweep would otherwise throw away
+    # every improvement it had made. The tracker is per (lambda, seed
+    # set), because a loss measured on ten seeds and one measured on
+    # thirty are different objectives and must not be compared.
+    best_seen: dict[tuple, tuple[float, np.ndarray]] = {}
+
+    def evaluate_batch(us: list[np.ndarray], lam: float, stage: str,
+                       seeds: tuple[int, ...]) -> list[float]:
+        repaired, penalties, raws = [], [], []
+        for u in us:
+            r, dist2 = space.repair(np.asarray(u, dtype=float))
+            repaired.append(r)
+            penalties.append(PENALTY_SCALE * dist2)
+            raws.append(space.to_raw(r))
+        rows = ev.batch(raws, seeds, stage)
+        out = [penalised(row, space, lam) + pen
+               for row, pen in zip(rows, penalties)]
+        key = (lam, seeds)
+        for value, r in zip(out, repaired):
+            if value < best_seen.get(key, (float("inf"), None))[0]:
+                best_seen[key] = (float(value), r.copy())
+        if ev.panel_runs % 200 < len(rows) * len(seeds):
+            say(ev.progress(stage, f" best {best_seen[key][0]:.4f}"))
+        return out
+
+    def run_stage(fn, lam: float, seeds: tuple[int, ...], label: str):
+        """Run one optimiser stage, surviving the budget guard.
+
+        A stage that runs out of budget mid-sweep has still done work;
+        the tracker is what it hands back, so the run degrades to "the
+        best point found within the budget" rather than to an exception.
+        """
+        try:
+            fn()
+        except BudgetExhausted as exc:
+            say(f"{label} stopped on budget: {exc}")
+        best = best_seen.get((lam, seeds))
+        if best is None:
+            raise SystemExit(f"{label}: no feasible point evaluated")
+        return best[1], best[0]
+
+    screen_points = [np.zeros(n)] + [lhs[i] for i in range(args.screen)]
+    try:
+        screen_losses = evaluate_batch(screen_points, args.lam, "screen",
+                                       search_seeds)
+    except BudgetExhausted as exc:
+        raise SystemExit(f"budget too small to screen: {exc}")
+    best_i = int(np.argmin(screen_losses))
+    x0 = screen_points[best_i]
+    trace.append({"stage": "screen", "samples": args.screen,
+                  "base_loss": float(screen_losses[0]),
+                  "best_loss": float(screen_losses[best_i])})
+    say(f"screen: base {screen_losses[0]:.4f} -> best "
+        f"{screen_losses[best_i]:.4f}")
+
+    # ── Stage 2: CMA-ES ──────────────────────────────────────────────────
+    cma_trace: list[dict] = []
+    best_u, best_loss = run_stage(
+        lambda: cma_es(
+            lambda us: evaluate_batch(us, args.lam, "cma", search_seeds),
+            space, x0, args.sigma0, args.population, args.generations, rng,
+            cma_trace),
+        args.lam, search_seeds, "cma")
+    trace.append({"stage": "cma", "generations": cma_trace})
+    say(f"cma: best penalised loss {best_loss:.4f}")
+
+    # ── Stage 3: compass polish on the search subset ─────────────────────
+    polish_trace: list[dict] = []
+    steps = [float(s) for s in args.compass_steps.split(",") if s]
+    best_u, best_loss = run_stage(
+        lambda: compass_polish(
+            lambda us: evaluate_batch(us, args.lam, "compass", search_seeds),
+            best_u, best_loss, space, steps, polish_trace),
+        args.lam, search_seeds, "compass")
+    trace.append({"stage": "compass", "steps": steps, "moves": polish_trace})
+    say(f"compass: best penalised loss {best_loss:.4f}")
+
+    # ── Stage 4: confirmation polish on the FULL training set ────────────
+    # §8's training objective is thirty seeds. The subset above is a
+    # ranking device; the last steps are taken against the objective the
+    # verdict is read on, so the reported optimum is an optimum OF that
+    # objective and not of its cheaper proxy.
+    ev.release()
+    confirm_trace: list[dict] = []
+    best_u, _ = space.repair(best_u)
+    confirm_steps = [float(s) for s in args.confirm_steps.split(",") if s]
+    start_u = best_u.copy()
+    try:
+        start_loss = evaluate_batch([start_u], args.lam, "confirm",
+                                    train_seeds)[0]
+        best_u, confirm_loss = run_stage(
+            lambda: compass_polish(
+                lambda us: evaluate_batch(us, args.lam, "confirm",
+                                          train_seeds),
+                start_u, start_loss, space, confirm_steps, confirm_trace),
+            args.lam, train_seeds, "confirm")
+    except BudgetExhausted:
+        say("confirmation skipped: budget spent before it could start")
+        confirm_loss = float("nan")
+    trace.append({"stage": "confirm", "steps": confirm_steps,
+                  "moves": confirm_trace})
+    best_u, _ = space.repair(best_u)
+    say(f"confirm: penalised loss {confirm_loss:.4f} on {len(train_seeds)} "
+        f"seeds")
+
+    # ── Stage 5: shrink — the same polish at a lambda that bites ─────────
+    # §6.3 asks for the frontier to be walked from lambda = infinity DOWN,
+    # "rather than starting from the unregularised fit and hoping". The
+    # stages above are the hoping half: they find where the feasible set
+    # is, at a lambda chosen so the realism term leads. This stage starts
+    # from that point and re-polishes under a penalty large enough to pay
+    # for itself, which pulls every parameter back toward pt-v1 as far as
+    # the statistics allow. What survives the pull is what the panel
+    # actually forced, and that — not the deepest point of a flat basin —
+    # is the vector worth shipping a name to.
+    shrink_trace: list[dict] = []
+    shrink_steps = [float(s) for s in args.shrink_steps.split(",") if s]
+    shrink_start = best_u.copy()
+    try:
+        shrink_start_loss = evaluate_batch([shrink_start], args.shrink_lam,
+                                           "shrink", train_seeds)[0]
+        best_u, shrink_loss = run_stage(
+            lambda: compass_polish(
+                lambda us: evaluate_batch(us, args.shrink_lam, "shrink",
+                                          train_seeds),
+                shrink_start, shrink_start_loss, space, shrink_steps,
+                shrink_trace),
+            args.shrink_lam, train_seeds, "shrink")
+    except BudgetExhausted:
+        say("shrink skipped: budget spent before it could start")
+        shrink_loss = float("nan")
+    trace.append({"stage": "shrink", "lambda": args.shrink_lam,
+                  "steps": shrink_steps, "moves": shrink_trace})
+    best_u, _ = space.repair(best_u)
+    best_raw = space.to_raw(best_u)
+    say(f"shrink: penalised loss {shrink_loss:.4f} at lambda "
+        f"{args.shrink_lam}, squared deviation "
+        f"{space.squared_deviation(best_raw):.4f}")
+
+    # ── Stage 5: the frontier, from the cache, for free ──────────────────
+    train_rows = [r for k, r in ev.cache.items()
+                  if k[1] == ",".join(str(s) for s in train_seeds)]
+    search_rows = [r for k, r in ev.cache.items()
+                   if k[1] == ",".join(str(s) for s in search_seeds)]
+    frontier = pareto_frontier(search_rows + train_rows, space)
+    lambda_picks = {}
+    for lam_text in args.lambda_frontier.split(","):
+        lam = float(lam_text)
+        pick = min(search_rows + train_rows,
+                   key=lambda r: penalised(r, space, lam))
+        lambda_picks[lam_text] = {
+            "overrides": pick["overrides"],
+            "loss_real": pick["loss_real"],
+            "squared_deviation": space.squared_deviation(pick["overrides"]),
+            "seeds": len(pick["seeds"]),
+        }
+
+    # ── Stage 6: the held-out axes (§8) ──────────────────────────────────
+    def measure(overrides: dict[str, float], seeds: tuple[int, ...],
+                universe_n: int, universe_seed: int, days: int) -> dict:
+        jobs = [(overrides, seed, days, universe_n, universe_seed)
+                for seed in seeds]
+        results = lib.run_pool(jobs, args.workers)
+        ev.panel_runs += len(jobs)
+        panels = [r["panel"] for r in results]
+        breakdown = loss_mod.band_distance_loss(panels)
+        return {
+            "seeds": list(seeds), "days": days,
+            "universe": f"Universe.random({universe_n}, seed={universe_seed})",
+            "loss_real": breakdown["loss"],
+            "bootstrap_spread": bootstrap_spread(panels),
+            "statistics": {k: {kk: vv for kk, vv in v.items()}
+                           for k, v in breakdown["statistics"].items()},
+            "panels": panels,
+        }
+
+    def bootstrap_spread(panels: list[dict], draws: int = 2000) -> float:
+        """§8's yardstick: how much L_real moves on a re-draw of the seeds.
+
+        The overfitting rule prices "validation worse than training"
+        against this, and without it the rule is a bare 2x on a number
+        whose own sampling spread nobody measured. Resampling is over
+        SEEDS — the unit that is exchangeable here — and the loss is
+        recomputed from each resample's medians by the same shipped
+        function the search minimised. Seeded, so the certificate's
+        number is reproducible like everything else in it.
+        """
+        if len(panels) < 2:
+            return float("nan")
+        boot = np.random.default_rng(args.cma_seed)
+        losses = []
+        for _ in range(draws):
+            idx = boot.integers(0, len(panels), len(panels))
+            losses.append(loss_mod.band_distance_loss(
+                [panels[i] for i in idx])["loss"])
+        return float(statistics.stdev(losses))
+
+    axes = {}
+    for label, vector in (("pt-v1", {}), ("candidate", best_raw)):
+        axes[label] = {
+            "train_seeds": measure(vector, train_seeds,
+                                   lib.PANEL_UNIVERSE_N,
+                                   lib.PANEL_UNIVERSE_SEED, lib.PANEL_DAYS),
+            "holdout_seeds": measure(vector, holdout_seeds,
+                                     lib.PANEL_UNIVERSE_N,
+                                     lib.PANEL_UNIVERSE_SEED, lib.PANEL_DAYS),
+            "holdout_universe": measure(vector, train_seeds, hu_n, hu_seed,
+                                        lib.PANEL_DAYS),
+            "holdout_horizon": measure(
+                vector,
+                tuple(int(s) for s in args.holdout_days_seeds.split(",")),
+                lib.PANEL_UNIVERSE_N, lib.PANEL_UNIVERSE_SEED,
+                args.holdout_days),
+        }
+        say(f"{label}: " + ", ".join(
+            f"{axis} {row['loss_real']:.3f}"
+            for axis, row in axes[label].items()))
+
+    # ── §8's verdict, computed rather than eyeballed ─────────────────────
+    train_loss = axes["candidate"]["train_seeds"]["loss_real"]
+    spread = axes["candidate"]["train_seeds"]["bootstrap_spread"]
+    overfitting: dict = {
+        "rule": "§8: any trained-to statistic in band on train and out of "
+                "band on a validation axis; or validation L_real exceeding "
+                "train L_real by more than 2x the bootstrap spread of train "
+                "L_real across its seeds",
+        "train_loss_real": train_loss,
+        "train_bootstrap_spread": spread,
+        "threshold": train_loss + 2.0 * spread,
+        "axes": {},
+        "statistics_in_band_on_train_out_on_validation": [],
+    }
+    train_stats = axes["candidate"]["train_seeds"]["statistics"]
+    for axis in ("holdout_seeds", "holdout_universe", "holdout_horizon"):
+        row = axes["candidate"][axis]
+        overfitting["axes"][axis] = {
+            "loss_real": row["loss_real"],
+            "exceeds_threshold": row["loss_real"] > train_loss + 2.0 * spread,
+        }
+        for key in list(loss_mod.LIVE_TARGETS) + list(loss_mod.CONSTRAINTS):
+            if (train_stats[key]["distance"] == 0
+                    and row["statistics"][key]["distance"] > 0):
+                overfitting[
+                    "statistics_in_band_on_train_out_on_validation"].append(
+                        {"statistic": key, "axis": axis,
+                         "measured": row["statistics"][key]["measured"],
+                         "band": row["statistics"][key]["band"]})
+    overfitting["verdict"] = (
+        "rejected by §8" if (
+            overfitting["statistics_in_band_on_train_out_on_validation"]
+            or any(a["exceeds_threshold"]
+                   for a in overfitting["axes"].values()))
+        else "passes §8 on every axis")
+    say(f"overfitting: {overfitting['verdict']}")
+
+    degeneracy = None
+    if args.degeneracy_probe:
+        corner = {"market_factor_sigma": 0.0084, "idio_sigma_scale": 0.86,
+                  "garch_alpha": 0.424, "garch_beta": 0.096,
+                  "garch_ceiling_multiple": 19.4, "momentum_theta": 0.216}
+        degeneracy = {
+            "vector": corner,
+            "source": "CALIBRATION-RESULTS.md §6.3 — the zero-memory corner",
+            "in_calibration_box": all(
+                calibration_box(k, ship[k])[0] <= v
+                <= calibration_box(k, ship[k])[1]
+                for k, v in corner.items() if k in lib.PARAM_SPECS),
+            "measured": measure(corner, train_seeds, lib.PANEL_UNIVERSE_N,
+                                lib.PANEL_UNIVERSE_SEED, lib.PANEL_DAYS),
+        }
+        say(f"degeneracy probe: L_real "
+            f"{degeneracy['measured']['loss_real']:.3f}")
+
+    wall = time.perf_counter() - started
+
+    moves = []
+    for name in params:
+        before, after = ship[name], best_raw[name]
+        moves.append({
+            "parameter": name, "pt_v1": before, "candidate": after,
+            "deviation": deviation(name, after, before),
+            "deviation_class": lib.PARAM_SPECS[name]["kind"],
+            "ratio": after / before if before else None,
+            "box": space.box[name],
+            "column_norm_seed_sds_per_dev_unit": COLUMN_NORMS.get(name),
+        })
+
+    print("\n=== candidate, as overrides on pt-v1 ===")
+    for move in sorted(moves, key=lambda m: -abs(m["deviation"])):
+        print(f"  {move['parameter']:<28} {move['pt_v1']:>10.5g} -> "
+              f"{move['candidate']:>10.5g}   dev {move['deviation']:+.4f}"
+              f"   x{move['ratio']:.3f}")
+    print("\n=== panel: pt-v1 -> candidate on the training seeds ===")
+    for key in facts.REAL_MARKETS:
+        before = axes["pt-v1"]["train_seeds"]["statistics"][key]
+        after = axes["candidate"]["train_seeds"]["statistics"][key]
+        print(f"  {key:<24} {before['measured']:+10.4f} -> "
+              f"{after['measured']:+10.4f}  band {before['band']}"
+              f"  {after['role']:<12}"
+              f"  d {before['distance']:.4f} -> {after['distance']:.4f}")
+    print(f"\nevaluations: {ev.vector_evaluations} vectors, "
+          f"{ev.panel_runs} panel runs "
+          f"({ev.panel_runs / 6.0:.0f} six-seed-vector equivalents against a "
+          f"budget of {args.budget_panel_runs / 6.0:.0f}), wall {wall:.0f}s")
+
+    lib.write_json(args.out, {
+        "provenance": lib.provenance(),
+        "claim": {
+            "kind": "calibration",
+            "model_class": "pt-v1 (the shipped preset) with the searched "
+                           "parameters free",
+            "targets": list(loss_mod.LIVE_TARGETS),
+            "constraints": list(loss_mod.CONSTRAINTS),
+            "structural_excluded": list(loss_mod.STRUCTURAL),
+            "searched_parameters": params,
+            "search_space_source": "CALIBRATION-RESULTS.md §5, the measured "
+                                   "identifiability spectrum (not §3.9's "
+                                   "argued list)",
+            "column_norms": {p: COLUMN_NORMS.get(p) for p in params},
+            "excluded": {
+                "guards_visible_but_off_limits": {
+                    "price_breaker_fraction": 8.3, "mispricing_cap": 4.6},
+                "weak_but_real": {
+                    "market_factor_sigma": 4.1, "market_vol_vix_anchor": 3.8,
+                    "garch_floor_multiple": 2.5, "crowd_momentum_gain": 2.0,
+                    "garch_omega": 1.6},
+                "effectively_unidentified": {
+                    "garch_ceiling_multiple": 0.41,
+                    "sector_factor_sigma": 0.28},
+            },
+        },
+        "method": {
+            "loss": "pretium.loss.band_distance_loss (the shipped "
+                    "objective) + lambda * sum_j dev_j^2 (§6.3)",
+            "lambda": args.lam,
+            "seed_sd_source": "pretium.facts.SEED_SD",
+            "seed_sd": dict(facts.SEED_SD),
+            "seed_sd_provenance": dict(facts.SEED_SD_PROVENANCE),
+            "bands": {k: list(v) for k, v in facts.REAL_MARKETS.items()},
+            "search_seeds": list(search_seeds),
+            "train_seeds": list(train_seeds),
+            "subset_offsets_at_pt_v1": subset_offsets,
+            "days": lib.PANEL_DAYS,
+            "universe": f"Universe.random({lib.PANEL_UNIVERSE_N}, "
+                        f"seed={lib.PANEL_UNIVERSE_SEED})",
+            "box_rule": "§6.3's ~[1/4x, 4x] of the shipped value, "
+                        "intersected with each parameter's hard range",
+            "box": {name: list(space.box[name]) for name in params},
+            "optimiser": {
+                "stages": ["latin-hypercube screen", "CMA-ES",
+                           "compass polish on the search subset",
+                           "compass polish on the full training set",
+                           "shrink: compass polish at the shrink lambda"],
+                "shrink_lambda": args.shrink_lam,
+                "shrink_steps": args.shrink_steps,
+                "implementation": "falsify.py's (mu/mu_w, lambda) CMA-ES "
+                                  "and compass polish, unmodified",
+                "screen": args.screen,
+                "population": args.population,
+                "generations": args.generations,
+                "sigma0": args.sigma0,
+                "seed": args.cma_seed,
+                "compass_steps": args.compass_steps,
+                "confirm_steps": args.confirm_steps,
+            },
+            "workers": args.workers,
+        },
+        "baseline": {"search_seeds": base_search, "train_seeds": base_train},
+        "best_vector": best_raw,
+        "moves": moves,
+        "axes": axes,
+        "lambda_frontier": {"picks": lambda_picks, "pareto": frontier},
+        "overfitting": overfitting,
+        "degeneracy_probe": degeneracy,
+        "crn_deviations": ev.crn_deviations,
+        "trace": trace,
+        "history": ev.history,
+        "vector_evaluations": ev.vector_evaluations,
+        "panel_runs": ev.panel_runs,
+        "budget_panel_runs": args.budget_panel_runs,
+        "reserve_panel_runs": args.reserve_panel_runs,
+        "six_seed_vector_equivalents": ev.panel_runs / 6.0,
+        "wall_seconds": wall,
+    })
+
+
+if __name__ == "__main__":
+    main()
