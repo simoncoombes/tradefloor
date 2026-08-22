@@ -35,9 +35,11 @@ def main() -> dict:
     report["universe"] = len(universe)
     print(f"1. universe: {len(universe)} instruments")
 
-    # 2. A sweep. Per seed is the only safe parallel boundary — the engine has
-    #    one shared RNG stream, so there is no decomposition WITHIN a run that
-    #    preserves the draw schedule.
+    # 2. A sweep. Per seed is the only safe parallel boundary — the engine's
+    #    three RNG streams split by domain (market, economy, external), not by
+    #    unit of work, and the market stream serves every draw in a tick in
+    #    one fixed order across the roster, so there is still no decomposition
+    #    WITHIN a run that preserves the draw schedule.
     mark = time.time()
     sweep = pt.run_many(seeds=list(range(20)), universe=universe, days=5,
                         workers=8, collect="summary")
@@ -273,9 +275,19 @@ def main() -> dict:
 
     # 8. What kind of market is this, statistically? The mismatches matter
     #    more than the matches -- they are where a conclusion drawn here stops
-    #    transferring. Six of the eight are known and documented, and they are
-    #    the six that describe how things move together rather than how one
-    #    series looks on its own.
+    #    transferring. At the documented method (40 names, 252 days, the
+    #    median over six seeds -- docs/how-realistic-is-this-market.md), four
+    #    of the eight sit in band, and how things move together is now the
+    #    half that mostly matches; what fails is scale and memory: volatility
+    #    runs high, returns trend where real ones do not, the leverage effect
+    #    is too weak, and volume shocks do not persist. Read the in-band half
+    #    with that page's disclosure attached: four of the eight statistics
+    #    were calibration targets this era, so a match there is partly the
+    #    tuning meeting its own target, and held out from the tuning point the
+    #    margins are thin. This run is one seed over 60 days on a different
+    #    universe, so its reads are noisier than the published medians --
+    #    here correlation overshoots its band and the leverage effect loses
+    #    the sign that is stable at the documented method.
     #
     #    `verdict` rather than `direction`, because the leverage effect has a
     #    NEGATIVE reference band: an absent one is numerically above that band,
