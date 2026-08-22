@@ -835,8 +835,18 @@ def main() -> None:
     screen_points = [np.zeros(n)]
     screen_labels = ["pt-v1"]
     if args.start_from and args.start_from != "pt-v1":
-        with open(args.start_from, encoding="utf-8") as handle:
-            warm = json.load(handle)["best_vector"]
+        # Either shape of certificate: `calibrate.py` writes one vector
+        # under `best_vector`, `evaluate_axes.py` writes several under
+        # `vectors`, and the vector this phase most wants to start from —
+        # pt-v2 itself — lives in the second kind, because it is a named
+        # variant of a search optimum rather than a search's own answer.
+        path, _, vector_name = args.start_from.partition("#")
+        with open(path, encoding="utf-8") as handle:
+            doc = json.load(handle)
+        if vector_name:
+            warm = doc["vectors"][vector_name]["vector"]
+        else:
+            warm = doc["best_vector"]
         w, _ = space.repair(space.from_raw(warm))
         screen_points.append(w)
         screen_labels.append(args.start_from)
