@@ -16,7 +16,7 @@ and duckdb all read them zero-copy, and the package depends on none of them.
 | `truth` | valuation, mispricing and a 7-way decomposition of every move |
 | `macro` | evolved macro state, per day |
 | `fills` | your executions, joinable to `bars` |
-| `book` | order-book depth, opt-in because it is 40x the rows |
+| `book` | order-book depth, opt-in because ten levels a side makes it 20x the rows |
 
 ```python
 import polars as pl
