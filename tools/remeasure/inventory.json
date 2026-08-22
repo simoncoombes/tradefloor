@@ -3079,7 +3079,7 @@
    "file": "docs/how-realistic-is-this-market.md",
    "line": 129,
    "label": "leverage reads -0.071",
-   "published": -0.071,
+   "published": -0.07,
    "group": "realism_heldout",
    "key": "held_seeds_lev",
    "compare": {
