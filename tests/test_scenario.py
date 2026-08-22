@@ -102,26 +102,29 @@ def test_a_vix_shock_moves_dispersion_more_than_level():
 # --------------------------------------------------------------------------
 
 
-def test_the_draw_divergence_is_reported_rather_than_hidden():
-    """A macro counterfactual is near-exact, not exact.
+def test_the_macro_counterfactual_is_exact_on_the_market_stream():
+    """A macro path cannot shift the market's draw schedule any more.
 
-    Unlike order flow, which consumes zero draws, a macro path changes prices,
-    prices change which branch the book settlement takes, and that branch
-    draws four uniforms or none. Re-measured on this build the delta is zero
-    in 24 of 24 comparisons; on an older build it was -4 in 425,600, which is
-    where the multiple-of-four mechanism was identified. The mechanism is
-    still present, so this asserts the shape rather than zero.
+    Before the RNG stream split, a macro path changed prices, prices changed
+    which settlement branch drew four uniforms, and the shared schedule
+    could shift -- an older build measured -4 in 425,600, and this test
+    asserted the multiple-of-four shape rather than zero. The split made
+    the market schedule a pure function of (market status, active roster,
+    sector count), and `compare` now reports `draw_delta` from the market
+    stream, so for scenarios that neither halt the market nor change the
+    roster the delta must be exactly zero.
 
-    Reported rather than asserted away, because a user comparing two worlds
-    should know whether they saw the same random numbers.
+    A failure here means a scenario changed the market's own draw schedule
+    -- a halt or a delisting -- or the market stream has stopped being
+    trajectory-independent, which would put the whole counterfactual back
+    where it was before the split.
     """
     for scenario in (Scenario.rate_shock(start=0.025, end=0.05, over=30),
                      Scenario.vix_shock(),
                      Scenario.rate_shock(start=0.025, end=0.10, over=30)):
         result = run(scenario)
-        assert result["draw_delta"] % 4 == 0
-        assert abs(result["draw_delta"]) <= 16
-        assert result["exact"] is (result["draw_delta"] == 0)
+        assert result["draw_delta"] == 0
+        assert result["exact"] is True
 
 
 def test_a_flat_scenario_is_exactly_its_own_baseline():
