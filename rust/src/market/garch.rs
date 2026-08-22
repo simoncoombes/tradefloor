@@ -43,15 +43,41 @@ use crate::mathx;
 
 /// Long-run variance weight.
 pub const OMEGA: f64 = 0.000002;
-/// Weight on yesterday's squared return — the surprise term.
-pub const ALPHA: f64 = 0.09;
+/// Weight on yesterday's squared return — the surprise term, for BOTH signs.
+///
+/// Recalibrated from the reference's symmetric 0.09 when `GAMMA` was
+/// introduced: GJR stationarity needs `ALPHA + BETA + GAMMA/2 < 1`, so the
+/// asymmetry is paid for out of the symmetric coefficients. Deliberately
+/// small but strictly positive — at zero, a large POSITIVE surprise would
+/// not raise tomorrow's variance at all, which deletes a day-one invariant
+/// (the property test below pins it).
+pub const ALPHA: f64 = 0.02;
 /// Weight on yesterday's variance — the persistence term.
-pub const BETA: f64 = 0.90;
+///
+/// Recalibrated from the reference's 0.90 to fund `GAMMA`; the effective
+/// persistence `ALPHA + BETA + GAMMA/2` is held at the reference's 0.99, so
+/// shocks decay at the same expected rate — more of the decay now travels
+/// through re-excitation by realised down moves and less through the smooth
+/// carry, which is measurably what raises volatility clustering into its
+/// real-world band (|r| acf(1) 0.124 → 0.186).
+pub const BETA: f64 = 0.80;
 /// Extra weight on yesterday's squared return when the return was NEGATIVE —
 /// the GJR leverage-effect term. Zero recovers the reference's symmetric
-/// GARCH(1,1) bit-for-bit. Stationarity needs `ALPHA + BETA + GAMMA/2 < 1`,
-/// so a meaningful `GAMMA` is paid for out of `ALPHA` and `BETA`.
-pub const GAMMA: f64 = 0.0;
+/// GARCH(1,1) bit-for-bit.
+///
+/// Chosen by the seventeen-point sweep in
+/// `tools/calibration/results/gjr-gamma-2026-08-21.json`
+/// (`tools/calibration/sweep_gjr_gamma.py`, published method, six seeds):
+/// 0.34 is the smallest measured value that lands the median leverage
+/// effect inside the real band of −0.30 to −0.10 (measured −0.107) while
+/// keeping `ALPHA` positive. It reads large against literature GJR fits
+/// (index estimates run ~0.10) because the panel statistic, not the
+/// coefficient, is the target: the day's return here carries factor and
+/// microstructure noise the variance process does not drive, and the
+/// sector ceiling clamp truncates the biggest asymmetric responses, so a
+/// larger structural asymmetry is needed to produce the same measured
+/// correlation.
+pub const GAMMA: f64 = 0.34;
 
 /// Ceiling as a multiple of the sector's long-run variance.
 ///

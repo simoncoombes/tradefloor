@@ -107,13 +107,19 @@ def test_the_autocorrelation_is_the_mispricing_process_showing_through():
     assert all(modulus < 1.0 for modulus in pretium.characteristic_root_moduli())
 
 
-def test_volatility_clustering_is_weaker_than_real_markets():
-    # Real markets show 0.2-0.3 at lag one with slow decay. Here it is about
-    # half that and largely gone by lag twenty, so a strategy whose edge is
-    # volatility forecasting will look worse here than it should.
+def test_volatility_clustering_is_in_band_at_lag_one_but_decays_too_fast():
+    # This test used to pin clustering BELOW its band -- real markets show
+    # 0.2-0.3 at lag one and this model measured about half that. The GJR
+    # recalibration moved it: paying the asymmetry term out of BETA shifts
+    # variance persistence from smooth carry to re-excitation by realised
+    # moves, which raises |r| acf(1) into the real band (0.19 here) as a
+    # side effect of buying the leverage effect. The decay is still too
+    # fast -- largely gone by lag twenty where real markets decay slowly --
+    # so a strategy whose edge is long-horizon volatility forecasting will
+    # still look worse here than it should.
     facts = measure(seed=3, universe=UNIVERSE, days=180)
     verdict = compare_to_real_markets(facts)["abs_return_acf1"]
-    assert verdict["direction"] == "below"
+    assert verdict["direction"] == "within"
     assert facts["abs_return_acf20"] < facts["abs_return_acf1"]
 
 

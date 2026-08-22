@@ -63,7 +63,19 @@ import pretium
 # unconditionally per active company per open tick. Each changes every
 # trajectory; the direct GameRng section below moves for neither, because
 # the Layer-1 generator API is untouched.
-KAT_VERSION = 5
+#
+# v6: same era boundary, fifth change. The variance process gains a
+# GJR asymmetry term (GAMMA = 0.34, funded by ALPHA 0.09 -> 0.02 and
+# BETA 0.90 -> 0.80 at held persistence 0.99), because the symmetric
+# GARCH squares the return at the only site where a realised return
+# touches future variance, so no parameter of it could produce the
+# leverage effect real equities have (design finding 8). The term is
+# written to be bit-identical at GAMMA = 0 -- proven against the v5
+# digest -- so this bump is the calibration, not the code structure;
+# the chosen point is the seventeen-point sweep in
+# tools/calibration/results/gjr-gamma-2026-08-21.json. It changes every
+# trajectory; the direct GameRng section below does not move.
+KAT_VERSION = 6
 
 SEED = 20260820
 DAYS = 250
