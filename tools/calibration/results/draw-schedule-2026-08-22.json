@@ -1,0 +1,2488 @@
+{
+ "claim": {
+  "kind": "draw-schedule deviation trace, per stream",
+  "operative_quantity": "Engine.draws_by_stream()['market'], not Engine.draws_consumed: the market stream's schedule is a pure function of (market status, active roster, sector count), while the economy stream's count varies with macro state by design",
+  "rule": "CALIBRATION.md \u00a75.2 \u2014 nothing settable may change how many draws are taken or in what order",
+  "source_certificate": "results/calibrate-pt-v2-2026-08-22.json"
+ },
+ "jacobian_bracket": {
+  "branching_pairs": 0,
+  "h": 0.05,
+  "pairs_checked": 480,
+  "parameters": {
+   "garch_alpha": {
+    "bracket": [
+     0.015,
+     0.025
+    ],
+    "deviations": []
+   },
+   "garch_beta": {
+    "bracket": [
+     0.795,
+     0.805
+    ],
+    "deviations": []
+   },
+   "garch_gamma": {
+    "bracket": [
+     0.335,
+     0.34500000000000003
+    ],
+    "deviations": []
+   },
+   "idio_sigma_scale": {
+    "bracket": [
+     0.7990327165805997,
+     0.8830677209558603
+    ],
+    "deviations": []
+   },
+   "market_vol_alpha": {
+    "bracket": [
+     0.445,
+     0.455
+    ],
+    "deviations": []
+   },
+   "market_vol_beta": {
+    "bracket": [
+     0.495,
+     0.505
+    ],
+    "deviations": []
+   },
+   "market_vol_vix_coupling": {
+    "bracket": [
+     0.995,
+     1.005
+    ],
+    "deviations": []
+   },
+   "momentum_theta": {
+    "bracket": [
+     0.245,
+     0.255
+    ],
+    "deviations": []
+   }
+  },
+  "seeds": [
+   101,
+   102,
+   103,
+   104,
+   105,
+   106,
+   107,
+   108,
+   109,
+   110,
+   111,
+   112,
+   113,
+   114,
+   115,
+   116,
+   117,
+   118,
+   119,
+   120,
+   121,
+   122,
+   123,
+   124,
+   125,
+   126,
+   127,
+   128,
+   129,
+   130
+  ]
+ },
+ "panel_runs": 605,
+ "provenance": {
+  "date": "2026-08-22",
+  "git_rev": "8f2e881",
+  "machine": "arm64",
+  "platform": "macOS-26.6-arm64-arm-64bit",
+  "python": "3.11.15"
+ },
+ "recorded_offenders": [
+  {
+   "overrides": {
+    "garch_alpha": 0.0064431800575754875,
+    "garch_beta": 0.8036846566225819,
+    "garch_gamma": 0.3757443266396852,
+    "idio_sigma_scale": 2.5855945630722372,
+    "market_vol_alpha": 0.1491391595608263,
+    "market_vol_beta": 0.31529399165675975,
+    "market_vol_vix_coupling": 0.3312468890097928,
+    "momentum_theta": 0.7019287656654682
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -15,
+     "pt_v1": 2420,
+     "vector": 2405
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -15,
+   "seed": 101,
+   "total_delta": -15
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.0064431800575754875,
+    "garch_beta": 0.8036846566225819,
+    "garch_gamma": 0.3757443266396852,
+    "idio_sigma_scale": 2.5855945630722372,
+    "market_vol_alpha": 0.1491391595608263,
+    "market_vol_beta": 0.31529399165675975,
+    "market_vol_vix_coupling": 0.3312468890097928,
+    "momentum_theta": 0.7019287656654682
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.0064431800575754875,
+    "garch_beta": 0.8036846566225819,
+    "garch_gamma": 0.3757443266396852,
+    "idio_sigma_scale": 2.5855945630722372,
+    "market_vol_alpha": 0.1491391595608263,
+    "market_vol_beta": 0.31529399165675975,
+    "market_vol_vix_coupling": 0.3312468890097928,
+    "momentum_theta": 0.7019287656654682
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -11,
+     "pt_v1": 2383,
+     "vector": 2372
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -11,
+   "seed": 110,
+   "total_delta": -11
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.0064431800575754875,
+    "garch_beta": 0.8036846566225819,
+    "garch_gamma": 0.3757443266396852,
+    "idio_sigma_scale": 2.5855945630722372,
+    "market_vol_alpha": 0.1491391595608263,
+    "market_vol_beta": 0.31529399165675975,
+    "market_vol_vix_coupling": 0.3312468890097928,
+    "momentum_theta": 0.7019287656654682
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -3,
+     "pt_v1": 2369,
+     "vector": 2366
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -3,
+   "seed": 119,
+   "total_delta": -3
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.0064431800575754875,
+    "garch_beta": 0.8036846566225819,
+    "garch_gamma": 0.3757443266396852,
+    "idio_sigma_scale": 2.5855945630722372,
+    "market_vol_alpha": 0.1491391595608263,
+    "market_vol_beta": 0.31529399165675975,
+    "market_vol_vix_coupling": 0.3312468890097928,
+    "momentum_theta": 0.7019287656654682
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -39,
+     "pt_v1": 2400,
+     "vector": 2361
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -39,
+   "seed": 125,
+   "total_delta": -39
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.036175567251230806,
+    "garch_beta": 0.705442033183541,
+    "garch_gamma": 0.5127647991304563,
+    "idio_sigma_scale": 3.0979566477771816,
+    "market_vol_alpha": 0.3767596712982911,
+    "market_vol_beta": 0.4796385146339515,
+    "market_vol_vix_coupling": 0.43524636916012405,
+    "momentum_theta": 0.165033991358092
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -15,
+     "pt_v1": 2420,
+     "vector": 2405
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -15,
+   "seed": 101,
+   "total_delta": -15
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.036175567251230806,
+    "garch_beta": 0.705442033183541,
+    "garch_gamma": 0.5127647991304563,
+    "idio_sigma_scale": 3.0979566477771816,
+    "market_vol_alpha": 0.3767596712982911,
+    "market_vol_beta": 0.4796385146339515,
+    "market_vol_vix_coupling": 0.43524636916012405,
+    "momentum_theta": 0.165033991358092
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.036175567251230806,
+    "garch_beta": 0.705442033183541,
+    "garch_gamma": 0.5127647991304563,
+    "idio_sigma_scale": 3.0979566477771816,
+    "market_vol_alpha": 0.3767596712982911,
+    "market_vol_beta": 0.4796385146339515,
+    "market_vol_vix_coupling": 0.43524636916012405,
+    "momentum_theta": 0.165033991358092
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -11,
+     "pt_v1": 2383,
+     "vector": 2372
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -11,
+   "seed": 110,
+   "total_delta": -11
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.036175567251230806,
+    "garch_beta": 0.705442033183541,
+    "garch_gamma": 0.5127647991304563,
+    "idio_sigma_scale": 3.0979566477771816,
+    "market_vol_alpha": 0.3767596712982911,
+    "market_vol_beta": 0.4796385146339515,
+    "market_vol_vix_coupling": 0.43524636916012405,
+    "momentum_theta": 0.165033991358092
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -4,
+     "pt_v1": 2369,
+     "vector": 2365
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -4,
+   "seed": 119,
+   "total_delta": -4
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.016145019197431262,
+    "garch_beta": 0.6654395372147138,
+    "garch_gamma": 0.6328308871757097,
+    "idio_sigma_scale": 2.8737935467303126,
+    "market_vol_alpha": 0.7193150703480584,
+    "market_vol_beta": 0.2786849296519417,
+    "market_vol_vix_coupling": 0.5599056890758451,
+    "momentum_theta": 0.1511096907667873
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -3,
+     "pt_v1": 2369,
+     "vector": 2366
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -3,
+   "seed": 119,
+   "total_delta": -3
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.016145019197431262,
+    "garch_beta": 0.6654395372147138,
+    "garch_gamma": 0.6328308871757097,
+    "idio_sigma_scale": 2.8737935467303126,
+    "market_vol_alpha": 0.7193150703480584,
+    "market_vol_beta": 0.2786849296519417,
+    "market_vol_vix_coupling": 0.5599056890758451,
+    "momentum_theta": 0.1511096907667873
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -36,
+     "pt_v1": 2400,
+     "vector": 2364
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -36,
+   "seed": 125,
+   "total_delta": -36
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.006420762663610717,
+    "garch_beta": 0.35643184026884844,
+    "garch_gamma": 0.0958385373584926,
+    "idio_sigma_scale": 0.24133111615113795,
+    "market_vol_alpha": 0.24487606959099162,
+    "market_vol_beta": 0.154362122773671,
+    "market_vol_vix_coupling": 0.6431812274518875,
+    "momentum_theta": 0.9020414399481119
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -59,
+     "pt_v1": 2420,
+     "vector": 2361
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -59,
+   "seed": 101,
+   "total_delta": -59
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.006420762663610717,
+    "garch_beta": 0.35643184026884844,
+    "garch_gamma": 0.0958385373584926,
+    "idio_sigma_scale": 0.24133111615113795,
+    "market_vol_alpha": 0.24487606959099162,
+    "market_vol_beta": 0.154362122773671,
+    "market_vol_vix_coupling": 0.6431812274518875,
+    "momentum_theta": 0.9020414399481119
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -17,
+     "pt_v1": 2400,
+     "vector": 2383
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -17,
+   "seed": 125,
+   "total_delta": -17
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.07266967778855915,
+    "garch_beta": 0.38990199009196524,
+    "garch_gamma": 0.7024512034002959,
+    "idio_sigma_scale": 2.1846753005718655,
+    "market_vol_alpha": 0.317005265406202,
+    "market_vol_beta": 0.4630923356620475,
+    "market_vol_vix_coupling": 0.8791790662300701,
+    "momentum_theta": 0.967012555199527
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.07266967778855915,
+    "garch_beta": 0.38990199009196524,
+    "garch_gamma": 0.7024512034002959,
+    "idio_sigma_scale": 2.1846753005718655,
+    "market_vol_alpha": 0.317005265406202,
+    "market_vol_beta": 0.4630923356620475,
+    "market_vol_vix_coupling": 0.8791790662300701,
+    "momentum_theta": 0.967012555199527
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -11,
+     "pt_v1": 2383,
+     "vector": 2372
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -11,
+   "seed": 110,
+   "total_delta": -11
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.04052495651325085,
+    "garch_beta": 0.6713480436756385,
+    "garch_gamma": 0.48360669954317614,
+    "idio_sigma_scale": 0.6932287289701006,
+    "market_vol_alpha": 0.5714478441478203,
+    "market_vol_beta": 0.4265521558521796,
+    "market_vol_vix_coupling": 0.3668471753910978,
+    "momentum_theta": 0.9427199397968353
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -55,
+     "pt_v1": 2420,
+     "vector": 2365
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -55,
+   "seed": 101,
+   "total_delta": -55
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.04052495651325085,
+    "garch_beta": 0.6713480436756385,
+    "garch_gamma": 0.48360669954317614,
+    "idio_sigma_scale": 0.6932287289701006,
+    "market_vol_alpha": 0.5714478441478203,
+    "market_vol_beta": 0.4265521558521796,
+    "market_vol_vix_coupling": 0.3668471753910978,
+    "momentum_theta": 0.9427199397968353
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.04052495651325085,
+    "garch_beta": 0.6713480436756385,
+    "garch_gamma": 0.48360669954317614,
+    "idio_sigma_scale": 0.6932287289701006,
+    "market_vol_alpha": 0.5714478441478203,
+    "market_vol_beta": 0.4265521558521796,
+    "market_vol_vix_coupling": 0.3668471753910978,
+    "momentum_theta": 0.9427199397968353
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -17,
+     "pt_v1": 2400,
+     "vector": 2383
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -17,
+   "seed": 125,
+   "total_delta": -17
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05737124554638544,
+    "garch_beta": 0.7076164673266544,
+    "garch_gamma": 0.46602457425392046,
+    "idio_sigma_scale": 2.065199422773399,
+    "market_vol_alpha": 0.5530711018986668,
+    "market_vol_beta": 0.444928898101333,
+    "market_vol_vix_coupling": 0.6930866331491017,
+    "momentum_theta": 0.937648547573489
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -34,
+     "pt_v1": 2420,
+     "vector": 2386
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -34,
+   "seed": 101,
+   "total_delta": -34
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05737124554638544,
+    "garch_beta": 0.7076164673266544,
+    "garch_gamma": 0.46602457425392046,
+    "idio_sigma_scale": 2.065199422773399,
+    "market_vol_alpha": 0.5530711018986668,
+    "market_vol_beta": 0.444928898101333,
+    "market_vol_vix_coupling": 0.6930866331491017,
+    "momentum_theta": 0.937648547573489
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05737124554638544,
+    "garch_beta": 0.7076164673266544,
+    "garch_gamma": 0.46602457425392046,
+    "idio_sigma_scale": 2.065199422773399,
+    "market_vol_alpha": 0.5530711018986668,
+    "market_vol_beta": 0.444928898101333,
+    "market_vol_vix_coupling": 0.6930866331491017,
+    "momentum_theta": 0.937648547573489
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -11,
+     "pt_v1": 2383,
+     "vector": 2372
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -11,
+   "seed": 110,
+   "total_delta": -11
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05737124554638544,
+    "garch_beta": 0.7076164673266544,
+    "garch_gamma": 0.46602457425392046,
+    "idio_sigma_scale": 2.065199422773399,
+    "market_vol_alpha": 0.5530711018986668,
+    "market_vol_beta": 0.444928898101333,
+    "market_vol_vix_coupling": 0.6930866331491017,
+    "momentum_theta": 0.937648547573489
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -3,
+     "pt_v1": 2369,
+     "vector": 2366
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -3,
+   "seed": 119,
+   "total_delta": -3
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05900481489005649,
+    "garch_beta": 0.798087065423263,
+    "garch_gamma": 0.28181623937336137,
+    "idio_sigma_scale": 1.5197443889522948,
+    "market_vol_alpha": 0.5779759954745787,
+    "market_vol_beta": 0.2188781984391599,
+    "market_vol_vix_coupling": 0.6729961053167858,
+    "momentum_theta": 0.6739779883512519
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -15,
+     "pt_v1": 2420,
+     "vector": 2405
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -15,
+   "seed": 101,
+   "total_delta": -15
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05900481489005649,
+    "garch_beta": 0.798087065423263,
+    "garch_gamma": 0.28181623937336137,
+    "idio_sigma_scale": 1.5197443889522948,
+    "market_vol_alpha": 0.5779759954745787,
+    "market_vol_beta": 0.2188781984391599,
+    "market_vol_vix_coupling": 0.6729961053167858,
+    "momentum_theta": 0.6739779883512519
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05900481489005649,
+    "garch_beta": 0.798087065423263,
+    "garch_gamma": 0.28181623937336137,
+    "idio_sigma_scale": 1.5197443889522948,
+    "market_vol_alpha": 0.5779759954745787,
+    "market_vol_beta": 0.2188781984391599,
+    "market_vol_vix_coupling": 0.6729961053167858,
+    "momentum_theta": 0.6739779883512519
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -11,
+     "pt_v1": 2383,
+     "vector": 2372
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -11,
+   "seed": 110,
+   "total_delta": -11
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.025743511673176827,
+    "garch_beta": 0.4832551770800977,
+    "garch_gamma": 0.3872942057210619,
+    "idio_sigma_scale": 3.3311805568508457,
+    "market_vol_alpha": 0.6190742856231707,
+    "market_vol_beta": 0.20006696865608736,
+    "market_vol_vix_coupling": 0.5768913018387497,
+    "momentum_theta": 0.4653164668487353
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -15,
+     "pt_v1": 2420,
+     "vector": 2405
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -15,
+   "seed": 101,
+   "total_delta": -15
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.025743511673176827,
+    "garch_beta": 0.4832551770800977,
+    "garch_gamma": 0.3872942057210619,
+    "idio_sigma_scale": 3.3311805568508457,
+    "market_vol_alpha": 0.6190742856231707,
+    "market_vol_beta": 0.20006696865608736,
+    "market_vol_vix_coupling": 0.5768913018387497,
+    "momentum_theta": 0.4653164668487353
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.025743511673176827,
+    "garch_beta": 0.4832551770800977,
+    "garch_gamma": 0.3872942057210619,
+    "idio_sigma_scale": 3.3311805568508457,
+    "market_vol_alpha": 0.6190742856231707,
+    "market_vol_beta": 0.20006696865608736,
+    "market_vol_vix_coupling": 0.5768913018387497,
+    "momentum_theta": 0.4653164668487353
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -11,
+     "pt_v1": 2383,
+     "vector": 2372
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -11,
+   "seed": 110,
+   "total_delta": -11
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.025743511673176827,
+    "garch_beta": 0.4832551770800977,
+    "garch_gamma": 0.3872942057210619,
+    "idio_sigma_scale": 3.3311805568508457,
+    "market_vol_alpha": 0.6190742856231707,
+    "market_vol_beta": 0.20006696865608736,
+    "market_vol_vix_coupling": 0.5768913018387497,
+    "momentum_theta": 0.4653164668487353
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -4,
+     "pt_v1": 2369,
+     "vector": 2365
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -4,
+   "seed": 119,
+   "total_delta": -4
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.025743511673176827,
+    "garch_beta": 0.4832551770800977,
+    "garch_gamma": 0.3872942057210619,
+    "idio_sigma_scale": 3.3311805568508457,
+    "market_vol_alpha": 0.6190742856231707,
+    "market_vol_beta": 0.20006696865608736,
+    "market_vol_vix_coupling": 0.5768913018387497,
+    "momentum_theta": 0.4653164668487353
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -36,
+     "pt_v1": 2400,
+     "vector": 2364
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -36,
+   "seed": 125,
+   "total_delta": -36
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.051996054471243586,
+    "garch_beta": 0.6346294128547199,
+    "garch_gamma": 0.6227490653480731,
+    "idio_sigma_scale": 0.40519792306449237,
+    "market_vol_alpha": 0.22270185405033335,
+    "market_vol_beta": 0.7696822573491311,
+    "market_vol_vix_coupling": 0.9550370714869763,
+    "momentum_theta": 0.7107431889171082
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -34,
+     "pt_v1": 2400,
+     "vector": 2366
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -34,
+   "seed": 125,
+   "total_delta": -34
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.04830130502434508,
+    "garch_beta": 0.6018703183543218,
+    "garch_gamma": 0.6956567532426663,
+    "idio_sigma_scale": 2.6800328370191755,
+    "market_vol_alpha": 0.571660442369022,
+    "market_vol_beta": 0.4263395576309781,
+    "market_vol_vix_coupling": 0.756764665014077,
+    "momentum_theta": 0.3691068912760927
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -15,
+     "pt_v1": 2420,
+     "vector": 2405
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -15,
+   "seed": 101,
+   "total_delta": -15
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.04830130502434508,
+    "garch_beta": 0.6018703183543218,
+    "garch_gamma": 0.6956567532426663,
+    "idio_sigma_scale": 2.6800328370191755,
+    "market_vol_alpha": 0.571660442369022,
+    "market_vol_beta": 0.4263395576309781,
+    "market_vol_vix_coupling": 0.756764665014077,
+    "momentum_theta": 0.3691068912760927
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.04830130502434508,
+    "garch_beta": 0.6018703183543218,
+    "garch_gamma": 0.6956567532426663,
+    "idio_sigma_scale": 2.6800328370191755,
+    "market_vol_alpha": 0.571660442369022,
+    "market_vol_beta": 0.4263395576309781,
+    "market_vol_vix_coupling": 0.756764665014077,
+    "momentum_theta": 0.3691068912760927
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -11,
+     "pt_v1": 2383,
+     "vector": 2372
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -11,
+   "seed": 110,
+   "total_delta": -11
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.04830130502434508,
+    "garch_beta": 0.6018703183543218,
+    "garch_gamma": 0.6956567532426663,
+    "idio_sigma_scale": 2.6800328370191755,
+    "market_vol_alpha": 0.571660442369022,
+    "market_vol_beta": 0.4263395576309781,
+    "market_vol_vix_coupling": 0.756764665014077,
+    "momentum_theta": 0.3691068912760927
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -4,
+     "pt_v1": 2369,
+     "vector": 2365
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -4,
+   "seed": 119,
+   "total_delta": -4
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.04830130502434508,
+    "garch_beta": 0.6018703183543218,
+    "garch_gamma": 0.6956567532426663,
+    "idio_sigma_scale": 2.6800328370191755,
+    "market_vol_alpha": 0.571660442369022,
+    "market_vol_beta": 0.4263395576309781,
+    "market_vol_vix_coupling": 0.756764665014077,
+    "momentum_theta": 0.3691068912760927
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -36,
+     "pt_v1": 2400,
+     "vector": 2364
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -36,
+   "seed": 125,
+   "total_delta": -36
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.013319285218998018,
+    "garch_beta": 0.514129155277887,
+    "garch_gamma": 0.6423531267196165,
+    "idio_sigma_scale": 2.3960610176200685,
+    "market_vol_alpha": 0.6856731827335206,
+    "market_vol_beta": 0.19021163354440312,
+    "market_vol_vix_coupling": 0.5991575858860263,
+    "momentum_theta": 0.760403980155948
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.013319285218998018,
+    "garch_beta": 0.514129155277887,
+    "garch_gamma": 0.6423531267196165,
+    "idio_sigma_scale": 2.3960610176200685,
+    "market_vol_alpha": 0.6856731827335206,
+    "market_vol_beta": 0.19021163354440312,
+    "market_vol_vix_coupling": 0.5991575858860263,
+    "momentum_theta": 0.760403980155948
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -11,
+     "pt_v1": 2383,
+     "vector": 2372
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -11,
+   "seed": 110,
+   "total_delta": -11
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.013319285218998018,
+    "garch_beta": 0.514129155277887,
+    "garch_gamma": 0.6423531267196165,
+    "idio_sigma_scale": 2.3960610176200685,
+    "market_vol_alpha": 0.6856731827335206,
+    "market_vol_beta": 0.19021163354440312,
+    "market_vol_vix_coupling": 0.5991575858860263,
+    "momentum_theta": 0.760403980155948
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -3,
+     "pt_v1": 2369,
+     "vector": 2366
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -3,
+   "seed": 119,
+   "total_delta": -3
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.013319285218998018,
+    "garch_beta": 0.514129155277887,
+    "garch_gamma": 0.6423531267196165,
+    "idio_sigma_scale": 2.3960610176200685,
+    "market_vol_alpha": 0.6856731827335206,
+    "market_vol_beta": 0.19021163354440312,
+    "market_vol_vix_coupling": 0.5991575858860263,
+    "momentum_theta": 0.760403980155948
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -34,
+     "pt_v1": 2400,
+     "vector": 2366
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -34,
+   "seed": 125,
+   "total_delta": -34
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.02179813126408571,
+    "garch_beta": 0.8582432899916153,
+    "garch_gamma": 0.21533632433175265,
+    "idio_sigma_scale": 0.21528533722900414,
+    "market_vol_alpha": 0.68958522190792,
+    "market_vol_beta": 0.30841477809207996,
+    "market_vol_vix_coupling": 0.4541312340781064,
+    "momentum_theta": 0.9810512104948544
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -55,
+     "pt_v1": 2420,
+     "vector": 2365
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -55,
+   "seed": 101,
+   "total_delta": -55
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.02179813126408571,
+    "garch_beta": 0.8582432899916153,
+    "garch_gamma": 0.21533632433175265,
+    "idio_sigma_scale": 0.21528533722900414,
+    "market_vol_alpha": 0.68958522190792,
+    "market_vol_beta": 0.30841477809207996,
+    "market_vol_vix_coupling": 0.4541312340781064,
+    "momentum_theta": 0.9810512104948544
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.02179813126408571,
+    "garch_beta": 0.8582432899916153,
+    "garch_gamma": 0.21533632433175265,
+    "idio_sigma_scale": 0.21528533722900414,
+    "market_vol_alpha": 0.68958522190792,
+    "market_vol_beta": 0.30841477809207996,
+    "market_vol_vix_coupling": 0.4541312340781064,
+    "momentum_theta": 0.9810512104948544
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -11,
+     "pt_v1": 2383,
+     "vector": 2372
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -11,
+   "seed": 110,
+   "total_delta": -11
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.02179813126408571,
+    "garch_beta": 0.8582432899916153,
+    "garch_gamma": 0.21533632433175265,
+    "idio_sigma_scale": 0.21528533722900414,
+    "market_vol_alpha": 0.68958522190792,
+    "market_vol_beta": 0.30841477809207996,
+    "market_vol_vix_coupling": 0.4541312340781064,
+    "momentum_theta": 0.9810512104948544
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -3,
+     "pt_v1": 2369,
+     "vector": 2366
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -3,
+   "seed": 119,
+   "total_delta": -3
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.02179813126408571,
+    "garch_beta": 0.8582432899916153,
+    "garch_gamma": 0.21533632433175265,
+    "idio_sigma_scale": 0.21528533722900414,
+    "market_vol_alpha": 0.68958522190792,
+    "market_vol_beta": 0.30841477809207996,
+    "market_vol_vix_coupling": 0.4541312340781064,
+    "momentum_theta": 0.9810512104948544
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -36,
+     "pt_v1": 2400,
+     "vector": 2364
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -36,
+   "seed": 125,
+   "total_delta": -36
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05684199058176506,
+    "garch_beta": 0.7338211521418098,
+    "garch_gamma": 0.30278911361801375,
+    "idio_sigma_scale": 2.3258119499707934,
+    "market_vol_alpha": 0.7809155724733505,
+    "market_vol_beta": 0.21708442752664958,
+    "market_vol_vix_coupling": 0.5391024684861427,
+    "momentum_theta": 0.4032106376264215
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -15,
+     "pt_v1": 2420,
+     "vector": 2405
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -15,
+   "seed": 101,
+   "total_delta": -15
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05684199058176506,
+    "garch_beta": 0.7338211521418098,
+    "garch_gamma": 0.30278911361801375,
+    "idio_sigma_scale": 2.3258119499707934,
+    "market_vol_alpha": 0.7809155724733505,
+    "market_vol_beta": 0.21708442752664958,
+    "market_vol_vix_coupling": 0.5391024684861427,
+    "momentum_theta": 0.4032106376264215
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05684199058176506,
+    "garch_beta": 0.7338211521418098,
+    "garch_gamma": 0.30278911361801375,
+    "idio_sigma_scale": 2.3258119499707934,
+    "market_vol_alpha": 0.7809155724733505,
+    "market_vol_beta": 0.21708442752664958,
+    "market_vol_vix_coupling": 0.5391024684861427,
+    "momentum_theta": 0.4032106376264215
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -11,
+     "pt_v1": 2383,
+     "vector": 2372
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -11,
+   "seed": 110,
+   "total_delta": -11
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05684199058176506,
+    "garch_beta": 0.7338211521418098,
+    "garch_gamma": 0.30278911361801375,
+    "idio_sigma_scale": 2.3258119499707934,
+    "market_vol_alpha": 0.7809155724733505,
+    "market_vol_beta": 0.21708442752664958,
+    "market_vol_vix_coupling": 0.5391024684861427,
+    "momentum_theta": 0.4032106376264215
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -3,
+     "pt_v1": 2369,
+     "vector": 2366
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -3,
+   "seed": 119,
+   "total_delta": -3
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.05684199058176506,
+    "garch_beta": 0.7338211521418098,
+    "garch_gamma": 0.30278911361801375,
+    "idio_sigma_scale": 2.3258119499707934,
+    "market_vol_alpha": 0.7809155724733505,
+    "market_vol_beta": 0.21708442752664958,
+    "market_vol_vix_coupling": 0.5391024684861427,
+    "momentum_theta": 0.4032106376264215
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -36,
+     "pt_v1": 2400,
+     "vector": 2364
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -36,
+   "seed": 125,
+   "total_delta": -36
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.06842001973085352,
+    "garch_beta": 0.6148281112667007,
+    "garch_gamma": 0.3532874104531768,
+    "idio_sigma_scale": 3.0219766148584006,
+    "market_vol_alpha": 0.6022023899308007,
+    "market_vol_beta": 0.39579761006919945,
+    "market_vol_vix_coupling": 0.9974073080094693,
+    "momentum_theta": 0.12257027970500656
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -15,
+     "pt_v1": 2420,
+     "vector": 2405
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -15,
+   "seed": 101,
+   "total_delta": -15
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.06842001973085352,
+    "garch_beta": 0.6148281112667007,
+    "garch_gamma": 0.3532874104531768,
+    "idio_sigma_scale": 3.0219766148584006,
+    "market_vol_alpha": 0.6022023899308007,
+    "market_vol_beta": 0.39579761006919945,
+    "market_vol_vix_coupling": 0.9974073080094693,
+    "momentum_theta": 0.12257027970500656
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -22,
+     "pt_v1": 2387,
+     "vector": 2365
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -22,
+   "seed": 107,
+   "total_delta": -22
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.06842001973085352,
+    "garch_beta": 0.6148281112667007,
+    "garch_gamma": 0.3532874104531768,
+    "idio_sigma_scale": 3.0219766148584006,
+    "market_vol_alpha": 0.6022023899308007,
+    "market_vol_beta": 0.39579761006919945,
+    "market_vol_vix_coupling": 0.9974073080094693,
+    "momentum_theta": 0.12257027970500656
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -11,
+     "pt_v1": 2383,
+     "vector": 2372
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -11,
+   "seed": 110,
+   "total_delta": -11
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.06842001973085352,
+    "garch_beta": 0.6148281112667007,
+    "garch_gamma": 0.3532874104531768,
+    "idio_sigma_scale": 3.0219766148584006,
+    "market_vol_alpha": 0.6022023899308007,
+    "market_vol_beta": 0.39579761006919945,
+    "market_vol_vix_coupling": 0.9974073080094693,
+    "momentum_theta": 0.12257027970500656
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -3,
+     "pt_v1": 2369,
+     "vector": 2366
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -3,
+   "seed": 119,
+   "total_delta": -3
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.06842001973085352,
+    "garch_beta": 0.6148281112667007,
+    "garch_gamma": 0.3532874104531768,
+    "idio_sigma_scale": 3.0219766148584006,
+    "market_vol_alpha": 0.6022023899308007,
+    "market_vol_beta": 0.39579761006919945,
+    "market_vol_vix_coupling": 0.9974073080094693,
+    "momentum_theta": 0.12257027970500656
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -36,
+     "pt_v1": 2400,
+     "vector": 2364
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -36,
+   "seed": 125,
+   "total_delta": -36
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.037661130305012225,
+    "garch_beta": 0.5252462235049276,
+    "garch_gamma": 0.26243589733099415,
+    "idio_sigma_scale": 3.0744870553940435,
+    "market_vol_alpha": 0.5180411955921393,
+    "market_vol_beta": 0.47995880440786054,
+    "market_vol_vix_coupling": 1.0,
+    "momentum_theta": 0.2848924216074398
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -25,
+     "pt_v1": 2387,
+     "vector": 2362
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -25,
+   "seed": 107,
+   "total_delta": -25
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.037661130305012225,
+    "garch_beta": 0.5252462235049276,
+    "garch_gamma": 0.26243589733099415,
+    "idio_sigma_scale": 3.0744870553940435,
+    "market_vol_alpha": 0.5180411955921393,
+    "market_vol_beta": 0.47995880440786054,
+    "market_vol_vix_coupling": 1.0,
+    "momentum_theta": 0.2848924216074398
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -3,
+     "pt_v1": 2369,
+     "vector": 2366
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -3,
+   "seed": 119,
+   "total_delta": -3
+  },
+  {
+   "overrides": {
+    "garch_alpha": 0.037661130305012225,
+    "garch_beta": 0.5252462235049276,
+    "garch_gamma": 0.26243589733099415,
+    "idio_sigma_scale": 3.0744870553940435,
+    "market_vol_alpha": 0.5180411955921393,
+    "market_vol_beta": 0.47995880440786054,
+    "market_vol_vix_coupling": 1.0,
+    "momentum_theta": 0.2848924216074398
+   },
+   "per_stream": {
+    "economy": {
+     "delta": -36,
+     "pt_v1": 2400,
+     "vector": 2364
+    },
+    "external": {
+     "delta": 0,
+     "pt_v1": 0,
+     "vector": 0
+    },
+    "market": {
+     "delta": 0,
+     "pt_v1": 24864840,
+     "vector": 24864840
+    }
+   },
+   "recorded_total_delta": -36,
+   "seed": 125,
+   "total_delta": -36
+  }
+ ],
+ "six_seed_vector_equivalents": 100.83333333333333,
+ "summary": {
+  "economy_accounts_for_total": 58,
+  "external_stream_moved": 0,
+  "market_stream_moved": 0,
+  "pairs_re_measured": 58,
+  "reproduces_recorded_delta": 58
+ },
+ "sweep": {
+  "box": [
+   0.21,
+   3.36
+  ],
+  "parameter": "idio_sigma_scale",
+  "points": [
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 18.322882497047026,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2420,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 30.232016010641104,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 0.21
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 21.12470349838897,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2420,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 32.42297689942195,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 0.42
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 27.12526515899854,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2420,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 37.37837180664968,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 0.63
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 38.186329436877834,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2420,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 46.7369230533463,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 0.84
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 53.47149807657119,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2420,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 58.76838631806305,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 1.05
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 68.70268363566004,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2420,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 72.14369499641076,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 1.26
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 83.37103404171386,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2420,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 85.71832479072337,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 1.47
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 97.43498568130155,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2420,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 98.51122299783826,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 1.68
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 110.43923176522073,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2420,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 110.5267221634634,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 1.89
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 122.13821804556555,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2420,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 121.62088304399816,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 2.1
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 132.4659922022196,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2420,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 131.84586442423313,
+      "deltas": {
+       "economy": -36,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2364,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 2.31
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 141.86641139500705,
+      "deltas": {
+       "economy": -15,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2405,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 140.87871852799094,
+      "deltas": {
+       "economy": -36,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2364,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 2.52
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 150.22446105111493,
+      "deltas": {
+       "economy": -15,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2405,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 149.25515570898006,
+      "deltas": {
+       "economy": -36,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2364,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 2.73
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 158.0074861849251,
+      "deltas": {
+       "economy": -15,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2405,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 156.92900361612786,
+      "deltas": {
+       "economy": -36,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2364,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 2.9399999999999995
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 165.02761870791625,
+      "deltas": {
+       "economy": -15,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2405,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 163.5741867933802,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 3.15
+   },
+   {
+    "seeds": {
+     "101": {
+      "annualised_vol_pct": 171.04482775865898,
+      "deltas": {
+       "economy": -15,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2405,
+       "external": 0,
+       "market": 24864840
+      }
+     },
+     "125": {
+      "annualised_vol_pct": 169.48482987208337,
+      "deltas": {
+       "economy": 0,
+       "external": 0,
+       "market": 0
+      },
+      "per_stream": {
+       "economy": 2400,
+       "external": 0,
+       "market": 24864840
+      }
+     }
+    },
+    "value": 3.36
+   }
+  ],
+  "seeds": [
+   101,
+   125
+  ]
+ },
+ "verdict": "the market stream \u2014 the one common random numbers rest on \u2014 is invariant across every recorded offender and the whole swept box axis; the economy stream accounts for the entire recorded deviation, which is the documented macro-state coupling and not a violation of anything the instrument needs; and 0 of 480 (vector, seed) pairs in phase 2's own Jacobian bracket branch the macro chain",
+ "wall_seconds": 461.5575900420081
+}

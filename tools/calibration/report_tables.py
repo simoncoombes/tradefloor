@@ -38,17 +38,104 @@ def verdict(stat: dict) -> str:
     return "out (high)" if stat["measured"] > high else "out (low)"
 
 
+def room(stat: dict) -> str:
+    """How far inside its band a statistic sits, in its own seed noise.
+
+    The band loss is flat inside the band (§6.1) and therefore blind to
+    this; it is the quantity phase 3's band-edge failure was about, and a
+    table that prints only "in"/"out" hides it. Negative means outside.
+    """
+    value = stat.get("room_sd")
+    return "--" if value is None else f"{value:+.2f}"
+
+
+def compare(cert: dict, keys: list[str]) -> None:
+    """An `evaluate_axes.py` certificate as a side-by-side panel.
+
+    The question this phase exists to answer is comparative — is the
+    margined vector better than `pt-v2` on the axes the search never saw
+    — so the table is one column per vector rather than one table per
+    vector, and every cell carries the band room that decides it.
+    """
+    names = list(cert["vectors"])
+    for axis, label in AXES:
+        print(f"\n**{label}** — L_real " + ", ".join(
+            f"{n} {cert['vectors'][n]['axes'][axis]['loss_real']:.4f}"
+            for n in names) + "\n")
+        print("| statistic | band | role | "
+              + " | ".join(f"{n} | room" for n in names) + " |")
+        print("|---|---|---|" + "---|---|" * len(names))
+        for key in keys:
+            first = cert["vectors"][names[0]]["axes"][axis]["statistics"][key]
+            band = f"{first['band'][0]:g} to {first['band'][1]:g}"
+            places = 1 if key == "annualised_vol_pct" else (
+                2 if key == "excess_kurtosis" else 4)
+            cells = []
+            for name in names:
+                stat = cert["vectors"][name]["axes"][axis]["statistics"][key]
+                mark = "" if stat["distance"] == 0 else " **out**"
+                cells.append(f"{fmt(stat['measured'], places)}{mark} | "
+                             f"{room(stat)} sd")
+            print(f"| {key} | {band} | {first['role']} | "
+                  + " | ".join(cells) + " |")
+
+    print("\n### The two variance persistences, against the 252-day window\n")
+    print("| vector | factor persistence | half-life | GJR persistence "
+          "| half-life |")
+    print("|---|---|---|---|---|")
+    for name in names:
+        d = cert["vectors"][name]["diagnostics"]
+        f, g = d["market_factor_variance"], d["per_name_garch"]
+        print(f"| {name} | {f['persistence']:.6f} | "
+              f"{f['half_life_days']:.1f} d | {g['persistence']:.6f} | "
+              f"{g['half_life_days']:.1f} d |")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--certificate", required=True)
+    parser.add_argument("--label", default="candidate",
+                        help="what to call the searched vector's column")
     args = parser.parse_args()
     with open(args.certificate, encoding="utf-8") as handle:
         cert = json.load(handle)
 
     keys = list(cert["method"]["bands"])
+    if "vectors" in cert:
+        compare(cert, keys)
+        return
+    label = args.label
+
+    margin = cert["method"].get("search_margin")
+    if margin:
+        print("### The margin the search aimed at\n")
+        print(f"The search scored candidates against bands shrunk by "
+              f"**{margin['margin_sd']} seed-sds on each side**. Every "
+              f"number in every other table here is the shipped "
+              f"`band_distance_loss` against the TRUE bands.\n")
+        print("| statistic | true band | width | searched band | margin |")
+        print("|---|---|---|---|---|")
+        for key, row in margin["bands"].items():
+            t, s = row["true"], row["searched"]
+            print(f"| {key} | {t[0]:g} to {t[1]:g} | "
+                  f"{row['band_width_sd']:.2f} sd | "
+                  f"{s[0]:.4g} to {s[1]:.4g} | "
+                  f"{row['achieved_margin_sd']:.2f} sd"
+                  + (" (degenerate)" if row["degenerate"] else "") + " |")
+
+    cap = cert["method"].get("factor_persistence_cap")
+    if cap:
+        print(f"\n### The identifiability cap\n")
+        print(f"- `market_vol_alpha + market_vol_beta` <= "
+              f"**{cap['persistence']:.6f}**")
+        print(f"- half-life {cap['half_life_days']:g} trading days against a "
+              f"{cap['window_days']}-day window "
+              f"({cap['half_lives_in_window']:g} half-lives inside it)\n")
+    print()
 
     print("### What moved\n")
-    print("| parameter | ‖column‖ | pt-v1 | pt-v2 | move | §6.3 deviation |")
+    print(f"| parameter | \u2016column\u2016 | pt-v1 | {label} | move "
+          "| \u00a76.3 deviation |")
     print("|---|---|---|---|---|---|")
     for move in sorted(cert["moves"],
                        key=lambda m: -abs(m["deviation"])):
@@ -59,15 +146,15 @@ def main() -> None:
               f"{move['pt_v1']:.6g} | {move['candidate']:.6g} | {ratio} | "
               f"{move['deviation']:+.4f} |")
 
-    print("\n### The panel, pt-v1 against pt-v2, on every axis\n")
-    for axis, label in AXES:
+    print(f"\n### The panel, pt-v1 against {label}, on every axis\n")
+    for axis, axis_label in AXES:
         before = cert["axes"]["pt-v1"][axis]
         after = cert["axes"]["candidate"][axis]
-        print(f"\n**{label}** — L_real "
+        print(f"\n**{axis_label}** — L_real "
               f"{before['loss_real']:.3f} -> {after['loss_real']:.3f}\n")
-        print("| statistic | band | role | pt-v1 | pt-v2 | verdict pt-v1 "
-              "| verdict pt-v2 |")
-        print("|---|---|---|---|---|---|---|")
+        print(f"| statistic | band | role | pt-v1 | {label} | "
+              f"verdict pt-v1 | verdict {label} | room {label} |")
+        print("|---|---|---|---|---|---|---|---|")
         for key in keys:
             b, a = before["statistics"][key], after["statistics"][key]
             band = f"{b['band'][0]:g} to {b['band'][1]:g}"
@@ -76,17 +163,17 @@ def main() -> None:
             print(f"| {key} | {band} | {a['role']} | "
                   f"{fmt(b['measured'], places)} | "
                   f"{fmt(a['measured'], places)} | "
-                  f"{verdict(b)} | {verdict(a)} |")
+                  f"{verdict(b)} | {verdict(a)} | {room(a)} sd |")
 
-    print("\n### Scaled band exits at pt-v2 (seed-sd units)\n")
+    print(f"\n### Band room at {label}, every axis (seed-sds inside the "
+          "TRUE band; negative is outside)\n")
     print("| statistic | " + " | ".join(l for _, l in AXES) + " |")
     print("|---" * (len(AXES) + 1) + "|")
     for key in keys:
         cells = []
         for axis, _ in AXES:
             stat = cert["axes"]["candidate"][axis]["statistics"][key]
-            cells.append("--" if stat["scaled"] is None
-                         else f"{stat['scaled']:.3f}")
+            cells.append(room(stat))
         print(f"| {key} | " + " | ".join(cells) + " |")
 
     print("\n### §8's overfitting test\n")
@@ -146,7 +233,13 @@ def main() -> None:
           f"{cert['reserve_panel_runs']} reserved for the thirty-seed "
           f"stages")
     print(f"- wall clock: {cert['wall_seconds']:.0f} s")
-    print(f"- CRN schedule deviations: {len(cert['crn_deviations'])}")
+    guard = cert.get("crn_guard", {})
+    print(f"- CRN guard: asserted on the "
+          f"`{guard.get('asserted_stream', 'total')}` stream, which held on "
+          f"every evaluation")
+    print(f"- economy-stream draw deviations (the documented macro-state "
+          f"coupling, not a violation): "
+          f"{len(guard.get('economy_deviations', []))}")
 
 
 if __name__ == "__main__":
