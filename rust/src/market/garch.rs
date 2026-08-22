@@ -1,24 +1,43 @@
-//! GARCH(1,1) volatility, ported from `src/lib/engine/market.ts:36`.
+//! GJR-GARCH(1,1) volatility, extending the GARCH(1,1) ported from
+//! `src/lib/engine/market.ts:36` with a leverage-effect asymmetry term.
 //!
-//! **Tier 1: no transcendentals, no RNG.** Four multiplies, a clamp, and a
-//! lookup — held to bit-parity.
+//! **Tier 1: no transcendentals, no RNG.** A handful of multiplies, one
+//! sign compare, a clamp, and a lookup — held to bit-parity.
 //!
 //! # What GARCH is doing here
 //!
 //! Volatility CLUSTERS: a large move today makes a large move tomorrow more
 //! likely, which is why real markets have quiet months and violent weeks
 //! rather than uniform noise. `ALPHA` is how much yesterday's surprise feeds
-//! through; `BETA` is how much of yesterday's volatility persists. Their sum
-//! (0.99) is the persistence — close to 1, so shocks decay slowly, which is
+//! through; `BETA` is how much of yesterday's volatility persists; `GAMMA`
+//! is how much MORE a negative surprise feeds through than a positive one
+//! of the same size — the leverage effect, which real equities have and a
+//! symmetric GARCH structurally cannot (the return enters squared, so its
+//! sign is destroyed; design finding 8, CALIBRATION.md §3.5). The effective
+//! persistence is `ALPHA + BETA + GAMMA/2` (the asymmetry term is live on
+//! roughly half of days) — close to 1, so shocks decay slowly, which is
 //! what produces multi-week crises rather than one bad afternoon.
 //!
-//! # The JS-fallback form is the contract
+//! GJR (Glosten–Jagannathan–Runkle) rather than EGARCH, deliberately:
+//! EGARCH's log-variance form needs `exp`/`log` per name per day, which
+//! would drag the volatility process out of Tier 1 and into the bit-parity
+//! budget. GJR is a compare and a multiply.
+//!
+//! # The JS-fallback form is the contract, plus one argued divergence
 //!
 //! `updateGarchVariance` tries WASM first and falls back to this arithmetic.
 //! `WASM-ORACLE.md` §3 establishes the two agree on all reachable inputs, and
 //! decisions D1–D3 already settled that the new era takes the JS side where
 //! they differ. There is no WASM in this crate, so the fallback is simply
-//! what the function is.
+//! what the function is — with one deliberate divergence: the reference has
+//! no `GAMMA` term. The term is written as a guarded `+=` AFTER the
+//! reference's three-term sum, never folded into it, so that at `GAMMA = 0`
+//! the arithmetic is bit-identical to the reference form (floating-point
+//! addition is not associative; a re-associated four-term sum would change
+//! every trajectory even at zero). The shipped `GAMMA` is nonzero — an era
+//! decision, calibrated by `tools/calibration/sweep_gjr_gamma.py` — and the
+//! zero-`GAMMA` bit-identity is what keeps the term revisitable without
+//! re-litigating the structure.
 
 use crate::mathx;
 
@@ -28,6 +47,11 @@ pub const OMEGA: f64 = 0.000002;
 pub const ALPHA: f64 = 0.09;
 /// Weight on yesterday's variance — the persistence term.
 pub const BETA: f64 = 0.90;
+/// Extra weight on yesterday's squared return when the return was NEGATIVE —
+/// the GJR leverage-effect term. Zero recovers the reference's symmetric
+/// GARCH(1,1) bit-for-bit. Stationarity needs `ALPHA + BETA + GAMMA/2 < 1`,
+/// so a meaningful `GAMMA` is paid for out of `ALPHA` and `BETA`.
+pub const GAMMA: f64 = 0.0;
 
 /// Ceiling as a multiple of the sector's long-run variance.
 ///
@@ -48,7 +72,17 @@ pub fn update_garch_variance(
     last_daily_return: f64,
     sector_base_variance: f64,
 ) -> f64 {
-    let new_var = OMEGA + ALPHA * last_daily_return * last_daily_return + BETA * current_variance;
+    let mut new_var =
+        OMEGA + ALPHA * last_daily_return * last_daily_return + BETA * current_variance;
+    // The GJR asymmetry: a negative return feeds through with weight
+    // ALPHA + GAMMA, a positive one with ALPHA alone. A guarded `+=` after
+    // the reference sum, NOT a fourth term inside it: at GAMMA = 0 this adds
+    // +0.0 to a strictly positive sum, which is bit-identical, where a
+    // re-associated four-term sum would not be. The evaluation order here is
+    // contractual, like every other arithmetic statement in this crate.
+    if last_daily_return < 0.0 {
+        new_var += GAMMA * last_daily_return * last_daily_return;
+    }
     // `Math.max(Math.min(newVar, ceiling), floor)` — written in that order in
     // the original, and the order is visible when the two bounds cross (a
     // zero or negative `sector_base_variance` makes them do exactly that).
@@ -68,15 +102,45 @@ mod tests {
 
     #[test]
     fn persistence_is_high_enough_for_crises_to_last() {
-        // ALPHA + BETA is the decay rate of a shock. At 0.99 a shock has
-        // half-decayed after ~69 days; at 0.9 it would be gone in a week and
-        // the model would have no crises, only bad afternoons.
-        let persistence = ALPHA + BETA;
+        // ALPHA + BETA + GAMMA/2 is the decay rate of a shock (the GJR term
+        // is live on roughly half of days, hence the half-weight — the
+        // GJR-GARCH stationarity condition for symmetric innovations). At
+        // 0.99 a shock has half-decayed after ~69 days; at 0.9 it would be
+        // gone in a week and the model would have no crises, only bad
+        // afternoons.
+        let persistence = ALPHA + BETA + GAMMA / 2.0;
         assert!(
             (0.98..1.0).contains(&persistence),
             "persistence {persistence} — below 0.98 crises evaporate, at or above 1.0 the \
              process is non-stationary and volatility runs away"
         );
+    }
+
+    #[test]
+    fn a_down_day_raises_tomorrows_volatility_at_least_as_much_as_an_up_day() {
+        // The GJR property, the reason the term exists. At GAMMA = 0 the two
+        // sides are exactly equal — the symmetric reference, bit-for-bit —
+        // and any positive GAMMA makes the down side strictly larger, which
+        // is the leverage effect real equities have (design finding 8).
+        let up = update_garch_variance(BASE, 0.02, BASE);
+        let down = update_garch_variance(BASE, -0.02, BASE);
+        assert!(
+            down >= up,
+            "a −2% day must raise variance at least as much as a +2% day: {down} vs {up}"
+        );
+        if GAMMA > 0.0 {
+            assert!(
+                down > up,
+                "with GAMMA = {GAMMA} a −2% day must raise variance STRICTLY more \
+                 than a +2% day: {down} vs {up}"
+            );
+        } else {
+            assert!(
+                down == up,
+                "at GAMMA = 0 the update must be exactly the symmetric reference: \
+                 {down} vs {up}"
+            );
+        }
     }
 
     // ── INVARIANTS 2.7 / 5.5: volatility clustering ───────────────────────
