@@ -208,6 +208,63 @@ REAL_MARKETS = {
     "volume_change_acf1": (-0.05, 0.15),
 }
 
+#: The across-seed standard deviation of each statistic at the shipped
+#: baseline (MARKET_FACTOR_SIGMA = 0.0075), from the post-RNG-split sweep
+#: re-run. It ships beside the bands because a band exit is only comparable
+#: across statistics once it is priced in units of that statistic's own
+#: sampling noise: pooled volatility runs ~55 on a band of width 20 while
+#: every autocorrelation is measured in hundredths, and any comparison that
+#: ignores the scales silently becomes a comparison of volatility alone.
+#: `pretium.loss` consumes these as its diagonal weighting.
+#:
+#: Provenance, and the history behind the values. CALIBRATION.md section 6.1
+#: tabulates seed sds measured pre-stream-split (git_rev 7c2877e) -- and, it
+#: turns out, at the OLD baseline sigma of 0.003, the shipped value at
+#: measurement time; every entry of that table matches the pre-split sweep
+#: file's 0.003 point to the printed digit. The values here are re-derived at
+#: the CURRENT baseline (0.0075) from the post-split re-run, so two changes
+#: separate them from the document's table: the sigma recalibration and the
+#: RNG stream split. The full chain, sample sd over the same six seeds:
+#:
+#:   statistic              doc @0.003   pre-split @0.0075   here @0.0075
+#:   annualised vol %          0.87           0.888              0.878
+#:   excess kurtosis           0.39           0.317              0.248
+#:   return acf(1)             0.015          0.009              0.015
+#:   |return| acf(1)           0.013          0.016              0.017
+#:   cross-sectional corr      0.013          0.017              0.014
+#:   volume vs |return|        0.015          0.009              0.013
+#:   leverage                  0.022          0.021              0.014
+#:   volume change acf(1)      0.008          0.007              0.006
+#:
+#: A six-seed sd is itself noisy -- its relative sampling error is roughly
+#: 1/sqrt(2(n-1)) = 32% -- and no move in either step exceeds about 1.5 of
+#: those sigmas, so the table corroborates the sweep re-run's finding: the
+#: split re-dealt the draws without changing the process law. Phase 2 of the
+#: calibration programme re-estimates these on thirty seeds;
+#: `pretium.loss.seed_sd_from_panels` is the estimator, and the loss takes
+#: the result as a parameter rather than requiring an edit here.
+SEED_SD = {
+    "annualised_vol_pct": 0.878001,
+    "excess_kurtosis": 0.24832,
+    "return_acf1": 0.0152672,
+    "abs_return_acf1": 0.0165008,
+    "cross_sectional_corr": 0.0137033,
+    "volume_abs_return_corr": 0.013005,
+    "leverage_effect": 0.0141133,
+    "volume_change_acf1": 0.00565191,
+}
+
+#: Where SEED_SD's values come from, carried as data so any consumer -- the
+#: loss report, a calibration manifest -- can quote it rather than assert it.
+SEED_SD_PROVENANCE = {
+    "source": "tools/calibration/results/"
+              "market-factor-sigma-2026-08-21-post-rng-split.json",
+    "git_rev": "ad91026",
+    "sweep_point": "MARKET_FACTOR_SIGMA = 0.0075 (the shipped baseline)",
+    "seeds": (1, 2, 3, 4, 5, 6),
+    "estimator": "sample standard deviation (n - 1) across seeds",
+}
+
 #: The first two are MARGINAL: properties of one series taken on its own. The
 #: other six are DEPENDENCE: how returns move together across time, across
 #: stocks, with volume, and asymmetrically with their own sign. Which half a
@@ -392,6 +449,28 @@ def _verdict(value: float, low: float, high: float) -> str:
     return "too high" if value > high else "too low"
 
 
+def band_distance(value: float, low: float, high: float) -> float:
+    """How far a statistic sits outside its band: max(0, low-value, value-high).
+
+    Zero anywhere inside the band, including on either boundary, and the
+    distance to the NEAREST edge outside it. Defined here, next to `_verdict`,
+    because the two share the hazard: on a band that is entirely negative --
+    leverage, -0.30 to -0.10 -- naive handling silently inverts. `_verdict`
+    solves the wording half (above a negative band is "too weak", and the
+    improving direction is DOWN); this solves the arithmetic half. The
+    specific failure this form exists to prevent is the one-sided
+    max(0, value - high), under which a leverage effect of -0.5 -- a large
+    OVERSHOOT past the strong edge -- would read as satisfying the band. The
+    two-sided form charges it low - value = 0.2, on the same footing as the
+    absent-effect exit on the weak side.
+
+    This is a distance on raw signed values; it does not know which side of a
+    band is "weak", and does not need to. Direction and wording stay
+    `_verdict`'s job.
+    """
+    return max(0.0, low - value, value - high)
+
+
 def measure(
     *,
     seed: int,
@@ -514,6 +593,8 @@ def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
         # of these bands.
         if value is None:
             continue
+        distance = band_distance(value, low, high)
+        sd = SEED_SD.get(key)
         out[key] = {
             "measured": value,
             "real_range": (low, high),
@@ -527,6 +608,14 @@ def compare_to_real_markets(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 "within" if low <= value <= high
                 else ("above" if value > high else "below")
             ),
+            # How FAR outside, twice over: in the statistic's own units, and
+            # in units of its across-seed sampling noise at the baseline
+            # (SEED_SD), so exits are comparable across statistics whose
+            # scales differ by three orders of magnitude. Per-statistic
+            # fields, deliberately -- this function still refuses to add
+            # them up, for the reason in the docstring.
+            "band_distance": distance,
+            "scaled_distance": distance / sd if sd else None,
         }
     return out
 
