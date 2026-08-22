@@ -95,6 +95,14 @@ pub const S_PHI_TICK: f64 = f64::from_bits(0x3FEF_FFC1_E138_5E9E);
 /// volatility, funded by variance moved OUT of the idiosyncratic GARCH
 /// rather than added on top.
 ///
+/// **Re-confirmed after the RNG stream split** (same era boundary; the
+/// split changed every trajectory, so the sweep was re-run on the same
+/// grid, seeds and method — `results/market-factor-sigma-2026-08-21-
+/// post-rng-split.json`). Median kurtosis at 0.0075 is 3.11 (was 3.24),
+/// still the largest grid value inside the band, with 0.010 at 2.52; the
+/// whole table moved by well under seed noise, so the split re-dealt the
+/// draws without changing how variance is shared. The value stands.
+///
 /// Change this only by re-running the sweep; a test pins the value to make
 /// that deliberate.
 pub const MARKET_FACTOR_SIGMA: f64 = 0.0075;
