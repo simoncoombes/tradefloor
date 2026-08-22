@@ -3,7 +3,12 @@ name = "pretium"
 version = "0.1.0"
 edition = "2021"
 description = "Deterministic market simulation with a real limit order book."
-license = "Apache-2.0"
+# Dual-licensed, the Rust-ecosystem norm (serde, tokio, rand): a downstream
+# user picks whichever term suits their own policy. Supersedes an earlier
+# Apache-2.0-only decision -- see DECISIONS.md in pretium-design for the
+# reasoning. LICENSE-APACHE and LICENSE-MIT carry the full texts; there is no
+# longer a generic LICENSE file, matching the same crates' convention.
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/simoncoombes/pretium"
 homepage = "https://simoncoombes.github.io/pretium"
 keywords = ["simulation", "finance", "market", "orderbook", "deterministic"]
