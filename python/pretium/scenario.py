@@ -159,6 +159,45 @@ tolerate — it means the scenario changed the market's own draw schedule (a
 halt, a delisting, a roster change), and the result compares two
 structurally different markets. That is worth surfacing, not averaging
 away.
+
+## Two pins on one field compose as consecutive segments
+
+Until 2026-08 a second pin on a field simply overwrote the first in a dict,
+and because every driver is a total function of the day the survivor
+back-filled the whole run. ``step(vix, before=15, after=48, at=60)`` followed
+by ``ramp(vix, start=48, end=22, over=45, begin=75)`` opened at VIX 48 on day
+ZERO — a market in crisis for the entire run, no warning — and reversing the
+two calls produced a crisis that never subsided. No ordering worked, so it was
+not an ordering convention anybody could have documented their way out of.
+
+Pins on one field now layer. Each owns ``[its start day, the next pin's start
+day)``, the last owns the rest of the run, and the first also owns everything
+before its own start (so a lone ``ramp`` still holds its ``start`` from day
+zero, exactly as before). A field with one pin behaves identically to the old
+surface; nothing that worked has changed.
+
+Start days must therefore be STRICTLY INCREASING within a field, and anything
+else is refused by name. Two pins claiming the same day mean one of them
+states a value that can never be reached, and a pin declared before an earlier
+one would have to back-fill — which is the defect, not a feature. So the
+step-then-decay path is written in the order it happens::
+
+    Scenario().hold(vix=15.0).ramp("vix", start=48.0, end=22.0, over=45,
+                                   begin=60)
+
+— calm until day 60, a jump to 48 on day 60 because a ramp starts AT its start
+value, then the decay. ``hold`` before ``ramp`` is the general idiom for
+"a level, then an episode".
+
+## The ready-made shapes are constructors, and say so
+
+:meth:`Scenario.rate_shock`, :meth:`Scenario.vix_shock`, :meth:`vol_shock` and
+:meth:`from_json` each build a WHOLE scenario. They read as chainable, and
+before 2026-08 ``Scenario().ramp("federal_funds_rate", ...).vix_shock(...)``
+silently threw the ramp away and returned a scenario driving only ``vix``.
+Python cannot stop a caller writing that, so the library does: calling one of
+them on an instance raises, names the fields that would have been discarded,
+and gives the composing form.
 """
 
 from __future__ import annotations
@@ -206,22 +245,214 @@ def _check(field: str, value: Any) -> None:
             )
 
 
+class _Pin:
+    """One declared segment of one field's path.
+
+    ``begin`` is the day the pin takes over the field. ``describe`` is how it
+    appears in a conflict message, and it carries the caller's own arguments
+    because "two pins on 'vix'" is not an error anybody can act on, while
+    "step('vix', before=15.0, after=48.0) at day 60 and ramp('vix', ...) at
+    day 60" names the exact two calls to change.
+    """
+
+    __slots__ = ("begin", "driver", "describe")
+
+    def __init__(self, begin: int, driver: Callable[[int], Any],
+                 describe: str) -> None:
+        self.begin = begin
+        self.driver = driver
+        self.describe = describe
+
+
+class _constructor:
+    """A ``classmethod`` that refuses to be called on an instance.
+
+    ``Scenario.vix_shock(...)`` builds a scenario. ``some_scenario.vix_shock(
+    ...)`` is the same call with a receiver Python silently ignores, so it
+    returned a NEW scenario and everything configured on the receiver
+    vanished with no error and no symptom until somebody read ``.fields``.
+
+    A plain ``classmethod`` cannot tell the two apart — it is handed ``cls``
+    either way. A descriptor can: ``__get__`` sees the instance. So the
+    instance form is the one place this failure can be caught, and it is
+    caught here rather than documented, because the documented version was
+    already true and people still wrote it.
+
+    ``advice`` is the composing form, given per constructor. A refusal that
+    only said "this is a classmethod" would leave the caller to work out
+    what ``rate_shock`` is actually made of.
+    """
+
+    def __init__(self, func: Callable[..., Any], advice: str) -> None:
+        self._func = func
+        self._advice = advice
+        self._name = func.__name__
+        self.__doc__ = func.__doc__
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self._name = name
+
+    def __get__(self, obj: Any, objtype: type | None = None) -> Callable[..., Any]:
+        cls = objtype if objtype is not None else type(obj)
+        if obj is None:
+            def bound(*args: Any, **kwargs: Any) -> Any:
+                return self._func(cls, *args, **kwargs)
+            bound.__name__ = self._name
+            bound.__doc__ = self.__doc__
+            return bound
+
+        name, advice = self._name, self._advice
+        driving = getattr(obj, "fields", ())
+
+        def refuse(*args: Any, **kwargs: Any) -> Any:
+            held = (f"drives {', '.join(driving)}" if driving
+                    else "drives nothing yet")
+            raise ValidationError(
+                f"Scenario.{name} is a CONSTRUCTOR, not a step: it builds a "
+                f"whole scenario. Called on an instance it looks chainable "
+                f"and is not -- the receiver ({held}) would be discarded and "
+                f"you would get back a scenario driving only "
+                f"{name}'s own fields, silently. "
+                f"Build it on the class instead: Scenario.{name}(...). "
+                f"To ADD this shape to a scenario you already have, {advice}"
+            )
+
+        refuse.__name__ = name
+        return refuse
+
+
+def _describe_call(name: str, *args: Any, **kwargs: Any) -> str:
+    """The call as the caller wrote it, for a conflict message.
+
+    Reconstructed rather than captured because the message has to be
+    actionable: the caller has to be able to find these two lines in their
+    own source, and a message naming only the field cannot help them.
+    """
+    parts = [repr(a) for a in args]
+    parts += [f"{k}={v!r}" for k, v in kwargs.items()]
+    return f"{name}({', '.join(parts)})"
+
+
 class Scenario:
     """A macro path, built from segments and read a day at a time."""
 
     __slots__ = ("_drivers", "_label")
 
     def __init__(self, label: str = "") -> None:
-        self._drivers: dict[str, Callable[[int], Any]] = {}
+        self._drivers: dict[str, list[_Pin]] = {}
         self._label = label
+
+    # -- per-field composition --------------------------------------------
+
+    def _pin(self, field: str, pin: _Pin) -> None:
+        """Layer one pin onto ``field``, or refuse to.
+
+        Pins on a field own consecutive day ranges, so their start days must
+        strictly increase. Both other orderings are the silent-wrong-answer
+        defect this method exists to close, and they fail differently enough
+        to be worth separate messages:
+
+        - a LATER pin declared with an EARLIER start day would have to
+          back-fill days the first pin already owns, which is exactly how a
+          decay ramp used to put day zero in crisis;
+        - two pins on the SAME start day mean the earlier one's value from
+          that day on is unreachable, so one of the two calls is dead code
+          the caller believes is running.
+        """
+        self._refuse_conflict(field, pin)
+        self._drivers.setdefault(field, []).append(pin)
+
+    def _refuse_conflict(self, field: str, pin: _Pin) -> None:
+        """Raise if ``pin`` cannot layer onto ``field``. Never mutates.
+
+        Split from :meth:`_pin` so ``hold`` can validate every keyword before
+        applying any of them: a scenario left half-pinned by a raised error
+        would be a quieter version of the same defect.
+        """
+        pins = self._drivers.get(field)
+        if not pins:
+            return
+
+        last = pins[-1]
+        if pin.begin > last.begin:
+            return
+
+        if pin.begin == last.begin:
+            # Two shapes, and the fix differs. Both starting from day zero is
+            # one pin too many and the caller has to drop one. Both starting
+            # at day N is usually a level plus an episode written as two
+            # overlapping whole-run paths, and the composing form is a `hold`
+            # for the level and the episode beginning on its own day.
+            fix = (
+                f"Keep one of them: two pins from day 0 is one whole path "
+                f"stated twice."
+                if pin.begin == 0 else
+                f"Say the level and the episode separately: "
+                f".hold({field}=<the level before day {pin.begin}>) then "
+                f".ramp({field!r}, start=..., end=..., over=..., "
+                f"begin={pin.begin}) -- a ramp starts AT its start value, so "
+                f"that is a jump on day {pin.begin} and then the path."
+            )
+            raise ValidationError(
+                f"two pins on {field!r} both begin on day {pin.begin}: "
+                f"{last.describe} and {pin.describe}. Pins on one field "
+                f"layer as consecutive segments, so the first one's values "
+                f"from day {pin.begin} onward could never be reached -- one "
+                f"of these two calls would do nothing, silently. {fix}"
+            )
+
+        raise ValidationError(
+            f"pins on {field!r} are out of order: {pin.describe} was declared "
+            f"after {last.describe}, but begins {last.begin - pin.begin} "
+            f"day(s) earlier. Pins on one field layer as consecutive "
+            f"segments, each owning from its own start day until the next "
+            f"one begins, so they must be declared in the order they happen. "
+            f"Swap the two calls -- the day-{pin.begin} pin first, then the "
+            f"day-{last.begin} one. (Declared this way round the later pin "
+            f"would have to back-fill days the earlier one already owns, "
+            f"which is a whole run under the wrong path and no error.)"
+        )
+
+    def _value(self, field: str, day: int) -> Any:
+        pins = self._drivers[field]
+        # The last pin that has started, or -- before any of them has -- the
+        # first, which holds its own pre-start value. That keeps a lone ramp
+        # or step defined on every day of any run length, which is the rule
+        # `ramp` has always documented, and makes a one-pin field behave
+        # exactly as it did before pins could layer.
+        chosen = pins[0]
+        for pin in pins:
+            if pin.begin > day:
+                break
+            chosen = pin
+        return chosen.driver(day)
 
     # -- construction -----------------------------------------------------
 
     def hold(self, **fields: Any) -> "Scenario":
-        """Pin fields to a constant for the whole run."""
+        """Pin fields to a constant from day zero.
+
+        As the FIRST pin on a field this is the whole path. Before a later
+        pin it is the level the run starts from, which is the idiom for
+        "calm, then an episode": ``.hold(vix=15.0).ramp("vix", start=48.0,
+        end=22.0, over=45, begin=60)``.
+        """
+        # Every field is validated before any is committed, so a conflict on
+        # the second keyword does not leave the first one applied. A
+        # half-mutated scenario after a raised error is the same class of
+        # quiet wrongness as the conflict itself.
+        pins = []
         for field, value in fields.items():
             _check(field, value)
-            self._drivers[field] = (lambda v: (lambda _day: v))(value)
+            pins.append((field, _Pin(
+                0,
+                (lambda v: (lambda _day: v))(value),
+                _describe_call("hold", **{field: value}) + " from day 0",
+            )))
+        for field, pin in pins:
+            self._refuse_conflict(field, pin)
+        for field, pin in pins:
+            self._pin(field, pin)
         return self
 
     def ramp(self, field: str, *, start: float, end: float, over: int,
@@ -231,6 +462,11 @@ class Scenario:
         Held at ``start`` before ``begin`` and at ``end`` after, so the path is
         defined on every day of any run length rather than only inside the
         ramp. A path with holes would make the run length change the scenario.
+
+        As a LATER pin on a field the pre-``begin`` hold never applies —
+        whatever pinned the field before keeps its days — so ``start`` is
+        simply the value the field jumps to on day ``begin``. That is what
+        makes ``hold`` then ``ramp`` a step followed by a decay.
         """
         _check(field, start)
         _check(field, end)
@@ -246,7 +482,11 @@ class Scenario:
                 return end
             return start + (end - start) * (day - begin) / over
 
-        self._drivers[field] = driver
+        self._pin(field, _Pin(
+            begin, driver,
+            _describe_call("ramp", field, start=start, end=end, over=over)
+            + f" from day {begin}",
+        ))
         return self
 
     def step(self, field: str, *, before: Any, after: Any, at: int) -> "Scenario":
@@ -255,6 +495,11 @@ class Scenario:
         A discontinuity, which a ramp is not. Use this for something that
         genuinely happens at once — a surprise cut, a regime change — and a
         ramp for something the market prices in gradually.
+
+        As a LATER pin on a field, ``before`` never applies: the pin that
+        already owns the days up to ``at`` keeps them. Pin the field from day
+        zero with ``hold`` if you want to state that level, and the step is
+        then only the jump.
         """
         _check(field, before)
         _check(field, after)
@@ -263,14 +508,23 @@ class Scenario:
         def driver(day: int, before=before, after=after, at=at) -> Any:
             return before if day < at else after
 
-        self._drivers[field] = driver
+        self._pin(field, _Pin(
+            at, driver,
+            _describe_call("step", field, before=before, after=after)
+            + f" at day {at}",
+        ))
         return self
 
     # -- reading ----------------------------------------------------------
 
     def at(self, day: int) -> dict[str, Any]:
-        """The pins for one day."""
-        return {field: driver(day) for field, driver in self._drivers.items()}
+        """The pins for one day.
+
+        Where a field carries several pins, the one in force is the last one
+        whose start day has arrived — or, before any has, the first, which
+        holds its own pre-start value.
+        """
+        return {field: self._value(field, day) for field in self._drivers}
 
     def table(self, days: int) -> list[dict[str, Any]]:
         """The whole path, for inspection BEFORE running it.
@@ -304,7 +558,6 @@ class Scenario:
             sort_keys=True, separators=(",", ":"),
         )
 
-    @classmethod
     def from_json(cls, text: str) -> "Scenario":
         """Rebuild a scenario from :meth:`to_json` output.
 
@@ -367,11 +620,19 @@ class Scenario:
         scenario = cls(label=payload.get("label", ""))
         last = len(path) - 1
         for field, series in values.items():
-            scenario._drivers[field] = (
-                lambda series=series, last=last:
-                    lambda day: series[day if day < last else last]
-            )()
+            scenario._pin(field, _Pin(
+                0,
+                (lambda series=series, last=last:
+                    lambda day: series[day if day < last else last])(),
+                f"from_json path for {field!r} from day 0",
+            ))
         return scenario
+
+    from_json = _constructor(from_json, (
+        "there is nothing to add: from_json rebuilds a complete recorded "
+        "path. Load it on the class and use the result, or take the fields "
+        "you want out of Scenario.from_json(text).at(day) and pin them."
+    ))
 
     def __bool__(self) -> bool:
         return bool(self._drivers)
@@ -382,7 +643,6 @@ class Scenario:
 
     # -- ready-made shapes ------------------------------------------------
 
-    @classmethod
     def rate_shock(cls, *, start: float = 0.025, end: float = 0.05,
                    over: int = 30, begin: int = 0,
                    credit_spread: float = 0.02) -> "Scenario":
@@ -406,7 +666,15 @@ class Scenario:
                   end=end + credit_spread, over=over, begin=begin)
         )
 
-    @classmethod
+    rate_shock = _constructor(rate_shock, (
+        "write the two ramps it is made of: "
+        ".ramp('federal_funds_rate', start=..., end=..., over=..., begin=...) "
+        "and .ramp('corporate_bond_yield', start=...+credit_spread, "
+        "end=...+credit_spread, over=..., begin=...). That is the whole "
+        "constructor -- it moves the policy rate and the corporate yield "
+        "together, held apart by the spread."
+    ))
+
     def vix_shock(cls, *, calm: float = 15.0, peak: float = 45.0,
                   at: int = 10, over: int = 20) -> "Scenario":
         """A VIX spike that decays back: a volatility, correlation and
@@ -441,10 +709,20 @@ class Scenario:
             return peak + (calm - peak) * (day - at) / over
 
         scenario = cls(label=f"vix_shock {calm}->{peak} at day {at}")
-        scenario._drivers["vix"] = driver
+        scenario._pin("vix", _Pin(
+            0, driver,
+            _describe_call("vix_shock", calm=calm, peak=peak, at=at,
+                           over=over) + " from day 0",
+        ))
         return scenario
 
-    @classmethod
+    vix_shock = _constructor(vix_shock, (
+        "write the shape it is made of: .hold(vix=calm) for the quiet days, "
+        "then .ramp('vix', start=peak, end=calm, over=over, begin=at) -- a "
+        "jump to the peak on day `at` because a ramp starts AT its start "
+        "value, then the decay back to calm."
+    ))
+
     def vol_shock(cls, *, calm: float = 15.0, peak: float = 45.0,
                   at: int = 10, over: int = 20) -> "Scenario":
         """Deprecated alias for :meth:`vix_shock`. Same path, same results.
@@ -469,6 +747,12 @@ class Scenario:
             stacklevel=2,
         )
         return cls.vix_shock(calm=calm, peak=peak, at=at, over=over)
+
+    vol_shock = _constructor(vol_shock, (
+        "use the vix_shock advice -- .hold(vix=calm) then .ramp('vix', "
+        "start=peak, end=calm, over=over, begin=at) -- and note that this "
+        "name is deprecated in favour of Scenario.vix_shock."
+    ))
 
 
 def run_scenario(
@@ -511,6 +795,72 @@ def run_scenario(
     return engine
 
 
+def _path_summary(scenario: Scenario, days: int) -> str:
+    """The day-zero pins, for an error message that names the actual values."""
+    pins = scenario.at(0)
+    if not pins:
+        return "it drives no fields at all"
+    return ", ".join(f"{field}={value!r}" for field, value in sorted(pins.items()))
+
+
+def _refuse_self_comparison(scenario: Scenario, days: int) -> None:
+    """Refuse a default-baseline comparison the scenario cannot lose.
+
+    The default baseline is ``hold(**scenario.at(0))``. When the scenario is
+    CONSTANT across the horizon that is not a counterfactual, it is the same
+    world twice, and the difference is exactly zero on every instrument by
+    construction rather than by measurement.
+
+    Three shapes reach here and they are worth telling apart, because the
+    reader's next action differs:
+
+    - a ``hold``-only scenario, or a ``step`` at day zero: there is no path
+      to isolate, only a level, and the caller wants a baseline at a
+      DIFFERENT level;
+    - a shock whose start day falls at or after ``days``: the path is real
+      but the run ends before it begins, so the caller wants a longer run;
+    - a scenario driving nothing.
+
+    The zero this replaces is the worst answer the library can give. It is
+    wrong, it is confident, it is quoted to three decimal places, and there
+    is nothing about it a careful reader could catch.
+    """
+    day_zero = scenario.at(0)
+    if any(scenario.at(day) != day_zero for day in range(1, days)):
+        return
+
+    unreached = sorted(
+        (pin.begin, field, pin.describe)
+        for field, pins in scenario._drivers.items()
+        for pin in pins
+        if pin.begin >= days
+    )
+
+    if unreached:
+        listed = "; ".join(f"{describe} (field {field!r})"
+                           for _, field, describe in unreached)
+        raise ValidationError(
+            f"compare() would report exactly 0.00% on every instrument: this "
+            f"scenario does not move within the {days}-day horizon, because "
+            f"{listed} begins on or after day {days}. The run ends before the "
+            f"shock starts, so the default baseline -- hold(**scenario.at(0)) "
+            f"-- is the scenario itself. Run at least "
+            f"{unreached[-1][0] + 1} days, or start the shock earlier."
+        )
+
+    raise ValidationError(
+        f"compare() would report exactly 0.00% on every instrument: this "
+        f"scenario is CONSTANT over all {days} days ({_path_summary(scenario, days)}), "
+        f"and the default baseline is hold(**scenario.at(0)) -- the day-zero "
+        f"values held flat -- which for a constant path IS the scenario. "
+        f"The default baseline isolates a PATH from the level it starts at, "
+        f"so it only means anything for a scenario that moves. To measure a "
+        f"held level, name the world WITHOUT it: "
+        f"compare(scenario, ..., baseline=Scenario().hold(<the calm levels>)). "
+        f"To measure a path, give the scenario one."
+    )
+
+
 def compare(
     scenario: Scenario,
     *,
@@ -531,6 +881,15 @@ def compare(
     values, which is the right comparison: it isolates the PATH rather than
     conflating it with the level the path started from.
 
+    That default is only meaningful for a scenario that MOVES inside the
+    horizon, and a scenario that does not is refused rather than reported.
+    For a ``hold``-only scenario — or a ``step`` at day zero, or any shock
+    whose start day falls outside ``days`` — the default baseline IS the
+    scenario, and the comparison returns exactly 0.00% on every instrument.
+    A confident, meaningless zero reads as "the shock did nothing", which is
+    the worst answer available: it is wrong, it looks like a finding, and
+    nothing about it looks like a mistake. See :meth:`Scenario.hold`.
+
     Keyword arguments — ``model=`` among them — pass through to
     :func:`run_scenario` and apply to BOTH worlds, because a shocked world
     differenced against a baseline under a different coefficient set would
@@ -539,8 +898,24 @@ def compare(
     """
     import struct
 
+    if days < 1:
+        raise ValidationError("days must be at least 1")
+
     if baseline is None:
+        _refuse_self_comparison(scenario, days)
         baseline = Scenario(label="flat").hold(**scenario.at(0))
+    elif scenario.table(days) == baseline.table(days):
+        # An explicit baseline that realises the same path is the same
+        # defect arriving by a different route: two runs of one world,
+        # differenced, reported as a clean zero.
+        raise ValidationError(
+            f"compare() would difference two identical worlds: the scenario "
+            f"and the baseline realise the same path on all {days} days "
+            f"({_path_summary(scenario, days)}). Every instrument would come "
+            f"back at exactly 0.00%, which reads as 'the shock did nothing' "
+            f"rather than as 'no shock was applied'. Give the baseline the "
+            f"levels the shocked world does NOT have."
+        )
 
     def run(which: Scenario):
         return run_scenario(which, seed=seed, universe=universe, days=days,
