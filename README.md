@@ -3,8 +3,9 @@
 A market simulator you can run a strategy against. Rust core, Python API.
 
 Give it a seed and a set of companies. It runs a market forward - prices, a
-limit order book, fills, macro state - and your orders match against real
-depth, so trading moves the price the way it would anywhere else.
+limit order book, fills, an economy that advances itself daily - and your
+orders match against real depth, so trading moves the price the way it would
+anywhere else.
 
 Two things you can do here that historical data will never let you do: run the
 same market twice with different decisions, and read the true value of every
@@ -80,7 +81,13 @@ ex.partial_fills()      # what you asked for versus what you got
 ```
 
 Arrival price, VWAP and fitted impact models are all standing in for a
-counterfactual nobody can run on real data. This one runs it.
+counterfactual nobody can run on real data. This one runs it. One boundary,
+stated rather than hidden: since VIX began driving the market factor's
+variance, the market prices fear of your flow, so names you never traded can
+move a few basis points through the fear gauge. That is impact, not error -
+and pinning VIX in both worlds makes the subtraction byte-exact again.
+[Transaction cost analysis](https://simoncoombes.github.io/pretium/transaction-cost-analysis.html)
+measures the channel.
 
 ### You're stress-testing a strategy
 
@@ -97,8 +104,15 @@ pt.evaluate(agents, seed=7, universe=universe, days=20, scenario=shock)
 
 ranking = pt.rank(lambda: pt.reference_agents(seed=3), seeds=range(12),
                   universe=universe, days=10, workers=4)
-ranking.separation("momentum", "mean_reversion")   # 7-5,  p = 0.77
+ranking.separation("momentum", "mean_reversion")   # wins-losses, sign-test p
 ```
+
+Use more than one seed. On the twelve-market grid the agents documentation
+measures - `Universe.random(30, seed=11)`, ten days, seeds 0 through 11 -
+momentum's pooled capture is nearly four times mean-reversion's, yet paired
+across the same twelve markets it wins only 7-5, p = 0.77: its lead lives in
+how big its wins are, not in how often they come, and a single seed picks the
+pooled leader only five times in twelve.
 
 Use it to kill strategies rather than to bless them. Something that dies under
 a rate shock, or whose edge evaporates once impact is charged honestly, is
@@ -125,38 +139,119 @@ A real matching engine your students can put orders into, with the answer key
 attached. They can watch a large order walk the book, then read exactly how
 much of the resulting move was their own flow.
 
+## A result someone else can check
+
+Everything that identifies a run serialises, fingerprints and round-trips: the
+seed, the universe, the macro initial conditions, the scenario path, the
+model, the strategy, the order log. Three surfaces carry that from "possible"
+to "one line".
+
+**A strategy is citable data.** `StrategySpec` writes a strategy down as a
+declarative, versioned, hashable document instead of an arbitrary Python
+callable, so a result can cite what earned it:
+
+```python
+spec = pt.StrategySpec.momentum(lookback_days=1.0, top_k=5)
+scores = pt.evaluate({"momentum": spec}, seed=7, universe=universe, days=10)
+scores["momentum"].strategy_fingerprint    # sha256 -- cite this
+```
+
+A hand-written agent still works everywhere it did; its scorecard's
+fingerprint is empty rather than fake, because that result is reproducible
+only by citing code at a commit. See
+[Strategy specs](https://simoncoombes.github.io/pretium/strategy-specs.html)
+for the grammar and its deliberate limits.
+
+**A run is one shareable document.** `RunManifest` embeds every component
+above, fingerprints each one, and carries the expected result digest, so the
+reader is told they rebuilt the same market rather than eyeballing numbers:
+
+```python
+manifest = pt.RunManifest.of(engine, seed=42, universe=universe, strategy=spec)
+open("run.json", "w").write(manifest.to_json())
+
+# the reader, with the package and this file and nothing else:
+same = pt.RunManifest.from_json(open("run.json").read()).reproduce()
+```
+
+`reproduce()` checks the build's arithmetic behaviourally before replaying,
+and on any mismatch refuses, naming the culprit - a manifest that silently
+reproduced a different market would manufacture false confidence, which is
+worse than no manifest at all. See
+[Sharing a run](https://simoncoombes.github.io/pretium/sharing-a-run.html).
+
+**A changed model has a different name.** The model's coefficients ship as the
+named preset `pt-v1` and are settable at runtime, and the fingerprint is the
+honesty mechanism:
+
+```python
+custom = pt.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+engine = pt.Engine(seed=42, universe=universe, model=custom)
+engine.model_fingerprint     # "custom-0c04c4ba" -- never "pt-v1"
+```
+
+A coefficient set bit-identical to the shipped preset fingerprints as the
+preset's name; anything else fingerprints as `custom-XXXXXXXX` and cannot
+masquerade as the benchmark. Nothing settable changes how many draws are taken
+or in what order, so two presets on one seed see identical noise and every
+difference in the outcome is a parameter effect. The fingerprint travels
+through scorecards, manifests, checkpoints and forks. See
+[Model presets](https://simoncoombes.github.io/pretium/model-presets.html).
+
 ## Under the hood
 
 **Same seed, same market, on every machine.** The library carries its own
 `exp`, `log`, `sin` and `cos` rather than calling the platform's, which is what
-normally makes float results drift between operating systems -- so that builds
-on Linux, macOS and Windows, x86 and ARM alike, agree to the last bit.
-
-Every release is meant to build wheels for five targets, run one fixed
-simulation inside each, and compare digests, failing the release on any
-disagreement (`.github/workflows/determinism.yml`). That gate has not yet run
-against a tagged release. What has actually been measured, by commit:
+normally makes float results drift between operating systems. Every release is
+meant to build wheels for five targets, run one fixed simulation inside each,
+and compare digests, failing the release on any disagreement
+(`.github/workflows/determinism.yml`). What has been measured, by commit:
 
 | commit | known-answer version | platforms built and compared | result |
 |---|---|---|---|
 | `a5afd1c` | v3 | Windows x86_64, macOS arm64 | identical: `112fd73e...6eff337` |
-| `0b4579d` (current era) | v4 | macOS arm64 only | self-consistent; baseline was regenerated on macOS and has not yet been checked against any other platform |
+| `ad91026` | v5 | all five: Linux x86_64 and aarch64, macOS arm64 and x86_64, Windows x86_64 | identical: `76983e65...3180eeb`, each also passing against the committed baseline |
+| `6e30497` (current era) | v8 | macOS arm64 only | `1ee64998...fe3581c`, regenerated after this era's model changes; one platform's confirmation until the gate runs again |
 
-The engineering claim -- no platform-varying transcendental reaches the
-source -- is enforced by a test (`rust/tests/mathx_parity.rs`) and held for the
-one cross-platform pair actually built and compared. Read it as confirmed for
-that pair on the prior era, not yet re-confirmed for this one; see
-[Reproducing a run](docs/reproducing-a-run.md).
+The gate has not yet run against a tagged release. The engineering claim - no
+platform-varying transcendental reaches the source - is enforced by a test
+(`rust/tests/mathx_parity.rs`); read cross-platform bit-identity as measured
+for all five targets at `ad91026`, and as engineering intent for the current
+baseline. See
+[Reproducing a run](https://simoncoombes.github.io/pretium/reproducing-a-run.html)
+for the full record.
+
+**The economy runs itself.** The macro chain - a full Taylor/Phillips/Okun
+loop - advances at every day close from the initial conditions you construct
+the engine with: measured over 120 days on `Universe.random(20, seed=11)`, sim
+seed 42, VIX takes a new value every day, the policy fields step at the
+central bank's meeting calendar, and fair value reprices per instrument when
+the discount rate moves. To impose a path of your own, drive a `Scenario` or
+pin a field; a pin overrides the endogenous step from the day it lands. See
+[Core concepts](https://simoncoombes.github.io/pretium/core-concepts.html).
+
+**VIX is a volatility lever.** The market factor's variance reverts to a
+target that scales with `(VIX/15)^2`, so a pinned VIX moves realised
+volatility - 49% annualised at VIX 5, 59% at 15, 107% at 45, 124% at 65
+(`Universe.random(20, seed=11)`, 120 days, sim seed 3) - widens the quoted
+spread, and above VIX 25.5 blends the cross-section toward the market factor:
+mean pairwise correlation reads +0.27 calm, +0.68 at VIX 45, +0.76 at 65
+(25 names, same horizon and seed). Diversification fails under stress the way
+real crises make it fail. What VIX does not move is any single name's own
+noise - it sizes the shared factor, not the idiosyncratic variance.
+[Scenarios](https://simoncoombes.github.io/pretium/scenarios.html) has the
+numbers and the one trap worth knowing about policy-only rate paths.
 
 **Impact is emergent.** A large order pays worse prices because it ate levels,
-with no slippage coefficient anywhere. Holding the signal and horizon fixed and
-changing only how often a strategy rebalances:
+with no slippage coefficient anywhere. Holding the same one-day momentum
+signal and horizon fixed and changing only how often the strategy re-decides
+(seed 2026, `Universe.random(40, seed=7)`, 30 days):
 
 | rebalances per day | return |
 |---|---|
-| 3 | +88.7% |
-| 6 | +30.9% |
-| 12 | -13.2% |
+| 3 | +97.5% |
+| 6 | +33.8% |
+| 12 | +0.1% |
 
 No fees are charged. That gap is spread and depth alone.
 
@@ -165,9 +260,14 @@ read zero-copy by polars, pandas, pyarrow and duckdb, and the package depends
 on none of them. Runs stream a batch per day, so a hundred-seed sweep at tick
 grain never has to fit in memory.
 
-**Fast enough to sweep.** A 252-day year over 100 instruments takes 27 seconds,
-and recording 9.8 million rows of ground truth adds 3%. Sweeps parallelise
-about 3.3x on eight cores.
+**Fast enough to sweep.** A 252-day year over 100 instruments takes 27 seconds
+on the documentation's reference desktop and under seven on an Apple-silicon
+laptop. Recording 9.8 million rows of ground truth costs less than wall-clock
+timing resolves - measured as interleaved pairs of recorded and plain runs,
+nearly half the pairs come out negative. Sweeps parallelise 3-4x on eight
+cores.
+[Performance](https://simoncoombes.github.io/pretium/performance.html) has the
+table.
 
 ## What it is bad at
 
@@ -178,38 +278,53 @@ look brilliant and teach you nothing about real markets. A strategy that
 under honest impact costs. Read the failures, not the P&L.
 
 **Momentum works here for the wrong reason.** Measured return autocorrelation
-is +0.219 at lag one where real equities sit near zero. That's the mispricing
-process showing through, and an agent trading it has an edge that won't
-transfer. `pt.facts.measure()` reports this and seven other statistics against
-real ranges, including the ones that match. Four are marginal properties of a
-single series and four are measures of dependence - how things move together,
-across names and across time.
+is +0.249 at lag one - median of six seeds at the published method,
+`Universe.random(40, seed=111)`, 252 days, sim seeds 1 to 6 - where real
+equities sit near zero. That's the mispricing process showing through, and an
+agent trading it has an edge that won't transfer.
+
+**In-band realism is partly the tuning meeting its target.**
+`pt.facts.measure()` reports eight statistics against real ranges - two
+marginal properties of a single series, six measures of dependence. At the
+published method above, the dependence rows now sit inside the real bands:
+cross-sectional correlation +0.257 (real +0.25 to +0.35), volatility
+clustering +0.242 (+0.15 to +0.35), volume against |return| +0.585 (+0.30 to
++0.60), excess kurtosis +3.1 (+3 to +10), and a leverage effect that holds its
+sign in six seeds of six at -0.085, just short of its -0.30 to -0.10 band. But
+four of the eight were calibration targets this era - the sweeps that chose
+the constants scored candidates on that same method - so an in-band verdict is
+partly the tuning meeting its target rather than an independent test. Held out
+from the calibration the margins thin: fresh sim seeds read correlation +0.225
+against a +0.25 band floor, and fresh 60-name universes hold correlation but
+halve the leverage effect. The honest headline is *in band at the published
+method, at the band edge everywhere else* - a conclusion that needs a
+dependence statistic deep inside its band should re-measure on its own
+universe and seeds.
+[How realistic is this market](https://simoncoombes.github.io/pretium/how-realistic-is-this-market.html)
+carries every number, its seed range, and the held-out checks.
+
+**Scale and memory still fail.** Annualised volatility runs 41.5% against a
+real 15-35% - a property of the deliberately dispersed generated universes, so
+prefer ratios (capture against the Oracle, shortfall in basis points) over raw
+percentages. Volume *changes* autocorrelate at -0.45 where real ones sit near
+zero, which is structural rather than calibratable: a volume forecast here is
+never wrong twice running, so an execution algorithm tested against this
+market faces an easier problem than the one it was written for. And
+volatility's memory is short - real clustering persists for months; here it is
+gone by lag twenty.
 
 **Single venue, no latency, no strategic counterparties.** Orders arrive
 instantly, there's one book per name, and you trade against a market maker and
 aggregate flow rather than agents that adapt to you.
 
-**There's no volatility knob.** VIX looks like one and isn't: it has no term
-in the variance process. Measured, a thirteenfold move in VIX changes
-annualised realised volatility by under one point, and below VIX 15 it changes
-nothing at all. What it moves is the quoted spread, and above VIX 40 a small
-lift in cross-sectional correlation. Use it to stress liquidity.
-[Scenarios](https://simoncoombes.github.io/pretium/scenarios.html) has the
-numbers.
-
-**The macro is exogenous.** It holds whatever initial conditions you gave it
-until you move it yourself. The engine carries a full Taylor/Phillips/Okun
-chain, but it isn't reachable from Python in this release, so nothing steps on
-its own and fair value is constant unless you drive it. Driving it works:
-`pin_macro` reprices exactly as designed.
-
 ## Documentation
 
 Full docs: [**simoncoombes.github.io/pretium**](https://simoncoombes.github.io/pretium/)
 
-Scenarios and macro paths, checkpointing and forking, Arrow output and
-streaming sweeps, SEC EDGAR loading, the RL environment, reproducibility and
-replay, performance, and the conventions worth reading before you hit them.
+Scenarios and macro paths, strategy specs, model presets, checkpointing and
+forking, sharing a run, Arrow output and streaming sweeps, SEC EDGAR loading,
+the RL environment, reproducibility and replay, performance, and the
+conventions worth reading before you hit them.
 
 ## A worked example
 
@@ -217,9 +332,11 @@ replay, performance, and the conventions worth reading before you hit them.
 python examples/research_workflow.py
 ```
 
-Fifteen seconds end to end: universe, 20-seed sweep, five-agent evaluation,
-TCA, 234,000 rows of ground truth, a fork into two macro futures, a realism
-report, then archives the run as JSON and replays it to identical prices.
+Seconds end to end - five, measured on an Apple-silicon laptop: universe,
+20-seed sweep, five-agent evaluation, TCA checked both ways across the
+fear-gauge boundary, 234,000 rows of ground truth, a fork into two macro
+futures, a realism report, then archives the run as JSON and replays it to
+identical prices.
 
 The test suite runs it. Using the library the way a user would is what caught
 the two worst bugs this project has had, both of which had green unit tests.
@@ -233,9 +350,11 @@ invented to fill the gap, and a Zenodo deposit is the next step.
 
 A citation identifies the software, not a run. A methods section needs both.
 What identifies a run is the seed, the universe fingerprint and how the
-universe was built, the macro initial conditions, the model preset name, and
-the archived order log - gathered with worked examples in
-[Reproducing a run](https://simoncoombes.github.io/pretium/reproducing-a-run.html).
+universe was built, the macro initial conditions, the model fingerprint, the
+strategy fingerprint, and the archived order log - gathered by hand with
+worked examples in
+[Reproducing a run](https://simoncoombes.github.io/pretium/reproducing-a-run.html),
+or as one self-verifying document by `RunManifest`.
 
 ## Licence
 
