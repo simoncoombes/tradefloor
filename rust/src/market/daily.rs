@@ -28,7 +28,6 @@
 //! desynchronise the stream once per simulated day — slowly enough to look
 //! like a modelling difference rather than a bug.
 
-use super::garch::update_garch_variance;
 use super::tick::TickCompany;
 use crate::mathx;
 
@@ -136,6 +135,18 @@ pub struct CloseInputs {
 /// then used twice — as the GARCH fallback innovation and as the stored
 /// `last_daily_return` that tomorrow's squeeze and cascade logic reads.
 pub fn close_day(company: &mut TickCompany, inputs: &CloseInputs) {
+    close_day_with(&crate::params::PT_V1, company, inputs);
+}
+
+/// [`close_day`] under explicit model parameters (the runtime seam,
+/// CALIBRATION.md §5.3): the GARCH update reads the params' coefficients.
+/// What the engine calls; at [`crate::params::PT_V1`] it is the shipped
+/// close bit for bit.
+pub fn close_day_with(
+    params: &crate::params::ModelParams,
+    company: &mut TickCompany,
+    inputs: &CloseInputs,
+) {
     let stock = &mut company.stock;
 
     // Guarded on `previousClose > 0`, so a newly listed name reports a flat
@@ -153,7 +164,8 @@ pub fn close_day(company: &mut TickCompany, inputs: &CloseInputs) {
         Some(noise) if noise.is_finite() => noise,
         _ => daily_return,
     };
-    stock.garch_variance = update_garch_variance(
+    stock.garch_variance = super::garch::update_garch_variance_with(
+        params,
         stock.garch_variance,
         innovation,
         inputs.sector_base_daily_variance,

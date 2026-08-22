@@ -280,6 +280,9 @@ fn check_scenario(file: &str) {
                 // variance process and pin behaviour at its baseline level.
                 market_sigma_daily: MARKET_FACTOR_SIGMA,
                 settle_draws: SettleDrawPolicy::FourOrZero,
+                // The shipped preset: the parity contract is against the
+                // reference model, which is what PT_V1 carries.
+                params: &pretium::params::PT_V1,
             },
             &mut rng,
         );

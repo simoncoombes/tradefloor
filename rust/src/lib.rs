@@ -36,6 +36,8 @@ pub mod mathx;
 pub mod microstructure;
 pub mod mispricing;
 pub mod order_book;
+/// The runtime parameter seam: `ModelParams` and the preset table.
+pub mod params;
 pub mod rng;
 /// The twelve sectors and their model parameters.
 pub mod sectors;

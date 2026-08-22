@@ -54,12 +54,12 @@ pub mod hours;
 pub mod index_value;
 pub mod tick;
 
-pub use daily::{close_day, close_day_all, reset_daily_prices, AvgVolumePolicy, CloseInputs};
-pub use factor_vol::{update_market_variance, MarketVarianceState};
+pub use daily::{close_day, close_day_all, close_day_with, reset_daily_prices, AvgVolumePolicy, CloseInputs};
+pub use factor_vol::{update_market_variance, update_market_variance_with, MarketVarianceState};
 pub use factors::{
     calculate_live_factors, order_imbalance, FactorCompany, LiveFactors, NewsEvent, SharedFactors,
 };
-pub use garch::update_garch_variance;
+pub use garch::{update_garch_variance, update_garch_variance_with};
 pub use hours::{
     get_market_status, intraday_fraction, intraday_vol, intraday_volume, is_market_open, GameTime,
     MarketStatus, MARKET_MINUTES,

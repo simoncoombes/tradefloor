@@ -98,8 +98,27 @@ pub fn update_garch_variance(
     last_daily_return: f64,
     sector_base_variance: f64,
 ) -> f64 {
-    let mut new_var =
-        OMEGA + ALPHA * last_daily_return * last_daily_return + BETA * current_variance;
+    update_garch_variance_with(
+        &crate::params::PT_V1,
+        current_variance,
+        last_daily_return,
+        sector_base_variance,
+    )
+}
+
+/// [`update_garch_variance`] under explicit model parameters (the runtime
+/// seam, CALIBRATION.md §5.3). At [`crate::params::PT_V1`] this is the
+/// shipped arithmetic bit for bit: same values, same operations, same
+/// order — the constants above remain the definition of the preset.
+pub fn update_garch_variance_with(
+    params: &crate::params::ModelParams,
+    current_variance: f64,
+    last_daily_return: f64,
+    sector_base_variance: f64,
+) -> f64 {
+    let mut new_var = params.garch_omega
+        + params.garch_alpha * last_daily_return * last_daily_return
+        + params.garch_beta * current_variance;
     // The GJR asymmetry: a negative return feeds through with weight
     // ALPHA + GAMMA, a positive one with ALPHA alone. A guarded `+=` after
     // the reference sum, NOT a fourth term inside it: at GAMMA = 0 this adds
@@ -107,14 +126,14 @@ pub fn update_garch_variance(
     // re-associated four-term sum would not be. The evaluation order here is
     // contractual, like every other arithmetic statement in this crate.
     if last_daily_return < 0.0 {
-        new_var += GAMMA * last_daily_return * last_daily_return;
+        new_var += params.garch_gamma * last_daily_return * last_daily_return;
     }
     // `Math.max(Math.min(newVar, ceiling), floor)` — written in that order in
     // the original, and the order is visible when the two bounds cross (a
     // zero or negative `sector_base_variance` makes them do exactly that).
     mathx::max(
-        mathx::min(new_var, sector_base_variance * CEILING_MULTIPLE),
-        sector_base_variance * FLOOR_MULTIPLE,
+        mathx::min(new_var, sector_base_variance * params.garch_ceiling_multiple),
+        sector_base_variance * params.garch_floor_multiple,
     )
 }
 

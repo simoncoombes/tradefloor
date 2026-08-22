@@ -60,10 +60,12 @@ use crate::economy::{
     DailyInputs, EconomicShock, EconomyState,
 };
 use crate::market::{
-    close_day, get_market_status, intraday_fraction, reset_daily_prices, simulate_market_tick,
-    AvgVolumePolicy, CloseInputs, GameTime, MarketStatus, MarketVarianceState, NewsEvent,
-    NewsImpactEntry, OrderVolume, SettleDrawPolicy, TickCompany, TickInputs,
+    close_day_with, get_market_status, intraday_fraction, reset_daily_prices,
+    simulate_market_tick, AvgVolumePolicy, CloseInputs, GameTime, MarketStatus,
+    MarketVarianceState, NewsEvent, NewsImpactEntry, OrderVolume, SettleDrawPolicy, TickCompany,
+    TickInputs,
 };
+use crate::params::ModelParams;
 use crate::rng::{stream, GameRng, Rng, RngState};
 
 /// The reference MAIN stream's sequence, from `rng.ts:32`. Not 0 and not 1 —
@@ -205,6 +207,11 @@ pub struct Engine {
     /// diagnosing a divergence: if these differ between two runs, nothing
     /// downstream is worth comparing.
     draws: StreamDraws,
+    /// The model coefficients this engine runs (the runtime seam,
+    /// CALIBRATION.md §5). [`crate::params::PT_V1`] unless the engine was
+    /// built with [`Engine::with_params`]; immutable for the engine's life,
+    /// which is what lets its fingerprint be quoted for the whole run.
+    params: ModelParams,
 }
 
 impl Engine {
@@ -235,6 +242,28 @@ impl Engine {
         central_bank: CentralBankState,
         sector_keys: Vec<String>,
     ) -> Self {
+        Self::with_params(
+            seed,
+            companies,
+            economy,
+            central_bank,
+            sector_keys,
+            crate::params::PT_V1,
+        )
+    }
+
+    /// [`Engine::new`] under an explicit model preset (the runtime seam,
+    /// CALIBRATION.md §5). With [`crate::params::PT_V1`] this IS `new`: the
+    /// preset-constructed engine reproduces the const build's trajectories
+    /// bit for bit, draw for draw — the phase-1 acceptance gate.
+    pub fn with_params(
+        seed: u32,
+        companies: Vec<TickCompany>,
+        economy: EconomyState,
+        central_bank: CentralBankState,
+        sector_keys: Vec<String>,
+        params: ModelParams,
+    ) -> Self {
         let companies_len = companies.len();
         Self {
             market_rng: GameRng::substream(seed, stream::MARKET),
@@ -250,10 +279,18 @@ impl Engine {
             // rather than as "not yet computed".
             tick_fundamental: vec![f64::NAN; companies_len],
             tick_anchor: vec![f64::NAN; companies_len],
-            market_vol: MarketVarianceState::new(),
+            market_vol: MarketVarianceState::new_with(&params),
             sector_keys,
             draws: StreamDraws::default(),
+            params,
         }
+    }
+
+    /// The model coefficients this engine runs. Read-only: an engine's
+    /// model is fixed at construction, so its fingerprint describes the
+    /// whole run rather than the moment someone asked.
+    pub fn params(&self) -> &ModelParams {
+        &self.params
     }
 
     // ── Draw delegation ───────────────────────────────────────────────────
@@ -403,6 +440,7 @@ impl Engine {
                 sector_keys: &self.sector_keys,
                 market_sigma_daily,
                 settle_draws,
+                params: &self.params,
             },
             rng,
         );
@@ -625,7 +663,8 @@ impl Engine {
             "one sector base variance per company"
         );
         for (i, company) in self.companies.iter_mut().enumerate() {
-            close_day(
+            close_day_with(
+                &self.params,
                 company,
                 &CloseInputs {
                     daily_innovation: request.daily_innovations[i],
@@ -639,7 +678,7 @@ impl Engine {
         // above and with the same zero-draw discipline. The VIX read here
         // is the day's TRADING value — the macro chain has not advanced
         // yet, exactly as the per-name updates see the day they closed.
-        self.market_vol.close_day(self.economy.vix);
+        self.market_vol.close_day_with(&self.params, self.economy.vix);
     }
 
     /// The daily macro step: economy, cycle roll, then the central bank.

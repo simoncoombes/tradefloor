@@ -26,6 +26,12 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 libm = "0.2.16"
 
+# For the ModelParams fingerprint (CALIBRATION.md §5.1/§9.2): sha256 over the
+# canonical preset serialisation, in the core, so a non-shipped preset can
+# never present as a shipped one on any surface — Rust or Python. Pure Rust,
+# no_std-capable, deterministic; already in the tree as a dev-dependency.
+sha2 = "0.10"
+
 # Optional, and NOT carrying `extension-module` here.
 #
 # `extension-module` tells the linker that Python symbols will be supplied by
