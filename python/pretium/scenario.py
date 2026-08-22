@@ -284,6 +284,75 @@ class Scenario:
             sort_keys=True, separators=(",", ":"),
         )
 
+    @classmethod
+    def from_json(cls, text: str) -> "Scenario":
+        """Rebuild a scenario from :meth:`to_json` output.
+
+        What comes back is the REALISED PATH as an object: a scenario whose
+        every day returns exactly the recorded values, whatever constructor
+        originally built them. That is the honest direction of the round trip
+        — the serialised form is the path, not the recipe, so the restored
+        object is the path too. Beyond the recorded horizon it holds its final
+        values, the same rule :meth:`ramp` applies after its end, so a longer
+        run is defined rather than an IndexError.
+
+        A newer schema is refused rather than read on a best-effort basis, and
+        so is an inconsistent document — a day count that disagrees with the
+        path, days out of order, or fields that appear and disappear between
+        rows. Each of those describes a scenario nobody constructed, and a
+        loader that guessed its way past them would replay a run under pins
+        the original never applied.
+        """
+        payload = json.loads(text)
+        if not isinstance(payload, dict) or "path" not in payload:
+            raise ValidationError("not a pretium scenario document")
+        schema = payload.get("schema", 0)
+        if schema > 1:
+            raise ValidationError(
+                f"scenario schema {schema} is newer than this version "
+                "understands. Upgrade pretium rather than reading it partially."
+            )
+        path = payload["path"]
+        days = payload.get("days")
+        if not isinstance(path, list) or days != len(path):
+            raise ValidationError(
+                f"scenario document says {days} days but carries "
+                f"{len(path) if isinstance(path, list) else 'no'} path rows. "
+                "An inconsistent path is a scenario nobody constructed."
+            )
+
+        fields: tuple[str, ...] | None = None
+        values: dict[str, list[Any]] = {}
+        for index, row in enumerate(path):
+            if not isinstance(row, dict) or row.get("day") != index:
+                raise ValidationError(
+                    f"path row {index} is not day {index}. Days must be "
+                    "contiguous from zero: a reordered or truncated path is a "
+                    "different scenario."
+                )
+            row_fields = tuple(sorted(k for k in row if k != "day"))
+            if fields is None:
+                fields = row_fields
+                values = {field: [] for field in fields}
+            elif row_fields != fields:
+                raise ValidationError(
+                    f"path row {index} drives {list(row_fields)} where earlier "
+                    f"rows drive {list(fields)}. A scenario's fields are fixed "
+                    "at construction, so this document was not written by one."
+                )
+            for field in fields:
+                _check(field, row[field])
+                values[field].append(row[field])
+
+        scenario = cls(label=payload.get("label", ""))
+        last = len(path) - 1
+        for field, series in values.items():
+            scenario._drivers[field] = (
+                lambda series=series, last=last:
+                    lambda day: series[day if day < last else last]
+            )()
+        return scenario
+
     def __bool__(self) -> bool:
         return bool(self._drivers)
 
