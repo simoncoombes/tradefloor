@@ -30,6 +30,38 @@
 //! thorough while never exercising the two most interesting interleavings. The
 //! `eventful` scenario ages the state so both fire, and the generator refuses
 //! to write it if they do not.
+//!
+//! # RETIRED, 2026-08-21 (D-P1)
+//!
+//! Both replay scenarios stopped being parity surfaces when
+//! `MARKET_FACTOR_SIGMA` was recalibrated 0.003 → 0.0075 (`tick.rs`). Every
+//! simulated day contains 390 open ticks, and every open tick multiplies the
+//! recorded market-factor draw by the new sigma, so the divergence is total
+//! and immediate — measured on the committed corpus: both scenarios fail on
+//! DAY 0 (`calm`: rust=153.17 ts=152.67; `eventful`: rust=391.94 ts=393.46,
+//! 0.33% and 0.39%), the signature of a constant scaling every tick rather
+//! than an interleaving defect. The daily macro step itself still matches —
+//! the divergence enters through the market hours, not the economy — but the
+//! day-level comparison is downstream of both, so no case in this file
+//! survives.
+//!
+//! What these two tests USED to prove — that the daily → transitions →
+//! market-hours INTERLEAVING reproduces the reference bit-for-bit over
+//! thirty days — they did prove, up to the era boundary. Retired with
+//! `#[ignore]` rather than deleted so the measured divergence stays
+//! reproducible: run with `-- --ignored` and each is EXPECTED to fail on
+//! day 0. A retired test that PASSES means the corpus changed, which D-P1
+//! forecloses — investigate, do not celebrate.
+//!
+//! `the_eventful_scenario_exercises_what_it_claims` stays live: it checks
+//! the CORPUS (that the eventful tape really contains transitions and
+//! meetings), not the port, and the retired tests are only worth their
+//! keep as divergence records while that remains true.
+//!
+//! The interleaving no longer has an external oracle. What replaces it is
+//! `tick_regression.rs`'s interleaved reproducibility gate — which holds
+//! REGARDLESS of calibration, and gates regression, not correctness; see
+//! its header for exactly what is and is not claimed.
 
 use std::fs;
 use std::path::PathBuf;
@@ -461,11 +493,13 @@ fn check(file: &str) {
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1): reference recorded at sigma 0.003, model moved to 0.0075; expected to fail on day 0 under --ignored"]
 fn thirty_days_calm() {
     check("thirty-day-calm.json");
 }
 
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1): reference recorded at sigma 0.003, model moved to 0.0075; expected to fail on day 0 under --ignored"]
 fn thirty_days_eventful() {
     check("thirty-day-eventful.json");
 }
@@ -474,6 +508,9 @@ fn thirty_days_eventful() {
 ///
 /// Without this the file would pass while exercising neither a cycle
 /// transition nor a bank meeting — the two interleavings it exists for.
+/// Still live after the D-P1 retirement: it gates the CORPUS, not the port,
+/// and the retired replays above are only meaningful divergence records
+/// while the corpus they replay stays what it claims to be.
 #[test]
 fn the_eventful_scenario_exercises_what_it_claims() {
     let doc = load("thirty-day-eventful.json");
