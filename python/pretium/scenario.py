@@ -18,8 +18,9 @@ scores = pt.evaluate(agents, seed=7, universe=u, days=60, scenario=shock)
 ## The trap this exists to close
 
 Pinning `federal_funds_rate` on its own does **nothing inside the first
-central-bank meeting window**. Measured: a 250bp hike over thirty days moved
-twenty instruments by exactly 0.00% at 40 days.
+central-bank meeting window**. Measured on this build, on
+``Universe.random(20, seed=4)`` at sim seed 5: a 250bp policy-only ramp over
+thirty days moved twenty instruments by exactly 0.00% at 40 days.
 
 That is not a defect, it is the valuation model. Equities are discounted off
 the **corporate bond yield**, and the policy rate is only a fallback used when
@@ -30,7 +31,7 @@ reaches fair value directly.
 Since the macro chain runs endogenously (2026-08), transmission exists but is
 lagged: the corporate yield is recomputed from the 10Y at central-bank
 MEETINGS, the first of which is scheduled 45 days out. Measured at 60 days,
-the same policy-only ramp prices the median instrument down 3.99%. So the
+the same policy-only ramp prices the median instrument down 4.19%. So the
 trap is now a horizon trap: a short study sees nothing, silently.
 
 The failure mode survives: you run a month-long rate shock, nothing happens,
@@ -43,10 +44,11 @@ corporate yield together, separated by a credit spread — which is what a rate
 shock is. Moving one alone is still possible through :meth:`ramp`, because
 isolating a channel is a legitimate experiment, but you have to ask for it.
 
-With both moving, the same 250bp hike prices twenty instruments down a median
-4.74%, with the most rate-sensitive name down 6.41% and one defensive name up
-0.25%. That dispersion is the point: a scenario that moved everything equally
-would tell a cross-sectional strategy nothing.
+With both moving, the same 250bp hike (measured at 60 days, same universe
+and seed) prices twenty instruments down a median 4.42%, with the most
+rate-sensitive name down 6.94% and the least sensitive one unmoved at
+0.00%. That dispersion is the point: a scenario that moved everything
+equally would tell a cross-sectional strategy nothing.
 
 ## What a VIX path actually moves
 
@@ -62,37 +64,42 @@ What VIX does reach:
    ``1 + max(0, (vix - 15) / 30)``.
 2. Cross-sectional correlation, but only above VIX 40, where idiosyncratic
    sector factors blend toward the market factor, up to 0.8.
-3. Credit spreads in the daily economy step, which is not reachable from
-   Python in this build. See the note under `Macro` in the Core concepts
-   documentation.
+3. Credit spreads in the daily economy step. Since the macro chain runs
+   endogenously this channel is LIVE from Python: the corporate spread
+   carries a VIX term and is recomputed at central-bank meetings, the first
+   of which sits at day 45.
 
-Measured on this build, 20 instruments over 120 days, seed 3, annualised
-realised volatility:
+Measured on this build — ``Universe.random(20, seed=11)``, 120 days, sim
+seed 3 — annualised realised volatility:
 
-    VIX  5    58.05%
-    VIX 15    58.05%   (the default)
-    VIX 45    58.22%
-    VIX 65    58.92%
+    VIX  5    63.93%
+    VIX 15    64.04%   (the default)
+    VIX 45    64.82%
+    VIX 65    67.19%
 
-A thirteenfold move in VIX changes realised volatility by under one point.
-Below VIX 15 it changes nothing whatsoever: the spread multiplier floors at
-1.0 and the correlation blend has not started, so there is no channel left,
-and VIX 5, VIX 10 and VIX 15 produce BIT-IDENTICAL prices over 60 days on 20
-instruments.
+A thirteenfold move in VIX moves realised volatility about three points, or
+5% of itself. Below VIX 15 the tick-level channels are closed — the spread
+multiplier floors at 1.0 and the correlation blend has not started — and
+VIX 5, VIX 10 and VIX 15 produce BIT-IDENTICAL prices over 40 days on 20
+instruments. They no longer do over 60: once a run crosses the first
+central-bank meeting at day 45, channel 3 reprices the corporate yield off
+a VIX that differs, so even a sub-15 pin diverges past that horizon.
 
-What does move. Mean quoted spread across 25 instruments after five days:
+What does move at the tick. Mean quoted spread across
+``Universe.random(25, seed=11)`` after five days, sim seed 3:
 
-    VIX  5    12.17 bps
-    VIX 15    12.17 bps
-    VIX 25    14.72 bps
-    VIX 45    20.05 bps
-    VIX 65    28.41 bps
+    VIX  5    11.57 bps
+    VIX 15    11.57 bps
+    VIX 25    14.38 bps
+    VIX 45    18.67 bps
+    VIX 65    24.88 bps
 
-The correlation channel is weaker still. Mean pairwise correlation of daily
-log returns, 25 names over 120 days, 300 pairs: +0.022 at VIX 15, +0.023 at
-VIX 45, +0.041 at VIX 65. It fires above 40, but it blends SECTOR factors,
-whose sigma is 0.002, against per-stock GARCH noise running 0.008 to 0.025. So
-the feature is correct in construction and close to invisible in output, and
+The correlation channel is real but smaller than the name suggests. Mean
+pairwise correlation of daily log returns, the same 25 names over 120 days,
+300 pairs: +0.108 at VIX 15, +0.122 at VIX 45, +0.159 at VIX 65. The calm
+baseline belongs to the market factor (sigma 0.0075 since the 2026-08
+recalibration); the blend above 40 acts on SECTOR factors, whose sigma is
+0.002, so a crisis-level VIX adds about half again to correlation and
 diversification keeps working at VIX 65. The realism documentation has the
 arithmetic.
 
@@ -102,43 +109,43 @@ volatility triples: nothing in this model raises realised volatility, and that
 limitation is stated here rather than left for a user to discover after
 publishing.
 
-## A macro counterfactual is near-exact, not exact — and that is worth knowing
+## The macro counterfactual is exact on the market stream — and says so
 
-This is the counterfactual real markets cannot offer: you cannot re-run a year
-without its hiking cycle, because your only observation is the one that
+This is the counterfactual real markets cannot offer: you cannot re-run a
+year without its hiking cycle, because your only observation is the one that
 happened. Here both are runnable.
 
-But it is a weaker guarantee than the ORDER-FLOW counterfactual in
-:mod:`pretium.tca`, and the difference is worth stating rather than glossing.
-Order flow consumes zero RNG draws, so adding a trade leaves the draw schedule
-byte-identical and the subtraction is exact. A macro path does not have that
-property: it changes prices, prices change which branches the microstructure
-takes, and one of those branches consumes draws.
+Before the RNG stream split (2026-08) this was a weaker guarantee than the
+ORDER-FLOW counterfactual in :mod:`pretium.tca`, and this docstring said so:
+a macro path changes prices, prices changed which settlement branch drew
+four uniforms, and the shared draw schedule could shift — measured once at
+-4 draws in 425,600 on an older build. The split closed that mechanism. The
+market stream's schedule is now a pure function of (market status, active
+roster, sector count), so two runs under different macro paths consume —
+and therefore see — identical market noise, draw for draw. The economy
+stream MAY branch under a different macro path (a chain in contraction
+draws a shock the expansion never rolls), which is exactly why it is
+counted separately instead of polluting the market comparison.
 
 Re-measured on this build, twenty instruments over forty days, 2,074,800
-draws in the flat run:
+market draws in the flat run:
 
-    rate_shock 2.5% -> 5%       0 draws
-    rate_shock 2.5% -> 10%      0 draws
-    vix_shock  15 -> 45         0 draws
-    vix_shock  15 -> 80         0 draws
+    rate_shock 2.5% -> 5%       market draw delta 0
+    rate_shock 2.5% -> 10%      market draw delta 0
+    vix_shock  15 -> 45         market draw delta 0
+    vix_shock  15 -> 80         market draw delta 0
 
-Zero in all four, and zero again when three of them are repeated across seeds
-1 to 8. An earlier measurement on an older build recorded a delta of -4 for
-three of these cases, which is where the mechanism was
-identified: settling a price through the book draws four uniforms, or none if
-it returns early, so a macro-induced price difference can flip that branch
-once and shift the schedule by a multiple of four.
+Zero in all four, zero again when three of them are repeated across seeds 1
+to 8, and in these 28 comparisons the economy stream happened not to branch
+either.
 
-The mechanism has not been removed, so the guarantee is "measured at zero on
-this build" rather than "cannot happen".
-
-So :func:`compare` REPORTS the divergence rather than asserting it away. A
-``draw_delta`` of zero means the two worlds saw an identical random sequence
-and the difference is purely the scenario. A non-zero one means they diverged
-slightly, and you should read the result as a very good approximation rather
-than an exact difference. Hiding that behind an average would be the more
-comfortable choice and the wrong one.
+So :func:`compare` reports ``draw_delta`` from the MARKET stream. Zero means
+the two worlds saw an identical market noise sequence and the difference is
+purely the scenario. A non-zero delta is no longer a small approximation to
+tolerate — it means the scenario changed the market's own draw schedule (a
+halt, a delisting, a roster change), and the result compares two
+structurally different markets. That is worth surfacing, not averaging
+away.
 """
 
 from __future__ import annotations
@@ -396,11 +403,12 @@ class Scenario:
 
         **This does not raise realised volatility.** VIX has no term in the
         variance process here. What a spike does is widen the quoted bid-ask,
-        and above VIX 40 pull idiosyncratic returns a little toward the market
-        factor. Measured on 20 instruments over 120 days, seed 3: taking the
-        peak from 45 to 80 moves annualised realised volatility from 58.01% to
-        58.36%, against a no-scenario baseline of 58.05%. This module's
-        docstring sets out the three channels and what each one is worth.
+        and above VIX 40 pull idiosyncratic returns a little toward the
+        market factor. Measured on ``Universe.random(20, seed=11)`` over 120
+        days, sim seed 3: taking the peak from 45 to 80 moves annualised
+        realised volatility from 63.96% to 64.57%, against a no-scenario
+        baseline of 63.99%. This module's docstring sets out the three
+        channels and what each one is worth.
 
         Use it for a liquidity and spread stress. No lever in this model raises
         realised volatility, and this one was renamed because its old name
@@ -517,15 +525,23 @@ def compare(
     median = (ordered[middle] if len(ordered) % 2
               else (ordered[middle - 1] + ordered[middle]) / 2)
 
-    # Reported, not asserted. A macro path CAN shift the schedule -- changing
-    # prices changes which branch the book settlement takes, and one branch
-    # draws four uniforms -- so demanding equality would fail on a real and
-    # tiny effect. Measured at zero or four draws in 425,600.
+    # Reported from the MARKET stream, the stream that decides whether the
+    # two worlds saw the same market. Since the 2026-08 stream split the
+    # market schedule is a pure function of (market status, active roster,
+    # sector count), so a macro path cannot shift it by moving prices. The
+    # economy stream MAY branch under a different macro path, and folding it
+    # into this delta -- as the pre-split draws_consumed subtraction
+    # effectively did -- would under-claim exactness: a run whose market
+    # noise was bit-identical would report exact=False because the macro
+    # chain took a draw the baseline did not.
     #
-    # The user gets the number instead: zero means the two worlds saw an
-    # identical random sequence, non-zero means read the result as a very good
-    # approximation rather than an exact difference.
-    delta = shocked.draws_consumed - flat.draws_consumed
+    # Zero therefore means the difference is purely the scenario. Non-zero
+    # means the scenario changed the market's own draw schedule -- a halt, a
+    # delisting, a roster change -- and the result compares two structurally
+    # different markets. Measured at zero across 28 scenario comparisons on
+    # this build.
+    delta = (shocked.draws_by_stream()["market"]
+             - flat.draws_by_stream()["market"])
 
     return {
         "seed": seed,
