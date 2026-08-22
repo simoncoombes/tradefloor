@@ -26,7 +26,10 @@ Still gated, bit-for-bit (measured on this corpus, 2026-08-21):
   - mispricing-*.json (12) ... constants, step, apply, roots, trajectories
   - market-islands.json ...... GARCH update, sessions, curves, index maths
   - market-daily.json ........ close bookkeeping, incl. the ReferenceEma arm
-  - economy-*.json (7) ....... tier-1 islands and the five macro trajectories
+  - economy-*.json ........... tier-1 islands; the stagflation and
+    no-central-bank trajectories in full (their recorded VIX never
+    exceeds CRISIS_VIX_THRESHOLD); the other three trajectories up to
+    their crisis-fork day, via the fork gate in economy_parity.rs
   - sector anchors ........... the lib-level sectors gate
   - market-tick-closed-weekend.json, plus the draw-schedule arithmetic
     asserted across all market-tick-*.json (corpus self-checks)
@@ -43,17 +46,31 @@ Forked -- parity RETIRED, tests kept as runnable divergence records:
   - divergence-reference.json / divergence-multiday.json: same fork, same
     cause (the examples and divergence_statistics measure it at mean 1.24%
     over a session); their disposition belongs to the examples' owners.
+  - economy-trajectory-{active-shocks,calm-expansion,
+    volatile-contraction}.json: the crisis-trigger fork, landed
+    2026-08-21. CRISIS_VIX_THRESHOLD re-sited the gold/USD crisis gates
+    from the reference's vix > 30 -- which no recorded trajectory ever
+    crosses (hardest: 29.09; active-shocks OPENS at exactly 30.00 and
+    the strict gate does not fire) -- to 25.5, where endogenous VIX
+    actually goes. These three cross 25.5 and diverge on their first
+    crossing day (0 / 306 / 16). Retired under #[ignore] in
+    economy_parity.rs; `cargo test --test economy_parity -- --ignored`
+    reproduces each divergence. Coverage replaced by the fork gate
+    there: bit-parity strictly before the fork day, the draw schedule
+    intact through it, and the divergence equal to the gate terms in
+    exactly the two gated fields.
 
 Expected to fork next (in-flight engine streams, noted so their failures
 are read as the fork landing, not as port regressions): a GJR asymmetry
 term in garch.rs will take the GARCH cases in market-islands.json and the
-garchVariance assertions in market-daily.json; a lowered crisis trigger in
-economy/ will take whichever economy trajectories cross the moved
-threshold (the tier-1 islands should survive); the market-factor variance
-process in tick.rs lands on an already-retired surface. When one of those
-suites goes red, retire the affected cases the same way -- reasoned header,
-#[ignore] with the cause, coverage replaced by a gate that says what it
-actually gates -- rather than deleting or widening.
+garchVariance assertions in market-daily.json; the market-factor variance
+process in tick.rs lands on an already-retired surface; the crisis
+CORRELATION trigger in tick.rs (vix > 40, still at the reference level,
+expected to adopt CRISIS_VIX_THRESHOLD when its stream lands) also lands
+on the already-retired market-tick surface. When one of those suites goes
+red, retire the affected cases the same way -- reasoned header, #[ignore]
+with the cause, coverage replaced by a gate that says what it actually
+gates -- rather than deleting or widening.
 
 Regression coverage for retired surfaces lives in tests/tick_regression.rs
 and is labelled for what it is: self-anchored, gating regression and
