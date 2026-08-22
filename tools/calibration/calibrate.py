@@ -138,9 +138,111 @@ SEARCH_SEEDS = tuple(range(101, 131, 3))
 
 PENALTY_SCALE = 1e3
 
+#: How far inside each band the SEARCH aims, in units of that statistic's
+#: own seed sd. `0.0` reproduces phase 3 exactly.
+#:
+#: Why a margin at all, and why it belongs in the search rather than in
+#: the loss. `pretium.loss.band_distance_loss` is a published surface
+#: whose meaning is "distance outside the band", and it is flat inside the
+#: band on purpose — a statistic that is in band contributes nothing, and
+#: there is no gradient rewarding one that is comfortably in over one that
+#: is barely in. §6.3's regulariser then pulls every parameter back toward
+#: the shipped preset until the pull stops paying, and the pull stops
+#: paying exactly when the target it was fighting reaches its band EDGE.
+#: The composition of the two therefore parks every trained-to statistic
+#: on the least robust point of the feasible set. Phase 3 measured that
+#: happening: its optimum put `return_acf1` 0.0002 inside a band top, and
+#: the statistic fell out of band on all three validation axes.
+#:
+#: The fix is to move the target the search aims at, not the ruler the
+#: verdict is read against. `MARGIN_SD` shrinks each band by k · s_k on
+#: each side for SCORING CANDIDATES ONLY. Every reported number — every
+#: `loss_real`, every panel row, every band verdict, §8's overfitting
+#: test — is computed by the shipped function against the true bands, and
+#: the certificate carries both under names that cannot be confused.
+DEFAULT_MARGIN_SD = 0.5
+
 
 class BudgetExhausted(Exception):
     """Raised when the panel-run budget is spent; stages stop, cleanly."""
+
+
+def margined_bands(bands: dict, seed_sd: dict, keys: list[str],
+                   k: float) -> dict:
+    """Each band shrunk by `k` seed-sds on each side, for the search only.
+
+    A statistic whose band is narrower than 2·k·s_k cannot be given k of
+    room on both sides. Rather than emit an empty interval — which would
+    make the target unreachable and hand the optimiser an arbitrary
+    direction — the shrink degenerates to that band's MIDPOINT, which is
+    the most robust point the band contains and is what a margin is
+    trying to reach in the first place. The certificate records, per
+    statistic, the room the shrink actually bought and whether the
+    degenerate case fired, because "the band was too narrow for the
+    margin asked for" is a fact about the panel that a reader should not
+    have to derive.
+    """
+    out = {}
+    for key in keys:
+        lo, hi = bands[key]
+        s = seed_sd[key]
+        room = k * s
+        if hi - lo <= 2.0 * room:
+            mid = 0.5 * (lo + hi)
+            out[key] = {"band": (mid, mid), "degenerate": True,
+                        "true_band": (lo, hi), "seed_sd": s,
+                        "requested_sd": k,
+                        "band_width_sd": (hi - lo) / s,
+                        "achieved_sd": 0.5 * (hi - lo) / s}
+        else:
+            out[key] = {"band": (lo + room, hi - room), "degenerate": False,
+                        "true_band": (lo, hi), "seed_sd": s,
+                        "requested_sd": k,
+                        "band_width_sd": (hi - lo) / s,
+                        "achieved_sd": k}
+    return out
+
+
+def search_loss(panels: list[dict], margin: dict) -> float:
+    """`L_real`'s arithmetic on the shrunk bands: the SEARCH objective.
+
+    Deliberately not a call into `pretium.loss.band_distance_loss` with
+    different bands, because that function does not take bands and must
+    not learn to: its published meaning is distance outside the REAL
+    band, and a reader who sees its name must never have to ask which
+    ruler produced the number. This is the same formula — median across
+    seeds, two-sided distance through the library's own `band_distance`,
+    scaled by the same `SEED_SD`, squared and summed — evaluated against
+    the margined interval, and it is named for what it is.
+
+    With `k = 0` it is `band_distance_loss(panels)["loss"]` to the bit,
+    which the certificate asserts rather than assumes.
+    """
+    from pretium.facts import band_distance
+
+    total = 0.0
+    for key, spec in margin.items():
+        lo, hi = spec["band"]
+        values = [p[key] for p in panels if p.get(key) is not None]
+        median = statistics.median(values)
+        total += (band_distance(median, lo, hi) / spec["seed_sd"]) ** 2
+    return total
+
+
+def persistence_cap(half_life_days: float) -> float:
+    """The AR(1) persistence whose half-life is `half_life_days`.
+
+    The market factor's variance persistence is `market_vol_alpha +
+    market_vol_beta`, and phase 3's search drove it to 0.9964 — a 192-day
+    half-life measured through a 252-day window. A memory that long is
+    not identified by that window: the panel cannot separate it from a
+    random walk, so the loss is compatible with the value rather than
+    evidence for it. Capping the half-life at a quarter of the window
+    means the window spans four half-lives, so any excursion decays to a
+    sixteenth inside it and the statistics are reading the process's RATE
+    of mean reversion rather than only its level.
+    """
+    return 0.5 ** (1.0 / half_life_days)
 
 
 def calibration_box(name: str, ship: float) -> tuple[float, float]:
@@ -191,9 +293,19 @@ class DevSpace:
     as §6.3 defines them, untouched by the rescaling.
     """
 
-    def __init__(self, params: list[str], ship: dict[str, float]) -> None:
+    def __init__(self, params: list[str], ship: dict[str, float],
+                 factor_persistence_cap: float | None = None) -> None:
         self.params = params
         self.ship = ship
+        #: An identifiability bound on `market_vol_alpha +
+        #: market_vol_beta`, or None for §6.3's stationarity bound alone.
+        #: It lives here rather than in `instrumentlib.feasibility_
+        #: violation` on purpose: that function states the constraints
+        #: the LIBRARY's stationarity analytics cover, three committed
+        #: falsification certificates were measured against it, and an
+        #: identifiability cap is a property of what this panel can
+        #: resolve rather than of what the model can run.
+        self.factor_persistence_cap = factor_persistence_cap
         self.center = np.array([ship[name] for name in params])
         self.kinds = [lib.PARAM_SPECS[name]["kind"] for name in params]
         self.box = {name: calibration_box(name, ship[name]) for name in params}
@@ -222,6 +334,18 @@ class DevSpace:
                               else center + du)
         return out
 
+    def from_raw(self, raw: dict[str, float]) -> np.ndarray:
+        """The inverse of `to_raw`: raw values -> search coordinates.
+
+        What a warm start needs. A parameter the mapping does not carry
+        sits at its shipped value, which is x = 0 — the same convention
+        `squared_deviation` uses for a missing key.
+        """
+        return np.array([
+            deviation(name, raw.get(name, self.ship[name]), self.ship[name])
+            / scale
+            for name, scale in zip(self.params, self.scale)])
+
     def repair(self, u: np.ndarray) -> tuple[np.ndarray, float]:
         """Clip into the box and onto §6.3's stationarity set.
 
@@ -247,7 +371,21 @@ class DevSpace:
             put("garch_beta", b * f)
             put("garch_gamma", g * f)
         ma, mb = get("market_vol_alpha"), get("market_vol_beta")
-        if ma + mb >= 0.999:
+        # The stationarity bound is STRICT — the library's analytics cover
+        # alpha + beta < 1 — so it repairs to 0.998, just inside. The
+        # identifiability cap is INCLUSIVE: a half-life of exactly the
+        # cap is the longest memory the panel can resolve and is a legal
+        # place to sit, so it repairs to the cap itself. Either way alpha
+        # and beta scale together, which preserves the variance process's
+        # SHAPE — the split between innovation and carry — and moves only
+        # its memory, so the repair changes the quantity the bound is
+        # about and nothing else.
+        if self.factor_persistence_cap is not None:
+            if ma + mb > self.factor_persistence_cap:
+                f = self.factor_persistence_cap / (ma + mb)
+                put("market_vol_alpha", ma * f)
+                put("market_vol_beta", mb * f)
+        elif ma + mb >= 0.999:
             f = 0.998 / (ma + mb)
             put("market_vol_alpha", ma * f)
             put("market_vol_beta", mb * f)
@@ -266,6 +404,13 @@ class DevSpace:
         bad = lib.feasibility_violation(raw, self.ship)
         if bad:
             raise AssertionError(f"repair failed to reach feasibility: {bad}")
+        if self.factor_persistence_cap is not None:
+            total = get("market_vol_alpha") + get("market_vol_beta")
+            if total > self.factor_persistence_cap + 1e-12:
+                raise AssertionError(
+                    f"repair failed to reach the identifiability cap: "
+                    f"factor variance persistence {total:.6f} > "
+                    f"{self.factor_persistence_cap:.6f}")
         return repaired, float(np.sum((repaired - u) ** 2))
 
     def squared_deviation(self, raw: dict[str, float]) -> float:
@@ -293,10 +438,14 @@ class Evaluator:
     """
 
     def __init__(self, workers: int, budget_panel_runs: int,
+                 margin: dict,
                  days: int = lib.PANEL_DAYS,
                  universe_n: int = lib.PANEL_UNIVERSE_N,
                  universe_seed: int = lib.PANEL_UNIVERSE_SEED) -> None:
         self.workers = workers
+        #: `margined_bands(...)`: what the SEARCH scores against. Never
+        #: what anything reports against.
+        self.margin = margin
         self.hard_budget = budget_panel_runs
         self.budget = budget_panel_runs
         self.reserved = 0
@@ -307,6 +456,7 @@ class Evaluator:
         self.panel_runs = 0
         self.vector_evaluations = 0
         self.draws_reference: dict[int, int] = {}
+        self.economy_reference: dict[int, int] = {}
         self.crn_deviations: list[dict] = []
         self.history: list[dict] = []
 
@@ -365,19 +515,37 @@ class Evaluator:
             by_key: dict[tuple[str, str], list[dict]] = {}
             for row, key in zip(results, labels):
                 by_key.setdefault(key, []).append(row)
+                # The CRN guard, on the stream it rests on. Phase 3
+                # recorded 16 vectors moving `draws_consumed` and called
+                # it a §5.2 violation; `draw_schedule.py` traced all 58
+                # (vector, seed) pairs and found the MARKET stream
+                # invariant on every one, with the economy stream —
+                # whose count varies with macro state by design, and
+                # whose macro state every parameter moves through
+                # realised volatility — accounting for the whole
+                # deviation. So the market count is asserted and the
+                # economy count is recorded: one is the property that
+                # makes a panel difference a parameter effect, the other
+                # is a real branch in the macro chain that a reader
+                # should be able to see.
+                streams = row["draws_by_stream"]
                 self.draws_reference.setdefault(row["seed"],
-                                                row["draws_consumed"])
-                if row["draws_consumed"] != self.draws_reference[row["seed"]]:
-                    # The CRN guard. Recorded rather than fatal, as in
-                    # falsify.py: a vector that moved the draw schedule
-                    # still has a valid panel LEVEL, which is all the loss
-                    # reads — but every comparison against it is
-                    # re-alignment noise, so the certificate has to say it
-                    # happened. None was observed in any committed run.
+                                                streams[lib.CRN_STREAM])
+                if streams[lib.CRN_STREAM] != self.draws_reference[row["seed"]]:
+                    raise AssertionError(
+                        f"seed {row['seed']}: the {lib.CRN_STREAM} stream "
+                        f"moved from {self.draws_reference[row['seed']]} to "
+                        f"{streams[lib.CRN_STREAM]} under "
+                        f"{row['overrides']} — common random numbers no "
+                        "longer hold and every secant here is noise")
+                self.economy_reference.setdefault(row["seed"],
+                                                  streams["economy"])
+                if streams["economy"] != self.economy_reference[row["seed"]]:
                     self.crn_deviations.append(
                         {"stage": stage, "seed": row["seed"],
-                         "expected": self.draws_reference[row["seed"]],
-                         "observed": row["draws_consumed"],
+                         "stream": "economy",
+                         "expected": self.economy_reference[row["seed"]],
+                         "observed": streams["economy"],
                          "overrides": row["overrides"]})
             for key, rows in by_key.items():
                 panels = [r["panel"] for r in rows]
@@ -395,27 +563,47 @@ class Evaluator:
                seeds: tuple[int, ...], stage: str) -> dict:
         from pretium.loss import band_distance_loss
 
+        # Two numbers, two rulers, and the names say which is which.
+        # `loss_real` is the shipped function against the TRUE bands: the
+        # published meaning, what every verdict in the certificate is read
+        # from, and what §8's overfitting test uses. `loss_search` is the
+        # same arithmetic against the margined bands and exists only to
+        # rank candidates. At margin 0 they are equal, which the caller
+        # asserts once at the baseline rather than trusting.
         breakdown = band_distance_loss(panels)
         medians = {key: statistics.median(p[key] for p in panels)
                    for key in panels[0]}
+        margined = search_loss(panels, self.margin)
         row = {
             "overrides": overrides,
             "loss_real": breakdown["loss"],
+            "loss_search": margined,
             "statistics": {k: {kk: vv for kk, vv in v.items()
                                if kk != "band"}
                            for k, v in breakdown["statistics"].items()},
             "medians": medians,
+            "panels": panels,
             "seeds": list(seeds),
             "stage": stage,
         }
         self.history.append({"stage": stage, "seeds": len(seeds),
                              "overrides": overrides,
-                             "loss_real": breakdown["loss"]})
+                             "loss_real": breakdown["loss"],
+                             "loss_search": margined})
         return row
 
 
-def penalised(row: dict, space: DevSpace, lam: float) -> float:
-    return row["loss_real"] + lam * space.squared_deviation(row["overrides"])
+def penalised(row: dict, space: DevSpace, lam: float,
+              key: str = "loss_search") -> float:
+    """§6.3's penalised objective on one of the two rulers.
+
+    `key="loss_search"` is what the optimiser minimises — the margined
+    bands, so the regulariser's pull stops paying k seed-sds inside each
+    edge instead of exactly on it. `key="loss_real"` is what the frontier
+    and every reported figure price, because §6.3's deliverable is
+    deviation against REALISM and realism means the published bands.
+    """
+    return row[key] + lam * space.squared_deviation(row["overrides"])
 
 
 def pareto_frontier(rows: list[dict], space: DevSpace) -> list[dict]:
@@ -429,7 +617,8 @@ def pareto_frontier(rows: list[dict], space: DevSpace) -> list[dict]:
     """
     points = sorted(
         ({"squared_deviation": space.squared_deviation(r["overrides"]),
-          "loss_real": r["loss_real"], "overrides": r["overrides"]}
+          "loss_real": r["loss_real"], "loss_search": r["loss_search"],
+          "overrides": r["overrides"]}
          for r in rows),
         key=lambda p: (p["squared_deviation"], p["loss_real"]))
     out: list[dict] = []
@@ -484,6 +673,23 @@ def main() -> None:
     parser.add_argument("--reserve-panel-runs", type=int, default=2600,
                         help="held back from the exploratory stages for "
                              "the thirty-seed confirmation and shrink")
+    parser.add_argument("--margin-sd", type=float, default=DEFAULT_MARGIN_SD,
+                        help="how far inside each band the SEARCH aims, in "
+                             "seed-sds; reporting always uses the true "
+                             "bands. 0 reproduces phase 3.")
+    parser.add_argument("--factor-persistence-half-life", type=float,
+                        default=None, metavar="DAYS",
+                        help="cap market_vol_alpha + market_vol_beta at the "
+                             "persistence with this half-life, so the search "
+                             "cannot buy a variance memory the 252-day panel "
+                             "cannot resolve. Unset leaves §6.3's "
+                             "stationarity bound alone.")
+    parser.add_argument("--start-from", default=None,
+                        help="a certificate whose best_vector seeds the "
+                             "search, or 'pt-v1'. Warm-starting replaces the "
+                             "Latin-hypercube screen, which phase 3 measured "
+                             "as its worst-value stage: 48 random points in "
+                             "the box and not one beat pt-v1.")
     parser.add_argument("--degeneracy-probe", action="store_true",
                         help="re-measure phase 2's zero-memory corner here")
     parser.add_argument("--workers", type=int, default=8)
@@ -507,8 +713,14 @@ def main() -> None:
     holdout_seeds = tuple(int(s) for s in args.holdout_seeds.split(","))
     hu_n, hu_seed = (int(x) for x in args.holdout_universe.split(":"))
 
-    space = DevSpace(params, ship)
-    ev = Evaluator(args.workers, args.budget_panel_runs)
+    cap = (persistence_cap(args.factor_persistence_half_life)
+           if args.factor_persistence_half_life else None)
+    space = DevSpace(params, ship, factor_persistence_cap=cap)
+
+    in_loss = list(loss_mod.LIVE_TARGETS) + list(loss_mod.CONSTRAINTS)
+    margin = margined_bands(facts.REAL_MARKETS, facts.SEED_SD, in_loss,
+                            args.margin_sd)
+    ev = Evaluator(args.workers, args.budget_panel_runs, margin)
     started = time.perf_counter()
     trace: list[dict] = []
 
@@ -528,6 +740,29 @@ def main() -> None:
         f"{len(search_seeds)}-seed search subset")
     for line in panel_rows(base_train):
         print(line)
+
+    # The margin, stated before anything is scored against it, and its
+    # zero case checked rather than assumed: at k = 0 the search
+    # objective must BE the shipped loss, or the two rulers have already
+    # drifted and no later comparison means anything.
+    zero = margined_bands(facts.REAL_MARKETS, facts.SEED_SD, in_loss, 0.0)
+    check = search_loss(base_train["panels"], zero)
+    if abs(check - base_train["loss_real"]) > 1e-12:
+        raise SystemExit(
+            f"the margined loss at k = 0 reads {check!r} where "
+            f"band_distance_loss reads {base_train['loss_real']!r}; the "
+            "search ruler and the published one disagree at the point they "
+            "must agree")
+    print(f"\n=== the search aims {args.margin_sd} seed-sds inside each "
+          f"band; every REPORTED verdict uses the true band ===")
+    for key, spec in margin.items():
+        lo, hi = spec["true_band"]
+        mlo, mhi = spec["band"]
+        print(f"  {key:<24} true [{lo:+8.4f}, {hi:+8.4f}] "
+              f"({spec['band_width_sd']:5.2f} sd wide) -> searched "
+              f"[{mlo:+8.4f}, {mhi:+8.4f}]"
+              + ("   DEGENERATE: narrower than 2k, aimed at the midpoint"
+                 if spec["degenerate"] else ""))
 
     # The confirmation and shrink stages run on thirty seeds and cost three
     # times what a search-subset sweep costs; they are also the only stages
@@ -588,7 +823,25 @@ def main() -> None:
             raise SystemExit(f"{label}: no feasible point evaluated")
         return best[1], best[0]
 
-    screen_points = [np.zeros(n)] + [lhs[i] for i in range(args.screen)]
+    # The screen's job is to find a starting point, and phase 3 measured
+    # what 48 random points in this box buy: nothing — not one of them
+    # beat pt-v1, for 8% of the budget. That is the expected shape of a
+    # box drawn around an already-calibrated model, and it means the
+    # information is better spent on polish. A warm start says so
+    # explicitly: the point to start from is a vector some earlier
+    # measurement already argued for, and the screen shrinks to the
+    # comparison that matters — is the warm start better than pt-v1 on
+    # THIS objective, which is not the objective that produced it.
+    screen_points = [np.zeros(n)]
+    screen_labels = ["pt-v1"]
+    if args.start_from and args.start_from != "pt-v1":
+        with open(args.start_from, encoding="utf-8") as handle:
+            warm = json.load(handle)["best_vector"]
+        w, _ = space.repair(space.from_raw(warm))
+        screen_points.append(w)
+        screen_labels.append(args.start_from)
+    screen_points += [lhs[i] for i in range(args.screen)]
+    screen_labels += [f"lhs{i}" for i in range(args.screen)]
     try:
         screen_losses = evaluate_batch(screen_points, args.lam, "screen",
                                        search_seeds)
@@ -597,10 +850,15 @@ def main() -> None:
     best_i = int(np.argmin(screen_losses))
     x0 = screen_points[best_i]
     trace.append({"stage": "screen", "samples": args.screen,
+                  "warm_start": args.start_from,
+                  "candidates": [{"label": lab, "penalised_loss": float(v)}
+                                 for lab, v in zip(screen_labels,
+                                                   screen_losses)],
                   "base_loss": float(screen_losses[0]),
+                  "best_label": screen_labels[best_i],
                   "best_loss": float(screen_losses[best_i])})
-    say(f"screen: base {screen_losses[0]:.4f} -> best "
-        f"{screen_losses[best_i]:.4f}")
+    say(f"screen: pt-v1 {screen_losses[0]:.4f} -> best "
+        f"{screen_losses[best_i]:.4f} ({screen_labels[best_i]})")
 
     # ── Stage 2: CMA-ES ──────────────────────────────────────────────────
     cma_trace: list[dict] = []
@@ -692,14 +950,20 @@ def main() -> None:
     search_rows = [r for k, r in ev.cache.items()
                    if k[1] == ",".join(str(s) for s in search_seeds)]
     frontier = pareto_frontier(search_rows + train_rows, space)
+    # The frontier is §6.3's deliverable and its realism axis is the
+    # PUBLISHED one: what a reader gets for a given deviation from the
+    # shipped preset, priced against the true bands. The margined loss
+    # rides along on each point so the two can be compared, but it is not
+    # what the picks are chosen on.
     lambda_picks = {}
     for lam_text in args.lambda_frontier.split(","):
         lam = float(lam_text)
         pick = min(search_rows + train_rows,
-                   key=lambda r: penalised(r, space, lam))
+                   key=lambda r: penalised(r, space, lam, "loss_real"))
         lambda_picks[lam_text] = {
             "overrides": pick["overrides"],
             "loss_real": pick["loss_real"],
+            "loss_search": pick["loss_search"],
             "squared_deviation": space.squared_deviation(pick["overrides"]),
             "seeds": len(pick["seeds"]),
         }
@@ -712,14 +976,35 @@ def main() -> None:
         results = lib.run_pool(jobs, args.workers)
         ev.panel_runs += len(jobs)
         panels = [r["panel"] for r in results]
+        lib.crn_streams(results)
         breakdown = loss_mod.band_distance_loss(panels)
+        stats = {k: {kk: vv for kk, vv in v.items()}
+                 for k, v in breakdown["statistics"].items()}
+        # `room_sd` is the quantity this whole phase is about: how far
+        # inside its TRUE band a statistic sits, in its own seed noise,
+        # signed so that negative means out. The band loss cannot see it
+        # — that is §6.1's flatness — and it is what decides whether a
+        # statistic survives a change of seeds, universe or horizon.
+        for key, row in stats.items():
+            lo, hi = row["band"]
+            sd = facts.SEED_SD.get(key)
+            m = row["measured"]
+            row["room_sd"] = (None if m is None or not sd
+                              else min(m - lo, hi - m) / sd)
+            if key in margin:
+                mlo, mhi = margin[key]["band"]
+                row["margined_band"] = [mlo, mhi]
+                row["inside_margined_band"] = (
+                    m is not None and mlo <= m <= mhi)
         return {
             "seeds": list(seeds), "days": days,
             "universe": f"Universe.random({universe_n}, seed={universe_seed})",
             "loss_real": breakdown["loss"],
+            "loss_search": search_loss(panels, margin),
+            "bands_used_for_every_verdict_here": "the TRUE bands "
+                                                 "(facts.REAL_MARKETS)",
             "bootstrap_spread": bootstrap_spread(panels),
-            "statistics": {k: {kk: vv for kk, vv in v.items()}
-                           for k, v in breakdown["statistics"].items()},
+            "statistics": stats,
             "panels": panels,
         }
 
@@ -840,13 +1125,17 @@ def main() -> None:
               f"{move['candidate']:>10.5g}   dev {move['deviation']:+.4f}"
               f"   x{move['ratio']:.3f}")
     print("\n=== panel: pt-v1 -> candidate on the training seeds ===")
+    print("    (bands and every verdict below are the TRUE bands; "
+          f"the search aimed {args.margin_sd} sd inside them)")
     for key in facts.REAL_MARKETS:
         before = axes["pt-v1"]["train_seeds"]["statistics"][key]
         after = axes["candidate"]["train_seeds"]["statistics"][key]
+        room = after.get("room_sd")
         print(f"  {key:<24} {before['measured']:+10.4f} -> "
               f"{after['measured']:+10.4f}  band {before['band']}"
               f"  {after['role']:<12}"
-              f"  d {before['distance']:.4f} -> {after['distance']:.4f}")
+              f"  d {before['distance']:.4f} -> {after['distance']:.4f}"
+              + (f"  room {room:+6.2f} sd" if room is not None else ""))
     print(f"\nevaluations: {ev.vector_evaluations} vectors, "
           f"{ev.panel_runs} panel runs "
           f"({ev.panel_runs / 6.0:.0f} six-seed-vector equivalents against a "
@@ -881,6 +1170,57 @@ def main() -> None:
         "method": {
             "loss": "pretium.loss.band_distance_loss (the shipped "
                     "objective) + lambda * sum_j dev_j^2 (§6.3)",
+            "search_margin": {
+                "margin_sd": args.margin_sd,
+                "what_it_changes": "the SEARCH objective only. Candidates "
+                                   "are ranked on `loss_search`, the same "
+                                   "arithmetic as band_distance_loss "
+                                   "evaluated against bands shrunk by "
+                                   "margin_sd * SEED_SD on each side. "
+                                   "`loss_real` and EVERY band verdict, "
+                                   "panel row and §8 result in this "
+                                   "certificate are the shipped function "
+                                   "against the TRUE bands "
+                                   "(facts.REAL_MARKETS), unshrunk.",
+                "why": "CALIBRATION.md §6.1's band loss is flat inside the "
+                       "band and §6.3's regulariser pulls back until the "
+                       "pull stops paying, which is exactly at a band "
+                       "edge; the composition parks every trained-to "
+                       "statistic on the least robust point of the "
+                       "feasible set (phase 3, CALIBRATION-PTV2.md §5.1). "
+                       "The margin moves what the search aims at without "
+                       "touching what the verdict is read against.",
+                "zero_case_checked": "at margin_sd = 0 the search loss is "
+                                     "asserted equal to "
+                                     "band_distance_loss(...)['loss'] on "
+                                     "the baseline panels before the "
+                                     "search starts",
+                "bands": {k: {"true": list(v["true_band"]),
+                              "searched": list(v["band"]),
+                              "seed_sd": v["seed_sd"],
+                              "band_width_sd": v["band_width_sd"],
+                              "achieved_margin_sd": v["achieved_sd"],
+                              "degenerate": v["degenerate"]}
+                          for k, v in margin.items()},
+            },
+            "factor_persistence_cap": (
+                None if cap is None else {
+                    "half_life_days": args.factor_persistence_half_life,
+                    "persistence": cap,
+                    "window_days": lib.PANEL_DAYS,
+                    "half_lives_in_window": (
+                        lib.PANEL_DAYS / args.factor_persistence_half_life),
+                    "applies_to": "market_vol_alpha + market_vol_beta",
+                    "why": "a variance memory longer than the window it is "
+                           "measured through is not identified by that "
+                           "window; the loss can be compatible with it "
+                           "without being evidence for it. Enforced in the "
+                           "search's own repair, not in "
+                           "instrumentlib.feasibility_violation, which "
+                           "states what the library's stationarity "
+                           "analytics cover and backs three committed "
+                           "falsification certificates.",
+                }),
             "lambda": args.lam,
             "seed_sd_source": "pretium.facts.SEED_SD",
             "seed_sd": dict(facts.SEED_SD),
@@ -911,6 +1251,7 @@ def main() -> None:
                 "seed": args.cma_seed,
                 "compass_steps": args.compass_steps,
                 "confirm_steps": args.confirm_steps,
+                "warm_start": args.start_from,
             },
             "workers": args.workers,
         },
@@ -921,7 +1262,21 @@ def main() -> None:
         "lambda_frontier": {"picks": lambda_picks, "pareto": frontier},
         "overfitting": overfitting,
         "degeneracy_probe": degeneracy,
-        "crn_deviations": ev.crn_deviations,
+        "crn_guard": {
+            "asserted_stream": lib.CRN_STREAM,
+            "note": "the market stream's draw count is a pure function of "
+                    "(market status, active roster, sector count) and is "
+                    "ASSERTED equal across every vector on every seed — a "
+                    "move there would make these secants re-alignment "
+                    "noise. The economy stream's count varies with macro "
+                    "state by design and every parameter reaches macro "
+                    "state through realised volatility, so its deviations "
+                    "are RECORDED, not failures. "
+                    "results/draw-schedule-2026-08-22.json traces phase "
+                    "3's 16 'violations' and finds the market stream "
+                    "invariant on all 58 (vector, seed) pairs.",
+            "economy_deviations": ev.crn_deviations,
+        },
         "trace": trace,
         "history": ev.history,
         "vector_evaluations": ev.vector_evaluations,
