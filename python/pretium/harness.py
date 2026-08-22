@@ -43,7 +43,7 @@ from __future__ import annotations
 import struct
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Sequence
 
-from ._core import Engine, Instrument, Macro, OrderError, ValidationError
+from ._core import Engine, Instrument, Macro, ModelParams, OrderError, ValidationError
 from .portfolio import Portfolio
 from .universe_util import fingerprint_of
 
@@ -160,7 +160,7 @@ class Scorecard:
     __slots__ = ("name", "pnl", "return_pct", "trades", "turnover", "impact_bps",
                  "max_leverage", "rejected", "explanations", "explanation_accuracy",
                  "final_net_worth", "errors", "seed", "universe_fingerprint",
-                 "strategy_fingerprint")
+                 "strategy_fingerprint", "model_fingerprint")
 
     def __init__(
         self, *, name: str, pnl: float, return_pct: float, trades: int,
@@ -168,6 +168,7 @@ class Scorecard:
         explanations: list[tuple[str, str]], explanation_accuracy: float | None,
         final_net_worth: float, errors: list[str], seed: int = -1,
         universe_fingerprint: str = "", strategy_fingerprint: str = "",
+        model_fingerprint: str = "",
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -193,6 +194,12 @@ class Scorecard:
         # agent, which is the honest reading -- such a result is reproducible
         # only by citing code at a commit, not from this card.
         self.strategy_fingerprint = strategy_fingerprint
+        # And what MODEL priced it. A shipped preset's name, or
+        # custom-XXXXXXXX for a run under a modified coefficient set --
+        # the same honesty mechanism as the strategy fingerprint, so a
+        # leaderboard row under a non-shipped model can never present as
+        # the benchmark market.
+        self.model_fingerprint = model_fingerprint
 
     def as_dict(self) -> dict[str, Any]:
         return {slot: getattr(self, slot) for slot in self.__slots__}
@@ -268,6 +275,7 @@ def evaluate(
     max_leverage: float | None = 2.0,
     start: tuple[int, int, int] = (9, 30, 3),
     scenario: Any = None,
+    model: str | ModelParams | None = None,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -292,6 +300,12 @@ def evaluate(
     visible symptom. A spec cannot, because it is not the agent; it is the
     instruction for building one.
 
+    ``model`` selects the coefficient set every engine in the evaluation
+    runs — a preset name or a :class:`pretium.ModelParams` — and defaults
+    to the shipped preset. One model for the whole evaluation, baseline
+    included: scoring agents across different models would compare markets,
+    not agents. Each scorecard records ``model_fingerprint``.
+
     Returns a scorecard per agent, keyed by name.
     """
     from .spec import StrategySpec
@@ -313,7 +327,7 @@ def evaluate(
 
     baseline = _run_untraded(seed, universe, macro, days, steps_per_day,
                              ticks_per_step, hour, minute, day_of_week,
-                             scenario)
+                             scenario, model)
 
     for name, entry in agents.items():
         agent = entry.build() if isinstance(entry, StrategySpec) else entry
@@ -326,14 +340,16 @@ def evaluate(
         results[name] = _evaluate_one(
             name, agent, seed, universe, macro, days, steps_per_day,
             ticks_per_step, cash, max_leverage, hour, minute, day_of_week,
-            baseline, scenario, fingerprint, strategy_fingerprint,
+            baseline, scenario, fingerprint, strategy_fingerprint, model,
         )
     return results
 
 
 def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
-                  hour, minute, day_of_week, scenario=None) -> list[float]:
-    engine = Engine(seed=seed, universe=universe, macro_state=macro)
+                  hour, minute, day_of_week, scenario=None,
+                  model=None) -> list[float]:
+    engine = Engine(seed=seed, universe=universe, macro_state=macro,
+                    model=model)
     for day in range(days):
         if scenario is not None:
             scenario.apply(engine, day)
@@ -352,8 +368,10 @@ def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
 def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   ticks_per_step, cash, max_leverage, hour, minute,
                   day_of_week, baseline, scenario=None,
-                  fingerprint="", strategy_fingerprint="") -> Scorecard:
-    engine = Engine(seed=seed, universe=universe, macro_state=macro)
+                  fingerprint="", strategy_fingerprint="",
+                  model=None) -> Scorecard:
+    engine = Engine(seed=seed, universe=universe, macro_state=macro,
+                    model=model)
     portfolio = Portfolio(cash=cash, max_leverage=max_leverage)
     tickers = engine.tickers
     adv = [inst.avg_volume for inst in universe]
@@ -460,6 +478,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         seed=seed,
         universe_fingerprint=fingerprint,
         strategy_fingerprint=strategy_fingerprint,
+        model_fingerprint=engine.model_fingerprint,
     )
 
 

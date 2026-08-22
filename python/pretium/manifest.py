@@ -98,6 +98,7 @@ from ._core import (
     Instrument,
     Macro,
     MispricingState,
+    ModelParams,
     ValidationError,
     fair_value,
     model_preset,
@@ -381,6 +382,11 @@ class RunManifest:
             "scenario": None if scenario_payload is None
             else _sha(_canonical(scenario_payload)),
             "strategy": strategy_fp,
+            # The model rides beside the strategy: the same honesty
+            # mechanism, where a shipped preset is cited by name and a
+            # custom one by custom-XXXXXXXX — never mistakable for a
+            # standard model in a published result.
+            "model": engine.model_fingerprint,
             "order_log": _sha(_canonical(log)),
         }
         fingerprints["inputs"] = _sha(_canonical(
@@ -393,7 +399,12 @@ class RunManifest:
                 "pretium_version": version(),
                 "platform": {"os": _platform.system(),
                              "machine": _platform.machine()},
-                "model": dict(model_preset()),
+                # The FULL preset surface of the model the engine actually
+                # ran — not the build's default — with "name" as its
+                # fingerprint. Embedding the values is what lets a custom
+                # preset travel: a fingerprint identifies, it cannot
+                # reconstruct.
+                "model": dict(engine.model_params),
                 "era": {"probe": ERA_PROBE, "digest": era_fingerprint()},
             },
             "seed": int(seed),
@@ -495,6 +506,18 @@ class RunManifest:
                 "fingerprint identifies, it cannot reconstruct."
             )
 
+        recorded_model = recorded.get("model")
+        if recorded_model is not None:
+            carried = (payload.get("written_by") or {}).get("model") or {}
+            if carried.get("name") != recorded_model:
+                raise ValidationError(
+                    "the model dictionary in this manifest is named "
+                    f"{carried.get('name')!r} but its recorded fingerprint "
+                    f"is {recorded_model!r}. One of them was edited in "
+                    "transit; the values themselves are re-verified against "
+                    "the fingerprint before any replay."
+                )
+
         if _sha(_canonical(payload["order_log"])) != recorded.get("order_log"):
             raise ValidationError(
                 "the order log does not match its recorded fingerprint. The "
@@ -532,7 +555,8 @@ class RunManifest:
         self._check_era()
 
         engine = replay(self.order_log, seed=self.seed,
-                        universe=self.universe, macro=self.macro)
+                        universe=self.universe, macro=self.macro,
+                        model=self._model_for_replay())
 
         recorded = self._doc["result"]
         digest = market_digest(engine)
@@ -553,33 +577,79 @@ class RunManifest:
             )
         return engine
 
+    def _model_for_replay(self) -> ModelParams | None:
+        """The model the run was recorded under, rebuilt for the replay.
+
+        ``None`` for a shipped preset (the engine's default) — including
+        every manifest written before the model dict carried the full
+        surface. A ``custom-`` model is rebuilt from the embedded values;
+        :meth:`_check_era` has already verified this build can run it and
+        that the values still match their recorded fingerprint.
+        """
+        theirs = (self._doc["written_by"].get("model") or {})
+        name = theirs.get("name")
+        if name is None or not str(name).startswith("custom-"):
+            return None
+        return ModelParams.from_dict(theirs)
+
     def _check_era(self) -> None:
         wrote = self._doc["written_by"]
         theirs = wrote.get("model") or {}
-        ours = dict(model_preset())
-        if theirs.get("name") != ours.get("name"):
-            raise ValidationError(
-                f"this manifest ran model preset {theirs.get('name')!r}; "
-                f"this build ships {ours.get('name')!r}. The coefficients "
-                "are the model, so the run cannot be checked here — "
-                "reproduce it on a build that ships the preset it ran."
+        name = theirs.get("name")
+
+        if isinstance(name, str) and name.startswith("custom-"):
+            # A custom preset: the embedded values ARE the model, so the
+            # check is that this build can run them and that they still
+            # hash to the name they were recorded under. from_dict refuses
+            # by name any value this build cannot run (a read-only or
+            # derived coefficient that moved — an era boundary for the
+            # unthreaded surface).
+            rebuilt = ModelParams.from_dict(theirs)
+            if rebuilt.fingerprint != name:
+                raise ValidationError(
+                    "the model dictionary in this manifest no longer "
+                    f"matches its own name: the values hash to "
+                    f"{rebuilt.fingerprint!r} against the recorded "
+                    f"{name!r}. Either the dictionary was edited in "
+                    "transit, or this build derives different bits from "
+                    "the same inputs — both mean the replay would run a "
+                    "model the manifest does not describe."
+                )
+        else:
+            ours = dict(model_preset())
+            if name != ours.get("name"):
+                raise ValidationError(
+                    f"this manifest ran model preset {name!r}; "
+                    f"this build ships {ours.get('name')!r}. The coefficients "
+                    "are the model, so the run cannot be checked here — "
+                    "reproduce it on a build that ships the preset it ran."
+                )
+            # Compare where both sides carry a value. The intersection
+            # rather than the union, deliberately: an older manifest
+            # carries the legacy nine-coefficient dict and a newer one the
+            # full surface, and a key only one side knows is a difference
+            # of BOOKKEEPING, not of model — the era probe above this
+            # block is what catches a behavioural change the comparison
+            # cannot see.
+            full = ModelParams.from_preset(ours["name"]).to_dict()
+            disagreeing = sorted(
+                key for key in set(theirs) & (set(ours) | set(full))
+                if key != "name"
+                and theirs.get(key) != ours.get(key, full.get(key))
             )
-        disagreeing = sorted(
-            key for key in set(theirs) | set(ours)
-            if key != "name" and theirs.get(key) != ours.get(key)
-        )
-        if disagreeing:
-            detail = "; ".join(
-                f"{key}: manifest {theirs.get(key)!r}, build {ours.get(key)!r}"
-                for key in disagreeing
-            )
-            raise ValidationError(
-                f"model preset {ours.get('name')!r} disagrees between this "
-                f"manifest and this build on {detail}. Same name, different "
-                "model: an era boundary. Every seed's trajectory moves "
-                "across one, so replaying here would produce a plausible "
-                "market that is not the one the manifest describes."
-            )
+            if disagreeing:
+                detail = "; ".join(
+                    f"{key}: manifest {theirs.get(key)!r}, "
+                    f"build {ours.get(key, full.get(key))!r}"
+                    for key in disagreeing
+                )
+                raise ValidationError(
+                    f"model preset {ours.get('name')!r} disagrees between this "
+                    f"manifest and this build on {detail}. Same name, different "
+                    "model: an era boundary. Every seed's trajectory moves "
+                    "across one, so replaying here would produce a plausible "
+                    "market that is not the one the manifest describes."
+                )
 
         era = wrote.get("era") or {}
         if era.get("probe") != ERA_PROBE:
@@ -675,6 +745,23 @@ class RunManifest:
     def written_by(self) -> dict[str, Any]:
         """The writing build: package version, platform, model, era digest."""
         return json.loads(json.dumps(self._doc["written_by"]))
+
+    @property
+    def model(self) -> dict[str, Any]:
+        """The coefficient dictionary of the model the run ran under, with
+        ``"name"`` as its fingerprint — a shipped preset's name, or
+        ``custom-XXXXXXXX`` for a run that must never be mistaken for one."""
+        return dict(self._doc["written_by"].get("model") or {})
+
+    @property
+    def model_fingerprint(self) -> str:
+        """The model's honest name, as recorded. Falls back to the model
+        dict's own name for manifests written before the fingerprint joined
+        :attr:`fingerprints`."""
+        recorded = self._doc.get("fingerprints", {}).get("model")
+        if recorded is not None:
+            return recorded
+        return str(self.model.get("name", ""))
 
     # -- honesty about what it does not carry ------------------------------
 

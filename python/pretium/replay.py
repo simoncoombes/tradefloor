@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from ._core import Engine, Instrument, Macro, News, ValidationError
+from ._core import Engine, Instrument, Macro, ModelParams, News, ValidationError
 
 # Every operation the log can carry. Declared once so an unknown op is caught
 # by name rather than by falling through a chain of ifs into silence.
@@ -36,6 +36,7 @@ def replay(
     seed: int,
     universe: Sequence[Instrument],
     macro: Macro | None = None,
+    model: str | ModelParams | None = None,
     until: int | None = None,
 ) -> Engine:
     """Re-execute a recorded log and return the resulting engine.
@@ -52,8 +53,17 @@ def replay(
     An unknown operation raises rather than being skipped. A replay that
     silently ignored an entry would produce a market that is not the one the
     log describes — and it would look like a successful replay.
+
+    ``model`` is the coefficient set the run was recorded under — a preset
+    name or a :class:`ModelParams` — and defaults to the shipped preset.
+    Like ``seed`` and ``universe`` it is identity, not history, so it is
+    not in the log; replaying a custom-model run under the default would
+    produce a plausible market that is not the recorded one, which is why
+    :class:`pretium.RunManifest` carries the full coefficient dictionary
+    and passes it back through here.
     """
-    engine = Engine(seed=seed, universe=universe, macro_state=macro)
+    engine = Engine(seed=seed, universe=universe, macro_state=macro,
+                    model=model)
     entries = list(log)[: until if until is not None else len(log)]
 
     for i, entry in enumerate(entries):

@@ -12,7 +12,7 @@ import json
 import pytest
 
 import pretium
-from pretium.manifest import era_fingerprint, market_digest
+from pretium.manifest import _canonical, _sha, era_fingerprint, market_digest
 from pretium.scenario import Scenario
 
 UNIVERSE = pretium.Universe.random(10, seed=3)
@@ -175,10 +175,34 @@ def test_a_moved_coefficient_is_named_by_key():
 
 
 def test_a_different_preset_name_is_refused():
+    # Renaming the model dict is now caught one gate earlier than it was:
+    # the manifest records the model fingerprint beside the strategy's, so
+    # a name that no longer matches it is an in-transit edit before it can
+    # ever become an era question.
     engine, macro, shock = full_run()
     text = tampered(manifest_of(engine, macro, shock),
                     lambda p: p["written_by"]["model"].__setitem__(
                         "name", "custom-a41f9c02"))
+    with pytest.raises(pretium.ValidationError,
+                       match="model dictionary|model preset"):
+        pretium.RunManifest.from_json(text).reproduce()
+
+
+def test_a_legacy_manifest_naming_a_different_preset_is_refused():
+    # A manifest written BEFORE the model fingerprint joined `fingerprints`
+    # carries only the dict; renaming that must still refuse, at the era
+    # gate, by preset name. Emulated by rebuilding the fingerprint block
+    # the way an old writer would have (no "model" key).
+    engine, macro, shock = full_run()
+
+    def rewrite(p):
+        p["written_by"]["model"]["name"] = "pt-v9"
+        fps = p["fingerprints"]
+        fps.pop("model", None)
+        check = {k: v for k, v in fps.items() if k != "inputs"}
+        fps["inputs"] = _sha(_canonical({"seed": p["seed"], **check}))
+
+    text = tampered(manifest_of(engine, macro, shock), rewrite)
     with pytest.raises(pretium.ValidationError, match="model preset"):
         pretium.RunManifest.from_json(text).reproduce()
 

@@ -79,7 +79,7 @@ from __future__ import annotations
 import json
 from typing import Any, Sequence
 
-from ._core import Engine, Instrument, Macro, ValidationError
+from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
 
 CHECKPOINT_SCHEMA = 1
 
@@ -87,16 +87,21 @@ CHECKPOINT_SCHEMA = 1
 class Checkpoint:
     """A point in a simulation you can return to, as data."""
 
-    __slots__ = ("seed", "universe", "log", "macro", "label")
+    __slots__ = ("seed", "universe", "log", "macro", "label", "model")
 
     def __init__(self, *, seed: int, universe: Sequence[Instrument],
                  log: Sequence[dict], macro: Macro | None = None,
-                 label: str = "") -> None:
+                 label: str = "", model: dict | None = None) -> None:
         self.seed = int(seed)
         self.universe = list(universe)
         self.log = [dict(entry) for entry in log]
         self.macro = macro
         self.label = label
+        # The full coefficient dictionary of a NON-shipped model, or None
+        # for a run under a shipped preset. Carried because a checkpoint of
+        # a custom-model run that resumed under the default would replay a
+        # plausible market that is not the one it froze.
+        self.model = dict(model) if model else None
 
     @property
     def universe_fingerprint(self) -> str:
@@ -116,8 +121,11 @@ class Checkpoint:
         and it means a checkpoint records the inputs it will need rather than
         discovering at resume time that it cannot reproduce anything.
         """
+        fingerprint = engine.model_fingerprint
         return cls(seed=seed, universe=universe, log=engine.order_log,
-                   macro=macro, label=label)
+                   macro=macro, label=label,
+                   model=(dict(engine.model_params)
+                          if fingerprint.startswith("custom-") else None))
 
     def resume(self, *, universe: Sequence[Instrument] | None = None) -> Engine:
         """A fresh engine at this exact state.
@@ -145,7 +153,9 @@ class Checkpoint:
                     "wrong fair values."
                 )
         return replay(self.log, seed=self.seed, universe=roster,
-                      macro=self.macro)
+                      macro=self.macro,
+                      model=(ModelParams.from_dict(self.model)
+                             if self.model else None))
 
     def branch(self, count: int = 2) -> list[Engine]:
         """``count`` independent engines, all at this state.
@@ -177,6 +187,8 @@ class Checkpoint:
             "universe_fingerprint": self.universe_fingerprint,
             "log": self.log,
         }
+        if self.model is not None:
+            payload["model"] = self.model
         if self.macro is not None:
             payload["macro"] = {
                 "vix": self.macro.vix,
@@ -223,6 +235,7 @@ class Checkpoint:
             log=payload["log"],
             macro=macro,
             label=payload.get("label", ""),
+            model=payload.get("model"),
         )
 
     def __len__(self) -> int:
@@ -269,7 +282,10 @@ def branch(
     snapshot = engine.state_snapshot()
     out: list[Engine] = []
     for _ in range(count):
-        fresh = Engine(seed=seed, universe=universe, macro_state=macro)
+        # The parent's own model, read off the live engine, so a fork of a
+        # custom-model run prices under the coefficients its parent ran.
+        fresh = Engine(seed=seed, universe=universe, macro_state=macro,
+                       model=engine.model)
         fresh.restore_state(snapshot)
         out.append(fresh)
     return out
