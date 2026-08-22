@@ -45,7 +45,14 @@ AXES = {
     "holdout_seeds": (lib.PUBLISHED_SEEDS, lib.PANEL_UNIVERSE_N,
                       lib.PANEL_UNIVERSE_SEED, lib.PANEL_DAYS),
     "holdout_universe": (lib.TRAIN_SEEDS, 60, 222, lib.PANEL_DAYS),
-    "holdout_horizon": ((101, 104, 107), lib.PANEL_UNIVERSE_N,
+    # The horizon axis varies the horizon and NOTHING ELSE, which is why it
+    # carries the training seeds rather than a subset of them. It used to run
+    # three (101, 104, 107), and that made it two changes wearing one name:
+    # the measured excess on `abs_return_acf5` at 504 days decomposes into
+    # +0.0435 from the horizon and +0.1287 from those three seeds being
+    # high-clustering draws. The seed term was three times the term the axis
+    # is named for, and it was being read as the horizon's.
+    "holdout_horizon": (lib.TRAIN_SEEDS, lib.PANEL_UNIVERSE_N,
                         lib.PANEL_UNIVERSE_SEED, 504),
 }
 

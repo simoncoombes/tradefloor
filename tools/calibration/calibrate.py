@@ -651,7 +651,13 @@ def main() -> None:
     parser.add_argument("--holdout-seeds", default="1,2,3,4,5,6")
     parser.add_argument("--holdout-universe", default="60:222")
     parser.add_argument("--holdout-days", type=int, default=504)
-    parser.add_argument("--holdout-days-seeds", default="101,104,107")
+    # Defaults to the training seeds so the horizon axis varies the horizon
+    # and nothing else. The old three-seed default confounded the two: on
+    # `abs_return_acf5` the 504-day excess is +0.0435 from the horizon and
+    # +0.1287 from the choice of those three seeds, so the axis reported a
+    # seed effect three times larger than the one it is named for.
+    parser.add_argument("--holdout-days-seeds",
+                        default=",".join(str(s) for s in lib.TRAIN_SEEDS))
     parser.add_argument("--screen", type=int, default=48)
     parser.add_argument("--population", type=int, default=12)
     parser.add_argument("--generations", type=int, default=26)
