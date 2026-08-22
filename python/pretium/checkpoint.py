@@ -97,10 +97,10 @@ class Checkpoint:
         self.log = [dict(entry) for entry in log]
         self.macro = macro
         self.label = label
-        # The full coefficient dictionary of a NON-shipped model, or None
-        # for a run under a shipped preset. Carried because a checkpoint of
-        # a custom-model run that resumed under the default would replay a
-        # plausible market that is not the one it froze.
+        # The full coefficient dictionary of a NON-DEFAULT model, or None
+        # for a run under the default preset. Carried because a checkpoint
+        # of a custom-model run that resumed under the default would replay
+        # a plausible market that is not the one it froze.
         self.model = dict(model) if model else None
 
     @property
@@ -121,11 +121,18 @@ class Checkpoint:
         and it means a checkpoint records the inputs it will need rather than
         discovering at resume time that it cannot reproduce anything.
         """
+        # Compared against the DEFAULT preset's fingerprint, not against a
+        # "custom-" prefix: `resume` passes None straight to Engine, so
+        # None is only honest for the model Engine defaults to. Under the
+        # prefix test, a run under some future shipped "pt-v2" would
+        # checkpoint as None and silently resume under pt-v1 -- the exact
+        # substitution the fingerprint exists to make impossible.
         fingerprint = engine.model_fingerprint
+        default = ModelParams.from_preset().fingerprint
         return cls(seed=seed, universe=universe, log=engine.order_log,
                    macro=macro, label=label,
                    model=(dict(engine.model_params)
-                          if fingerprint.startswith("custom-") else None))
+                          if fingerprint != default else None))
 
     def resume(self, *, universe: Sequence[Instrument] | None = None) -> Engine:
         """A fresh engine at this exact state.

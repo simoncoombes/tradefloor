@@ -1676,6 +1676,11 @@ impl PyEngine {
         }
         out.set_item("rng", rng_out)?;
         out.set_item("tickers", self.inner.ids().to_vec())?;
+        // The model the frozen market was priced under. `restore_state`
+        // refuses a mismatch: a snapshot restored onto an engine running
+        // other coefficients would continue plausibly and wrongly -- the
+        // same failure class as the roster check above, for the model.
+        out.set_item("model_fingerprint", self.inner.params().fingerprint())?;
         // The per-DAY accumulators. The columns above are per-company state;
         // these live beside them and were missing, which made a mid-day fork
         // diverge in PRICE -- `attribution` is the day's GARCH innovation at
@@ -1782,6 +1787,25 @@ impl PyEngine {
             return Err(ValidationError::new_err(
                 "snapshot roster does not match this engine. Columns are                  positional, so restoring across rosters would attach every                  value to the wrong instrument.",
             ));
+        }
+
+        // The model check mirrors the roster check: state restored under
+        // different coefficients continues a market the snapshot does not
+        // describe, with no visible symptom. A snapshot written before the
+        // fingerprint was recorded has no key and is accepted as before --
+        // the caller vouches for the context, as with the universe.
+        if let Some(recorded) = snapshot.get_item("model_fingerprint")? {
+            let recorded: String = recorded.extract()?;
+            let ours = self.inner.params().fingerprint();
+            if recorded != ours {
+                return Err(ValidationError::new_err(format!(
+                    "this snapshot was taken under model {recorded:?} and \
+                     this engine runs {ours:?}. Restoring across models \
+                     would continue the frozen market under coefficients \
+                     it was never priced with; build the engine with the \
+                     snapshot's model instead."
+                )));
+            }
         }
 
         let columns = snapshot
