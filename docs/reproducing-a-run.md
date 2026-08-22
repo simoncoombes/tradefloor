@@ -165,6 +165,22 @@ divergence bisectable - `replay(log, ..., until=n)` stops after `n` entries -
 and an experiment archivable as data. A script may not run next year; a list
 of dicts will.
 
+## The archive as one object
+
+Everything on this page, constructed and checked by the library rather than
+by hand:
+
+```python
+manifest = pt.RunManifest.of(engine, seed=42, universe=universe, macro=macro)
+same = pt.RunManifest.from_json(manifest.to_json()).reproduce()
+```
+
+`RunManifest` embeds every component above, fingerprints each one, carries
+the expected result digest so the reviewer's check runs itself, and refuses -
+loudly, naming the culprit - rather than replaying against a changed
+component or a build whose trajectories have moved. See
+[Sharing a run](sharing-a-run.html).
+
 ## What the reproduction guarantees
 
 **Across machines -- measured once, not yet on this era.** The library carries

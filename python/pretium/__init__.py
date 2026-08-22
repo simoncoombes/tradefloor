@@ -29,6 +29,8 @@ from . import scenario as _scenario_mod
 from . import facts
 from .checkpoint import Checkpoint, branch
 from .sweep import sweep
+from . import manifest
+from .manifest import RunManifest
 from . import spec
 from .spec import SPEC_VERSION, StrategySpec
 from .scenario import Scenario, run_scenario
@@ -81,6 +83,7 @@ __all__ = [
     "rank", "Ranking", "AgentRecord",
     "spec", "StrategySpec", "SPEC_VERSION",
     "Scenario", "run_scenario", "facts", "Checkpoint", "branch", "sweep",
+    "manifest", "RunManifest",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",
     "market_status", "model_preset", "run_many", "sector_daily_sigma", "sectors",
