@@ -14,22 +14,54 @@
 //! layers up, and the tick has enough of its own failure modes without
 //! inheriting these.
 //!
-//! # Status under the 2026-08 fork (D-P1)
+//! # GARCH retired, 2026-08-21 (D-P1)
 //!
-//! Everything here still passes against the committed corpus — these islands
-//! are faithful ports and remain gated. But `garch_matches_bit_for_bit` sits
-//! directly on a path an in-flight stream is diverging: a GJR asymmetry term
-//! is landing in `garch.rs`. When it does, the GARCH cases here will fail —
-//! read that as the fork arriving, not as a port regression, and retire them
-//! the way `market_tick_parity.rs` retired its scenarios: reasoned header,
-//! `#[ignore]` naming the cause, coverage replaced by gates that say what
-//! they gate. One measured detail for whoever does it: the four recorded
-//! `garchChains` drive only non-negative returns, so under a pure
-//! asymmetry term (extra weight on NEGATIVE innovations, parameters
-//! otherwise untouched) the chains and the non-negative point cases would
-//! keep passing and only negative-return cases fail; if everything fails
-//! including the chains, the parameters were retuned too. The sessions,
-//! curves and index tests share no path with any announced divergence.
+//! The GJR asymmetry term landed in `garch.rs` with the parameters retuned:
+//! α 0.09 → 0.02, β 0.90 → 0.80, γ 0.34, effective persistence held at the
+//! reference's 0.99. `garch_matches_bit_for_bit` stopped being a parity
+//! surface at that moment and is retired under `#[ignore]` below, body
+//! intact: `cargo test --test market_islands_parity -- --ignored` replays
+//! it, and it is EXPECTED to fail — 84 mismatches on the committed corpus:
+//! 80 of the 420 point cases, across every sign of return, and all four
+//! chains, three at day 0 and `alternating-extremes` at day 1 (its 0.9
+//! day-0 return drives every parameterisation into the same sector ceiling,
+//! so the clamp masks day 0). A retired test that PASSES means the corpus
+//! was regenerated from a constants-matched source — which D-P2 forecloses
+//! — and is an incident, not a fix.
+//!
+//! What this test used to prove — that the update reproduces the
+//! reference's symmetric GARCH(1,1) bit-for-bit, 420 point cases and four
+//! compounding chains — it did prove, up to the era boundary; the migration
+//! is verified and the corpus still records it.
+//!
+//! ## The forward-note's discriminator, resolved
+//!
+//! The note this section replaces left a prediction: the four recorded
+//! `garchChains` drive only non-negative returns, so a PURE asymmetry term
+//! (γ alone, parameters otherwise untouched) would leave the chains and the
+//! non-negative point cases passing and fail only negative-return cases; if
+//! everything failed, chains included, the parameters were retuned too.
+//! Everything failed, chains included, and the parameters WERE retuned —
+//! the note resolved correctly, and it identified which KIND of change had
+//! arrived rather than merely detecting that one had. Re-verified case by
+//! case at retirement time: the reference parameterisation reproduces all
+//! 420 recorded point cases and all four chains bit-for-bit; a
+//! pure-asymmetry variant (γ 0.34 on the reference's α/β) fails exactly 31
+//! negative-return cases and nothing else; the shipped retune fails 80
+//! cases and every chain. One refinement for the next note-writer:
+//! "everything fails" is bounded by the clamp — wherever a case pins to the
+//! sector floor or ceiling, every parameterisation agrees, which is what
+//! spares 340 of the 420 point cases and `alternating-extremes`' day 0.
+//!
+//! Replacement coverage: `garch_regression.rs` pins the shipped era's
+//! arithmetic against itself — REGRESSION, not correctness; its header says
+//! what that does and does not claim — and adds the negative-return chain
+//! the reference vectors never drove. The model properties (clustering,
+//! leverage asymmetry, bounds, decay) are pinned by `garch.rs`'s own tests,
+//! and correctness of the calibration is argued by
+//! `tools/calibration/sweep_gjr_gamma.py`, not by any test in this
+//! directory. The sessions, curves and index tests below share no path with
+//! the fork and stay live.
 
 use std::fs;
 use std::path::PathBuf;
@@ -76,9 +108,15 @@ fn report(name: &str, problems: Vec<String>, checked: usize) {
     }
 }
 
-// ── GARCH ─────────────────────────────────────────────────────────────────
+// ── GARCH — RETIRED, see the module header ────────────────────────────────
 
+/// Retired whole rather than split: every assertion in it — 420 point cases
+/// and four compounding chains — routes through `update_garch_variance`,
+/// so no live remainder exists. Expected to FAIL when run with
+/// `-- --ignored`; a PASS means the corpus changed and needs investigating,
+/// because D-P2 forecloses regenerating it.
 #[test]
+#[ignore = "retired 2026-08-21 (D-P1): reference recorded symmetric GARCH (alpha 0.09, beta 0.90); model moved to GJR (gamma 0.34, alpha 0.02, beta 0.80); expected to fail under --ignored"]
 fn garch_matches_bit_for_bit() {
     let doc = load();
     let mut problems = Vec::new();
