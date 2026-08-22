@@ -759,7 +759,7 @@
    "id": "scen.fed_zero",
    "file": "docs/scenarios.md",
    "line": 31,
-   "label": "pinning federal_funds_rate alone: exactly 0.00% across twenty instruments",
+   "label": "pinning federal_funds_rate alone: exactly 0.00% across twenty instruments over 40 days",
    "published": 0.0,
    "group": "fedfunds",
    "key": "max_abs_move_pct",
@@ -767,12 +767,28 @@
     "kind": "exact"
    },
    "source": "reconstructed",
-   "method": "compare(ramp federal_funds_rate 0.025->0.05 over 30), random(20,4), seed 5, 30 days; max |move_pct|"
+   "method": "compare(ramp federal_funds_rate 0.025->0.05 over 30), random(20,4), seed 5, 40 days; max |move_pct|"
+  },
+  {
+   "id": "scen.fed_meeting",
+   "file": "docs/scenarios.md",
+   "line": 32,
+   "label": "a 60-day run crossing the day-45 central-bank meeting reprices a median -3.99%",
+   "published": -3.99,
+   "group": "fedfunds",
+   "key": "meeting_median_pct",
+   "compare": {
+    "kind": "band",
+    "abs": 0.5
+   },
+   "source": "reconstructed",
+   "method": "same ramp over 60 days, median move_pct",
+   "note": "written fresh by the engine-fix PR but with no universe or seed stated; plausible reconstructions land between -3.95 and -4.40, bracketing the published -3.99, so this row is judged as a band rather than at printed precision"
   },
   {
    "id": "scen.vol_5",
    "file": "docs/scenarios.md",
-   "line": 48,
+   "line": 50,
    "label": "annualised realised vol at VIX 5",
    "published": 58.05,
    "group": "vix",
@@ -787,7 +803,7 @@
   {
    "id": "scen.vol_15",
    "file": "docs/scenarios.md",
-   "line": 49,
+   "line": 51,
    "label": "annualised realised vol at VIX 15",
    "published": 58.05,
    "group": "vix",
@@ -802,7 +818,7 @@
   {
    "id": "scen.vol_45",
    "file": "docs/scenarios.md",
-   "line": 50,
+   "line": 52,
    "label": "annualised realised vol at VIX 45",
    "published": 58.22,
    "group": "vix",
@@ -817,7 +833,7 @@
   {
    "id": "scen.vol_65",
    "file": "docs/scenarios.md",
-   "line": 51,
+   "line": 53,
    "label": "annualised realised vol at VIX 65",
    "published": 58.92,
    "group": "vix",
@@ -832,7 +848,7 @@
   {
    "id": "scen.bit_identical",
    "file": "docs/scenarios.md",
-   "line": 54,
+   "line": 56,
    "label": "VIX 5, 10 and 15 produce bit-identical prices over 60 days",
    "published": true,
    "group": "vix",
@@ -846,7 +862,7 @@
   {
    "id": "scen.spread_15",
    "file": "docs/scenarios.md",
-   "line": 61,
+   "line": 63,
    "label": "mean quoted spread at VIX 15",
    "published": 12.17,
    "group": "vix",
@@ -861,7 +877,7 @@
   {
    "id": "scen.spread_25",
    "file": "docs/scenarios.md",
-   "line": 61,
+   "line": 64,
    "label": "mean quoted spread at VIX 25",
    "published": 14.72,
    "group": "vix",
@@ -876,7 +892,7 @@
   {
    "id": "scen.spread_45",
    "file": "docs/scenarios.md",
-   "line": 61,
+   "line": 63,
    "label": "mean quoted spread at VIX 45",
    "published": 20.05,
    "group": "vix",
@@ -891,7 +907,7 @@
   {
    "id": "scen.spread_65",
    "file": "docs/scenarios.md",
-   "line": 62,
+   "line": 64,
    "label": "mean quoted spread at VIX 65",
    "published": 28.41,
    "group": "vix",
@@ -906,7 +922,7 @@
   {
    "id": "scen.corr_15",
    "file": "docs/scenarios.md",
-   "line": 66,
+   "line": 68,
    "label": "mean pairwise correlation at VIX 15, 300 pairs",
    "published": 0.022,
    "group": "vix",
@@ -921,7 +937,7 @@
   {
    "id": "scen.corr_45",
    "file": "docs/scenarios.md",
-   "line": 66,
+   "line": 68,
    "label": "mean pairwise correlation at VIX 45",
    "published": 0.023,
    "group": "vix",
@@ -936,7 +952,7 @@
   {
    "id": "scen.corr_65",
    "file": "docs/scenarios.md",
-   "line": 66,
+   "line": 68,
    "label": "mean pairwise correlation at VIX 65",
    "published": 0.041,
    "group": "vix",
@@ -951,7 +967,7 @@
   {
    "id": "scen.tca_wins",
    "file": "docs/scenarios.md",
-   "line": 90,
+   "line": 92,
    "label": "VIX 45 regime costs more in 12 of 12 seeds",
    "published": 12,
    "group": "tca_vix",
@@ -965,7 +981,7 @@
   {
    "id": "scen.tca_median_hi",
    "file": "docs/scenarios.md",
-   "line": 90,
+   "line": 92,
    "label": "median shortfall at VIX 45",
    "published": 11.69,
    "group": "tca_vix",
@@ -980,7 +996,7 @@
   {
    "id": "scen.tca_median_lo",
    "file": "docs/scenarios.md",
-   "line": 90,
+   "line": 92,
    "label": "median shortfall at VIX 15",
    "published": 6.06,
    "group": "tca_vix",
@@ -995,7 +1011,7 @@
   {
    "id": "scen.tca_paired_delta",
    "file": "docs/scenarios.md",
-   "line": 91,
+   "line": 93,
    "label": "paired median delta",
    "published": 5.62,
    "group": "tca_vix",
@@ -1010,7 +1026,7 @@
   {
    "id": "scen.drawdiv_zero",
    "file": "docs/scenarios.md",
-   "line": 100,
+   "line": 102,
    "label": "macro-counterfactual draw divergence zero in every comparison run",
    "published": 0,
    "group": "drawdiv",
@@ -2057,6 +2073,125 @@
    "source": "stated",
    "status_override": "covered_by_tests",
    "note": "asserted by tests/test_gym.py when gymnasium is installed"
+  },
+  {
+   "id": "spec.universe_fp",
+   "file": "docs/strategy-specs.md",
+   "line": 27,
+   "label": "methods-section universe fingerprint a7861d15...",
+   "published": "a7861d15",
+   "group": "spec",
+   "key": "universe_fp8",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "reconstructed",
+   "method": "Universe.random(20, seed=7).fingerprint[:8] (the only shipped recipe with this prefix)"
+  },
+  {
+   "id": "spec.momentum_fp",
+   "file": "docs/strategy-specs.md",
+   "line": 28,
+   "label": "strategy spec fingerprint e6bbc35c...",
+   "published": "e6bbc35c",
+   "group": "spec",
+   "key": "momentum_fp8",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "StrategySpec.momentum().fingerprint, pinned in full in tests/test_spec.py:203"
+  },
+  {
+   "id": "spec.oracle_fp",
+   "file": "docs/strategy-specs.md",
+   "line": 29,
+   "label": "oracle spec fingerprint f383b990...",
+   "published": "f383b990",
+   "group": "spec",
+   "key": "oracle_fp8",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "StrategySpec.oracle().fingerprint, pinned in full in tests/test_spec.py:205"
+  },
+  {
+   "id": "spec.bitwise_baselines",
+   "file": "docs/strategy-specs.md",
+   "line": 55,
+   "label": "spec-built and hand-built baselines score bit-identically",
+   "published": true,
+   "group": null,
+   "key": null,
+   "compare": {
+    "kind": "none"
+   },
+   "source": "stated",
+   "status_override": "covered_by_tests",
+   "note": "asserted by tests/test_spec.py"
+  },
+  {
+   "id": "spec.weight_scale",
+   "file": "docs/strategy-specs.md",
+   "line": 103,
+   "label": "blend weights 1.2/0.8 and 0.6/0.4 build bit-identical agents",
+   "published": true,
+   "group": null,
+   "key": null,
+   "compare": {
+    "kind": "none"
+   },
+   "source": "stated",
+   "status_override": "covered_by_tests",
+   "note": "asserted by tests/test_spec.py (fingerprint scale invariance)"
+  },
+  {
+   "id": "spec.rebalance_high",
+   "file": "docs/strategy-specs.md",
+   "line": 152,
+   "label": "the rebalance table swings the same signal from +88.7%...",
+   "published": 88.7,
+   "group": "rebalance",
+   "key": "ret_3",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "reconstructed",
+   "method": "same measurement as readme.rebalance_3",
+   "note": "a page written after the era boundary quoting the pre-boundary figures from the baselines docstring; whatever the rebalance rows re-measure to belongs here too"
+  },
+  {
+   "id": "spec.rebalance_low",
+   "file": "docs/strategy-specs.md",
+   "line": 152,
+   "label": "...to -13.2% purely by trading it more often",
+   "published": -13.2,
+   "group": "rebalance",
+   "key": "ret_12",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "reconstructed",
+   "method": "same measurement as readme.rebalance_12",
+   "note": "see spec.rebalance_high"
+  },
+  {
+   "id": "readme.workflow_asserts",
+   "file": "README.md",
+   "line": 219,
+   "label": "the worked example's internal assertions all pass",
+   "published": true,
+   "group": "workflow",
+   "key": "asserts_passed",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "run examples/research_workflow.py main(); it asserts its own published findings",
+   "note": "after an engine change a failure here means the example script itself needs re-fitting, not just the prose"
   }
  ]
 }
