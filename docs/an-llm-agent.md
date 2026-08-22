@@ -27,17 +27,31 @@ against the engine's own attribution of what actually moved prices that day.
 
 ```
 agent                     pnl    impact    why-right
-oracle                  42650      87.5         100%
-claude                     ...       ...          ..%
-momentum                 -221      20.7            -
+oracle                 114727       ...         100%
+claude                    ...       ...          ..%
+momentum                22488       ...            -
 ```
 
-The oracle and momentum rows are measured. The claude row is left blank
-deliberately: no published run exists yet, because every run costs money and
-one seed would not be worth quoting anyway. Run it and you get your own
-numbers. The oracle scores 100% on `why-right` because it reads the true
-mispricing, which is the same reason it is a reference rather than a
-competitor.
+The oracle and momentum rows are measured, by the same call the example makes:
+the reference agents (`pt.reference_agents(seed=3)`) over
+`Universe.random(12, seed=7)`, seed 2026, 20 days, `max_leverage=2.0`. The
+claude row is left blank deliberately: no published run exists yet, because
+every run costs money and one seed would not be worth quoting anyway. Run it
+and you get your own numbers. The oracle scores 100% on `why-right` because it
+reads the true mispricing, which is the same reason it is a reference rather
+than a competitor.
+
+The `impact` column is left blank for a harder reason: the run prints a
+number, and the number is not a measurement. `impact_bps` compares the traded
+run's closing prices against the same seed with nobody trading, and fills feed
+back into the price process, so the gap between the two runs compounds with
+horizon. Re-measured across seeds 2020-2031 at this exact configuration, the
+oracle's twenty-day impact spans -181 to +577 bps and is positive in only 8 of
+12 seeds; momentum's flips sign the same way. Over three days both are
+positive in 12 of 12 and read as what they are, the cost of trading. A
+twenty-day impact figure has whatever sign the seed hands it, so this page
+stops publishing one. Read `impact_bps` over days, not weeks, and across
+seeds.
 
 A model can earn the first score by accident. The second is the one no real
 market can produce, because attributing a real price move to mean reversion
