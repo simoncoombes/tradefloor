@@ -172,19 +172,31 @@ def test_a_real_difference_separates_and_a_median_gap_may_not(ranking):
     aggregate (+0.064 against +0.019), and THAT ordering is not established
     at all -- 6-6, p = 1.0. It wins bigger, not more often.
 
-    Re-measured twice: once when a stepped day stopped re-opening the market
-    at every step (which had inflated momentum's edge through the
-    `previous_close` reset), and again at the 2026-08 era boundary, which
-    moved the weak pair from momentum-vs-mean-reversion (7-5 then) to
-    mean-reversion-vs-random. The phenomenon -- an aggregate ordering the
-    sign test refuses to confirm -- survives both re-rolls.
+    Re-measured three times: once when a stepped day stopped re-opening the
+    market at every step (which had inflated momentum's edge through the
+    `previous_close` reset), again at the 2026-08 era boundary, and again at
+    the pt-v3 boundary -- which INVERTED the leaderboard and so swapped
+    which pair is which.
+
+    Under pt-v1 momentum was the strong pair, because the model's return
+    autocorrelation was +0.243 and momentum was mechanically profitable
+    against it. pt-v3 takes that to +0.084, and the ranking rearranges to
+    match: mean-reversion now dominates on pooled capture (+0.785 against
+    momentum's +0.087) and wins 12 of 12 paired seeds against random,
+    p = 0.0005, while momentum -- still ordered above random on the pooled
+    aggregate -- wins only 9 of 12, p = 0.146, and is not established at all.
+
+    That inversion is the calibration landing rather than a regression: with
+    returns no longer autocorrelated, the exploitable process is the
+    mispricing one, which is much closer to real equities, where momentum is
+    a weak and contested effect rather than a free lunch.
 
     Asserted as the CONTRAST rather than as two fixed p-values, because the
     counts belong to these seeds. What must hold is that the sign test can
     tell the two situations apart at all.
     """
-    strong = ranking.separation("momentum", "random")
-    weak = ranking.separation("mean_reversion", "random")
+    strong = ranking.separation("mean_reversion", "random")
+    weak = ranking.separation("momentum", "random")
     assert strong["p_value"] < 0.05, (
         f"momentum did not separate from random: {strong}"
     )
