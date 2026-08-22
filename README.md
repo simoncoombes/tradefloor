@@ -127,21 +127,26 @@ much of the resulting move was their own flow.
 
 ## Under the hood
 
-**Same seed, same market, on every machine.** Identical prices to the last bit
-on Linux, macOS and Windows, x86 and ARM alike. The library carries its own
+**Same seed, same market, on every machine.** The library carries its own
 `exp`, `log`, `sin` and `cos` rather than calling the platform's, which is what
-normally makes float results drift between operating systems.
+normally makes float results drift between operating systems -- so that builds
+on Linux, macOS and Windows, x86 and ARM alike, agree to the last bit.
 
-Every release builds wheels for five targets, runs one fixed simulation inside
-each, and compares digests. Any disagreement fails the release.
+Every release is meant to build wheels for five targets, run one fixed
+simulation inside each, and compare digests, failing the release on any
+disagreement (`.github/workflows/determinism.yml`). That gate has not yet run
+against a tagged release. What has actually been measured, by commit:
 
-```
-linux-x86_64     112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
-linux-aarch64    112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
-macos-arm64      112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
-macos-x86_64     112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
-windows-x86_64   112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337
-```
+| commit | known-answer version | platforms built and compared | result |
+|---|---|---|---|
+| `a5afd1c` | v3 | Windows x86_64, macOS arm64 | identical: `112fd73e...6eff337` |
+| `0b4579d` (current era) | v4 | macOS arm64 only | self-consistent; baseline was regenerated on macOS and has not yet been checked against any other platform |
+
+The engineering claim -- no platform-varying transcendental reaches the
+source -- is enforced by a test (`rust/tests/mathx_parity.rs`) and held for the
+one cross-platform pair actually built and compared. Read it as confirmed for
+that pair on the prior era, not yet re-confirmed for this one; see
+[Reproducing a run](docs/reproducing-a-run.md).
 
 **Impact is emergent.** A large order pays worse prices because it ate levels,
 with no slippage coefficient anywhere. Holding the signal and horizon fixed and
