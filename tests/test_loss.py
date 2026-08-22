@@ -446,7 +446,14 @@ def test_the_shipped_seed_sds_are_reproducible_by_re_measurement():
     universe = pretium.Universe.random(40, seed=111)
     for seed in (101, 130):
         position = THIRTY_SEED_PANELS["seeds"].index(seed)
-        panel = measure(seed=seed, universe=universe, days=252)
+        # pt-v1 NAMED, not the default. SEED_SD is a noise scale measured
+        # once on pt-v1 and deliberately frozen there: it is the
+        # denominator of every "room in seed-sds" figure this project has
+        # published, and re-deriving it at each era boundary would silently
+        # restate every one of them. The pt-v3 boundary is exactly where
+        # that would have happened, because this line used to read the
+        # default.
+        panel = measure(seed=seed, universe=universe, days=252, model="pt-v1")
         assert panel["model_fingerprint"] == "pt-v1"
         for key in SEED_SD:
             assert panel[key] == pytest.approx(

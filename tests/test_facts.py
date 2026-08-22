@@ -73,23 +73,32 @@ def test_volatility_clusters():
 # --------------------------------------------------------------------------
 
 
-def test_returns_are_positively_autocorrelated_and_real_ones_are_not():
-    """The mismatch that qualifies every agent ranking this library produces.
+def test_return_autocorrelation_no_longer_disqualifies_an_agent_ranking():
+    """The caveat this test used to pin, now retired by measurement.
 
-    Measured at +0.235 at lag one, in six seeds of six, ranging only +0.221 to
-    +0.240. Real daily equity returns sit near zero and are if anything
-    slightly negative.
+    It used to read: "+0.235 at lag one, six seeds of six, +0.221 to +0.240 --
+    the mismatch that qualifies every agent ranking this library produces",
+    and it instructed whoever saw it move near zero to take the caveat out.
+    pt-v3 moved it. Six seeds at this horizon now read a median of +0.065,
+    ranging +0.017 to +0.196, against +0.235 before.
 
-    Pinned as a test because it is a KNOWN deviation that must stay documented.
-    If it ever moves near zero the model changed and the caveat in
-    `pretium.facts` -- that momentum is mechanically profitable here in a way it
-    is not in real markets -- is no longer true and must come out.
+    So momentum is no longer mechanically profitable here, and the ranking it
+    used to invalidate has rearranged to match: mean-reversion now dominates
+    the leaderboard and momentum sits barely above random
+    (`test_a_real_difference_separates_and_a_median_gap_may_not`).
+
+    What is still true, and worth keeping pinned, is that the mispricing
+    process underneath it has not gone away -- it is weaker, not absent, and
+    at this 180-day horizon the statistic is still marginally above its band
+    even though it sits inside it at the calibrated 252 days (+0.048 on
+    thirty seeds). This asserts the size of the improvement, so a regression
+    toward the old model trips it.
     """
     facts = measure(seed=3, universe=UNIVERSE, days=180)
-    assert facts["return_acf1"] > 0.1
-    verdict = compare_to_real_markets(facts)["return_acf1"]
-    assert not verdict["matches"]
-    assert verdict["direction"] == "above"
+    assert facts["return_acf1"] < 0.15, (
+        "return autocorrelation has risen back toward the pt-v1 era; the "
+        "retired 'momentum is mechanically profitable' caveat may be live again"
+    )
 
 
 def test_the_autocorrelation_is_the_mispricing_process_showing_through():
@@ -114,29 +123,52 @@ def test_the_autocorrelation_is_the_mispricing_process_showing_through():
     assert all(modulus < 1.0 for modulus in pretium.characteristic_root_moduli())
 
 
-def test_volatility_clustering_is_too_strong_at_short_lags_for_a_year():
-    # This test has pinned three eras of the same statistic. First it
-    # pinned clustering BELOW an inherited 0.15-0.35 band; then the GJR
-    # recalibration raised |r| acf(1) into that band and this test pinned
-    # "in band but decays too fast". The band re-derivation showed the
-    # inherited band was the LONG-SAMPLE textbook value (S&P over 66
-    # years reads ~0.3), where a 252-day window of real large caps reads
-    # 0.04-0.18 -- so the calibration, aimed at an unprovenanced target,
-    # overshot the within-year quantity, and the shipped model now reads
-    # ABOVE the honest band at lags one (0.27 here) and five. Clustering
-    # itself is real and decays with lag, which the second assertion
-    # keeps pinned.
+def test_volatility_clustering_is_in_band_at_short_lags_and_dies_too_fast():
+    # This test has now pinned four eras of the same statistic. It pinned
+    # clustering BELOW an inherited 0.15-0.35 band; then the GJR
+    # recalibration raised |r| acf(1) into that band; then the band
+    # re-derivation showed the inherited band was the LONG-SAMPLE textbook
+    # value (S&P over 66 years reads ~0.3) where a 252-day window of real
+    # large caps reads 0.04-0.18, which left the model reading ABOVE the
+    # honest band at lags one and five. pt-v3 brings both inside it: lag one
+    # reads 0.130 here against a 0.02-0.22 band, lag five 0.052 against
+    # 0.02-0.09.
+    #
+    # What did NOT get fixed is the SHAPE, and that is the finding worth
+    # keeping. The model's clustering is gone by lag twenty -- it reads
+    # negative here -- where real markets stay weakly positive out to lag
+    # sixty (a 252-day real median of +0.020 at lag 20). Measured across the
+    # whole curve the model is 2.6-3.2x real out to lag five and crosses to
+    # nothing by twenty: a log-log decay slope of -1.33 against real markets'
+    # -0.44. Exponential memory imitating hyperbolic memory. It is
+    # structural, no parameter setting fixes it, and it is the reason the
+    # 504-day horizon is the one axis still not perfectly in band.
     facts = measure(seed=3, universe=UNIVERSE, days=180)
-    verdict = compare_to_real_markets(facts)["abs_return_acf1"]
-    assert verdict["direction"] == "above"
-    assert verdict["verdict"] == "too high"
+    verdicts = compare_to_real_markets(facts)
+    assert verdicts["abs_return_acf1"]["matches"]
+    assert verdicts["abs_return_acf5"]["matches"]
+    # The shape defect, pinned: lag twenty has no clustering left.
+    assert facts["abs_return_acf20"] < 0.02
     assert facts["abs_return_acf20"] < facts["abs_return_acf5"] < facts[
         "abs_return_acf1"]
 
 
-def test_volatility_is_high_so_prefer_ratios_to_raw_percentages():
+def test_volatility_is_in_band_so_raw_percentages_mean_something_now():
+    # Was `test_volatility_is_high_so_prefer_ratios_to_raw_percentages`, and
+    # it pinned 41.3% annualised against a real 15-36%. That was a property
+    # of the deliberately dispersed generated universes AND of an
+    # uncalibrated variance process; pt-v3 reads 24.8% here, inside the band,
+    # with a six-seed median of 23.8%.
+    #
+    # Ratios are still the safer quantity to publish -- capture against the
+    # Oracle, shortfall in basis points -- because they survive a universe
+    # change that a raw percentage does not. But the reason to prefer them is
+    # no longer that the level is wrong.
     facts = measure(seed=3, universe=UNIVERSE, days=180)
-    assert compare_to_real_markets(facts)["annualised_vol_pct"]["direction"] == "above"
+    verdict = compare_to_real_markets(facts)["annualised_vol_pct"]
+    assert verdict["matches"], (
+        f"annualised volatility left its band at {facts['annualised_vol_pct']:.1f}%"
+    )
 
 
 # --------------------------------------------------------------------------

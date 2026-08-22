@@ -60,8 +60,8 @@ def test_the_preset_constructed_engine_is_the_const_build_bit_for_bit():
     committed known-answer digest guards the first; this makes the other
     two the same engine."""
     default = market_state(run_market())
-    named = market_state(run_market("pt-v1"))
-    built = market_state(run_market(pretium.ModelParams.from_preset("pt-v1")))
+    named = market_state(run_market("pt-v3"))
+    built = market_state(run_market(pretium.ModelParams.from_preset("pt-v3")))
     assert default == named
     assert default == built
 
@@ -69,8 +69,8 @@ def test_the_preset_constructed_engine_is_the_const_build_bit_for_bit():
 def test_an_override_equal_to_the_preset_is_the_preset():
     # Bit-identity is the membership rule, not construction history: the
     # same value must produce the same model, fingerprint and trajectory.
-    same = pretium.ModelParams.from_preset("pt-v1", garch_alpha=0.02)
-    assert same.fingerprint == "pt-v1"
+    same = pretium.ModelParams.from_preset("pt-v3", garch_alpha=0.059507211981547736)
+    assert same.fingerprint == "pt-v3"
     assert market_state(run_market(same)) == market_state(run_market())
 
 
@@ -105,7 +105,13 @@ PERTURBATIONS = [
     ("garch_alpha", 0.12, True),
     ("garch_beta", 0.7, True),
     ("garch_gamma", 0.0, True),
-    ("garch_ceiling_multiple", 1.01, True),
+    # 1.01 bound under pt-v1 and stopped binding at pt-v3: the calibrated
+    # persistence is lower (alpha+beta 0.740 against 0.820), so a 3-day
+    # probe never drives the variance 1% above its long-run level for the
+    # ceiling to catch. 0.9 puts the ceiling below that level, which binds
+    # on any preset and keeps the parameter's wiring proven rather than
+    # excused.
+    ("garch_ceiling_multiple", 0.9, True),
     ("garch_floor_multiple", 0.99, True),
     ("market_vol_alpha", 0.2, True),
     ("market_vol_beta", 0.7, True),
@@ -138,7 +144,13 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     count NEVER does. A parameter that changed `draws_consumed` would have
     changed the draw schedule, which no preset member may (§5.2)."""
     base = market_state(run_market())
-    custom = pretium.ModelParams.from_preset("pt-v1", **{name: value})
+    # Perturb the DEFAULT preset, not a named one: `base` is the default
+    # engine, so building the perturbation from any other preset compares
+    # a preset change and a parameter change at once and calls the sum a
+    # parameter effect. That is what happened at the pt-v3 era boundary --
+    # six parameters documented as inert "failed" because the baseline had
+    # moved underneath them.
+    custom = pretium.ModelParams.from_preset("pt-v3", **{name: value})
     assert custom.fingerprint.startswith("custom-")
     perturbed = market_state(run_market(custom))
 
@@ -284,9 +296,9 @@ def test_a_custom_preset_round_trips_through_a_manifest():
 def test_a_default_manifest_still_reproduces_and_names_its_preset():
     engine = run_market()
     manifest = pretium.RunManifest.of(engine, seed=42, universe=UNIVERSE)
-    assert manifest.fingerprints["model"] == "pt-v1"
+    assert manifest.fingerprints["model"] == "pt-v3"
     rebuilt = pretium.RunManifest.from_json(manifest.to_json()).reproduce()
-    assert rebuilt.model_fingerprint == "pt-v1"
+    assert rebuilt.model_fingerprint == "pt-v3"
     assert market_state(rebuilt) == market_state(engine)
 
 
@@ -337,7 +349,7 @@ def test_the_scorecard_carries_the_model_fingerprint():
     small = pretium.Universe.random(4, seed=5)
     default = pretium.evaluate({"idle": Idle()}, seed=9, universe=small,
                                days=1, steps_per_day=2, ticks_per_step=10)
-    assert default["idle"].model_fingerprint == "pt-v1"
+    assert default["idle"].model_fingerprint == "pt-v3"
     scored = pretium.evaluate({"idle": Idle()}, seed=9, universe=small,
                               days=1, steps_per_day=2, ticks_per_step=10,
                               model=custom)
@@ -400,13 +412,13 @@ def test_facts_measure_runs_the_model_and_names_it():
     kwargs = dict(seed=1, universe=SMALL, days=35)
     default = pretium.facts.measure(**kwargs)
     custom = pretium.facts.measure(**kwargs, model=CUSTOM)
-    assert default["model_fingerprint"] == "pt-v1"
+    assert default["model_fingerprint"] == "pt-v3"
     assert custom["model_fingerprint"] == CUSTOM.fingerprint
     # The statistics were measured on the custom market, not merely
     # relabelled: tripling the factor sigma moves pooled volatility.
     assert custom["annualised_vol_pct"] != default["annualised_vol_pct"]
     # And the shipped default is untouched by the parameter existing.
-    assert pretium.facts.measure(**kwargs, model="pt-v1") == default
+    assert pretium.facts.measure(**kwargs, model="pt-v3") == default
 
 
 def test_tca_analyse_runs_the_model_in_both_worlds():
@@ -414,7 +426,7 @@ def test_tca_analyse_runs_the_model_in_both_worlds():
                   ticks_per_step=10)
     default = pretium.tca.analyse(_BuyFirst(), **kwargs)
     custom = pretium.tca.analyse(_BuyFirst(), **kwargs, model=CUSTOM)
-    assert default.model_fingerprint == "pt-v1"
+    assert default.model_fingerprint == "pt-v3"
     assert custom.model_fingerprint == CUSTOM.fingerprint
     assert custom.as_dict()["model_fingerprint"] == CUSTOM.fingerprint
     # The custom model is a different market...
@@ -429,7 +441,7 @@ def test_run_scenario_and_compare_run_the_model():
     kwargs = dict(seed=3, universe=SMALL, days=1, ticks_per_day=30)
     default = pretium.run_scenario(scenario, **kwargs)
     custom = pretium.run_scenario(scenario, **kwargs, model=CUSTOM)
-    assert default.model_fingerprint == "pt-v1"
+    assert default.model_fingerprint == "pt-v3"
     assert custom.model_fingerprint == CUSTOM.fingerprint
     assert custom.prices() != default.prices()
 
@@ -450,7 +462,7 @@ def test_run_many_runs_the_model_and_stamps_every_row():
     default = pretium.run_many([1, 2], **kwargs)
     custom = pretium.run_many([1, 2], **kwargs, model=CUSTOM)
     for row in default:
-        assert row["model_fingerprint"] == "pt-v1"
+        assert row["model_fingerprint"] == "pt-v3"
     for before, after in zip(default, custom):
         assert after["model_fingerprint"] == CUSTOM.fingerprint
         assert after["prices"] != before["prices"]
@@ -490,7 +502,7 @@ def test_the_gym_env_runs_the_model_and_reports_it_at_reset():
                   ticks_per_step=10)
     default = TradingEnv(**kwargs)
     _, info = default.reset()
-    assert info["model_fingerprint"] == "pt-v1"
+    assert info["model_fingerprint"] == "pt-v3"
     custom = TradingEnv(**kwargs, model=CUSTOM)
     _, info = custom.reset()
     assert info["model_fingerprint"] == CUSTOM.fingerprint
@@ -506,7 +518,7 @@ def test_rank_runs_the_model_and_the_ranking_records_it():
     kwargs = dict(seeds=[1], universe=SMALL, days=1, steps_per_day=1,
                   ticks_per_step=10)
     default = pretium.rank(lambda: {"idle": _Idle()}, **kwargs)
-    assert default.model_fingerprint == "pt-v1"
+    assert default.model_fingerprint == "pt-v3"
     ranking = pretium.rank(lambda: {"idle": _Idle()}, **kwargs, model=CUSTOM)
     assert ranking.model_fingerprint == CUSTOM.fingerprint
     assert ranking.as_dict()["model_fingerprint"] == CUSTOM.fingerprint
@@ -553,6 +565,6 @@ def test_an_engine_batch_member_is_the_standalone_custom_engine():
         assert rows[i * len(SMALL):(i + 1) * len(SMALL)] == expected, seed
 
     assert pretium.EngineBatch(seeds=seeds,
-                               universe=SMALL).model_fingerprint == "pt-v1"
+                               universe=SMALL).model_fingerprint == "pt-v3"
     with pytest.raises(pretium.ValidationError, match="model must be"):
         pretium.EngineBatch(seeds=seeds, universe=SMALL, model=0.12)
