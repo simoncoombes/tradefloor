@@ -1,5 +1,5 @@
 {
- "comment": "Every quantitative claim published in README.md, docs/**.md and examples/** at ad91026 (the 2026-08 era boundary: endogenous macro chain, avg_volume fix, MARKET_FACTOR_SIGMA recalibration, per-domain RNG substreams), with the method that produces it. `group`/`key` point into tools/remeasure/measures.py; `compare` says how close a re-measurement must land to count as reproducing the published value. `source` says whether the method is stated on the page, reconstructed from tests/docstrings, or unknown. Rows with compare.kind == 'none' carry a status_override instead of being measured. Timing-derived quantities are never judged at printed precision: the recording overhead in particular is a median of interleaved pairs judged against a band or a bound, because the point is below the wall-clock noise floor.",
+ "comment": "Every quantitative claim published in README.md, docs/**.md and examples/** after the v8-era documentation re-measurement (streams Z/AB/AA, PRs 26-28: agents and LLM pages, scenarios and TCA, realism and the five version-reference pages), with the method that produces it. `group`/`key` point into tools/remeasure/measures.py; `compare` says how close a re-measurement must land to count as reproducing the published value. `source` says whether the method is stated on the page, reconstructed from tests/docstrings, or unknown - nothing ships at 0.1.0 carrying source=unknown. Rows with compare.kind == 'none' carry a status_override instead of being measured. Timing-derived quantities are never judged at printed precision: wall clocks are machine_bound, the recording overhead is a median of interleaved pairs judged against a band or a bound, and the checkpoint-resume absolute is judged only through its branch/resume ratio.",
  "figures": [
   {
    "id": "readme.residual",
@@ -20,7 +20,7 @@
   {
    "id": "index.residual",
    "file": "docs/index.md",
-   "line": 63,
+   "line": 65,
    "label": "seven factor contributions, residual around 1e-16",
    "published": 1e-16,
    "group": "truth_residual",
@@ -32,6 +32,35 @@
    },
    "source": "stated",
    "method": "same as readme.residual"
+  },
+  {
+   "id": "index.kat_five_targets",
+   "file": "docs/index.md",
+   "line": 55,
+   "label": "measured green on all five targets at commit ad91026",
+   "published": true,
+   "group": null,
+   "key": null,
+   "compare": {
+    "kind": "none"
+   },
+   "source": "stated",
+   "status_override": "not_harnessable",
+   "note": "the page now carries the by-commit record instead of the unqualified five-target claim (retired index.kat_digest); the record itself is pinned to ad91026 - see repro.kat_five_targets"
+  },
+  {
+   "id": "index.kat_one_platform",
+   "file": "docs/index.md",
+   "line": 56,
+   "label": "the current baseline's digest has been reproduced on one platform so far",
+   "published": true,
+   "group": "determinism",
+   "key": "kat_matches_pinned",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "known_answer_digest() against the sha256 pinned in tests/known_answer.json - this build reproducing the pinned digest is exactly the one-platform claim"
   },
   {
    "id": "groundtruth.residual",
@@ -92,21 +121,6 @@
    },
    "source": "stated",
    "method": "known_answer_digest() against the sha256 pinned in tests/known_answer.json"
-  },
-  {
-   "id": "index.kat_digest",
-   "file": "docs/index.md",
-   "line": 53,
-   "label": "five wheel targets, one fixed simulation, digests compared",
-   "published": "112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337",
-   "group": "determinism",
-   "key": "kat_digest",
-   "compare": {
-    "kind": "exact"
-   },
-   "source": "stated",
-   "method": "same as readme.kat_digest (the page states the mechanism, the README prints the digest)",
-   "note": "index.md still carries the unqualified five-target release-gate claim that 0790bf4 rewrote in README.md and reproducing-a-run.md as a by-commit record; the digest that claim rested on belongs to the a5afd1c era, so this row stays MOVED until the page gets the same treatment"
   },
   {
    "id": "readme.rebalance_3",
@@ -347,40 +361,12 @@
    "method": "research_workflow report['capture'] plus the reference"
   },
   {
-   "id": "core.macro_static",
-   "file": "docs/core-concepts.md",
-   "line": 50,
-   "label": "over run_days(120) each macro field takes exactly one distinct value",
-   "published": 1,
-   "group": "macro_frozen",
-   "key": "max_distinct_macro",
-   "compare": {
-    "kind": "exact"
-   },
-   "source": "stated",
-   "method": "run_days(120, record=True), distinct values per macro-table field; random(20,7), seed 42"
-  },
-  {
-   "id": "core.fv_static",
-   "file": "docs/core-concepts.md",
-   "line": 52,
-   "label": "fundamental_value takes exactly one distinct value per instrument",
-   "published": 1,
-   "group": "macro_frozen",
-   "key": "max_distinct_fv",
-   "compare": {
-    "kind": "exact"
-   },
-   "source": "stated",
-   "method": "distinct fundamental_value per instrument over the same run"
-  },
-  {
    "id": "core.default_cby",
    "file": "docs/core-concepts.md",
-   "line": 67,
+   "line": 73,
    "label": "corporate bond yield defaults to 0.0456",
    "published": 0.0456,
-   "group": "macro_frozen",
+   "group": "macro_chain",
    "key": "default_cby",
    "compare": {
     "kind": "round",
@@ -390,9 +376,122 @@
    "method": "macro table, day 0, engine constructed with Macro() defaults"
   },
   {
+   "id": "core.vix_distinct",
+   "file": "docs/core-concepts.md",
+   "line": 56,
+   "label": "vix takes a new value every day: 120 distinct values in 120 days",
+   "published": 120,
+   "group": "macro_chain",
+   "key": "vix_distinct",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "run_days(120, record=True) on random(20,11), sim seed 42; distinct values in the macro table's vix column - the page states the whole method"
+  },
+  {
+   "id": "core.fed_distinct",
+   "file": "docs/core-concepts.md",
+   "line": 58,
+   "label": "federal_funds_rate takes 2 distinct values over the run",
+   "published": 2,
+   "group": "macro_chain",
+   "key": "fed_distinct",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "as core.vix_distinct"
+  },
+  {
+   "id": "core.cby_distinct",
+   "file": "docs/core-concepts.md",
+   "line": 59,
+   "label": "corporate_bond_yield 3",
+   "published": 3,
+   "group": "macro_chain",
+   "key": "cby_distinct",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "as core.vix_distinct"
+  },
+  {
+   "id": "core.inflation_distinct",
+   "file": "docs/core-concepts.md",
+   "line": 59,
+   "label": "inflation_rate 4",
+   "published": 4,
+   "group": "macro_chain",
+   "key": "inflation_distinct",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "as core.vix_distinct"
+  },
+  {
+   "id": "core.gdp_distinct",
+   "file": "docs/core-concepts.md",
+   "line": 59,
+   "label": "gdp_growth 6",
+   "published": 6,
+   "group": "macro_chain",
+   "key": "gdp_distinct",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "as core.vix_distinct"
+  },
+  {
+   "id": "core.fv_distinct",
+   "file": "docs/core-concepts.md",
+   "line": 60,
+   "label": "fundamental_value takes 3 distinct values per instrument",
+   "published": 3,
+   "group": "macro_chain",
+   "key": "fv_distinct_repricer",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "distinct fundamental_value per instrument over the same run; the repricing instruments all read 3",
+   "note": "replaces the retired core.fv_static (published 1): the frozen-macro section inverted at the era boundary"
+  },
+  {
+   "id": "core.reprice_days",
+   "file": "docs/core-concepts.md",
+   "line": 61,
+   "label": "repricing when the discount rate moves at a meeting - days 45 and 96 of that run",
+   "published": "45,96",
+   "group": "macro_chain",
+   "key": "reprice_days",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "days on which any instrument's fundamental_value changes from the prior close"
+  },
+  {
+   "id": "core.fv_lossmaker",
+   "file": "docs/core-concepts.md",
+   "line": 62,
+   "label": "the loss-maker valued off book value never reprices",
+   "published": 1,
+   "group": "macro_chain",
+   "key": "fv_distinct_lossmaker",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the minimum per-instrument distinct count over the same run"
+  },
+  {
    "id": "core.pin_reprices_19",
    "file": "docs/core-concepts.md",
-   "line": 70,
+   "line": 79,
    "label": "pin_macro(corporate_bond_yield=0.09) repriced nineteen of twenty",
    "published": 19,
    "group": "pin_macro",
@@ -400,13 +499,13 @@
    "compare": {
     "kind": "exact"
    },
-   "source": "reconstructed",
-   "method": "random(20,7) (one loss-maker as the page requires; random(20,11) gives the same counts), 2 days, pin, 2 more days, instruments whose fundamental_value changed"
+   "source": "stated",
+   "method": "random(20,11) (the macro-chain run's universe - 'the loss-maker above'), 2 days, pin, 2 more days, instruments whose fundamental_value changed; the pin lands well before the first meeting so the endogenous chain cannot confound the count"
   },
   {
    "id": "core.pin_lossmaker",
    "file": "docs/core-concepts.md",
-   "line": 71,
+   "line": 80,
    "label": "the twentieth is a loss-maker valued off book value",
    "published": 1,
    "group": "pin_macro",
@@ -414,13 +513,13 @@
    "compare": {
     "kind": "exact"
    },
-   "source": "reconstructed",
-   "method": "count of eps <= 0 in the reconstructed universe"
+   "source": "stated",
+   "method": "count of eps <= 0 in random(20,11)"
   },
   {
    "id": "core.pin_fed_none",
    "file": "docs/core-concepts.md",
-   "line": 73,
+   "line": 81,
    "label": "pinning federal_funds_rate alone repriced none of the twenty",
    "published": 0,
    "group": "pin_macro",
@@ -428,7 +527,7 @@
    "compare": {
     "kind": "exact"
    },
-   "source": "reconstructed",
+   "source": "stated",
    "method": "same run shape with pin_macro(federal_funds_rate=0.12)"
   },
   {
@@ -500,8 +599,9 @@
    "compare": {
     "kind": "timing"
    },
-   "source": "unknown",
-   "note": "replay cost scales with the order log and the page does not say what run length 2.7 s was measured over; the portable part of the claim is the ratio, next row"
+   "source": "reconstructed",
+   "note": "a wall-clock absolute like readme.t100: machine-bound, reported but never judged at printed precision (kind=timing). The portable, judged form of this claim is fork.three_orders, the branch/resume ratio on the same 30-day run, held to a +/-1.2 band on log10",
+   "method": "Checkpoint.of(engine after a 30-day run over random(20,11), seed 42).resume() wall clock - the same run the ratio row states; the page never said what run length 2.7 s was measured over"
   },
   {
    "id": "fork.three_orders",
@@ -759,7 +859,7 @@
    "file": "docs/scenarios.md",
    "line": 24,
    "label": "buy_and_hold calm return",
-   "published": -6.11,
+   "published": -7.16,
    "group": "scenario_leaderboard",
    "key": "buy_and_hold_calm",
    "compare": {
@@ -767,14 +867,14 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method since f4c6a44"
+   "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method"
   },
   {
    "id": "scen.bh_hiked",
    "file": "docs/scenarios.md",
    "line": 24,
    "label": "buy_and_hold hiked return",
-   "published": -9.87,
+   "published": -10.75,
    "group": "scenario_leaderboard",
    "key": "buy_and_hold_hiked",
    "compare": {
@@ -782,14 +882,14 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "as scen.bh_calm"
+   "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method"
   },
   {
    "id": "scen.bh_delta",
    "file": "docs/scenarios.md",
    "line": 24,
    "label": "buy_and_hold delta",
-   "published": -3.76,
+   "published": -3.59,
    "group": "scenario_leaderboard",
    "key": "buy_and_hold_delta",
    "compare": {
@@ -797,14 +897,14 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "as scen.bh_calm"
+   "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method"
   },
   {
    "id": "scen.mom_calm",
    "file": "docs/scenarios.md",
    "line": 25,
    "label": "momentum calm return",
-   "published": -0.68,
+   "published": -1.17,
    "group": "scenario_leaderboard",
    "key": "momentum_calm",
    "compare": {
@@ -812,14 +912,14 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "as scen.bh_calm"
+   "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method"
   },
   {
    "id": "scen.mom_hiked",
    "file": "docs/scenarios.md",
    "line": 25,
    "label": "momentum hiked return",
-   "published": -2.55,
+   "published": -3.52,
    "group": "scenario_leaderboard",
    "key": "momentum_hiked",
    "compare": {
@@ -827,14 +927,14 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "as scen.bh_calm"
+   "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method"
   },
   {
    "id": "scen.mom_delta",
    "file": "docs/scenarios.md",
    "line": 25,
    "label": "momentum delta",
-   "published": -1.87,
+   "published": -2.36,
    "group": "scenario_leaderboard",
    "key": "momentum_delta",
    "compare": {
@@ -842,14 +942,14 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "as scen.bh_calm"
+   "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method"
   },
   {
    "id": "scen.orc_calm",
    "file": "docs/scenarios.md",
    "line": 26,
    "label": "oracle calm return",
-   "published": 18.21,
+   "published": 11.11,
    "group": "scenario_leaderboard",
    "key": "oracle_calm",
    "compare": {
@@ -857,14 +957,14 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "as scen.bh_calm"
+   "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method"
   },
   {
    "id": "scen.orc_hiked",
    "file": "docs/scenarios.md",
    "line": 26,
    "label": "oracle hiked return",
-   "published": 16.06,
+   "published": 8.7,
    "group": "scenario_leaderboard",
    "key": "oracle_hiked",
    "compare": {
@@ -872,14 +972,14 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "as scen.bh_calm"
+   "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method"
   },
   {
    "id": "scen.orc_delta",
    "file": "docs/scenarios.md",
    "line": 26,
    "label": "oracle delta",
-   "published": -2.15,
+   "published": -2.41,
    "group": "scenario_leaderboard",
    "key": "oracle_delta",
    "compare": {
@@ -887,12 +987,100 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "as scen.bh_calm"
+   "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method"
+  },
+  {
+   "id": "scen.bh_seedband_lo",
+   "file": "docs/scenarios.md",
+   "line": 34,
+   "label": "across sim seeds 5 to 9 buy-and-hold gives up 3.4 to 4.7 points (delta -4.7...)",
+   "published": -4.7,
+   "group": "scenario_leaderboard",
+   "key": "bh_seedband_lo",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "the leaderboard's calm/hiked pair repeated at sim seeds 5-9; min and max of buy_and_hold's delta"
+  },
+  {
+   "id": "scen.bh_seedband_hi",
+   "file": "docs/scenarios.md",
+   "line": 34,
+   "label": "...to -3.4",
+   "published": -3.4,
+   "group": "scenario_leaderboard",
+   "key": "bh_seedband_hi",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "as scen.bh_seedband_lo"
+  },
+  {
+   "id": "scen.bh_never_escapes",
+   "file": "docs/scenarios.md",
+   "line": 35,
+   "label": "and never escapes",
+   "published": 0,
+   "group": "scenario_leaderboard",
+   "key": "bh_escapes",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "count of seeds 5-9 where buy_and_hold's delta is positive"
+  },
+  {
+   "id": "scen.mom_seedband_lo",
+   "file": "docs/scenarios.md",
+   "line": 35,
+   "label": "momentum's give-up spans -5.1...",
+   "published": -5.1,
+   "group": "scenario_leaderboard",
+   "key": "mom_seedband_lo",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "as scen.bh_seedband_lo, for momentum"
+  },
+  {
+   "id": "scen.mom_seedband_hi",
+   "file": "docs/scenarios.md",
+   "line": 35,
+   "label": "...to +0.5",
+   "published": 0.5,
+   "group": "scenario_leaderboard",
+   "key": "mom_seedband_hi",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "as scen.mom_seedband_lo"
+  },
+  {
+   "id": "scen.mom_escapes",
+   "file": "docs/scenarios.md",
+   "line": 36,
+   "label": "on one seed in five it trades around the shock entirely",
+   "published": 1,
+   "group": "scenario_leaderboard",
+   "key": "mom_escapes",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "count of seeds 5-9 where momentum's delta is positive"
   },
   {
    "id": "scen.fed_zero",
    "file": "docs/scenarios.md",
-   "line": 36,
+   "line": 41,
    "label": "pinning federal_funds_rate alone: exactly 0.00% across twenty instruments over 40 days",
    "published": 0.0,
    "group": "fedfunds",
@@ -900,252 +1088,279 @@
    "compare": {
     "kind": "exact"
    },
-   "source": "reconstructed",
-   "method": "compare(ramp federal_funds_rate 0.025->0.05 over 30), random(20,4), seed 5, 40 days; max |move_pct|"
+   "source": "stated",
+   "method": "compare(ramp federal_funds_rate 0.025->0.05 over 30), random(20,4), sim seed 5, 40 days; max |move_pct| - method stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.fed_meeting",
    "file": "docs/scenarios.md",
-   "line": 37,
-   "label": "a 60-day run crossing the day-45 central-bank meeting reprices a median -3.99%",
-   "published": -3.99,
+   "line": 41,
+   "label": "a 60-day run crossing the day-45 central-bank meeting reprices a median -4.29%",
+   "published": -4.29,
    "group": "fedfunds",
    "key": "meeting_median_pct",
    "compare": {
-    "kind": "band",
-    "abs": 0.5
+    "kind": "round",
+    "decimals": 2
    },
-   "source": "reconstructed",
-   "method": "same ramp over 60 days, median move_pct",
-   "note": "written fresh by the engine-fix PR but with no universe or seed stated; plausible reconstructions land between -3.95 and -4.40, bracketing the published -3.99, so this row is judged as a band rather than at printed precision"
+   "source": "stated",
+   "method": "same ramp over 60 days, median move_pct; method stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.vol_5",
    "file": "docs/scenarios.md",
-   "line": 55,
+   "line": 68,
    "label": "annualised realised vol at VIX 5",
-   "published": 58.05,
+   "published": 49.48,
    "group": "vix",
    "key": "vol_5",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
-   "source": "reconstructed",
-   "method": "facts.measure(seed=3, random(20,11), 120 days, hold(vix=V)) annualised_vol_pct; universe reconstructed, VIX 15 reproduces the published value exactly"
+   "source": "stated",
+   "method": "facts.measure(seed=3, random(20,11), 120 days, hold(vix=V)) annualised_vol_pct; universe and seed stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.vol_15",
    "file": "docs/scenarios.md",
-   "line": 56,
+   "line": 69,
    "label": "annualised realised vol at VIX 15",
-   "published": 58.05,
+   "published": 58.76,
    "group": "vix",
    "key": "vol_15",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
-   "source": "reconstructed",
-   "method": "as scen.vol_5"
+   "source": "stated",
+   "method": "facts.measure(seed=3, random(20,11), 120 days, hold(vix=V)) annualised_vol_pct; universe and seed stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.vol_45",
    "file": "docs/scenarios.md",
-   "line": 57,
+   "line": 70,
    "label": "annualised realised vol at VIX 45",
-   "published": 58.22,
+   "published": 107.07,
    "group": "vix",
    "key": "vol_45",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
-   "source": "reconstructed",
-   "method": "as scen.vol_5"
+   "source": "stated",
+   "method": "facts.measure(seed=3, random(20,11), 120 days, hold(vix=V)) annualised_vol_pct; universe and seed stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.vol_65",
    "file": "docs/scenarios.md",
-   "line": 58,
+   "line": 71,
    "label": "annualised realised vol at VIX 65",
-   "published": 58.92,
+   "published": 124.31,
    "group": "vix",
    "key": "vol_65",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
-   "source": "reconstructed",
-   "method": "as scen.vol_5"
+   "source": "stated",
+   "method": "facts.measure(seed=3, random(20,11), 120 days, hold(vix=V)) annualised_vol_pct; universe and seed stated on the page since the stream-AB rewrite"
   },
   {
-   "id": "scen.bit_identical",
+   "id": "scen.vix_vol_factor",
    "file": "docs/scenarios.md",
-   "line": 61,
-   "label": "VIX 5, 10 and 15 produce bit-identical prices over 60 days",
+   "line": 73,
+   "label": "a thirteenfold move in VIX moves realised volatility by a factor of 2.5",
+   "published": 2.5,
+   "group": "vix",
+   "key": "vol_ratio_65_5",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "vol_65 / vol_5 from the page's own table"
+  },
+  {
+   "id": "scen.bit_day1",
+   "file": "docs/scenarios.md",
+   "line": 77,
+   "label": "day one's closes are bit-identical across VIX 5, 10 and 15",
    "published": true,
    "group": "vix",
-   "key": "bit_identical_5_10_15",
+   "key": "bit_day1_identical",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "run_scenario(hold(vix=V), seed=3, random(20,11), 60 days), prices() bytes compared"
+   "method": "closes after day one of hold(vix=5/10/15), random(20,11), seed 3, compared byte-for-byte",
+   "note": "replaces the retired 60-day form of scen.bit_identical: the coupling ends bit-identity at the first close a pin can reach"
+  },
+  {
+   "id": "scen.bit_day2",
+   "file": "docs/scenarios.md",
+   "line": 78,
+   "label": "and day two's differ for every pair",
+   "published": true,
+   "group": "vix",
+   "key": "bit_day2_all_pairs_differ",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "closes after day two of the same three runs; all of 5v10, 5v15, 10v15 must differ"
+  },
+  {
+   "id": "scen.factor_clamp",
+   "file": "docs/scenarios.md",
+   "line": 83,
+   "label": "the factor's variance is clamped at 8x its baseline",
+   "published": 8.0,
+   "group": "consts",
+   "key": "factor_vol_ceiling_multiple",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "MARKET_VOL_CEILING_MULTIPLE in rust/src/market/factor_vol.rs"
+  },
+  {
+   "id": "scen.spread_formula",
+   "file": "docs/scenarios.md",
+   "line": 96,
+   "label": "quoted bid-ask widens through 1 + max(0, (vix - 15) / 30)",
+   "published": true,
+   "group": "consts",
+   "key": "spread_formula_present",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the formula's presence in rust/src/microstructure.rs"
+  },
+  {
+   "id": "scen.crisis_threshold",
+   "file": "docs/scenarios.md",
+   "line": 99,
+   "label": "cross-sectional correlation blends above VIX 25.5",
+   "published": 25.5,
+   "group": "consts",
+   "key": "crisis_vix_threshold",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "CRISIS_VIX_THRESHOLD in rust/src/economy/state.rs"
   },
   {
    "id": "scen.spread_15",
    "file": "docs/scenarios.md",
-   "line": 68,
+   "line": 98,
    "label": "mean quoted spread at VIX 15",
-   "published": 12.17,
+   "published": 11.52,
    "group": "vix",
    "key": "spread_15",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
-   "source": "reconstructed",
-   "method": "mean (ask-bid)/mid across random(25,11) after five 390-tick days, seed 3; universe reconstructed, VIX 15 reproduces exactly"
+   "source": "stated",
+   "method": "mean (ask-bid)/mid across random(25,11) after five 390-tick days, seed 3; universe and seed stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.spread_25",
    "file": "docs/scenarios.md",
-   "line": 69,
+   "line": 98,
    "label": "mean quoted spread at VIX 25",
-   "published": 14.72,
+   "published": 13.92,
    "group": "vix",
    "key": "spread_25",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
-   "source": "reconstructed",
-   "method": "as scen.spread_15"
+   "source": "stated",
+   "method": "mean (ask-bid)/mid across random(25,11) after five 390-tick days, seed 3; universe and seed stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.spread_45",
    "file": "docs/scenarios.md",
-   "line": 69,
+   "line": 98,
    "label": "mean quoted spread at VIX 45",
-   "published": 20.05,
+   "published": 18.87,
    "group": "vix",
    "key": "spread_45",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
-   "source": "reconstructed",
-   "method": "as scen.spread_15"
+   "source": "stated",
+   "method": "mean (ask-bid)/mid across random(25,11) after five 390-tick days, seed 3; universe and seed stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.spread_65",
    "file": "docs/scenarios.md",
-   "line": 69,
+   "line": 98,
    "label": "mean quoted spread at VIX 65",
-   "published": 28.41,
+   "published": 25.89,
    "group": "vix",
    "key": "spread_65",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
-   "source": "reconstructed",
-   "method": "as scen.spread_15"
+   "source": "stated",
+   "method": "mean (ask-bid)/mid across random(25,11) after five 390-tick days, seed 3; universe and seed stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.corr_15",
    "file": "docs/scenarios.md",
-   "line": 73,
+   "line": 104,
    "label": "mean pairwise correlation at VIX 15, 300 pairs",
-   "published": 0.022,
+   "published": 0.269,
    "group": "vix",
    "key": "corr_15",
    "compare": {
     "kind": "round",
     "decimals": 3
    },
-   "source": "reconstructed",
-   "method": "facts.measure(seed=3, random(25,11), 120 days, hold(vix=V)) cross_sectional_corr"
+   "source": "stated",
+   "method": "facts.measure(seed=3, random(25,11), 120 days, hold(vix=V)) cross_sectional_corr; universe and seed stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.corr_45",
    "file": "docs/scenarios.md",
-   "line": 73,
+   "line": 104,
    "label": "mean pairwise correlation at VIX 45",
-   "published": 0.023,
+   "published": 0.678,
    "group": "vix",
    "key": "corr_45",
    "compare": {
     "kind": "round",
     "decimals": 3
    },
-   "source": "reconstructed",
-   "method": "as scen.corr_15"
+   "source": "stated",
+   "method": "facts.measure(seed=3, random(25,11), 120 days, hold(vix=V)) cross_sectional_corr; universe and seed stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.corr_65",
    "file": "docs/scenarios.md",
-   "line": 73,
+   "line": 104,
    "label": "mean pairwise correlation at VIX 65",
-   "published": 0.041,
+   "published": 0.759,
    "group": "vix",
    "key": "corr_65",
    "compare": {
     "kind": "round",
     "decimals": 3
    },
-   "source": "reconstructed",
-   "method": "as scen.corr_15"
-  },
-  {
-   "id": "scen.sector_factor_sigma",
-   "file": "docs/scenarios.md",
-   "line": 75,
-   "label": "the correlation blend acts on sector factors with sigma 0.002",
-   "published": 0.002,
-   "group": "consts",
-   "key": "sector_factor_sigma",
-   "compare": {
-    "kind": "exact"
-   },
    "source": "stated",
-   "method": "SECTOR_FACTOR_SIGMA in rust/src/market/tick.rs"
-  },
-  {
-   "id": "scen.stock_sigma_lo",
-   "file": "docs/scenarios.md",
-   "line": 75,
-   "label": "against per-stock noise running 0.008...",
-   "published": 0.008,
-   "group": "consts",
-   "key": "sector_sigma_min",
-   "compare": {
-    "kind": "round",
-    "decimals": 3
-   },
-   "source": "stated",
-   "method": "min of pt.sector_daily_sigma over the twelve sectors"
-  },
-  {
-   "id": "scen.stock_sigma_hi",
-   "file": "docs/scenarios.md",
-   "line": 76,
-   "label": "...to 0.025",
-   "published": 0.025,
-   "group": "consts",
-   "key": "sector_sigma_max",
-   "compare": {
-    "kind": "round",
-    "decimals": 3
-   },
-   "source": "stated",
-   "method": "max of pt.sector_daily_sigma over the twelve sectors"
+   "method": "facts.measure(seed=3, random(25,11), 120 days, hold(vix=V)) cross_sectional_corr; universe and seed stated on the page since the stream-AB rewrite"
   },
   {
    "id": "scen.tca_wins",
    "file": "docs/scenarios.md",
-   "line": 97,
+   "line": 128,
    "label": "VIX 45 regime costs more in 12 of 12 seeds",
    "published": 12,
    "group": "tca_vix",
@@ -1159,7 +1374,7 @@
   {
    "id": "scen.tca_median_hi",
    "file": "docs/scenarios.md",
-   "line": 97,
+   "line": 128,
    "label": "median shortfall at VIX 45",
    "published": 11.69,
    "group": "tca_vix",
@@ -1174,7 +1389,7 @@
   {
    "id": "scen.tca_median_lo",
    "file": "docs/scenarios.md",
-   "line": 97,
+   "line": 128,
    "label": "median shortfall at VIX 15",
    "published": 6.06,
    "group": "tca_vix",
@@ -1189,7 +1404,7 @@
   {
    "id": "scen.tca_paired_delta",
    "file": "docs/scenarios.md",
-   "line": 98,
+   "line": 129,
    "label": "paired median delta",
    "published": 5.62,
    "group": "tca_vix",
@@ -1202,39 +1417,9 @@
    "method": "as scen.tca_wins"
   },
   {
-   "id": "scen.tca_exact",
-   "file": "docs/scenarios.md",
-   "line": 104,
-   "label": "order flow consumes no RNG draws, so a TCA counterfactual is exact",
-   "published": true,
-   "group": null,
-   "key": null,
-   "compare": {
-    "kind": "none"
-   },
-   "source": "stated",
-   "status_override": "covered_by_tests",
-   "note": "asserted by tests/test_tca.py (order flow consumes zero draws) and tests/test_scenario.py:235"
-  },
-  {
-   "id": "scen.settle_conditional",
-   "file": "docs/scenarios.md",
-   "line": 106,
-   "label": "'that branch draws either four uniforms or none' - settlement draws conditioned on the trajectory",
-   "published": false,
-   "group": "rng",
-   "key": "market_sched_independent",
-   "compare": {
-    "kind": "exact"
-   },
-   "source": "stated",
-   "method": "pin corporate_bond_yield mid-run and compare draws_by_stream()['market'] against the unpinned twin; equal counts mean the schedule cannot depend on the trajectory",
-   "note": "true before the RNG split; since ad91026 the four are drawn unconditionally per active company per open tick (rng-streams.md), so the market stream cannot diverge and this paragraph - including 'near-exact rather than exact' - describes the previous era"
-  },
-  {
    "id": "scen.drawdiv_zero",
    "file": "docs/scenarios.md",
-   "line": 107,
+   "line": 153,
    "label": "macro-counterfactual draw divergence zero in every comparison run",
    "published": 0,
    "group": "drawdiv",
@@ -1243,12 +1428,12 @@
     "kind": "exact"
    },
    "source": "reconstructed",
-   "method": "compare() draw_delta over four scenarios at seed 3 plus three repeated across seeds 1-8; scenarios from scenario.py:110-117, universe reconstructed as random(20,4), 40 days"
+   "method": "compare() draw_delta over four scenarios at seed 3 plus three repeated across seeds 1-8 (counts stated on the page); scenarios from scenario.py:110-117, universe reconstructed as random(20,4), 40 days"
   },
   {
    "id": "scen.old_draw_delta",
    "file": "docs/scenarios.md",
-   "line": 109,
+   "line": 144,
    "label": "an older build recorded a delta of -4 in 425,600 draws",
    "published": -4,
    "group": null,
@@ -1259,6 +1444,21 @@
    "source": "stated",
    "status_override": "not_harnessable",
    "note": "a historical record of a pre-split build, kept on the page as provenance; not re-measurable on this build"
+  },
+  {
+   "id": "scen.market_sched",
+   "file": "docs/scenarios.md",
+   "line": 145,
+   "label": "the market stream's schedule is a pure function of (market status, active roster, sector count)",
+   "published": true,
+   "group": "rng",
+   "key": "market_sched_independent",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "pin corporate_bond_yield mid-run and compare draws_by_stream()['market'] against the unpinned twin; same measurement as rng.market_sched",
+   "note": "replaces the retired scen.settle_conditional: the paragraph now states the post-split guarantee instead of the four-or-zero settlement branch"
   },
   {
    "id": "rng.three_streams",
@@ -1277,9 +1477,24 @@
   {
    "id": "rng.kat_v5",
    "file": "docs/rng-streams.md",
-   "line": 35,
-   "label": "the split is part of the 2026-08 era boundary (KAT_VERSION = 5)",
+   "line": 36,
+   "label": "'KAT_VERSION = 5 at the split' - a historical record pinned to ad91026",
    "published": 5,
+   "group": null,
+   "key": null,
+   "compare": {
+    "kind": "none"
+   },
+   "source": "stated",
+   "note": "the split's own version is a property of commit ad91026, not of this build; the current version is measured by rng.kat_now",
+   "status_override": "not_harnessable"
+  },
+  {
+   "id": "rng.kat_now",
+   "file": "docs/rng-streams.md",
+   "line": 37,
+   "label": "the era's later model changes have since taken the known-answer version to 8",
+   "published": 8,
    "group": "determinism",
    "key": "kat_version",
    "compare": {
@@ -1291,7 +1506,7 @@
   {
    "id": "rng.market_sched",
    "file": "docs/rng-streams.md",
-   "line": 46,
+   "line": 48,
    "label": "the market stream's schedule is a pure function of (market status, active roster, sector count)",
    "published": true,
    "group": "rng",
@@ -1305,7 +1520,7 @@
   {
    "id": "rng.stream_names",
    "file": "docs/rng-streams.md",
-   "line": 56,
+   "line": 58,
    "label": "draws_by_stream() reports market, economy, external",
    "published": "market,economy,external",
    "group": "rng",
@@ -1319,7 +1534,7 @@
   {
    "id": "rng.derivation",
    "file": "docs/rng-streams.md",
-   "line": 67,
+   "line": 68,
    "label": "the substream derivation contract (splitmix64 finalizer, sequence 256+k)",
    "published": true,
    "group": null,
@@ -1334,7 +1549,7 @@
   {
    "id": "rng.sequence_bases",
    "file": "docs/rng-streams.md",
-   "line": 116,
+   "line": 117,
    "label": "raw sequences 0/1 (constructors), 21 (universe), 99 (reference MAIN)",
    "published": true,
    "group": null,
@@ -1349,7 +1564,7 @@
   {
    "id": "rng.snapshot_nine",
    "file": "docs/rng-streams.md",
-   "line": 134,
+   "line": 136,
    "label": "state_snapshot()['rng'] is nine numbers, three per stream",
    "published": 9,
    "group": "rng",
@@ -1363,7 +1578,7 @@
   {
    "id": "rng.presplit_refused",
    "file": "docs/rng-streams.md",
-   "line": 138,
+   "line": 141,
    "label": "a pre-split snapshot (three numbers) is refused on restore",
    "published": true,
    "group": "rng",
@@ -1392,8 +1607,8 @@
    "id": "agents.beat12_momentum",
    "file": "docs/agents-and-evaluation.md",
    "line": 48,
-   "label": "momentum beats the Oracle 5 of 12 on the twelve-market grid",
-   "published": 5,
+   "label": "momentum beats the Oracle 4 of 12 on the twelve-market grid",
+   "published": 4,
    "group": "ranking",
    "key": "beat12_momentum",
    "compare": {
@@ -1406,8 +1621,8 @@
    "id": "agents.beat12_mr",
    "file": "docs/agents-and-evaluation.md",
    "line": 49,
-   "label": "mean_reversion beats the Oracle 0 of 12",
-   "published": 0,
+   "label": "mean_reversion beats the Oracle 1 of 12",
+   "published": 1,
    "group": "ranking",
    "key": "beat12_mean_reversion",
    "compare": {
@@ -1420,8 +1635,8 @@
    "id": "agents.beat12_bh",
    "file": "docs/agents-and-evaluation.md",
    "line": 50,
-   "label": "buy_and_hold beats the Oracle 0 of 12",
-   "published": 0,
+   "label": "buy_and_hold beats the Oracle 1 of 12",
+   "published": 1,
    "group": "ranking",
    "key": "beat12_buy_and_hold",
    "compare": {
@@ -1445,11 +1660,55 @@
    "method": "as agents.beat12_momentum"
   },
   {
+   "id": "agents.beat_mr_capture",
+   "file": "docs/agents-and-evaluation.md",
+   "line": 60,
+   "label": "mean-reversion's one win is barely above 1.0: capture 1.004",
+   "published": 1.004,
+   "group": "ranking",
+   "key": "mr_beat_capture",
+   "compare": {
+    "kind": "round",
+    "decimals": 3
+   },
+   "source": "stated",
+   "method": "mean_reversion's per-seed P&L over the reference's on the seed it wins, from the same twelve-market ranking"
+  },
+  {
+   "id": "agents.beat_bh_capture",
+   "file": "docs/agents-and-evaluation.md",
+   "line": 61,
+   "label": "buy-and-hold's one win is capture 1.59...",
+   "published": 1.59,
+   "group": "ranking",
+   "key": "bh_beat_capture",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as agents.beat_mr_capture, for buy_and_hold"
+  },
+  {
+   "id": "agents.bh_beat_grid_max",
+   "file": "docs/agents-and-evaluation.md",
+   "line": 61,
+   "label": "...the largest capture on the whole grid",
+   "published": true,
+   "group": "ranking",
+   "key": "bh_beat_is_grid_max",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "buy_and_hold's winning capture equals the maximum per-seed capture over all four agents and twelve seeds"
+  },
+  {
    "id": "agents.oracle_narrow",
    "file": "docs/agents-and-evaluation.md",
-   "line": 66,
-   "label": "Oracle median P&L on the ranking grid at ten days, sim seeds 0-7, default top_k=5: $87k",
-   "published": 87000,
+   "line": 70,
+   "label": "Oracle median P&L on the ranking grid at ten days, sim seeds 0-7, default top_k=5: $93k",
+   "published": 93000,
    "group": "oracle_config",
    "key": "narrow_median_pnl",
    "compare": {
@@ -1462,9 +1721,9 @@
   {
    "id": "agents.oracle_wide",
    "file": "docs/agents-and-evaluation.md",
-   "line": 66,
-   "label": "the same information across three times as many names, top_k=15: $71k",
-   "published": 71000,
+   "line": 70,
+   "label": "the same information across three times as many names, top_k=15: $65k",
+   "published": 65000,
    "group": "oracle_config",
    "key": "wide_median_pnl",
    "compare": {
@@ -1477,7 +1736,7 @@
   {
    "id": "agents.halflife",
    "file": "docs/agents-and-evaluation.md",
-   "line": 69,
+   "line": 73,
    "label": "mispricing reverts on a 60-day half-life",
    "published": 60,
    "group": "consts",
@@ -1492,9 +1751,9 @@
   {
    "id": "agents.oracle_5d_pnl",
    "file": "docs/agents-and-evaluation.md",
-   "line": 71,
-   "label": "the Oracle makes $21k in five days on seed 2026 over random(40,7)",
-   "published": 21000,
+   "line": 76,
+   "label": "the Oracle makes $85k in five days on seed 2026 over random(40,7)",
+   "published": 85000,
    "group": "horizon",
    "key": "oracle_pnl_5d",
    "compare": {
@@ -1507,9 +1766,9 @@
   {
    "id": "agents.oracle_60d_pnl",
    "file": "docs/agents-and-evaluation.md",
-   "line": 71,
-   "label": "and $568k in sixty",
-   "published": 568000,
+   "line": 76,
+   "label": "and $504k in sixty",
+   "published": 504000,
    "group": "horizon",
    "key": "oracle_pnl_60d",
    "compare": {
@@ -1522,9 +1781,9 @@
   {
    "id": "agents.capture_5d",
    "file": "docs/agents-and-evaluation.md",
-   "line": 72,
-   "label": "momentum's capture ratio against the five-day denominator: 2.98",
-   "published": 2.98,
+   "line": 77,
+   "label": "momentum's capture ratio against the five-day denominator: 0.40",
+   "published": 0.4,
    "group": "horizon",
    "key": "capture_5d",
    "compare": {
@@ -1537,24 +1796,24 @@
   {
    "id": "agents.capture_60d",
    "file": "docs/agents-and-evaluation.md",
-   "line": 72,
-   "label": "and 1.47 against the sixty-day one",
-   "published": 1.47,
+   "line": 77,
+   "label": "and 1.24 against the sixty-day one - the horizon alone carries the verdict across 1.0",
+   "published": 1.24,
    "group": "horizon",
    "key": "capture_60d",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
-   "source": "reconstructed",
+   "source": "stated",
    "method": "as agents.capture_5d with days=60"
   },
   {
    "id": "agents.pooled_momentum",
    "file": "docs/agents-and-evaluation.md",
-   "line": 82,
-   "label": "over twelve markets momentum ranks +0.805 pooled",
-   "published": 0.805,
+   "line": 88,
+   "label": "over twelve markets momentum ranks +0.593 pooled",
+   "published": 0.593,
    "group": "ranking",
    "key": "pooled_momentum",
    "compare": {
@@ -1567,9 +1826,9 @@
   {
    "id": "agents.pooled_mr",
    "file": "docs/agents-and-evaluation.md",
-   "line": 82,
-   "label": "mean-reversion +0.064",
-   "published": 0.064,
+   "line": 88,
+   "label": "mean-reversion +0.160",
+   "published": 0.16,
    "group": "ranking",
    "key": "pooled_mean_reversion",
    "compare": {
@@ -1582,9 +1841,9 @@
   {
    "id": "agents.single_seed_wins",
    "file": "docs/agents-and-evaluation.md",
-   "line": 83,
-   "label": "a single seed picks the pooled leader ten times in twelve",
-   "published": 10,
+   "line": 89,
+   "label": "a single seed picks the pooled leader only five times in twelve",
+   "published": 5,
    "group": "ranking",
    "key": "momentum_wins",
    "compare": {
@@ -1594,11 +1853,25 @@
    "method": "the pooled leader's per-seed win count out of 12"
   },
   {
+   "id": "agents.mr_wins",
+   "file": "docs/agents-and-evaluation.md",
+   "line": 89,
+   "label": "and equally often crowns mean-reversion: 5 of 12",
+   "published": 5,
+   "group": "ranking",
+   "key": "mr_wins",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "mean_reversion's per-seed win count out of 12, same ranking as agents.single_seed_wins"
+  },
+  {
    "id": "agents.mom_range_lo",
    "file": "docs/agents-and-evaluation.md",
-   "line": 84,
-   "label": "momentum capture range, low",
-   "published": -0.169,
+   "line": 92,
+   "label": "momentum capture range, low: +0.089",
+   "published": 0.089,
    "group": "ranking",
    "key": "momentum_capture_lo",
    "compare": {
@@ -1611,9 +1884,9 @@
   {
    "id": "agents.mom_range_hi",
    "file": "docs/agents-and-evaluation.md",
-   "line": 84,
-   "label": "momentum capture range, high",
-   "published": 1.672,
+   "line": 92,
+   "label": "momentum capture range, high: +1.523",
+   "published": 1.523,
    "group": "ranking",
    "key": "momentum_capture_hi",
    "compare": {
@@ -1626,9 +1899,9 @@
   {
    "id": "agents.sep_mom_mr",
    "file": "docs/agents-and-evaluation.md",
-   "line": 92,
-   "label": "momentum vs mean_reversion: 11-1",
-   "published": "11-1",
+   "line": 101,
+   "label": "momentum vs mean_reversion: 7-5",
+   "published": "7-5",
    "group": "ranking",
    "key": "sep_mom_mr",
    "compare": {
@@ -1636,19 +1909,19 @@
    },
    "source": "stated",
    "method": "as agents.pooled_momentum",
-   "note": "the prose at lines 99-100 repeats both separations; edit them together"
+   "note": "the snippet comment at line 101; the prose repeats the separation at line 110 - edit them together"
   },
   {
    "id": "agents.sep_mom_mr_p",
    "file": "docs/agents-and-evaluation.md",
-   "line": 92,
-   "label": "p = 0.006",
-   "published": 0.006,
+   "line": 101,
+   "label": "p = 0.77",
+   "published": 0.77,
    "group": "ranking",
    "key": "sep_mom_mr_p",
    "compare": {
     "kind": "round",
-    "decimals": 3
+    "decimals": 2
    },
    "source": "stated",
    "method": "as agents.pooled_momentum"
@@ -1656,28 +1929,29 @@
   {
    "id": "agents.sep_mom_rand",
    "file": "docs/agents-and-evaluation.md",
-   "line": 93,
-   "label": "momentum vs random: 11-1",
-   "published": "11-1",
+   "line": 102,
+   "label": "momentum vs random: 12-0, a clean sweep",
+   "published": "12-0",
    "group": "ranking",
    "key": "sep_mom_rand",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "as agents.pooled_momentum"
+   "method": "as agents.pooled_momentum",
+   "note": "the prose repeats it at line 112"
   },
   {
    "id": "agents.sep_mom_rand_p",
    "file": "docs/agents-and-evaluation.md",
-   "line": 93,
-   "label": "p = 0.006",
-   "published": 0.006,
+   "line": 102,
+   "label": "p = 0.0005, the floor twelve paired seeds can produce",
+   "published": 0.0005,
    "group": "ranking",
    "key": "sep_mom_rand_p",
    "compare": {
     "kind": "round",
-    "decimals": 3
+    "decimals": 4
    },
    "source": "stated",
    "method": "as agents.pooled_momentum"
@@ -1685,7 +1959,7 @@
   {
    "id": "agents.sep_window_b",
    "file": "docs/agents-and-evaluation.md",
-   "line": 102,
+   "line": 115,
    "label": "the identical test over seeds 12-23: momentum over mean-reversion 9-3",
    "published": "9-3",
    "group": "ranking",
@@ -1699,7 +1973,7 @@
   {
    "id": "agents.sep_window_b_p",
    "file": "docs/agents-and-evaluation.md",
-   "line": 102,
+   "line": 115,
    "label": "p = 0.15",
    "published": 0.15,
    "group": "ranking",
@@ -1714,7 +1988,7 @@
   {
    "id": "agents.clean_sweep_p",
    "file": "docs/agents-and-evaluation.md",
-   "line": 103,
+   "line": 113,
    "label": "even a clean sweep only reaches p = 0.0005",
    "published": 0.0005,
    "group": "arith",
@@ -1729,9 +2003,9 @@
   {
    "id": "agents.ref_3d_span_lo",
    "file": "docs/agents-and-evaluation.md",
-   "line": 114,
-   "label": "three days, seeds 0-9: the reference's per-seed P&L spans $7.2k...",
-   "published": 7200,
+   "line": 126,
+   "label": "three days, seeds 0-9: the reference's per-seed P&L spans $11.2k...",
+   "published": 11200,
    "group": "ranking",
    "key": "oracle_pnl_3d_min",
    "compare": {
@@ -1744,9 +2018,9 @@
   {
    "id": "agents.ref_3d_span_hi",
    "file": "docs/agents-and-evaluation.md",
-   "line": 114,
-   "label": "...to $41.7k",
-   "published": 41700,
+   "line": 126,
+   "label": "...to $45.6k",
+   "published": 45600,
    "group": "ranking",
    "key": "oracle_pnl_3d_max",
    "compare": {
@@ -1759,14 +2033,14 @@
   {
    "id": "agents.mr_3d_thinnest",
    "file": "docs/agents-and-evaluation.md",
-   "line": 115,
-   "label": "mean-reversion's ratio on the thinnest of those markets: +2.8",
-   "published": 2.8,
+   "line": 127,
+   "label": "mean-reversion's ratio on the thinnest of those markets: +1.29",
+   "published": 1.29,
    "group": "ranking",
    "key": "mr_capture_thinnest",
    "compare": {
     "kind": "round",
-    "decimals": 1
+    "decimals": 2
    },
    "source": "stated",
    "method": "mean_reversion's per-seed capture on the seed with the smallest reference P&L in the same three-day ranking"
@@ -1774,9 +2048,9 @@
   {
    "id": "agents.mr_3d_pooled",
    "file": "docs/agents-and-evaluation.md",
-   "line": 115,
-   "label": "against a pooled +0.27 across the ten",
-   "published": 0.27,
+   "line": 127,
+   "label": "against a pooled +0.44 across the ten",
+   "published": 0.44,
    "group": "ranking",
    "key": "pooled_mr_3d",
    "compare": {
@@ -1787,11 +2061,40 @@
    "method": "mean_reversion's pooled capture over the same three-day ranking"
   },
   {
+   "id": "agents.mr_3d_thin_structural",
+   "file": "docs/agents-and-evaluation.md",
+   "line": 128,
+   "label": "every ratio above 1.0 it posts sits on one of the four thinnest denominators",
+   "published": true,
+   "group": "ranking",
+   "key": "mr3_gt1_all_on_4_thinnest",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "indices of mean-reversion's three-day captures above 1.0 against the indices of the four smallest reference P&Ls"
+  },
+  {
+   "id": "agents.mr_3d_mean_of_ratios",
+   "file": "docs/agents-and-evaluation.md",
+   "line": 132,
+   "label": "averaging the ten ratios instead of pooling them would move the verdict to +0.61",
+   "published": 0.61,
+   "group": "ranking",
+   "key": "mr3_mean_of_ratios",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "mean of mean-reversion's ten per-seed three-day captures"
+  },
+  {
    "id": "llm.oracle_pnl",
    "file": "docs/an-llm-agent.md",
    "line": 30,
-   "label": "oracle pnl 114727",
-   "published": 114727,
+   "label": "oracle pnl 229751",
+   "published": 229751,
    "group": "llm_leaderboard",
    "key": "oracle_pnl",
    "compare": {
@@ -1820,8 +2123,8 @@
    "id": "llm.momentum_pnl",
    "file": "docs/an-llm-agent.md",
    "line": 32,
-   "label": "momentum pnl 22488",
-   "published": 22488,
+   "label": "momentum pnl 21520",
+   "published": 21520,
    "group": "llm_leaderboard",
    "key": "momentum_pnl",
    "compare": {
@@ -1849,8 +2152,8 @@
    "id": "llm.imp20_lo",
    "file": "docs/an-llm-agent.md",
    "line": 49,
-   "label": "oracle twenty-day impact spans -181...",
-   "published": -181,
+   "label": "oracle twenty-day impact spans -235...",
+   "published": -235,
    "group": "llm_impact",
    "key": "oracle_imp20_min",
    "compare": {
@@ -1864,8 +2167,8 @@
    "id": "llm.imp20_hi",
    "file": "docs/an-llm-agent.md",
    "line": 49,
-   "label": "...to +577 bps across seeds 2020-2031",
-   "published": 577,
+   "label": "...to +470 bps across seeds 2020-2031",
+   "published": 470,
    "group": "llm_impact",
    "key": "oracle_imp20_max",
    "compare": {
@@ -1879,8 +2182,8 @@
    "id": "llm.imp20_pos",
    "file": "docs/an-llm-agent.md",
    "line": 49,
-   "label": "positive in only 8 of 12 seeds",
-   "published": 8,
+   "label": "positive in only 7 of 12 seeds",
+   "published": 7,
    "group": "llm_impact",
    "key": "oracle_imp20_pos",
    "compare": {
@@ -1904,23 +2207,68 @@
    "method": "as llm.imp20_lo, momentum impact_bps takes both signs across the twelve seeds"
   },
   {
-   "id": "llm.imp3_all_pos",
+   "id": "llm.imp2_all_pos",
    "file": "docs/an-llm-agent.md",
-   "line": 51,
-   "label": "over three days both are positive in 12 of 12",
+   "line": 52,
+   "label": "over two days both agents are positive in 12 of 12",
    "published": 12,
    "group": "llm_impact",
-   "key": "imp3_pos_min",
+   "key": "imp2_pos_min",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "same grid at days=3; the smaller of the oracle's and momentum's positive counts"
+   "method": "same grid at days=2; the smaller of the oracle's and momentum's positive counts"
+  },
+  {
+   "id": "llm.imp3_oracle_pos",
+   "file": "docs/an-llm-agent.md",
+   "line": 53,
+   "label": "by day three the oracle's sign already belongs to the seed: positive in 8 of 12",
+   "published": 8,
+   "group": "llm_impact",
+   "key": "imp3_oracle_pos",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "same grid at days=3, oracle impact_bps",
+   "note": "re-keyed from llm.imp3_all_pos (both agents 12 of 12 at three days), which PR 26's re-measurement retired: three days no longer reads clean"
+  },
+  {
+   "id": "llm.imp3_span_lo",
+   "file": "docs/an-llm-agent.md",
+   "line": 53,
+   "label": "with a span of -29...",
+   "published": -29,
+   "group": "llm_impact",
+   "key": "imp3_oracle_min",
+   "compare": {
+    "kind": "round",
+    "decimals": 0
+   },
+   "source": "stated",
+   "method": "as llm.imp3_oracle_pos"
+  },
+  {
+   "id": "llm.imp3_span_hi",
+   "file": "docs/an-llm-agent.md",
+   "line": 53,
+   "label": "...to +90 bps",
+   "published": 90,
+   "group": "llm_impact",
+   "key": "imp3_oracle_max",
+   "compare": {
+    "kind": "round",
+    "decimals": 0
+   },
+   "source": "stated",
+   "method": "as llm.imp3_oracle_pos"
   },
   {
    "id": "llm.seven_factors",
    "file": "docs/an-llm-agent.md",
-   "line": 76,
+   "line": 73,
    "label": "driver is one of the engine's seven factors",
    "published": 7,
    "group": "determinism",
@@ -1934,7 +2282,7 @@
   {
    "id": "llm.steps_default",
    "file": "docs/an-llm-agent.md",
-   "line": 105,
+   "line": 106,
    "label": "steps_per_day defaults to 6",
    "published": 6,
    "group": "determinism",
@@ -1948,7 +2296,7 @@
   {
    "id": "llm.calls",
    "file": "docs/an-llm-agent.md",
-   "line": 122,
+   "line": 124,
    "label": "default run is 20 days over 12 instruments, so 20 calls",
    "published": 20,
    "group": "arith",
@@ -1962,7 +2310,7 @@
   {
    "id": "llm.cost",
    "file": "docs/an-llm-agent.md",
-   "line": 123,
+   "line": 124,
    "label": "a run lands around $0.30 to $0.60 at Opus 5 rates",
    "published": "0.30-0.60",
    "group": null,
@@ -1977,9 +2325,9 @@
   {
    "id": "realism.sample.vol",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 36,
+   "line": 43,
    "label": "sample report: annualised vol",
-   "published": 55.006,
+   "published": 43.866,
    "group": "realism_sample",
    "key": "annualised_vol_pct",
    "compare": {
@@ -1992,9 +2340,9 @@
   {
    "id": "realism.sample.kurtosis",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 37,
+   "line": 44,
    "label": "sample report: excess kurtosis",
-   "published": 5.166,
+   "published": 3.172,
    "group": "realism_sample",
    "key": "excess_kurtosis",
    "compare": {
@@ -2007,9 +2355,9 @@
   {
    "id": "realism.sample.acf",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 40,
+   "line": 47,
    "label": "sample report: return acf(1)",
-   "published": 0.248,
+   "published": 0.274,
    "group": "realism_sample",
    "key": "return_acf1",
    "compare": {
@@ -2022,9 +2370,9 @@
   {
    "id": "realism.sample.absacf",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 41,
+   "line": 48,
    "label": "sample report: |return| acf(1)",
-   "published": 0.134,
+   "published": 0.244,
    "group": "realism_sample",
    "key": "abs_return_acf1",
    "compare": {
@@ -2037,9 +2385,9 @@
   {
    "id": "realism.sample.cross",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 42,
+   "line": 49,
    "label": "sample report: cross-sectional corr",
-   "published": 0.027,
+   "published": 0.265,
    "group": "realism_sample",
    "key": "cross_sectional_corr",
    "compare": {
@@ -2052,9 +2400,9 @@
   {
    "id": "realism.sample.volabs",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 43,
+   "line": 50,
    "label": "sample report: volume vs |return|",
-   "published": 0.129,
+   "published": 0.59,
    "group": "realism_sample",
    "key": "volume_abs_return_corr",
    "compare": {
@@ -2067,9 +2415,9 @@
   {
    "id": "realism.sample.leverage",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 44,
+   "line": 51,
    "label": "sample report: leverage",
-   "published": -0.018,
+   "published": -0.137,
    "group": "realism_sample",
    "key": "leverage_effect",
    "compare": {
@@ -2082,9 +2430,9 @@
   {
    "id": "realism.sample.volchg",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 45,
+   "line": 52,
    "label": "sample report: volume change acf(1)",
-   "published": -0.45,
+   "published": -0.425,
    "group": "realism_sample",
    "key": "volume_change_acf1",
    "compare": {
@@ -2097,7 +2445,7 @@
   {
    "id": "realism.sample.observations",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 31,
+   "line": 38,
    "label": "sample report: 10,040 daily returns",
    "published": 10040,
    "group": "realism_sample",
@@ -2111,7 +2459,7 @@
   {
    "id": "realism.fingerprint",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 64,
+   "line": 72,
    "label": "universe fingerprint 5d8de78b55aad752",
    "published": "5d8de78b55aad752",
    "group": "realism_sample",
@@ -2125,16 +2473,16 @@
   {
    "id": "realism.six.kurtosis",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 72,
+   "line": 80,
    "label": "excess kurtosis, median of six seeds",
-   "published": 4.0,
+   "published": 3.1,
    "group": "realism_six",
    "key": "excess_kurtosis_median",
    "compare": {
     "kind": "range",
     "decimals": 1,
-    "lo": 3.6,
-    "hi": 5.2
+    "lo": 2.4,
+    "hi": 5.7
    },
    "source": "stated",
    "method": "facts.measure(seed=s, random(40,111), 252 days) for s in 1..6; median and range, as the page states"
@@ -2142,16 +2490,16 @@
   {
    "id": "realism.six.vol",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 73,
+   "line": 81,
    "label": "annualised vol, median of six seeds",
-   "published": 53.0,
+   "published": 41.5,
    "group": "realism_six",
    "key": "annualised_vol_pct_median",
    "compare": {
     "kind": "range",
-    "decimals": 0,
-    "lo": 52.0,
-    "hi": 55.0
+    "decimals": 1,
+    "lo": 39.0,
+    "hi": 50.0
    },
    "source": "stated",
    "method": "as realism.six.kurtosis"
@@ -2159,16 +2507,16 @@
   {
    "id": "realism.six.acf",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 79,
+   "line": 87,
    "label": "return acf(1), median of six seeds",
-   "published": 0.233,
+   "published": 0.249,
    "group": "realism_six",
    "key": "return_acf1_median",
    "compare": {
     "kind": "range",
     "decimals": 3,
-    "lo": 0.211,
-    "hi": 0.249
+    "lo": 0.237,
+    "hi": 0.443
    },
    "source": "stated",
    "method": "as realism.six.kurtosis"
@@ -2176,16 +2524,16 @@
   {
    "id": "realism.six.absacf",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 80,
+   "line": 88,
    "label": "|return| acf(1), median of six seeds",
-   "published": 0.117,
+   "published": 0.242,
    "group": "realism_six",
    "key": "abs_return_acf1_median",
    "compare": {
     "kind": "range",
     "decimals": 3,
-    "lo": 0.093,
-    "hi": 0.134
+    "lo": 0.189,
+    "hi": 0.454
    },
    "source": "stated",
    "method": "as realism.six.kurtosis"
@@ -2193,16 +2541,16 @@
   {
    "id": "realism.six.cross",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 81,
+   "line": 89,
    "label": "cross-sectional corr, median of six seeds",
-   "published": 0.024,
+   "published": 0.257,
    "group": "realism_six",
    "key": "cross_sectional_corr_median",
    "compare": {
     "kind": "range",
     "decimals": 3,
-    "lo": 0.021,
-    "hi": 0.03
+    "lo": 0.205,
+    "hi": 0.456
    },
    "source": "stated",
    "method": "as realism.six.kurtosis"
@@ -2210,16 +2558,16 @@
   {
    "id": "realism.six.volabs",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 82,
+   "line": 90,
    "label": "volume vs |return|, median of six seeds",
-   "published": 0.105,
+   "published": 0.585,
    "group": "realism_six",
    "key": "volume_abs_return_corr_median",
    "compare": {
     "kind": "range",
     "decimals": 3,
-    "lo": 0.087,
-    "hi": 0.129
+    "lo": 0.541,
+    "hi": 0.655
    },
    "source": "stated",
    "method": "as realism.six.kurtosis"
@@ -2227,16 +2575,16 @@
   {
    "id": "realism.six.leverage",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 83,
+   "line": 91,
    "label": "leverage, median of six seeds",
-   "published": -0.004,
+   "published": -0.085,
    "group": "realism_six",
    "key": "leverage_effect_median",
    "compare": {
     "kind": "range",
     "decimals": 3,
-    "lo": -0.018,
-    "hi": 0.005
+    "lo": -0.181,
+    "hi": -0.031
    },
    "source": "stated",
    "method": "as realism.six.kurtosis"
@@ -2244,114 +2592,531 @@
   {
    "id": "realism.six.volchg",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 84,
+   "line": 92,
    "label": "volume change acf(1), median of six seeds",
-   "published": -0.463,
+   "published": -0.446,
    "group": "realism_six",
    "key": "volume_change_acf1_median",
    "compare": {
     "kind": "range",
     "decimals": 3,
-    "lo": -0.476,
-    "hi": -0.45
+    "lo": -0.454,
+    "hi": -0.425
    },
    "source": "stated",
    "method": "as realism.six.kurtosis"
   },
   {
+   "id": "realism.six.kurt_lo",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 100,
+   "label": "kurtosis reads +2.4 on one seed of six",
+   "published": 2.4,
+   "group": "realism_six",
+   "key": "excess_kurtosis_lo",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "min across the six realism seeds"
+  },
+  {
+   "id": "realism.six.cross_hi",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 101,
+   "label": "correlation's range reaches +0.46",
+   "published": 0.46,
+   "group": "realism_six",
+   "key": "cross_sectional_corr_hi",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "max across the six realism seeds"
+  },
+  {
+   "id": "realism.held.seeds_corr",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 127,
+   "label": "held out, fresh sim seeds 101-106: cross-sectional correlation +0.225",
+   "published": 0.225,
+   "group": "realism_heldout",
+   "key": "held_seeds_corr",
+   "compare": {
+    "kind": "round",
+    "decimals": 3
+   },
+   "source": "stated",
+   "method": "median over sim seeds 101-106 of facts.measure(random(40,111), 252 days); method stated on the page"
+  },
+  {
+   "id": "realism.held.seeds_kurt",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 128,
+   "label": "kurtosis +3.67",
+   "published": 3.67,
+   "group": "realism_heldout",
+   "key": "held_seeds_kurt",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as realism.held.seeds_corr"
+  },
+  {
+   "id": "realism.held.seeds_clust",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 128,
+   "label": "clustering +0.202",
+   "published": 0.202,
+   "group": "realism_heldout",
+   "key": "held_seeds_clust",
+   "compare": {
+    "kind": "round",
+    "decimals": 3
+   },
+   "source": "stated",
+   "method": "as realism.held.seeds_corr"
+  },
+  {
+   "id": "realism.held.seeds_volabs",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 129,
+   "label": "volume vs |return| +0.546",
+   "published": 0.546,
+   "group": "realism_heldout",
+   "key": "held_seeds_volabs",
+   "compare": {
+    "kind": "round",
+    "decimals": 3
+   },
+   "source": "stated",
+   "method": "as realism.held.seeds_corr"
+  },
+  {
+   "id": "realism.held.seeds_lev",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 129,
+   "label": "leverage reads -0.071",
+   "published": -0.071,
+   "group": "realism_heldout",
+   "key": "held_seeds_lev",
+   "compare": {
+    "kind": "round",
+    "decimals": 3
+   },
+   "source": "stated",
+   "method": "as realism.held.seeds_corr"
+  },
+  {
+   "id": "realism.held.uni_corr_lo",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 135,
+   "label": "five fresh 60-name universes: correlation medians run +0.29...",
+   "published": 0.29,
+   "group": "realism_heldout",
+   "key": "held_uni_corr_lo",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "for k in 1,7,11,42,222: median over sim seeds 1-6 of facts.measure(random(60,k), 252 days); min and max of the five medians; method stated on the page"
+  },
+  {
+   "id": "realism.held.uni_corr_hi",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 135,
+   "label": "...to +0.35",
+   "published": 0.35,
+   "group": "realism_heldout",
+   "key": "held_uni_corr_hi",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as realism.held.uni_corr_lo"
+  },
+  {
+   "id": "realism.held.uni_kurt_lo",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 135,
+   "label": "and kurtosis +3.4...",
+   "published": 3.4,
+   "group": "realism_heldout",
+   "key": "held_uni_kurt_lo",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "as realism.held.uni_corr_lo"
+  },
+  {
+   "id": "realism.held.uni_kurt_hi",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 135,
+   "label": "...to +4.7",
+   "published": 4.7,
+   "group": "realism_heldout",
+   "key": "held_uni_kurt_hi",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "as realism.held.uni_corr_lo"
+  },
+  {
+   "id": "realism.held.uni_clust_lo",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 136,
+   "label": "clustering reads +0.20...",
+   "published": 0.2,
+   "group": "realism_heldout",
+   "key": "held_uni_clust_lo",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as realism.held.uni_corr_lo"
+  },
+  {
+   "id": "realism.held.uni_clust_hi",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 136,
+   "label": "...to +0.21",
+   "published": 0.21,
+   "group": "realism_heldout",
+   "key": "held_uni_clust_hi",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as realism.held.uni_corr_lo"
+  },
+  {
+   "id": "realism.held.uni_lev_lo",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 137,
+   "label": "the leverage effect weakens to -0.05...",
+   "published": -0.05,
+   "group": "realism_heldout",
+   "key": "held_uni_lev_lo",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as realism.held.uni_corr_lo"
+  },
+  {
+   "id": "realism.held.uni_lev_hi",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 137,
+   "label": "...to -0.04, half its published-method value",
+   "published": -0.04,
+   "group": "realism_heldout",
+   "key": "held_uni_lev_hi",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as realism.held.uni_corr_lo"
+  },
+  {
+   "id": "realism.held.long_corr",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 141,
+   "label": "the published universe over 504 days: correlation +0.34",
+   "published": 0.34,
+   "group": "realism_heldout",
+   "key": "held_long_corr",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "median over sim seeds 1-6 of facts.measure(random(40,111), 504 days); method stated on the page"
+  },
+  {
+   "id": "realism.held.long_kurt",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 141,
+   "label": "kurtosis +3.2",
+   "published": 3.2,
+   "group": "realism_heldout",
+   "key": "held_long_kurt",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "as realism.held.long_corr"
+  },
+  {
+   "id": "realism.held.long_clust",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 141,
+   "label": "clustering +0.25",
+   "published": 0.25,
+   "group": "realism_heldout",
+   "key": "held_long_clust",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as realism.held.long_corr"
+  },
+  {
+   "id": "realism.held.long_lev",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 141,
+   "label": "leverage -0.062",
+   "published": -0.062,
+   "group": "realism_heldout",
+   "key": "held_long_lev",
+   "compare": {
+    "kind": "round",
+    "decimals": 3
+   },
+   "source": "stated",
+   "method": "as realism.held.long_corr"
+  },
+  {
+   "id": "realism.held.long_vol",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 142,
+   "label": "volatility 47.6%",
+   "published": 47.6,
+   "group": "realism_heldout",
+   "key": "held_long_vol",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "as realism.held.long_corr"
+  },
+  {
    "id": "realism.market_sigma",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 111,
-   "label": "shared market factor sigma 0.003/day",
-   "published": 0.003,
+   "line": 163,
+   "label": "the factor's baseline sigma is 0.016 a day (the 0.003 beside it is named history)",
+   "published": 0.016,
    "group": "consts",
    "key": "market_factor_sigma",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "MARKET_FACTOR_SIGMA in rust/src/market/tick.rs",
-   "note": "58837b3 recalibrated MARKET_FACTOR_SIGMA from a sweep; the mechanism paragraph at lines 111-116 and the 'largest gap' framing above it predate that. Stream N is re-confirming the constant post-split, so re-run before editing the page"
+   "method": "MARKET_FACTOR_SIGMA in rust/src/market/tick.rs; the factor-vol process in factor_vol.rs reverts to its square",
+   "note": "the page's old mechanism paragraph (0.003, sector sigmas, variance share) is gone; 0.003 survives only as the reference implementation's value, so this row now pins the recalibrated constant the page publishes"
   },
   {
-   "id": "realism.sector_sigma_lo",
+   "id": "realism.idio_scale",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 112,
-   "label": "sector daily sigma runs 0.008...",
-   "published": 0.008,
+   "line": 165,
+   "label": "per-name idiosyncratic noise is scaled down by 0.84",
+   "published": 0.84,
    "group": "consts",
-   "key": "sector_sigma_min",
+   "key": "idio_sigma_scale",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "IDIO_SIGMA_SCALE in rust/src/market/factor_vol.rs"
+  },
+  {
+   "id": "realism.vix_corr_45",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 169,
+   "label": "pinned VIX 45 takes mean pairwise correlation to +0.68",
+   "published": 0.68,
+   "group": "vix",
+   "key": "corr_45",
    "compare": {
     "kind": "round",
-    "decimals": 3
+    "decimals": 2
    },
    "source": "stated",
-   "method": "min of pt.sector_daily_sigma over the twelve sectors"
+   "method": "the Scenarios page's method: facts.measure(seed=3, random(25,11), 120 days, hold(vix=45)) cross_sectional_corr"
   },
   {
-   "id": "realism.sector_sigma_hi",
+   "id": "realism.vix_corr_65",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 113,
-   "label": "...to 0.025",
-   "published": 0.025,
-   "group": "consts",
-   "key": "sector_sigma_max",
+   "line": 169,
+   "label": "and VIX 65 to +0.76",
+   "published": 0.76,
+   "group": "vix",
+   "key": "corr_65",
    "compare": {
     "kind": "round",
-    "decimals": 3
+    "decimals": 2
    },
    "source": "stated",
-   "method": "max of pt.sector_daily_sigma over the twelve sectors"
+   "method": "as realism.vix_corr_45 at VIX 65"
   },
   {
-   "id": "realism.sector_sigma_range",
+   "id": "realism.vix_corr_calm",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 113,
-   "label": "sector daily sigma runs 0.008 to 0.025, median 0.015",
-   "published": 0.015,
-   "group": "consts",
-   "key": "sector_sigma_median",
+   "line": 170,
+   "label": "against +0.27 calm",
+   "published": 0.27,
+   "group": "vix",
+   "key": "corr_15",
    "compare": {
     "kind": "round",
-    "decimals": 3
+    "decimals": 2
    },
    "source": "stated",
-   "method": "pt.sector_daily_sigma over the twelve sectors"
+   "method": "as realism.vix_corr_45 at VIX 15"
   },
   {
-   "id": "realism.variance_share",
+   "id": "realism.crisis_threshold",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 114,
-   "label": "the shared factor carries about 4% of a typical name's variance",
-   "published": 4.0,
+   "line": 173,
+   "label": "the correlation blend engages above VIX 25.5",
+   "published": 25.5,
    "group": "consts",
-   "key": "market_share_pct",
+   "key": "crisis_vix_threshold",
    "compare": {
-    "kind": "band",
-    "abs": 0.3
+    "kind": "exact"
    },
    "source": "stated",
-   "method": "(MARKET_FACTOR_SIGMA / median sector sigma)^2 from the measured constants, not the page's printed 0.003 - so a recalibrated sigma moves this row instead of silently passing"
+   "method": "CRISIS_VIX_THRESHOLD in rust/src/economy/state.rs"
+  },
+  {
+   "id": "realism.sweep_kurtosis_collapse",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 182,
+   "label": "the pre-era sweep found the correlation band reachable only where kurtosis had collapsed to 1.26",
+   "published": 1.26,
+   "group": null,
+   "key": null,
+   "compare": {
+    "kind": "none"
+   },
+   "source": "stated",
+   "status_override": "not_harnessable",
+   "note": "a historical record of the tools/calibration sweeps on the pre-era model; re-measuring it means rebuilding that model"
   },
   {
    "id": "realism.acf20",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 126,
-   "label": "clustering largely gone by lag twenty",
-   "published": 0.0,
+   "line": 199,
+   "label": "clustering gone by lag twenty: -0.006",
+   "published": -0.006,
    "group": "realism_six",
    "key": "abs_return_acf20_median",
    "compare": {
-    "kind": "band",
-    "abs": 0.05
+    "kind": "round",
+    "decimals": 3
    },
    "source": "stated",
-   "method": "median across the six realism seeds of abs_return_acf20"
+   "method": "median across the six realism seeds of abs_return_acf20; the page now prints the value"
+  },
+  {
+   "id": "realism.acf5",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 199,
+   "label": "clustering reads +0.090 at lag five",
+   "published": 0.09,
+   "group": "realism_six",
+   "key": "abs_return_acf5_median",
+   "compare": {
+    "kind": "round",
+    "decimals": 3
+   },
+   "source": "stated",
+   "method": "median across the six realism seeds of abs_return_acf5"
+  },
+  {
+   "id": "realism.leverage_sign_stable",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 215,
+   "label": "the leverage sign is stable: negative in six seeds of six",
+   "published": true,
+   "group": "realism_six",
+   "key": "leverage_all_negative",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "max of leverage_effect across the six realism seeds is below zero"
+  },
+  {
+   "id": "realism.factor_halflife",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 191,
+   "label": "the factor variance process's shocks decay with a half-life of about 13.5 days",
+   "published": 13.5,
+   "group": "consts",
+   "key": "factor_halflife_days",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "ln(0.5)/ln(MARKET_VOL_ALPHA + MARKET_VOL_BETA) from rust/src/market/factor_vol.rs"
+  },
+  {
+   "id": "realism.gjr_neg",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 219,
+   "label": "a negative day's squared return feeds through at ALPHA + GAMMA = 0.36",
+   "published": 0.36,
+   "group": "consts",
+   "key": "gjr_neg_passthrough",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "ALPHA + GAMMA in rust/src/market/garch.rs"
+  },
+  {
+   "id": "realism.gjr_alpha",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 219,
+   "label": "against ALPHA = 0.02 for a positive one",
+   "published": 0.02,
+   "group": "consts",
+   "key": "gjr_alpha",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "ALPHA in rust/src/market/garch.rs"
+  },
+  {
+   "id": "realism.gjr_gamma",
+   "file": "docs/how-realistic-is-this-market.md",
+   "line": 223,
+   "label": "GAMMA = 0.34, already large against literature GJR fits",
+   "published": 0.34,
+   "group": "consts",
+   "key": "gjr_gamma",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "GAMMA in rust/src/market/garch.rs"
   },
   {
    "id": "realism.impulse",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 174,
+   "line": 232,
    "label": "AR(2) impulse response rises to 1.284 by day two",
    "published": 1.284,
    "group": "consts",
@@ -2366,7 +3131,7 @@
   {
    "id": "realism.theta_counterfactual",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 196,
+   "line": 290,
    "label": "MOMENTUM_THETA 0.25 -> 0.05 takes return acf to +0.034",
    "published": 0.034,
    "group": null,
@@ -2381,8 +3146,8 @@
   {
    "id": "realism.garch_persistence",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 203,
-   "label": "GARCH persistence is 0.99",
+   "line": 190,
+   "label": "the per-name GJR-GARCH's effective persistence ALPHA + BETA + GAMMA/2 is 0.99",
    "published": 0.99,
    "group": "consts",
    "key": "garch_persistence",
@@ -2391,13 +3156,13 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "ALPHA + BETA in rust/src/market/garch.rs"
+   "method": "ALPHA + BETA + GAMMA/2 in rust/src/market/garch.rs - the GJR form the page states since the stream-AA rewrite"
   },
   {
    "id": "realism.ceiling_counterfactual",
    "file": "docs/how-realistic-is-this-market.md",
-   "line": 204,
-   "label": "raising the variance ceiling lifts clustering 0.016 and vol 52.7% -> 72%",
+   "line": 279,
+   "label": "raising the variance ceiling bought +0.016 of clustering for 20 points of volatility",
    "published": 0.016,
    "group": null,
    "key": null,
@@ -2407,36 +3172,6 @@
    "source": "stated",
    "status_override": "not_harnessable",
    "note": "requires rebuilding the engine with a changed constant"
-  },
-  {
-   "id": "realism.corr_calibration",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 208,
-   "label": "a realistic +0.30 needs a market factor near 0.0098 against the 0.0030 in the source",
-   "published": 0.0098,
-   "group": "arith",
-   "key": "sigma_for_corr_030",
-   "compare": {
-    "kind": "round",
-    "decimals": 4
-   },
-   "source": "stated",
-   "method": "0.65 x 0.015, the page's own arithmetic; the 0.0030 is realism.market_sigma"
-  },
-  {
-   "id": "realism.market_sigma_030",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 208,
-   "label": "'against the 0.0030 in the source' - the calibration paragraph's reference to the constant",
-   "published": 0.003,
-   "group": "consts",
-   "key": "market_factor_sigma",
-   "compare": {
-    "kind": "exact"
-   },
-   "source": "stated",
-   "method": "MARKET_FACTOR_SIGMA in rust/src/market/tick.rs",
-   "note": "same constant as realism.market_sigma; the calibration argument's premise moved when the sigma was recalibrated in 58837b3"
   },
   {
    "id": "repro.version",
@@ -2497,7 +3232,7 @@
   {
    "id": "repro.archive_fp",
    "file": "docs/reproducing-a-run.md",
-   "line": 155,
+   "line": 158,
    "label": "rebuilt universe fingerprint matches the archive",
    "published": true,
    "group": "replay",
@@ -2511,7 +3246,7 @@
   {
    "id": "repro.replay_prices",
    "file": "docs/reproducing-a-run.md",
-   "line": 159,
+   "line": 162,
    "label": "replayed.prices() == engine.prices()",
    "published": true,
    "group": "replay",
@@ -2525,7 +3260,7 @@
   {
    "id": "repro.replay_draws",
    "file": "docs/reproducing-a-run.md",
-   "line": 160,
+   "line": 163,
    "label": "replayed.draws_consumed == engine.draws_consumed",
    "published": true,
    "group": "replay",
@@ -2539,7 +3274,7 @@
   {
    "id": "repro.kat_historical",
    "file": "docs/reproducing-a-run.md",
-   "line": 196,
+   "line": 202,
    "label": "at a5afd1c two independent platform builds produced the identical digest (historical record)",
    "published": "112fd73e8e5bc0d68788627a3d74d814553094b9527f9ff480c55426e6eff337",
    "group": null,
@@ -2552,11 +3287,40 @@
    "note": "pinned to commit a5afd1c; see readme.kat_digest"
   },
   {
+   "id": "repro.kat_five_targets",
+   "file": "docs/reproducing-a-run.md",
+   "line": 199,
+   "label": "at ad91026 (v5) all five targets produced the identical digest 76983e65...3180eeb",
+   "published": "76983e65...3180eeb",
+   "group": null,
+   "key": null,
+   "compare": {
+    "kind": "none"
+   },
+   "source": "stated",
+   "status_override": "not_harnessable",
+   "note": "a historical record of the determinism gate's run at ad91026, pinned to that commit; not re-measurable from the installed package"
+  },
+  {
+   "id": "repro.kat_current_digest",
+   "file": "docs/reproducing-a-run.md",
+   "line": 207,
+   "label": "the current digest, 1ee64998...fe3581c at v8",
+   "published": "1ee64998...fe3581c",
+   "group": "determinism",
+   "key": "kat_digest_elided",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "known_answer_digest() on this build, elided the way the page prints it (first 8 and last 7 hex characters)"
+  },
+  {
    "id": "repro.kat_era_version",
    "file": "docs/reproducing-a-run.md",
-   "line": 198,
-   "label": "'0b4579d ... bumped the known-answer baseline to v4' - named as the current era",
-   "published": 4,
+   "line": 207,
+   "label": "'the current digest ... at v8' - the era named as current",
+   "published": 8,
    "group": "determinism",
    "key": "kat_version",
    "compare": {
@@ -2564,7 +3328,7 @@
    },
    "source": "stated",
    "method": "KAT_VERSION in tests/known_answer.py",
-   "note": "ad91026 bumped it again to v5 when the RNG split regenerated the baseline; this paragraph and the README table are one era behind"
+   "note": "the page now carries the by-commit record: v5 measured on all five targets at ad91026 (repro.kat_five_targets), v6/v7/v8 from the era's model changes, v8 current"
   },
   {
    "id": "share.version",
@@ -2626,47 +3390,300 @@
   {
    "id": "tca.entry_cost",
    "file": "docs/transaction-cost-analysis.md",
-   "line": 28,
-   "label": "buying and holding costs +16.7 bps in one measured example",
-   "published": 16.7,
-   "group": null,
-   "key": null,
+   "line": 30,
+   "label": "buying 97 shares (1% ADV) at the first step and holding costs +16.71 bps",
+   "published": 16.71,
+   "group": "tca_example",
+   "key": "entry_bps",
    "compare": {
-    "kind": "none"
+    "kind": "round",
+    "decimals": 2
    },
-   "source": "unknown",
-   "status_override": "method_unknown",
-   "note": "'one measured example' with no seed, universe, size or horizon stated anywhere in the repo; the number cannot be re-measured as published"
+   "source": "stated",
+   "note": "was method_unknown ('one measured example', nothing stated); stream AB attached the test suite's pinned configuration and the value reproduced",
+   "method": "tca.analyse(BuyOnce(0.01), first name of random(20,7), one six-step day, sim seed 2026).shortfall_bps(); the page states the whole method since the stream-AB rewrite"
+  },
+  {
+   "id": "tca.first_adv",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 26,
+   "label": "the first name of random(20,7) has ADV 9,713 shares",
+   "published": 9713,
+   "group": "tca_example",
+   "key": "first_adv",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "round(Universe.random(20, seed=7)[0].avg_volume)"
+  },
+  {
+   "id": "tca.entry_seed_invariant",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 30,
+   "label": "the entry cost is identical on every seed measured",
+   "published": true,
+   "group": "tca_example",
+   "key": "entry_all_equal",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "entry shortfall equal across sim seeds 2026,1,2,3,4,5,7,11; the entry lands at step zero, before the worlds can diverge"
   },
   {
    "id": "tca.roundtrip_cost",
    "file": "docs/transaction-cost-analysis.md",
-   "line": 29,
-   "label": "buying and selling three steps later comes to -10.8 bps",
-   "published": -10.8,
-   "group": null,
-   "key": null,
+   "line": 35,
+   "label": "the round trip's median across the eight published seeds: -8.4 bps",
+   "published": -8.4,
+   "group": "tca_example",
+   "key": "rt_median",
    "compare": {
-    "kind": "none"
+    "kind": "range",
+    "decimals": 1,
+    "lo": -13.3,
+    "hi": 5.8
    },
-   "source": "unknown",
-   "status_override": "method_unknown",
-   "note": "same unstated example as tca.entry_cost"
+   "source": "stated",
+   "note": "was method_unknown and a point (-10.8); the era's re-deal flipped the anchor seed, so the page now publishes a seed range and this row is judged as one: the median against the printed -8.4, falling back to the published -13.3..+5.8 range",
+   "method": "tca.analyse(RoundTrip(0.01)).shortfall_bps() over sim seeds 2026,1,2,3,4,5,7,11; same configuration as tca.entry_cost"
+  },
+  {
+   "id": "tca.roundtrip_lo",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 33,
+   "label": "the round trip ends anywhere between -13.3...",
+   "published": -13.3,
+   "group": "tca_example",
+   "key": "rt_lo",
+   "compare": {
+    "kind": "band",
+    "abs": 0.1
+   },
+   "source": "stated",
+   "method": "min over the eight published seeds",
+   "note": "the page rounds the range outward (measured -13.25 prints as -13.3), so the endpoints are judged to within one outward-rounding step rather than at nearest-decimal precision"
+  },
+  {
+   "id": "tca.roundtrip_hi",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 34,
+   "label": "...and +5.8 bps",
+   "published": 5.8,
+   "group": "tca_example",
+   "key": "rt_hi",
+   "compare": {
+    "kind": "band",
+    "abs": 0.1
+   },
+   "source": "stated",
+   "method": "max over the eight published seeds",
+   "note": "see tca.roundtrip_lo on outward rounding"
+  },
+  {
+   "id": "tca.roundtrip_neg",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 34,
+   "label": "negative on six of the eight",
+   "published": 6,
+   "group": "tca_example",
+   "key": "rt_neg",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "count of negative round-trip shortfalls over the eight seeds"
   },
   {
    "id": "tca.partial_fill",
    "file": "docs/transaction-cost-analysis.md",
-   "line": 35,
-   "label": "a request for 4,856 shares filled 483, and every larger request filled the same 483",
+   "line": 45,
+   "label": "a request for 4,856 shares (half ADV, sim seed 2026) filled 483",
    "published": 483,
+   "group": "tca_example",
+   "key": "fill_half",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "note": "was method_unknown; the mechanism is now stated correctly on the page as the book truncating at displayed depth (tca.fill_saturates, tca.fill_seed_invariant), and examples/research_workflow.py asserts the structural gate every run",
+   "method": "tca.analyse(BuyOnce(0.5)) partial_fills(), same configuration as tca.entry_cost; the page states the method since the stream-AB rewrite"
+  },
+  {
+   "id": "tca.fill_requested",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 44,
+   "label": "the request was for 4,856 shares (half ADV)",
+   "published": 4856,
+   "group": "tca_example",
+   "key": "fill_half_requested",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "round(requested) from the partial-fill record"
+  },
+  {
+   "id": "tca.fill_saturates",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 46,
+   "label": "requests of 9,713 and 48,563 shares fill the same 483",
+   "published": true,
+   "group": "tca_example",
+   "key": "fills_saturate",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "opening fills equal across participations 0.5, 1.0 and 5.0 of ADV at sim seed 2026; the book truncating at displayed depth",
+   "note": "also asserted structurally by examples/research_workflow.py every run"
+  },
+  {
+   "id": "tca.fill_seed_invariant",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 47,
+   "label": "483 at the open on every seed measured - opening depth is a property of the universe",
+   "published": true,
+   "group": "tca_example",
+   "key": "fill_seed_invariant",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the half-ADV opening fill equal across the eight published seeds"
+  },
+  {
+   "id": "tca.no_draws",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 56,
+   "label": "order flow consumes no RNG draws - the per-domain stream split exists for exactly this",
+   "published": true,
    "group": null,
    "key": null,
    "compare": {
     "kind": "none"
    },
-   "source": "unknown",
-   "status_override": "method_unknown",
-   "note": "instrument and universe unstated; the structural claim (fills saturate at displayed depth) is asserted every run by examples/research_workflow.py, which this harness executes"
+   "source": "stated",
+   "status_override": "covered_by_tests",
+   "note": "asserted by tests/test_tca.py (the untraded world is unmoved where the trader did not go) and tests/test_streams.py; the qualified successor of the retired scen.tca_exact"
+  },
+  {
+   "id": "tca.ripple_traded",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 65,
+   "label": "the agent traded 46 names",
+   "published": 46,
+   "group": "tca_ripple",
+   "key": "traded_names",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "tca.analyse(Momentum(), seed=7, random(60,11), 10 days); distinct tickers in fills - the page states the whole method"
+  },
+  {
+   "id": "tca.ripple_untouched",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 65,
+   "label": "leaving fourteen untouched",
+   "published": 14,
+   "group": "tca_ripple",
+   "key": "untouched_names",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "as tca.ripple_traded",
+   "note": "PR 25 said '2 of 44 untraded names'; on this build Momentum trades 46 of the 60, so the page's 14 is the honest denominator and it reproduces"
+  },
+  {
+   "id": "tca.ripple_moved",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 65,
+   "label": "two of the fourteen it never touched moved",
+   "published": 2,
+   "group": "tca_ripple",
+   "key": "leaked_count",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "len(untouched_moved()) on the same run"
+  },
+  {
+   "id": "tca.ripple_lo",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 66,
+   "label": "by -6.5...",
+   "published": -6.5,
+   "group": "tca_ripple",
+   "key": "leak_min_bps",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "impact_bps of the two leaked names, smaller"
+  },
+  {
+   "id": "tca.ripple_hi",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 66,
+   "label": "...and +3.2 bps",
+   "published": 3.2,
+   "group": "tca_ripple",
+   "key": "leak_max_bps",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "impact_bps of the two leaked names, larger"
+  },
+  {
+   "id": "tca.ripple_direct",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 66,
+   "label": "against a 13.0 bps median direct impact on the traded names",
+   "published": 13.0,
+   "group": "tca_ripple",
+   "key": "direct_median_bps",
+   "compare": {
+    "kind": "round",
+    "decimals": 1
+   },
+   "source": "stated",
+   "method": "median |impact_bps| over the traded names, exactly as examples/research_workflow.py computes it"
+  },
+  {
+   "id": "tca.ripple_short_horizon",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 69,
+   "label": "the same configuration run for two, three or four days leaks nothing",
+   "published": true,
+   "group": "tca_ripple",
+   "key": "short_horizon_no_leak",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "untouched_moved() empty at days=2, 3 and 4 on the same configuration"
+  },
+  {
+   "id": "tca.ripple_pinned_empty",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 84,
+   "label": "pinned, untouched_moved() comes back empty - byte-exact",
+   "published": true,
+   "group": "tca_ripple",
+   "key": "pinned_empty",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same ten-day run under hold(vix=15.0)",
+   "note": "also asserted by examples/research_workflow.py every run (readme.workflow_asserts executes it)"
   },
   {
    "id": "sweeps.buffers",
@@ -2819,33 +3836,31 @@
    "id": "spec.rebalance_high",
    "file": "docs/strategy-specs.md",
    "line": 152,
-   "label": "the rebalance table swings the same signal from +88.7%...",
-   "published": 88.7,
+   "label": "the rebalance table swings the same signal from +97.5%...",
+   "published": 97.5,
    "group": "rebalance",
    "key": "ret_3",
    "compare": {
     "kind": "round",
     "decimals": 1
    },
-   "source": "reconstructed",
-   "method": "same measurement as readme.rebalance_3",
-   "note": "a page written after the era boundary quoting the pre-boundary figures from the baselines docstring; whatever the rebalance rows re-measure to belongs here too"
+   "source": "stated",
+   "method": "same measurement as readme.rebalance_3; seed 2026, random(40,7), 30 days now stated on the page"
   },
   {
    "id": "spec.rebalance_low",
    "file": "docs/strategy-specs.md",
    "line": 152,
-   "label": "...to -13.2% purely by trading it more often",
-   "published": -13.2,
+   "label": "...to +0.1% purely by trading it more often",
+   "published": 0.1,
    "group": "rebalance",
    "key": "ret_12",
    "compare": {
     "kind": "round",
     "decimals": 1
    },
-   "source": "reconstructed",
-   "method": "same measurement as readme.rebalance_12",
-   "note": "see spec.rebalance_high"
+   "source": "stated",
+   "method": "same measurement as readme.rebalance_12; method stated on the page"
   },
   {
    "id": "readme.workflow_asserts",
