@@ -275,12 +275,18 @@ def _run_one(args: tuple) -> Any:
     waiting to happen. A list of dicts cannot be.
     """
     (seed, universe_json, macro_kwargs, days, ticks, hour, minute, day_of_week,
-     collect, path, fingerprint) = args
+     collect, path, fingerprint, model) = args
     universe = Universe.from_json(universe_json)
+    # The model crosses as the OBJECT, unlike the universe. Same reasoning,
+    # opposite conclusion: what makes thread-shared state safe here is
+    # immutability, and ModelParams is immutable by construction where a
+    # Universe is a mutable list. Serialising it would round-trip through
+    # from_dict for no isolation gained.
     engine = Engine(
         seed=seed,
         universe=universe,
         macro_state=Macro(**macro_kwargs) if macro_kwargs is not None else None,
+        model=model,
     )
     for day in range(days):
         if path is not None:
@@ -300,6 +306,7 @@ def _run_one(args: tuple) -> Any:
             # none, which is why it is the one mode without provenance.
             "seed": seed,
             "universe_fingerprint": fingerprint,
+            "model_fingerprint": engine.model_fingerprint,
             "columns": {name: engine.attribution(name)
                         for name in _harness.FACTOR_NAMES},
         }
@@ -315,6 +322,10 @@ def _run_one(args: tuple) -> Any:
             # generated positionally, so two universes share every name and
             # no fundamentals.
             "universe_fingerprint": fingerprint,
+            # And which model. One sweep runs one model, but the row is
+            # what travels, and a row that cannot name its coefficient set
+            # merges silently with rows from a different model's sweep.
+            "model_fingerprint": engine.model_fingerprint,
             "prices": engine.prices(),
             "draws_consumed": engine.draws_consumed,
             "tickers": engine.tickers,
@@ -335,6 +346,7 @@ def run_many(
     workers: int | None = None,
     collect: str = "prices",
     scenario: Any = None,
+    model: str | ModelParams | None = None,
 ) -> list[Any]:
     """Run one simulation per seed, in parallel, and return results in order.
 
@@ -363,6 +375,12 @@ def run_many(
     ``collect`` chooses what comes back: ``"prices"`` (raw f64 bytes),
     ``"attribution"`` (the seven component columns), or ``"summary"`` (prices,
     draw count and tickers).
+
+    ``model`` selects the coefficient set — a preset name or a
+    :class:`pretium.ModelParams` — and every seed runs it, because a sweep
+    is many draws of ONE market and members under different models would be
+    a model comparison presented as a seed distribution. The ``summary``
+    and ``attribution`` rows record ``model_fingerprint``.
 
     # Threads, and why that is not a compromise
 
@@ -412,7 +430,7 @@ def run_many(
     fingerprint = _universe_util.fingerprint_of(universe)
     payloads = [
         (seed, universe_json, macro_kwargs, days, ticks, hour, minute,
-         day_of_week, collect, path, fingerprint)
+         day_of_week, collect, path, fingerprint, model)
         for seed in seeds
     ]
 
@@ -581,6 +599,7 @@ def flow_impact(
     days: int = 1,
     ticks: int = 390,
     start: tuple[int, int, int] = (9, 30, 3),
+    model: str | ModelParams | None = None,
 ) -> FlowImpact:
     """Measure what an order-flow imbalance does to the market.
 
@@ -588,7 +607,10 @@ def flow_impact(
     returns both worlds plus their difference.
 
     The two runs are otherwise identical by construction: same seed, same
-    universe, same macro, same session. The ONLY difference is the flow, which
+    universe, same macro, same session, and the same ``model`` — a preset
+    name or a :class:`pretium.ModelParams`, applied to BOTH worlds, since a
+    difference against a baseline under other coefficients would measure
+    the model rather than the flow. The ONLY difference is the flow, which
     is what makes the subtraction meaningful. Anything else that differed
     between them would show up as impact and be wrong.
     """
@@ -599,7 +621,8 @@ def flow_impact(
         )
 
     def run(flow):
-        engine = Engine(seed=seed, universe=universe, macro_state=macro)
+        engine = Engine(seed=seed, universe=universe, macro_state=macro,
+                        model=model)
         for _ in range(days):
             engine.open_market()
             engine.run_session(*start, ticks, order_flow=flow)

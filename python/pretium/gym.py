@@ -40,7 +40,8 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from ._core import Engine, Instrument, Macro, OrderError, ValidationError
+from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
+                    ValidationError)
 from .harness import session_clock
 from .portfolio import Portfolio
 from .universe_util import as_universe
@@ -99,12 +100,19 @@ class TradingEnv(_Base):
         cash: float = 1_000_000.0,
         max_leverage: float | None = 2.0,
         start: tuple[int, int, int] = (9, 30, 3),
+        model: str | ModelParams | None = None,
     ) -> None:
         _require(_np, "numpy", "numpy")
 
         self.universe = as_universe(universe)
         self.base_seed = int(seed)
         self.macro = macro
+        # The coefficient set every episode runs -- a preset name or a
+        # ModelParams, fixed at construction like the universe. Per-episode
+        # models would make a policy's replay buffer a mixture of markets
+        # with nothing in the observation to tell them apart; train against
+        # a different model by building a different env.
+        self.model = model
         self.days = int(days)
         self.steps_per_day = int(steps_per_day)
         self.ticks_per_step = int(ticks_per_step)
@@ -169,14 +177,18 @@ class TradingEnv(_Base):
 
         episode_seed = self.base_seed if seed is None else int(seed)
         self.engine = Engine(seed=episode_seed, universe=self.universe,
-                             macro_state=self.macro)
+                             macro_state=self.macro, model=self.model)
         self.portfolio = Portfolio(cash=self.starting_cash,
                                    max_leverage=self.max_leverage)
         self._step = 0
         self.engine.open_market()
         self._prev_prices = self._prices()
         self._prev_worth = self.portfolio.net_worth(self.engine)
-        return self._observe(), {"seed": episode_seed}
+        # The info dict names the episode's market: the seed that drew it
+        # and the model that priced it, so a training log can cite both.
+        return self._observe(), {"seed": episode_seed,
+                                 "model_fingerprint":
+                                     self.engine.model_fingerprint}
 
     def step(self, action):
         if self.engine is None or self.portfolio is None:

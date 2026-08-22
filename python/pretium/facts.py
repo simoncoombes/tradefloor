@@ -190,7 +190,7 @@ import math
 import statistics
 from typing import Any, Sequence
 
-from ._core import Engine, Instrument, Macro, ValidationError
+from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
 from .universe_util import fingerprint_of
 
 #: What the same statistics look like for real daily equity returns, as
@@ -479,12 +479,22 @@ def measure(
     macro: Macro | None = None,
     scenario: Any = None,
     min_observations: int = 30,
+    model: str | ModelParams | None = None,
 ) -> dict[str, Any]:
     """Run a market and report its statistical properties.
 
     Eight statistics against `REAL_MARKETS`: two marginal, describing one
     return series on its own, and six dependence, describing how things move
     together. The split is the finding, so `report` prints it in two sections.
+
+    ``model`` selects the coefficient set the market runs — a preset name or
+    a :class:`pretium.ModelParams` — defaulting to the shipped preset. This
+    is the seam the calibration search evaluates through: the panel at a
+    candidate vector is ``measure(model=candidate)``, no rebuild. The result
+    carries ``model_fingerprint`` beside ``universe_fingerprint`` for the
+    same reason that field exists — a realism claim is only checkable
+    against the exact model it measured, and ``custom-XXXXXXXX`` can never
+    present as the shipped one.
 
     Cross-sectional statistics are pooled where pooling is meaningful and taken
     as a MEDIAN across instruments where it is not. Autocorrelation is the
@@ -500,7 +510,8 @@ def measure(
     if days < 2:
         raise ValidationError("days must be at least 2 to have a return")
 
-    engine = Engine(seed=seed, universe=universe, macro_state=macro)
+    engine = Engine(seed=seed, universe=universe, macro_state=macro,
+                    model=model)
     for day in range(days):
         if scenario is not None:
             scenario.apply(engine, day)
@@ -556,6 +567,11 @@ def measure(
         # is unfalsifiable: "kurtosis is +4.8" is only checkable against the
         # roster it was measured on, and tickers do not identify a roster.
         "universe_fingerprint": fingerprint_of(universe),
+        # And which MODEL produced them. The panel is the calibration
+        # search's objective, so a panel row that does not name its
+        # coefficient set is exactly the ambiguity the fingerprint exists
+        # to remove.
+        "model_fingerprint": engine.model_fingerprint,
         "days": days,
         "instruments": count,
         "observations": len(pooled),

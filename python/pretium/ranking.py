@@ -99,7 +99,7 @@ from __future__ import annotations
 import statistics
 from typing import Any, Callable, Iterable, Sequence
 
-from ._core import Instrument, Macro, ValidationError
+from ._core import Instrument, Macro, ModelParams, ValidationError
 
 
 class AgentRecord:
@@ -210,11 +210,12 @@ class Ranking:
     """Agent results over a set of seeds, and the comparisons worth making."""
 
     __slots__ = ("records", "seeds", "unmeasurable", "universe_fingerprint",
-                 "oracle", "reference_pnls")
+                 "oracle", "reference_pnls", "model_fingerprint")
 
     def __init__(self, records: dict[str, AgentRecord], seeds: list[int],
                  unmeasurable: list[int], universe_fingerprint: str,
-                 oracle: str, reference_pnls: list[float]) -> None:
+                 oracle: str, reference_pnls: list[float],
+                 model_fingerprint: str = "") -> None:
         self.records = records
         self.seeds = seeds
         #: What the reference earned on each seed, parallel to ``seeds``. This
@@ -230,6 +231,10 @@ class Ranking:
         self.unmeasurable = unmeasurable
         self.universe_fingerprint = universe_fingerprint
         self.oracle = oracle
+        #: The model every seed ran under -- one value, because ranking
+        #: agents across different models would compare markets, not
+        #: agents. A shipped preset's name or custom-XXXXXXXX.
+        self.model_fingerprint = model_fingerprint
 
     def table(self, by: str = "pooled_capture") -> list[AgentRecord]:
         """Records sorted best-first, ties broken on name.
@@ -307,6 +312,7 @@ class Ranking:
             "seeds": list(self.seeds),
             "unmeasurable_seeds": list(self.unmeasurable),
             "universe_fingerprint": self.universe_fingerprint,
+            "model_fingerprint": self.model_fingerprint,
             "oracle": self.oracle,
             "reference_pnls": list(self.reference_pnls),
             "agents": {n: r.as_dict() for n, r in self.records.items()},
@@ -317,6 +323,11 @@ class Ranking:
         lines = [
             f"{len(self.seeds)} seeds on universe "
             f"{self.universe_fingerprint[:12]}..."
+            # The model is part of the citation whenever one was recorded;
+            # a custom-XXXXXXXX here is what stops a modified-model ranking
+            # reading as a benchmark table.
+            + (f" under model {self.model_fingerprint}"
+               if self.model_fingerprint else "")
         ]
         for record in self.table():
             pooled = record.pooled_capture
@@ -397,6 +408,7 @@ def rank(
     scenario: Any = None,
     oracle: str = "oracle",
     workers: int = 1,
+    model: str | ModelParams | None = None,
 ) -> Ranking:
     """Score agents on many seeds and rank them on the aggregate.
 
@@ -406,6 +418,12 @@ def rank(
     Every agent still meets an identical market within each seed, so the
     per-seed comparison stays exact. What changes is that the verdict is taken
     across seeds, where it is a property of the agents rather than of one draw.
+
+    ``model`` selects the coefficient set every evaluation runs — a preset
+    name or a :class:`pretium.ModelParams` — one model for the whole
+    ranking, agents and seeds alike, because a verdict taken across models
+    would rank markets rather than agents. The :class:`Ranking` records
+    ``model_fingerprint``, as does every scorecard under it.
 
     ```python
     ranking = pt.rank(lambda: reference_agents(seed=3), seeds=range(12),
@@ -434,7 +452,7 @@ def rank(
     kwargs: dict[str, Any] = dict(
         universe=roster, macro=macro, days=days, steps_per_day=steps_per_day,
         ticks_per_step=ticks_per_step, cash=cash, max_leverage=max_leverage,
-        start=start, scenario=scenario,
+        start=start, scenario=scenario, model=model,
     )
 
     def one(seed: int):
@@ -471,5 +489,8 @@ def rank(
             if name == winner:
                 record.wins += 1
 
+    # Read off a scorecard rather than recomputed here, so the recorded
+    # name is the one the evaluations actually ran under.
+    model_fingerprint = next(iter(results[0][1].values())).model_fingerprint
     return Ranking(records, seed_list, unmeasurable, fingerprint_of(roster),
-                   oracle, reference_pnls)
+                   oracle, reference_pnls, model_fingerprint)

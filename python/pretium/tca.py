@@ -83,7 +83,8 @@ from __future__ import annotations
 import struct
 from typing import Any, Sequence
 
-from ._core import Engine, Instrument, Macro, OrderError, ValidationError
+from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
+                    ValidationError)
 from .harness import Observation, session_clock
 from .portfolio import Portfolio
 from .universe_util import as_universe, fingerprint_of
@@ -98,10 +99,11 @@ class Execution:
 
     __slots__ = ("tickers", "fills", "baseline_path", "actual_path",
                  "baseline_final", "actual_final", "seed", "portfolio",
-                 "steps", "universe_fingerprint")
+                 "steps", "universe_fingerprint", "model_fingerprint")
 
     def __init__(self, *, tickers, fills, baseline_path, actual_path, seed,
-                 portfolio, steps, universe_fingerprint=""):
+                 portfolio, steps, universe_fingerprint="",
+                 model_fingerprint=""):
         self.tickers = list(tickers)
         self.fills = list(fills)
         # One cross-section per decision step, in both worlds. The path rather
@@ -119,6 +121,12 @@ class Execution:
         # meaningless without the book it was paid against, and the book is a
         # property of the roster.
         self.universe_fingerprint = universe_fingerprint
+        # And which MODEL priced it -- both worlds ran the same one, so this
+        # is one value. A shipped preset's name or custom-XXXXXXXX, the same
+        # honesty mechanism as Scorecard's: a cost measured under a modified
+        # coefficient set can never present as one paid in the benchmark
+        # market.
+        self.model_fingerprint = model_fingerprint
 
     # -- shortfall --------------------------------------------------------
 
@@ -237,6 +245,7 @@ class Execution:
         return {
             "seed": self.seed,
             "universe_fingerprint": self.universe_fingerprint,
+            "model_fingerprint": self.model_fingerprint,
             "steps": self.steps,
             "fills": len(self.fills),
             "traded": traded,
@@ -268,6 +277,7 @@ def analyse(
     max_leverage: float | None = 2.0,
     start: tuple[int, int, int] = (9, 30, 3),
     scenario: Any = None,
+    model: str | ModelParams | None = None,
 ) -> Execution:
     """Run an agent, then run the same market without it, and price the gap.
 
@@ -280,6 +290,12 @@ def analyse(
     execution cost DURING a shock, against the same shock without it. Both
     worlds run the identical macro path, so the difference is still the
     trading and not the regime.
+
+    ``model`` selects the coefficient set — a preset name or a
+    :class:`pretium.ModelParams` — and BOTH worlds run it, for the same
+    reason they share a scenario: a shortfall priced against a baseline
+    under a different model would measure the model gap, not the trading.
+    The :class:`Execution` records ``model_fingerprint``.
 
     Returns an :class:`Execution`. Its ``shortfall`` is the measurement real
     TCA cannot make, because the benchmark it compares against is a market
@@ -294,7 +310,8 @@ def analyse(
     adv = [instrument.avg_volume for instrument in universe]
 
     def fresh():
-        return Engine(seed=seed, universe=universe, macro_state=macro)
+        return Engine(seed=seed, universe=universe, macro_state=macro,
+                      model=model)
 
     # -- world A: the trader exists ---------------------------------------
     engine = fresh()
@@ -363,4 +380,5 @@ def analyse(
         portfolio=portfolio,
         steps=step,
         universe_fingerprint=fingerprint_of(universe),
+        model_fingerprint=engine.model_fingerprint,
     )

@@ -326,9 +326,12 @@ class EngineBatch:
     tickers: list[str]
     draws_consumed: list[int]
     shape: tuple[int, int]
+    model: ModelParams
+    model_fingerprint: str
     def __init__(
         self, *, seeds: Sequence[int], universe: Sequence[Instrument],
         macro_state: Macro | None = ...,
+        model: str | ModelParams | None = ...,
     ) -> None: ...
     def __len__(self) -> int: ...
     def open_market(self) -> None: ...
