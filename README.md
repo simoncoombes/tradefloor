@@ -234,4 +234,5 @@ the archived order log - gathered with worked examples in
 
 ## Licence
 
-Apache-2.0. See `LICENSE` and `NOTICE`.
+Dual-licensed under MIT or Apache-2.0, at your option. See `LICENSE-MIT`,
+`LICENSE-APACHE` and `NOTICE`.

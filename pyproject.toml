@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "Deterministic market simulation with a real limit order book."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "Apache-2.0"
+# Dual-licensed, the Rust-ecosystem norm. See LICENSE-APACHE and LICENSE-MIT
+# at the repository root, and DECISIONS.md in pretium-design for the
+# reasoning that superseded an earlier Apache-2.0-only decision.
+license = "MIT OR Apache-2.0"
 authors = [{ name = "Simon Coombes" }]
 keywords = ["simulation", "finance", "market", "orderbook", "deterministic", "backtesting"]
 classifiers = [
