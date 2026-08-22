@@ -248,8 +248,23 @@ impl Engine {
             economy,
             central_bank,
             sector_keys,
-            crate::params::PT_V1,
+            Self::default_model(),
         )
+    }
+
+    /// The preset an engine gets when the caller names none.
+    ///
+    /// One definition, because the alternative is what this replaced: the
+    /// default written as a bare `PT_V1` at two call sites, where moving an
+    /// era means finding both. Since 2026-08-22 this is [`PT_V3`], the
+    /// converged margined optimum — `L_real` 0.0000 on all three 252-day
+    /// axes and 0.0058 on the 504-day one. `pt-v1` and `pt-v2` stay
+    /// selectable and bit-reproducing, so anything recorded under either
+    /// replays exactly by naming it.
+    ///
+    /// [`PT_V3`]: crate::params::PT_V3
+    pub const fn default_model() -> crate::params::ModelParams {
+        crate::params::PT_V3
     }
 
     /// [`Engine::new`] under an explicit model preset (the runtime seam,

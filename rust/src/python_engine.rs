@@ -544,7 +544,7 @@ pub fn model_params_from(
     model: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<crate::params::ModelParams> {
     let Some(value) = model else {
-        return Ok(crate::params::PT_V1);
+        return Ok(crate::engine::Engine::default_model());
     };
     if let Ok(name) = value.extract::<String>() {
         return crate::params::ModelParams::preset(&name).ok_or_else(|| {
