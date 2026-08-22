@@ -36,11 +36,21 @@ def facts():
 
 def test_returns_are_fat_tailed():
     # The most robust fact about asset returns, and the one a Gaussian
-    # simulator gets wrong. Measured around +4 across seeds; real daily equity
-    # returns run +3 to +10.
+    # simulator gets wrong. Real daily equity returns run +3 to +10.
+    #
+    # The 2026-08 market-factor recalibration spent some of this statistic
+    # deliberately: the shared factor is Gaussian, so the correlation it buys
+    # dilutes the GARCH-driven tails, and the sigma sweep
+    # (tools/calibration/) chose the largest value whose SIX-SEED MEDIAN
+    # kurtosis stays inside the band (+3.24). This fixture's single seed is
+    # the noisy floor of that spread — a fourth moment on one seed, exactly
+    # the estimator this file's universe comment warns about — so what is
+    # asserted here is fat-tailedness itself, not band membership on one
+    # draw. If this reads near-Gaussian (< 1.5), the tails are gone and the
+    # calibration trade documented on MARKET_FACTOR_SIGMA has been
+    # re-traded; re-run the sweep before touching anything.
     facts = measure(seed=3, universe=UNIVERSE, days=180)
     assert facts["excess_kurtosis"] > 1.5
-    assert compare_to_real_markets(facts)["excess_kurtosis"]["matches"]
 
 
 def test_volatility_clusters():
@@ -137,19 +147,23 @@ def test_the_report_covers_dependence_and_not_only_marginals(facts):
         assert label in text, label
 
 
-def test_stocks_here_barely_move_together(facts):
-    """Cross-sectional correlation near zero, against +0.25 to +0.35 real.
+def test_stocks_move_together_more_than_before_but_less_than_reality(facts):
+    """Cross-sectional correlation is a third of real, up from a tenth.
 
-    The largest realism gap in the model, and it went undetected for as long
-    as it did because nothing measured it. The shared market factor carries a
-    few percent of a single name's variance, and that share IS the pairwise
-    correlation it can induce.
-
-    The cost of it: diversification works far better here than in any real
-    market, market beta barely exists, and an index built from these names is
-    smoother than a real one.
+    The largest realism gap in the model. The share of a name's variance the
+    shared market factor carries IS the pairwise correlation it can induce,
+    and before the 2026-08 recalibration that share put the measurement at
+    +0.026 against a real +0.25 to +0.35. The sigma sweep behind the
+    recalibration (tools/calibration/) tripled it — and showed the band
+    itself is unreachable by that constant: a Gaussian factor big enough to
+    reach +0.25 collapses kurtosis to a third of ITS band's floor and adds
+    seventeen points of annualised volatility. So both bounds here are
+    load-bearing: the floor pins the recalibration (a regression to the old
+    near-zero regime must fail), and the verdict pins the honesty (this is
+    still not a real market's correlation, and diversification still works
+    better here than it should).
     """
-    assert facts["cross_sectional_corr"] < 0.10
+    assert 0.04 < facts["cross_sectional_corr"] < 0.15
     verdict = compare_to_real_markets(facts)["cross_sectional_corr"]
     assert not verdict["matches"]
     assert verdict["verdict"] == "too low"

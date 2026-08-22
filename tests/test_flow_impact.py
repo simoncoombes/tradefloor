@@ -14,25 +14,43 @@ UNIVERSE = pretium.Universe.random(6, seed=3)
 TRADED = UNIVERSE[0].ticker
 
 
+# A day's counterfactual impact carries noise as well as push: the flow
+# perturbs the traded name's own state (its book, its maker inventory, its
+# variance path), and identical draws map through that perturbed state to a
+# per-seed divergence of several bps either way. At this flow size the
+# deterministic push is ALSO a few bps — `order_imbalance` floors at 0.2 for
+# any realistic participation, so raising the flow does not raise the push —
+# which makes single-seed sign assertions a seed lottery. They passed by luck
+# before the 2026-08 market-factor recalibration re-rolled every trajectory
+# (at the old sigma, seed 6 already read -4 bps for a buyer). The direction
+# of the MECHANISM is asserted where it is visible: in the mean across seeds.
+IMPACT_SEEDS = range(1, 9)
+
+
+def _mean_impact_and_cost_bps(flow):
+    impact = cost = 0.0
+    for seed in IMPACT_SEEDS:
+        cf = pretium.flow_impact(
+            seed=seed, universe=UNIVERSE, order_flow={TRADED: flow}, ticks=390
+        )
+        impact += cf.impact_bps[cf.tickers.index(TRADED)]
+        cost += cf.cost_bps(TRADED)
+    return impact / len(IMPACT_SEEDS), cost / len(IMPACT_SEEDS)
+
+
 def test_a_buyer_moves_the_price_up_and_pays_for_it():
-    cf = pretium.flow_impact(
-        seed=42, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
-    )
-    i = cf.tickers.index(TRADED)
-    assert cf.impact[i] > 0, "buying pressure must lift the price"
-    assert cf.cost_bps(TRADED) > 0, "and that lift is a cost to the buyer"
+    impact, cost = _mean_impact_and_cost_bps((6e6, 0.0))
+    assert impact > 0, "buying pressure must lift the price"
+    assert cost > 0, "and that lift is a cost to the buyer"
 
 
 def test_a_seller_moves_the_price_down_and_also_pays():
     # cost_bps is signed so positive always means worse for the trader.
     # Reporting raw impact and leaving the caller to reason about direction is
     # how sign errors reach published numbers.
-    cf = pretium.flow_impact(
-        seed=42, universe=UNIVERSE, order_flow={TRADED: (0.0, 6e6)}, ticks=390
-    )
-    i = cf.tickers.index(TRADED)
-    assert cf.impact[i] < 0, "selling pressure must push the price down"
-    assert cf.cost_bps(TRADED) > 0, "which is still a cost to the seller"
+    impact, cost = _mean_impact_and_cost_bps((0.0, 6e6))
+    assert impact < 0, "selling pressure must push the price down"
+    assert cost > 0, "which is still a cost to the seller"
 
 
 def test_impact_is_isolated_to_the_names_actually_traded():

@@ -205,7 +205,15 @@ pub fn calculate_live_factors(
     // more heavily on it and diversification stops working — which is what
     // actually happens in a crash. `market_factor` is already at per-tick
     // scale, so the magnitude is normalised by the same scale.
-    let shock_magnitude = shared.market_factor.abs() / (0.003 / mathx::sqrt(390.0));
+    //
+    // The normaliser is `MARKET_FACTOR_SIGMA` BY NAME, where the reference
+    // implementation inlined the value: "extreme" means beyond two standard
+    // deviations of the factor's own distribution, so the threshold must
+    // follow the sigma. With the literal kept, recalibrating the sigma would
+    // silently re-denominate this threshold in the old units — at 3x it
+    // would fire on half of all ticks instead of the designed ~5% tail.
+    let shock_magnitude = shared.market_factor.abs()
+        / (crate::market::tick::MARKET_FACTOR_SIGMA / mathx::sqrt(390.0));
     let crash_amplifier = if shock_magnitude > 2.0 {
         1.0 + (shock_magnitude - 2.0) * 0.2
     } else {
@@ -592,7 +600,9 @@ mod tests {
     fn a_crash_sized_market_shock_amplifies_the_market_loading() {
         // Below the 2-sigma threshold the loading is linear in the factor;
         // above it, it steepens. Diversification stops working in a crash.
-        let tick_scale = 0.003 / (390.0f64).sqrt();
+        // Denominated in the CURRENT sigma, so the test keeps meaning
+        // "2 standard deviations of the factor" across recalibrations.
+        let tick_scale = crate::market::tick::MARKET_FACTOR_SIGMA / (390.0f64).sqrt();
         let c = company();
         let noise_at = |mult: f64| {
             let mut s = shared();

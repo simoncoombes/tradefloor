@@ -51,7 +51,13 @@ import pretium
 # close (advance_day was previously unreachable from Python) and
 # avg_volume no longer feeds back on itself (the reference's EMA
 # compounded without bound). Both change every seed's trajectory.
-KAT_VERSION = 4
+#
+# v5: same era boundary, third change. MARKET_FACTOR_SIGMA recalibrated
+# from the reference's 0.003 (cross-sectional correlation 0.02 against a
+# real 0.25-0.35, design findings 7-9); the sweep behind the chosen value
+# is tools/calibration/sweep_market_factor_sigma.py. Changes every
+# trajectory, hence the new baseline.
+KAT_VERSION = 5
 
 SEED = 20260820
 DAYS = 250
