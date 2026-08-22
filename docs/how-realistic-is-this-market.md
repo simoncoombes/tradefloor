@@ -93,8 +93,8 @@ fourth moment is noise rather than a model property.
 
 Read the verdicts with the leverage band's sign in mind: that band is
 negative, so a value above it is an effect *weaker* than real markets show,
-not stronger - `facts.py` words it "too weak" for exactly that reason, and
--0.085 sits 0.015 above the -0.10 edge.
+not stronger - `pretium.facts` words it "too weak" for exactly that reason,
+and -0.085 sits 0.015 above the -0.10 edge.
 
 And read the range column, not only the medians. A median can sit inside a
 band its seed range escapes: kurtosis reads +2.4 on one seed of six against a
@@ -125,10 +125,10 @@ Three checks, each with its method, all at commit `a7994e2`.
 
 **Fresh seeds, same universe.** Sim seeds 101 to 106 over the same
 `random(40, seed=111)`, 252 days: cross-sectional correlation **+0.225**,
-against a band floor of +0.25. Kurtosis +3.67, clustering +0.202, volume vs
-\|return\| +0.546, leverage -0.071, all still in band or where the published
-method put them. Correlation is the one that slips out, by about one point of
-its own seed noise.
+against a band floor of +0.25. Kurtosis +3.67, clustering +0.202 and volume
+vs \|return\| +0.546 all hold in band; leverage reads -0.071, a shade weaker
+than the published -0.085. Correlation is the one that slips out, by 0.025 -
+just under two of its own across-seed standard deviations.
 
 **Fresh universes.** Five 60-name universes - `Universe.random(60, seed=k)`
 for k in 1, 7, 11, 42, 222 - each measured over sim seeds 1 to 6, 252 days.
@@ -298,7 +298,7 @@ What remains, and what each would take:
   price process, and would be recalibrated there.
 - **Volume dynamics** need a model - persistent volume shocks - not a
   constant. Until then -0.45 is structural.
-- **The leverage effect's last hundredth** is expensive: `GAMMA` is already
+- **The leverage effect's last 0.015** is expensive: `GAMMA` is already
   three times literature fits because the variance ceiling truncates the
   responses that would express it, so further asymmetry buys less and less.
 
