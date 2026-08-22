@@ -59,6 +59,10 @@ mod python_book;
 #[cfg(feature = "python")]
 mod python_engine;
 
+/// ModelParams bindings - the runtime parameter seam's boundary.
+#[cfg(feature = "python")]
+mod python_params;
+
 /// Arrow record batches for the results surface.
 #[cfg(feature = "python")]
 mod python_arrow;

@@ -537,6 +537,34 @@ impl PyEngine {
     }
 }
 
+/// Resolve the `model=` argument: `None` is the shipped preset, a string
+/// names a shipped preset, a `ModelParams` is taken as built. Anything else
+/// is refused by type, so `model=0.12` cannot silently run the default.
+pub fn model_params_from(
+    model: Option<&Bound<'_, PyAny>>,
+) -> PyResult<crate::params::ModelParams> {
+    let Some(value) = model else {
+        return Ok(crate::params::PT_V1);
+    };
+    if let Ok(name) = value.extract::<String>() {
+        return crate::params::ModelParams::preset(&name).ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "unknown model preset {name:?}. Shipped presets: {}. For a \
+                 modified model, pass ModelParams.from_preset(name, ...) \
+                 instead of a string.",
+                crate::params::ModelParams::preset_names().join(", ")
+            ))
+        });
+    }
+    if let Ok(params) = value.extract::<PyRef<'_, crate::python_params::PyModelParams>>() {
+        return Ok(params.inner.clone());
+    }
+    Err(ValidationError::new_err(format!(
+        "model must be a preset name or a ModelParams, got {}",
+        value.get_type().name().map(|n| n.to_string()).unwrap_or_default()
+    )))
+}
+
 /// Build the core economy from an optional macro state.
 ///
 /// Shared between the single engine and the batch so the two cannot drift:
@@ -738,14 +766,25 @@ impl PyEngine {
     /// `seed` is required, never defaulted. A simulator that seeds itself from
     /// the clock when you forget produces a run nobody can reproduce, and the
     /// failure is invisible until someone tries.
+    ///
+    /// `model` selects the coefficient set: a shipped preset's name
+    /// (`"pt-v1"`, the default) or a `ModelParams`. The escape hatch is
+    /// deliberately ceremonial — the fingerprint means an overridden run
+    /// can never silently masquerade as the benchmark model (API §3).
     #[new]
-    #[pyo3(signature = (*, seed, universe, macro_state = None))]
-    fn new(seed: u32, universe: Vec<PyInstrument>, macro_state: Option<PyMacro>) -> PyResult<Self> {
+    #[pyo3(signature = (*, seed, universe, macro_state = None, model = None))]
+    fn new(
+        seed: u32,
+        universe: Vec<PyInstrument>,
+        macro_state: Option<PyMacro>,
+        model: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
         if universe.is_empty() {
             return Err(ValidationError::new_err(
                 "universe is empty - an engine with no instruments has nothing to simulate",
             ));
         }
+        let params = model_params_from(model)?;
         let economy = economy_from(macro_state)?;
         let companies: Vec<TickCompany> = universe
             .iter()
@@ -755,12 +794,13 @@ impl PyEngine {
         let tickers = universe.iter().map(|i| i.ticker.clone()).collect();
 
         Ok(Self {
-            inner: Engine::new(
+            inner: Engine::with_params(
                 seed,
                 companies,
                 economy,
                 create_initial_central_bank_state(0),
                 crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
+                params,
             ),
             buffer: SessionBuffer::new(),
             day_buffer: DayBuffer::default(),
@@ -1341,6 +1381,35 @@ impl PyEngine {
     #[getter]
     fn draws_consumed(&self) -> usize {
         self.inner.draws_consumed()
+    }
+
+    /// The honest name of the model this engine runs: a shipped preset's
+    /// name when the coefficients are bit-identical to it, and
+    /// `custom-XXXXXXXX` otherwise. Joins `seed` and the universe
+    /// fingerprint in identifying a run — a result under a non-shipped
+    /// model can never present as a standard one.
+    #[getter]
+    fn model_fingerprint(&self) -> String {
+        self.inner.params().fingerprint()
+    }
+
+    /// The model this engine runs, as a `ModelParams`.
+    #[getter]
+    fn model(&self) -> crate::python_params::PyModelParams {
+        crate::python_params::PyModelParams {
+            inner: self.inner.params().clone(),
+        }
+    }
+
+    /// The full coefficient dictionary of the model this engine runs —
+    /// `ModelParams.to_dict()` of `model`, with `"name"` set to the
+    /// fingerprint. What a manifest embeds.
+    #[getter]
+    fn model_params(&self, py: Python<'_>) -> PyResult<PyObject> {
+        crate::python_params::PyModelParams {
+            inner: self.inner.params().clone(),
+        }
+        .to_dict(py)
     }
 
     /// Cumulative draws per stream: `{"market": n, "economy": n, "external": n}`.

@@ -49,6 +49,7 @@ from ._core import (  # noqa: F401
     Macro,
     MatchResult,
     MispricingState,
+    ModelParams,
     News,
     NewsImpact,
     OrderBook,
@@ -75,7 +76,7 @@ from ._core import (  # noqa: F401
 __version__ = _core.__version__
 __all__ = [
     "ArrowStream", "Engine", "EngineBatch", "FairValue", "Fill", "GameRng", "Instrument", "Macro",
-    "MatchResult", "MispricingState", "News", "NewsImpact", "OrderBook",
+    "MatchResult", "MispricingState", "ModelParams", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "FlowImpact",
     "flow_impact", "Portfolio", "Position", "Agent", "Observation",
