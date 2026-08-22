@@ -62,7 +62,42 @@ use super::hours::{intraday_vol, intraday_volume, MarketStatus};
 pub const S_PHI_TICK: f64 = f64::from_bits(0x3FEF_FFC1_E138_5E9E);
 
 /// Standard deviation of the shared market factor, at DAILY scale.
-pub const MARKET_FACTOR_SIGMA: f64 = 0.003;
+///
+/// **Recalibrated at the 2026-08 era boundary; the reference implementation
+/// says 0.003.** That value put a few percent of a typical name's variance
+/// in the shared factor, and that share IS the pairwise correlation it can
+/// induce: measured cross-sectional correlation was 0.026 against a real
+/// 0.25 to 0.35 (design findings 7-9). An argued divergence from source, of
+/// the same class as the `avg_volume` hold: the defect is upstream too.
+///
+/// **The value comes from a sweep, not a hand-tune** —
+/// `tools/calibration/sweep_market_factor_sigma.py`, whose committed output
+/// (`tools/calibration/results/`) measures the full realism panel at eight
+/// sigmas across six seeds. What it shows, six-seed medians, 40 names,
+/// 252 days:
+///
+/// | sigma  | pairwise corr | excess kurtosis | pooled ann. vol |
+/// |--------|---------------|-----------------|-----------------|
+/// | 0.003  | 0.026         | 4.25            | 53.7%           |
+/// | 0.0075 | 0.089         | 3.24            | 57.2%           |
+/// | 0.010  | 0.122         | 2.64            | 59.8%           |
+/// | 0.021  | 0.274         | 1.26            | 71.2%           |
+///
+/// Correlation scales with the factor's variance share, and the factor is
+/// GAUSSIAN with constant sigma: every point of correlation bought this way
+/// dilutes the GARCH-driven fat tails and adds realised volatility that is
+/// already above band. The real-market correlation band is reachable only
+/// at 0.021, where kurtosis — the one marginal this model got right — has
+/// collapsed to a third of the real band's floor. 0.0075 is the largest
+/// value at which median kurtosis stays inside the real 3-10, and it
+/// triples the correlation. Closing the rest of the gap is not a
+/// calibration: it needs the factor to carry its own fat-tailed conditional
+/// volatility, funded by variance moved OUT of the idiosyncratic GARCH
+/// rather than added on top.
+///
+/// Change this only by re-running the sweep; a test pins the value to make
+/// that deliberate.
+pub const MARKET_FACTOR_SIGMA: f64 = 0.0075;
 /// Standard deviation of a shared sector factor, at DAILY scale.
 pub const SECTOR_FACTOR_SIGMA: f64 = 0.002;
 
@@ -581,6 +616,19 @@ mod tests {
     #[test]
     fn s_phi_tick_matches_the_recorded_v8_bits() {
         assert_eq!(S_PHI_TICK.to_bits(), 0x3FEF_FFC1_E138_5E9E);
+    }
+
+    #[test]
+    fn market_factor_sigma_is_the_2026_08_sweep_calibration() {
+        // Not a tautology: a gate. This constant is the measured answer of
+        // `tools/calibration/sweep_market_factor_sigma.py`, and the doc
+        // comment on it records the trade it sits on — correlation against
+        // kurtosis and realised volatility. Moving it by hand un-measures
+        // it; whoever fails this test should re-run the sweep (one command)
+        // and update the constant, its documentation and this pin together.
+        // The sweep must also be re-run after any change that re-orders RNG
+        // draws, because that re-rolls every statistic the value rests on.
+        assert_eq!(MARKET_FACTOR_SIGMA, 0.0075);
     }
 
     #[test]
