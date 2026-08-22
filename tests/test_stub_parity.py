@@ -88,6 +88,10 @@ def stub_params(class_name: str | None, func_name: str) -> list[str]:
         if isinstance(node, ast.FunctionDef) and node.name == func_name:
             args = node.args
             names = [a.arg for a in args.posonlyargs + args.args + args.kwonlyargs]
+            # `**kwargs` is a parameter too — `ModelParams.from_preset` takes
+            # its overrides that way, and the runtime side reports the name.
+            if args.kwarg is not None:
+                names.append(args.kwarg.arg)
             return [n for n in names if n != "self"]
     raise AssertionError(f"{func_name} is not declared in the stub")
 
