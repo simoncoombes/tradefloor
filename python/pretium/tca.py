@@ -29,12 +29,18 @@ The split matters because they decay differently, and every serious execution
 model is built on the distinction. Elsewhere it is fitted from data with
 heroic assumptions. Here both worlds are runnable and the split is measured.
 
-Be aware that the information channel is bounded at both ends: below about
-1.3x the average minute volume a floor applies and the impact is flat, and
-above 10x it saturates and is flat again. Between them it scales. That is a
-property of the model, stated because a user sizing experiments needs to know
-where the response is linear — 20x and 100x the minute volume produce exactly
-the same 48.4 bps.
+Be aware of the bounds before sizing an experiment. The information
+channel's imbalance term is clamped per tick: below about 1.33x the
+instrument's average minute volume a floor applies and the term is flat,
+above 10x it is capped and flat again, and between them it scales — both
+constants live in ``order_imbalance`` in ``rust/src/market/factors.rs``. In
+practice an ``analyse`` run hits a harder bound first: the book caps the
+fill at the displayed depth, and identical fills mean identical flow and
+identical numbers. Measured on this build — the first name of
+``Universe.random(20, seed=7)``, sim seed 2026, one six-step day — requests
+of 20x and 100x the average minute volume both fill the same 483 shares and
+land exactly the same 260.02 bps of end-of-run impact. The response is
+linear in what actually fills, not in what you ask for.
 
 ## What the number means
 
@@ -49,9 +55,12 @@ into published numbers.
 
 ## This is an execution measure, not a strategy P&L, and a round trip shows why
 
-Measured on one instrument, seed 2026: buying 97 shares and holding costs
-**+16.71 bps**. Buying the same 97 shares and selling them three steps later
-comes to **-10.81 bps** — a gain.
+Measured on this build — the first instrument of ``Universe.random(20,
+seed=7)``, sim seed 2026, one six-step day, trading 1% of ADV: buying 97
+shares and holding costs **+16.71 bps**. Buying the same 97 shares and
+selling them three steps later comes to **-13.57 bps** — a gain, and not a
+quirk of the seed: the round trip ends negative on seven of the eight seeds
+the test suite measures.
 
 Nothing is wrong. The entry pushed the price up, part of that impact persisted,
 and the exit sold into it. The agent really did transact at prices better than
@@ -188,10 +197,12 @@ class Execution:
 
         Worth reading before believing a low shortfall. An order that only
         half filled only paid half the impact, and the untraded half cost
-        nothing precisely because it never happened -- measured here, a
-        request for 4,856 shares filled 483, because that was the whole
-        displayed depth. The cheapest execution is the one that did not occur,
-        which is not a result anyone should quote.
+        nothing precisely because it never happened -- measured on this
+        build (half the ADV of the first name of ``Universe.random(20,
+        seed=7)``, sim seed 2026), a request for 4,856 shares filled 483,
+        because that was the whole displayed depth. The cheapest execution
+        is the one that did not occur, which is not a result anyone should
+        quote.
         """
         return [f for f in self.fills if f.get("partial")]
 
