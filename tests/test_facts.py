@@ -4,8 +4,12 @@ The mismatches are the point. A simulator you cannot characterise is one you
 cannot reason about, and a conclusion drawn here transfers only as far as the
 properties it depends on do.
 
-Every figure is measured. The bands are deliberately wide: these pin the model
-against drift, not against a target it was tuned to hit.
+Every figure is measured, and since 2026-08-22 every band is derived: from a
+real reference panel measured with this module's own estimators, reconciled
+against retrieved literature, with the provenance carried as data in
+`facts.REAL_MARKETS_PROVENANCE`. The bands are deliberately wide -- they pin
+the model against drift, not against a target it was tuned to hit -- and
+they are wide by measured seed noise, not by convenience.
 """
 
 import pytest
@@ -36,7 +40,10 @@ def facts():
 
 def test_returns_are_fat_tailed():
     # The most robust fact about asset returns, and the one a Gaussian
-    # simulator gets wrong. Real daily equity returns run +3 to +10.
+    # simulator gets wrong. The re-derived band (+1.6 to +41) is wide
+    # because a fourth moment on 252 days is noise-dominated, but the
+    # fact itself -- excess kurtosis clearly above Gaussian -- is what
+    # this test pins.
     #
     # The 2026-08 market-factor recalibration spent some of this statistic
     # deliberately: the shared factor is Gaussian, so the correlation it buys
@@ -107,20 +114,24 @@ def test_the_autocorrelation_is_the_mispricing_process_showing_through():
     assert all(modulus < 1.0 for modulus in pretium.characteristic_root_moduli())
 
 
-def test_volatility_clustering_is_in_band_at_lag_one_but_decays_too_fast():
-    # This test used to pin clustering BELOW its band -- real markets show
-    # 0.2-0.3 at lag one and this model measured about half that. The GJR
-    # recalibration moved it: paying the asymmetry term out of BETA shifts
-    # variance persistence from smooth carry to re-excitation by realised
-    # moves, which raises |r| acf(1) into the real band (0.19 here) as a
-    # side effect of buying the leverage effect. The decay is still too
-    # fast -- largely gone by lag twenty where real markets decay slowly --
-    # so a strategy whose edge is long-horizon volatility forecasting will
-    # still look worse here than it should.
+def test_volatility_clustering_is_too_strong_at_short_lags_for_a_year():
+    # This test has pinned three eras of the same statistic. First it
+    # pinned clustering BELOW an inherited 0.15-0.35 band; then the GJR
+    # recalibration raised |r| acf(1) into that band and this test pinned
+    # "in band but decays too fast". The band re-derivation showed the
+    # inherited band was the LONG-SAMPLE textbook value (S&P over 66
+    # years reads ~0.3), where a 252-day window of real large caps reads
+    # 0.04-0.18 -- so the calibration, aimed at an unprovenanced target,
+    # overshot the within-year quantity, and the shipped model now reads
+    # ABOVE the honest band at lags one (0.27 here) and five. Clustering
+    # itself is real and decays with lag, which the second assertion
+    # keeps pinned.
     facts = measure(seed=3, universe=UNIVERSE, days=180)
     verdict = compare_to_real_markets(facts)["abs_return_acf1"]
-    assert verdict["direction"] == "within"
-    assert facts["abs_return_acf20"] < facts["abs_return_acf1"]
+    assert verdict["direction"] == "above"
+    assert verdict["verdict"] == "too high"
+    assert facts["abs_return_acf20"] < facts["abs_return_acf5"] < facts[
+        "abs_return_acf1"]
 
 
 def test_volatility_is_high_so_prefer_ratios_to_raw_percentages():
@@ -171,12 +182,17 @@ def test_stocks_move_together_at_a_real_market_rate_since_the_factor_vol_change(
     Both bounds stay load-bearing: the floor pins the calibration (a
     regression toward the near-zero regime must fail), and the ceiling
     pins the funding (correlation far above band would mean the factor's
-    share grew without being paid for). The fixture is one seed at 180
-    days, so the bounds are wider than the published six-seed medians.
+    share grew without being paid for). The re-derived band (0.08 to
+    0.56, a real decade's own calm-market spread) is wider than the
+    inherited 0.25-0.35 was -- real windows sat outside that one on both
+    sides -- so the verdict here is now robustly "matches" rather than
+    edge-of-band, on the held-out seeds as well as the published ones.
+    The explicit range assertion stays tighter than the band because it
+    pins the CALIBRATED near-band-centre regime, not mere membership.
     """
     assert 0.15 < facts["cross_sectional_corr"] < 0.45
     verdict = compare_to_real_markets(facts)["cross_sectional_corr"]
-    assert verdict["matches"] or verdict["direction"] == "above"
+    assert verdict["matches"]
 
 
 def test_volume_and_volatility_arrive_together_since_the_volume_fix(facts):
@@ -194,11 +210,14 @@ def test_volume_and_volatility_arrive_together_since_the_volume_fix(facts):
     face is a volume shock that persists, which is the change-autocorrelation
     test below and the caveat that survives.
     """
-    # The floor is the claim; the ceiling is left to the published
-    # six-seed medians (0.584, in band at the factor-vol calibration),
-    # because a single 180-day seed can overshoot the band top now that
-    # factor-variance regimes couple volume to market-wide moves.
-    assert facts["volume_abs_return_corr"] > 0.30
+    # The re-derived band (0.46 to 0.66) is the tightest on the panel --
+    # every real window of a decade reads 0.50-0.64 -- and this fixture
+    # sits inside it. The measured floor is higher than the inherited
+    # 0.30, so a half-repaired channel that once could have idled just
+    # over the old floor now fails here.
+    verdict = compare_to_real_markets(facts)["volume_abs_return_corr"]
+    assert verdict["matches"]
+    assert facts["volume_abs_return_corr"] > 0.46
 
 
 def test_the_leverage_effect_is_real_since_the_gjr_term(facts):
@@ -208,28 +227,33 @@ def test_the_leverage_effect_is_real_since_the_gjr_term(facts):
     symmetric GARCH(1,1) -- squaring the return discards its sign -- and
     this test used to pin that absence. The GJR asymmetry term (GAMMA =
     0.34, garch.rs) made it real: the published six-seed median reads
-    -0.107, every seed negative, inside the real -0.30 to -0.10 band. The
-    factor-variance change leaves the mechanism intact (measured -0.094 at
-    its calibration); what this fixture pins is that the effect exists and
-    points the right way on a single seed, not band membership of a noisy
-    single-seed estimate.
+    -0.085, every seed negative. Under the re-derived band (-0.16 to
+    0.00 -- per-name Pearson leverage is a WEAK effect in real data, and
+    the inherited -0.30/-0.10 band demanded index-strength from a
+    single-name estimator) that median is in band. What this fixture pins
+    is that the effect exists and points the right way on a single seed,
+    not band membership of a noisy single-seed estimate.
     """
     assert facts["leverage_effect"] < -0.02
 
 
 def test_a_weak_leverage_effect_would_read_as_weak_not_as_too_high():
-    """The wording trap in the one statistic with a negative band.
+    """The wording trap in the statistics whose bands sit at or below zero.
 
-    A leverage effect of -0.01 against a band of -0.30 to -0.10 is numerically
-    ABOVE the band and semantically ABSENT. Reporting the numeric direction
-    would print "too high" for a missing effect, which states the opposite of
-    the finding. The live fixture no longer exercises the trap (the GJR term
-    made the effect real), so it is pinned on a synthetic panel instead --
-    the wording rule has to survive the statistic being healthy.
+    A leverage effect of +0.05 against a band of -0.16 to 0.00 is
+    numerically ABOVE the band and semantically ABSENT -- reversed, even.
+    Reporting the numeric direction would print "too high" for a missing
+    effect, which states the opposite of the finding. The re-derived band
+    top is exactly 0.00 (the mechanical top was positive and was clamped,
+    because every retrieved source agrees on the sign), so the wording
+    branch keys on `high <= 0` and this value must exercise it. The live
+    fixture does not (the GJR term made the effect real and the honest
+    band contains it), so the trap is pinned on a synthetic panel -- the
+    wording rule has to survive the statistic being healthy.
     """
     facts = measure(seed=3, universe=UNIVERSE, days=180)
     weakened = dict(facts)
-    weakened["leverage_effect"] = -0.01
+    weakened["leverage_effect"] = +0.05
     verdict = compare_to_real_markets(weakened)["leverage_effect"]
     assert verdict["direction"] == "above"
     assert verdict["verdict"] == "too weak"
@@ -246,8 +270,13 @@ def test_volume_is_measured_in_changes_because_the_level_says_nothing():
     the level held it reads about +0.10. Opposite engines, and the level
     statistic cannot tell them apart from the dynamics side. The CHANGE
     autocorrelation can, and it reads near -0.5 in BOTH worlds: the signature
-    of independent daily noise around whatever the level is. Real volume
-    shocks persist, so real markets sit near zero.
+    of PURELY independent daily noise around whatever the level is. Real
+    volume shocks partly persist, so real markets read about -0.22 to -0.30
+    at this estimator -- negative, because differencing a noisy level is
+    negatively autocorrelated as arithmetic, but not the -0.5 of noise with
+    no persistence at all. (The band this row is judged against was
+    RELOCATED at the re-derivation: the inherited one said real markets sit
+    near zero here, and no observed real window does.)
 
     The upper bound on the level doubles as the tripwire for the divergence
     coming back: a compounding level drives the level autocorrelation toward

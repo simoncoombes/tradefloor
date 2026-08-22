@@ -11,16 +11,16 @@ real-market band (`facts.REAL_MARKETS`), and s_k is its across-seed
 standard deviation at the shipped baseline (`facts.SEED_SD`). Each
 statistic's band exit is priced in units of its own sampling noise -- the
 simulated-method-of-moments weighting discipline with a deliberately
-DIAGONAL matrix. Not the full inverse covariance: eight moments estimated
+DIAGONAL matrix. Not the full inverse covariance: ten moments estimated
 from thirty seeds make the full inverse ill-conditioned, and using it
 quietly bets the search on noisy off-diagonal estimates. The diagonal is
 honest and revisitable, and every result this module returns says which
 weighting was used so the choice stays visible.
 
 There is no unweighted form, on purpose. Pooled volatility is numerically
-~55 on a band of width 20 while every autocorrelation is measured in
+~40 on a band of width ~20 while every autocorrelation is measured in
 hundredths, so an unweighted sum is not a neutral default -- it is a
-volatility objective wearing an eight-statistic costume. `band_distance_loss`
+volatility objective wearing a ten-statistic costume. `band_distance_loss`
 therefore refuses to run without a positive s_k for every statistic in the
 loss, rather than falling back to weights of one.
 
@@ -28,27 +28,32 @@ loss, rather than falling back to weights of one.
 
 Membership is data, not conditionals:
 
-- `LIVE_TARGETS` -- the four statistics the search is trying to move into
-  band.
-- `CONSTRAINTS` -- the two statistics in band at the baseline. They
+- `LIVE_TARGETS` -- the five statistics the search is trying to move into
+  band, lag-5 clustering among them since the band re-derivation closed
+  the zero-memory corner phase 2's instrument found.
+- `CONSTRAINTS` -- the four statistics in band at the baseline. They
   contribute zero loss there and push back only when a candidate drives
-  them out; a calibration that fixed correlation by breaking kurtosis
-  would trade a documented gap for a new one.
+  them out; a calibration that fixed correlation by breaking kurtosis --
+  or reached lag-5 clustering by destroying the leverage effect -- would
+  trade a documented gap for a new one.
 - Structural exclusions -- everything in `facts.REAL_MARKETS` not named
-  above, currently the leverage effect (a symmetric GARCH has no
-  coefficient that produces asymmetry) and volume-change autocorrelation
-  (a held level plus independent noise sits near -0.5 at any
-  coefficients). They appear in every result this module returns, with
-  their band distances, as the standing falsification verdict -- but an
-  optimiser pointed at a target no parameter reaches does not fail
-  cleanly: it distorts every other parameter chasing it, then "succeeds"
-  by overfitting. Excluding them is the identifiability gate applied.
+  above, now only the volume-change autocorrelation: a held volume level
+  plus independent per-tick noise sits near -0.5 at any coefficients,
+  against a real band of -0.32 to -0.20, and no parameter reaches the
+  row. It appears in every result this module returns, with its band
+  distance, as the standing falsification verdict -- but an optimiser
+  pointed at a target no parameter reaches does not fail cleanly: it
+  distorts every other parameter chasing it, then "succeeds" by
+  overfitting. Excluding it is the identifiability gate applied.
 
-Promoting a structural statistic once a model change makes it reachable --
-a GJR asymmetry term for `leverage_effect`, a market-level conditional
-variance for market-wide clustering -- is one edit: append its key to
-`LIVE_TARGETS`. The structural set is derived as the complement, so
-nothing else moves; its band, verdict wording and seed sd already ship in
+Promoting a structural statistic once a model change makes it reachable
+is one edit: append its key to `LIVE_TARGETS` (or to `CONSTRAINTS`, if
+it is already in band and only needs defending). That is not
+hypothetical any more: the GJR term made `leverage_effect` reachable and
+the re-derived band showed it in band, so it moved to `CONSTRAINTS`; the
+instrument's lag-5 finding moved `abs_return_acf5` into `LIVE_TARGETS`.
+The structural set is derived as the complement, so nothing else moves;
+a promoted statistic's band, verdict wording and seed sd already ship in
 `pretium.facts`.
 
 ## What this module is not
@@ -58,7 +63,7 @@ refusal is a considered position: a model is realistic in some respects
 and not others, and one number hides exactly the structure that matters.
 This loss does not reopen that question. It is an OPTIMISATION DEVICE --
 a search direction for calibration tooling -- not a published metric, and
-the published artifact remains the eight-row panel with per-statistic
+the published artifact remains the ten-row panel with per-statistic
 verdicts. That is why `band_distance_loss` returns the full per-statistic
 breakdown with the scalar inside it rather than a bare float, why the
 structural rows ride along in every result, and why nothing here is
@@ -77,18 +82,32 @@ from .facts import REAL_MARKETS, SEED_SD, SEED_SD_PROVENANCE, band_distance
 #: is the ONE tuple to edit when a model change makes a structural statistic
 #: reachable: append its key here and it enters the loss with the band,
 #: verdict wording and seed sd it already has in `pretium.facts`.
+#: `abs_return_acf5` joined at the band re-derivation: phase 2's instrument
+#: found a parameter corner with lag-1 clustering in band and lag-5 memory
+#: at -0.001, so lag 5 is banded and live to price that hole out of the
+#: search space.
 LIVE_TARGETS = (
     "annualised_vol_pct",
     "return_acf1",
     "abs_return_acf1",
+    "abs_return_acf5",
     "cross_sectional_corr",
 )
 
 #: In band at the baseline; constraints rather than targets. Zero loss
 #: where they stand, resistance when a candidate drives them out.
+#: `leverage_effect` joined when the re-derived band (per-name Pearson,
+#: -0.16 to 0.00) put the shipped GJR-backed model inside it -- it is
+#: reachable (the falsification certificates reach -0.12 in band through
+#: `garch_gamma`) and in band, which is this tuple's definition.
+#: `abs_return_acf20` joined for the same reason lag 5 became live: a
+#: measured statistic outside the loss is a direction an optimiser can
+#: break for free.
 CONSTRAINTS = (
     "excess_kurtosis",
     "volume_abs_return_corr",
+    "leverage_effect",
+    "abs_return_acf20",
 )
 
 #: Reported in every result, excluded from the loss: the panel statistics
@@ -113,10 +132,10 @@ def seed_sd_from_panels(
     later promotion needs no re-measurement here.
 
     This is the estimator behind the shipped `facts.SEED_SD` (there is a
-    test asserting exactly that against the committed sweep file), and it is
-    what phase 2 of the calibration programme runs on its thirty-seed panel
-    at the new era. Sample (n-1) standard deviation, matching the shipped
-    values' convention.
+    test re-deriving those constants from the committed thirty-seed panel
+    table, two seeds of which it re-measures live), and it is what the
+    calibration instrument runs on its own seed panels. Sample (n-1)
+    standard deviation, matching the shipped values' convention.
 
     A statistic that came back None on any panel is refused rather than
     dropped: an sd computed over a quietly shrunken seed set would carry the
@@ -173,7 +192,7 @@ def band_distance_loss(
           "panels":     how many per-seed panels were aggregated,
         }
 
-    All eight panel statistics appear in `"statistics"`, in panel order.
+    All ten panel statistics appear in `"statistics"`, in panel order.
     Structural rows carry their measured value and band distance --
     the standing falsification verdict rides along with every loss
     evaluation -- but their `"contribution"` is None and they are absent
