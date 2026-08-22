@@ -515,10 +515,14 @@ pub fn update_economy_daily(
     let real_rate = economy.federal_funds_rate - economy.inflation_rate;
     let real_rate_drift = -real_rate * 0.8;
     let inflation_hedge = mathx::max(0.0, (economy.inflation_rate - 2.0) * 1.5);
-    let crisis_premium = if economy.vix > 30.0 && economy.gdp_growth < -1.0 {
+    // Reference: `vix > 30`, a level endogenous VIX never reaches (measured
+    // ceiling 26.57). Re-sited at the endogenous P94 so the gate is live;
+    // see `CRISIS_VIX_THRESHOLD`. The hinge origin moves with the gate, so
+    // the premium stays continuous at the threshold.
+    let crisis_premium = if economy.vix > CRISIS_VIX_THRESHOLD && economy.gdp_growth < -1.0 {
         mathx::min(
             5.0,
-            economy.gdp_growth.abs() * 1.0 + (economy.vix - 30.0) * 0.15,
+            economy.gdp_growth.abs() * 1.0 + (economy.vix - CRISIS_VIX_THRESHOLD) * 0.15,
         )
     } else {
         0.0
@@ -563,8 +567,10 @@ pub fn update_economy_daily(
     // ── USD ───────────────────────────────────────────────────────────────
     let usd_target = 100.0 + (economy.federal_funds_rate - 2.5) * 3.0;
     let usd_mean_reversion = (usd_target - economy.usd_index) * 0.02;
-    let safe_haven_drift = if economy.vix > 30.0 {
-        (economy.vix - 30.0) * 0.05
+    // Reference: `vix > 30` — dead for the same reason as the gold crisis
+    // premium above; re-sited with it. See `CRISIS_VIX_THRESHOLD`.
+    let safe_haven_drift = if economy.vix > CRISIS_VIX_THRESHOLD {
+        (economy.vix - CRISIS_VIX_THRESHOLD) * 0.05
     } else {
         0.0
     };
