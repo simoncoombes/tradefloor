@@ -14,8 +14,8 @@ fundamentals are), a **macro** state (rates, inflation, the cycle), and a
 import pretium as pt
 
 universe = pt.Universe.random(108, seed=7)
-macro = pt.Macro(fed_funds=0.025, corporate_bond_yield=0.052, vix=16.0)
-engine = pt.Engine(seed=42, universe=universe, macro=macro)
+macro = pt.Macro(federal_funds_rate=0.025, corporate_bond_yield=0.052, vix=16.0)
+engine = pt.Engine(seed=42, universe=universe, macro_state=macro)
 ```
 
 ### Universe
@@ -44,34 +44,43 @@ pt.Universe.from_edgar(snapshot)                 # real SEC fundamentals
 
 ### Macro
 
-**The macro state is exogenous. It does not evolve on its own.** You set the
-initial conditions, and every macro field holds that value for the whole run
-unless you move it. Measured over `run_days(120)`: `vix`,
-`federal_funds_rate`, `corporate_bond_yield`, `inflation_rate`,
-`unemployment_rate`, `gdp_growth`, `qe_pe_boost` and `fear_greed_index` each
-take exactly one distinct value, and `fundamental_value` takes exactly one
-distinct value per instrument.
+**The macro chain runs endogenously by default.** The `Macro` you construct
+the engine with is the day-zero state, not the whole run: every day close
+advances the economy - economy update, cycle transition, central bank - so
+rates, the cycle and fair value evolve on their own from your initial
+conditions. This is a 2026-08 era-boundary change; before it the chain was
+implemented in the Rust core but unreachable from Python, and every field
+held its initial value for the whole run.
 
-The engine does carry a full macro chain - a Taylor rule feeding off Phillips
-and Okun relationships over a cycle - and it is implemented and unit-tested in
-the Rust core. It is simply not reachable from Python in this release, so it
-never steps.
+Measured over `run_days(120)` on `Universe.random(20, seed=11)`, sim seed 42:
+`vix` takes a new value every day, 120 distinct values in 120 days; the
+policy-driven fields step at the central bank's meeting calendar rather than
+daily - `federal_funds_rate` takes 2 distinct values over the run,
+`corporate_bond_yield` 3, `inflation_rate` 4, `gdp_growth` 6; and
+`fundamental_value` takes 3 distinct values per instrument, repricing when
+the discount rate moves at a meeting - days 45 and 96 of that run. The one
+exception is a loss-maker valued off book value, which never reprices,
+because book value carries no discount rate - see
+[Conventions](conventions.html).
 
-That matters for what you can conclude. A run with no macro path has a
-constant fair value, so mean reversion pulls toward a fixed anchor and nothing
-reprices. To get a macro that moves, drive it yourself with
-[Scenarios](scenarios.html) - and the exogenous path works exactly as
-designed:
+That matters for what you can conclude. Fair value is an anchor that moves:
+mean reversion pulls toward a level that itself reprices at the meeting
+calendar, so a run long enough to cross a meeting is not a stationary
+experiment. To impose a macro path of your own, drive it with
+[Scenarios](scenarios.html) or pin a field directly:
 
 ```python
 engine.pin_macro(corporate_bond_yield=0.09)   # from a default of 0.0456
 ```
 
-Measured on twenty instruments, that repriced nineteen of them. The twentieth
-is a loss-maker, valued off book value, and book value carries no discount
-rate - see [Conventions](conventions.html). Pinning `federal_funds_rate` alone
+A pin overrides the endogenous step for that field: a day-by-day pinned
+series stays fully exogenous, and a single pin moves the field once, after
+which the chain evolves onward from the pinned value rather than freezing it.
+Measured on twenty instruments, that pin repriced nineteen of them. The
+twentieth is the loss-maker above. Pinning `federal_funds_rate` alone
 repriced none of the twenty, for the reason set out under
 [Scenarios](scenarios.html).
 
 Read the macro back per day from `day.economy`, or over a whole run from the
-`macro` table.
+`macro` table. The macro row for a day carries the values the day traded
+under; the close then advances the chain into the next day.
