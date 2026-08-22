@@ -1,0 +1,262 @@
+{
+  "kind": "mispricing.createState",
+  "meta": {
+    "generator": "scripts/rust-port/generate-goldens.ts",
+    "generatedFrom": "TypeScript (the parity contract — never regenerate from Rust)",
+    "gitCommit": "51e673d3c536ca350a92b97ca7a09f91ed3f5061",
+    "sourceFiles": [
+      {
+        "path": "src/lib/engine/prng.ts",
+        "sha256": "31e7c173c5d62ba0282040ddb46ac4a1c2676448fc767ed60c7723887907e2ab"
+      },
+      {
+        "path": "src/lib/engine/mispricing.ts",
+        "sha256": "513108f9455908fb09e4f8f36d4c3dd25e009a94bfcecb41d0a363dbcb636a24"
+      }
+    ],
+    "sourceModule": "src/lib/engine/mispricing.ts",
+    "covers": ["createMispricingState"],
+    "description": "Clamps the initial value to ±MISPRICING_CAP and sets sPrev equal to it.",
+    "notes": [
+      "clamp() is `x < lo ? lo : x > hi ? hi : x`. NaN fails both comparisons and PASSES THROUGH UNCHANGED. Rust f64::clamp panics on NaN and f64::min/max would return the bound — neither reproduces this. The port must use the same ternary.", "Negative zero also passes through unchanged, so createMispricingState(-0) yields s = -0, not +0."
+    ],
+    "floatEncoding": "bits = raw IEEE-754 f64, big-endian, 16 uppercase hex digits. dec = shortest round-trip decimal, informational only.",
+    "nanPolicy": "Every NaN is recorded as 7FF8000000000000 (the pattern of Rust f64::NAN). V8 does not emit a stable NaN sign/payload, so only NaN-ness is contractual — compare NaN results with is_nan(), not with bits."
+  },
+  "cases": [
+    {
+      "input": {
+        "initial": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "sPrev": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "sPrev": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "sPrev": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "sPrev": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "sPrev": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": {
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" },
+        "sPrev": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "sPrev": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "sPrev": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "sPrev": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "sPrev": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "sPrev": { "dec": "-5e-324", "bits": "8000000000000001" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "sPrev": { "dec": "-0", "bits": "8000000000000000" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "sPrev": { "dec": "0", "bits": "0000000000000000" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "sPrev": { "dec": "5e-324", "bits": "0000000000000001" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "sPrev": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "sPrev": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "sPrev": { "dec": "0.1", "bits": "3FB999999999999A" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "sPrev": { "dec": "0.5", "bits": "3FE0000000000000" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": {
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" },
+        "sPrev": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "sPrev": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "sPrev": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "sPrev": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "sPrev": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "sPrev": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      }
+    },
+    {
+      "input": {
+        "initial": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "sPrev": { "dec": "NaN", "bits": "7FF8000000000000" }
+      }
+    }
+  ],
+  "defaultCase": {
+    "input": {
+      "initial": "default (0)"
+    },
+    "output": {
+      "s": { "dec": "0", "bits": "0000000000000000" },
+      "sPrev": { "dec": "0", "bits": "0000000000000000" }
+    }
+  }
+}

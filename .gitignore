@@ -16,9 +16,10 @@ __pycache__/
 dist-spike/
 .venv-spike/
 
-# Golden vectors: large parity fixtures synced from the reference
-# implementation. Not committed - see rust/sync-goldens.py.
-rust/goldens/
+# Golden vectors ARE committed: they are the parity contract, and a research
+# library whose tests cannot run on a fresh clone is not checkable by anyone.
+# 135 MB raw. See rust/sync-goldens.py for how they are produced, and
+# CONTINUE.md for the compression decision still to make (85% available).
 
 # Build artefacts from `maturin develop`, which writes the compiled extension
 # and its debug symbols straight into the source tree. They are 2 MB, they

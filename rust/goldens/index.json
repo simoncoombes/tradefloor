@@ -1,0 +1,357 @@
+{
+  "kind": "index",
+  "meta": {
+    "generator": "scripts/rust-port/generate-goldens.ts",
+    "generatedFrom": "TypeScript (the parity contract — never regenerate from Rust)",
+    "gitCommit": "51e673d3c536ca350a92b97ca7a09f91ed3f5061",
+    "sourceFiles": [
+      {
+        "path": "src/lib/engine/prng.ts",
+        "sha256": "31e7c173c5d62ba0282040ddb46ac4a1c2676448fc767ed60c7723887907e2ab"
+      },
+      {
+        "path": "src/lib/engine/mispricing.ts",
+        "sha256": "513108f9455908fb09e4f8f36d4c3dd25e009a94bfcecb41d0a363dbcb636a24"
+      }
+    ],
+    "sourceModule": "src/lib/engine/prng.ts + src/lib/engine/mispricing.ts",
+    "covers": [
+      "all golden vector files"
+    ],
+    "description": "Manifest of the golden vector set: file list, byte sizes, SHA-256 of each file, and assertion counts.",
+    "notes": [
+      "These vectors are the PARITY CONTRACT and are generated from TypeScript. They must never be regenerated from the Rust implementation — doing so would make the Rust its own oracle and silently legitimise any divergence.",
+      "Regenerate with: npx tsx scripts/rust-port/generate-goldens.ts",
+      "Verify with:     npx tsx scripts/rust-port/generate-goldens.ts --check"
+    ],
+    "floatEncoding": "bits = raw IEEE-754 f64, big-endian, 16 uppercase hex digits. dec = shortest round-trip decimal, informational only.",
+    "nanPolicy": "Every NaN is recorded as 7FF8000000000000 (the pattern of Rust f64::NAN). V8 does not emit a stable NaN sign/payload, so only NaN-ness is contractual — compare NaN results with is_nan(), not with bits.",
+    "manifestBuiltBy": "scripts/rust-port/rebuild-golden-manifest.mjs",
+    "manifestNote": "Covers every file in the directory, not only those one generator declares. Vectors are generated FROM TypeScript; this records them."
+  },
+  "totalAssertions": 995783,
+  "files": [
+    {
+      "file": "divergence-multiday.json",
+      "kind": "divergence.multiday",
+      "bytes": 285399,
+      "sha256": "d507e42351b9adf65d11dc03c9814efbe1c9d658ff2631e61d107a7c4fddd8a8",
+      "assertions": null
+    },
+    {
+      "file": "divergence-reference.json",
+      "kind": "divergence.reference",
+      "bytes": 304218,
+      "sha256": "4576b4a9c2da41e20a2917a23c6eba543eb4f4674432edfa235175fbc99958a7",
+      "assertions": null
+    },
+    {
+      "file": "economy-tier1.json",
+      "kind": "economy.tier1",
+      "bytes": 33324394,
+      "sha256": "d0df3149187377522259371112a40e6dfef7898572e1d26fa1d33f354b8ce8fe",
+      "assertions": null
+    },
+    {
+      "file": "economy-trajectory-active-shocks.json",
+      "kind": "economy.trajectory",
+      "bytes": 1218281,
+      "sha256": "c2a182c5c0a68e96b7aec73b809bca4d8927e761b971f31bebe34286c21072b7",
+      "assertions": null
+    },
+    {
+      "file": "economy-trajectory-calm-expansion.json",
+      "kind": "economy.trajectory",
+      "bytes": 1193797,
+      "sha256": "f0072d629bb1287b8e8703619f6e8fd681a2ca66b25d220882216edcbca38423",
+      "assertions": null
+    },
+    {
+      "file": "economy-trajectory-no-central-bank.json",
+      "kind": "economy.trajectory",
+      "bytes": 537877,
+      "sha256": "0417b3154d82181ecef874939f28c8676ed91d23b28890c2daf483002888b1d7",
+      "assertions": null
+    },
+    {
+      "file": "economy-trajectory-stagflation.json",
+      "kind": "economy.trajectory",
+      "bytes": 1193983,
+      "sha256": "1b60ccd8de3441dba47d284941029595c17906ceb3ef464c54a11e97a1cf8b22",
+      "assertions": null
+    },
+    {
+      "file": "economy-trajectory-volatile-contraction.json",
+      "kind": "economy.trajectory",
+      "bytes": 1198035,
+      "sha256": "c646d627dbe5d0c5238433260ff3c480f60098c1b18b251c2fd5c0708d574d1d",
+      "assertions": null
+    },
+    {
+      "file": "fairvalue.json",
+      "kind": "fairvalue",
+      "bytes": 203082,
+      "sha256": "9019fd588fe5399dc116bceac6a571b10b638db544691e7b868643d17094a532",
+      "assertions": 260
+    },
+    {
+      "file": "market-daily.json",
+      "kind": "market.daily",
+      "bytes": 29914674,
+      "sha256": "12bca8d320cea0cc385b8b97b6ced02f79c5fbcabc390f8b8f17013e354d3416",
+      "assertions": 43200
+    },
+    {
+      "file": "market-islands.json",
+      "kind": "market.islands",
+      "bytes": 281825,
+      "sha256": "aabe51fa9e463941b6a294ab6f6b47c719042832e8f4e9ced2f650e9310658ad",
+      "assertions": null
+    },
+    {
+      "file": "market-tick-after-hours.json",
+      "kind": "market.tick",
+      "bytes": 113465,
+      "sha256": "c3e74f3ed679c3c8aadc81efe14419acce09bca8aad32cc4d202cb3922b99c06",
+      "assertions": null
+    },
+    {
+      "file": "market-tick-bankrupt-and-private.json",
+      "kind": "market.tick",
+      "bytes": 185435,
+      "sha256": "edb6caecbcb7aa26aed4ee529d0c6adde22febacfa1da41ebec050361a1f1292",
+      "assertions": null
+    },
+    {
+      "file": "market-tick-breaker-binding.json",
+      "kind": "market.tick",
+      "bytes": 259886,
+      "sha256": "428c673809ae735e9a64bd1473c3ece214d9f25b38d269ba25bcb37586e99e21",
+      "assertions": null
+    },
+    {
+      "file": "market-tick-closed-weekend.json",
+      "kind": "market.tick",
+      "bytes": 33446,
+      "sha256": "4715922733801043f0230f844ee54dcd4dbe814ce8989ed89b23d28f4e17efde",
+      "assertions": null
+    },
+    {
+      "file": "market-tick-crisis-vix.json",
+      "kind": "market.tick",
+      "bytes": 309205,
+      "sha256": "9144488ea555f0c5365b193483a94e1a920ead8aca76ab3fb849cfd2a01705ae",
+      "assertions": null
+    },
+    {
+      "file": "market-tick-midday.json",
+      "kind": "market.tick",
+      "bytes": 210562,
+      "sha256": "a94d22a3c8f06739e090aad36e7eb91b8d163dabc8568c7dd5de46ab57e2a4c2",
+      "assertions": null
+    },
+    {
+      "file": "market-tick-open-session.json",
+      "kind": "market.tick",
+      "bytes": 407732,
+      "sha256": "06204cec38ca9374d04910e916369d5ef06001617af89ded9be8e3372f1bb244",
+      "assertions": null
+    },
+    {
+      "file": "market-tick-pre-market.json",
+      "kind": "market.tick",
+      "bytes": 113460,
+      "sha256": "cba0f7e340a4ac4b45cd60b66b8f334f619e65d751d1219db96231f5c619c4b5",
+      "assertions": null
+    },
+    {
+      "file": "market-tick-squeeze-and-cascade.json",
+      "kind": "market.tick",
+      "bytes": 259930,
+      "sha256": "91f28d2b14232a6d7f05fe70bf8d8a9d3e13ddeb8907aafb0abc3424edc22bcf",
+      "assertions": null
+    },
+    {
+      "file": "marketmaker.json",
+      "kind": "marketmaker",
+      "bytes": 176352,
+      "sha256": "f205788b0fc107e739441131cb6a72b422a0af5b64fad0a27e3dd1ce24f97c78",
+      "assertions": 129
+    },
+    {
+      "file": "mathx-v8.json",
+      "kind": "unknown",
+      "bytes": 668492,
+      "sha256": "ec88178f8056c7426134032a33dac14c07b22f14a8dfeb312e0812f34d302579",
+      "assertions": null
+    },
+    {
+      "file": "microstructure.json",
+      "kind": "microstructure",
+      "bytes": 1038591,
+      "sha256": "578c32633de3daf1b4950137ff33adce78c4343ef3b8f8afdfcd7ab51d8cc7af",
+      "assertions": null
+    },
+    {
+      "file": "mispricing-apply.json",
+      "kind": "mispricing.apply",
+      "bytes": 90220,
+      "sha256": "c70eef2c90d040d2394e7a35939deca8e8bc3d134137783bdbae6bd593e1671f",
+      "assertions": 375
+    },
+    {
+      "file": "mispricing-constants.json",
+      "kind": "mispricing.constants",
+      "bytes": 2694,
+      "sha256": "4e1cc293fddac03a840bc02b731b7f11622c1ab29389930c9f64139f62a6b48f",
+      "assertions": 13
+    },
+    {
+      "file": "mispricing-create-state.json",
+      "kind": "mispricing.createState",
+      "bytes": 8163,
+      "sha256": "ba795c8bc6bc73b977a738d80872dde4f7a26f71464619e1c1caefe48604b0bc",
+      "assertions": 25
+    },
+    {
+      "file": "mispricing-crowd-lean.json",
+      "kind": "mispricing.crowdLean",
+      "bytes": 104052,
+      "sha256": "8399962e9ac4834beff9d213de07db2dc28a8704e507aefd21e80b2ef2984fa0",
+      "assertions": 441
+    },
+    {
+      "file": "mispricing-impulse.json",
+      "kind": "mispricing.impulse",
+      "bytes": 306956,
+      "sha256": "0dd03879f2380e2158115a458f6e82049a5d09d0c4f1493e4ab90478c5cd9a9f",
+      "assertions": 11
+    },
+    {
+      "file": "mispricing-roots.json",
+      "kind": "mispricing.roots",
+      "bytes": 84441,
+      "sha256": "f55b9ec1310f3c44b35665d9af11282fe5d2fa3ef6bc9b55602688870cb5ed60",
+      "assertions": 195
+    },
+    {
+      "file": "mispricing-step-cases.json",
+      "kind": "mispricing.step",
+      "bytes": 7391507,
+      "sha256": "e51922ad5f1c2c9c5f3c7b7b396165388692d70ee2f9176f61b3348534112683",
+      "assertions": 116952
+    },
+    {
+      "file": "mispricing-trajectory-calm.json",
+      "kind": "mispricing.trajectory",
+      "bytes": 4137417,
+      "sha256": "5ed2fb73786f28d5107a1b9365725e435d666081bba451c90bcba9b7fd5de4cb",
+      "assertions": 100022
+    },
+    {
+      "file": "mispricing-trajectory-denormal-drift.json",
+      "kind": "mispricing.trajectory",
+      "bytes": 4134944,
+      "sha256": "b76b29292e7e9fe559e07c439f53f907573780130f5cd55ec6a57c58f4040f2d",
+      "assertions": 100022
+    },
+    {
+      "file": "mispricing-trajectory-extreme-clamped.json",
+      "kind": "mispricing.trajectory",
+      "bytes": 6186238,
+      "sha256": "bca85bd69a73baa4485ceb487f015a2ad85d10a54ad1a93bb1338adad8791afa",
+      "assertions": 100022
+    },
+    {
+      "file": "mispricing-trajectory-garch-clustered.json",
+      "kind": "mispricing.trajectory",
+      "bytes": 4137591,
+      "sha256": "c6067b721b4018a701f728646cd638cff56271f2e0db8cb056e869bb09856843",
+      "assertions": 100022
+    },
+    {
+      "file": "mispricing-trajectory-news-shocks.json",
+      "kind": "mispricing.trajectory",
+      "bytes": 6187662,
+      "sha256": "dc1f8d5199a7aa285b6f462c249093cd9abd51849479411e72345cfec90c90f9",
+      "assertions": 100022
+    },
+    {
+      "file": "orderbook.json",
+      "kind": "orderbook",
+      "bytes": 328835,
+      "sha256": "16d6fb20f0eef29788d0a8b93ef6adf886209fab9c947b3ecd7e8fbd4532a898",
+      "assertions": null
+    },
+    {
+      "file": "prng-checkpoints.json",
+      "kind": "prng.checkpoints",
+      "bytes": 5717,
+      "sha256": "41bbf8f6a6ca02e5ca423a21ee53b28079e13f2d5128b3da4c4902deb8258a2e",
+      "assertions": 6
+    },
+    {
+      "file": "prng-derived.json",
+      "kind": "prng.derived",
+      "bytes": 165599,
+      "sha256": "6da69f035062550955864478ecf92e61713e4e28e0fa7a942c9e517d7c0b1501",
+      "assertions": 7032
+    },
+    {
+      "file": "prng-floats.json",
+      "kind": "prng.floats",
+      "bytes": 1288889,
+      "sha256": "21211d988a5f56632a67b0038f205295f132943c7050aee1c4bc9cf33abe154b",
+      "assertions": 6
+    },
+    {
+      "file": "prng-mixed-sequence.json",
+      "kind": "prng.mixed",
+      "bytes": 1061399,
+      "sha256": "69bf92d4053544d6ea8596d09a14b6fb577dd64838e66628a9017e47d769fd85",
+      "assertions": 32008
+    },
+    {
+      "file": "prng-nextbool.json",
+      "kind": "prng.nextBool",
+      "bytes": 143400,
+      "sha256": "e8a227da526053f4befdef92c0290b27d00825911121a488ef4800caa4e6c334",
+      "assertions": 30
+    },
+    {
+      "file": "prng-nextint.json",
+      "kind": "prng.nextInt",
+      "bytes": 689661,
+      "sha256": "147ecf8f5aaca8c64620783bf84e475995987e66c76be809e37551251dce0fb9",
+      "assertions": 54
+    },
+    {
+      "file": "prng-normals.json",
+      "kind": "prng.normals",
+      "bytes": 1289466,
+      "sha256": "2014589f42935618bb97038192693eca0373cd5629a1910c088f8889b7f0a2f2",
+      "assertions": 6
+    },
+    {
+      "file": "prng-raw-u32.json",
+      "kind": "prng.rawU32",
+      "bytes": 1771720,
+      "sha256": "1df129133eafca5503d9ee7a6aa57ea18e4ff1ab203a477d0d6e6c3cc484211f",
+      "assertions": 48
+    },
+    {
+      "file": "thirty-day-calm.json",
+      "kind": "engine.thirtyDay",
+      "bytes": 13822586,
+      "sha256": "c449d85fdbdb1d6ce045bcd2bfc90a94f015544e0cdc9226714362274dfb83ba",
+      "assertions": null
+    },
+    {
+      "file": "thirty-day-eventful.json",
+      "kind": "engine.thirtyDay",
+      "bytes": 13822785,
+      "sha256": "6e6eec3ecc78a6566aecd7d0267a51b5f6e3747cd20323cc147459af36590f80",
+      "assertions": null
+    }
+  ]
+}
