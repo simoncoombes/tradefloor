@@ -276,6 +276,16 @@ def main() -> int:
         default=None,
         help="scratch space for per-point wheels and panels; default a temp dir",
     )
+    parser.add_argument(
+        "--resume-across-revs",
+        action="store_true",
+        help="resume an --out file recorded at a different git rev. Only "
+        "defensible when the revisions differ in files that cannot move a "
+        "trajectory (test fixtures, tools, docs) -- the caller is making "
+        "that claim by passing this. Each point records the rev it was "
+        "measured at, and the stale-wheel fingerprint guard still protects "
+        "every point individually.",
+    )
     args = parser.parse_args()
 
     points = parse_points(args.points)
@@ -314,15 +324,29 @@ def main() -> int:
     # still sees every fingerprint the sweep has ever produced.
     sweep: dict[str, dict] = {}
     seen: dict[str, str] = {}
+    file_rev = git_rev
     if out_path.exists():
         with open(out_path, encoding="utf-8") as handle:
             existing = json.load(handle)
         if existing.get("git_rev") != git_rev:
-            raise SystemExit(
-                f"{out_path} was measured at {existing.get('git_rev')}, the "
-                f"tree is now at {git_rev}; refusing to blend two builds in "
-                f"one results file -- use a fresh --out"
+            if not args.resume_across_revs:
+                raise SystemExit(
+                    f"{out_path} was measured at {existing.get('git_rev')}, "
+                    f"the tree is now at {git_rev}; refusing to blend two "
+                    f"builds in one results file -- use a fresh --out, or "
+                    f"pass --resume-across-revs if and only if the revisions "
+                    f"differ in files that cannot move a trajectory"
+                )
+            print(
+                f"WARNING: resuming across revs "
+                f"({existing.get('git_rev')} -> {git_rev}) on the caller's "
+                f"claim that no trajectory-moving file differs; each point "
+                f"records its own rev",
+                flush=True,
             )
+        # The file-level rev stays the one the file was started at; points
+        # measured after a --resume-across-revs carry their own rev.
+        file_rev = existing.get("git_rev", git_rev)
         sweep = existing["sweep"]
         for label, entry in sweep.items():
             seen[entry["trajectory_fingerprint"]] = label
@@ -364,6 +388,7 @@ def main() -> int:
             entry["coefficients"] = {
                 "gamma": gamma, "alpha": alpha, "beta": beta,
             }
+            entry["git_rev"] = git_rev
             sweep[label] = entry
 
             # Persist after every point, so an aborted sweep still reports
@@ -373,7 +398,7 @@ def main() -> int:
                     {
                         "constants":
                             "GAMMA, ALPHA, BETA (rust/src/market/garch.rs)",
-                        "git_rev": git_rev,
+                        "git_rev": file_rev,
                         "date": datetime.date.today().isoformat(),
                         "sweep": sweep,
                     },
