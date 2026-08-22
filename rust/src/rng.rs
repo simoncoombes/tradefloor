@@ -85,6 +85,121 @@
 
 use crate::mathx;
 
+/// Named substreams of one root seed.
+///
+/// # Why streams exist
+///
+/// The reference implementation ran every consumer — market, economy,
+/// microstructure, embedder — off ONE generator, so changing what any
+/// consumer drew shifted every draw that every other consumer saw
+/// afterwards. That coupling is what made "what would have happened if I
+/// changed only this?" unanswerable: the TCA counterfactual, a
+/// pinned-versus-baseline macro comparison and the cutover embedder all
+/// need to vary one thing while the rest of the randomness stays put.
+///
+/// The 2026-08 era boundary splits the engine onto three independent
+/// substreams, all derived from the same root seed. One seed still fully
+/// determines the whole simulation; what changes is that perturbing one
+/// domain's consumption no longer moves any other domain's sequence.
+///
+/// # The derivation contract
+///
+/// This is a CONTRACT, not an implementation detail: it is the thing a
+/// reader reproduces, and changing it is an era boundary in its own right.
+/// For a root seed `s` (a `u32`) and a stream id `k` (one of the constants
+/// below):
+///
+/// ```text
+/// mixed    = splitmix64_mix((s as u64) << 32 | k as u64)
+/// seed_k   = (mixed >> 32) as u32          // top 32 bits of the mix
+/// seq_k    = STREAM_SEQUENCE_BASE + k      // = 256 + k
+/// stream_k = GameRng::new(seed_k, seq_k)
+/// ```
+///
+/// where `splitmix64_mix` is the SplitMix64 output finalizer (Stafford's
+/// "Mix13", the one in Vigna's reference `splitmix64.c`):
+///
+/// ```text
+/// z  = input + 0x9E3779B97F4A7C15
+/// z ^= z >> 30;  z *= 0xBF58476D1CE4E5B9
+/// z ^= z >> 27;  z *= 0x94D049BB133111EB
+/// z ^= z >> 31
+/// ```
+///
+/// # Why this derivation gives independent streams
+///
+/// Two properties carry the independence argument, and each half of the
+/// derivation supplies one:
+///
+/// 1. **Distinct sequences, structurally.** Each stream gets its own PCG
+///    `sequence`, so its LCG increment differs from every other stream's.
+///    Two PCG32 generators with different odd increments traverse
+///    DIFFERENT orbits — one can never be a shifted copy of the other, the
+///    failure mode where two "independent" streams eventually replay each
+///    other's values. This holds by construction, not probabilistically.
+///
+/// 2. **Decorrelated states, by mixing.** The lazy derivation —
+///    `GameRng::new(s, k)` with the root seed used raw — is exactly the one
+///    this contract refuses, and the refusal has a reason: two PCG streams
+///    seeded with the SAME state and different increments `c, c'` have
+///    states related by the affine identity
+///    `state'_n − state_n = (c' − c)(aⁿ⁻¹ + ⋯ + 1)`, a deterministic
+///    cross-stream structure that the output permutation only obscures.
+///    Feeding the (root, id) pair through an avalanche finalizer first
+///    gives every stream an unrelated starting state — a one-bit change in
+///    either the root or the id flips each output bit with probability
+///    ~1/2 — so no such relation exists between any two substreams.
+///
+/// Every operation is integer arithmetic, exactly specified on every
+/// platform: no floats, no hashing with platform-dependent behaviour, and
+/// nothing for the cross-OS bit-identity claim to trip on.
+///
+/// The sequence base 256 keeps the derived sequences clear of every
+/// sequence in historical use with RAW seeds (0 and 1 from the two
+/// constructors, 21 for the universe, 99 for the reference MAIN stream) —
+/// not because a collision would alias a stream (the mixed seed already
+/// differs) but so that a recorded sequence number identifies its era at a
+/// glance.
+///
+/// # What is deliberately NOT derived this way
+///
+/// - `random_universe` keeps its original `GameRng::new(seed, 21)`. Its
+///   seed is a UNIVERSE seed, a different input domain from the simulation
+///   seed, so it shares no root with the engine streams and re-deriving it
+///   would churn every published universe fingerprint for no independence
+///   gain.
+/// - `GameRng::new(seed, sequence)` stays public and raw. It is the
+///   Layer-1 API and the replay surface for pre-split recordings; the
+///   contract above is about how the ENGINE seeds itself.
+pub mod stream {
+    /// Every draw inside `simulate_market_tick`: shared factors, per-company
+    /// noise, volume, and book settlement.
+    pub const MARKET: u32 = 0;
+    /// The daily macro chain: `update_economy_daily`, the cycle roll, and
+    /// the central bank.
+    pub const ECONOMY: u32 = 1;
+    /// The embedder's own draws, taken through `Engine::draw_uniform` /
+    /// `draw_normal`: seed-derived and reproducible, but incapable of
+    /// perturbing the market.
+    pub const EXTERNAL: u32 = 2;
+
+    /// Derived streams live at `256 + id`. See the module docs for why the
+    /// offset exists.
+    pub const STREAM_SEQUENCE_BASE: u32 = 256;
+}
+
+/// The SplitMix64 output finalizer. Integer-only, exact on every platform.
+///
+/// The constants are load-bearing and pinned by `substream_derivation_is_the_documented_formula`
+/// below: this is Stafford's Mix13 with SplitMix64's golden-ratio increment,
+/// as published in Vigna's reference implementation.
+fn splitmix64_mix(input: u64) -> u64 {
+    let mut z = input.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
 /// The draw interface the engine modules consume.
 ///
 /// Exists so that a caller can supply RECORDED draws instead of generated
@@ -242,6 +357,22 @@ impl GameRng {
     /// different streams from the same seed.
     pub fn from_seed(seed: u32) -> Self {
         Self::new(seed, 0)
+    }
+
+    /// A named substream of `root_seed`, per the derivation contract in
+    /// [`stream`]'s module docs.
+    ///
+    /// One root seed, several independent generators: the engine seeds its
+    /// market, economy and external streams through here, so perturbing what
+    /// one domain draws cannot shift any other domain's sequence. The
+    /// derivation is integer-only and documented as a formula a reader can
+    /// reproduce; it is pinned by a golden test rather than trusted.
+    pub fn substream(root_seed: u32, stream_id: u32) -> Self {
+        let mixed = splitmix64_mix(((root_seed as u64) << 32) | stream_id as u64);
+        Self::new(
+            (mixed >> 32) as u32,
+            stream::STREAM_SEQUENCE_BASE + stream_id,
+        )
     }
 
     pub fn next_f64(&mut self) -> f64 {
@@ -420,6 +551,110 @@ mod tests {
         assert_eq!(to_uint32(-1.9), 4294967295, "truncates, then wraps");
         assert_eq!(to_uint32(f64::NAN), 0);
         assert_eq!(to_uint32(f64::INFINITY), 0);
+    }
+}
+
+#[cfg(test)]
+mod substream_tests {
+    use super::*;
+
+    /// The derivation is a documented contract, so it is pinned to the
+    /// formula's hand-computed values rather than to "whatever the code
+    /// does". If this fails, either the formula in the [`stream`] docs or
+    /// this test is wrong — and a silent re-derivation would strand every
+    /// recorded result of the era, so failing loudly is the point.
+    #[test]
+    fn substream_derivation_is_the_documented_formula() {
+        // splitmix64_mix(42 << 32 | k), top 32 bits, computed independently.
+        for (id, seed) in [
+            (stream::MARKET, 0xEA67_E2F1_u32),
+            (stream::ECONOMY, 0x6997_3300),
+            (stream::EXTERNAL, 0x4B07_4493),
+        ] {
+            let mut derived = GameRng::substream(42, id);
+            let mut expected = GameRng::new(seed, stream::STREAM_SEQUENCE_BASE + id);
+            for _ in 0..64 {
+                assert_eq!(
+                    derived.next_f64().to_bits(),
+                    expected.next_f64().to_bits(),
+                    "stream {id} does not match the documented derivation"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn substreams_of_one_root_differ_from_each_other() {
+        let ids = [stream::MARKET, stream::ECONOMY, stream::EXTERNAL];
+        for a in ids {
+            for b in ids {
+                if a == b {
+                    continue;
+                }
+                let mut x = GameRng::substream(7, a);
+                let mut y = GameRng::substream(7, b);
+                assert!(
+                    (0..64).any(|_| x.next_f64() != y.next_f64()),
+                    "streams {a} and {b} agree on a 64-draw prefix"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn substreams_differ_across_roots() {
+        let mut x = GameRng::substream(1, stream::MARKET);
+        let mut y = GameRng::substream(2, stream::MARKET);
+        assert!((0..64).any(|_| x.next_f64() != y.next_f64()));
+    }
+
+    /// The failure the distinct-sequence half of the contract rules out:
+    /// one substream must never be a time-shifted copy of another. Checked
+    /// over a window rather than proved — the proof is that different odd
+    /// increments give different LCG orbits, which holds by construction —
+    /// so this is the tripwire for someone replacing the derivation with
+    /// one that reuses an increment.
+    #[test]
+    fn no_substream_is_a_shifted_copy_of_another() {
+        let ids = [stream::MARKET, stream::ECONOMY, stream::EXTERNAL];
+        for a in ids {
+            for b in ids {
+                if a == b {
+                    continue;
+                }
+                let reference: Vec<u32> = {
+                    let mut rng = GameRng::substream(2026, a);
+                    (0..64).map(|_| rng.pcg.next_u32()).collect()
+                };
+                let window: Vec<u32> = {
+                    let mut rng = GameRng::substream(2026, b);
+                    (0..1024).map(|_| rng.pcg.next_u32()).collect()
+                };
+                assert!(
+                    !window
+                        .windows(reference.len())
+                        .any(|w| w == reference.as_slice()),
+                    "stream {b} replays stream {a}'s prefix at an offset"
+                );
+            }
+        }
+    }
+
+    /// The substreams must also stay clear of every stream in historical
+    /// use with the same nominal seed — a consumer holding root seed 42
+    /// must not find the engine's market stream replaying `GameRng::new(42, 99)`.
+    #[test]
+    fn substreams_do_not_replay_the_legacy_streams() {
+        for legacy_sequence in [0, 1, 21, 99] {
+            for id in [stream::MARKET, stream::ECONOMY, stream::EXTERNAL] {
+                let mut legacy = GameRng::new(42, legacy_sequence);
+                let mut derived = GameRng::substream(42, id);
+                assert!(
+                    (0..64).any(|_| derived.next_f64() != legacy.next_f64()),
+                    "substream {id} replays legacy sequence {legacy_sequence}"
+                );
+            }
+        }
     }
 }
 

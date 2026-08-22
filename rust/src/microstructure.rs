@@ -31,6 +31,15 @@
 //! unconditionally, and [`tests`] asserts the draw count rather than trusting
 //! the shape of the code.
 //!
+//! Since the 2026-08 stream split, the four-or-zero consumption is the
+//! REPLAY schedule: it is what a recorded reference stream actually holds,
+//! and `market::SettleDrawPolicy::FourOrZero` preserves it. The engine's
+//! own generated schedule pre-draws the four uniforms unconditionally
+//! (`FourAlways`) and serves this function from the buffer, so the market
+//! stream's position cannot depend on which guard fired — an early return
+//! leaves drawn values unused rather than draws untaken. This function's
+//! own contract is unchanged either way.
+//!
 //! # Faithfulness notes
 //!
 //! - **`||` is not `??`.** `baseQuoteSize` falls through a chain of `||`, so

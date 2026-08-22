@@ -69,4 +69,4 @@ mod python_log;
 #[cfg(feature = "python")]
 mod python_batch;
 
-pub use rng::{to_uint32, GameRng, Pcg32};
+pub use rng::{stream, to_uint32, GameRng, Pcg32};

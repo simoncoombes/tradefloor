@@ -20,12 +20,17 @@
 //! |---|---|
 //! | Once per tick | 1 normal (market factor), then 1 normal per sector |
 //! | Per active company, phase 1 | 1 normal (GARCH idiosyncratic), then 1 uniform |
-//! | Per active company, settlement | 4 uniforms via `microstructure::settle_price_through_book`, market-open only |
+//! | Per active company, settlement | 4 uniforms, market-open only — unconditional under `SettleDrawPolicy::FourAlways` (the engine's generated schedule), or four-or-zero as `microstructure::settle_price_through_book`'s guards decide under `FourOrZero` (recorded-stream replay) |
 //!
 //! "Active" means not bankrupt and public, in `companies` array order. The
 //! order is contractual: the uniform drawn at the end of each phase-1 body is
 //! consumed much later, so a port that batched the normals separately from
 //! the uniforms would produce the same counts and a different stream.
+//!
+//! Under `FourAlways` the whole schedule is a pure function of (market
+//! status, active set, sector count) — the 2026-08 era's alignment
+//! guarantee: no price, macro value or order flow can move the market
+//! stream's position.
 //!
 //! # D6 — the circuit breaker is a SESSION band
 //!
@@ -59,6 +64,6 @@ pub use hours::{
 };
 pub use index_value::{calculate_market_index, IndexConstituent, IndexValue};
 pub use tick::{
-    simulate_market_tick, NewsImpactEntry, OrderVolume, TickCompany, TickInputs, TickOutcome,
-    TickStock, S_PHI_TICK,
+    simulate_market_tick, NewsImpactEntry, OrderVolume, SettleDrawPolicy, TickCompany, TickInputs,
+    TickOutcome, TickStock, S_PHI_TICK,
 };

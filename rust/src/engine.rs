@@ -12,19 +12,36 @@
 //! the price only through the generic news channels, so there is nothing to
 //! port for them.
 //!
-//! # The stream is shared, and that is the hard part
+//! # The streams are split, and that is the 2026-08 era boundary
 //!
-//! Every one of those TypeScript-side subsystems draws from the **same** MAIN
-//! PCG32 stream this engine owns. So an embedder cannot simply run its own
-//! generator alongside: the two would interleave differently and every price
-//! would diverge. [`Engine::draw_uniform`] and [`Engine::draw_normal`] exist
-//! for exactly that reason — the embedder asks THIS engine for its draws, so
-//! there is one stream with one position.
+//! The reference ran every consumer — market, economy, microstructure,
+//! embedder — off ONE PCG32 stream, so changing what any consumer drew
+//! shifted every draw every other consumer saw afterwards. This engine
+//! instead derives three independent substreams from the root seed
+//! ([`crate::rng::stream`] documents the derivation contract):
 //!
-//! That also means Box-Muller's spare cache is shared. An embedder that takes
-//! an odd number of normals leaves a spare waiting that this engine's next
-//! normal will consume, which is correct and is why the cache lives in
-//! `GameRng` rather than being reset per call.
+//! - **market** — everything inside `simulate_market_tick`, settlement
+//!   included. With [`SettleDrawPolicy::FourAlways`] its schedule is a pure
+//!   function of (status, active set, sector count): no price, macro value
+//!   or order flow can move its position.
+//! - **economy** — the daily macro chain, whose draw count genuinely
+//!   depends on macro state. Its branches stay its own problem now.
+//! - **external** — [`Engine::draw_uniform`] / [`Engine::draw_normal`]:
+//!   seed-derived, reproducible, and incapable of perturbing the market.
+//!
+//! One seed still fully determines the whole simulation. What the split
+//! buys is the counterfactual: vary the order flow (TCA), the macro path
+//! (pinned-versus-baseline), or the embedder's own consumption (cutover),
+//! and every other domain's sequence is bit-identical.
+//!
+//! Each stream keeps its own Box-Muller spare, inside its own `GameRng` —
+//! the parity of normal draws is per-stream state and never crosses
+//! between domains.
+//!
+//! Replaying a PRE-SPLIT recorded stream is still possible:
+//! [`Engine::tick_with`] and [`Engine::advance_day_with`] take an external
+//! draw source and consume it in the reference's shared-stream order,
+//! settlement's four-or-zero included.
 //!
 //! # Columnar access
 //!
@@ -45,14 +62,50 @@ use crate::economy::{
 use crate::market::{
     close_day, get_market_status, intraday_fraction, reset_daily_prices, simulate_market_tick,
     AvgVolumePolicy, CloseInputs, GameTime, MarketStatus, NewsEvent, NewsImpactEntry, OrderVolume,
-    TickCompany, TickInputs,
+    SettleDrawPolicy, TickCompany, TickInputs,
 };
-use crate::rng::{GameRng, Rng};
+use crate::rng::{stream, GameRng, Rng, RngState};
 
-/// The main stream's sequence, from `rng.ts:32`. Not 0 and not 1 — both are
-/// different streams from the same seed, and picking the wrong one produces a
-/// plausible market that matches nothing.
+/// The reference MAIN stream's sequence, from `rng.ts:32`. Not 0 and not 1 —
+/// both are different streams from the same seed, and picking the wrong one
+/// produces a plausible market that matches nothing.
+///
+/// Since the 2026-08 stream split the ENGINE no longer seeds itself here —
+/// it derives per-domain substreams instead (`crate::rng::stream`). The
+/// constant remains because it is what a pre-split recording was produced
+/// with: a replay harness reconstructing the reference's generator needs
+/// `GameRng::new(seed, MAIN_STREAM)`, exactly as before.
 pub const MAIN_STREAM: u32 = 99;
+
+/// The exact position of all three engine streams — the checkpoint half
+/// that cannot be reconstructed from the columns.
+///
+/// One [`RngState`] per stream, because each stream has its own LCG
+/// position AND its own Box-Muller spare. A checkpoint that carried only
+/// one of the three would restore a market whose untouched domains replay
+/// correctly and whose missing one silently starts a different sequence.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EngineRngState {
+    pub market: RngState,
+    pub economy: RngState,
+    pub external: RngState,
+}
+
+/// Cumulative draws per stream. Diagnostic, per D-R1: the single most
+/// useful numbers for locating a divergence, and deliberately not part of
+/// any behavioural contract.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StreamDraws {
+    pub market: usize,
+    pub economy: usize,
+    pub external: usize,
+}
+
+impl StreamDraws {
+    pub fn total(&self) -> usize {
+        self.market + self.economy + self.external
+    }
+}
 
 /// What the embedder supplies for one tick.
 #[derive(Debug, Clone)]
@@ -113,7 +166,9 @@ pub struct DayAdvanceOutcome {
 }
 
 pub struct Engine {
-    rng: GameRng,
+    market_rng: GameRng,
+    economy_rng: GameRng,
+    external_rng: GameRng,
     companies: Vec<TickCompany>,
     economy: EconomyState,
     central_bank: CentralBankState,
@@ -139,15 +194,16 @@ pub struct Engine {
     tick_components: Vec<[f64; 7]>,
     tick_fundamental: Vec<f64>,
     tick_anchor: Vec<f64>,
-    /// Cumulative MAIN-stream draws, including any the embedder took through
-    /// [`Engine::draw_uniform`]. The single most useful number for diagnosing
-    /// a cross-language divergence: if these differ, nothing downstream is
-    /// worth comparing.
-    draws: usize,
+    /// Cumulative draws per stream, including any the embedder took through
+    /// [`Engine::draw_uniform`]. The single most useful numbers for
+    /// diagnosing a divergence: if these differ between two runs, nothing
+    /// downstream is worth comparing.
+    draws: StreamDraws,
 }
 
 impl Engine {
-    /// Seed the MAIN stream and take ownership of the state.
+    /// Derive the three engine streams from the root seed and take
+    /// ownership of the state.
     ///
     /// # Both orderings are CONTRACTUAL
     ///
@@ -175,7 +231,9 @@ impl Engine {
     ) -> Self {
         let companies_len = companies.len();
         Self {
-            rng: GameRng::new(seed, MAIN_STREAM),
+            market_rng: GameRng::substream(seed, stream::MARKET),
+            economy_rng: GameRng::substream(seed, stream::ECONOMY),
+            external_rng: GameRng::substream(seed, stream::EXTERNAL),
             companies,
             economy,
             central_bank,
@@ -187,55 +245,75 @@ impl Engine {
             tick_fundamental: vec![f64::NAN; companies_len],
             tick_anchor: vec![f64::NAN; companies_len],
             sector_keys,
-            draws: 0,
+            draws: StreamDraws::default(),
         }
     }
 
     // ── Draw delegation ───────────────────────────────────────────────────
 
-    /// Take one uniform from the shared stream, on the embedder's behalf.
+    /// Take one uniform from the EXTERNAL stream, on the embedder's behalf.
     ///
     /// The embedder's own subsystems — events, corporate actions, earnings —
-    /// draw from this same stream in the TypeScript. Routing them through here
-    /// keeps one stream with one position; running a second generator
-    /// alongside would interleave differently and diverge every price.
+    /// drew from the engine's one shared stream in the reference, which
+    /// meant an extra event roll on the embedder's side moved every price.
+    /// Since the stream split these draws come from a substream of the same
+    /// root seed: still fully seed-determined and reproducible, but taking
+    /// one — or a thousand — leaves the market's own sequence untouched.
+    /// That isolation is what lets an embedder change what IT rolls without
+    /// invalidating every seeded market trajectory it embeds.
     pub fn draw_uniform(&mut self) -> f64 {
-        self.draws += 1;
-        self.rng.next_f64()
+        self.draws.external += 1;
+        self.external_rng.next_f64()
     }
 
-    /// Take one normal from the shared stream. See [`Engine::draw_uniform`];
-    /// note this also shares the Box-Muller spare.
+    /// Take one normal from the EXTERNAL stream. See
+    /// [`Engine::draw_uniform`]; the Box-Muller spare involved is the
+    /// external stream's own and is never visible to the market.
     pub fn draw_normal(&mut self) -> f64 {
-        self.draws += 1;
-        self.rng.next_normal()
+        self.draws.external += 1;
+        self.external_rng.next_normal()
     }
 
-    /// Cumulative draws taken since construction.
-    /// The generator's exact position, as three numbers.
+    /// The exact position of all three streams.
     ///
     /// The half of a checkpoint that cannot be reconstructed from the roster.
     /// Every other piece of engine state -- prices, GARCH variance, maker
     /// inventory, the mispricing carry -- is observable through `column()`, so
     /// an embedder that persists its own instruments already has it. The
-    /// stream position is not observable that way, and without it a restored
-    /// market continues from a different sequence while looking correct.
-    pub fn rng_state(&self) -> crate::rng::RngState {
-        self.rng.snapshot()
+    /// stream positions are not observable that way, and without them a
+    /// restored market continues from a different sequence while looking
+    /// correct.
+    pub fn rng_state(&self) -> EngineRngState {
+        EngineRngState {
+            market: self.market_rng.snapshot(),
+            economy: self.economy_rng.snapshot(),
+            external: self.external_rng.snapshot(),
+        }
     }
 
-    /// Put the generator back to a captured position.
+    /// Put all three generators back to a captured position.
     ///
-    /// Deliberately narrow: it restores the STREAM and nothing else. Company
+    /// Deliberately narrow: it restores the STREAMS and nothing else. Company
     /// state is the caller's to restore, because the caller is the one that
     /// persisted it. A method that pretended to restore everything would have
     /// to be kept in step with every field ever added to a company, and would
     /// fail silently the first time it was not.
-    pub fn set_rng_state(&mut self, state: crate::rng::RngState) {
-        self.rng = GameRng::restore(state);
+    pub fn set_rng_state(&mut self, state: EngineRngState) {
+        self.market_rng = GameRng::restore(state.market);
+        self.economy_rng = GameRng::restore(state.economy);
+        self.external_rng = GameRng::restore(state.external);
     }
 
+    /// Cumulative draws across all three streams. The per-stream split is
+    /// [`Engine::draws_by_stream`].
     pub fn draws_consumed(&self) -> usize {
+        self.draws.total()
+    }
+
+    /// Cumulative draws, per stream. Diagnostic (D-R1): equality of the
+    /// market counts between two runs is what "the two markets saw the same
+    /// noise" means operationally.
+    pub fn draws_by_stream(&self) -> StreamDraws {
         self.draws
     }
 
@@ -247,18 +325,20 @@ impl Engine {
     /// inside [`simulate_market_tick`] and precedes every draw site, which
     /// matters because most of the clock is closed.
     pub fn tick(&mut self, request: &TickRequest) -> TickOutcome {
-        // The generator is moved out, used, and moved back. `tick_with` takes
-        // `&mut self`, so it cannot also borrow `self.rng` — and swapping is
-        // clearer than duplicating the tick body for the two cases.
-        let mut rng = std::mem::replace(&mut self.rng, GameRng::new(0, MAIN_STREAM));
+        // The market generator is moved out, used, and moved back.
+        // `tick_inner` takes `&mut self`, so it cannot also borrow
+        // `self.market_rng` — and swapping is clearer than duplicating the
+        // tick body for the two cases. The placeholder is never drawn from:
+        // the real generator is restored before this method returns.
+        let mut rng = std::mem::replace(&mut self.market_rng, GameRng::new(0, MAIN_STREAM));
         let mut counting = Counting {
             inner: &mut rng,
             count: 0,
         };
-        let mut outcome = self.tick_with(request, &mut counting);
+        let mut outcome = self.tick_inner(request, &mut counting, SettleDrawPolicy::FourAlways);
         let consumed = counting.count;
-        self.rng = rng;
-        self.draws += consumed;
+        self.market_rng = rng;
+        self.draws.market += consumed;
         outcome.draws_consumed = consumed;
         outcome
     }
@@ -271,9 +351,24 @@ impl Engine {
     /// separates the arithmetic under test from the generator that is known to
     /// differ.
     ///
+    /// Because the source is a RECORDING of the pre-split shared stream,
+    /// this path keeps the pre-split schedule: settlement draws four or
+    /// zero, exactly as the guards decided when the tape was cut
+    /// ([`SettleDrawPolicy::FourOrZero`]). The engine's own generated
+    /// schedule ([`Engine::tick`]) draws settlement's four unconditionally.
+    ///
     /// `draws_consumed` in the returned outcome is 0 here — the caller owns
     /// the source and already knows what it handed over.
     pub fn tick_with(&mut self, request: &TickRequest, rng: &mut impl Rng) -> TickOutcome {
+        self.tick_inner(request, rng, SettleDrawPolicy::FourOrZero)
+    }
+
+    fn tick_inner(
+        &mut self,
+        request: &TickRequest,
+        rng: &mut impl Rng,
+        settle_draws: SettleDrawPolicy,
+    ) -> TickOutcome {
         let status = get_market_status(request.time);
 
         let outcome = simulate_market_tick(
@@ -287,6 +382,7 @@ impl Engine {
                 news_impact_queue: request.news_impact_queue,
                 order_volumes: request.order_volumes,
                 sector_keys: &self.sector_keys,
+                settle_draws,
             },
             rng,
         );
@@ -498,15 +594,20 @@ impl Engine {
     /// the factor model reads on the first tick of a new day are already the
     /// day's NEW values, not yesterday's.
     pub fn advance_day(&mut self, request: &DayAdvanceRequest) -> DayAdvanceOutcome {
-        let mut rng = std::mem::replace(&mut self.rng, GameRng::new(0, MAIN_STREAM));
+        // The ECONOMY stream, not the market's. The macro chain's draw count
+        // genuinely depends on macro state — a cycle entering contraction
+        // draws a shock the expansion never rolls — and before the split
+        // that variability shifted every market draw after it. Now its
+        // branches move only its own stream.
+        let mut rng = std::mem::replace(&mut self.economy_rng, GameRng::new(0, MAIN_STREAM));
         let mut counting = Counting {
             inner: &mut rng,
             count: 0,
         };
         let mut outcome = self.advance_day_with(request, &mut counting);
         let consumed = counting.count;
-        self.rng = rng;
-        self.draws += consumed;
+        self.economy_rng = rng;
+        self.draws.economy += consumed;
         outcome.draws_consumed = consumed;
         outcome
     }
@@ -1461,37 +1562,167 @@ mod tests {
     }
 
     #[test]
-    fn embedder_draws_share_the_engines_stream() {
-        // The point of `draw_uniform`. An embedder running its own generator
-        // would interleave differently and diverge every price, so taking a
-        // draw here must move the market that follows it.
-        //
-        // Asserted across the ROSTER after several ticks, not on one name
-        // after one tick. Prints round to cents, so a sub-cent perturbation
-        // legitimately need not move a $100 stock within a single minute — an
-        // assertion that narrow would be demanding something the model does
-        // not promise. Measured: after one tick only the $220 name differs;
-        // by tick five all three do.
+    fn embedder_draws_leave_the_market_bit_identical() {
+        // The CUTOVER half of the stream split. Under the shared stream this
+        // test's inverse held — one embedder draw shifted every subsequent
+        // market draw, and the old assertion here demanded exactly that. Now
+        // the embedder's consumption lives on its own substream, so a game
+        // that adds an event roll no longer invalidates every seeded market.
         let run = |extra_draws: usize| {
             let mut e = engine(99);
             e.open_market();
             for _ in 0..extra_draws {
                 e.draw_uniform();
+                e.draw_normal();
             }
             for m in 0..5i64 {
                 e.tick(&request(10, m));
             }
-            e.prices()
+            (e.prices(), e.rng_state())
         };
-        let without = run(0);
-        let with_draw = run(1);
-        assert!(
-            without
-                .iter()
-                .zip(&with_draw)
-                .any(|(a, b)| a.to_bits() != b.to_bits()),
-            "an embedder draw must shift the shared stream: {without:?} vs {with_draw:?}"
+        let (without, state_without) = run(0);
+        let (with_draws, state_with) = run(1000);
+        for (i, (a, b)) in without.iter().zip(&with_draws).enumerate() {
+            assert_eq!(
+                a.to_bits(),
+                b.to_bits(),
+                "company {i} moved because the embedder drew"
+            );
+        }
+        // Bit-identical POSITION, not merely price: the market stream never
+        // saw the embedder's draws at all.
+        assert_eq!(state_without.market, state_with.market);
+        assert_ne!(
+            state_without.external, state_with.external,
+            "the embedder's draws were not taken from the external stream"
         );
+    }
+
+    #[test]
+    fn embedder_draws_are_seed_determined_and_reproducible() {
+        // Isolation must not cost reproducibility: the external stream is
+        // derived from the same root seed, so an embedder replaying a run
+        // gets its own draws back too.
+        let a: Vec<f64> = {
+            let mut e = engine(7);
+            (0..16).map(|_| e.draw_normal()).collect()
+        };
+        let b: Vec<f64> = {
+            let mut e = engine(7);
+            (0..16).map(|_| e.draw_normal()).collect()
+        };
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn macro_branch_differences_leave_the_market_stream_untouched() {
+        // The PINNED-VERSUS-BASELINE half of the stream split. The macro
+        // chain's draw count depends on macro state — a cycle sitting in
+        // contraction rolls a shock the expansion never draws — so two runs
+        // whose macro paths branch differently consume different economy
+        // draws. Under the shared stream that shifted every market draw
+        // after the day boundary; a pinned run and its baseline never saw
+        // the same noise again. Now the market stream's position is
+        // identical whatever the macro chain consumed.
+        let run = |fresh_phase: bool| {
+            let mut e = engine(4242);
+            // A phase that changed TODAY draws the phase-change shock
+            // uniform; one 0.9 months in draws neither that (window passed)
+            // nor the transition roll (min_months not reached). The counts
+            // differ by construction, which is the shape of the hazard: a
+            // pinned macro path and its baseline sit in different phases and
+            // stop consuming in step.
+            e.economy_mut().months_in_current_phase = if fresh_phase { 0.0 } else { 0.9 };
+            e.advance_day(&DayAdvanceRequest {
+                volatility: 1.0,
+                active_shocks: &[],
+                market_return_pct: 0.0,
+                game_day: 1,
+                timestamp: 24 * 60,
+            });
+            // The market's draws, taken AFTER the diverging macro step.
+            e.open_market();
+            for m in 0..10i64 {
+                e.tick(&request(10, m));
+            }
+            e
+        };
+        let flat = run(false);
+        let shocked = run(true);
+        // The precondition that makes the assertion mean something: the two
+        // macro chains really did consume different numbers of draws.
+        assert_ne!(
+            flat.draws_by_stream().economy,
+            shocked.draws_by_stream().economy,
+            "the two macro paths drew in step; the test constructed nothing"
+        );
+        assert_eq!(
+            flat.rng_state().market,
+            shocked.rng_state().market,
+            "the macro chain moved the market stream"
+        );
+        assert_eq!(flat.draws_by_stream().market, shocked.draws_by_stream().market);
+    }
+
+    #[test]
+    fn a_pinned_macro_run_and_its_baseline_see_identical_market_noise() {
+        // The consumer's actual workflow: world A advances the macro chain
+        // endogenously; world B replays a PINNED macro path — it never runs
+        // the chain at all, it writes the day's values directly. Before the
+        // split, world B's skipped macro draws shifted the market stream and
+        // the two worlds' intraday noise had nothing to do with each other.
+        // Now: pin the same values the endogenous chain produced, and the
+        // sessions are bit-identical — which is what makes "the difference
+        // is the macro path and nothing else" a guarantee rather than an
+        // approximation when the pinned values DO differ.
+        let day = |e: &mut Engine| {
+            e.open_market();
+            for m in 0..30i64 {
+                e.tick(&request(10, m));
+            }
+            e.close_market(&DayCloseRequest {
+                daily_innovations: &[None, None, None],
+                sector_base_variances: &[0.000225; 3],
+                avg_volume: AvgVolumePolicy::default(),
+            });
+        };
+
+        // World A: the chain runs.
+        let mut endogenous = engine(2026);
+        endogenous.advance_day(&DayAdvanceRequest {
+            volatility: 1.0,
+            active_shocks: &[],
+            market_return_pct: 0.0,
+            game_day: 1,
+            timestamp: 24 * 60,
+        });
+        let evolved = endogenous.economy().clone();
+        day(&mut endogenous);
+
+        // World B: no chain — the evolved values are pinned directly, as a
+        // replay of a recorded macro series would.
+        let mut pinned = engine(2026);
+        *pinned.economy_mut() = evolved;
+        day(&mut pinned);
+
+        assert_eq!(
+            pinned.draws_by_stream().economy,
+            0,
+            "the pinned world must not run the macro chain"
+        );
+        for (i, (a, b)) in endogenous
+            .prices()
+            .iter()
+            .zip(&pinned.prices())
+            .enumerate()
+        {
+            assert_eq!(
+                a.to_bits(),
+                b.to_bits(),
+                "company {i}: pinning the macro path perturbed the market noise"
+            );
+        }
+        assert_eq!(endogenous.rng_state().market, pinned.rng_state().market);
     }
 
     #[test]

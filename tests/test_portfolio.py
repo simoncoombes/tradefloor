@@ -157,12 +157,25 @@ def test_pending_flow_is_what_the_market_should_feel():
 
 
 def test_flow_fed_back_actually_moves_the_market():
+    # Traded on AAB, not the usual TICKER (AAA), and the reason is worth
+    # keeping: AAA is a 44M-share-a-day mega-cap, information impact
+    # saturates at 10x the average minute volume, and its saturated ceiling
+    # works out to about one cent over this session -- which the cent grid
+    # then hides or shows depending on where the seed's noise lands. It
+    # showed until the stream-split re-deal and hides after, but that is the
+    # coin flip, not the claim. AAB's 2M-share day clears the grid by an
+    # order of magnitude, so THIS assertion measures the mechanism.
+    #
+    # Probed at the re-deal: the same 500k order moves AAB +0.14, AAC +0.01,
+    # AAD +12.26, AAE +0.09 -- and in every case only the traded name, which
+    # is the stream split doing exactly what it promises.
+    thin = UNIVERSE[1].ticker
     quiet = market()
     quiet.run_session(10, 30, 3, 200)
 
     traded = market()
     p = pretium.Portfolio(cash=1e10)
-    p.execute(traded, TICKER, 500_000)
+    p.execute(traded, thin, 500_000)
     traded.run_session(10, 30, 3, 200, order_flow=p.pending_flow())
 
     assert quiet.prices() != traded.prices()

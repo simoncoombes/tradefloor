@@ -211,7 +211,10 @@ def test_a_snapshot_covers_every_column():
                   "maker_inventory", "garch_variance", "beta",
                   "short_interest", "float_shares"):
         assert field in snapshot["columns"], field
-    assert len(snapshot["rng"]) == 3
+    # (state, increment, spare) for each of the market, economy and external
+    # streams, in that order. Three numbers -- one stream -- is the pre-split
+    # format, and restore_state refuses it by design.
+    assert len(snapshot["rng"]) == 9
 
 
 def test_absence_survives_a_snapshot_round_trip():
