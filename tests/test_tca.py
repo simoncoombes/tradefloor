@@ -67,12 +67,20 @@ def test_the_untraded_world_is_unmoved_where_the_trader_did_not_go():
     """The property the whole measurement depends on.
 
     Order flow consumes no RNG draws, so adding a trade in one name leaves the
-    draw schedule byte-identical and every other name follows exactly the path
-    it would have followed. If that were not true, impact would be a signal
+    draw schedule byte-identical and every other name sees exactly the noise
+    it would have seen. If that were not true, impact would be a signal
     buried in a shifted market and the subtraction would be meaningless.
 
-    Asserted rather than assumed: a non-empty result means something leaked
-    between the two worlds.
+    This is a ONE-DAY analysis, which is what makes emptiness assertable
+    exactly: the final prices predate the first close-repriced variance
+    target, so the 2026-08 fear-gauge channel — trading moves the same-day
+    VIX, VIX reaches other names' volatility two closes later — cannot
+    arrive in time. On a multi-day run that channel can move untraded names
+    a little unless VIX is pinned; the measurement and the bounds are in
+    ``Execution.moved``'s docstring.
+
+    Asserted rather than assumed: a non-empty result here means something
+    leaked between the two worlds.
     """
     execution = analyse(BuyOnce(0.01))
     assert execution.untouched_moved() == []
