@@ -207,6 +207,24 @@ pub const PT_V2: ModelParams = ModelParams::pt_v2();
 /// by the test at the bottom of this file — in both directions, so a
 /// coefficient that moved without appearing here fails just as loudly as one
 /// that drifted from its recorded value.
+/// `pt-v3`, the shipped default. Emitted beside the preset body by
+/// `emit_preset.py` from the converged certificate and held to by the test
+/// at the bottom of this file, in both directions.
+pub const PT_V3: ModelParams = ModelParams::pt_v3();
+
+/// Every coefficient `pt-v3` moved, with the exact bits the converged
+/// certificate recorded.
+const PT_V3_BITS: &[(&str, u64)] = &[
+    ("garch_alpha", 0x3FAE_77BA_B2AC_7C70u64),
+    ("garch_beta", 0x3FE5_C531_3DAD_6D68u64),
+    ("garch_gamma", 0x3FCB_D5BD_BB38_9ED4u64),
+    ("idio_sigma_scale", 0x3FEA_1135_9352_B54Bu64),
+    ("market_vol_alpha", 0x3FDE_2948_3B36_360Au64),
+    ("market_vol_beta", 0x3FE0_CDE1_E131_8584u64),
+    ("market_vol_vix_coupling", 0x3FEE_3AC6_B051_60C9u64),
+    ("momentum_theta", 0x3FB7_7DF3_B645_A1CAu64),
+];
+
 const PT_V2_BITS: &[(&str, u64)] = &[
     ("garch_alpha", 0x3FB0_319F_E8B2_672Eu64),
     ("garch_beta", 0x3FE7_0C76_769C_A23Fu64),
@@ -280,26 +298,59 @@ impl ModelParams {
         p
     }
 
+    /// `pt-v3` — the converged margined optimum, and the shipped default
+    /// from 2026-08-22.
+    ///
+    /// Emitted from
+    /// `tools/calibration/results/calibrate-pt-v3-converged-2026-08-22.json`
+    /// by `emit_preset.py`, pinned bit-for-bit by the test at the bottom of
+    /// this file, and built from `pt_v1()` for the same reason `PT_V2` is.
+    ///
+    /// What separates it from `pt-v2`. The search that produced `pt-v2`
+    /// minimised a loss that is flat inside each band, so it parked every
+    /// trained-to statistic on a band EDGE — the least robust point it
+    /// could occupy. `pt-v3` aims half a seed-sd inside every band while
+    /// still reporting against the true bands, and it was run to
+    /// convergence rather than stopping on a budget guard. The result is
+    /// `L_real` 0.0000 on all three 252-day axes and 0.0058 on the 504-day
+    /// one, against `pt-v2`'s 0.0002 / 0.0000 / 0.0000 / 2.2252.
+    pub const fn pt_v3() -> ModelParams {
+        let mut p = ModelParams::pt_v1();
+        p.garch_alpha = 0.059507211981547736;
+        p.garch_beta = 0.6803213314664562;
+        p.garch_gamma = 0.21746036187800277;
+        p.idio_sigma_scale = 0.8146007420925029;
+        p.market_vol_alpha = 0.471269662689196;
+        p.market_vol_beta = 0.525132121878571;
+        p.market_vol_vix_coupling = 0.9446748202999738;
+        p.momentum_theta = 0.09176562499999999;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
-    /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md).
+    /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
+    /// the converged margined optimum that replaced it as the default the
+    /// same day (CALIBRATION-FOLLOWUPS.md §7.5).
     ///
     /// Note what this function does NOT decide: which preset an engine
-    /// gets when the caller names none. That is
-    /// `python_engine.rs`'s default, and it is still [`PT_V1`] —
-    /// adoption of `pt-v2` as the shipped default is the owner's era
-    /// decision, taken separately from making it selectable.
+    /// gets when the caller names none. That is `engine.rs`'s and
+    /// `python_engine.rs`'s default, and as of the `pt-v3` era boundary it
+    /// is [`PT_V3`]. `pt-v1` and `pt-v2` remain selectable and
+    /// bit-reproducing forever, so a result recorded under either replays
+    /// exactly by naming it.
     pub fn preset(name: &str) -> Option<ModelParams> {
         match name {
             "pt-v1" => Some(PT_V1),
             "pt-v2" => Some(PT_V2),
+            "pt-v3" => Some(PT_V3),
             _ => None,
         }
     }
 
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
-        &["pt-v1", "pt-v2"]
+        &["pt-v1", "pt-v2", "pt-v3"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -617,7 +668,45 @@ mod tests {
         assert_eq!(ModelParams::preset("pt-v1").unwrap().fingerprint(), "pt-v1");
         assert_eq!(PT_V2.fingerprint(), "pt-v2");
         assert_eq!(ModelParams::preset("pt-v2").unwrap().fingerprint(), "pt-v2");
-        assert!(ModelParams::preset("pt-v3").is_none());
+        assert_eq!(PT_V3.fingerprint(), "pt-v3");
+        assert_eq!(ModelParams::preset("pt-v3").unwrap().fingerprint(), "pt-v3");
+        assert!(ModelParams::preset("pt-v4").is_none());
+    }
+
+    #[test]
+    fn the_three_presets_are_three_different_models() {
+        // Same guard as `the_calibrated_preset_is_a_different_model_from_
+        // the_shipped_one`, extended: a pt_v3() body holding pt-v2's values
+        // would compile, pass every other test, and ship an era boundary
+        // that moved nothing while the fingerprint rule reported it as
+        // `pt-v2` and hid the mistake.
+        assert_ne!(PT_V3.digest(), PT_V1.digest());
+        assert_ne!(PT_V3.digest(), PT_V2.digest());
+    }
+
+    #[test]
+    fn the_default_preset_is_pt_v3() {
+        // The era boundary, asserted rather than assumed. An engine built
+        // without a model gets pt-v3 from 2026-08-22; if this flips back,
+        // every published figure silently describes a different market.
+        assert_eq!(crate::params::PT_V3.fingerprint(), "pt-v3");
+        assert_eq!(
+            crate::engine::Engine::default_model().fingerprint(),
+            "pt-v3"
+        );
+    }
+
+    #[test]
+    fn the_default_preset_holds_the_bits_the_converged_certificate_recorded() {
+        // Emitted by tools/calibration/emit_preset.py from
+        // results/calibrate-pt-v3-converged-2026-08-22.json.
+        for (name, bits) in PT_V3_BITS {
+            assert_eq!(
+                PT_V3.get(name).unwrap().to_bits(),
+                *bits,
+                "{name} drifted from the certificate"
+            );
+        }
     }
 
     #[test]
