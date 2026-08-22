@@ -490,25 +490,41 @@ fn impulse_response(horizon_days: i64, phi: Option<f64>, theta: Option<f64>) -> 
 /// and `.to_dict()` instead; this function gains `name=` so a preset can
 /// be selected by the string an engine takes, and keeps its legacy shape
 /// until the next KAT bump carries the growth deliberately.
+///
+/// # Values follow the name
+///
+/// The values come from the NAMED preset, not from the `pub const`s. While
+/// `pt-v1` was the only entry the two were the same thing and reading the
+/// consts was the shorter spelling; with a second preset in the table they
+/// are not, and a `model_preset("pt-v2")` that answered with pt-v1's
+/// coefficients under the label "pt-v1" would be the exact substitution the
+/// fingerprint rule exists to make impossible — reached through the one
+/// function on the surface that had not been taught the difference. The
+/// default path is unchanged to the bit, so the KAT's digest does not move.
+/// `daily_shock_cap` still reads its const because it is carried read-only
+/// and identical in every preset by construction.
 #[pyfunction]
 #[pyo3(signature = (name = "pt-v1"))]
 fn model_preset(py: Python<'_>, name: &str) -> PyResult<PyObject> {
     use crate::mispricing as m;
-    if crate::params::ModelParams::preset(name).is_none() {
-        return Err(ValidationError::new_err(format!(
+    let preset = crate::params::ModelParams::preset(name).ok_or_else(|| {
+        ValidationError::new_err(format!(
             "unknown model preset {name:?}. Shipped presets: {}",
             crate::params::ModelParams::preset_names().join(", ")
-        )));
-    }
+        ))
+    })?;
     let d = pyo3::types::PyDict::new_bound(py);
-    d.set_item("name", "pt-v1")?;
-    d.set_item("mispricing_half_life_days", m::MISPRICING_HALF_LIFE_DAYS)?;
-    d.set_item("mispricing_phi", m::MISPRICING_PHI)?;
-    d.set_item("momentum_theta", m::MOMENTUM_THETA)?;
-    d.set_item("mispricing_cap", m::MISPRICING_CAP)?;
+    d.set_item("name", name)?;
+    d.set_item(
+        "mispricing_half_life_days",
+        preset.mispricing_half_life_days,
+    )?;
+    d.set_item("mispricing_phi", preset.mispricing_phi)?;
+    d.set_item("momentum_theta", preset.momentum_theta)?;
+    d.set_item("mispricing_cap", preset.mispricing_cap)?;
     d.set_item("daily_shock_cap", m::DAILY_SHOCK_CAP)?;
-    d.set_item("crowd_valuation_gain", m::CROWD_VALUATION_GAIN)?;
-    d.set_item("crowd_momentum_gain", m::CROWD_MOMENTUM_GAIN)?;
-    d.set_item("crowd_lean_cap", m::CROWD_LEAN_CAP)?;
+    d.set_item("crowd_valuation_gain", preset.crowd_valuation_gain)?;
+    d.set_item("crowd_momentum_gain", preset.crowd_momentum_gain)?;
+    d.set_item("crowd_lean_cap", preset.crowd_lean_cap)?;
     Ok(d.into())
 }
