@@ -83,11 +83,15 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # top agent about half the time.
     #
     # Re-measured at the 2026-08 era boundary, on the fixture's new seed --
-    # and again when the RNG stream split joined that boundary, which
-    # re-dealt every trajectory and dropped mean-reversion from third to
-    # last on this seed (-38,788 against random's -3,653).
-    assert ranked == ["oracle", "momentum", "random", "buy_and_hold",
-                      "mean_reversion"]
+    # again when the RNG stream split joined that boundary, which re-dealt
+    # every trajectory and dropped mean-reversion from third to last on
+    # this seed (-38,788 against random's -3,653) -- and again when the
+    # GJR leverage recalibration joined the same boundary, which lifted
+    # mean-reversion straight back to third (-1,758 against random's
+    # -3,617 and buy_and_hold's -9,172). The oracle and momentum have
+    # never swapped.
+    assert ranked == ["oracle", "momentum", "mean_reversion", "random",
+                      "buy_and_hold"]
 
 
 def test_random_trading_is_close_to_flat_over_a_short_run(scores):
