@@ -158,12 +158,68 @@ def test_the_macro_counterfactual_is_exact_on_the_market_stream():
         assert result["exact"] is True
 
 
-def test_a_flat_scenario_is_exactly_its_own_baseline():
+def test_a_flat_scenario_against_its_default_baseline_is_refused():
+    """The zero this used to assert was a world differenced against itself.
+
+    The old form of this test ran a `hold`-only scenario through `compare`
+    with no baseline and asserted `median_pct == 0`. It passed for a reason
+    that had nothing to do with the engine: the default baseline is
+    `hold(**scenario.at(0))`, which for a constant path IS the scenario, so
+    the zero was arithmetic rather than measurement. The same call is how a
+    user asks "what does a held VIX 65 do to prices?" and gets told
+    "nothing", confidently, with no warning -- which is the defect.
+
+    So the refusal is the property now, and the exactness claim the old test
+    was reaching for is asserted below on a comparison that actually differs.
+    """
     flat = Scenario().hold(federal_funds_rate=0.03, corporate_bond_yield=0.05)
-    result = run(flat)
+    with pytest.raises(pretium.ValidationError) as excinfo:
+        run(flat)
+    message = str(excinfo.value)
+    # Every refusal names the fields, the conflict and the fix.
+    assert "federal_funds_rate=0.03" in message
+    assert "corporate_bond_yield=0.05" in message
+    assert "CONSTANT" in message
+    assert "baseline=" in message
+
+
+def test_a_held_level_measures_against_an_explicit_baseline():
+    """The fix the refusal names, and the exactness claim it used to carry."""
+    result = run(Scenario().hold(federal_funds_rate=0.03,
+                                 corporate_bond_yield=0.05),
+                 baseline=Scenario().hold(federal_funds_rate=0.02,
+                                          corporate_bond_yield=0.04))
     assert result["draw_delta"] == 0
     assert result["exact"] is True
-    assert result["median_pct"] == pytest.approx(0.0, abs=1e-12)
+    # And it is a measurement rather than a tautology: the worlds differ.
+    assert result["median_pct"] != 0.0
+
+
+def test_a_shock_that_starts_after_the_run_ends_is_refused_by_name():
+    """The other way to get a confident zero out of the default baseline.
+
+    A ramp beginning on day 60 in a 40-day run never moves, so the scenario
+    is constant over the horizon and the default baseline is the scenario
+    again -- but the caller's mistake is a horizon, not a missing baseline,
+    and the message has to say which.
+    """
+    with pytest.raises(pretium.ValidationError) as excinfo:
+        run(Scenario().ramp("vix", start=15.0, end=45.0, over=10, begin=60))
+    message = str(excinfo.value)
+    assert "'vix'" in message
+    assert "day 60" in message
+    assert "at least 61 days" in message
+
+
+def test_an_explicit_baseline_identical_to_the_scenario_is_refused():
+    """The same defect arriving by the other route.
+
+    An explicit baseline is normally the fix. An explicit baseline that
+    realises the SAME path is the original mistake with more typing, and it
+    reports the same clean zero.
+    """
+    with pytest.raises(pretium.ValidationError, match="identical worlds"):
+        run(Scenario().hold(vix=45.0), baseline=Scenario().hold(vix=45.0))
 
 
 # --------------------------------------------------------------------------
@@ -198,6 +254,141 @@ def test_scenarios_compose_across_fields():
     assert day["vix"] == 30.0
     assert day["cycle"] == "contraction"
     assert 0.02 < day["federal_funds_rate"] < 0.04
+
+
+# --------------------------------------------------------------------------
+# Two pins on one field
+# --------------------------------------------------------------------------
+
+
+def test_two_pins_on_one_field_layer_as_consecutive_segments():
+    """The step-then-decay path, which used to open the run in crisis.
+
+    Before pins layered, the second driver overwrote the first in a dict and,
+    because every driver is total over the days, the survivor back-filled the
+    whole run: this exact pair read VIX 48 on DAY ZERO. There is no ordering
+    that fixed it -- the other order discarded the decay instead -- so it was
+    never a documentation problem.
+    """
+    scenario = (Scenario()
+                .step("vix", before=15.0, after=48.0, at=60)
+                .ramp("vix", start=48.0, end=22.0, over=45, begin=75))
+    assert scenario.at(0)["vix"] == 15.0        # the whole point: NOT 48
+    assert scenario.at(59)["vix"] == 15.0
+    assert scenario.at(60)["vix"] == 48.0       # the step lands
+    assert scenario.at(74)["vix"] == 48.0       # and holds until the decay
+    assert 22.0 < scenario.at(97)["vix"] < 48.0  # mid-decay
+    assert scenario.at(120)["vix"] == 22.0
+    assert scenario.at(9_999)["vix"] == 22.0    # defined past the horizon
+
+
+def test_hold_then_ramp_is_the_idiom_for_a_level_and_then_an_episode():
+    """A ramp starts AT its start value, so this is a jump and then a decay.
+
+    Written with one pin per phase, which is what the same-day refusal points
+    callers at.
+    """
+    scenario = (Scenario().hold(vix=15.0)
+                .ramp("vix", start=48.0, end=18.0, over=40, begin=60))
+    assert scenario.at(59)["vix"] == 15.0
+    assert scenario.at(60)["vix"] == 48.0
+    assert scenario.at(100)["vix"] == 18.0
+
+
+def test_one_pin_on_a_field_behaves_exactly_as_it_did_before_layering():
+    """Layering must not be a change to any scenario anybody already wrote."""
+    ramp = Scenario().ramp("vix", start=15.0, end=45.0, over=10, begin=5)
+    assert [ramp.at(d)["vix"] for d in (0, 5, 15, 9_999)] == [15.0, 15.0, 45.0, 45.0]
+    assert ramp.at(10)["vix"] == pytest.approx(30.0)
+    step = Scenario().step("vix", before=15.0, after=45.0, at=10)
+    assert [step.at(d)["vix"] for d in (0, 9, 10, 9_999)] == [15.0, 15.0, 45.0, 45.0]
+
+
+def test_pins_declared_out_of_order_are_refused_and_name_both():
+    """The reverse ordering, which used to leave a crisis that never subsided."""
+    with pytest.raises(pretium.ValidationError) as excinfo:
+        (Scenario()
+         .ramp("vix", start=48.0, end=22.0, over=45, begin=75)
+         .step("vix", before=15.0, after=48.0, at=60))
+    message = str(excinfo.value)
+    assert "'vix'" in message                # the field
+    assert "day 75" in message               # both pins, by their own args
+    assert "at day 60" in message
+    assert "Swap the two calls" in message   # the fix
+
+
+def test_two_pins_claiming_the_same_day_are_refused():
+    """One of the two would be dead code the caller believes is running."""
+    with pytest.raises(pretium.ValidationError) as excinfo:
+        (Scenario()
+         .step("vix", before=15.0, after=48.0, at=60)
+         .ramp("vix", start=48.0, end=18.0, over=40, begin=60))
+    message = str(excinfo.value)
+    assert "both begin on day 60" in message
+    assert ".hold(vix=" in message           # the composing form
+    assert "begin=60" in message
+
+    # Two whole-run paths on one field is the same conflict at day zero, and
+    # the fix there is to keep one rather than to split them.
+    with pytest.raises(pretium.ValidationError, match="Keep one of them"):
+        Scenario().hold(vix=15.0).hold(vix=20.0)
+
+
+def test_a_refused_hold_leaves_the_scenario_untouched():
+    """A half-applied hold would be the same quiet wrongness one level down."""
+    scenario = Scenario().hold(vix=15.0)
+    with pytest.raises(pretium.ValidationError):
+        scenario.hold(inflation_rate=0.06, vix=20.0)
+    assert scenario.fields == ("vix",)
+    assert scenario.at(0) == {"vix": 15.0}
+
+
+def test_layered_pins_survive_the_json_round_trip():
+    """The serialised form is the PATH, so a layered scenario cites cleanly."""
+    scenario = (Scenario("layered")
+                .hold(vix=15.0)
+                .ramp("vix", start=48.0, end=18.0, over=10, begin=6))
+    restored = Scenario.from_json(scenario.to_json(20))
+    assert [restored.at(d)["vix"] for d in range(20)] == \
+           [scenario.at(d)["vix"] for d in range(20)]
+
+
+# --------------------------------------------------------------------------
+# The ready-made shapes are constructors
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", ["rate_shock", "vix_shock", "vol_shock",
+                                  "from_json"])
+def test_a_constructor_called_on_an_instance_is_refused(name):
+    """They look chainable and are not. Python will not stop the caller.
+
+    `Scenario().ramp(...).vix_shock(...)` used to return a NEW scenario
+    driving only `vix`: the ramp vanished with no error and no symptom until
+    somebody read `.fields`. A plain classmethod cannot tell the two call
+    forms apart -- it is handed `cls` either way -- so the refusal lives in a
+    descriptor, which can.
+    """
+    base = Scenario().ramp("federal_funds_rate", start=0.02, end=0.05, over=30)
+    with pytest.raises(pretium.ValidationError) as excinfo:
+        getattr(base, name)()
+    message = str(excinfo.value)
+    assert f"Scenario.{name}" in message
+    assert "federal_funds_rate" in message   # what would have been discarded
+    assert "CONSTRUCTOR" in message
+    # The base is not mutated by the attempt either.
+    assert base.fields == ("federal_funds_rate",)
+
+
+def test_the_constructors_still_build_from_the_class():
+    """The refusal must cost nothing to the way they are meant to be used."""
+    assert set(Scenario.rate_shock().fields) == {
+        "federal_funds_rate", "corporate_bond_yield"}
+    assert Scenario.vix_shock().fields == ("vix",)
+    assert Scenario.from_json(Scenario.vix_shock().to_json(4)).fields == ("vix",)
+    # And the docstrings survive the descriptor, since that is how anybody
+    # discovers what these shapes do.
+    assert "curve" in Scenario.rate_shock.__doc__
 
 
 def test_a_percent_where_a_fraction_belongs_is_refused_at_construction():
