@@ -27,9 +27,9 @@ against the engine's own attribution of what actually moved prices that day.
 
 ```
 agent                     pnl    impact    why-right
-oracle                 114727       ...         100%
+oracle                 229751       ...         100%
 claude                    ...       ...          ..%
-momentum                22488       ...            -
+momentum                21520       ...            -
 ```
 
 The oracle and momentum rows are measured, by the same call the example makes:
@@ -46,12 +46,13 @@ number, and the number is not a measurement. `impact_bps` compares the traded
 run's closing prices against the same seed with nobody trading, and fills feed
 back into the price process, so the gap between the two runs compounds with
 horizon. Re-measured across seeds 2020-2031 at this exact configuration, the
-oracle's twenty-day impact spans -181 to +577 bps and is positive in only 8 of
-12 seeds; momentum's flips sign the same way. Over three days both are
-positive in 12 of 12 and read as what they are, the cost of trading. A
-twenty-day impact figure has whatever sign the seed hands it, so this page
-stops publishing one. Read `impact_bps` over days, not weeks, and across
-seeds.
+oracle's twenty-day impact spans -235 to +470 bps and is positive in only 7 of
+12 seeds; momentum's flips sign the same way. Only the first day or two read
+as what they are, the cost of trading - over two days both agents are positive
+in 12 of 12 - and by day three the oracle's sign already belongs to the seed,
+positive in 8 of 12 with a span of -29 to +90 bps. A twenty-day impact figure
+has whatever sign the seed hands it, so this page stops publishing one. Read
+`impact_bps` over a day or two, not weeks, and across seeds.
 
 A model can earn the first score by accident. The second is the one no real
 market can produce, because attributing a real price move to mean reversion
