@@ -32,7 +32,7 @@ from pathlib import Path
 import pretium as pt
 import pyarrow as pa
 from pretium.baselines import BuyAndHold, Momentum, Oracle, capture_ratio, reference_agents
-from pretium.scenario import Scenario, compare
+from pretium.scenario import Scenario, compare, run_scenario
 
 
 @dataclass
@@ -1137,6 +1137,257 @@ def g_workflow(ctx: Ctx) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# docs/scenario-recipes.md
+# ---------------------------------------------------------------------------
+#
+# The recipe page publishes two different kinds of number and they age
+# differently. The CONFIGS and their historical anchors are the durable half:
+# a hiking cycle is 11 increases from 0-0.25% to 5.25-5.50%, and no engine
+# change touches that. The MEASURED EFFECTS are this build's answer to those
+# configs and move whenever the model does, which is why every one of them is
+# a row here rather than a number typed into prose.
+#
+# These builders are the page's code blocks, copied verbatim. That is
+# deliberate duplication in one direction only: the page shows what this
+# module runs, so a reader who pastes a block gets the run the harness
+# measured. Editing a config here without editing the page is the failure
+# this arrangement is meant to make impossible, so the inventory rows carry
+# the page's line numbers.
+
+#: The universe/seed pair docs/scenarios.md uses for every RATE claim, reused
+#: so a reader can hold one convention in their head across both pages.
+_RECIPE_PRICE_U, _RECIPE_PRICE_SEED = (20, 4), 5
+#: The pair both pages use for every VOLATILITY claim, for the same reason.
+_RECIPE_VOL_U, _RECIPE_VOL_SEED = (20, 11), 3
+
+
+def _r1_hiking_cycle() -> Scenario:
+    """Recipe 1: a hiking cycle of the 2022-23 shape."""
+    return Scenario.rate_shock(start=0.00125, end=0.0538, over=90,
+                               credit_spread=0.02)
+
+
+def _r2_inflation_shock() -> Scenario:
+    """Recipe 2: an inflation shock of the 2021-22 shape."""
+    return Scenario("inflation shock").ramp(
+        "inflation_rate", start=0.014, end=0.091, over=100, begin=5)
+
+
+def _r3_liquidity_crisis() -> Scenario:
+    """Recipe 3: a liquidity crisis of the 2008 shape.
+
+    Two fields, so chaining is safe: the VIX spike comes from the built-in
+    shape (one driver, therefore no self-conflict) and the credit leg is a
+    ramp on a DIFFERENT field.
+    """
+    return (Scenario.vix_shock(calm=18.0, peak=80.0, at=20, over=60)
+            .ramp("corporate_bond_yield", start=0.055, end=0.095,
+                  over=40, begin=20))
+
+
+def _r4_contraction() -> Scenario:
+    """Recipe 4: a contraction regime."""
+    return (Scenario("contraction")
+            .hold(cycle="contraction")
+            .step("fear_greed_index", before=50.0, after=25.0, at=5))
+
+
+def _r4_baseline() -> Scenario:
+    """Recipe 4's baseline, which MUST be passed explicitly: `compare`'s
+    default is `hold(**scenario.at(0))`, and for a hold-only scenario that is
+    the scenario itself, so the default measures exactly zero."""
+    return (Scenario("expansion baseline")
+            .hold(cycle="expansion")
+            .hold(fear_greed_index=50.0))
+
+
+def _r5_compound_path(days: int = 120) -> Scenario:
+    """Recipe 5: a compound episode of the 2020 shape.
+
+    Four fields on four different schedules, one of which (the policy rate)
+    needs TWO segments. Two pins on one field silently collapse to the last
+    one written, so the whole path is built as data and loaded through
+    `from_json` -- the one form that expresses an arbitrary piecewise path on
+    a single field without a self-conflict.
+    """
+    rows = []
+    for d in range(days):
+        if d < 15:                      # calm
+            vix = 15.0
+        elif d < 60:                    # spike to the record close, decaying
+            vix = 82.0 + (18.0 - 82.0) * (d - 15) / 45
+        else:
+            vix = 18.0
+
+        if d < 18:                      # policy: two cuts, ten days apart
+            ff = 0.0155
+        elif d < 28:
+            ff = 0.01125
+        else:
+            ff = 0.00125
+
+        if d < 18:                      # credit: blow-out, then facilities
+            corp = 0.036
+        elif d < 40:
+            corp = 0.036 + (0.105 - 0.036) * (d - 18) / 22
+        elif d < 90:
+            corp = 0.105 + (0.045 - 0.105) * (d - 40) / 50
+        else:
+            corp = 0.045
+
+        qe = 0.0 if d < 40 else min(0.10, 0.10 * (d - 40) / 30)
+        rows.append({"day": d, "vix": vix, "federal_funds_rate": ff,
+                     "corporate_bond_yield": corp, "qe_pe_boost": qe})
+
+    return Scenario.from_json(json.dumps(
+        {"schema": 1, "label": "compound: pandemic shape",
+         "days": days, "path": rows}))
+
+
+def g_recipes(ctx: Ctx) -> dict:
+    """docs/scenario-recipes.md: every measured effect, plus the four silent
+    conflicts the page warns about, pinned as structural claims so that a
+    future engine fix flags the warning as stale rather than leaving the page
+    frightening readers about behaviour that no longer exists.
+
+    Price effects use `Universe.random(20, seed=4)` at sim seed 5 and
+    volatility effects `Universe.random(20, seed=11)` at sim seed 3 -- the
+    two conventions docs/scenarios.md already uses, restated on the page."""
+    up = _u(*_RECIPE_PRICE_U)
+    uv = _u(*_RECIPE_VOL_U)
+    out: dict = {}
+
+    def price(scenario, days, baseline=None):
+        return compare(scenario, seed=_RECIPE_PRICE_SEED, universe=up,
+                       days=days, baseline=baseline)
+
+    def vol(scenario, days=120):
+        return pt.facts.measure(seed=_RECIPE_VOL_SEED, universe=uv,
+                                days=days, scenario=scenario)
+
+    jobs = {
+        "r1": lambda: price(_r1_hiking_cycle(), 120),
+        # 40 days is inside the first central-bank meeting window, 120 is
+        # well past it: the pair is the page's evidence that the meeting
+        # -cadence trap is not specific to the policy rate.
+        "r2_early": lambda: price(_r2_inflation_shock(), 40),
+        "r2_late": lambda: price(_r2_inflation_shock(), 120),
+        "r3_price": lambda: price(_r3_liquidity_crisis(), 120),
+        "r3_vol": lambda: vol(_r3_liquidity_crisis()),
+        "r3_calm": lambda: vol(Scenario("calm").hold(vix=18.0)),
+        "r4": lambda: price(_r4_contraction(), 120, _r4_baseline()),
+        "r5_price": lambda: price(_r5_compound_path(), 120),
+        "r5_vol": lambda: vol(_r5_compound_path()),
+    }
+    with ThreadPoolExecutor(max_workers=min(9, ctx.workers)) as pool:
+        got = dict(zip(jobs, pool.map(lambda f: f(), jobs.values())))
+
+    out["r1_median_pct"] = got["r1"]["median_pct"]
+    out["r1_worst_pct"] = got["r1"]["worst_pct"]
+    out["r1_best_pct"] = got["r1"]["best_pct"]
+    out["r1_exact"] = got["r1"]["exact"]
+
+    out["r2_early_max_abs_pct"] = max(abs(x) for x in got["r2_early"]["move_pct"])
+    out["r2_late_median_pct"] = got["r2_late"]["median_pct"]
+
+    out["r3_median_pct"] = got["r3_price"]["median_pct"]
+    out["r3_worst_pct"] = got["r3_price"]["worst_pct"]
+    out["r3_vol_pct"] = got["r3_vol"]["annualised_vol_pct"]
+    out["r3_calm_vol_pct"] = got["r3_calm"]["annualised_vol_pct"]
+    out["r3_vol_uplift_pct"] = (got["r3_vol"]["annualised_vol_pct"]
+                                - got["r3_calm"]["annualised_vol_pct"])
+    out["r3_corr"] = got["r3_vol"]["cross_sectional_corr"]
+    out["r3_calm_corr"] = got["r3_calm"]["cross_sectional_corr"]
+
+    out["r4_median_pct"] = got["r4"]["median_pct"]
+    out["r4_exact"] = got["r4"]["exact"]
+
+    # Recipe 4 pins `cycle` and `fear_greed_index`, NEITHER of which reaches
+    # fair value directly -- both steer the macro chain, and the chain is the
+    # claim worth publishing because it is the mechanism. Read the recorded
+    # macro rather than inferring it from the price delta.
+    def macro_end(scenario):
+        e = run_scenario(scenario, seed=_RECIPE_PRICE_SEED, universe=up,
+                         days=120, record=True)
+        t = pa.RecordBatchReader.from_stream(
+            e.macro_table()).read_all().to_pydict()
+        return {"ff": t["federal_funds_rate"][119],
+                "corp": t["corporate_bond_yield"][119],
+                "infl": t["inflation_rate"][119]}
+
+    con, exp = macro_end(_r4_contraction()), macro_end(_r4_baseline())
+    # Published as percentages, because that is how the page's table prints
+    # them: the inventory should compare the number a reader can see.
+    for world, ended in (("contraction", con), ("expansion", exp)):
+        for field in ("ff", "corp", "infl"):
+            out[f"r4_{world}_{field}_pct"] = ended[field] * 100.0
+
+    out["r5_median_pct"] = got["r5_price"]["median_pct"]
+    out["r5_worst_pct"] = got["r5_price"]["worst_pct"]
+    out["r5_best_pct"] = got["r5_price"]["best_pct"]
+    out["r5_vol_pct"] = got["r5_vol"]["annualised_vol_pct"]
+    out["r5_exact"] = got["r5_price"]["exact"]
+
+    # -- the silent conflicts, pinned as behaviour --------------------------
+    # Edge 1: a step then a decay ramp on the SAME field. The ramp wins and
+    # back-fills day zero with its start value, so the run opens in crisis.
+    e1 = (Scenario()
+          .step("vix", before=15.0, after=48.0, at=60)
+          .ramp("vix", start=48.0, end=18.0, over=40, begin=60))
+    out["edge1_day0_vix"] = e1.at(0)["vix"]
+    out["edge1_fields"] = len(e1.fields)
+
+    # Edge 1 reversed: writing them the other way round does NOT fix it. The
+    # step wins, the decay is discarded, and the crisis never subsides.
+    e1r = (Scenario()
+           .ramp("vix", start=48.0, end=18.0, over=40, begin=60)
+           .step("vix", before=15.0, after=48.0, at=60))
+    out["edge1_reverse_day0_vix"] = e1r.at(0)["vix"]
+    out["edge1_reverse_day99_vix"] = e1r.at(99)["vix"]
+
+    # Edge 2: the shape constructors are classmethods. Calling one on a
+    # configured scenario returns a NEW scenario driving only its own field.
+    base = Scenario("base").hold(inflation_rate=0.06, fear_greed_index=20.0)
+    chained = base.vix_shock(calm=15.0, peak=60.0, at=10, over=30)
+    out["edge2_base_fields"] = len(base.fields)
+    out["edge2_chained_fields"] = ",".join(chained.fields)
+    out["edge2_chained_is_base"] = chained is base
+
+    # Edge 4: compare()'s default baseline is hold(**scenario.at(0)), which
+    # for a hold-only scenario IS the scenario -- a clean, wrong zero.
+    held = Scenario("held crisis").hold(vix=45.0)
+    out["edge4_default_median_pct"] = price(held, 30)["median_pct"]
+    out["edge4_explicit_median_pct"] = price(
+        held, 30, Scenario("calm").hold(vix=15.0))["median_pct"]
+
+    # ...and why a PRICE delta is the wrong measure for a volatility
+    # scenario even once the baseline is right: across sim seeds 1-8 the
+    # same VIX 45-vs-15 comparison spans both signs. The page tells readers
+    # to measure realised volatility instead, and this band is the evidence.
+    def vix_delta(seed):
+        return compare(Scenario().hold(vix=45.0), seed=seed, universe=up,
+                       days=30, baseline=Scenario().hold(vix=15.0)
+                       )["median_pct"]
+
+    with ThreadPoolExecutor(max_workers=min(8, ctx.workers)) as pool:
+        band = list(pool.map(vix_delta, range(1, 9)))
+    out["edge4_seedband_lo"] = min(band)
+    out["edge4_seedband_hi"] = max(band)
+    out["edge4_seedband_negative"] = sum(1 for x in band if x < 0)
+
+    # The from_json escape hatch the compound recipe rests on: an arbitrary
+    # piecewise path on ONE field, holding its final value past the horizon.
+    p = _r5_compound_path()
+    out["r5_day0_vix"] = p.at(0)["vix"]
+    out["r5_day17_vix"] = round(p.at(17)["vix"], 5)
+    out["r5_day30_corp"] = round(p.at(30)["corporate_bond_yield"], 5)
+    out["r5_day17_ff"] = p.at(17)["federal_funds_rate"]
+    out["r5_day30_ff"] = p.at(30)["federal_funds_rate"]
+    out["r5_beyond_horizon_ff"] = p.at(500)["federal_funds_rate"]
+    return out
+
+
 GROUPS = {
     "determinism": g_determinism,
     "consts": g_consts,
@@ -1150,6 +1401,7 @@ GROUPS = {
     "oracle_config": g_oracle_config,
     "ranking": g_ranking,
     "scenario_leaderboard": g_scenario_leaderboard,
+    "recipes": g_recipes,
     "llm_leaderboard": g_llm_leaderboard,
     "llm_impact": g_llm_impact,
     "rng": g_rng,

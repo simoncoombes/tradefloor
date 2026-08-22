@@ -4297,6 +4297,587 @@
    "source": "stated",
    "method": "run examples/research_workflow.py main(); it asserts its own published findings",
    "note": "after an engine change a failure here means the example script itself needs re-fitting, not just the prose"
+  },
+  {
+   "id": "rec.edge1_day0",
+   "file": "docs/scenario-recipes.md",
+   "line": 66,
+   "label": "step-then-ramp on one field: day zero back-filled with the ramp's start",
+   "published": 48.0,
+   "group": "recipes",
+   "key": "edge1_day0_vix",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "Scenario().step('vix', before=15, after=48, at=60).ramp('vix', start=48, end=18, over=40, begin=60).at(0)",
+   "note": "if this stops reading 48.0 the surface has gained per-field composition and the page's first warning is stale"
+  },
+  {
+   "id": "rec.edge1_rev_day0",
+   "file": "docs/scenario-recipes.md",
+   "line": 85,
+   "label": "ramp-then-step on one field: day zero",
+   "published": 15.0,
+   "group": "recipes",
+   "key": "edge1_reverse_day0_vix",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same two calls in the opposite order, .at(0)"
+  },
+  {
+   "id": "rec.edge1_rev_day99",
+   "file": "docs/scenario-recipes.md",
+   "line": 85,
+   "label": "ramp-then-step on one field: the decay is discarded, day 99 still at the peak",
+   "published": 48.0,
+   "group": "recipes",
+   "key": "edge1_reverse_day99_vix",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same two calls in the opposite order, .at(99)"
+  },
+  {
+   "id": "rec.edge2_chained",
+   "file": "docs/scenario-recipes.md",
+   "line": 135,
+   "label": "vix_shock called on a configured scenario drives only 'vix'",
+   "published": "vix",
+   "group": "recipes",
+   "key": "edge2_chained_fields",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "Scenario().hold(inflation_rate=0.06, fear_greed_index=20.0).vix_shock(...).fields",
+   "note": "a classmethod, so the hold is discarded; if this ever reports three fields the constructors have become instance methods"
+  },
+  {
+   "id": "rec.edge2_base_fields",
+   "file": "docs/scenario-recipes.md",
+   "line": 135,
+   "label": "the base scenario is not mutated: still drives two fields",
+   "published": 2,
+   "group": "recipes",
+   "key": "edge2_base_fields",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "len(base.fields) after calling base.vix_shock(...)"
+  },
+  {
+   "id": "rec.edge4_default",
+   "file": "docs/scenario-recipes.md",
+   "line": 197,
+   "label": "compare() on a hold-only scenario against its default baseline",
+   "published": 0.0,
+   "group": "recipes",
+   "key": "edge4_default_median_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(Scenario().hold(vix=45.0), seed=5, universe=Universe.random(20, seed=4), days=30) with no baseline=",
+   "note": "exactly zero because the default baseline is hold(**scenario.at(0)), which for a hold IS the scenario"
+  },
+  {
+   "id": "rec.edge4_explicit",
+   "file": "docs/scenario-recipes.md",
+   "line": 198,
+   "label": "the same comparison against an explicit calm baseline",
+   "published": 29.72,
+   "group": "recipes",
+   "key": "edge4_explicit_median_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as above with baseline=Scenario().hold(vix=15.0)"
+  },
+  {
+   "id": "rec.edge4_band_lo",
+   "file": "docs/scenario-recipes.md",
+   "line": 209,
+   "label": "VIX 45-vs-15 median move, lowest of sim seeds 1-8",
+   "published": -26.56,
+   "group": "recipes",
+   "key": "edge4_seedband_lo",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "the explicit-baseline comparison repeated across sim seeds 1 to 8, 30 days"
+  },
+  {
+   "id": "rec.edge4_band_hi",
+   "file": "docs/scenario-recipes.md",
+   "line": 209,
+   "label": "VIX 45-vs-15 median move, highest of sim seeds 1-8",
+   "published": 29.72,
+   "group": "recipes",
+   "key": "edge4_seedband_hi",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "the explicit-baseline comparison repeated across sim seeds 1 to 8, 30 days"
+  },
+  {
+   "id": "rec.edge4_band_neg",
+   "file": "docs/scenario-recipes.md",
+   "line": 209,
+   "label": "VIX 45-vs-15 median move is negative on 2 of 8 seeds",
+   "published": 2,
+   "group": "recipes",
+   "key": "edge4_seedband_negative",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "count of negative medians across sim seeds 1 to 8",
+   "note": "the page's argument for measuring volatility scenarios with facts.measure rather than a price delta rests on this sign flip"
+  },
+  {
+   "id": "rec.r1_median",
+   "file": "docs/scenario-recipes.md",
+   "line": 263,
+   "label": "hiking cycle: median move at 120 days",
+   "published": -9.26,
+   "group": "recipes",
+   "key": "r1_median_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon"
+  },
+  {
+   "id": "rec.r1_worst",
+   "file": "docs/scenario-recipes.md",
+   "line": 263,
+   "label": "hiking cycle: most rate-sensitive name",
+   "published": -13.21,
+   "group": "recipes",
+   "key": "r1_worst_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon"
+  },
+  {
+   "id": "rec.r1_best",
+   "file": "docs/scenario-recipes.md",
+   "line": 263,
+   "label": "hiking cycle: least rate-sensitive name",
+   "published": 0.26,
+   "group": "recipes",
+   "key": "r1_best_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon"
+  },
+  {
+   "id": "rec.r1_exact",
+   "file": "docs/scenario-recipes.md",
+   "line": 263,
+   "label": "hiking cycle: market draws identical across both worlds",
+   "published": true,
+   "group": "recipes",
+   "key": "r1_exact",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon"
+  },
+  {
+   "id": "rec.r2_early",
+   "file": "docs/scenario-recipes.md",
+   "line": 332,
+   "label": "inflation shock: largest absolute move anywhere at 40 days",
+   "published": 0.26,
+   "group": "recipes",
+   "key": "r2_early_max_abs_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=40); the page states the universe/seed convention and the horizon",
+   "note": "inside the first central-bank meeting window; the pair with rec.r2_late is the page's evidence that the meeting-cadence trap is not specific to the policy rate"
+  },
+  {
+   "id": "rec.r2_late",
+   "file": "docs/scenario-recipes.md",
+   "line": 333,
+   "label": "inflation shock: median move at 120 days",
+   "published": -10.01,
+   "group": "recipes",
+   "key": "r2_late_median_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon"
+  },
+  {
+   "id": "rec.r3_calm_vol",
+   "file": "docs/scenario-recipes.md",
+   "line": 396,
+   "label": "liquidity crisis: annualised realised volatility, calm baseline",
+   "published": 61.76,
+   "group": "recipes",
+   "key": "r3_calm_vol_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+  },
+  {
+   "id": "rec.r3_vol",
+   "file": "docs/scenario-recipes.md",
+   "line": 396,
+   "label": "liquidity crisis: annualised realised volatility under the spike",
+   "published": 82.16,
+   "group": "recipes",
+   "key": "r3_vol_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+  },
+  {
+   "id": "rec.r3_vol_uplift",
+   "file": "docs/scenario-recipes.md",
+   "line": 445,
+   "label": "liquidity crisis: volatility uplift in percentage points",
+   "published": 20.4,
+   "group": "recipes",
+   "key": "r3_vol_uplift_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+  },
+  {
+   "id": "rec.r3_calm_corr",
+   "file": "docs/scenario-recipes.md",
+   "line": 397,
+   "label": "liquidity crisis: mean pairwise correlation, calm baseline",
+   "published": 0.493,
+   "group": "recipes",
+   "key": "r3_calm_corr",
+   "compare": {
+    "kind": "round",
+    "decimals": 3
+   },
+   "source": "stated",
+   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+  },
+  {
+   "id": "rec.r3_corr",
+   "file": "docs/scenario-recipes.md",
+   "line": 397,
+   "label": "liquidity crisis: mean pairwise correlation under the spike",
+   "published": 0.636,
+   "group": "recipes",
+   "key": "r3_corr",
+   "compare": {
+    "kind": "round",
+    "decimals": 3
+   },
+   "source": "stated",
+   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+  },
+  {
+   "id": "rec.r3_median",
+   "file": "docs/scenario-recipes.md",
+   "line": 452,
+   "label": "liquidity crisis: median price move at 120 days",
+   "published": -8.29,
+   "group": "recipes",
+   "key": "r3_median_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon",
+   "note": "published with an explicit warning not to lean on it: the sign of a volatility scenario's price effect is seed-dependent (see rec.edge4_band_*)"
+  },
+  {
+   "id": "rec.r3_worst",
+   "file": "docs/scenario-recipes.md",
+   "line": 452,
+   "label": "liquidity crisis: worst name at 120 days",
+   "published": -13.07,
+   "group": "recipes",
+   "key": "r3_worst_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon"
+  },
+  {
+   "id": "rec.r4_median",
+   "file": "docs/scenario-recipes.md",
+   "line": 485,
+   "label": "contraction regime: median move against an explicit expansion baseline",
+   "published": 2.85,
+   "group": "recipes",
+   "key": "r4_median_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(contraction, seed=5, universe=Universe.random(20, seed=4), days=120, baseline=expansion); the baseline is explicit and the page says why"
+  },
+  {
+   "id": "rec.r4_exact",
+   "file": "docs/scenario-recipes.md",
+   "line": 485,
+   "label": "contraction regime: market draws identical across both worlds",
+   "published": true,
+   "group": "recipes",
+   "key": "r4_exact",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon"
+  },
+  {
+   "id": "rec.r4_con_ff",
+   "file": "docs/scenario-recipes.md",
+   "line": 527,
+   "label": "contraction world: policy rate at day 119",
+   "published": 2.0,
+   "group": "recipes",
+   "key": "r4_contraction_ff_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "run_scenario(contraction, seed=5, universe=Universe.random(20, seed=4), days=120, record=True), macro_table() row 119"
+  },
+  {
+   "id": "rec.r4_con_corp",
+   "file": "docs/scenario-recipes.md",
+   "line": 527,
+   "label": "contraction world: corporate yield at day 119",
+   "published": 6.41,
+   "group": "recipes",
+   "key": "r4_contraction_corp_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as rec.r4_con_ff, corporate_bond_yield column"
+  },
+  {
+   "id": "rec.r4_con_infl",
+   "file": "docs/scenario-recipes.md",
+   "line": 527,
+   "label": "contraction world: inflation at day 119",
+   "published": 1.0,
+   "group": "recipes",
+   "key": "r4_contraction_infl_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as rec.r4_con_ff, inflation_rate column"
+  },
+  {
+   "id": "rec.r4_exp_ff",
+   "file": "docs/scenario-recipes.md",
+   "line": 528,
+   "label": "expansion world: policy rate at day 119",
+   "published": 2.75,
+   "group": "recipes",
+   "key": "r4_expansion_ff_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as rec.r4_con_ff, run under the expansion baseline"
+  },
+  {
+   "id": "rec.r4_exp_corp",
+   "file": "docs/scenario-recipes.md",
+   "line": 528,
+   "label": "expansion world: corporate yield at day 119",
+   "published": 4.91,
+   "group": "recipes",
+   "key": "r4_expansion_corp_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as rec.r4_con_ff, run under the expansion baseline"
+  },
+  {
+   "id": "rec.r4_exp_infl",
+   "file": "docs/scenario-recipes.md",
+   "line": 528,
+   "label": "expansion world: inflation at day 119",
+   "published": 3.09,
+   "group": "recipes",
+   "key": "r4_expansion_infl_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "as rec.r4_con_ff, run under the expansion baseline"
+  },
+  {
+   "id": "rec.r5_median",
+   "file": "docs/scenario-recipes.md",
+   "line": 602,
+   "label": "compound episode: median move at 120 days",
+   "published": 9.79,
+   "group": "recipes",
+   "key": "r5_median_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon"
+  },
+  {
+   "id": "rec.r5_worst",
+   "file": "docs/scenario-recipes.md",
+   "line": 602,
+   "label": "compound episode: worst name",
+   "published": -0.67,
+   "group": "recipes",
+   "key": "r5_worst_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon"
+  },
+  {
+   "id": "rec.r5_best",
+   "file": "docs/scenario-recipes.md",
+   "line": 602,
+   "label": "compound episode: best name",
+   "published": 12.04,
+   "group": "recipes",
+   "key": "r5_best_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon"
+  },
+  {
+   "id": "rec.r5_exact",
+   "file": "docs/scenario-recipes.md",
+   "line": 602,
+   "label": "compound episode: market draws identical across both worlds",
+   "published": true,
+   "group": "recipes",
+   "key": "r5_exact",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "compare(scenario, seed=5, universe=Universe.random(20, seed=4), days=120); the page states the universe/seed convention and the horizon"
+  },
+  {
+   "id": "rec.r5_vol",
+   "file": "docs/scenario-recipes.md",
+   "line": 678,
+   "label": "compound episode: annualised realised volatility over the run",
+   "published": 80.79,
+   "group": "recipes",
+   "key": "r5_vol_pct",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+  },
+  {
+   "id": "rec.r5_day17_vix",
+   "file": "docs/scenario-recipes.md",
+   "line": 617,
+   "label": "compound path: VIX partway down the decay leg at day 17",
+   "published": 79.15556,
+   "group": "recipes",
+   "key": "r5_day17_vix",
+   "compare": {
+    "kind": "round",
+    "decimals": 5
+   },
+   "source": "stated",
+   "method": "pandemic_shape(120).at(17); pins the from_json path the page prints"
+  },
+  {
+   "id": "rec.r5_day30_corp",
+   "file": "docs/scenario-recipes.md",
+   "line": 618,
+   "label": "compound path: corporate yield partway up the blow-out leg at day 30",
+   "published": 0.07364,
+   "group": "recipes",
+   "key": "r5_day30_corp",
+   "compare": {
+    "kind": "round",
+    "decimals": 5
+   },
+   "source": "stated",
+   "method": "pandemic_shape(120).at(30)"
+  },
+  {
+   "id": "rec.r5_beyond",
+   "file": "docs/scenario-recipes.md",
+   "line": 620,
+   "label": "compound path: holds its final policy rate past the recorded horizon",
+   "published": 0.00125,
+   "group": "recipes",
+   "key": "r5_beyond_horizon_ff",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "pandemic_shape(120).at(500); from_json holds final values rather than raising"
   }
  ]
 }
