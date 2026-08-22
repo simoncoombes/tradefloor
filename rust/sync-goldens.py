@@ -24,8 +24,12 @@ Still gated, bit-for-bit (measured on this corpus, 2026-08-21):
   - orderbook.json ........... the matching program replay
   - microstructure.json ...... spreads, books, settlement + draw counts
   - mispricing-*.json (12) ... constants, step, apply, roots, trajectories
-  - market-islands.json ...... GARCH update, sessions, curves, index maths
-  - market-daily.json ........ close bookkeeping, incl. the ReferenceEma arm
+  - market-islands.json ...... sessions, curves, index maths (the GARCH
+    cases and chains retired -- the GJR fork, below)
+  - market-daily.json ........ close bookkeeping minus garchVariance: the
+    momentum roll, lastDailyReturn, sPrevClose, the resets and the
+    ReferenceEma avgVolume arm, through the chains' full 500 days (the
+    garchVariance assertions retired -- the GJR fork, below)
   - economy-*.json ........... tier-1 islands; the stagflation and
     no-central-bank trajectories in full (their recorded VIX never
     exceeds CRISIS_VIX_THRESHOLD); the other three trajectories up to
@@ -59,22 +63,40 @@ Forked -- parity RETIRED, tests kept as runnable divergence records:
     there: bit-parity strictly before the fork day, the draw schedule
     intact through it, and the divergence equal to the gate terms in
     exactly the two gated fields.
+  - the GARCH cases and garchChains in market-islands.json, and the
+    garchVariance assertions (cases and chains) in market-daily.json:
+    the GJR asymmetry fork, landed 2026-08-21. garch.rs moved from the
+    reference's symmetric GARCH(1,1) (alpha 0.09, beta 0.90) to GJR
+    with gamma 0.34, alpha 0.02, beta 0.80, persistence held at 0.99.
+    Everything failed, chains included -- the retune signature the
+    market_islands_parity.rs forward-note's discriminator predicted (a
+    pure asymmetry term would have spared the all-non-negative chains;
+    that header carries the resolved measurement). Retired whole in
+    market_islands_parity.rs (every assertion routes through the
+    update) and as split-off #[ignore] tests in market_daily_parity.rs
+    (the rest of the close stays live); `cargo test -- --ignored`
+    reproduces the divergence: 84 mismatches in the islands cases, day
+    0 of every chain except alternating-extremes at day 1 (its 0.9
+    return clamps every parameterisation to the same ceiling), and
+    19,980 of 43,200 daily cases (the rest pin to the clamp bounds).
+    Coverage replaced by tests/garch_regression.rs and garch.rs's own
+    property tests; correctness argued by the gamma sweep in
+    tools/calibration/.
 
 Expected to fork next (in-flight engine streams, noted so their failures
-are read as the fork landing, not as port regressions): a GJR asymmetry
-term in garch.rs will take the GARCH cases in market-islands.json and the
-garchVariance assertions in market-daily.json; the market-factor variance
-process in tick.rs lands on an already-retired surface; the crisis
-CORRELATION trigger in tick.rs (vix > 40, still at the reference level,
-expected to adopt CRISIS_VIX_THRESHOLD when its stream lands) also lands
-on the already-retired market-tick surface. When one of those suites goes
-red, retire the affected cases the same way -- reasoned header, #[ignore]
-with the cause, coverage replaced by a gate that says what it actually
-gates -- rather than deleting or widening.
+are read as the fork landing, not as port regressions): the market-factor
+variance process in tick.rs lands on an already-retired surface; the
+crisis CORRELATION trigger in tick.rs (vix > 40, still at the reference
+level, expected to adopt CRISIS_VIX_THRESHOLD when its stream lands) also
+lands on the already-retired market-tick surface. When a suite goes red,
+retire the affected cases the same way -- reasoned header, #[ignore] with
+the cause, coverage replaced by a gate that says what it actually gates --
+rather than deleting or widening.
 
-Regression coverage for retired surfaces lives in tests/tick_regression.rs
-and is labelled for what it is: self-anchored, gating regression and
-reproducibility, never correctness.
+Regression coverage for retired surfaces lives in
+tests/tick_regression.rs and tests/garch_regression.rs, each labelled for
+what it is: self-anchored, gating regression and reproducibility, never
+correctness.
 
 Two rules this script enforces, both learned the hard way:
 
