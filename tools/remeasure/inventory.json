@@ -4299,157 +4299,461 @@
    "note": "after an engine change a failure here means the example script itself needs re-fitting, not just the prose"
   },
   {
-   "id": "rec.edge1_day0",
+   "id": "rec.rule1_seg_day0",
    "file": "docs/scenario-recipes.md",
-   "line": 66,
-   "label": "step-then-ramp on one field: day zero back-filled with the ramp's start",
-   "published": 48.0,
-   "group": "recipes",
-   "key": "edge1_day0_vix",
-   "compare": {
-    "kind": "exact"
-   },
-   "source": "stated",
-   "method": "Scenario().step('vix', before=15, after=48, at=60).ramp('vix', start=48, end=18, over=40, begin=60).at(0)",
-   "note": "if this stops reading 48.0 the surface has gained per-field composition and the page's first warning is stale"
-  },
-  {
-   "id": "rec.edge1_rev_day0",
-   "file": "docs/scenario-recipes.md",
-   "line": 85,
-   "label": "ramp-then-step on one field: day zero",
+   "line": 98,
+   "label": "segment rule: the first pin owns every day before its own start",
    "published": 15.0,
    "group": "recipes",
-   "key": "edge1_reverse_day0_vix",
+   "key": "rule1_seg_day0",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "the same two calls in the opposite order, .at(0)"
+   "method": "Scenario().step('vix', before=15, after=48, at=60).ramp('vix', start=48, end=22, over=45, begin=75).at(0)",
+   "note": "if this stops reading 15.0 the first-pin clause has changed and the page's three-clause statement of the segment rule is stale"
   },
   {
-   "id": "rec.edge1_rev_day99",
+   "id": "rec.rule1_seg_day60",
    "file": "docs/scenario-recipes.md",
-   "line": 85,
-   "label": "ramp-then-step on one field: the decay is discarded, day 99 still at the peak",
+   "line": 100,
+   "label": "segment rule: the step's own segment opens on day 60",
    "published": 48.0,
    "group": "recipes",
-   "key": "edge1_reverse_day99_vix",
+   "key": "rule1_seg_day60",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "the same two calls in the opposite order, .at(99)"
+   "method": "the same scenario .at(60)"
   },
   {
-   "id": "rec.edge2_chained",
+   "id": "rec.rule1_seg_day74",
    "file": "docs/scenario-recipes.md",
-   "line": 135,
-   "label": "vix_shock called on a configured scenario drives only 'vix'",
-   "published": "vix",
+   "line": 101,
+   "label": "segment rule: each pin owns its days until the next one begins",
+   "published": 48.0,
    "group": "recipes",
-   "key": "edge2_chained_fields",
+   "key": "rule1_seg_day74",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "Scenario().hold(inflation_rate=0.06, fear_greed_index=20.0).vix_shock(...).fields",
-   "note": "a classmethod, so the hold is discarded; if this ever reports three fields the constructors have become instance methods"
+   "method": "the same scenario .at(74), the day before the ramp's start day",
+   "note": "the plateau; if this reads the ramp's value the ramp has started back-filling and two pins no longer lay end to end"
   },
   {
-   "id": "rec.edge2_base_fields",
+   "id": "rec.rule1_seg_day97",
    "file": "docs/scenario-recipes.md",
-   "line": 135,
-   "label": "the base scenario is not mutated: still drives two fields",
-   "published": 2,
+   "line": 103,
+   "label": "segment rule: inside the ramp's own segment, day 97",
+   "published": 35.3,
    "group": "recipes",
-   "key": "edge2_base_fields",
-   "compare": {
-    "kind": "exact"
-   },
-   "source": "stated",
-   "method": "len(base.fields) after calling base.vix_shock(...)"
-  },
-  {
-   "id": "rec.edge4_default",
-   "file": "docs/scenario-recipes.md",
-   "line": 197,
-   "label": "compare() on a hold-only scenario against its default baseline",
-   "published": 0.0,
-   "group": "recipes",
-   "key": "edge4_default_median_pct",
+   "key": "rule1_seg_day97",
    "compare": {
     "kind": "round",
-    "decimals": 2
+    "decimals": 1
    },
    "source": "stated",
-   "method": "compare(Scenario().hold(vix=45.0), seed=5, universe=Universe.random(20, seed=4), days=30) with no baseline=",
-   "note": "exactly zero because the default baseline is hold(**scenario.at(0)), which for a hold IS the scenario"
+   "method": "the same scenario .at(97); the page prints it to one decimal"
   },
   {
-   "id": "rec.edge4_explicit",
+   "id": "rec.rule1_seg_day120",
    "file": "docs/scenario-recipes.md",
-   "line": 198,
-   "label": "the same comparison against an explicit calm baseline",
+   "line": 104,
+   "label": "segment rule: the last pin owns the rest of the run",
+   "published": 22.0,
+   "group": "recipes",
+   "key": "rule1_seg_day120",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same scenario .at(120), past the end of the ramp and of the 120-day horizon the pins were written for"
+  },
+  {
+   "id": "rec.rule1_same_day_msg",
+   "file": "docs/scenario-recipes.md",
+   "line": 135,
+   "label": "the same-day refusal, printed in full on the page",
+   "published": "two pins on 'vix' both begin on day 60: step('vix', before=15.0, after=48.0) at day 60 and ramp('vix', start=48.0, end=18.0, over=40) from day 60. Pins on one field layer as consecutive segments, so the first one's values from day 60 onward could never be reached -- one of these two calls would do nothing, silently. Say the level and the episode separately: .hold(vix=<the level before day 60>) then .ramp('vix', start=..., end=..., over=..., begin=60) -- a ramp starts AT its start value, so that is a jump on day 60 and then the path.",
+   "group": "recipes",
+   "key": "rule1_same_day_message",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "str(ValidationError) from Scenario().step('vix', ..., at=60).ramp('vix', ..., begin=60)",
+   "note": "the page prints this message verbatim, so the message IS the published figure: reword it and the page needs the same edit"
+  },
+  {
+   "id": "rec.rule1_same_day_rev",
+   "file": "docs/scenario-recipes.md",
+   "line": 146,
+   "label": "the same pair declared the other way round is the same refusal",
+   "published": true,
+   "group": "recipes",
+   "key": "rule1_same_day_reversed_refused",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "Scenario().ramp('vix', ..., begin=60).step('vix', ..., at=60) raises ValidationError naming 'both begin on day 60'",
+   "note": "structural: the page says whichever call was written first is the dead one, which only holds if the rule is symmetric"
+  },
+  {
+   "id": "rec.rule1_out_of_order",
+   "file": "docs/scenario-recipes.md",
+   "line": 170,
+   "label": "a pin declared after one that begins later is refused as out of order",
+   "published": true,
+   "group": "recipes",
+   "key": "rule1_out_of_order_refused",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "Scenario().ramp('vix', ..., begin=75).step('vix', ..., at=60) raises ValidationError containing 'are out of order' and 'must be declared in the order they happen'",
+   "note": "structural: the page quotes both of those phrases"
+  },
+  {
+   "id": "rec.rule1_ex_day0",
+   "file": "docs/scenario-recipes.md",
+   "line": 159,
+   "label": "hold-then-ramp: calm at 15.0 on day zero",
+   "published": 15.0,
+   "group": "recipes",
+   "key": "rule1_example_day0",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "Scenario().hold(vix=15.0).ramp('vix', start=48, end=18, over=40, begin=60).at(0)",
+   "note": "the page's own step-then-decay example, in the form the same-day refusal advises"
+  },
+  {
+   "id": "rec.rule1_ex_day30",
+   "file": "docs/scenario-recipes.md",
+   "line": 159,
+   "label": "hold-then-ramp: still calm on day 30",
+   "published": 15.0,
+   "group": "recipes",
+   "key": "rule1_example_day30",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same scenario .at(30)"
+  },
+  {
+   "id": "rec.rule1_ex_day59",
+   "file": "docs/scenario-recipes.md",
+   "line": 159,
+   "label": "hold-then-ramp: still calm on the day before the ramp begins",
+   "published": 15.0,
+   "group": "recipes",
+   "key": "rule1_example_day59",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same scenario .at(59)"
+  },
+  {
+   "id": "rec.rule1_ex_day60",
+   "file": "docs/scenario-recipes.md",
+   "line": 159,
+   "label": "hold-then-ramp: the jump to 48.0 on day 60",
+   "published": 48.0,
+   "group": "recipes",
+   "key": "rule1_example_day60",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same scenario .at(60)",
+   "note": "a ramp starts AT its start value, so a ramp behind a hold is a jump and then a decay; this is the whole reason the page uses this form"
+  },
+  {
+   "id": "rec.rule1_ex_day80",
+   "file": "docs/scenario-recipes.md",
+   "line": 159,
+   "label": "hold-then-ramp: half way down, day 80",
+   "published": 33.0,
+   "group": "recipes",
+   "key": "rule1_example_day80",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same scenario .at(80)"
+  },
+  {
+   "id": "rec.rule1_ex_day100",
+   "file": "docs/scenario-recipes.md",
+   "line": 159,
+   "label": "hold-then-ramp: the decay reaches 18.0 on day 100",
+   "published": 18.0,
+   "group": "recipes",
+   "key": "rule1_example_day100",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same scenario .at(100)"
+  },
+  {
+   "id": "rec.rule1_table_day0",
+   "file": "docs/scenario-recipes.md",
+   "line": 186,
+   "label": "Scenario.table(5) opens at the held level, not the ramp's start",
+   "published": 15.0,
+   "group": "recipes",
+   "key": "rule1_table_day0",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same scenario .table(5)[0]['vix']"
+  },
+  {
+   "id": "rec.rule2_vix_shock_inst",
+   "file": "docs/scenario-recipes.md",
+   "line": 199,
+   "label": "vix_shock called on a configured scenario is refused",
+   "published": true,
+   "group": "recipes",
+   "key": "rule2_vix_shock_on_instance_refused",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "Scenario().hold(inflation_rate=0.06, fear_greed_index=20.0).vix_shock(...) raises ValidationError containing 'is a CONSTRUCTOR, not a step' and the receiver's field list",
+   "note": "structural: the page says the refusal names the fields the receiver was driving, so both halves are checked"
+  },
+  {
+   "id": "rec.rule2_rate_shock_inst",
+   "file": "docs/scenario-recipes.md",
+   "line": 195,
+   "label": "rate_shock called on a configured scenario is refused",
+   "published": true,
+   "group": "recipes",
+   "key": "rule2_rate_shock_on_instance_refused",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same receiver .rate_shock(...) raises ValidationError containing 'is a CONSTRUCTOR, not a step'"
+  },
+  {
+   "id": "rec.rule2_from_json_inst",
+   "file": "docs/scenario-recipes.md",
+   "line": 196,
+   "label": "from_json called on a configured scenario is refused",
+   "published": true,
+   "group": "recipes",
+   "key": "rule2_from_json_on_instance_refused",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same receiver .from_json(...) raises ValidationError containing 'is a CONSTRUCTOR, not a step'",
+   "note": "the page lists all four constructors; vol_shock shares the descriptor with vix_shock and is covered by the test suite"
+  },
+  {
+   "id": "rec.rule2_base_intact",
+   "file": "docs/scenario-recipes.md",
+   "line": 199,
+   "label": "the refused call leaves the receiver driving what it drove",
+   "published": "fear_greed_index,inflation_rate",
+   "group": "recipes",
+   "key": "rule2_base_intact",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the receiver's .fields after the refused vix_shock/rate_shock/from_json calls above",
+   "note": "a refusal that half-applied would be a quieter version of the defect it replaced"
+  },
+  {
+   "id": "rec.rule2_right_fields",
+   "file": "docs/scenario-recipes.md",
+   "line": 213,
+   "label": "constructor first, then chain the other fields: three fields driven",
+   "published": "fear_greed_index,inflation_rate,vix",
+   "group": "recipes",
+   "key": "rule2_right_fields",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "Scenario.vix_shock(calm=15, peak=60, at=10, over=30).hold(inflation_rate=0.06, fear_greed_index=20.0).fields"
+  },
+  {
+   "id": "rec.rule2_vix_is_hold_ramp",
+   "file": "docs/scenario-recipes.md",
+   "line": 229,
+   "label": "vix_shock is exactly a hold at the calm level then a ramp back to it",
+   "published": true,
+   "group": "recipes",
+   "key": "rule2_vix_shock_is_hold_then_ramp",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the scenario above .table(120) equals .hold(...).hold(vix=15.0).ramp('vix', start=60, end=15, over=30, begin=10).table(120)",
+   "note": "structural: the page's claim that the constructors are convenience rather than capability, and the reason recipe 3 no longer needs vix_shock for its shape"
+  },
+  {
+   "id": "rec.rule2_rate_is_two_ramps",
+   "file": "docs/scenario-recipes.md",
+   "line": 232,
+   "label": "rate_shock is two ramps held apart by credit_spread",
+   "published": true,
+   "group": "recipes",
+   "key": "rule2_rate_shock_is_two_ramps",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "recipe 1's scenario .table(120) equals two ramps on federal_funds_rate and corporate_bond_yield, the second offset by credit_spread=0.02, over the same 90 days"
+  },
+  {
+   "id": "rec.rule3_hold_only",
+   "file": "docs/scenario-recipes.md",
+   "line": 250,
+   "label": "compare() with the default baseline refuses a hold-only scenario",
+   "published": true,
+   "group": "recipes",
+   "key": "rule3_hold_only_refused",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "compare(Scenario().hold(vix=45.0), seed=5, universe=Universe.random(20, seed=4), days=30) with no baseline= raises ValidationError containing 'is CONSTANT over all 30 days'",
+   "note": "replaces the row that published the +0.00% this now refuses"
+  },
+  {
+   "id": "rec.rule3_step_at_zero",
+   "file": "docs/scenario-recipes.md",
+   "line": 250,
+   "label": "...and a step at day zero, whose day-zero value is the after value",
+   "published": true,
+   "group": "recipes",
+   "key": "rule3_step_at_zero_refused",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same call on Scenario().step('vix', before=15, after=45, at=0)"
+  },
+  {
+   "id": "rec.rule3_after_horizon",
+   "file": "docs/scenario-recipes.md",
+   "line": 253,
+   "label": "...and a shock whose start day falls at or after the horizon",
+   "published": true,
+   "group": "recipes",
+   "key": "rule3_after_horizon_refused",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "compare(Scenario().ramp('federal_funds_rate', start=0.025, end=0.05, over=30, begin=60), ..., days=40) raises ValidationError containing 'begins on or after day 40' and 'Run at least 61 days'",
+   "note": "structural: the page says the message names the day and the run length it needs, so both are checked"
+  },
+  {
+   "id": "rec.rule3_empty",
+   "file": "docs/scenario-recipes.md",
+   "line": 256,
+   "label": "...and a scenario driving nothing at all",
+   "published": true,
+   "group": "recipes",
+   "key": "rule3_empty_refused",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "the same call on Scenario() raises ValidationError containing 'it drives no fields at all'"
+  },
+  {
+   "id": "rec.rule3_same_path_baseline",
+   "file": "docs/scenario-recipes.md",
+   "line": 258,
+   "label": "an explicit baseline realising the same path is refused too",
+   "published": true,
+   "group": "recipes",
+   "key": "rule3_same_path_baseline_refused",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "compare(hold(vix=45.0), ..., baseline=hold(vix=45.0)) raises ValidationError containing 'would difference two identical worlds'"
+  },
+  {
+   "id": "rec.rule3_explicit",
+   "file": "docs/scenario-recipes.md",
+   "line": 273,
+   "label": "compare() on the same hold against an explicit calm baseline",
    "published": 29.72,
    "group": "recipes",
-   "key": "edge4_explicit_median_pct",
+   "key": "rule3_explicit_median_pct",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
    "source": "stated",
-   "method": "as above with baseline=Scenario().hold(vix=15.0)"
+   "method": "compare(Scenario().hold(vix=45.0), seed=5, universe=Universe.random(20, seed=4), days=30, baseline=Scenario().hold(vix=15.0))"
   },
   {
-   "id": "rec.edge4_band_lo",
+   "id": "rec.rule3_band_lo",
    "file": "docs/scenario-recipes.md",
-   "line": 209,
-   "label": "VIX 45-vs-15 median move, lowest of sim seeds 1-8",
+   "line": 281,
+   "label": "the same comparison across sim seeds 1-8 spans -26.56...",
    "published": -26.56,
    "group": "recipes",
-   "key": "edge4_seedband_lo",
+   "key": "rule3_seedband_lo",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
    "source": "stated",
-   "method": "the explicit-baseline comparison repeated across sim seeds 1 to 8, 30 days"
+   "method": "the explicit-baseline comparison above, run at seeds 1 to 8; min"
   },
   {
-   "id": "rec.edge4_band_hi",
+   "id": "rec.rule3_band_hi",
    "file": "docs/scenario-recipes.md",
-   "line": 209,
-   "label": "VIX 45-vs-15 median move, highest of sim seeds 1-8",
+   "line": 281,
+   "label": "...to +29.72",
    "published": 29.72,
    "group": "recipes",
-   "key": "edge4_seedband_hi",
+   "key": "rule3_seedband_hi",
    "compare": {
     "kind": "round",
     "decimals": 2
    },
    "source": "stated",
-   "method": "the explicit-baseline comparison repeated across sim seeds 1 to 8, 30 days"
+   "method": "the same eight comparisons; max"
   },
   {
-   "id": "rec.edge4_band_neg",
+   "id": "rec.rule3_band_neg",
    "file": "docs/scenario-recipes.md",
-   "line": 209,
-   "label": "VIX 45-vs-15 median move is negative on 2 of 8 seeds",
+   "line": 281,
+   "label": "...negative on 2 of the 8",
    "published": 2,
    "group": "recipes",
-   "key": "edge4_seedband_negative",
+   "key": "rule3_seedband_negative",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "count of negative medians across sim seeds 1 to 8",
-   "note": "the page's argument for measuring volatility scenarios with facts.measure rather than a price delta rests on this sign flip"
+   "method": "the same eight comparisons; count of medians below zero",
+   "note": "the page's argument for measuring volatility scenarios with facts.measure rather than a price delta"
   },
   {
    "id": "rec.r1_median",
    "file": "docs/scenario-recipes.md",
-   "line": 263,
+   "line": 336,
    "label": "hiking cycle: median move at 120 days",
    "published": -9.26,
    "group": "recipes",
@@ -4464,7 +4768,7 @@
   {
    "id": "rec.r1_worst",
    "file": "docs/scenario-recipes.md",
-   "line": 263,
+   "line": 336,
    "label": "hiking cycle: most rate-sensitive name",
    "published": -13.21,
    "group": "recipes",
@@ -4479,7 +4783,7 @@
   {
    "id": "rec.r1_best",
    "file": "docs/scenario-recipes.md",
-   "line": 263,
+   "line": 336,
    "label": "hiking cycle: least rate-sensitive name",
    "published": 0.26,
    "group": "recipes",
@@ -4494,7 +4798,7 @@
   {
    "id": "rec.r1_exact",
    "file": "docs/scenario-recipes.md",
-   "line": 263,
+   "line": 336,
    "label": "hiking cycle: market draws identical across both worlds",
    "published": true,
    "group": "recipes",
@@ -4508,7 +4812,7 @@
   {
    "id": "rec.r2_early",
    "file": "docs/scenario-recipes.md",
-   "line": 332,
+   "line": 405,
    "label": "inflation shock: largest absolute move anywhere at 40 days",
    "published": 0.26,
    "group": "recipes",
@@ -4524,7 +4828,7 @@
   {
    "id": "rec.r2_late",
    "file": "docs/scenario-recipes.md",
-   "line": 333,
+   "line": 406,
    "label": "inflation shock: median move at 120 days",
    "published": -10.01,
    "group": "recipes",
@@ -4539,7 +4843,7 @@
   {
    "id": "rec.r3_calm_vol",
    "file": "docs/scenario-recipes.md",
-   "line": 396,
+   "line": 469,
    "label": "liquidity crisis: annualised realised volatility, calm baseline",
    "published": 61.76,
    "group": "recipes",
@@ -4554,7 +4858,7 @@
   {
    "id": "rec.r3_vol",
    "file": "docs/scenario-recipes.md",
-   "line": 396,
+   "line": 469,
    "label": "liquidity crisis: annualised realised volatility under the spike",
    "published": 82.16,
    "group": "recipes",
@@ -4569,7 +4873,7 @@
   {
    "id": "rec.r3_vol_uplift",
    "file": "docs/scenario-recipes.md",
-   "line": 445,
+   "line": 520,
    "label": "liquidity crisis: volatility uplift in percentage points",
    "published": 20.4,
    "group": "recipes",
@@ -4584,7 +4888,7 @@
   {
    "id": "rec.r3_calm_corr",
    "file": "docs/scenario-recipes.md",
-   "line": 397,
+   "line": 470,
    "label": "liquidity crisis: mean pairwise correlation, calm baseline",
    "published": 0.493,
    "group": "recipes",
@@ -4599,7 +4903,7 @@
   {
    "id": "rec.r3_corr",
    "file": "docs/scenario-recipes.md",
-   "line": 397,
+   "line": 470,
    "label": "liquidity crisis: mean pairwise correlation under the spike",
    "published": 0.636,
    "group": "recipes",
@@ -4614,7 +4918,7 @@
   {
    "id": "rec.r3_median",
    "file": "docs/scenario-recipes.md",
-   "line": 452,
+   "line": 531,
    "label": "liquidity crisis: median price move at 120 days",
    "published": -8.29,
    "group": "recipes",
@@ -4630,7 +4934,7 @@
   {
    "id": "rec.r3_worst",
    "file": "docs/scenario-recipes.md",
-   "line": 452,
+   "line": 532,
    "label": "liquidity crisis: worst name at 120 days",
    "published": -13.07,
    "group": "recipes",
@@ -4645,7 +4949,7 @@
   {
    "id": "rec.r4_median",
    "file": "docs/scenario-recipes.md",
-   "line": 485,
+   "line": 561,
    "label": "contraction regime: median move against an explicit expansion baseline",
    "published": 2.85,
    "group": "recipes",
@@ -4660,7 +4964,7 @@
   {
    "id": "rec.r4_exact",
    "file": "docs/scenario-recipes.md",
-   "line": 485,
+   "line": 561,
    "label": "contraction regime: market draws identical across both worlds",
    "published": true,
    "group": "recipes",
@@ -4674,7 +4978,7 @@
   {
    "id": "rec.r4_con_ff",
    "file": "docs/scenario-recipes.md",
-   "line": 527,
+   "line": 603,
    "label": "contraction world: policy rate at day 119",
    "published": 2.0,
    "group": "recipes",
@@ -4689,7 +4993,7 @@
   {
    "id": "rec.r4_con_corp",
    "file": "docs/scenario-recipes.md",
-   "line": 527,
+   "line": 603,
    "label": "contraction world: corporate yield at day 119",
    "published": 6.41,
    "group": "recipes",
@@ -4704,7 +5008,7 @@
   {
    "id": "rec.r4_con_infl",
    "file": "docs/scenario-recipes.md",
-   "line": 527,
+   "line": 603,
    "label": "contraction world: inflation at day 119",
    "published": 1.0,
    "group": "recipes",
@@ -4719,7 +5023,7 @@
   {
    "id": "rec.r4_exp_ff",
    "file": "docs/scenario-recipes.md",
-   "line": 528,
+   "line": 604,
    "label": "expansion world: policy rate at day 119",
    "published": 2.75,
    "group": "recipes",
@@ -4734,7 +5038,7 @@
   {
    "id": "rec.r4_exp_corp",
    "file": "docs/scenario-recipes.md",
-   "line": 528,
+   "line": 604,
    "label": "expansion world: corporate yield at day 119",
    "published": 4.91,
    "group": "recipes",
@@ -4749,7 +5053,7 @@
   {
    "id": "rec.r4_exp_infl",
    "file": "docs/scenario-recipes.md",
-   "line": 528,
+   "line": 604,
    "label": "expansion world: inflation at day 119",
    "published": 3.09,
    "group": "recipes",
@@ -4764,7 +5068,7 @@
   {
    "id": "rec.r5_median",
    "file": "docs/scenario-recipes.md",
-   "line": 602,
+   "line": 683,
    "label": "compound episode: median move at 120 days",
    "published": 9.79,
    "group": "recipes",
@@ -4779,7 +5083,7 @@
   {
    "id": "rec.r5_worst",
    "file": "docs/scenario-recipes.md",
-   "line": 602,
+   "line": 683,
    "label": "compound episode: worst name",
    "published": -0.67,
    "group": "recipes",
@@ -4794,7 +5098,7 @@
   {
    "id": "rec.r5_best",
    "file": "docs/scenario-recipes.md",
-   "line": 602,
+   "line": 683,
    "label": "compound episode: best name",
    "published": 12.04,
    "group": "recipes",
@@ -4809,7 +5113,7 @@
   {
    "id": "rec.r5_exact",
    "file": "docs/scenario-recipes.md",
-   "line": 602,
+   "line": 683,
    "label": "compound episode: market draws identical across both worlds",
    "published": true,
    "group": "recipes",
@@ -4823,7 +5127,7 @@
   {
    "id": "rec.r5_vol",
    "file": "docs/scenario-recipes.md",
-   "line": 678,
+   "line": 792,
    "label": "compound episode: annualised realised volatility over the run",
    "published": 80.79,
    "group": "recipes",
@@ -4838,7 +5142,7 @@
   {
    "id": "rec.r5_day17_vix",
    "file": "docs/scenario-recipes.md",
-   "line": 617,
+   "line": 698,
    "label": "compound path: VIX partway down the decay leg at day 17",
    "published": 79.15556,
    "group": "recipes",
@@ -4853,7 +5157,7 @@
   {
    "id": "rec.r5_day30_corp",
    "file": "docs/scenario-recipes.md",
-   "line": 618,
+   "line": 699,
    "label": "compound path: corporate yield partway up the blow-out leg at day 30",
    "published": 0.07364,
    "group": "recipes",
@@ -4868,7 +5172,7 @@
   {
    "id": "rec.r5_beyond",
    "file": "docs/scenario-recipes.md",
-   "line": 620,
+   "line": 701,
    "label": "compound path: holds its final policy rate past the recorded horizon",
    "published": 0.00125,
    "group": "recipes",
@@ -4878,6 +5182,21 @@
    },
    "source": "stated",
    "method": "pandemic_shape(120).at(500); from_json holds final values rather than raising"
+  },
+  {
+   "id": "rec.r5_chained",
+   "file": "docs/scenario-recipes.md",
+   "line": 728,
+   "label": "the compound path written as ten chained pins is the same scenario",
+   "published": true,
+   "group": "recipes",
+   "key": "r5_chained_matches_loaded",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "_r5_compound_chained().table(120) == pandemic_shape(120).table(120)",
+   "note": "structural: the segment rule on a four-field episode, and the claim that replaces recipe 5's old 'chaining cannot express two segments'"
   }
  ]
 }
