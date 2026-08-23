@@ -265,6 +265,9 @@ fn check_scenario(file: &str) {
         simulate_market_tick(
             &mut companies,
             &TickInputs {
+                // The mechanism ships inert; 0.0 is the value that
+                // preserves the behaviour these tests pin.
+                universe_stress: 0.0,
                 economy: &economy,
                 market_status: status,
                 intraday_t: intraday_fraction(time),

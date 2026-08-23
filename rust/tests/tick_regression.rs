@@ -146,6 +146,9 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
     simulate_market_tick(
         companies,
         &TickInputs {
+            // The mechanism ships inert; 0.0 is the value that
+            // preserves the behaviour these tests pin.
+            universe_stress: 0.0,
             economy: &economy,
             market_status: status,
             intraday_t: 0.5,
