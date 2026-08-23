@@ -443,10 +443,32 @@ impl MarketVarianceState {
             component_step(self.fast_variance, self.day_factor, target,
                            params.market_vol_alpha, params.market_vol_beta),
         );
+        // The slow component may revert to a LESS VIX-coupled target than
+        // the fast one, which is the whole point of having two.
+        //
+        // With a shared target, adding a slow component makes the mixture
+        // track a VIX spike more sluggishly than the fast component alone --
+        // the opposite of what the scenario transient needs. The measured
+        // defect is exactly that: pt-v3 retains 95.2% of pt-v1's STEADY-STATE
+        // VIX lever and only 27.6% of its TRANSIENT, because one variance
+        // timescale is doing two jobs. Within-year clustering wants long
+        // memory; tracking a twenty-day spike wants short.
+        //
+        // Damping the slow component's coupling separates them: the fast
+        // component chases VIX, the slow one carries the autonomous level and
+        // the long memory. At 0.0 the two targets are the same expression and
+        // the branch is skipped, so every preset before pt-v4 is untouched.
+        let slow_target = if params.market_vol_slow_vix_damp == 0.0 {
+            target
+        } else {
+            let c = params.market_vol_vix_coupling
+                * (1.0 - params.market_vol_slow_vix_damp);
+            base * (1.0 - c + c * (vix_ratio * vix_ratio))
+        };
         let (sa, sb) = slow_alpha_beta(params);
         let slow = clamp_variance(
             params,
-            component_step(self.slow_variance, self.day_factor, target, sa, sb),
+            component_step(self.slow_variance, self.day_factor, slow_target, sa, sb),
         );
 
         self.fast_variance = fast;

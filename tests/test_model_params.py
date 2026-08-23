@@ -160,6 +160,11 @@ PERTURBATIONS = [
     # anyone. Shown live by `test_peer_transfer_moves_a_name_the_news_never_named`.
     ("news_peer_weight", 0.2, False),          # needs company-tagged news
     ("news_peer_weight_down", 0.5, False),     # needs company-tagged BAD news
+    # Decoupling the slow variance component's target from VIX (pt-v4).
+    # Inert in the probe for two reasons at once: the slow component has zero
+    # weight in every shipped preset, so there is no slow target to decouple,
+    # and a 3-day probe at a flat default VIX has no spike to track anyway.
+    ("market_vol_slow_vix_damp", 0.5, False),  # needs slow weight AND a VIX move
 ]
 
 

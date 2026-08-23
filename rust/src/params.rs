@@ -245,6 +245,27 @@ pub struct ModelParams {
     /// 0.0 means the market ignores the cycle, which is every preset
     /// before pt-v4.
     pub regime_stress_points: f64,
+    /// How far the SLOW variance component's target is decoupled from VIX,
+    /// in [0, 1].
+    ///
+    /// With a shared target the two components chase VIX together, so adding
+    /// a slow one makes the mixture track a spike MORE sluggishly than the
+    /// fast component alone -- the opposite of what a scenario transient
+    /// needs. The measurement says that is the live defect: pt-v3 retains
+    /// 95.2% of pt-v1's steady-state VIX lever and only 27.6% of its
+    /// transient, because one timescale is doing two jobs. Within-year
+    /// clustering wants long memory; tracking a twenty-day spike wants short.
+    ///
+    /// At 0.0 the slow component tracks VIX exactly as the fast one does and
+    /// the branch is skipped, so every preset before pt-v4 is bit-identical.
+    /// At 1.0 it ignores VIX entirely and reverts to the autonomous baseline,
+    /// leaving the fast component to carry the whole response.
+    ///
+    /// Neither lever is near real markets regardless: measured on the 40-name
+    /// reference roster, real is x6.16 (17.2% annualised below VIX 12 against
+    /// 106.1% above VIX 45) against roughly x3.1 here. "Restore pt-v1's
+    /// lever" was never the right target.
+    pub market_vol_slow_vix_damp: f64,
 
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
     /// Trading days for half of a mispricing to decay. The ONE settable
@@ -393,6 +414,7 @@ impl ModelParams {
             universe_stress_decay: 0.0,
             universe_stress_weight: 0.0,
             regime_stress_points: 0.0,
+            market_vol_slow_vix_damp: 0.0,
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
@@ -522,6 +544,7 @@ impl ModelParams {
             "universe_stress_decay" => self.universe_stress_decay,
             "universe_stress_weight" => self.universe_stress_weight,
             "regime_stress_points" => self.regime_stress_points,
+            "market_vol_slow_vix_damp" => self.market_vol_slow_vix_damp,
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
@@ -599,6 +622,7 @@ impl ModelParams {
             "universe_stress_decay" => out.universe_stress_decay = value,
             "universe_stress_weight" => out.universe_stress_weight = value,
             "regime_stress_points" => out.regime_stress_points = value,
+            "market_vol_slow_vix_damp" => out.market_vol_slow_vix_damp = value,
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
             "momentum_theta" => out.momentum_theta = value,
@@ -727,6 +751,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_floor_multiple",
         "market_vol_slow_gain",
         "market_vol_slow_persistence",
+        "market_vol_slow_vix_damp",
         "market_vol_slow_weight",
         "market_vol_vix_anchor",
         "market_vol_vix_coupling",

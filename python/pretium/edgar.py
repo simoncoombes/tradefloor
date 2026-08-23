@@ -324,15 +324,25 @@ _SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 #: which a filing is treated as mis-tagged rather than as a very large or
 #: very small company.
 #:
-#: The ceiling is deliberately generous: Berkshire's A shares trade near
-#: $700k, so a threshold tuned to ordinary equities would reject a real
-#: company. What it catches is the XBRL scale error -- a filer reporting
-#: thousands as units, or a fund reporting an aggregate -- which lands
-#: orders of magnitude outside any traded price. Rejecting on a quantity
-#: that MEANS something, rather than on the float value itself, is what
-#: makes the filter explicable: "this filing implies a share price of eight
-#: million dollars" is a diagnosis, "this number is too big" is a guess.
-PLAUSIBLE_IMPLIED_PRICE = (0.5, 1_000_000.0)
+#: Rejecting on a quantity that MEANS something, rather than on the float
+#: value itself, is what makes the filter explicable: "this filing implies a
+#: share price of ninety-seven thousand dollars" is a diagnosis, "this number
+#: is too big" is a guess.
+#:
+#: The ceiling was $1,000,000 on the first attempt, chosen so Berkshire's A
+#: shares near $700k would survive. Measured against the live SEC, that was
+#: an order of magnitude too loose to catch anything: the scale errors imply
+#: prices of $97k (ONTO), $116k (MGRC) and $143k (OLED), all comfortably
+#: under a million, and they ranked ABOVE Nvidia -- whose own filing is
+#: correct at an implied $163. A filter that admits every error it was
+#: written to reject is worse than none, because it looks like diligence.
+#:
+#: $10,000 is the working ceiling. It clears the genuinely high-priced US
+#: listings -- NVR near $7k, Booking near $5k -- and rejects every scale
+#: error seen. It also rejects Berkshire's A shares, and that is the
+#: deliberate trade: one real company excluded, against several hundred
+#: mis-tagged filings admitted. B shares are unaffected.
+PLAUSIBLE_IMPLIED_PRICE = (0.5, 10_000.0)
 
 _REVENUE_TAGS = (
     ("us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax", "USD"),
