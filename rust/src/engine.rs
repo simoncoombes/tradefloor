@@ -96,6 +96,8 @@ pub struct EngineRngState {
     /// DIFFERENT sequence while looking correct. That is harmless while
     /// jumps are inert and silently wrong the day they are not.
     pub jumps: RngState,
+    /// The persistent-volume stream, carried for the same reason.
+    pub volume: RngState,
 }
 
 /// Cumulative draws per stream. Diagnostic, per D-R1: the single most
@@ -177,6 +179,7 @@ pub struct Engine {
     economy_rng: GameRng,
     external_rng: GameRng,
     jump_rng: GameRng,
+    volume_rng: GameRng,
     companies: Vec<TickCompany>,
     economy: EconomyState,
     central_bank: CentralBankState,
@@ -213,6 +216,9 @@ pub struct Engine {
     /// event's effect on the cross-section OUTLIVES the day it happened.
     /// Zero, and inert, under every preset before pt-v4.
     universe_stress: f64,
+    /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
+    /// exactly 1.0, which is every preset before pt-v4.
+    volume_state: f64,
     /// Cumulative draws per stream, including any the embedder took through
     /// [`Engine::draw_uniform`]. The single most useful numbers for
     /// diagnosing a divergence: if these differ between two runs, nothing
@@ -337,6 +343,7 @@ impl Engine {
             economy_rng: GameRng::substream(seed, stream::ECONOMY),
             external_rng: GameRng::substream(seed, stream::EXTERNAL),
             jump_rng: GameRng::substream(seed, stream::JUMPS),
+            volume_rng: GameRng::substream(seed, stream::VOLUME),
             companies,
             economy,
             central_bank,
@@ -349,6 +356,7 @@ impl Engine {
             tick_anchor: vec![f64::NAN; companies_len],
             market_vol: MarketVarianceState::new_with(&params),
             universe_stress: 0.0,
+            volume_state: 0.0,
             sector_keys,
             draws: StreamDraws::default(),
             params,
@@ -402,6 +410,7 @@ impl Engine {
             economy: self.economy_rng.snapshot(),
             external: self.external_rng.snapshot(),
             jumps: self.jump_rng.snapshot(),
+            volume: self.volume_rng.snapshot(),
         }
     }
 
@@ -417,6 +426,7 @@ impl Engine {
         self.economy_rng = GameRng::restore(state.economy);
         self.external_rng = GameRng::restore(state.external);
         self.jump_rng = GameRng::restore(state.jumps);
+        self.volume_rng = GameRng::restore(state.volume);
     }
 
     /// Cumulative draws across all three streams. The per-stream split is
@@ -503,6 +513,7 @@ impl Engine {
             &TickInputs {
                 economy: &self.economy,
                 universe_stress: self.universe_stress,
+                volume_state: self.volume_state,
                 market_status: status,
                 intraday_t: intraday_fraction(request.time),
                 volatility_multiplier: request.volatility_multiplier,
@@ -766,6 +777,7 @@ impl Engine {
         self.market_vol.close_day_with(&self.params, self.economy.vix);
         self.update_universe_stress();
         self.apply_jumps();
+        self.update_volume_state();
     }
 
     /// Endogenous jumps, applied once per name at the day close.
@@ -829,6 +841,36 @@ impl Engine {
                 }
             }
         }
+    }
+
+    /// The shared persistent volume component, stepped once per day.
+    ///
+    /// Volume is otherwise a LEVEL with independent per-tick noise, so
+    /// consecutive volumes are near-independent draws around a fixed mean
+    /// and differencing them gives a change autocorrelation near -0.5 at any
+    /// coefficients. That is the whole reason `volume_change_acf1` sits 13.7
+    /// seed-sd outside its band and is excluded from the objective as
+    /// structurally unreachable: the defect is an absent process, and no
+    /// parameter reaches it.
+    ///
+    /// A log-scale AR(1), so a busy day is followed by a busy day. The
+    /// draw is unconditional and lives on [`stream::VOLUME`], so the
+    /// schedule never depends on the parameters and no earlier preset's
+    /// sequence moves.
+    ///
+    /// COMMON component only: every name shares this multiplier. Real volume
+    /// persistence is partly idiosyncratic, and that half is not modelled.
+    fn update_volume_state(&mut self) {
+        let z = self.volume_rng.next_normal();
+        let p = &self.params;
+        // Guarded rather than computed through: at zero persistence and zero
+        // innovation the state must stay exactly 0.0, so the multiplier stays
+        // exactly 1.0 and the tick's volume arithmetic is untouched.
+        if p.volume_persistence == 0.0 && p.volume_innovation_sigma == 0.0 {
+            return;
+        }
+        self.volume_state =
+            p.volume_persistence * self.volume_state + p.volume_innovation_sigma * z;
     }
 
     /// The daily macro step: economy, cycle roll, then the central bank.

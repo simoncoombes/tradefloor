@@ -268,6 +268,7 @@ fn check_scenario(file: &str) {
                 // The mechanism ships inert; 0.0 is the value that
                 // preserves the behaviour these tests pin.
                 universe_stress: 0.0,
+                volume_state: 0.0,
                 economy: &economy,
                 market_status: status,
                 intraday_t: intraday_fraction(time),

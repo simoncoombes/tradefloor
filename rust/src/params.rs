@@ -323,6 +323,33 @@ pub struct ModelParams {
     /// Standard deviation of the idiosyncratic jump, in log-return units.
     pub jump_sigma_idio: f64,
 
+    // ── Persistent volume (engine.rs close, market/tick.rs phase 3) ─────
+    /// Day-to-day persistence of the shared volume component, in [0, 1).
+    ///
+    /// Volume is otherwise a LEVEL -- `avg_volume` scaled by multipliers,
+    /// with an independent uniform each tick. Consecutive volumes are then
+    /// near-independent draws around a fixed level, and differencing that
+    /// gives a change autocorrelation near -0.5 at ANY coefficients. That is
+    /// why `volume_change_acf1` sits 13.7 seed-sd outside a real band of
+    /// -0.32 to -0.20 and is excluded from the calibration objective as
+    /// structurally unreachable: no parameter reaches a row whose defect is
+    /// the absence of a process.
+    ///
+    /// This supplies the process: a log-scale AR(1) multiplier, so a busy
+    /// day is followed by a busy day. It models the COMMON component only --
+    /// market-wide volume persistence shared by every name. Real volume
+    /// persistence is partly idiosyncratic too (a name in play stays in
+    /// play), and that part is NOT modelled here, because per-name state
+    /// would touch the column and checkpoint surface for a second-order
+    /// effect. Stated so the limitation is on the record rather than
+    /// discovered later.
+    ///
+    /// 0.0 with a zero innovation leaves the multiplier at exactly 1.0 and
+    /// the branch is skipped, so every preset before pt-v4 is bit-identical.
+    pub volume_persistence: f64,
+    /// Standard deviation of the daily log-volume innovation.
+    pub volume_innovation_sigma: f64,
+
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
     /// Trading days for half of a mispricing to decay. The ONE settable
     /// knob for the decay: overriding it recomputes `mispricing_phi` and
@@ -476,6 +503,8 @@ impl ModelParams {
             jump_sigma_market: 0.0,
             jump_intensity_idio: 0.0,
             jump_sigma_idio: 0.0,
+            volume_persistence: 0.0,
+            volume_innovation_sigma: 0.0,
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
@@ -611,6 +640,8 @@ impl ModelParams {
             "jump_sigma_market" => self.jump_sigma_market,
             "jump_intensity_idio" => self.jump_intensity_idio,
             "jump_sigma_idio" => self.jump_sigma_idio,
+            "volume_persistence" => self.volume_persistence,
+            "volume_innovation_sigma" => self.volume_innovation_sigma,
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
@@ -694,6 +725,8 @@ impl ModelParams {
             "jump_mean_market" => out.jump_mean_market = value,
             "jump_sigma_idio" => out.jump_sigma_idio = value,
             "jump_sigma_market" => out.jump_sigma_market = value,
+            "volume_innovation_sigma" => out.volume_innovation_sigma = value,
+            "volume_persistence" => out.volume_persistence = value,
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
             "momentum_theta" => out.momentum_theta = value,
@@ -845,6 +878,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "sector_factor_sigma",
         "universe_stress_decay",
         "universe_stress_weight",
+        "volume_innovation_sigma",
+        "volume_persistence",
         "volume_variance_gain",
     ]
 }

@@ -177,6 +177,13 @@ PERTURBATIONS = [
     ("jump_mean_market", -0.05, False),        # needs an occurrence
     ("jump_sigma_market", 0.05, False),        # needs an occurrence
     ("jump_sigma_idio", 0.05, False),          # needs an occurrence
+    # The persistent volume component (pt-v4). The innovation is live alone:
+    # even at zero persistence it injects a fresh multiplier each day, and
+    # that reaches volume on the next tick. Persistence is NOT, because at a
+    # zero innovation there is nothing to persist -- `0.9 * 0.0 + 0.0 * z`
+    # is 0.0 forever. Measured, after this table first claimed otherwise.
+    ("volume_persistence", 0.9, False),        # needs an innovation
+    ("volume_innovation_sigma", 0.3, True),
 ]
 
 

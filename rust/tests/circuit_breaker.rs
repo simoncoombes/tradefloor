@@ -104,6 +104,7 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
             // The mechanism ships inert; 0.0 is the value that
             // preserves the behaviour these tests pin.
             universe_stress: 0.0,
+            volume_state: 0.0,
             economy: &economy,
             market_status: MarketStatus::Open,
             intraday_t: 0.5,
@@ -230,6 +231,7 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
                     universe_stress: 0.0,
+                    volume_state: 0.0,
                     economy: &economy,
                     market_status: MarketStatus::Open,
                     intraday_t: t as f64 / 390.0,
@@ -270,6 +272,7 @@ fn the_band_holds_in_extended_hours_too() {
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
                     universe_stress: 0.0,
+                    volume_state: 0.0,
                     economy: &economy,
                     market_status: status,
                     intraday_t: 0.0,
@@ -320,6 +323,7 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
                     universe_stress: 0.0,
+                    volume_state: 0.0,
                     economy: &economy,
                     market_status: MarketStatus::Open,
                     intraday_t: t as f64 / 390.0,

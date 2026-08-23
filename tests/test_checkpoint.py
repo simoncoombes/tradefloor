@@ -216,7 +216,7 @@ def test_a_snapshot_covers_every_column():
     # pre-split format, and restore_state refuses it by design; nine is the
     # pre-jump format and still restores, keeping this engine's own
     # seed-derived jump position.
-    assert len(snapshot["rng"]) == 12
+    assert len(snapshot["rng"]) == 15
 
 
 def test_absence_survives_a_snapshot_round_trip():

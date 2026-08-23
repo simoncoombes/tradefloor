@@ -196,6 +196,14 @@ pub mod stream {
     /// `ECONOMY` and `EXTERNAL` are untouched, so every shipped preset
     /// reproduces bit for bit and the known-answer digest does not move.
     pub const JUMPS: u32 = 3;
+    /// The persistent volume component, drawn once per day at the close.
+    ///
+    /// Its own stream for the same reason [`JUMPS`] has one, and a SEPARATE
+    /// one from jumps so neither mechanism's draw count can shift the
+    /// other's sequence. Two mechanisms sharing a stream are coupled by
+    /// their draw counts, which is a dependency nobody would choose and
+    /// everybody would forget.
+    pub const VOLUME: u32 = 4;
 
     /// Derived streams live at `256 + id`. See the module docs for why the
     /// offset exists.

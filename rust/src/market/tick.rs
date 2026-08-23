@@ -311,6 +311,9 @@ pub struct TickInputs<'a> {
     /// before pt-v4 and under any preset with the memory disabled, which
     /// is what makes the correlation blend below reproduce exactly.
     pub universe_stress: f64,
+    /// Shared log-scale volume multiplier state, from the engine's daily
+    /// AR(1). 0.0 means a multiplier of exactly 1.0.
+    pub volume_state: f64,
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
@@ -373,6 +376,21 @@ pub struct TickOutcome {
 ///
 /// Clamped to [0.25, 4.0]: volume is a count, and a multiplier that reached
 /// zero would print an empty tape.
+/// The persistent volume multiplier, `exp(volume_state)`.
+///
+/// Returns exactly `1.0` at state 0.0 -- by BRANCH, not by evaluating
+/// `exp(0.0)`. The two agree in IEEE-754, but the branch says the intent
+/// out loud and owes nothing to an argument about a library function.
+fn persistent_volume_multiplier(inputs: &TickInputs) -> f64 {
+    if inputs.volume_state == 0.0 {
+        return 1.0;
+    }
+    // Clamped for the same reason the variance multiplier is: volume is a
+    // count, and an unbounded multiplier turns a plausible process into a
+    // number nobody can defend.
+    mathx::clamp(mathx::exp(inputs.volume_state), 0.25, 4.0)
+}
+
 fn variance_volume_multiplier(inputs: &TickInputs) -> f64 {
     let gain = inputs.params.volume_variance_gain;
     if gain == 0.0 {
@@ -675,6 +693,9 @@ pub fn simulate_market_tick(
     // exogenous to volume. At gain 0 this is exactly 1.0 and the product
     // below is bit-identical to the single-multiplier form.
     let volume_multiplier = volume_multiplier * variance_volume_multiplier(inputs);
+    // The persistent component: exactly 1.0 at state 0.0, so the product
+    // is bit-identical for every preset that does not set it.
+    let volume_multiplier = volume_multiplier * persistent_volume_multiplier(inputs);
     let mut volumes = vec![0.0; active_count];
     for i in 0..active_count {
         let idx = active_indices[i];
