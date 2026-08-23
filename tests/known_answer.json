@@ -5,5 +5,5 @@
   "kind": "pretium.known-answer",
   "note": "Cross-platform determinism gate. Every wheel target must produce this digest. A mismatch WITHOUT a katVersion bump means a platform disagreed. v9 regenerated at the pt-v3 era boundary: the default preset moved from pt-v1 to pt-v3, so every trajectory moved with it.",
   "seed": 20260820,
-  "sha256": "2803647e42ab710e27c6f94322b0cc6351ae4d618d2b15ace80839f53bfc5c30"
+  "sha256": "992ef95d98e075846f13d0a312231642b26c2030833b10bd8536e374bdc185e3"
 }

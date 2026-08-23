@@ -216,13 +216,13 @@ pub const PT_V3: ModelParams = ModelParams::pt_v3();
 /// certificate recorded.
 const PT_V3_BITS: &[(&str, u64)] = &[
     ("garch_alpha", 0x3FAE_77BA_B2AC_7C70u64),
-    ("garch_beta", 0x3FE5_C531_3DAD_6D68u64),
-    ("garch_gamma", 0x3FCB_D5BD_BB38_9ED4u64),
+    ("garch_beta", 0x3FE5_EE19_E4CB_5403u64),
+    ("garch_gamma", 0x3FC7_729E_312F_9BF6u64),
     ("idio_sigma_scale", 0x3FEA_1135_9352_B54Bu64),
-    ("market_vol_alpha", 0x3FDE_2948_3B36_360Au64),
-    ("market_vol_beta", 0x3FE0_CDE1_E131_8584u64),
-    ("market_vol_vix_coupling", 0x3FEE_3AC6_B051_60C9u64),
-    ("momentum_theta", 0x3FB7_7DF3_B645_A1CAu64),
+    ("market_vol_alpha", 0x3FDD_F05F_AB30_7BC3u64),
+    ("market_vol_beta", 0x3FE0_AE2D_0FC7_85DDu64),
+    ("market_vol_vix_coupling", 0x3FEE_8793_7D1E_2D96u64),
+    ("momentum_theta", 0x3FB2_FF2E_48E8_A71Cu64),
 ];
 
 const PT_V2_BITS: &[(&str, u64)] = &[
@@ -317,13 +317,13 @@ impl ModelParams {
     pub const fn pt_v3() -> ModelParams {
         let mut p = ModelParams::pt_v1();
         p.garch_alpha = 0.059507211981547736;
-        p.garch_beta = 0.6803213314664562;
-        p.garch_gamma = 0.21746036187800277;
+        p.garch_beta = 0.6853150814664563;
+        p.garch_gamma = 0.18318536187800277;
         p.idio_sigma_scale = 0.8146007420925029;
-        p.market_vol_alpha = 0.471269662689196;
-        p.market_vol_beta = 0.525132121878571;
-        p.market_vol_vix_coupling = 0.9446748202999738;
-        p.momentum_theta = 0.09176562499999999;
+        p.market_vol_alpha = 0.46779624669755665;
+        p.market_vol_beta = 0.5212617214385166;
+        p.market_vol_vix_coupling = 0.9540498202999739;
+        p.momentum_theta = 0.07420624999999997;
         p
     }
 
