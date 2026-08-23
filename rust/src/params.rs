@@ -261,6 +261,34 @@ pub struct ModelParams {
     /// At 1.0 it ignores VIX entirely and reverts to the autonomous baseline,
     /// leaving the fast component to carry the whole response.
     ///
+    /// # Measured, and the motivation above is REFUTED
+    ///
+    /// This was built on the reasoning that a VIX-coupled slow component
+    /// blunts the transient, so decoupling it should sharpen the response.
+    /// Swept at thirty seeds against eighteen configurations, damping makes
+    /// both the shock ratio AND the steady-state lever monotonically WORSE,
+    /// at every fast persistence and every weight:
+    ///
+    /// | damp | shock | lever |
+    /// |---|---|---|
+    /// | 0.0 | 1.228 | 4.446 |
+    /// | 0.5 | 1.208 | 4.116 |
+    /// | 1.0 | 1.194 | 3.821 |
+    ///
+    /// The reasoning was wrong in a nameable way: response SPEED is set by
+    /// the fast component's persistence, while the slow component's VIX
+    /// coupling contributes GAIN, not lag. Removing it removes gain.
+    ///
+    /// Kept, inert, because a measured negative is worth keeping and a
+    /// search may still find a use for it in a region this grid did not
+    /// cover. But nothing should set it above zero on the strength of the
+    /// argument that produced it.
+    ///
+    /// What DID restore the transient was the fast component's persistence:
+    /// 0.95 gives shock 1.228 and lever 4.446 where 0.97 gives 1.170 and
+    /// 3.944. pt-v3 raised it to 0.989 to buy clustering, and that single
+    /// choice is what cost the scenario response.
+    ///
     /// Neither lever is near real markets regardless: measured on the 40-name
     /// reference roster, real is x6.16 (17.2% annualised below VIX 12 against
     /// 106.1% above VIX 45) against roughly x3.1 here. "Restore pt-v1's
