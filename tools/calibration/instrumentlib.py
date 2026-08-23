@@ -136,6 +136,17 @@ PARAM_SPECS: dict[str, dict] = {
     "market_vol_beta":          {"kind": "abs", "step_unit": 0.1},
     "market_vol_vix_coupling":  {"kind": "abs", "step_unit": 0.1,
                                  "hard_range": (0.0, 1.0)},
+    # The slow variance component (pt-v4). All three ship at 0.0, so the
+    # multiplicative [1/4x, 4x] box collapses on them and the hard range is
+    # what a search actually gets -- see `calibration_box`.
+    "market_vol_slow_persistence": {"kind": "abs", "step_unit": 0.1,
+                                    "hard_range": (0.0, 0.999)},
+    "market_vol_slow_gain":     {"kind": "abs", "step_unit": 0.05,
+                                 "hard_range": (0.0, 0.5)},
+    "market_vol_slow_weight":   {"kind": "abs", "step_unit": 0.1,
+                                 "hard_range": (0.0, 2.0)},
+    "volume_variance_gain":     {"kind": "abs", "step_unit": 0.1,
+                                 "hard_range": (0.0, 8.0)},
     "informed_flow_fraction":   {"kind": "abs", "step_unit": 0.1,
                                  "hard_range": (0.0, 1.0)},
     "news_market_weight":       {"kind": "abs", "step_unit": 0.1,
