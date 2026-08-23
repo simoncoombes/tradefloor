@@ -269,11 +269,20 @@ impl Engine {
     /// the behaviour of every preset before pt-v4.
     fn update_universe_stress(&mut self) {
         let threshold = crate::economy::CRISIS_VIX_THRESHOLD;
-        let instant = if self.economy.vix > threshold {
+        let from_vix = if self.economy.vix > threshold {
             self.economy.vix - threshold
         } else {
             0.0
         };
+        // THE CYCLE, WHICH THE MARKET HAS NEVER READ. The engine runs a
+        // five-phase business cycle and `cycle_phase` appears nowhere in
+        // src/market/: the central bank changes its entire policy by
+        // phase while the price process behaves as though the economy
+        // were always expanding. A contraction now reaches the market the
+        // same way a VIX spike does, and is remembered the same way.
+        let from_regime = self.params.regime_stress_points
+            * self.economy.cycle_phase.stress_intensity();
+        let instant = crate::mathx::max(from_vix, from_regime);
         let remembered = self.params.universe_stress_decay * self.universe_stress;
         self.universe_stress = crate::mathx::max(instant, remembered);
     }

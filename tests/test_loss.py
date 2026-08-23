@@ -149,22 +149,20 @@ def test_band_distance_agrees_with_the_verdict_wording_on_every_band():
 
 
 def test_the_loss_covers_nine_statistics_and_reports_ten():
-    # Six live targets: lag-5 clustering joined when the instrument found
-    # the corner with in-band lag-1 clustering and zero memory behind it,
-    # and lag-20 clustering was PROMOTED from CONSTRAINTS at the pt-v4 era
-    # because sitting in band turned out not to be enough -- a band whose
-    # floor is -0.04 could not tell +0.020 (real markets) from +0.009,
-    # which is a decay curve twice as steep and no clustering left by lag
-    # sixty.
+    # Five live targets: lag-5 clustering joined when the instrument found
+    # the corner with in-band lag-1 clustering and zero memory behind it.
     assert set(LIVE_TARGETS) == {
         "annualised_vol_pct", "return_acf1", "abs_return_acf1",
-        "abs_return_acf5", "cross_sectional_corr", "abs_return_acf20",
+        "abs_return_acf5", "cross_sectional_corr",
     }
-    # Three constraints: leverage joined when the re-derived band showed
-    # the GJR-backed model inside it. Each is in band AND has nothing
-    # structural pulling it out, which is this tuple's definition.
+    # Four constraints: leverage joined when the re-derived band showed the
+    # GJR-backed model inside it, and lag-20 clustering is here -- briefly
+    # promoted to a live target and reverted, because real markets' own
+    # dispersion in it is six times the model's defect and no panel
+    # statistic can carry that. See the note in loss.py.
     assert set(CONSTRAINTS) == {
-        "excess_kurtosis", "volume_abs_return_corr", "leverage_effect",
+        "excess_kurtosis", "volume_abs_return_corr",
+        "leverage_effect", "abs_return_acf20",
     }
     # The structurally unreachable remainder, derived as the complement of
     # the membership tuples so nothing else needs editing when one is

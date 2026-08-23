@@ -83,6 +83,32 @@ pub enum CyclePhase {
 }
 
 impl CyclePhase {
+    /// How much stress this phase carries, on 0 (calm) to 1 (worst).
+    ///
+    /// The business cycle already runs in this engine and the MARKET has
+    /// never read it: `cycle_phase` appears nowhere in `src/market/`. The
+    /// central bank reads it -- recession cuts, contraction policy, a
+    /// different Taylor coefficient per phase -- while the price process
+    /// carries on as though the economy were always expanding.
+    ///
+    /// So every market parameter is static beside a regime chain that is
+    /// already switching, already deterministic, and already drawn on its
+    /// own stream. This is the number that lets the market listen.
+    ///
+    /// The profile is the cycle's own shape rather than a fit: expansion
+    /// is calm, the peak is where risk builds unnoticed, contraction is
+    /// the worst of it, the trough is bad but improving, and recovery
+    /// still carries scar tissue.
+    pub fn stress_intensity(self) -> f64 {
+        match self {
+            CyclePhase::Expansion => 0.0,
+            CyclePhase::Peak => 0.25,
+            CyclePhase::Contraction => 1.0,
+            CyclePhase::Trough => 0.75,
+            CyclePhase::Recovery => 0.25,
+        }
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             CyclePhase::Expansion => "expansion",
@@ -453,4 +479,29 @@ pub enum ShockKind {
     Pandemic,
     War,
     Other,
+}
+
+#[cfg(test)]
+mod regime_intensity_tests {
+    use super::*;
+
+    #[test]
+    fn the_cycle_orders_its_stress_the_way_the_cycle_runs() {
+        // Not a fit -- the cycle's own shape. Expansion is calm, the peak
+        // is where risk builds unnoticed, contraction is the worst of it,
+        // the trough is bad but improving, recovery carries scar tissue.
+        assert_eq!(CyclePhase::Expansion.stress_intensity(), 0.0);
+        assert!(CyclePhase::Contraction.stress_intensity()
+                > CyclePhase::Trough.stress_intensity());
+        assert!(CyclePhase::Trough.stress_intensity()
+                > CyclePhase::Recovery.stress_intensity());
+        assert!(CyclePhase::Recovery.stress_intensity()
+                >= CyclePhase::Expansion.stress_intensity());
+        for p in [CyclePhase::Expansion, CyclePhase::Peak,
+                  CyclePhase::Contraction, CyclePhase::Trough,
+                  CyclePhase::Recovery] {
+            let v = p.stress_intensity();
+            assert!((0.0..=1.0).contains(&v), "{} out of range", p.as_str());
+        }
+    }
 }
