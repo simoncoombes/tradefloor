@@ -182,6 +182,20 @@ pub mod stream {
     /// `draw_normal`: seed-derived and reproducible, but incapable of
     /// perturbing the market.
     pub const EXTERNAL: u32 = 2;
+    /// Endogenous jumps, drawn once per name per day at the close.
+    ///
+    /// Its own stream, and that is the whole reason a draw-CONSUMING
+    /// mechanism could be added at all. The draw-schedule rule says nothing
+    /// settable may change how many draws are taken or in what order, so a
+    /// jump process sharing [`MARKET`] would shift every subsequent market
+    /// draw and change every preset's trajectory the moment the code
+    /// landed — inert parameters or not.
+    ///
+    /// On a stream of its own, the jump draws happen unconditionally and
+    /// perturb nothing: at zero intensity no jump fires, and `MARKET`,
+    /// `ECONOMY` and `EXTERNAL` are untouched, so every shipped preset
+    /// reproduces bit for bit and the known-answer digest does not move.
+    pub const JUMPS: u32 = 3;
 
     /// Derived streams live at `256 + id`. See the module docs for why the
     /// offset exists.

@@ -91,6 +91,11 @@ pub struct EngineRngState {
     pub market: RngState,
     pub economy: RngState,
     pub external: RngState,
+    /// The jump stream. Carried here for the reason this type's own
+    /// documentation gives: a stream left out of a checkpoint restores to a
+    /// DIFFERENT sequence while looking correct. That is harmless while
+    /// jumps are inert and silently wrong the day they are not.
+    pub jumps: RngState,
 }
 
 /// Cumulative draws per stream. Diagnostic, per D-R1: the single most
@@ -171,6 +176,7 @@ pub struct Engine {
     market_rng: GameRng,
     economy_rng: GameRng,
     external_rng: GameRng,
+    jump_rng: GameRng,
     companies: Vec<TickCompany>,
     economy: EconomyState,
     central_bank: CentralBankState,
@@ -330,6 +336,7 @@ impl Engine {
             market_rng: GameRng::substream(seed, stream::MARKET),
             economy_rng: GameRng::substream(seed, stream::ECONOMY),
             external_rng: GameRng::substream(seed, stream::EXTERNAL),
+            jump_rng: GameRng::substream(seed, stream::JUMPS),
             companies,
             economy,
             central_bank,
@@ -394,6 +401,7 @@ impl Engine {
             market: self.market_rng.snapshot(),
             economy: self.economy_rng.snapshot(),
             external: self.external_rng.snapshot(),
+            jumps: self.jump_rng.snapshot(),
         }
     }
 
@@ -408,6 +416,7 @@ impl Engine {
         self.market_rng = GameRng::restore(state.market);
         self.economy_rng = GameRng::restore(state.economy);
         self.external_rng = GameRng::restore(state.external);
+        self.jump_rng = GameRng::restore(state.jumps);
     }
 
     /// Cumulative draws across all three streams. The per-stream split is
@@ -756,6 +765,70 @@ impl Engine {
         // yet, exactly as the per-name updates see the day they closed.
         self.market_vol.close_day_with(&self.params, self.economy.vix);
         self.update_universe_stress();
+        self.apply_jumps();
+    }
+
+    /// Endogenous jumps, applied once per name at the day close.
+    ///
+    /// The model has no discontinuities without this. Prices diffuse; real
+    /// markets gap, and nothing here ever surprised the market unless a
+    /// caller injected news by hand. That is why excess kurtosis reads 5.2
+    /// over 504-day windows against real markets' 7.1 to 22 -- fat tails at
+    /// that scale are not reachable from a diffusion plus GARCH at any
+    /// coefficients, so this is a mechanism gap and not a calibration one.
+    ///
+    /// # Where the jump lands, and why not on the price
+    ///
+    /// A jump moves `mispricing_s`, the same channel news already uses,
+    /// rather than the price directly. That makes it a gap AWAY from fair
+    /// value which then mean-reverts on the existing process -- which is
+    /// what a news or panic jump does -- and it reuses a tested path
+    /// instead of opening a second way for something to move a price.
+    /// The existing cap applies, so a jump cannot dislocate a name further
+    /// than the model's own guard allows.
+    ///
+    /// # Draw discipline
+    ///
+    /// Two draws for the market, then two per company, ALWAYS -- never
+    /// conditionally. A schedule that depended on whether a jump fired
+    /// would make the stream position a function of the parameters, and
+    /// every preset would stop being comparable under common random
+    /// numbers. The uniform decides occurrence, the normal decides size,
+    /// and at zero intensity `u < 0.0` is false for every `u` in [0, 1),
+    /// so nothing fires.
+    ///
+    /// These draws come from [`stream::JUMPS`], which no earlier preset
+    /// touched. That is what lets a draw-CONSUMING mechanism ship inert:
+    /// the market, economy and external streams are untouched, so every
+    /// shipped preset reproduces bit for bit.
+    fn apply_jumps(&mut self) {
+        let p = &self.params;
+        let u_market = self.jump_rng.next_f64();
+        let z_market = self.jump_rng.next_normal();
+        let market = if u_market < p.jump_intensity_market {
+            p.jump_mean_market + p.jump_sigma_market * z_market
+        } else {
+            0.0
+        };
+        for company in self.companies.iter_mut() {
+            let u = self.jump_rng.next_f64();
+            let z = self.jump_rng.next_normal();
+            let idio = if u < p.jump_intensity_idio {
+                p.jump_sigma_idio * z
+            } else {
+                0.0
+            };
+            let total = market + idio;
+            // Guarded rather than added: `s + 0.0` is not a no-op on a
+            // negative zero, and a mechanism that ships inert must leave
+            // the state it does not touch bit-identical.
+            if total != 0.0 {
+                if let Some(s) = company.stock.mispricing_s {
+                    company.stock.mispricing_s =
+                        Some(crate::market::tick::clamp_s(&self.params, s + total));
+                }
+            }
+        }
     }
 
     /// The daily macro step: economy, cycle roll, then the central bank.

@@ -1684,14 +1684,16 @@ impl PyEngine {
         }
         out.set_item("columns", columns)?;
         let rng = self.inner.rng_state();
-        // Three streams, three numbers each — (state, increment, spare) for
-        // market, economy, external, in that order. The u64s ride as f64 bit
+        // Four streams, three numbers each — (state, increment, spare) for
+        // market, economy, external, jumps, in that order. A snapshot written
+        // before the jump stream existed carries nine, and restore detects
+        // that by length rather than by a version field. The u64s ride as f64 bit
         // patterns: a u64 does not survive a Python float, and this has to
         // round-trip exactly rather than closely. Nine numbers rather than a
         // nested structure so a pre-split snapshot (three numbers) is
         // unmistakable at a glance and on restore.
-        let mut rng_out = Vec::with_capacity(9);
-        for s in [rng.market, rng.economy, rng.external] {
+        let mut rng_out = Vec::with_capacity(12);
+        for s in [rng.market, rng.economy, rng.external, rng.jumps] {
             rng_out.push(f64::from_bits(s.state));
             rng_out.push(f64::from_bits(s.increment));
             rng_out.push(s.spare.unwrap_or(f64::NAN));
@@ -1870,10 +1872,14 @@ impl PyEngine {
                  version that wrote it, or re-simulate from the seed.",
             ));
         }
-        if rng.len() != 9 {
+        // Nine is a snapshot from before the jump stream; twelve carries it.
+        // Both restore, and the nine-number case keeps this engine's own
+        // seed-derived jump position -- see the `jumps` binding below.
+        if rng.len() != 9 && rng.len() != 12 {
             return Err(ValidationError::new_err(format!(
-                "rng must be 9 numbers, (state, increment, spare) for the \
-                 market, economy and external streams, got {}",
+                "rng must be 9 numbers (market, economy, external) or 12 \
+                 (those three plus jumps), as (state, increment, spare) \
+                 triples, got {}",
                 rng.len()
             )));
         }
@@ -1886,10 +1892,21 @@ impl PyEngine {
                 Some(rng[at + 2])
             },
         };
+        // A nine-number snapshot predates the jump stream. Its jump position
+        // is whatever this engine derived from its seed, and keeping that is
+        // the only choice that leaves such a snapshot restoring exactly as it
+        // did before jumps existed -- the alternative, a zeroed generator,
+        // would be a different sequence wearing the same seed.
+        let jumps = if rng.len() >= 12 {
+            stream(9)
+        } else {
+            self.inner.rng_state().jumps
+        };
         self.inner.set_rng_state(crate::engine::EngineRngState {
             market: stream(0),
             economy: stream(3),
             external: stream(6),
+            jumps,
         });
 
         // The per-day accumulators. Absent from a snapshot written before

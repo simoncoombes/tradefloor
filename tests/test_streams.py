@@ -160,7 +160,7 @@ def test_the_per_stream_counts_sum_to_the_total():
     assert by_stream["external"] == 1
 
 
-def test_a_snapshot_carries_all_three_streams():
+def test_a_snapshot_carries_all_four_streams():
     # An odd number of normals per stream, so each has a Box-Muller spare in
     # flight -- the piece of position a lazy snapshot drops first.
     e = pretium.Engine(seed=3, universe=UNIVERSE)
@@ -169,7 +169,12 @@ def test_a_snapshot_carries_all_three_streams():
     e.run_session(9, 30, 3, 17)
     e.close_market()
     snapshot = e.state_snapshot()
-    assert len(snapshot["rng"]) == 9
+    # Four streams now, three numbers each. The jump stream joined when
+    # endogenous jumps landed: it is drawn every day whether or not a jump
+    # fires, so a snapshot that omitted it would restore to a different jump
+    # sequence while looking correct -- harmless while jumps are inert, and
+    # silently wrong the day they are not.
+    assert len(snapshot["rng"]) == 12
 
     restored = pretium.Engine(seed=3, universe=UNIVERSE)
     restored.restore_state(snapshot)

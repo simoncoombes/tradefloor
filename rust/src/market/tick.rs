@@ -775,7 +775,7 @@ pub fn simulate_market_tick(
     }
 }
 
-fn clamp_s(params: &ModelParams, s: f64) -> f64 {
+pub fn clamp_s(params: &ModelParams, s: f64) -> f64 {
     // `Math.max(-CAP, Math.min(CAP, s))` — the min/max spelling, not the
     // ternary, matching the source.
     mathx::max(-params.mispricing_cap, mathx::min(params.mispricing_cap, s))

@@ -165,6 +165,18 @@ PERTURBATIONS = [
     # weight in every shipped preset, so there is no slow target to decouple,
     # and a 3-day probe at a flat default VIX has no spike to track anyway.
     ("market_vol_slow_vix_damp", 0.5, False),  # needs slow weight AND a VIX move
+    # Endogenous jumps (pt-v4). Every row here is inert ALONE, and each waits
+    # on a different partner, which is why they are listed separately rather
+    # than as one mechanism. An intensity of 1.0 fires a jump on every day and
+    # still moves nothing, because the size is zero -- occurrence without
+    # magnitude is not an event. A size or a mean moves nothing either,
+    # because nothing occurs. The pair is shown live by
+    # `test_jumps_move_prices_when_intensity_is_on`.
+    ("jump_intensity_market", 1.0, False),     # fires, but at size zero
+    ("jump_intensity_idio", 1.0, False),       # fires, but at size zero
+    ("jump_mean_market", -0.05, False),        # needs an occurrence
+    ("jump_sigma_market", 0.05, False),        # needs an occurrence
+    ("jump_sigma_idio", 0.05, False),          # needs an occurrence
 ]
 
 
@@ -253,6 +265,69 @@ def test_universe_memory_acts_above_the_crisis_threshold():
         "universe memory changed nothing across a VIX spike and decay; "
         "the state is not reaching the correlation blend"
     )
+
+
+def test_jumps_move_prices_when_intensity_is_on():
+    """The model has no discontinuities without this.
+
+    Prices diffuse; real markets gap. Nothing here ever surprised the market
+    unless a caller injected news by hand, which is why excess kurtosis reads
+    5.2 over 504-day windows against real markets' 7.1 to 22.
+
+    Asserted three ways, because "the prices differ" alone would pass on a
+    mechanism that merely perturbed the stream: the jump must move prices,
+    a market-wide jump must move EVERY name (it is common), and a negative
+    mean must push the cross-section DOWN rather than merely around.
+    """
+    def run(model=None, days=6):
+        kwargs = {} if model is None else {"model": model}
+        engine = pretium.Engine(seed=42, universe=UNIVERSE, **kwargs)
+        for _ in range(days):
+            engine.open_market()
+            engine.run_session(9, 30, 3, 40)
+            engine.close_market()
+        return struct.unpack("<%dd" % len(engine.tickers), engine.column("price"))
+
+    quiet = run(pretium.ModelParams.from_preset("pt-v3"))
+    crashing = run(pretium.ModelParams.from_preset(
+        "pt-v3", jump_intensity_market=1.0, jump_mean_market=-0.06,
+        jump_sigma_market=0.01))
+
+    moved = [i for i in range(len(quiet)) if quiet[i] != crashing[i]]
+    assert len(moved) == len(quiet), (
+        f"a market-wide jump moved {len(moved)} of {len(quiet)} names; it is "
+        "common, so it must reach all of them"
+    )
+    # A negative mean must move the cross-section down on balance, not just
+    # scatter it. Median rather than mean, so one name cannot carry it.
+    down = sum(1 for i in range(len(quiet)) if crashing[i] < quiet[i])
+    assert down > len(quiet) // 2, (
+        f"only {down} of {len(quiet)} names fell under a jump with mean "
+        "-0.06; the sign is not reaching the price"
+    )
+
+
+def test_jumps_are_inert_at_the_shipped_intensity():
+    """Zero intensity must be bit-identical, not merely close.
+
+    The jump draws happen EVERY day whether or not a jump fires -- a
+    conditional schedule would make the stream position depend on the
+    parameters. They land on their own RNG stream, so the market, economy and
+    external streams are untouched and every shipped preset reproduces
+    exactly. This is the assertion that guards that claim.
+    """
+    def prices(model):
+        engine = pretium.Engine(seed=7, universe=UNIVERSE, model=model)
+        engine.open_market()
+        engine.run_session(9, 30, 3, 40)
+        engine.close_market()
+        return struct.unpack("<%dd" % len(engine.tickers), engine.column("price"))
+
+    shipped = prices(pretium.ModelParams.from_preset("pt-v3"))
+    explicit_zero = prices(pretium.ModelParams.from_preset(
+        "pt-v3", jump_intensity_market=0.0, jump_intensity_idio=0.0,
+        jump_sigma_market=0.0, jump_sigma_idio=0.0, jump_mean_market=0.0))
+    assert shipped == explicit_zero
 
 
 def test_peer_transfer_moves_a_name_the_news_never_named():

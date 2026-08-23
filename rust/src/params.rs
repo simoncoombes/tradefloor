@@ -295,6 +295,34 @@ pub struct ModelParams {
     /// lever" was never the right target.
     pub market_vol_slow_vix_damp: f64,
 
+    // ── Endogenous jumps (engine.rs, applied at the day close) ──────────
+    /// Daily probability that a MARKET-WIDE jump fires.
+    ///
+    /// The model has no discontinuities without this. Prices diffuse; real
+    /// markets gap. Nothing surprises this market unless a caller injects
+    /// news by hand, and that is why excess kurtosis reads 5.2 over 504-day
+    /// windows against real markets' 7.1 to 22 — fat tails at that scale are
+    /// not reachable from a diffusion plus GARCH at any coefficients.
+    ///
+    /// Jumps are drawn from their OWN RNG stream ([`crate::rng::stream::JUMPS`]),
+    /// which is what lets a draw-consuming mechanism ship inert: at intensity
+    /// 0 the draws still happen, but they happen on a stream no earlier preset
+    /// ever touched, so the market, economy and external streams are
+    /// bit-identical and every shipped preset reproduces exactly.
+    pub jump_intensity_market: f64,
+    /// Mean of the market jump in log-return units. NEGATIVE by intent:
+    /// real crash jumps are asymmetric, and a symmetric jump process
+    /// produces fat tails with the wrong skew — which would read as
+    /// "kurtosis fixed" on the panel while getting crises backwards.
+    pub jump_mean_market: f64,
+    /// Standard deviation of the market jump, in log-return units.
+    pub jump_sigma_market: f64,
+    /// Daily probability that a per-name idiosyncratic jump fires — the
+    /// earnings-surprise channel, independent across names.
+    pub jump_intensity_idio: f64,
+    /// Standard deviation of the idiosyncratic jump, in log-return units.
+    pub jump_sigma_idio: f64,
+
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
     /// Trading days for half of a mispricing to decay. The ONE settable
     /// knob for the decay: overriding it recomputes `mispricing_phi` and
@@ -443,6 +471,11 @@ impl ModelParams {
             universe_stress_weight: 0.0,
             regime_stress_points: 0.0,
             market_vol_slow_vix_damp: 0.0,
+            jump_intensity_market: 0.0,
+            jump_mean_market: 0.0,
+            jump_sigma_market: 0.0,
+            jump_intensity_idio: 0.0,
+            jump_sigma_idio: 0.0,
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
@@ -573,6 +606,11 @@ impl ModelParams {
             "universe_stress_weight" => self.universe_stress_weight,
             "regime_stress_points" => self.regime_stress_points,
             "market_vol_slow_vix_damp" => self.market_vol_slow_vix_damp,
+            "jump_intensity_market" => self.jump_intensity_market,
+            "jump_mean_market" => self.jump_mean_market,
+            "jump_sigma_market" => self.jump_sigma_market,
+            "jump_intensity_idio" => self.jump_intensity_idio,
+            "jump_sigma_idio" => self.jump_sigma_idio,
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
@@ -651,6 +689,11 @@ impl ModelParams {
             "universe_stress_weight" => out.universe_stress_weight = value,
             "regime_stress_points" => out.regime_stress_points = value,
             "market_vol_slow_vix_damp" => out.market_vol_slow_vix_damp = value,
+            "jump_intensity_idio" => out.jump_intensity_idio = value,
+            "jump_intensity_market" => out.jump_intensity_market = value,
+            "jump_mean_market" => out.jump_mean_market = value,
+            "jump_sigma_idio" => out.jump_sigma_idio = value,
+            "jump_sigma_market" => out.jump_sigma_market = value,
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
             "momentum_theta" => out.momentum_theta = value,
@@ -772,6 +815,11 @@ pub fn settable_names() -> Vec<&'static str> {
         "garch_omega",
         "idio_sigma_scale",
         "informed_flow_fraction",
+        "jump_intensity_idio",
+        "jump_intensity_market",
+        "jump_mean_market",
+        "jump_sigma_idio",
+        "jump_sigma_market",
         "market_factor_sigma",
         "market_vol_alpha",
         "market_vol_beta",

@@ -211,10 +211,12 @@ def test_a_snapshot_covers_every_column():
                   "maker_inventory", "garch_variance", "beta",
                   "short_interest", "float_shares"):
         assert field in snapshot["columns"], field
-    # (state, increment, spare) for each of the market, economy and external
-    # streams, in that order. Three numbers -- one stream -- is the pre-split
-    # format, and restore_state refuses it by design.
-    assert len(snapshot["rng"]) == 9
+    # (state, increment, spare) for each of the market, economy, external and
+    # jump streams, in that order. Three numbers -- one stream -- is the
+    # pre-split format, and restore_state refuses it by design; nine is the
+    # pre-jump format and still restores, keeping this engine's own
+    # seed-derived jump position.
+    assert len(snapshot["rng"]) == 12
 
 
 def test_absence_survives_a_snapshot_round_trip():
