@@ -25,7 +25,7 @@ The scorecard now carries the strategy's identity next to the seed and the
 universe fingerprint, so a methods section becomes:
 
 > Evaluated over 12 seeds against universe `a7861d15...`, model preset
-> `pt-v1`, strategy spec `e6bbc35c...`, capture ratio quoted against oracle
+> `pt-v3`, strategy spec `e6bbc35c...`, capture ratio quoted against oracle
 > spec `f383b990...`.
 
 Every one of those is checkable by someone who has the package and nothing

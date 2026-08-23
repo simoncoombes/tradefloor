@@ -289,8 +289,9 @@ and credit scenarios — which move fair value directionally — with
 ## How the measured effects below were produced
 
 Every "in this model" figure on this page was measured on engine commit
-`9b485a0`, pretium 0.1.0, under the default model preset `pt-v1` — worth
-naming now that the build ships a second one — and every one of them is an
+`9b485a0`, pretium 0.1.0, under model preset `pt-v1`, which was the default
+at the time and is not any more — the shipped default is now `pt-v3`, so
+these figures describe an earlier era — and every one of them is an
 inventory row in the re-measurement harness under the group `recipes`:
 
 ```

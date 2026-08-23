@@ -180,9 +180,9 @@ reproduced a different market would manufacture false confidence, which is
 worse than no manifest at all. See
 [Sharing a run](https://simoncoombes.github.io/pretium/sharing-a-run.html).
 
-**A changed model has a different name.** The model's coefficients ship as the
-named preset `pt-v1` and are settable at runtime, and the fingerprint is the
-honesty mechanism:
+**A changed model has a different name.** The model's coefficients ship as a
+named preset — `pt-v3` is the current default — and are settable at runtime,
+with the fingerprint as the honesty mechanism:
 
 ```python
 custom = pt.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
@@ -283,25 +283,29 @@ is +0.249 at lag one - median of six seeds at the published method,
 equities sit near zero. That's the mispricing process showing through, and an
 agent trading it has an edge that won't transfer.
 
-**In-band realism is partly the tuning meeting its target.**
-`pt.facts.measure()` reports eight statistics against real ranges - two
-marginal properties of a single series, six measures of dependence. At the
-published method above, the dependence rows now sit inside the real bands:
-cross-sectional correlation +0.257 (real +0.25 to +0.35), volatility
-clustering +0.242 (+0.15 to +0.35), volume against |return| +0.585 (+0.30 to
-+0.60), excess kurtosis +3.1 (+3 to +10), and a leverage effect that holds its
-sign in six seeds of six at -0.085, just short of its -0.30 to -0.10 band. But
-four of the eight were calibration targets this era - the sweeps that chose
-the constants scored candidates on that same method - so an in-band verdict is
-partly the tuning meeting its target rather than an independent test. Held out
-from the calibration the margins thin: fresh sim seeds read correlation +0.225
-against a +0.25 band floor, and fresh 60-name universes hold correlation but
-halve the leverage effect. The honest headline is *in band at the published
-method, at the band edge everywhere else* - a conclusion that needs a
-dependence statistic deep inside its band should re-measure on its own
-universe and seeds.
+**Realism is a stated envelope, not a score.** `pt.facts.measure()` reports
+ten statistics against real-market bands. At a 252-day horizon the shipped
+`pt-v3` preset puts **nine of the ten in band**, and - this is the part worth
+trusting - it holds the same nine at the same zero band-distance on axes the
+calibration never saw: fresh seeds, and a fresh 60-name universe. Five of the
+ten were live calibration targets, so an in-band verdict on those is partly
+the tuning meeting its target; the held-out axes are what make it more than
+that.
+
+The tenth, the autocorrelation of volume changes, fails structurally at
+13.7 seed-standard-deviations and is excluded from the calibration objective
+deliberately, because an optimiser pointed at an unreachable target does not
+fail cleanly - it distorts every other parameter chasing it.
+
+Four further gaps are measured and named rather than assumed: the certified
+horizon is 252 days and the model does not hold beyond it, its volatility
+memory decays exponentially where real markets' decays hyperbolically, its
+tails are too thin over multi-year windows, and scenario response is
+directionally right but not calibrated in magnitude.
+[The realism envelope](https://simoncoombes.github.io/pretium/realism-envelope.html)
+states each gap and what it forbids;
 [How realistic is this market](https://simoncoombes.github.io/pretium/how-realistic-is-this-market.html)
-carries every number, its seed range, and the held-out checks.
+is the narrative of what closing each earlier gap took.
 
 **Scale and memory still fail.** Annualised volatility runs 41.5% against a
 real 15-35% - a property of the deliberately dispersed generated universes, so

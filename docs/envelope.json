@@ -1,0 +1,555 @@
+{
+ "preset": "pt-v3",
+ "certified_horizon_days": 252,
+ "provenance": {
+  "kat_sha256_at_measurement": "992ef95d98e075846f13d0a312231642b26c2030833b10bd8536e374bdc185e3",
+  "runs": [
+   {
+    "name": "envelope",
+    "produced": [
+     "certified",
+     "holdout seeds (1-6)",
+     "holdout universe (60 names)",
+     "horizon_504"
+    ]
+   },
+   {
+    "name": "decay252",
+    "produced": [
+     "decay"
+    ]
+   }
+  ],
+  "note": "Two runs, not one: the first hung at its 1260-day stage (an OOM kill) after persisting everything through 504 days, and the decay curve was re-measured separately. Both built from the same source tarball and report the KAT digest above."
+ },
+ "certified": {
+  "axis": "252d/30 seeds/40 names",
+  "statistics": {
+   "annualised_vol_pct": {
+    "measured": 24.097214072272823,
+    "band": [
+     15.0,
+     36.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "excess_kurtosis": {
+    "measured": 2.530521316735698,
+    "band": [
+     1.6,
+     41.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "return_acf1": {
+    "measured": 0.03745060296347685,
+    "band": [
+     -0.08,
+     0.06
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf1": {
+    "measured": 0.14127142910145438,
+    "band": [
+     0.02,
+     0.22
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf5": {
+    "measured": 0.04962379448651105,
+    "band": [
+     0.02,
+     0.09
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf20": {
+    "measured": 0.008165975509233512,
+    "band": [
+     -0.04,
+     0.08
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "cross_sectional_corr": {
+    "measured": 0.25580280330473915,
+    "band": [
+     0.08,
+     0.56
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "volume_abs_return_corr": {
+    "measured": 0.5339084256109392,
+    "band": [
+     0.46,
+     0.66
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "leverage_effect": {
+    "measured": -0.034862857561783395,
+    "band": [
+     -0.16,
+     0.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "volume_change_acf1": {
+    "measured": -0.4598243679770862,
+    "band": [
+     -0.32,
+     -0.2
+    ],
+    "verdict": "OUT",
+    "distance": 0.1398243679770862,
+    "sd_out": 13.662595438493488,
+    "role": "structural"
+   }
+  },
+  "loss": 0.0
+ },
+ "holdout_seeds": {
+  "statistics": {
+   "annualised_vol_pct": {
+    "measured": 23.851589633399684,
+    "band": [
+     15.0,
+     36.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "excess_kurtosis": {
+    "measured": 2.0418087355069012,
+    "band": [
+     1.6,
+     41.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "return_acf1": {
+    "measured": 0.048467658083115144,
+    "band": [
+     -0.08,
+     0.06
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf1": {
+    "measured": 0.13988905798173545,
+    "band": [
+     0.02,
+     0.22
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf5": {
+    "measured": 0.047159466145195825,
+    "band": [
+     0.02,
+     0.09
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf20": {
+    "measured": -0.014347141432983776,
+    "band": [
+     -0.04,
+     0.08
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "cross_sectional_corr": {
+    "measured": 0.25154795237617544,
+    "band": [
+     0.08,
+     0.56
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "volume_abs_return_corr": {
+    "measured": 0.5549501156309857,
+    "band": [
+     0.46,
+     0.66
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "leverage_effect": {
+    "measured": -0.04926514865410652,
+    "band": [
+     -0.16,
+     0.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "volume_change_acf1": {
+    "measured": -0.45125403298480915,
+    "band": [
+     -0.32,
+     -0.2
+    ],
+    "verdict": "OUT",
+    "distance": 0.13125403298480914,
+    "sd_out": 12.825166158705617,
+    "role": "structural"
+   }
+  },
+  "loss": 0.0
+ },
+ "holdout_universe": {
+  "statistics": {
+   "annualised_vol_pct": {
+    "measured": 26.8175320023024,
+    "band": [
+     15.0,
+     36.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "excess_kurtosis": {
+    "measured": 4.024973270960204,
+    "band": [
+     1.6,
+     41.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "return_acf1": {
+    "measured": 0.05075586289566497,
+    "band": [
+     -0.08,
+     0.06
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf1": {
+    "measured": 0.1547851459017016,
+    "band": [
+     0.02,
+     0.22
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf5": {
+    "measured": 0.07872294537720659,
+    "band": [
+     0.02,
+     0.09
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf20": {
+    "measured": -0.010661280579880741,
+    "band": [
+     -0.04,
+     0.08
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "cross_sectional_corr": {
+    "measured": 0.2812801060767207,
+    "band": [
+     0.08,
+     0.56
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "volume_abs_return_corr": {
+    "measured": 0.5581842974020218,
+    "band": [
+     0.46,
+     0.66
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "leverage_effect": {
+    "measured": -0.04767259664111235,
+    "band": [
+     -0.16,
+     0.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "volume_change_acf1": {
+    "measured": -0.4602397201439649,
+    "band": [
+     -0.32,
+     -0.2
+    ],
+    "verdict": "OUT",
+    "distance": 0.1402397201439649,
+    "sd_out": 13.703180557544378,
+    "role": "structural"
+   }
+  },
+  "loss": 0.0
+ },
+ "horizon_504": {
+  "statistics": {
+   "annualised_vol_pct": {
+    "measured": 29.289300720522625,
+    "band": [
+     16,
+     34
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "excess_kurtosis": {
+    "measured": 5.227444947706776,
+    "band": [
+     7.1000000000000005,
+     22
+    ],
+    "verdict": "OUT",
+    "distance": 1.8725550522932242,
+    "sd_out": 1.5980022804833753,
+    "role": "constraint"
+   },
+   "return_acf1": {
+    "measured": 0.05706444563840943,
+    "band": [
+     -0.03,
+     0.04
+    ],
+    "verdict": "OUT",
+    "distance": 0.017064445638409427,
+    "sd_out": 0.32074880104675635,
+    "role": "live target"
+   },
+   "abs_return_acf1": {
+    "measured": 0.28867078274248614,
+    "band": [
+     0.04,
+     0.22
+    ],
+    "verdict": "OUT",
+    "distance": 0.06867078274248614,
+    "sd_out": 0.7261002163629862,
+    "role": "live target"
+   },
+   "abs_return_acf5": {
+    "measured": 0.1524266091550004,
+    "band": [
+     0.02,
+     0.1
+    ],
+    "verdict": "OUT",
+    "distance": 0.05242660915500039,
+    "sd_out": 0.9522795729813452,
+    "role": "live target"
+   },
+   "abs_return_acf20": {
+    "measured": 0.012671879348595644,
+    "band": [
+     -0.02,
+     0.07
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "cross_sectional_corr": {
+    "measured": 0.4057350603766128,
+    "band": [
+     0.23,
+     0.41000000000000003
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "volume_abs_return_corr": {
+    "measured": 0.6300893543564667,
+    "band": [
+     0.48,
+     0.65
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "leverage_effect": {
+    "measured": -0.04609670946770761,
+    "band": [
+     -0.13,
+     0.02
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "volume_change_acf1": {
+    "measured": -0.4327261554164075,
+    "band": [
+     -0.29,
+     -0.21
+    ],
+    "verdict": "OUT",
+    "distance": 0.14272615541640754,
+    "sd_out": 13.946136486491978,
+    "role": "structural"
+   }
+  },
+  "bands": "504-matched",
+  "curve": {
+   "1": 0.28867078274248614,
+   "2": 0.236341428230591,
+   "3": 0.19831482278475548,
+   "5": 0.1524266091550004,
+   "8": 0.10286853641792057,
+   "12": 0.04893836891079642,
+   "20": 0.012671879348595644,
+   "30": 0.009932897431747306,
+   "45": -0.005251275021286923,
+   "60": -0.0006514656727139456
+  }
+ },
+ "decay": {
+  "curve_252": {
+   "1": 0.14127142910145438,
+   "2": 0.10632118585701743,
+   "3": 0.08971647915760297,
+   "5": 0.04962379448651105,
+   "8": 0.03709219903081132,
+   "12": 0.01728278580930355,
+   "20": 0.008165975509233512,
+   "30": -0.005236479190304647,
+   "45": -0.011964144048419882,
+   "60": -0.014196771934927362
+  },
+  "loglog_slope_1_20": -0.9532749987012988,
+  "real_slope": -0.436,
+  "real_curve": {
+   "1": 0.1071,
+   "5": 0.0518,
+   "8": 0.0453,
+   "12": 0.0295,
+   "20": 0.0286,
+   "30": 0.0179,
+   "60": 0.0054
+  },
+  "seeds": 30
+ },
+ "gaps": [
+  {
+   "id": 1,
+   "statistic": "volume_change_acf1",
+   "kind": "structural",
+   "detail": "-0.46 against band -0.32..-0.20, 13.7 seed-sd out; unreachable at any coefficients"
+  },
+  {
+   "id": 2,
+   "kind": "horizon",
+   "detail": "5/10 in band at 504 days against horizon-matched bands; not certified beyond 252 days"
+  },
+  {
+   "id": 3,
+   "kind": "mechanism",
+   "statistic": "decay shape",
+   "detail": "log-log slope -0.953 vs real -0.436; memory turns negative by lag 30"
+  },
+  {
+   "id": 4,
+   "kind": "horizon",
+   "statistic": "excess_kurtosis",
+   "detail": "5.23 at 504 days against a horizon-matched band of 7.1-22; tails too thin at long horizons"
+  },
+  {
+   "id": 5,
+   "kind": "magnitude",
+   "statistic": "scenario response",
+   "detail": "VIX shock response directionally right, magnitude not certified"
+  }
+ ]
+}

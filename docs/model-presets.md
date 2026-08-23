@@ -6,16 +6,18 @@ rack: experiment
 
 # Model presets
 
-The model's coefficients ship as a named, versioned preset. `"pt-v1"` names
+The model's coefficients ship as a named, versioned preset. A preset names
 the complete set — the variance processes, the factor structure, the
-mispricing dynamics, the guards — frozen and documented. It is the default;
-most users never touch it.
+mispricing dynamics, the guards — frozen and documented. **`"pt-v3"` is the
+current default**; most users never touch it. `"pt-v1"` and `"pt-v2"` remain
+selectable and bit-reproducing forever.
 
 ```python
-eng = pt.Engine(seed=42, universe=u, model="pt-v1")   # the default, spelled out
+eng = pt.Engine(seed=42, universe=u, model="pt-v3")   # the default, spelled out
+eng = pt.Engine(seed=42, universe=u, model="pt-v1")   # an earlier era, still exact
 ```
 
-The reason is comparability. `(package version, model="pt-v1", universe
+The reason is comparability. `(package version, model="pt-v3", universe
 fingerprint, seed)` is a complete, minimal, citable specification of a
 market. If every user ran a bespoke coefficient set, no two published
 results would be comparable, and "tested on the pretium simulator" would
@@ -100,10 +102,15 @@ distinct fingerprints, and draw counts match across vectors per seed.
 
 ## Presets are consumed here, produced elsewhere
 
-A calibrated preset (a future `"pt-v2"`) arrives as a new named entry in
-the shipped table, produced by the calibration tooling with its provenance
-committed; `"pt-v1"` stays selectable and bit-reproducing forever. The
-library consumes presets; it does not ship an optimiser.
+A calibrated preset arrives as a new named entry in the shipped table,
+produced by the calibration tooling with its provenance committed; every
+earlier preset stays selectable and bit-reproducing forever. That has now
+happened twice — `"pt-v2"` and `"pt-v3"` were both produced this way, and
+`"pt-v3"` is the current default. The library consumes presets; it does not
+ship an optimiser.
+
+What the shipped default is certified to reproduce, and where it is not, is
+[the realism envelope](realism-envelope.md).
 
 For the compact coefficient table the known-answer test hashes, see
 `pt.model_preset()` — it returns the mispricing coefficient dictionary and
