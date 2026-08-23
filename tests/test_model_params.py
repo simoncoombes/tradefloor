@@ -118,17 +118,17 @@ PERTURBATIONS = [
     ("market_vol_ceiling_multiple", 0.5, True),
     ("market_vol_floor_multiple", 2.0, True),
     ("market_vol_vix_coupling", 0.0, True),
-    # The slow variance component, added at pt-v4. Each of the three is
-    # inert ALONE by construction: the composed update takes an explicit
-    # zero-weight branch, so with weight 0 neither of the other two can
-    # reach the variance, and with weight non-zero but persistence and
-    # gain both 0 the slow level never leaves baseline so the deviation
-    # it contributes is exactly zero. They act together, which
-    # `test_the_slow_variance_component_acts_when_its_three_parts_agree`
-    # measures rather than assumes.
-    ("market_vol_slow_persistence", 0.99, False),   # needs gain and weight
-    ("market_vol_slow_gain", 0.1, False),           # needs weight
-    ("market_vol_slow_weight", 0.5, False),         # needs gain (or persistence)
+    # The slow variance component, added at pt-v4. The WEIGHT is the
+    # switch: the update takes an explicit zero-weight branch, so with
+    # weight 0 neither of the other two can reach the variance at all.
+    # With weight non-zero the mixture is live even at zero persistence
+    # and gain, because the slow component then sits at the target rather
+    # than tracking the fast one -- which is a different variance, so the
+    # weight moves the market on its own. That asymmetry is why it reads
+    # True here and the other two read False.
+    ("market_vol_slow_persistence", 0.99, False),   # needs a non-zero weight
+    ("market_vol_slow_gain", 0.1, False),           # needs a non-zero weight
+    ("market_vol_slow_weight", 0.5, True),
     ("market_vol_vix_anchor", 22.0, True),
     ("mispricing_half_life_days", 10.0, True),
     ("momentum_theta", 0.5, True),

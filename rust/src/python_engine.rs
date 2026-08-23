@@ -1704,11 +1704,12 @@ impl PyEngine {
         // Engine-level rather than per-company, so it has no column; a
         // fork that lost it would re-open at the baseline factor sigma
         // mid-regime and diverge from its parent at the next close.
-        let (market_variance, market_day_factor, market_slow_variance) =
-            self.inner.market_variance_state();
+        let (market_variance, market_day_factor, market_fast_variance,
+             market_slow_variance) = self.inner.market_variance_state();
         out.set_item(
             "market_variance",
-            vec![market_variance, market_day_factor, market_slow_variance],
+            vec![market_variance, market_day_factor, market_fast_variance,
+                 market_slow_variance],
         )?;
 
         // The macro chain's state. The chain advances at every close now, so
@@ -1906,18 +1907,23 @@ impl PyEngine {
             let vals: Vec<f64> = raw.extract()?;
             // Two values is a checkpoint written before the slow component
             // existed; three is one written after. Both replay.
-            if vals.len() != 2 && vals.len() != 3 {
+            if vals.len() != 2 && vals.len() != 3 && vals.len() != 4 {
                 return Err(ValidationError::new_err(format!(
-                    "market_variance must be [variance, day_factor] or \
-                     [variance, day_factor, slow_variance], got {} values",
+                    "market_variance must be [variance, day_factor], or that \
+                     plus the two component levels, got {} values",
                     vals.len()
                 )));
             }
-            if vals.len() == 3 {
-                self.inner
-                    .set_market_variance_state_with_slow(vals[0], vals[1], vals[2]);
-            } else {
-                self.inner.set_market_variance_state(vals[0], vals[1]);
+            match vals.len() {
+                // Four is a pt-v4 checkpoint. Three predates the mixture
+                // and carried an additive slow level; adopting it as both
+                // components is the only reading that leaves a legacy
+                // preset replaying identically, where neither is read.
+                4 => self.inner.set_market_variance_state_with_components(
+                    vals[0], vals[1], vals[2], vals[3]),
+                3 => self.inner.set_market_variance_state_with_components(
+                    vals[0], vals[1], vals[0], vals[2]),
+                _ => self.inner.set_market_variance_state(vals[0], vals[1]),
             }
         }
 
