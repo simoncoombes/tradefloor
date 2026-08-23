@@ -108,6 +108,36 @@ pub struct ModelParams {
     pub news_sector_weight: f64,
     /// Weight of market-wide news on every name (§5.4 promotion).
     pub news_market_weight: f64,
+    /// Weight of one company's GOOD news on its sector peers — the
+    /// information-transfer channel.
+    ///
+    /// Before this, a company-tagged event moved only the company it named.
+    /// The news dispatch is an if/else-if chain whose sector branch requires
+    /// `company_id.is_none()`, so an earnings beat at one cloud name reached
+    /// no other cloud name, in either direction. Sector co-movement existed
+    /// but arrived entirely as exogenous shared shocks — a per-tick sector
+    /// factor draw and market beta — never as contagion from a member.
+    ///
+    /// Real markets transfer: a surprise at one name moves its close
+    /// competitors, typically at a fraction of the announcer's move (Foster
+    /// 1981; Freeman and Tse 1992). The realism panel cannot see this at all,
+    /// because `cross_sectional_corr` is unconditional and dominated by the
+    /// market factor, while transfer is a conditional, event-time effect.
+    ///
+    /// 0.0 means no transfer, which is every preset before pt-v4, and the
+    /// branch is skipped entirely at zero rather than adding `0.0 * impact`
+    /// — so it is bit-identical when off, not merely numerically close.
+    pub news_peer_weight: f64,
+    /// Weight of one company's BAD news on its sector peers.
+    ///
+    /// Separate from [`ModelParams::news_peer_weight`] because the effect is
+    /// asymmetric in the literature: negative surprises transfer more
+    /// strongly than positive ones. One parameter with a sign flip would
+    /// impose symmetry the data does not support, and a search cannot
+    /// discover the asymmetry it was never given room to express.
+    ///
+    /// Applies when the event's price impact is negative. 0.0 is inert.
+    pub news_peer_weight_down: f64,
     /// Market-shock magnitude, in baseline sigmas, above which the crash
     /// amplifier fires (§5.4 promotion).
     pub crash_amplifier_threshold: f64,
@@ -363,6 +393,8 @@ impl ModelParams {
             universe_stress_decay: 0.0,
             universe_stress_weight: 0.0,
             regime_stress_points: 0.0,
+            news_peer_weight: 0.0,
+            news_peer_weight_down: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -490,6 +522,8 @@ impl ModelParams {
             "universe_stress_decay" => self.universe_stress_decay,
             "universe_stress_weight" => self.universe_stress_weight,
             "regime_stress_points" => self.regime_stress_points,
+            "news_peer_weight" => self.news_peer_weight,
+            "news_peer_weight_down" => self.news_peer_weight_down,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -565,6 +599,8 @@ impl ModelParams {
             "universe_stress_decay" => out.universe_stress_decay = value,
             "universe_stress_weight" => out.universe_stress_weight = value,
             "regime_stress_points" => out.regime_stress_points = value,
+            "news_peer_weight" => out.news_peer_weight = value,
+            "news_peer_weight_down" => out.news_peer_weight_down = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -698,6 +734,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "mispricing_half_life_days",
         "momentum_theta",
         "news_market_weight",
+        "news_peer_weight",
+        "news_peer_weight_down",
         "news_sector_weight",
         "order_flow_coefficient",
         "price_breaker_fraction",

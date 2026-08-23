@@ -182,14 +182,44 @@ pub fn calculate_live_factors(
     rng: &mut impl crate::rng::Rng,
 ) -> LiveFactors {
     // ── News ──────────────────────────────────────────────────────────────
-    // Company-specific at full weight, sector-wide at half, market-wide at
-    // 0.3. The branches are exclusive and ORDERED: an event with both a
-    // companyId and a sector counts once, as company news.
+    // Company-specific at full weight, a sector PEER's news at the transfer
+    // weight, sector-wide at half, market-wide at 0.3. The branches are
+    // exclusive and ORDERED, and the order carries the meaning: an event
+    // naming this company counts once, as company news, whatever sector it
+    // also carries. The same event reaches OTHER names in that sector
+    // through the peer arm, which is off in every shipped preset — so
+    // before pt-v4 an event with a companyId moved exactly one name.
     let mut company_news = 0.0;
     for event in news {
         let impact = truthy(event.price_impact);
         if event.company_id.as_deref() == Some(company.id.as_str()) {
             company_news += impact;
+        } else if event.company_id.is_some()
+            && event.sector.as_deref() == Some(company.sector.as_str())
+        {
+            // Information transfer: a surprise at a PEER, not at this name.
+            // Before this branch existed the chain fell straight through
+            // here — the sector branch below requires `company_id.is_none()`
+            // — so an earnings beat at one cloud name moved no other cloud
+            // name. Sector co-movement was entirely exogenous: a per-tick
+            // sector factor draw and market beta, never contagion from a
+            // member.
+            //
+            // Asymmetric by construction, because the effect is: bad news
+            // transfers more strongly than good. The weight is read by the
+            // SIGN OF THE ANNOUNCER'S IMPACT, not of anything local.
+            let weight = if impact < 0.0 {
+                params.news_peer_weight_down
+            } else {
+                params.news_peer_weight
+            };
+            // Guarded rather than multiplied through: at zero weight this
+            // adds nothing at all, so the accumulator is untouched and the
+            // branch is bit-identical to not existing. `+ 0.0` would not be
+            // — it turns a -0.0 accumulator into +0.0.
+            if weight != 0.0 {
+                company_news += impact * weight;
+            }
         } else if event.sector.as_deref() == Some(company.sector.as_str())
             && event.company_id.is_none()
         {
@@ -458,17 +488,101 @@ mod tests {
         );
     }
 
-    #[test]
-    fn an_event_for_another_company_is_ignored_entirely() {
-        let c = company();
-        // Has a companyId, so it can never fall through to the sector or
-        // market-wide arms even though its sector matches.
-        let e = NewsEvent {
+    /// A peer's news event, for the information-transfer tests.
+    fn peer_event(impact: f64) -> NewsEvent {
+        NewsEvent {
             company_id: Some("OTHER".into()),
+            sector: Some("technology".into()),
+            price_impact: Some(impact),
+        }
+    }
+
+    fn with_peer_weights(up: f64, down: f64) -> crate::params::ModelParams {
+        crate::params::PT_V1
+            .with_override("news_peer_weight", up)
+            .unwrap()
+            .with_override("news_peer_weight_down", down)
+            .unwrap()
+    }
+
+    #[test]
+    fn an_event_for_another_company_is_ignored_at_the_shipped_weight() {
+        let c = company();
+        // Has a companyId, so it cannot fall through to the sector or
+        // market-wide arms even though its sector matches — and the peer arm
+        // that now sits between them is off in every shipped preset.
+        //
+        // This assertion is the inertness proof for the information-transfer
+        // channel: EXACTLY zero, not approximately, because the branch is
+        // skipped rather than multiplied by a zero weight.
+        assert_eq!(factors(&c, &[peer_event(0.5)], 0.0, &shared()).company_news, 0.0);
+    }
+
+    #[test]
+    fn a_peers_good_news_lifts_this_name_when_transfer_is_on() {
+        let c = company();
+        let p = with_peer_weights(0.2, 0.5);
+        let got =
+            calculate_live_factors(&c, &[peer_event(0.5)], 0.0, 1.0, &shared(), &p, &mut Fixed(0.0))
+                .company_news;
+        assert_eq!(got, 0.5 * 0.2);
+    }
+
+    #[test]
+    fn bad_news_transfers_on_its_own_weight() {
+        // The asymmetry is the point: the same magnitude of surprise moves
+        // peers further down than up. A single signed weight could not carry
+        // this, and a search given only one could never find it.
+        let c = company();
+        let p = with_peer_weights(0.2, 0.5);
+        let up =
+            calculate_live_factors(&c, &[peer_event(0.4)], 0.0, 1.0, &shared(), &p, &mut Fixed(0.0))
+                .company_news;
+        let down = calculate_live_factors(
+            &c,
+            &[peer_event(-0.4)],
+            0.0,
+            1.0,
+            &shared(),
+            &p,
+            &mut Fixed(0.0),
+        )
+        .company_news;
+        assert_eq!(up, 0.4 * 0.2);
+        assert_eq!(down, -0.4 * 0.5);
+        assert!(down.abs() > up.abs(), "bad news must transfer more strongly");
+    }
+
+    #[test]
+    fn the_named_company_still_takes_the_full_impact_not_the_peer_weight() {
+        // The company the event names is matched by id, before sector is
+        // consulted at all. Transfer must not dilute the announcer's own move.
+        let c = company();
+        let p = with_peer_weights(0.2, 0.5);
+        let own = NewsEvent {
+            company_id: Some(c.id.clone()),
             sector: Some("technology".into()),
             price_impact: Some(0.5),
         };
-        assert_eq!(factors(&c, &[e], 0.0, &shared()).company_news, 0.0);
+        let got =
+            calculate_live_factors(&c, &[own], 0.0, 1.0, &shared(), &p, &mut Fixed(0.0))
+                .company_news;
+        assert_eq!(got, 0.5);
+    }
+
+    #[test]
+    fn transfer_does_not_reach_a_different_sector() {
+        let c = company(); // technology
+        let p = with_peer_weights(0.2, 0.5);
+        let elsewhere = NewsEvent {
+            company_id: Some("OTHER".into()),
+            sector: Some("energy".into()),
+            price_impact: Some(0.5),
+        };
+        let got =
+            calculate_live_factors(&c, &[elsewhere], 0.0, 1.0, &shared(), &p, &mut Fixed(0.0))
+                .company_news;
+        assert_eq!(got, 0.0);
     }
 
     #[test]

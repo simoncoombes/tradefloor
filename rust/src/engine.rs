@@ -1077,6 +1077,16 @@ impl Engine {
         self.companies.iter().map(|c| c.id.clone()).collect()
     }
 
+    /// Company sectors, in roster order. Positional against [`Engine::ids`].
+    ///
+    /// Exists for the information-transfer channel: news naming a company
+    /// has to be resolvable to that company's sector before its peers can be
+    /// found, and a caller writing `News(ticker="AWS", price_impact=0.05)`
+    /// should not have to restate the sector the roster already knows.
+    pub fn sectors(&self) -> Vec<String> {
+        self.companies.iter().map(|c| c.sector.clone()).collect()
+    }
+
     /// Columnar read of one field, for the FFI boundary.
     ///
     /// A single contiguous `f64` buffer crosses a WASM boundary as one view;

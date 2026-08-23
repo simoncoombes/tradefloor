@@ -338,6 +338,16 @@ impl PyEngine {
         self.inner.ids().get(pos).cloned()
     }
 
+    /// The sector of the instrument a ticker names.
+    ///
+    /// Used to resolve the ANNOUNCER's sector for company-tagged news, so
+    /// the information-transfer channel can find that company's peers
+    /// without the caller restating what the roster already knows.
+    fn sector_for(&self, ticker: &str) -> Option<String> {
+        let pos = self.tickers.iter().position(|t| t == ticker)?;
+        self.inner.sectors().get(pos).cloned()
+    }
+
     fn build_news(&self, news: Option<Vec<PyNews>>) -> PyResult<Vec<NewsEvent>> {
         let Some(items) = news else { return Ok(Vec::new()) };
         let mut out = Vec::with_capacity(items.len());
@@ -350,9 +360,21 @@ impl PyEngine {
                 })?),
                 None => None,
             };
+            // A company-tagged event with no sector is resolved to the
+            // announcer's own sector, so the information-transfer channel can
+            // find its peers. Bit-inert while `news_peer_weight` is zero:
+            // the only branch that reads a sector alongside a company id is
+            // the peer branch, and that one is skipped entirely at zero
+            // weight. The named company itself is matched by id, before
+            // sector is consulted at all.
+            let sector = match (&n.sector, n.ticker.as_deref()) {
+                (Some(s), _) => Some(s.clone()),
+                (None, Some(t)) => self.sector_for(t),
+                (None, None) => None,
+            };
             out.push(NewsEvent {
                 company_id,
-                sector: n.sector.clone(),
+                sector,
                 // Some(), so a genuine zero reaches the truthy-or in the
                 // factor model and contributes nothing -- which is what the
                 // reference does with a zero impact.

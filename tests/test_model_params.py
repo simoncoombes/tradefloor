@@ -154,6 +154,12 @@ PERTURBATIONS = [
     # only exists above CRISIS_VIX_THRESHOLD, AND a 3-day probe starts in
     # Expansion, whose stress intensity is exactly 0.0.
     ("regime_stress_points", 12.0, False),     # needs a non-expansion phase
+    # Information transfer between sector peers (pt-v4). Inert in the probe
+    # for the simplest reason of all: the probe fires no news, and with no
+    # company-tagged event there is no announcer whose surprise could reach
+    # anyone. Shown live by `test_peer_transfer_moves_a_name_the_news_never_named`.
+    ("news_peer_weight", 0.2, False),          # needs company-tagged news
+    ("news_peer_weight_down", 0.5, False),     # needs company-tagged BAD news
 ]
 
 
@@ -241,6 +247,49 @@ def test_universe_memory_acts_above_the_crisis_threshold():
     assert forgetful != remembering, (
         "universe memory changed nothing across a VIX spike and decay; "
         "the state is not reaching the correlation blend"
+    )
+
+
+def test_peer_transfer_moves_a_name_the_news_never_named():
+    """A company-tagged event must reach that company's sector peers.
+
+    Before pt-v4 it could not: the news dispatch is an if/else-if chain whose
+    sector arm requires `company_id is None`, so an earnings beat at one name
+    moved exactly that name and nothing else. Sector co-movement existed, but
+    only as exogenous shared shocks -- a per-tick sector factor draw and market
+    beta -- never as contagion from a member.
+
+    Asserted on a name OTHER than the announcer, because the announcer moves
+    identically either way: it is matched by id, before sector is consulted.
+    """
+    universe = pretium.Universe.random(40, seed=3)
+    announcer = universe.tickers()[0]
+
+    def prices(model=None):
+        kwargs = {} if model is None else {"model": model}
+        engine = pretium.Engine(seed=42, universe=universe, **kwargs)
+        engine.open_market()
+        engine.run_session(
+            9, 30, 3, 39,
+            news=[pretium.News(ticker=announcer, price_impact=0.05)],
+        )
+        engine.close_market()
+        return struct.unpack("<%dd" % len(engine.tickers),
+                             engine.column("price"))
+
+    isolated = prices(pretium.ModelParams.from_preset("pt-v3"))
+    transferring = prices(pretium.ModelParams.from_preset(
+        "pt-v3", news_peer_weight=0.2, news_peer_weight_down=0.5))
+
+    moved = [i for i in range(1, len(isolated))
+             if isolated[i] != transferring[i]]
+    assert moved, (
+        "a company-tagged event reached no other name in the roster; the "
+        "information-transfer channel is not wired to the news dispatch"
+    )
+    assert isolated[0] == transferring[0], (
+        "the announcer's own move changed with the peer weight; it must be "
+        "matched by id before sector is consulted, so transfer cannot dilute it"
     )
 
 
