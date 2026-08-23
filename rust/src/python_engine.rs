@@ -2057,6 +2057,7 @@ impl PyEngine {
             gdp_growth: crate::units::percent_to_fraction(e.gdp_growth),
             qe_pe_boost: e.qe_pe_boost,
             fear_greed_index: e.fear_greed_index,
+            universe_stress: self.inner.universe_stress(),
         });
         Ok(())
     }

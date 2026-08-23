@@ -326,6 +326,14 @@ pub fn macro_schema() -> SchemaRef {
         Field::new("gdp_growth", DataType::Float64, false),
         Field::new("qe_pe_boost", DataType::Float64, false),
         Field::new("fear_greed_index", DataType::Float64, false),
+        // The universe's remembered stress, in VIX points above the crisis
+        // threshold. Exposed because it is the market's REGIME as the model
+        // actually holds it -- not an estimate of the regime, the thing
+        // itself. A regime detector can be scored against this the way an
+        // attribution model is scored against `truth`, which is the check
+        // no real market can offer. Zero under any preset with the memory
+        // disabled, which is every preset before pt-v4.
+        Field::new("universe_stress", DataType::Float64, false),
     ]))
 }
 
@@ -341,6 +349,7 @@ pub struct MacroRow {
     pub gdp_growth: f64,
     pub qe_pe_boost: f64,
     pub fear_greed_index: f64,
+    pub universe_stress: f64,
 }
 
 pub fn macro_batch(rows: &[MacroRow]) -> Result<RecordBatch, String> {
@@ -354,6 +363,7 @@ pub fn macro_batch(rows: &[MacroRow]) -> Result<RecordBatch, String> {
         Arc::new(Float64Array::from(rows.iter().map(|r| r.gdp_growth).collect::<Vec<_>>())),
         Arc::new(Float64Array::from(rows.iter().map(|r| r.qe_pe_boost).collect::<Vec<_>>())),
         Arc::new(Float64Array::from(rows.iter().map(|r| r.fear_greed_index).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.universe_stress).collect::<Vec<_>>())),
     ];
     RecordBatch::try_new(macro_schema(), columns).map_err(|e| e.to_string())
 }
