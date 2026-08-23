@@ -168,8 +168,23 @@ class BudgetExhausted(Exception):
 
 
 def margined_bands(bands: dict, seed_sd: dict, keys: list[str],
-                   k: float) -> dict:
+                   k: float, per_key: dict[str, float] | None = None) -> dict:
     """Each band shrunk by `k` seed-sds on each side, for the search only.
+
+    `per_key` overrides `k` for named statistics, because one margin does
+    not fit every band. The case it was added for: `abs_return_acf20`'s
+    band spans 2.57 seed-sds, and at the global 0.5 the searched interval
+    is (-0.017, +0.057). Real markets read +0.020 there and this model
+    reads -0.004 -- NO CLUSTERING LEFT AT ALL -- and both sit inside, so
+    the loss is identical for a market with the right tail and one with
+    none. A search cannot chase what the objective cannot see, and the
+    pt-v4 run proved it: given a two-component variance and a reason to
+    use it, it set the slow weight to 0.035 and left it there.
+
+    At 1.0 the searched interval becomes (+0.007, +0.033): the model's
+    no-tail value falls outside it and the real-market median falls
+    inside. That is the gradient the statistic was promoted to provide
+    and did not.
 
     A statistic whose band is narrower than 2·k·s_k cannot be given k of
     room on both sides. Rather than emit an empty interval — which would
@@ -183,9 +198,11 @@ def margined_bands(bands: dict, seed_sd: dict, keys: list[str],
     have to derive.
     """
     out = {}
+    per_key = per_key or {}
     for key in keys:
         lo, hi = bands[key]
         s = seed_sd[key]
+        k = per_key.get(key, k)
         room = k * s
         if hi - lo <= 2.0 * room:
             mid = 0.5 * (lo + hi)
@@ -705,6 +722,12 @@ def main() -> None:
                         help="how far inside each band the SEARCH aims, in "
                              "seed-sds; reporting always uses the true "
                              "bands. 0 reproduces phase 3.")
+    parser.add_argument("--margin-sd-for", action="append", default=[],
+                        metavar="NAME:SD",
+                        help="override --margin-sd for one statistic. One "
+                             "margin does not fit every band: a wide band "
+                             "at a small margin cannot distinguish the "
+                             "model from reality. Repeatable.")
     parser.add_argument("--fix", action="append", default=[],
                         metavar="NAME:VALUE",
                         help="set a parameter by construction: applied to "
@@ -762,8 +785,19 @@ def main() -> None:
     space = DevSpace(params, ship, factor_persistence_cap=cap, fixed=fixed)
 
     in_loss = list(loss_mod.LIVE_TARGETS) + list(loss_mod.CONSTRAINTS)
+    per_key_margin = {}
+    for item in args.margin_sd_for:
+        name, _, value = item.partition(":")
+        name = name.strip()
+        if not name or not value:
+            raise SystemExit(f"--margin-sd-for wants NAME:SD, got {item!r}")
+        if name not in in_loss:
+            raise SystemExit(
+                f"--margin-sd-for {name} is not in the loss; a margin on a "
+                "statistic the objective does not read buys nothing")
+        per_key_margin[name] = float(value)
     margin = margined_bands(facts.REAL_MARKETS, facts.SEED_SD, in_loss,
-                            args.margin_sd)
+                            args.margin_sd, per_key_margin)
     ev = Evaluator(args.workers, args.budget_panel_runs, margin)
     started = time.perf_counter()
     trace: list[dict] = []
@@ -1212,6 +1246,7 @@ def main() -> None:
                     "objective) + lambda * sum_j dev_j^2 (§6.3)",
             "search_margin": {
                 "margin_sd": args.margin_sd,
+                "margin_sd_overrides": per_key_margin,
                 "what_it_changes": "the SEARCH objective only. Candidates "
                                    "are ranked on `loss_search`, the same "
                                    "arithmetic as band_distance_loss "
