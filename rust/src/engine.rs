@@ -621,7 +621,7 @@ impl Engine {
     /// close its first day on a truncated innovation — pricing differently
     /// from the parent it forked from, the exact failure class
     /// [`Engine::restore_day_state`] exists for.
-    pub fn market_variance_state(&self) -> (f64, f64) {
+    pub fn market_variance_state(&self) -> (f64, f64, f64) {
         self.market_vol.snapshot()
     }
 
@@ -629,6 +629,18 @@ impl Engine {
     /// [`Engine::market_variance_state`].
     pub fn set_market_variance_state(&mut self, variance: f64, day_factor: f64) {
         self.market_vol = MarketVarianceState::restore(variance, day_factor);
+    }
+
+    /// Put the market factor's variance state back including the slow
+    /// component. See [`Engine::market_variance_state`].
+    pub fn set_market_variance_state_with_slow(
+        &mut self,
+        variance: f64,
+        day_factor: f64,
+        slow_variance: f64,
+    ) {
+        self.market_vol =
+            MarketVarianceState::restore_with_slow(variance, day_factor, slow_variance);
     }
 
     /// One attribution column across all companies, by index 0..7.
