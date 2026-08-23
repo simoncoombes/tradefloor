@@ -268,34 +268,56 @@ fn update_toward(current_variance: f64, day_factor: f64, target_variance: f64) -
     )
 }
 
-/// The slow component's step. Returns the new slow variance level.
+/// One variance component's GARCH step against a shared target.
 ///
-/// Engle-Lee in shape: a persistent level that reverts to the baseline and
-/// takes up part of each day's variance surprise. At
-/// `market_vol_slow_persistence == 0` and `market_vol_slow_gain == 0` this
-/// returns `base` on every call, which is what makes the composed update
-/// below reduce to the single-component form bit for bit.
-pub fn update_slow_variance_with(
-    params: &crate::params::ModelParams,
-    current_slow: f64,
-    current_variance: f64,
+/// Both components of the two-timescale process use this, with their own
+/// `(alpha, beta)`; the persistence of a component is `alpha + beta`, so
+/// its autocorrelation decays at that rate and its half-life is
+/// `ln(0.5)/ln(alpha+beta)`.
+///
+/// Why a MIXTURE and not an additive deviation. The first version of this
+/// added `weight * (slow - base)` on top of the fast update, and a sweep
+/// killed it in ninety seconds: over a 504-day window a 17-day component
+/// is nearly constant, so an additive term acts as a LEVEL SHIFT and adds
+/// roughly the same autocorrelation at every lag. The measured curve came
+/// out flat -- 0.070 at lag 20 against 0.044 at lag 60, where real markets
+/// read 0.029 and 0.005 -- and the parameters barely moved it, which is
+/// the signature of a dial that is not connected to the thing it names.
+///
+/// A mixture `w_f*c_f + w_s*c_s` of two components reverting to the SAME
+/// target genuinely superposes two decay rates, which is what the fitted
+/// structure needs.
+fn component_step(
+    current: f64,
     day_factor: f64,
+    target: f64,
+    alpha: f64,
+    beta: f64,
 ) -> f64 {
-    let base = params.market_factor_sigma * params.market_factor_sigma;
+    (1.0 - alpha - beta) * target + alpha * day_factor * day_factor + beta * current
+}
+
+/// The slow component's `(alpha, beta)`, from its persistence and the
+/// share of that persistence carried by the shock term.
+///
+/// Parameterised this way because the fitted quantity is the HALF-LIFE --
+/// the analytic fit against real markets wants 1 day fast and 17 days slow
+/// -- and a half-life is a statement about `alpha + beta`, not about
+/// either one alone.
+fn slow_alpha_beta(params: &crate::params::ModelParams) -> (f64, f64) {
     let rho = params.market_vol_slow_persistence;
-    let surprise = day_factor * day_factor - current_variance;
-    let next = base + rho * (current_slow - base) + params.market_vol_slow_gain * surprise;
-    // The same clamp discipline the fast component uses: a slow level is
-    // still a variance and may not go negative or run away.
-    let lo = params.market_vol_floor_multiple * base;
-    let hi = params.market_vol_ceiling_multiple * base;
-    if next < lo {
-        lo
-    } else if next > hi {
-        hi
-    } else {
-        next
-    }
+    let share = params.market_vol_slow_gain;
+    (share * rho, (1.0 - share) * rho)
+}
+
+/// The shared clamp: a variance stays inside its floor and ceiling
+/// multiples of the baseline, in the bound order `garch.rs` uses.
+fn clamp_variance(params: &crate::params::ModelParams, v: f64) -> f64 {
+    let base = params.market_factor_sigma * params.market_factor_sigma;
+    mathx::max(
+        mathx::min(v, base * params.market_vol_ceiling_multiple),
+        base * params.market_vol_floor_multiple,
+    )
 }
 
 fn update_toward_with(
@@ -328,10 +350,13 @@ fn update_toward_with(
 /// which becomes the innovation at the close.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MarketVarianceState {
+    /// The MIXTURE — what the tick draws against. Equals `fast_variance`
+    /// exactly whenever the slow component is off.
     variance: f64,
     day_factor: f64,
-    /// The SLOW component's level. Held at the baseline whenever the slow
-    /// component is off, which is every preset before pt-v4.
+    /// The fast component's own level.
+    fast_variance: f64,
+    /// The slow component's own level.
     slow_variance: f64,
 }
 
@@ -355,10 +380,12 @@ impl MarketVarianceState {
     /// `sqrt(x*x)` returns `x`'s bits for any positive finite `x` whose
     /// square neither overflows nor underflows.
     pub fn new_with(params: &crate::params::ModelParams) -> Self {
+        let base = params.market_factor_sigma * params.market_factor_sigma;
         Self {
-            variance: params.market_factor_sigma * params.market_factor_sigma,
+            variance: base,
             day_factor: 0.0,
-            slow_variance: params.market_factor_sigma * params.market_factor_sigma,
+            fast_variance: base,
+            slow_variance: base,
         }
     }
 
@@ -391,35 +418,51 @@ impl MarketVarianceState {
     /// calls; at [`crate::params::PT_V1`] it is the shipped update bit for
     /// bit.
     pub fn close_day_with(&mut self, params: &crate::params::ModelParams, vix: f64) {
-        let next_slow = update_slow_variance_with(
-            params, self.slow_variance, self.variance, self.day_factor);
-        let fast =
-            update_market_variance_with(params, self.variance, self.day_factor, vix);
-        // The zero-weight branch is a BRANCH and not `+ 0.0 * x` on
-        // purpose. Every preset before pt-v4 must reproduce the
-        // single-component update to the bit, and `fast + 0.0 * (s - b)`
-        // is only bit-identical to `fast` while `s - b` is finite and
-        // non-NaN. A branch owes nothing to that argument.
-        self.variance = if params.market_vol_slow_weight == 0.0 {
-            fast
-        } else {
-            let base = params.market_factor_sigma * params.market_factor_sigma;
-            mathx::max(
-                mathx::min(
-                    fast + params.market_vol_slow_weight * (next_slow - base),
-                    base * params.market_vol_ceiling_multiple,
-                ),
-                base * params.market_vol_floor_multiple,
-            )
-        };
-        self.slow_variance = next_slow;
+        let base = params.market_factor_sigma * params.market_factor_sigma;
+        let vix_ratio = vix / params.market_vol_vix_anchor;
+        let target = base
+            * (1.0 - params.market_vol_vix_coupling
+                + params.market_vol_vix_coupling * (vix_ratio * vix_ratio));
+
+        let w = params.market_vol_slow_weight;
+
+        // The zero-weight branch is a BRANCH and not arithmetic on purpose.
+        // Every preset before pt-v4 must reproduce the single-component
+        // update to the bit, and this is the only spelling that owes
+        // nothing to an argument about how floats behave.
+        if w == 0.0 {
+            self.variance = update_market_variance_with(
+                params, self.variance, self.day_factor, vix);
+            self.fast_variance = self.variance;
+            self.day_factor = 0.0;
+            return;
+        }
+
+        let fast = clamp_variance(
+            params,
+            component_step(self.fast_variance, self.day_factor, target,
+                           params.market_vol_alpha, params.market_vol_beta),
+        );
+        let (sa, sb) = slow_alpha_beta(params);
+        let slow = clamp_variance(
+            params,
+            component_step(self.slow_variance, self.day_factor, target, sa, sb),
+        );
+
+        self.fast_variance = fast;
+        self.slow_variance = slow;
+        // Both components revert to the SAME target, so the mixture's
+        // autocorrelation is the weighted sum of two decay rates rather
+        // than one decay plus a level.
+        self.variance = clamp_variance(params, (1.0 - w) * fast + w * slow);
         self.day_factor = 0.0;
     }
 
-    /// The three state numbers, for checkpoints:
-    /// `(variance, day_factor, slow_variance)`.
-    pub fn snapshot(&self) -> (f64, f64, f64) {
-        (self.variance, self.day_factor, self.slow_variance)
+    /// The four state numbers, for checkpoints:
+    /// `(variance, day_factor, fast_variance, slow_variance)`.
+    pub fn snapshot(&self) -> (f64, f64, f64, f64) {
+        (self.variance, self.day_factor, self.fast_variance,
+         self.slow_variance)
     }
 
     /// Restore from a checkpoint. Values are adopted verbatim, like every
@@ -433,17 +476,19 @@ impl MarketVarianceState {
         Self {
             variance,
             day_factor,
+            fast_variance: variance,
             slow_variance: variance,
         }
     }
 
     /// Restore including the slow component, for checkpoints that carry it.
-    pub fn restore_with_slow(variance: f64, day_factor: f64, slow_variance: f64) -> Self {
-        Self {
-            variance,
-            day_factor,
-            slow_variance,
-        }
+    pub fn restore_with_components(
+        variance: f64,
+        day_factor: f64,
+        fast_variance: f64,
+        slow_variance: f64,
+    ) -> Self {
+        Self { variance, day_factor, fast_variance, slow_variance }
     }
 }
 
@@ -692,8 +737,8 @@ mod tests {
         state.accumulate(0.007);
         state.close_day(22.0);
         state.accumulate(-0.003);
-        let (v, df, slow) = state.snapshot();
-        let restored = MarketVarianceState::restore_with_slow(v, df, slow);
+        let (v, df, fast, slow) = state.snapshot();
+        let restored = MarketVarianceState::restore_with_components(v, df, fast, slow);
         assert_eq!(state, restored);
     }
 
@@ -714,7 +759,7 @@ mod tests {
         original.close_day_with(params, 31.0);
         original.accumulate(-0.004);
 
-        let (v, df, _slow) = original.snapshot();
+        let (v, df, _fast, _slow) = original.snapshot();
         let mut restored = MarketVarianceState::restore(v, df);
 
         for day in 0..12 {
