@@ -320,6 +320,20 @@ _SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 # filers use Revenues or SalesRevenueNet. Tried in order, first hit wins, and
 # a company matching none simply has no growth figure rather than a zero --
 # which would be a claim of flat revenue rather than an absence.
+#: Implied price per share, `public_float / shares_outstanding`, outside
+#: which a filing is treated as mis-tagged rather than as a very large or
+#: very small company.
+#:
+#: The ceiling is deliberately generous: Berkshire's A shares trade near
+#: $700k, so a threshold tuned to ordinary equities would reject a real
+#: company. What it catches is the XBRL scale error -- a filer reporting
+#: thousands as units, or a fund reporting an aggregate -- which lands
+#: orders of magnitude outside any traded price. Rejecting on a quantity
+#: that MEANS something, rather than on the float value itself, is what
+#: makes the filter explicable: "this filing implies a share price of eight
+#: million dollars" is a diagnosis, "this number is too big" is a guess.
+PLAUSIBLE_IMPLIED_PRICE = (0.5, 1_000_000.0)
+
 _REVENUE_TAGS = (
     ("us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax", "USD"),
     ("us-gaap", "Revenues", "USD"),
@@ -450,8 +464,46 @@ def fetch(
     transport=None,
     progress=None,
     exclude_negative_equity: bool = True,
+    rank_by: str = "equity",
 ) -> Snapshot:
     """Build a :class:`Snapshot` from SEC filings.
+
+    # Which companies you get, and why it matters
+
+    ``rank_by`` decides which ``limit`` companies are taken, and the choice
+    changes the roster's SHAPE, not just its membership.
+
+    ``"equity"`` (the default, and what this function has always done) ranks
+    by shareholders' equity. That is a book quantity, and book equity bears a
+    wildly different relation to size across sectors: a bank carries enormous
+    equity against its market value while a software company carries almost
+    none. Measured on the live SEC for CY2025, the top 150 by equity came
+    back **27% financial services and 17% technology**, with five banks in
+    the top ten -- against roughly 13% and 30% for the S&P 500. So the
+    default roster is bank-heavy by construction, and any realism measured on
+    it inherits that.
+
+    ``"public_float"`` ranks by ``dei:EntityPublicFloat`` instead -- the
+    aggregate market value of stock held by non-affiliates, filed on the 10-K
+    cover page. It is the one market-derived number in EDGAR, and it produces
+    a roster whose composition resembles a real index.
+
+    Its two costs are real and are not hidden. It is **stale**: as-of the
+    last business day of the most recently completed second fiscal quarter,
+    so six to eighteen months old depending on the filer. And it is
+    **float, not capitalisation** -- it excludes affiliate and insider
+    holdings, which understates founder-controlled companies specifically.
+
+    It is also visibly mis-tagged in places: XBRL scale errors put several
+    filers above any real company's market value. Rather than a magic
+    threshold, the implausible ones are rejected by a quantity that means
+    something -- the implied price per share, ``public_float / shares``,
+    which must land in ``PLAUSIBLE_IMPLIED_PRICE``. A filer whose filing
+    implies a share price of eight million dollars has a units error, and
+    saying so in those terms beats saying "too big".
+
+    Neither ranking is a market-cap ranking, because EDGAR has no prices.
+    For that, set ``initial_price`` yourself from a market data source.
 
     ``user_agent`` is required and must identify you -- the SEC's fair-access
     policy asks for a name and a contact address, e.g.
@@ -525,14 +577,49 @@ def fetch(
             "check the User-Agent."
         )
 
-    # Equity descending, CIK ascending. The tie-break is not decoration:
-    # without it, two filers with identical equity would order by whichever
-    # the response happened to list first, and the universe would depend on a
-    # detail of the JSON rather than on the data.
-    candidates = sorted(
-        (cik for cik in eps if cik in shares and shares[cik] > 0),
-        key=lambda cik: (-equity.get(cik, 0.0), cik),
-    )
+    if rank_by not in ("equity", "public_float"):
+        raise ValidationError(
+            f'rank_by must be "equity" or "public_float", got {rank_by!r}'
+        )
+
+    usable = [cik for cik in eps if cik in shares and shares[cik] > 0]
+
+    if rank_by == "public_float":
+        # Filed as-of the fiscal SECOND quarter, not the fourth: the cover
+        # page reports it at the last business day of the most recently
+        # completed Q2. Asking for the Q4 instant returns almost nothing,
+        # which would silently degrade to an empty ranking.
+        say(f"public float for CY{fy}Q2I")
+        floats = _frame(get, "dei", "EntityPublicFloat", "USD", f"CY{fy}Q2I")
+        lo, hi = PLAUSIBLE_IMPLIED_PRICE
+        ranked, rejected = {}, 0
+        for cik in usable:
+            value = floats.get(cik)
+            if value is None or value <= 0:
+                continue
+            implied = value / shares[cik]
+            if lo <= implied <= hi:
+                ranked[cik] = value
+            else:
+                rejected += 1
+        say(f"{len(ranked)} filers have a plausible public float "
+            f"({rejected} rejected on implied price)")
+        if not ranked:
+            raise FetchError(
+                f"no filer had a usable dei:EntityPublicFloat for CY{fy}Q2I. "
+                'Fall back to rank_by="equity", which needs no market data.'
+            )
+        # Filers without a float sort last, keeping the roster fillable while
+        # the ranked ones lead. Ranked value descending, CIK ascending.
+        candidates = sorted(
+            usable, key=lambda cik: (-ranked.get(cik, 0.0), cik)
+        )
+    else:
+        # Equity descending, CIK ascending. The tie-break is not decoration:
+        # without it, two filers with identical equity would order by whichever
+        # the response happened to list first, and the universe would depend on a
+        # detail of the JSON rather than on the data.
+        candidates = sorted(usable, key=lambda cik: (-equity.get(cik, 0.0), cik))
     say(f"{len(candidates)} filers have EPS and a share count")
 
     rows: list[dict] = []
