@@ -23,6 +23,7 @@ from . import universe_util as _universe_util
 from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
 from .replay import replay
 from . import edgar
+from . import envelope
 from . import baselines
 from . import tca
 from . import scenario as _scenario_mod
@@ -75,6 +76,7 @@ from ._core import (  # noqa: F401
 
 __version__ = _core.__version__
 __all__ = [
+    "envelope",
     "ArrowStream", "Engine", "EngineBatch", "FairValue", "Fill", "GameRng", "Instrument", "Macro",
     "MatchResult", "MispricingState", "ModelParams", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",
