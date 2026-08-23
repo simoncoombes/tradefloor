@@ -285,6 +285,22 @@ pub const PT_V2: ModelParams = ModelParams::pt_v2();
 /// at the bottom of this file, in both directions.
 pub const PT_V3: ModelParams = ModelParams::pt_v3();
 
+/// The name of the preset an engine runs when none is named.
+///
+/// This exists because the name and the coefficients drifted apart once
+/// already, and silently. `model_preset()`'s default argument was the
+/// literal `"pt-v1"` and stayed that way when [`crate::engine::Engine`]'s
+/// default moved to [`PT_V3`], so the library answered "you are running
+/// pt-v1, momentum_theta 0.25" for runs that had actually executed pt-v3
+/// at 0.0742 — and `manifest.py` folded those wrong coefficients into the
+/// run digest whose stated job is catching exactly that substitution.
+///
+/// So the name is a const beside the params it names, and the test at the
+/// bottom of this file asserts it resolves to the engine's default
+/// bit-for-bit. A future era that moves the default and forgets this
+/// constant fails the suite instead of mislabelling every manifest.
+pub const DEFAULT_PRESET_NAME: &str = "pt-v3";
+
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
 /// certificate recorded.
 const PT_V3_BITS: &[(&str, u64)] = &[
@@ -774,6 +790,24 @@ mod tests {
         assert_eq!(PT_V3.fingerprint(), "pt-v3");
         assert_eq!(ModelParams::preset("pt-v3").unwrap().fingerprint(), "pt-v3");
         assert!(ModelParams::preset("pt-v4").is_none());
+    }
+
+    #[test]
+    fn the_default_preset_name_names_the_default_model() {
+        // The bug this exists to prevent shipped once. `model_preset()`'s
+        // default argument was the literal "pt-v1" and did not move when
+        // the engine's default became pt-v3, so the library reported
+        // pt-v1's name AND pt-v1's coefficients for runs that had executed
+        // pt-v3 — and manifest.py folded those coefficients into the run
+        // digest whose whole job is catching a coefficient substitution.
+        //
+        // Asserting the name resolves to the default model bit-for-bit
+        // turns a future era's forgetfulness into a test failure rather
+        // than a quietly mislabelled manifest.
+        let named = ModelParams::preset(DEFAULT_PRESET_NAME)
+            .expect("DEFAULT_PRESET_NAME must name a shipped preset");
+        assert_eq!(named.digest(), crate::engine::Engine::default_model().digest());
+        assert_eq!(named.fingerprint(), DEFAULT_PRESET_NAME);
     }
 
     #[test]

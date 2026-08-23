@@ -504,9 +504,15 @@ fn impulse_response(horizon_days: i64, phi: Option<f64>, theta: Option<f64>) -> 
 /// `daily_shock_cap` still reads its const because it is carried read-only
 /// and identical in every preset by construction.
 #[pyfunction]
-#[pyo3(signature = (name = "pt-v1"))]
-fn model_preset(py: Python<'_>, name: &str) -> PyResult<PyObject> {
+#[pyo3(signature = (name = None))]
+fn model_preset(py: Python<'_>, name: Option<&str>) -> PyResult<PyObject> {
     use crate::mispricing as m;
+    // The default follows the engine's default preset rather than a literal.
+    // It did not, once: this argument read "pt-v1" while engines ran pt-v3,
+    // so every manifest recorded the wrong coefficient set under the wrong
+    // name. See `params::DEFAULT_PRESET_NAME`, which a test ties to
+    // `Engine::default_model()` so the two cannot drift apart again.
+    let name = name.unwrap_or(crate::params::DEFAULT_PRESET_NAME);
     let preset = crate::params::ModelParams::preset(name).ok_or_else(|| {
         ValidationError::new_err(format!(
             "unknown model preset {name:?}. Shipped presets: {}",

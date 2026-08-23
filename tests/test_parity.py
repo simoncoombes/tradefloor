@@ -334,7 +334,12 @@ def test_hundred_thousand_step_trajectories_do_not_drift(name):
 
 def test_model_constants_match_the_reference():
     golden = load("mispricing-constants.json")["constants"]
-    preset = pretium.model_preset()
+    # Named explicitly, because the golden is a pt-v1-era artifact: it records
+    # what the reference TypeScript implementation computes. Reading the
+    # DEFAULT preset here made a parity check against a fixed reference depend
+    # on which era ships, so moving the default to pt-v3 broke a test that has
+    # nothing to do with the default. Parity is against pt-v1 forever.
+    preset = pretium.model_preset("pt-v1")
     pairs = {
         "MISPRICING_PHI": "mispricing_phi",
         "MOMENTUM_THETA": "momentum_theta",
@@ -348,7 +353,15 @@ def test_model_constants_match_the_reference():
 
 def test_the_preset_is_named_and_carries_only_live_coefficients():
     preset = pretium.model_preset()
-    assert preset["name"] == "pt-v1"
+    # The default preset must name the model an engine actually runs. This
+    # assertion used to read `== "pt-v1"`, which locked the reported default
+    # to a literal: when the engine's default became pt-v3 the library went on
+    # reporting pt-v1's name AND pt-v1's momentum_theta for pt-v3 runs, and
+    # manifest.py folded those wrong coefficients into the run digest whose
+    # purpose is catching exactly that substitution. Comparing against the
+    # engine instead of a literal is the contract that was being violated.
+    engine = pretium.Engine(seed=1, universe=pretium.Universe.random(2, seed=1))
+    assert preset["name"] == engine.model_fingerprint
     # Dead coefficients must not appear. A preset listing knobs wired to
     # nothing is a documentation lie, and this model has two such constants
     # (mean-reversion) that belong to a discarded factor.
