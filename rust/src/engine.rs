@@ -202,6 +202,11 @@ pub struct Engine {
     /// as the factor's sigma. Recorded-stream replay (`tick_with`)
     /// bypasses it: that era's factor was constant-sigma.
     market_vol: MarketVarianceState,
+    /// The universe's remembered stress, in VIX points above the crisis
+    /// threshold. Ratchets up with a shock and decays geometrically, so an
+    /// event's effect on the cross-section OUTLIVES the day it happened.
+    /// Zero, and inert, under every preset before pt-v4.
+    universe_stress: f64,
     /// Cumulative draws per stream, including any the embedder took through
     /// [`Engine::draw_uniform`]. The single most useful numbers for
     /// diagnosing a divergence: if these differ between two runs, nothing
@@ -252,6 +257,38 @@ impl Engine {
         )
     }
 
+    /// Advance the universe's remembered stress by one day.
+    ///
+    /// A ratchet with decay: today's stress enters immediately and in full,
+    /// and what is already remembered decays geometrically. Asymmetric on
+    /// purpose, because correlation is — it spikes with the shock and
+    /// unwinds over weeks, rather than lagging the shock on the way in.
+    ///
+    /// `universe_stress_decay` is a per-day survival fraction, so 0.97 is a
+    /// 23-day half-life and 0.0 means nothing survives the night, which is
+    /// the behaviour of every preset before pt-v4.
+    fn update_universe_stress(&mut self) {
+        let threshold = crate::economy::CRISIS_VIX_THRESHOLD;
+        let instant = if self.economy.vix > threshold {
+            self.economy.vix - threshold
+        } else {
+            0.0
+        };
+        let remembered = self.params.universe_stress_decay * self.universe_stress;
+        self.universe_stress = crate::mathx::max(instant, remembered);
+    }
+
+    /// The universe's remembered stress, for checkpoints and for anyone
+    /// asking what the market is still carrying.
+    pub fn universe_stress(&self) -> f64 {
+        self.universe_stress
+    }
+
+    /// Put the remembered stress back. See [`Engine::universe_stress`].
+    pub fn set_universe_stress(&mut self, stress: f64) {
+        self.universe_stress = stress;
+    }
+
     /// The preset an engine gets when the caller names none.
     ///
     /// One definition, because the alternative is what this replaced: the
@@ -295,6 +332,7 @@ impl Engine {
             tick_fundamental: vec![f64::NAN; companies_len],
             tick_anchor: vec![f64::NAN; companies_len],
             market_vol: MarketVarianceState::new_with(&params),
+            universe_stress: 0.0,
             sector_keys,
             draws: StreamDraws::default(),
             params,
@@ -446,6 +484,7 @@ impl Engine {
             &mut self.companies,
             &TickInputs {
                 economy: &self.economy,
+                universe_stress: self.universe_stress,
                 market_status: status,
                 intraday_t: intraday_fraction(request.time),
                 volatility_multiplier: request.volatility_multiplier,
@@ -707,6 +746,7 @@ impl Engine {
         // is the day's TRADING value — the macro chain has not advanced
         // yet, exactly as the per-name updates see the day they closed.
         self.market_vol.close_day_with(&self.params, self.economy.vix);
+        self.update_universe_stress();
     }
 
     /// The daily macro step: economy, cycle roll, then the central bank.

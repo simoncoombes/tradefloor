@@ -306,6 +306,11 @@ pub struct TickInputs<'a> {
     /// constant sigma. A caller building `TickInputs` directly and wanting
     /// the old constant-sigma behaviour passes the constant.
     pub market_sigma_daily: f64,
+    /// The universe's remembered stress, in VIX points above the crisis
+    /// threshold, carried from previous days. Zero under every preset
+    /// before pt-v4 and under any preset with the memory disabled, which
+    /// is what makes the correlation blend below reproduce exactly.
+    pub universe_stress: f64,
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
@@ -437,11 +442,28 @@ pub fn simulate_market_tick(
     // makes crossing it MEAN something: the blend saturates at its 0.8
     // cap by VIX ≈ 26.6, the ceiling of what the macro chain can produce,
     // instead of asking for a VIX of 64 that cannot exist.
-    let vix_correlation_spike = if economy.vix > crate::economy::CRISIS_VIX_THRESHOLD {
-        mathx::min(
-            p.crisis_blend_cap,
-            (economy.vix - crate::economy::CRISIS_VIX_THRESHOLD) / p.crisis_blend_ramp,
-        )
+    // Today's stress, in VIX points above the crisis threshold.
+    let instant_stress = if economy.vix > crate::economy::CRISIS_VIX_THRESHOLD {
+        economy.vix - crate::economy::CRISIS_VIX_THRESHOLD
+    } else {
+        0.0
+    };
+    // UNIVERSE MEMORY. Without it this blend is a lookup on today's VIX and
+    // nothing else: the tick VIX drops back under the threshold and the
+    // whole cross-section decouples in the same tick, so a crisis leaves no
+    // trace. With it, remembered stress from earlier days holds the blend
+    // up while it decays, which is what real correlation does after a
+    // panic. The branch keeps every earlier preset bit-identical -- at
+    // weight zero this is `instant_stress` and no arithmetic has touched it.
+    let effective_stress = if p.universe_stress_weight == 0.0 {
+        instant_stress
+    } else {
+        instant_stress
+            + p.universe_stress_weight
+                * mathx::max(inputs.universe_stress - instant_stress, 0.0)
+    };
+    let vix_correlation_spike = if effective_stress > 0.0 {
+        mathx::min(p.crisis_blend_cap, effective_stress / p.crisis_blend_ramp)
     } else {
         0.0
     };
@@ -830,4 +852,64 @@ mod tests {
             crate::mispricing::MISPRICING_PHI
         );
     }
+
+    #[test]
+    fn universe_memory_holds_correlation_up_after_the_shock_passes() {
+        // The property this state exists for. Real correlation spikes with
+        // a panic and unwinds over weeks; without memory this model's blend
+        // is a lookup on today's VIX, so the cross-section re-decouples in
+        // the same tick the VIX falls back. Here: shock the memory, then
+        // ask what the blend does on a CALM day.
+        let base = crate::params::PT_V1;
+        let mut remembering = base.clone();
+        remembering.universe_stress_weight = 1.0;
+        remembering.universe_stress_decay = 0.97;
+
+        let calm_vix = crate::economy::CRISIS_VIX_THRESHOLD - 5.0;
+        let carried = 8.0; // VIX points of remembered stress
+
+        let forgetful = blend_for(&base, calm_vix, carried);
+        let remembers = blend_for(&remembering, calm_vix, carried);
+
+        assert_eq!(forgetful, 0.0, "without memory a calm day decouples");
+        assert!(remembers > 0.0,
+                "with memory the blend survives the day the panic ended");
+        assert!(remembers <= base.crisis_blend_cap);
+    }
+
+    #[test]
+    fn universe_memory_is_inert_at_its_legacy_weight() {
+        // Bit-identity for every preset before pt-v4: at weight zero the
+        // blend must be exactly the today's-VIX lookup, whatever the
+        // universe happens to be remembering.
+        let base = crate::params::PT_V1;
+        assert_eq!(base.universe_stress_weight, 0.0);
+        for vix in [5.0, 15.0, 22.0, 30.0, 65.0] {
+            for carried in [0.0, 3.0, 25.0] {
+                assert_eq!(
+                    blend_for(&base, vix, carried),
+                    blend_for(&base, vix, 0.0),
+                    "vix {vix} carried {carried}"
+                );
+            }
+        }
+    }
+
+    /// The blend as `simulate_market_tick` computes it, extracted so the
+    /// two tests above can ask about it without driving a whole market.
+    fn blend_for(p: &crate::params::ModelParams, vix: f64, carried: f64) -> f64 {
+        let threshold = crate::economy::CRISIS_VIX_THRESHOLD;
+        let instant = if vix > threshold { vix - threshold } else { 0.0 };
+        let effective = if p.universe_stress_weight == 0.0 {
+            instant
+        } else {
+            instant + p.universe_stress_weight * mathx::max(carried - instant, 0.0)
+        };
+        if effective > 0.0 {
+            mathx::min(p.crisis_blend_cap, effective / p.crisis_blend_ramp)
+        } else {
+            0.0
+        }
+    }
+
 }
