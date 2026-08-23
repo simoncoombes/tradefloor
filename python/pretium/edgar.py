@@ -694,7 +694,18 @@ def fetch(
             "fiscal_year": fy,
             "duration_frame": duration,
             "instant_frame": instant,
-            "ranked_by": "stockholders_equity",
+            # Reports what the ranking ACTUALLY was. This read
+            # "stockholders_equity" unconditionally when `rank_by` landed,
+            # so a float-ranked snapshot carried a note saying it was
+            # equity-ranked -- the identical bug class as `model_preset()`'s
+            # hardcoded "pt-v1" default, fixed hours earlier in this same
+            # session, reintroduced by the person who fixed it. A provenance
+            # field that does not follow the thing it describes is worse than
+            # no field: it is a confident wrong answer.
+            "ranked_by": (
+                "public_float" if rank_by == "public_float"
+                else "stockholders_equity"
+            ),
             "candidates": len(candidates),
             "requested": limit,
         },
