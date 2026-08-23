@@ -1,28 +1,47 @@
 """The guard for behaviour the realism panel cannot see.
 
-Why this exists. On 2026-08-22 the pt-v3 era boundary halved a documented
+Why this exists. On 2026-08-22 the pt-v3 era boundary moved a documented
 headline feature -- "VIX is a volatility lever" -- and nothing in the
 calibration noticed. Every guard this project runs reads the ten-statistic
-panel, and the panel is measured at a single flat VIX on one horizon. A
-vector can therefore be perfect on all four axes while the market stops
-responding to the scenario machinery entirely, which is what happened:
-`L_real` went to 0.0058 and the VIX 5->65 volatility lever fell from x2.51
-to x1.54 in the same step.
+panel, and the panel is measured at a single flat VIX on one horizon, so a
+vector can be perfect on all four axes while the market's response to the
+scenario machinery changes underneath it.
 
-The cause is now measured and it is not subtle. The market factor's
-variance reverts to a target that scales with `(VIX/15)^2`, and how fast it
-gets there is `market_vol_alpha + market_vol_beta`:
+**Read the correction below before quoting any number from this file's
+history.** This instrument shipped measuring its held-VIX half at ONE
+hardcoded seed, and on 2026-08-23 it was re-measured at thirty. The
+headline claim it was written to support -- that the era boundary halved
+the lever -- did not survive:
 
-    pt-v1    persistence 0.950000   half-life  13.5 d   lever x2.51
-    capped   persistence 0.989058   half-life  63.0 d   lever x1.97
-    pt-v3    persistence 0.996402   half-life 192.3 d   lever x1.54
+                        1 seed (as shipped)    30 seeds (true)
+    pt-v1 lever                  x2.51              x3.22
+    pt-v3 lever                  x2.03              x3.07
+    retained                       81%              95.2%
 
-A twenty-day VIX spike cannot move a variance that reverts over 192 days.
-And CALIBRATION-FOLLOWUPS.md §2 established that the 252-day panel cannot
-DISTINGUISH those half-lives -- `L_real` is 0.0000 on all three 252-day axes
-at both 63 and 192 days. So the panel is indifferent to the exact quantity
-that sets this feature, which is the definition of a blind spot: the search
-was free to spend it, and it did, for nothing.
+The steady-state lever is essentially intact. What IS real, and held at
+both sample sizes, is the transient:
+
+    shock response retained       31%              27.6%
+
+So the defect is **transient response, not steady-state gain**, and that
+distinction is physical rather than cosmetic. A 63-day half-life still
+reaches the right level for a held VIX given enough days; what it cannot
+do is track a twenty-day spike. The market factor's variance reverts to a
+target scaling with `(VIX/15)^2`, and `market_vol_alpha + market_vol_beta`
+sets how fast:
+
+    pt-v1     persistence 0.950000   half-life  13.5 d   shock x1.225
+    pt-v3     persistence 0.989058   half-life  63.0 d   shock x1.062
+
+Both levers are also far below the real market's x6.16 (measured by
+`real_vix_lever.py`: 17.2% annualised at VIX<12 against 106.1% at VIX 45+),
+so "restore pt-v1's lever" was never the right target either.
+
+CALIBRATION-FOLLOWUPS.md §2 established that the 252-day panel cannot
+DISTINGUISH those half-lives -- `L_real` is 0.0000 on all three 252-day
+axes at both 63 and 192 days. So the panel is indifferent to the quantity
+that sets the transient, which is the blind spot this instrument exists
+to cover.
 
 What this measures, all against the same vector:
 
@@ -50,6 +69,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing
 import math
 import statistics
 import time
@@ -60,7 +80,25 @@ from pretium import Scenario
 from pretium.scenario import run_scenario
 
 HELD_VIX = (5.0, 15.0, 25.0, 45.0, 65.0)
-SHOCK_SEEDS = (3, 5, 7)
+
+#: Seeds for BOTH halves of the measurement. Thirty, not three.
+#:
+#: This instrument shipped reading three seeds, and three is how a whole
+#: day of mistakes happened. The `holdout_horizon` axis was confounded
+#: because it ran three seeds where every other axis runs thirty -- the
+#: seed term on `abs_return_acf5` was +0.1287 against the horizon's
+#: +0.0435, so the axis reported a seed effect three times larger than the
+#: one it was named for. A three-seed decay measurement then produced a
+#: finding that had to be retracted, and a three-seed tuning sweep landed
+#: entirely inside its own noise.
+#:
+#: Every one of those was a sample-size problem wearing a different hat,
+#: and each instrument was three-seed because thirty was slow on eight
+#: cores. That is tooling shaped by a core count rather than by what the
+#: measurement needs, so the fix is thirty seeds AND the worker pool that
+#: makes thirty affordable -- not one or the other.
+DEFAULT_SEEDS = tuple(range(101, 131))
+
 UNIVERSE_N, UNIVERSE_SEED = 20, 11
 HELD_DAYS = 120
 SHOCK_DAYS, SHOCK_TICKS = 40, 80
@@ -96,24 +134,71 @@ def pooled_vol(scenario, seed, model) -> float:
     return statistics.pstdev(returns)
 
 
-def measure_vector(model) -> dict:
-    universe = pretium.Universe.random(UNIVERSE_N, seed=UNIVERSE_SEED)
+def _held_job(job):
+    """One (vix, seed) held-VIX panel, in a worker."""
+    overrides, vix, seed = job
+    model = _rebuild(overrides)
+    panel = facts.measure(
+        seed=seed, universe=pretium.Universe.random(UNIVERSE_N,
+                                                    seed=UNIVERSE_SEED),
+        days=HELD_DAYS, scenario=Scenario().hold(vix=vix), model=model)
+    return vix, seed, panel["annualised_vol_pct"], panel["cross_sectional_corr"]
+
+
+def _shock_job(job):
+    """One seed's shocked/flat ratio, both runs on identical draws."""
+    overrides, seed = job
+    model = _rebuild(overrides)
+    shock = Scenario.vix_shock(calm=15.0, peak=45.0, at=10, over=20)
+    flat = Scenario().hold(vix=15.0)
+    return seed, pooled_vol(shock, seed, model) / pooled_vol(flat, seed, model)
+
+
+def _rebuild(overrides):
+    """Workers get a dict, not a ModelParams: presets are named, vectors
+    are overrides on pt-v1, and neither needs the object to survive a
+    pickle."""
+    if isinstance(overrides, str):
+        return overrides
+    return pretium.ModelParams.from_preset("pt-v1", **overrides)
+
+
+def _as_overrides(model):
+    if isinstance(model, str):
+        return model
+    ship = pretium.ModelParams.from_preset("pt-v1").to_dict()
+    live = model.to_dict()
+    return {k: v for k, v in live.items()
+            if k in pretium.ModelParams.settable() and v != ship[k]}
+
+
+def measure_vector(model, seeds=DEFAULT_SEEDS, workers: int = 8) -> dict:
+    """Every number here is a median across `seeds`, not a single draw.
+
+    The medians matter more than the parallelism: a lever is a ratio of
+    two volatilities, so a one-seed lever divides one noisy number by
+    another and reports the result to two decimals.
+    """
+    overrides = _as_overrides(model)
+    held_jobs = [(overrides, vix, seed) for vix in HELD_VIX for seed in seeds]
+    shock_jobs = [(overrides, seed) for seed in seeds]
+
+    with multiprocessing.Pool(processes=max(1, workers)) as pool:
+        held_rows = pool.map(_held_job, held_jobs)
+        shock_rows = pool.map(_shock_job, shock_jobs)
 
     held = {}
     for vix in HELD_VIX:
-        panel = facts.measure(seed=3, universe=universe, days=HELD_DAYS,
-                              scenario=Scenario().hold(vix=vix), model=model)
+        vols = [v for (x, _s, v, _c) in held_rows if x == vix]
+        corrs = [c for (x, _s, _v, c) in held_rows if x == vix]
         held[vix] = {
-            "annualised_vol_pct": panel["annualised_vol_pct"],
-            "cross_sectional_corr": panel["cross_sectional_corr"],
+            "annualised_vol_pct": statistics.median(vols),
+            "cross_sectional_corr": statistics.median(corrs),
+            "seeds": len(vols),
+            "annualised_vol_pct_sd": (statistics.stdev(vols)
+                                      if len(vols) > 1 else 0.0),
         }
-
-    shock = Scenario.vix_shock(calm=15.0, peak=45.0, at=10, over=20)
-    flat = Scenario().hold(vix=15.0)
-    ratios = {}
-    for seed in SHOCK_SEEDS:
-        ratios[seed] = pooled_vol(shock, seed, model) / pooled_vol(flat, seed,
-                                                                   model)
+    ratios = {seed: r for seed, r in shock_rows}
 
     lo, hi = HELD_VIX[0], HELD_VIX[-1]
     return {
@@ -122,7 +207,10 @@ def measure_vector(model) -> dict:
         / held[lo]["annualised_vol_pct"],
         "corr_blend": held[45.0]["cross_sectional_corr"]
         / held[15.0]["cross_sectional_corr"],
+        "seeds": list(seeds),
         "shock_ratio": {str(k): v for k, v in ratios.items()},
+        "shock_ratio_sd": (statistics.stdev(ratios.values())
+                           if len(ratios) > 1 else 0.0),
         "shock_ratio_median": statistics.median(ratios.values()),
     }
 
@@ -148,14 +236,22 @@ def main() -> int:
     parser.add_argument("--reference", default="pt-v1",
                         help="preset or certificate to report against")
     parser.add_argument("--out", default=None)
+    parser.add_argument("--seeds", default=None,
+                        help="comma list; default is the thirty training "
+                             "seeds. Fewer is how this instrument used to "
+                             "mislead -- see DEFAULT_SEEDS.")
+    parser.add_argument("--workers", type=int, default=8)
     args = parser.parse_args()
 
+    seeds = (tuple(int(x) for x in args.seeds.split(",")) if args.seeds
+             else DEFAULT_SEEDS)
     started = time.perf_counter()
     out = {}
+    print(f"seeds: {len(seeds)}  workers: {args.workers}\n")
     for label, spec in (("vector", args.vector), ("reference", args.reference)):
         name, model = load_vector(spec)
         out[label] = {"spec": name, **persistence(model),
-                      **measure_vector(model)}
+                      **measure_vector(model, seeds, args.workers)}
 
     v, r = out["vector"], out["reference"]
     print(f"{'':22s} {'vector':>12s} {'reference':>12s}")
@@ -189,7 +285,7 @@ def main() -> int:
     out["wall_seconds"] = time.perf_counter() - started
     out["method"] = {
         "held_vix": list(HELD_VIX), "held_days": HELD_DAYS,
-        "shock_seeds": list(SHOCK_SEEDS),
+        "seeds": list(seeds),
         "shock": "vix_shock(calm=15, peak=45, at=10, over=20) over "
                  "hold(vix=15) on identical draws",
         "universe": f"Universe.random({UNIVERSE_N}, seed={UNIVERSE_SEED})",

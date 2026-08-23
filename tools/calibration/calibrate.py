@@ -256,9 +256,19 @@ def calibration_box(name: str, ship: float) -> tuple[float, float]:
     constant move twenty-fold is not asking it.
     """
     spec = lib.PARAM_SPECS[name]
+    hard = spec.get("hard_range", (0.0, 0.999))
+    if ship == 0.0:
+        # A multiplicative box around zero is the single point zero, which
+        # would silently pin the parameter rather than search it. Every
+        # parameter this applies to was introduced OFF by construction --
+        # the pt-v4 slow-variance trio -- so "~[1/4x, 4x] of the shipped
+        # value" has no meaning for them and the declared hard range is the
+        # honest box. The §6.3 penalty still prices any move away from
+        # zero, so the regulariser, not the box, is what keeps the move
+        # small.
+        return hard
     lo, hi = ship / 4.0, ship * 4.0
     if spec["kind"] == "abs":
-        hard = spec.get("hard_range", (0.0, 0.999))
         lo, hi = max(lo, hard[0]), min(hi, hard[1])
     return lo, hi
 
@@ -294,9 +304,13 @@ class DevSpace:
     """
 
     def __init__(self, params: list[str], ship: dict[str, float],
-                 factor_persistence_cap: float | None = None) -> None:
+                 factor_persistence_cap: float | None = None,
+                 fixed: dict[str, float] | None = None) -> None:
         self.params = params
         self.ship = ship
+        #: Parameters set by construction: applied to every vector, never
+        #: searched, never penalised. See `to_raw`.
+        self.fixed = dict(fixed or {})
         #: An identifiability bound on `market_vol_alpha +
         #: market_vol_beta`, or None for §6.3's stationarity bound alone.
         #: It lives here rather than in `instrumentlib.feasibility_
@@ -332,6 +346,14 @@ class DevSpace:
             du = float(x) * scale
             out[name] = float(center * math.exp(du) if kind == "log"
                               else center + du)
+        # Fixed overrides ride on every vector the search prices. They are
+        # NOT searched and NOT penalised: a parameter set by construction
+        # is a decision taken outside the objective, usually because the
+        # objective cannot see what it buys. `volume_variance_gain` is the
+        # case this was added for -- it lands `volume_change_acf1` in band,
+        # and `volume_change_acf1` is STRUCTURAL, so the loss is blind to
+        # it by design and a search would leave the parameter at zero.
+        out.update(self.fixed)
         return out
 
     def from_raw(self, raw: dict[str, float]) -> np.ndarray:
@@ -683,6 +705,11 @@ def main() -> None:
                         help="how far inside each band the SEARCH aims, in "
                              "seed-sds; reporting always uses the true "
                              "bands. 0 reproduces phase 3.")
+    parser.add_argument("--fix", action="append", default=[],
+                        metavar="NAME:VALUE",
+                        help="set a parameter by construction: applied to "
+                             "every vector, not searched, not penalised. "
+                             "Repeatable.")
     parser.add_argument("--factor-persistence-half-life", type=float,
                         default=None, metavar="DAYS",
                         help="cap market_vol_alpha + market_vol_beta at the "
@@ -721,7 +748,18 @@ def main() -> None:
 
     cap = (persistence_cap(args.factor_persistence_half_life)
            if args.factor_persistence_half_life else None)
-    space = DevSpace(params, ship, factor_persistence_cap=cap)
+    fixed = {}
+    for item in args.fix:
+        name, _, value = item.partition(":")
+        name = name.strip()
+        if not name or not value:
+            raise SystemExit(f"--fix wants NAME:VALUE, got {item!r}")
+        if name in params:
+            raise SystemExit(
+                f"--fix {name} is also in --params: a parameter is either "
+                "searched or set by construction, not both")
+        fixed[name] = float(value)
+    space = DevSpace(params, ship, factor_persistence_cap=cap, fixed=fixed)
 
     in_loss = list(loss_mod.LIVE_TARGETS) + list(loss_mod.CONSTRAINTS)
     margin = margined_bands(facts.REAL_MARKETS, facts.SEED_SD, in_loss,
@@ -1135,28 +1173,14 @@ def main() -> None:
             "column_norm_seed_sds_per_dev_unit": COLUMN_NORMS.get(name),
         })
 
-    print("\n=== candidate, as overrides on pt-v1 ===")
-    for move in sorted(moves, key=lambda m: -abs(m["deviation"])):
-        print(f"  {move['parameter']:<28} {move['pt_v1']:>10.5g} -> "
-              f"{move['candidate']:>10.5g}   dev {move['deviation']:+.4f}"
-              f"   x{move['ratio']:.3f}")
-    print("\n=== panel: pt-v1 -> candidate on the training seeds ===")
-    print("    (bands and every verdict below are the TRUE bands; "
-          f"the search aimed {args.margin_sd} sd inside them)")
-    for key in facts.REAL_MARKETS:
-        before = axes["pt-v1"]["train_seeds"]["statistics"][key]
-        after = axes["candidate"]["train_seeds"]["statistics"][key]
-        room = after.get("room_sd")
-        print(f"  {key:<24} {before['measured']:+10.4f} -> "
-              f"{after['measured']:+10.4f}  band {before['band']}"
-              f"  {after['role']:<12}"
-              f"  d {before['distance']:.4f} -> {after['distance']:.4f}"
-              + (f"  room {room:+6.2f} sd" if room is not None else ""))
-    print(f"\nevaluations: {ev.vector_evaluations} vectors, "
-          f"{ev.panel_runs} panel runs "
-          f"({ev.panel_runs / 6.0:.0f} six-seed-vector equivalents against a "
-          f"budget of {args.budget_panel_runs / 6.0:.0f}), wall {wall:.0f}s")
-
+    # The certificate is written BEFORE the human-readable summary, and
+    # the ordering is load-bearing rather than stylistic. It used to be
+    # the other way round, and on 2026-08-23 a formatting bug in the
+    # summary -- a parameter that ships at ZERO has no ratio, and None
+    # does not take a float format -- raised after every axis had been
+    # measured and before anything was saved. Ninety minutes of search
+    # died in a print statement. A run that has computed its answer must
+    # persist it before it does anything else with it.
     lib.write_json(args.out, {
         "provenance": lib.provenance(),
         "claim": {
@@ -1302,6 +1326,36 @@ def main() -> None:
         "six_seed_vector_equivalents": ev.panel_runs / 6.0,
         "wall_seconds": wall,
     })
+
+    print("\n=== candidate, as overrides on pt-v1 ===")
+    for move in sorted(moves, key=lambda m: -abs(m["deviation"])):
+        # `ratio` is None for a parameter that SHIPS AT ZERO, because
+        # there is no multiple of zero. The pt-v4 slow-variance trio is
+        # the first such parameter this project has had, and formatting
+        # that None as a float crashed a 90-minute run after its axes
+        # were measured and before its certificate was written.
+        ratio = ("      n/a" if move["ratio"] is None
+                 else f"x{move['ratio']:.3f}")
+        print(f"  {move['parameter']:<28} {move['pt_v1']:>10.5g} -> "
+              f"{move['candidate']:>10.5g}   dev {move['deviation']:+.4f}"
+              f"   {ratio}")
+    print("\n=== panel: pt-v1 -> candidate on the training seeds ===")
+    print("    (bands and every verdict below are the TRUE bands; "
+          f"the search aimed {args.margin_sd} sd inside them)")
+    for key in facts.REAL_MARKETS:
+        before = axes["pt-v1"]["train_seeds"]["statistics"][key]
+        after = axes["candidate"]["train_seeds"]["statistics"][key]
+        room = after.get("room_sd")
+        print(f"  {key:<24} {before['measured']:+10.4f} -> "
+              f"{after['measured']:+10.4f}  band {before['band']}"
+              f"  {after['role']:<12}"
+              f"  d {before['distance']:.4f} -> {after['distance']:.4f}"
+              + (f"  room {room:+6.2f} sd" if room is not None else ""))
+    print(f"\nevaluations: {ev.vector_evaluations} vectors, "
+          f"{ev.panel_runs} panel runs "
+          f"({ev.panel_runs / 6.0:.0f} six-seed-vector equivalents against a "
+          f"budget of {args.budget_panel_runs / 6.0:.0f}), wall {wall:.0f}s")
+
 
 
 if __name__ == "__main__":
