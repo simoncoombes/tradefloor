@@ -142,6 +142,13 @@ PERTURBATIONS = [
     # the three slow-variance rows this one acts alone: the variance it
     # reads is already moving under any preset.
     ("volume_variance_gain", 1.5, True),
+    # Universe memory (pt-v4). Inert here for exactly the reason
+    # crisis_blend_ramp and crisis_blend_cap are: the blend they modify
+    # only exists above CRISIS_VIX_THRESHOLD, and a 3-day probe starting
+    # at the default VIX of 15 never gets there. Shown live under that
+    # condition by `test_universe_memory_acts_above_the_crisis_threshold`.
+    ("universe_stress_decay", 0.97, False),    # needs VIX > threshold
+    ("universe_stress_weight", 1.0, False),    # needs VIX > threshold
 ]
 
 
@@ -198,6 +205,38 @@ def test_the_slow_variance_component_acts_when_its_three_parts_agree():
     moved = market_state(run_market(both))
     assert moved["draws"] == base["draws"], "the slow component moved the draw schedule"
     assert any(moved[k] != base[k] for k in moved if k != "draws")
+
+
+def test_universe_memory_acts_above_the_crisis_threshold():
+    """The state that lets a crisis OUTLIVE itself, measured.
+
+    Without it the crisis correlation blend is a lookup on today's VIX:
+    the tick VIX falls back under the threshold and the whole
+    cross-section decouples in the same tick, so a panic leaves the
+    universe exactly as it found it. With it, remembered stress holds the
+    blend up while it decays.
+
+    Driven through a scenario that spikes VIX and then lets it fall,
+    because that is the only shape in which the difference exists at all
+    -- at a flat VIX there is nothing to remember.
+    """
+    import pretium.scenario as sc
+
+    def final_prices(model=None):
+        kwargs = {} if model is None else {"model": model}
+        shock = sc.Scenario.vix_shock(calm=15.0, peak=45.0, at=3, over=5)
+        engine = sc.run_scenario(shock, seed=42, universe=UNIVERSE, days=20,
+                                 ticks_per_day=40, **kwargs)
+        return struct.unpack("<%dd" % len(engine.tickers),
+                             engine.column("price"))
+
+    forgetful = final_prices(pretium.ModelParams.from_preset("pt-v3"))
+    remembering = final_prices(pretium.ModelParams.from_preset(
+        "pt-v3", universe_stress_decay=0.97, universe_stress_weight=1.0))
+    assert forgetful != remembering, (
+        "universe memory changed nothing across a VIX spike and decay; "
+        "the state is not reaching the correlation blend"
+    )
 
 
 def test_the_conditionally_inert_parameters_act_under_their_conditions():

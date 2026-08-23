@@ -174,6 +174,30 @@ pub struct ModelParams {
     /// 0.0 disables it and volume is exactly what it was.
     pub volume_variance_gain: f64,
 
+    // ── Universe memory (market/tick.rs, engine.rs) ─────────────────────
+    /// How slowly the universe's remembered stress decays, per day.
+    ///
+    /// The crisis correlation blend is otherwise a LOOKUP ON TODAY'S VIX:
+    /// `spike = min(cap, (vix - threshold) / ramp)` with no state at all,
+    /// so the tick VIX falls back under the threshold and the whole
+    /// cross-section decouples in the same tick. A crisis leaves the
+    /// universe exactly as it found it.
+    ///
+    /// Real correlation does not work that way -- it spikes with the shock
+    /// and decays over weeks, which is the most-observed crisis fact there
+    /// is and the one this model could not produce. This carries a stress
+    /// level that ratchets up instantly and decays geometrically, so an
+    /// event has an effect that OUTLIVES it.
+    ///
+    /// 0.0 means the level never survives a day and the blend is exactly
+    /// what it always was.
+    pub universe_stress_decay: f64,
+    /// How much of the remembered stress reaches the correlation blend.
+    ///
+    /// 0.0 disables the memory entirely; the blend then reads today's VIX
+    /// and nothing else, bit for bit.
+    pub universe_stress_weight: f64,
+
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
     /// Trading days for half of a mispricing to decay. The ONE settable
     /// knob for the decay: overriding it recomputes `mispricing_phi` and
@@ -302,6 +326,8 @@ impl ModelParams {
             market_vol_slow_gain: 0.0,
             market_vol_slow_weight: 0.0,
             volume_variance_gain: 0.0,
+            universe_stress_decay: 0.0,
+            universe_stress_weight: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -426,6 +452,8 @@ impl ModelParams {
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "market_vol_slow_weight" => self.market_vol_slow_weight,
             "volume_variance_gain" => self.volume_variance_gain,
+            "universe_stress_decay" => self.universe_stress_decay,
+            "universe_stress_weight" => self.universe_stress_weight,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -498,6 +526,8 @@ impl ModelParams {
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "market_vol_slow_weight" => out.market_vol_slow_weight = value,
             "volume_variance_gain" => out.volume_variance_gain = value,
+            "universe_stress_decay" => out.universe_stress_decay = value,
+            "universe_stress_weight" => out.universe_stress_weight = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -636,6 +666,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "price_breaker_fraction",
         "price_hard_cap",
         "sector_factor_sigma",
+        "universe_stress_decay",
+        "universe_stress_weight",
         "volume_variance_gain",
     ]
 }
