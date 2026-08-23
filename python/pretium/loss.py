@@ -92,22 +92,6 @@ LIVE_TARGETS = (
     "abs_return_acf1",
     "abs_return_acf5",
     "cross_sectional_corr",
-    # `abs_return_acf20` moved here from CONSTRAINTS at the pt-v4 era.
-    # It sat in band and therefore contributed zero loss, so nothing
-    # rewarded the model for having any clustering left at lag twenty --
-    # and the model has almost none. Real markets read +0.020 at this lag
-    # in a 252-day window and stay weakly positive out to lag sixty; the
-    # shipped model reads about +0.002 and is negative by lag sixty. Being
-    # inside a band whose floor is -0.04 hid a decay curve three times too
-    # steep (log-log slope -1.33 against real markets' -0.44).
-    #
-    # It is promoted rather than replaced by a new long-lag statistic
-    # because it is already banded with full provenance, and because the
-    # obvious alternatives were measured and failed: a decay-exponent
-    # statistic has per-panel seed noise half the width of the entire
-    # real-market spread, and lands the model INSIDE the band meant to
-    # exclude it.
-    "abs_return_acf20",
 )
 
 #: In band at the baseline; constraints rather than targets. Zero loss
@@ -116,14 +100,30 @@ LIVE_TARGETS = (
 #: -0.16 to 0.00) put the shipped GJR-backed model inside it -- it is
 #: reachable (the falsification certificates reach -0.12 in band through
 #: `garch_gamma`) and in band, which is this tuple's definition.
-#: `abs_return_acf20` was here for the same reason lag 5 became live -- a
+#: `abs_return_acf20` is here for the same reason lag 5 became live: a
 #: measured statistic outside the loss is a direction an optimiser can
-#: break for free -- and moved to LIVE_TARGETS at the pt-v4 era, because
-#: being in band turned out not to be enough: see the note there.
+#: break for free.
+#:
+#: It was promoted to LIVE_TARGETS on 2026-08-23 to make the search chase
+#: the long-lag clustering the model lacks, and reverted the same day
+#: because it CANNOT. Real markets' own year-to-year variation in this
+#: statistic (windows spanning -0.015 to +0.141, a range of 0.156) is
+#: SIX TIMES the model's entire defect (-0.004 against real's +0.020, a
+#: gap of 0.024). The band is wide because that dispersion is real, so no
+#: role, margin or penalty can make a single 252-day panel distinguish a
+#: market with the right tail from one with none -- three successive
+#: searches proved it, each removing a real obstacle and finding another
+#: behind it.
+#:
+#: The tail is a GATE property, not a panel property. It is checked by
+#: `decay_curve.py` over thirty seeds, where aggregation kills exactly the
+#: noise that defeats the panel: real markets fit a log-log slope of
+#: -0.436 there and the model -0.956, which is unambiguous.
 CONSTRAINTS = (
     "excess_kurtosis",
     "volume_abs_return_corr",
     "leverage_effect",
+    "abs_return_acf20",
 )
 
 #: Reported in every result, excluded from the loss: the panel statistics
