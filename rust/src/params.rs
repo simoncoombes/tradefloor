@@ -197,6 +197,24 @@ pub struct ModelParams {
     /// 0.0 disables the memory entirely; the blend then reads today's VIX
     /// and nothing else, bit for bit.
     pub universe_stress_weight: f64,
+    /// Stress the business cycle contributes, in VIX-equivalent points at
+    /// full intensity (contraction).
+    ///
+    /// The engine runs a five-phase cycle -- expansion, peak, contraction,
+    /// trough, recovery -- that the MARKET has never read. The central
+    /// bank changes its whole policy by phase; the price process behaves
+    /// as though the economy were always expanding. This is the wire.
+    ///
+    /// It feeds the same remembered stress VIX does, so a contraction
+    /// raises correlation across the whole cross-section and keeps it
+    /// raised while the phase lasts and for weeks after it ends. Regime
+    /// switching is also, per Diebold and Inoue, indistinguishable from
+    /// long memory in the data -- so this may reproduce the decay curve a
+    /// second variance timescale was added to chase.
+    ///
+    /// 0.0 means the market ignores the cycle, which is every preset
+    /// before pt-v4.
+    pub regime_stress_points: f64,
 
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
     /// Trading days for half of a mispricing to decay. The ONE settable
@@ -328,6 +346,7 @@ impl ModelParams {
             volume_variance_gain: 0.0,
             universe_stress_decay: 0.0,
             universe_stress_weight: 0.0,
+            regime_stress_points: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -454,6 +473,7 @@ impl ModelParams {
             "volume_variance_gain" => self.volume_variance_gain,
             "universe_stress_decay" => self.universe_stress_decay,
             "universe_stress_weight" => self.universe_stress_weight,
+            "regime_stress_points" => self.regime_stress_points,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -528,6 +548,7 @@ impl ModelParams {
             "volume_variance_gain" => out.volume_variance_gain = value,
             "universe_stress_decay" => out.universe_stress_decay = value,
             "universe_stress_weight" => out.universe_stress_weight = value,
+            "regime_stress_points" => out.regime_stress_points = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -665,6 +686,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "order_flow_coefficient",
         "price_breaker_fraction",
         "price_hard_cap",
+        "regime_stress_points",
         "sector_factor_sigma",
         "universe_stress_decay",
         "universe_stress_weight",

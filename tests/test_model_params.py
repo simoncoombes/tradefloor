@@ -149,6 +149,11 @@ PERTURBATIONS = [
     # condition by `test_universe_memory_acts_above_the_crisis_threshold`.
     ("universe_stress_decay", 0.97, False),    # needs VIX > threshold
     ("universe_stress_weight", 1.0, False),    # needs VIX > threshold
+    # The business cycle reaching the market. Inert in the probe for a
+    # third variant of the same reason: it feeds the crisis blend, which
+    # only exists above CRISIS_VIX_THRESHOLD, AND a 3-day probe starts in
+    # Expansion, whose stress intensity is exactly 0.0.
+    ("regime_stress_points", 12.0, False),     # needs a non-expansion phase
 ]
 
 
