@@ -118,6 +118,17 @@ PERTURBATIONS = [
     ("market_vol_ceiling_multiple", 0.5, True),
     ("market_vol_floor_multiple", 2.0, True),
     ("market_vol_vix_coupling", 0.0, True),
+    # The slow variance component, added at pt-v4. Each of the three is
+    # inert ALONE by construction: the composed update takes an explicit
+    # zero-weight branch, so with weight 0 neither of the other two can
+    # reach the variance, and with weight non-zero but persistence and
+    # gain both 0 the slow level never leaves baseline so the deviation
+    # it contributes is exactly zero. They act together, which
+    # `test_the_slow_variance_component_acts_when_its_three_parts_agree`
+    # measures rather than assumes.
+    ("market_vol_slow_persistence", 0.99, False),   # needs gain and weight
+    ("market_vol_slow_gain", 0.1, False),           # needs weight
+    ("market_vol_slow_weight", 0.5, False),         # needs gain (or persistence)
     ("market_vol_vix_anchor", 22.0, True),
     ("mispricing_half_life_days", 10.0, True),
     ("momentum_theta", 0.5, True),
@@ -161,6 +172,28 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
         f"{name}={value}: expected moved={moves}, got {moved} — either a "
         "parameter is not wired through, or an inert reason above is stale"
     )
+
+
+def test_the_slow_variance_component_acts_when_its_three_parts_agree():
+    """The other half of the three inert rows above, measured.
+
+    The market factor's variance carries two timescales from pt-v4: a fast
+    one tracking the VIX-scaled target and a slow one carrying long-horizon
+    clustering. The slow half is off in every shipped preset, and off means
+    bit-identical rather than merely small -- the composed update branches
+    on a zero weight instead of adding `0.0 * deviation`.
+
+    So all three parts must be present for it to do anything, and that is
+    what makes the three inert rows above honest rather than a hole an
+    optimiser could walk through.
+    """
+    base = market_state(run_market())
+    both = pretium.ModelParams.from_preset(
+        "pt-v3", market_vol_slow_gain=0.1, market_vol_slow_weight=0.5)
+    assert both.fingerprint.startswith("custom-")
+    moved = market_state(run_market(both))
+    assert moved["draws"] == base["draws"], "the slow component moved the draw schedule"
+    assert any(moved[k] != base[k] for k in moved if k != "draws")
 
 
 def test_the_conditionally_inert_parameters_act_under_their_conditions():

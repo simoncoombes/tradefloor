@@ -268,6 +268,36 @@ fn update_toward(current_variance: f64, day_factor: f64, target_variance: f64) -
     )
 }
 
+/// The slow component's step. Returns the new slow variance level.
+///
+/// Engle-Lee in shape: a persistent level that reverts to the baseline and
+/// takes up part of each day's variance surprise. At
+/// `market_vol_slow_persistence == 0` and `market_vol_slow_gain == 0` this
+/// returns `base` on every call, which is what makes the composed update
+/// below reduce to the single-component form bit for bit.
+pub fn update_slow_variance_with(
+    params: &crate::params::ModelParams,
+    current_slow: f64,
+    current_variance: f64,
+    day_factor: f64,
+) -> f64 {
+    let base = params.market_factor_sigma * params.market_factor_sigma;
+    let rho = params.market_vol_slow_persistence;
+    let surprise = day_factor * day_factor - current_variance;
+    let next = base + rho * (current_slow - base) + params.market_vol_slow_gain * surprise;
+    // The same clamp discipline the fast component uses: a slow level is
+    // still a variance and may not go negative or run away.
+    let lo = params.market_vol_floor_multiple * base;
+    let hi = params.market_vol_ceiling_multiple * base;
+    if next < lo {
+        lo
+    } else if next > hi {
+        hi
+    } else {
+        next
+    }
+}
+
 fn update_toward_with(
     params: &crate::params::ModelParams,
     current_variance: f64,
@@ -300,6 +330,9 @@ fn update_toward_with(
 pub struct MarketVarianceState {
     variance: f64,
     day_factor: f64,
+    /// The SLOW component's level. Held at the baseline whenever the slow
+    /// component is off, which is every preset before pt-v4.
+    slow_variance: f64,
 }
 
 impl Default for MarketVarianceState {
@@ -325,6 +358,7 @@ impl MarketVarianceState {
         Self {
             variance: params.market_factor_sigma * params.market_factor_sigma,
             day_factor: 0.0,
+            slow_variance: params.market_factor_sigma * params.market_factor_sigma,
         }
     }
 
@@ -357,23 +391,58 @@ impl MarketVarianceState {
     /// calls; at [`crate::params::PT_V1`] it is the shipped update bit for
     /// bit.
     pub fn close_day_with(&mut self, params: &crate::params::ModelParams, vix: f64) {
-        self.variance =
+        let next_slow = update_slow_variance_with(
+            params, self.slow_variance, self.variance, self.day_factor);
+        let fast =
             update_market_variance_with(params, self.variance, self.day_factor, vix);
+        // The zero-weight branch is a BRANCH and not `+ 0.0 * x` on
+        // purpose. Every preset before pt-v4 must reproduce the
+        // single-component update to the bit, and `fast + 0.0 * (s - b)`
+        // is only bit-identical to `fast` while `s - b` is finite and
+        // non-NaN. A branch owes nothing to that argument.
+        self.variance = if params.market_vol_slow_weight == 0.0 {
+            fast
+        } else {
+            let base = params.market_factor_sigma * params.market_factor_sigma;
+            mathx::max(
+                mathx::min(
+                    fast + params.market_vol_slow_weight * (next_slow - base),
+                    base * params.market_vol_ceiling_multiple,
+                ),
+                base * params.market_vol_floor_multiple,
+            )
+        };
+        self.slow_variance = next_slow;
         self.day_factor = 0.0;
     }
 
-    /// The two state numbers, for checkpoints: `(variance, day_factor)`.
-    pub fn snapshot(&self) -> (f64, f64) {
-        (self.variance, self.day_factor)
+    /// The three state numbers, for checkpoints:
+    /// `(variance, day_factor, slow_variance)`.
+    pub fn snapshot(&self) -> (f64, f64, f64) {
+        (self.variance, self.day_factor, self.slow_variance)
     }
 
     /// Restore from a checkpoint. Values are adopted verbatim, like every
     /// other restored column: the snapshot is trusted to be one this
     /// engine wrote.
     pub fn restore(variance: f64, day_factor: f64) -> Self {
+        // A two-value checkpoint predates the slow component. Adopting the
+        // variance as the slow level is the only choice that keeps such a
+        // checkpoint replaying identically under a legacy preset, where the
+        // slow level is inert and never read.
         Self {
             variance,
             day_factor,
+            slow_variance: variance,
+        }
+    }
+
+    /// Restore including the slow component, for checkpoints that carry it.
+    pub fn restore_with_slow(variance: f64, day_factor: f64, slow_variance: f64) -> Self {
+        Self {
+            variance,
+            day_factor,
+            slow_variance,
         }
     }
 }
@@ -623,8 +692,59 @@ mod tests {
         state.accumulate(0.007);
         state.close_day(22.0);
         state.accumulate(-0.003);
-        let (v, df) = state.snapshot();
-        let restored = MarketVarianceState::restore(v, df);
+        let (v, df, slow) = state.snapshot();
+        let restored = MarketVarianceState::restore_with_slow(v, df, slow);
         assert_eq!(state, restored);
+    }
+
+    #[test]
+    fn a_two_value_checkpoint_still_replays_under_a_legacy_preset() {
+        // Checkpoints written before the slow component carry two numbers,
+        // so the slow level cannot be reconstructed from them. That is
+        // harmless exactly where it has to be: under any preset with the
+        // slow component off the level is never read, so the RESTORED
+        // state prices identically even though it is not `==` to the
+        // original. This pins the property that matters -- the
+        // trajectory -- rather than the struct equality that does not.
+        let params = &crate::params::PT_V1;
+        assert_eq!(params.market_vol_slow_weight, 0.0);
+
+        let mut original = MarketVarianceState::new_with(params);
+        original.accumulate(0.011);
+        original.close_day_with(params, 31.0);
+        original.accumulate(-0.004);
+
+        let (v, df, _slow) = original.snapshot();
+        let mut restored = MarketVarianceState::restore(v, df);
+
+        for day in 0..12 {
+            let vix = 15.0 + day as f64;
+            let mut a = original;
+            let mut b = restored;
+            a.close_day_with(params, vix);
+            b.close_day_with(params, vix);
+            assert_eq!(a.sigma_daily(), b.sigma_daily(), "day {day}");
+            original = a;
+            restored = b;
+        }
+    }
+
+    #[test]
+    fn the_slow_component_is_inert_at_its_legacy_values() {
+        // The bit-identity contract for every preset before pt-v4: with
+        // the slow component off, the composed update must equal the
+        // single-component update exactly, not approximately.
+        let params = &crate::params::PT_V1;
+        let mut composed = MarketVarianceState::new_with(params);
+        let mut variance = params.market_factor_sigma * params.market_factor_sigma;
+
+        for day in 0..40 {
+            let innovation = 0.004 * ((day % 7) as f64 - 3.0);
+            let vix = 12.0 + (day % 11) as f64;
+            composed.accumulate(innovation);
+            composed.close_day_with(params, vix);
+            variance = update_market_variance_with(params, variance, innovation, vix);
+            assert_eq!(composed.sigma_daily(), mathx::sqrt(variance), "day {day}");
+        }
     }
 }

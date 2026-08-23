@@ -142,6 +142,18 @@ pub struct ModelParams {
     pub market_vol_vix_coupling: f64,
     /// VIX level at which a coupled target equals the baseline variance.
     pub market_vol_vix_anchor: f64,
+    /// Persistence of the SLOW variance component (Engle-Lee style). The
+    /// market factor's variance carries two timescales from the pt-v4 era:
+    /// the fast one above tracks the VIX-scaled target, this one carries
+    /// long-horizon clustering. 0.0 disables it and recovers the
+    /// single-component update bit for bit.
+    pub market_vol_slow_persistence: f64,
+    /// How much of each day's variance surprise the slow component takes
+    /// up. 0.0 disables it.
+    pub market_vol_slow_gain: f64,
+    /// How much of the slow component's deviation from baseline reaches
+    /// the realised variance. 0.0 disables it.
+    pub market_vol_slow_weight: f64,
 
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
     /// Trading days for half of a mispricing to decay. The ONE settable
@@ -265,6 +277,11 @@ impl ModelParams {
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
             market_vol_vix_coupling: factor_vol::MARKET_VOL_VIX_COUPLING,
             market_vol_vix_anchor: factor_vol::MARKET_VOL_VIX_ANCHOR,
+            // Legacy values: the slow component is OFF, and the update
+            // reduces to the single-component form bit for bit.
+            market_vol_slow_persistence: 0.0,
+            market_vol_slow_gain: 0.0,
+            market_vol_slow_weight: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -385,6 +402,9 @@ impl ModelParams {
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
             "market_vol_vix_coupling" => self.market_vol_vix_coupling,
             "market_vol_vix_anchor" => self.market_vol_vix_anchor,
+            "market_vol_slow_persistence" => self.market_vol_slow_persistence,
+            "market_vol_slow_gain" => self.market_vol_slow_gain,
+            "market_vol_slow_weight" => self.market_vol_slow_weight,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -453,6 +473,9 @@ impl ModelParams {
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
             "market_vol_vix_coupling" => out.market_vol_vix_coupling = value,
             "market_vol_vix_anchor" => out.market_vol_vix_anchor = value,
+            "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
+            "market_vol_slow_gain" => out.market_vol_slow_gain = value,
+            "market_vol_slow_weight" => out.market_vol_slow_weight = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -577,6 +600,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_beta",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",
+        "market_vol_slow_gain",
+        "market_vol_slow_persistence",
+        "market_vol_slow_weight",
         "market_vol_vix_anchor",
         "market_vol_vix_coupling",
         "mispricing_cap",

@@ -1704,8 +1704,12 @@ impl PyEngine {
         // Engine-level rather than per-company, so it has no column; a
         // fork that lost it would re-open at the baseline factor sigma
         // mid-regime and diverge from its parent at the next close.
-        let (market_variance, market_day_factor) = self.inner.market_variance_state();
-        out.set_item("market_variance", vec![market_variance, market_day_factor])?;
+        let (market_variance, market_day_factor, market_slow_variance) =
+            self.inner.market_variance_state();
+        out.set_item(
+            "market_variance",
+            vec![market_variance, market_day_factor, market_slow_variance],
+        )?;
 
         // The macro chain's state. The chain advances at every close now, so
         // a fork that did not carry these would snap back to the initial
@@ -1899,18 +1903,22 @@ impl PyEngine {
             self.market_open = flag.extract()?;
         }
         if let Some(raw) = snapshot.get_item("market_variance")? {
-            // The market factor's variance state. Optional like the other
-            // late-added keys: a snapshot written before the factor had a
-            // variance process described a market running at the baseline,
-            // and the fresh state this engine constructed IS the baseline.
             let vals: Vec<f64> = raw.extract()?;
-            if vals.len() != 2 {
+            // Two values is a checkpoint written before the slow component
+            // existed; three is one written after. Both replay.
+            if vals.len() != 2 && vals.len() != 3 {
                 return Err(ValidationError::new_err(format!(
-                    "market_variance must be [variance, day_factor], got {} values",
+                    "market_variance must be [variance, day_factor] or \
+                     [variance, day_factor, slow_variance], got {} values",
                     vals.len()
                 )));
             }
-            self.inner.set_market_variance_state(vals[0], vals[1]);
+            if vals.len() == 3 {
+                self.inner
+                    .set_market_variance_state_with_slow(vals[0], vals[1], vals[2]);
+            } else {
+                self.inner.set_market_variance_state(vals[0], vals[1]);
+            }
         }
 
         // The macro chain's state. Optional for the same reason as the
