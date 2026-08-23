@@ -1,0 +1,94 @@
+{
+ "method": {
+  "held_days": 120,
+  "held_vix": [
+   5.0,
+   15.0,
+   25.0,
+   45.0,
+   65.0
+  ],
+  "shock": "vix_shock(calm=15, peak=45, at=10, over=20) over hold(vix=15) on identical draws",
+  "shock_seeds": [
+   3,
+   5,
+   7
+  ],
+  "universe": "Universe.random(20, seed=11)"
+ },
+ "reference": {
+  "corr_blend": 1.5725740154605774,
+  "factor_variance_persistence": 0.95,
+  "half_life_days": 13.513407333964874,
+  "held_vix": {
+   "15.0": {
+    "annualised_vol_pct": 58.7631459118106,
+    "cross_sectional_corr": 0.458492654347794
+   },
+   "25.0": {
+    "annualised_vol_pct": 71.06648020912138,
+    "cross_sectional_corr": 0.5827466789903508
+   },
+   "45.0": {
+    "annualised_vol_pct": 107.06672739304561,
+    "cross_sectional_corr": 0.721013634506889
+   },
+   "5.0": {
+    "annualised_vol_pct": 49.47975066358932,
+    "cross_sectional_corr": 0.3208165709225148
+   },
+   "65.0": {
+    "annualised_vol_pct": 124.31151009260024,
+    "cross_sectional_corr": 0.774332642472845
+   }
+  },
+  "market_vol_alpha": 0.45,
+  "market_vol_beta": 0.5,
+  "shock_ratio": {
+   "3": 1.2650874145841406,
+   "5": 1.2526683319950895,
+   "7": 1.1705519630197811
+  },
+  "shock_ratio_median": 1.2526683319950895,
+  "spec": "pt-v1",
+  "vol_lever": 2.512371392850963
+ },
+ "vector": {
+  "corr_blend": 1.3089927620989303,
+  "factor_variance_persistence": 0.9890579681360732,
+  "half_life_days": 62.99999999999912,
+  "held_vix": {
+   "15.0": {
+    "annualised_vol_pct": 44.29682235767482,
+    "cross_sectional_corr": 0.5740920649215939
+   },
+   "25.0": {
+    "annualised_vol_pct": 47.91253409523654,
+    "cross_sectional_corr": 0.615544144065376
+   },
+   "45.0": {
+    "annualised_vol_pct": 71.78465719918935,
+    "cross_sectional_corr": 0.7514823577607956
+   },
+   "5.0": {
+    "annualised_vol_pct": 42.83579667665812,
+    "cross_sectional_corr": 0.5598048831136884
+   },
+   "65.0": {
+    "annualised_vol_pct": 86.84381567887715,
+    "cross_sectional_corr": 0.7855146292526283
+   }
+  },
+  "market_vol_alpha": 0.46779624669755665,
+  "market_vol_beta": 0.5212617214385166,
+  "shock_ratio": {
+   "3": 1.1067289108040508,
+   "5": 1.0508518284798904,
+   "7": 1.0775403217081598
+  },
+  "shock_ratio_median": 1.0775403217081598,
+  "spec": "pt-v3",
+  "vol_lever": 2.027365484396364
+ },
+ "wall_seconds": 7.178794540999661
+}
