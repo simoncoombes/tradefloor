@@ -138,6 +138,10 @@ PERTURBATIONS = [
     ("crowd_lean_cap", 0.0, True),
     ("price_breaker_fraction", 0.0001, True),
     ("price_hard_cap", 25.0, True),
+    # Volume tracking the market factor's variance, added at pt-v4. Unlike
+    # the three slow-variance rows this one acts alone: the variance it
+    # reads is already moving under any preset.
+    ("volume_variance_gain", 1.5, True),
 ]
 
 
