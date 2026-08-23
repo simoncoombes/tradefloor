@@ -354,6 +354,34 @@ pub struct TickOutcome {
 }
 
 /// Run one simulated market minute.
+/// Volume's response to the market factor's variance.
+///
+/// Returns exactly `1.0` when [`crate::params::ModelParams::volume_variance_gain`]
+/// is zero, so every preset before pt-v4 prints the volume it always did --
+/// `x * 1.0` is `x` for every f64, which the known-answer digest checks on
+/// every build.
+///
+/// The ratio is taken in VARIANCE rather than sigma because the quantity
+/// with the documented persistence is the variance, and squaring the sigma
+/// ratio is how the rest of this model spells that (see
+/// `factor_vol::update_market_variance_with`'s VIX target).
+///
+/// Clamped to [0.25, 4.0]: volume is a count, and a multiplier that reached
+/// zero would print an empty tape.
+fn variance_volume_multiplier(inputs: &TickInputs) -> f64 {
+    let gain = inputs.params.volume_variance_gain;
+    if gain == 0.0 {
+        return 1.0;
+    }
+    let base_sigma = inputs.params.market_factor_sigma;
+    if !(base_sigma > 0.0) {
+        return 1.0;
+    }
+    let sigma_ratio = inputs.market_sigma_daily / base_sigma;
+    let raw = 1.0 + gain * (sigma_ratio * sigma_ratio - 1.0);
+    mathx::max(mathx::min(raw, 4.0), 0.25)
+}
+
 pub fn simulate_market_tick(
     companies: &mut [TickCompany],
     inputs: &TickInputs,
@@ -621,6 +649,10 @@ pub fn simulate_market_tick(
 
     // ── Phase 3: volume ───────────────────────────────────────────────────
     let volume_multiplier = if open { 1.0 } else { 0.1 };
+    // Volume tracks the market factor's variance, which is persistent and
+    // exogenous to volume. At gain 0 this is exactly 1.0 and the product
+    // below is bit-identical to the single-multiplier form.
+    let volume_multiplier = volume_multiplier * variance_volume_multiplier(inputs);
     let mut volumes = vec![0.0; active_count];
     for i in 0..active_count {
         let idx = active_indices[i];

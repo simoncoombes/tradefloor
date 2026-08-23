@@ -154,6 +154,25 @@ pub struct ModelParams {
     /// How much of the slow component's deviation from baseline reaches
     /// the realised variance. 0.0 disables it.
     pub market_vol_slow_weight: f64,
+    /// How strongly realised volume tracks the market factor's variance.
+    ///
+    /// Volume in this engine is a pure function of `avg_volume`, which the
+    /// close holds fixed ([`crate::market::daily::AvgVolumePolicy::Hold`]),
+    /// so daily volume changes are very nearly independent noise and
+    /// difference to an autocorrelation near -0.5 -- measured -0.46 against
+    /// a real -0.32..-0.20. Real volume is a persistent level plus large
+    /// day-to-day noise, and the persistence is what this supplies.
+    ///
+    /// The driver is the market factor's variance, which is already
+    /// persistent and is genuinely EXOGENOUS to volume -- the property the
+    /// `Hold` docstring names as the precondition for reintroducing any
+    /// feedback. Feeding realised volume back was tried and removed: it is
+    /// a pure function of `avg_volume`, so the loop carried no information
+    /// and compounded at ~1.7%/day. This carries information, because
+    /// volume and volatility genuinely co-move.
+    ///
+    /// 0.0 disables it and volume is exactly what it was.
+    pub volume_variance_gain: f64,
 
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
     /// Trading days for half of a mispricing to decay. The ONE settable
@@ -282,6 +301,7 @@ impl ModelParams {
             market_vol_slow_persistence: 0.0,
             market_vol_slow_gain: 0.0,
             market_vol_slow_weight: 0.0,
+            volume_variance_gain: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -405,6 +425,7 @@ impl ModelParams {
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "market_vol_slow_weight" => self.market_vol_slow_weight,
+            "volume_variance_gain" => self.volume_variance_gain,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -476,6 +497,7 @@ impl ModelParams {
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "market_vol_slow_weight" => out.market_vol_slow_weight = value,
+            "volume_variance_gain" => out.volume_variance_gain = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -614,6 +636,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "price_breaker_fraction",
         "price_hard_cap",
         "sector_factor_sigma",
+        "volume_variance_gain",
     ]
 }
 
