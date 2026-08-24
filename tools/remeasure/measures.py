@@ -491,7 +491,7 @@ def g_scenario_leaderboard(ctx: Ctx) -> dict:
 
 
 def g_llm_leaderboard(ctx: Ctx) -> dict:
-    """an-llm-agent.md leaderboard, method stated in examples/claude_agent.py:
+    """an-llm-agent.md leaderboard, method stated in examples/08-claude-agent.py:
     reference agents, Universe.random(12, seed=7), seed 2026, 20 days."""
     u = _u(12, 7)
     scores = pt.evaluate(reference_agents(seed=3), seed=2026, universe=u,
@@ -878,7 +878,7 @@ def g_tca_ripple(ctx: Ctx) -> dict:
     and +3.2 bps) against a 13.0 bps median direct impact; the same
     configuration over two, three or four days leaks nothing; pinning VIX
     returns untouched_moved() to empty, byte-exact. Mirrors the assertions
-    examples/research_workflow.py runs every time."""
+    examples/07-research-workflow.py runs every time."""
     u = _u(60, 11)
 
     def analyse(days, scenario=None):
@@ -1107,11 +1107,11 @@ def g_fork(ctx: Ctx) -> dict:
 
 
 def g_workflow(ctx: Ctx) -> dict:
-    """README's worked example: examples/research_workflow.py, run whole."""
+    """README's worked example: examples/07-research-workflow.py, run whole."""
     import contextlib
     import io
     spec = importlib.util.spec_from_file_location(
-        "research_workflow", ctx.root / "examples" / "research_workflow.py")
+        "research_workflow", ctx.root / "examples" / "07-research-workflow.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     buf = io.StringIO()

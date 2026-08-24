@@ -35,7 +35,7 @@ Documentation = "https://simoncoombes.github.io/pretium"
 # through whichever dataframe library the consumer already has.
 rl = ["numpy>=1.24", "gymnasium>=0.29"]
 arrow = ["pyarrow>=14"]
-# examples/claude_agent.py drives an agent with the Claude API. Optional
+# examples/08-claude-agent.py drives an agent with the Claude API. Optional
 # because nothing in the library calls it -- it is one example, and it needs
 # an API key and spends money per decision.
 claude = ["anthropic>=0.40", "pydantic>=2"]

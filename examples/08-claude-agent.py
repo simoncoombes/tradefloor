@@ -4,7 +4,7 @@ Run:
 
     pip install "pretium[claude]"
     export ANTHROPIC_API_KEY=...          # or: ant auth login
-    python examples/claude_agent.py
+    python examples/08-claude-agent.py
 
 What makes this worth doing here rather than on real data: the harness knows
 why every price moved. Claude is asked for a portfolio AND for the factor it

@@ -1,45 +1,51 @@
 # Examples
 
-Four notebooks, in order. Each runs end to end and the committed copies
-carry their real output, so you can read them without running anything.
+Six notebooks and two scripts, numbered in reading order. The committed
+notebooks carry their output, so you can read them without running anything.
 
-| notebook | what it answers |
+| | what it covers |
 |---|---|
-| [`01-first-simulation.ipynb`](01-first-simulation.ipynb) | What does a market look like, and what did I just run? |
-| [`02-evaluating-a-strategy.ipynb`](02-evaluating-a-strategy.ipynb) | Is my strategy any good, and how would I know? |
-| [`03-why-did-the-price-move.ipynb`](03-why-did-the-price-move.ipynb) | Ground truth: the seven factors that sum to every move |
-| [`04-how-realistic-is-this.ipynb`](04-how-realistic-is-this.ipynb) | What is this certified to reproduce, and where does it fail? |
+| [`01-first-simulation.ipynb`](01-first-simulation.ipynb) | Universe, engine, order book, determinism, provenance |
+| [`02-evaluating-a-strategy.ipynb`](02-evaluating-a-strategy.ipynb) | Strategy specs, baselines, capture ratio, ranking across seeds |
+| [`03-why-did-the-price-move.ipynb`](03-why-did-the-price-move.ipynb) | The seven factor contributions that sum to every move |
+| [`04-how-realistic-is-this.ipynb`](04-how-realistic-is-this.ipynb) | The realism panel, the gaps, choosing a preset |
+| [`05-training-an-agent.ipynb`](05-training-an-agent.ipynb) | The Gymnasium environment, episodes, what size costs |
+| [`06-execution-and-impact.ipynb`](06-execution-and-impact.ipynb) | TCA, the counterfactual run, partial fills |
+| [`07-research-workflow.py`](07-research-workflow.py) | A whole study in one file: sweep, evaluation, TCA, replay |
+| [`08-claude-agent.py`](08-claude-agent.py) | An LLM agent scored against the baselines |
+
+Notebooks 05 and 06 map to the two audiences the project is built for — RL
+researchers and execution developers.
 
 ## Running them
 
 ```
-pip install pretium jupyter matplotlib
+pip install pretium jupyter
 jupyter lab
 ```
 
-Only notebook 3 needs `matplotlib`, and only for its final chart. The core
-library has no dependencies.
+Notebook 03 also needs `matplotlib` for its chart, and 05 needs
+`pretium[rl]` for the Gymnasium environment. The core library has no
+dependencies.
 
-## Scripts
+`07-research-workflow.py` runs in about five seconds and needs nothing
+extra. `08-claude-agent.py` needs `pretium[claude]` and an API key, and
+spends money per decision, so it is the one file here that is not run
+automatically.
 
-- **`research_workflow.py`** — universe, 20-seed sweep, five-agent
-  evaluation and TCA in about five seconds. The whole shape of a study in
-  one file.
-- **`claude_agent.py`** — drives an agent with the Claude API and scores it
-  against the reference baselines, including whether it named the right
-  factor for a move. Needs `pip install "pretium[claude]"` and an API key,
-  and costs money per decision.
+## How they are kept working
 
-## Kept honest
-
-`tests/test_examples.py` executes every notebook and checks the committed
-copies carry their output, so one whose code no longer runs is a failing
-test rather than something a reader discovers. It is opt-in because it takes
-about half a minute and needs `jupyter`:
+`tests/test_examples.py` checks them. The scripts are syntax-checked on
+every test run, which catches a rename that missed a reference. The rest is
+opt-in, because executing six notebooks takes about half a minute:
 
 ```
 PRETIUM_SLOW_TESTS=1 pytest tests/test_examples.py
 ```
+
+That executes every notebook, confirms the committed copies carry output,
+runs `07-research-workflow.py` end to end, and checks `08-claude-agent.py`
+refuses readably when its extra is missing rather than raising a traceback.
 
 Regenerate the committed output with:
 

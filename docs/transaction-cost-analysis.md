@@ -82,6 +82,6 @@ ex.untouched_moved()      # empty again, byte-exact
 ```
 
 Verified both ways on the run above: pinned, `untouched_moved()` comes back
-empty. `examples/research_workflow.py` asserts both halves on every test
+empty. `examples/07-research-workflow.py` asserts both halves on every test
 run — fear ripples stay well under direct impact, and the pinned-VIX
 counterfactual is exact.

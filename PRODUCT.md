@@ -117,7 +117,7 @@ agent-versus-Oracle table over 384 agent-seed pairs; the paired sign tests;
 the four realism statistics against real-equity ranges; the performance
 timings; the volatile-regime TCA result over twelve seeds.
 
-`examples/research_workflow.py` runs end to end in about fifteen seconds and is
+`examples/07-research-workflow.py` runs end to end in about fifteen seconds and is
 exercised by the test suite.
 
 No testimonials, customers, benchmarks against competitors, pricing or

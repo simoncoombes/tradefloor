@@ -120,20 +120,23 @@ and aggregate flow rather than agents that adapt to you.
 
 ## Worked examples
 
-Four notebooks in [`examples/`](examples/), each runnable end to end:
+Six notebooks and two scripts in [`examples/`](examples/), numbered in
+reading order and executed as part of the test suite:
 
-| notebook | what it answers |
+| | what it covers |
 |---|---|
-| [`01-first-simulation.ipynb`](examples/01-first-simulation.ipynb) | What does a market look like, and what did I just run? |
-| [`02-evaluating-a-strategy.ipynb`](examples/02-evaluating-a-strategy.ipynb) | Is my strategy any good, and how would I know? |
-| [`03-why-did-the-price-move.ipynb`](examples/03-why-did-the-price-move.ipynb) | Ground truth: the seven factors that sum to every move |
-| [`04-how-realistic-is-this.ipynb`](examples/04-how-realistic-is-this.ipynb) | What is this certified to reproduce, and where does it fail? |
+| [`01-first-simulation`](examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
+| [`02-evaluating-a-strategy`](examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
+| [`03-why-did-the-price-move`](examples/03-why-did-the-price-move.ipynb) | The seven factors that sum to every move |
+| [`04-how-realistic-is-this`](examples/04-how-realistic-is-this.ipynb) | The realism panel and the gaps |
+| [`05-training-an-agent`](examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
+| [`06-execution-and-impact`](examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
 
-Or as a script — universe, 20-seed sweep, five-agent evaluation and TCA in
-about five seconds:
+Or a whole study in one file — sweep, evaluation, TCA and replay in about
+five seconds:
 
 ```
-python examples/research_workflow.py
+python examples/07-research-workflow.py
 ```
 
 ## Documentation

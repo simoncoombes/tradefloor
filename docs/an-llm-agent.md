@@ -7,13 +7,13 @@ short: An LLM agent
 
 # An LLM agent
 
-`examples/claude_agent.py` drives an agent with the Claude API and scores it
+`examples/08-claude-agent.py` drives an agent with the Claude API and scores it
 against the reference baselines.
 
 ```
 pip install "pretium[claude]"
 export ANTHROPIC_API_KEY=...        # or: ant auth login
-python examples/claude_agent.py
+python examples/08-claude-agent.py
 ```
 
 The interesting part is not that a language model can pick a portfolio. It is

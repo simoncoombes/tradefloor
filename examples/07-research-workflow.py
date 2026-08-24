@@ -2,7 +2,7 @@
 
 Run it:
 
-    python examples/research_workflow.py
+    python examples/07-research-workflow.py
 
 This exercises all four things the library exists to provide — a reproducible
 market, ground truth about why prices moved, emergent impact through a real
