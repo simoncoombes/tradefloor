@@ -602,6 +602,65 @@ SEED_SD = {
     "volume_change_acf1": 0.0102341,
 }
 
+#: Real-market bands re-derived at a 504-DAY measurement window.
+#:
+#: `REAL_MARKETS` comes from ten 252-bar windows. These come from the same
+#: reference roster, the same estimators and the same band rule at 505 bars,
+#: because these statistics are strongly horizon-dependent and scoring a
+#: 504-day measurement against the 252-day bands is grading with the wrong
+#: ruler. This project made that error three times in one day before the
+#: bands were promoted out of the design notes and shipped here.
+#:
+#: They are mostly TIGHTER, not looser, which is the opposite of what the
+#: first attempt assumed: the model looked flattered by the 252-day bands on
+#: kurtosis specifically, whose 252-day floor of 1.6 hid a real failure --
+#: real markets read 7.1 to 22 over two-year windows against the model's 5.2.
+#:
+#: Mechanical bands only. The literature reconciliation applied to
+#: `REAL_MARKETS` needs a retrieved, horizon-compatible source per statistic
+#: and is a human judgement that has not been made at this horizon.
+REAL_MARKETS_504 = {
+    "annualised_vol_pct": (16, 34),
+    "excess_kurtosis": (7.1000000000000005, 22),
+    "return_acf1": (-0.03, 0.04),
+    "abs_return_acf1": (0.04, 0.22),
+    "abs_return_acf5": (0.02, 0.1),
+    "abs_return_acf20": (-0.02, 0.07),
+    "cross_sectional_corr": (0.23, 0.41000000000000003),
+    "volume_abs_return_corr": (0.48, 0.65),
+    "leverage_effect": (-0.13, 0.02),
+    "volume_change_acf1": (-0.29, -0.21),
+}
+
+#: The across-seed noise scale at 504 days, the companion to `SEED_SD`.
+#:
+#: Measured because it could not be assumed: the scales differ from the
+#: 252-day ones by factors from 0.80 to 3.23. Excess kurtosis is 3.2x
+#: noisier at 504 days, so an objective reusing `SEED_SD` there would have
+#: over-penalised it threefold while under-penalising volatility.
+SEED_SD_504 = {
+    "annualised_vol_pct": 5.143322,
+    "excess_kurtosis": 3.781635,
+    "return_acf1": 0.059668,
+    "abs_return_acf1": 0.119851,
+    "abs_return_acf5": 0.09079536,
+    "abs_return_acf20": 0.05491287,
+    "cross_sectional_corr": 0.09997682,
+    "volume_abs_return_corr": 0.04210395,
+    "leverage_effect": 0.08338545,
+    "volume_change_acf1": 0.01183045,
+}
+
+#: Where SEED_SD_504 came from.
+SEED_SD_504_PROVENANCE = {
+    "source": "facts.measure() on Universe.random(40, seed=111), 504 days, "
+              "seeds 101-130, sample sd across seeds",
+    "date": "2026-08-23",
+    "model_fingerprint": "pt-v3",
+    "bands": "pretium-design/bands-504-noncrisis.json, five non-crisis "
+             "505-bar windows of the same 40-name reference roster",
+}
+
 #: Where SEED_SD's values come from, carried as data so any consumer -- the
 #: loss report, a calibration manifest -- can quote it rather than assert it.
 SEED_SD_PROVENANCE = {

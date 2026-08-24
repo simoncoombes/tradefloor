@@ -479,6 +479,8 @@ class Evaluator:
     def __init__(self, workers: int, budget_panel_runs: int,
                  margin: dict,
                  days: int = lib.PANEL_DAYS,
+                 days_far: int | None = None,
+                 margin_far: dict | None = None,
                  universe_n: int = lib.PANEL_UNIVERSE_N,
                  universe_seed: int = lib.PANEL_UNIVERSE_SEED) -> None:
         self.workers = workers
@@ -489,6 +491,14 @@ class Evaluator:
         self.budget = budget_panel_runs
         self.reserved = 0
         self.days = days
+        #: The SECOND horizon, or None for the single-horizon objective.
+        #: Three consecutive searches bought 252-day realism by spending
+        #: 504-day realism, because the objective read one horizon and the
+        #: validation read the other, so the trade was free to the optimiser
+        #: and only visible afterwards. When this is set, every candidate is
+        #: priced at BOTH horizons and the search loss is their sum.
+        self.days_far = days_far
+        self.margin_far = margin_far
         self.universe_n = universe_n
         self.universe_seed = universe_seed
         self.cache: dict[tuple[str, str], dict] = {}
@@ -533,8 +543,9 @@ class Evaluator:
             if key not in self.cache and key not in seen:
                 seen.add(key)
                 pending.append((raw, key))
+        horizons = [self.days] if self.days_far is None else [self.days, self.days_far]
         if pending:
-            need = len(pending) * len(seeds)
+            need = len(pending) * len(seeds) * len(horizons)
             if self.panel_runs + need > self.budget:
                 affordable = max(0, (self.remaining()) // len(seeds))
                 if affordable == 0:
@@ -544,16 +555,22 @@ class Evaluator:
                 pending = pending[:affordable]
             jobs, labels = [], []
             for raw, key in pending:
-                for seed in seeds:
-                    jobs.append((raw, seed, self.days, self.universe_n,
-                                 self.universe_seed))
-                    labels.append(key)
+                for days in horizons:
+                    for seed in seeds:
+                        jobs.append((raw, seed, days, self.universe_n,
+                                     self.universe_seed))
+                        labels.append((key, days))
             results = lib.run_pool(jobs, self.workers)
             self.panel_runs += len(jobs)
             self.vector_evaluations += len(pending)
-            by_key: dict[tuple[str, str], list[dict]] = {}
+            by_key: dict[tuple, list[dict]] = {}
             for row, key in zip(results, labels):
                 by_key.setdefault(key, []).append(row)
+                # The CRN reference is per (seed, HORIZON): a 504-day run
+                # draws more than a 252-day one by construction, so a
+                # reference keyed on the seed alone would fire on the first
+                # dual-horizon batch and call a longer window a violation.
+                crn_key = key[1]
                 # The CRN guard, on the stream it rests on. Phase 3
                 # recorded 16 vectors moving `draws_consumed` and called
                 # it a §5.2 violation; `draw_schedule.py` traced all 58
@@ -568,28 +585,34 @@ class Evaluator:
                 # is a real branch in the macro chain that a reader
                 # should be able to see.
                 streams = row["draws_by_stream"]
-                self.draws_reference.setdefault(row["seed"],
-                                                streams[lib.CRN_STREAM])
-                if streams[lib.CRN_STREAM] != self.draws_reference[row["seed"]]:
+                ref = (row["seed"], crn_key)
+                self.draws_reference.setdefault(ref, streams[lib.CRN_STREAM])
+                if streams[lib.CRN_STREAM] != self.draws_reference[ref]:
                     raise AssertionError(
-                        f"seed {row['seed']}: the {lib.CRN_STREAM} stream "
-                        f"moved from {self.draws_reference[row['seed']]} to "
+                        f"seed {row['seed']} at {crn_key}d: the "
+                        f"{lib.CRN_STREAM} stream "
+                        f"moved from {self.draws_reference[ref]} to "
                         f"{streams[lib.CRN_STREAM]} under "
                         f"{row['overrides']} — common random numbers no "
                         "longer hold and every secant here is noise")
-                self.economy_reference.setdefault(row["seed"],
-                                                  streams["economy"])
-                if streams["economy"] != self.economy_reference[row["seed"]]:
+                self.economy_reference.setdefault(ref, streams["economy"])
+                if streams["economy"] != self.economy_reference[ref]:
                     self.crn_deviations.append(
                         {"stage": stage, "seed": row["seed"],
                          "stream": "economy",
-                         "expected": self.economy_reference[row["seed"]],
+                         "expected": self.economy_reference[ref],
                          "observed": streams["economy"],
                          "overrides": row["overrides"]})
-            for key, rows in by_key.items():
-                panels = [r["panel"] for r in rows]
-                self.cache[key] = self._score(panels, rows[0]["overrides"],
-                                              seeds, stage)
+            grouped: dict[tuple[str, str], dict[int, list[dict]]] = {}
+            for (key, days), rows in by_key.items():
+                grouped.setdefault(key, {})[days] = rows
+            for key, by_days in grouped.items():
+                near = [r["panel"] for r in by_days[self.days]]
+                far = ([r["panel"] for r in by_days[self.days_far]]
+                       if self.days_far is not None else None)
+                overrides = by_days[self.days][0]["overrides"]
+                self.cache[key] = self._score(near, overrides, seeds, stage,
+                                              far_panels=far)
         out = []
         for raw in raws:
             key = (lib.vector_key(raw), tag)
@@ -599,7 +622,8 @@ class Evaluator:
         return out
 
     def _score(self, panels: list[dict], overrides: dict[str, float],
-               seeds: tuple[int, ...], stage: str) -> dict:
+               seeds: tuple[int, ...], stage: str,
+               far_panels: list[dict] | None = None) -> dict:
         from pretium.loss import band_distance_loss
 
         # Two numbers, two rulers, and the names say which is which.
@@ -613,10 +637,21 @@ class Evaluator:
         medians = {key: statistics.median(p[key] for p in panels)
                    for key in panels[0]}
         margined = search_loss(panels, self.margin)
+        far_margined = None
+        if far_panels is not None and self.margin_far is not None:
+            # The second horizon, scored against ITS OWN margined bands and
+            # its own noise scale. Summed unweighted: there is no principled
+            # exchange rate between a band exit at one horizon and the other,
+            # and an unstated weighting buried in a scalar would be worse
+            # than an equal one stated out loud.
+            far_margined = search_loss(far_panels, self.margin_far)
+            margined = margined + far_margined
         row = {
             "overrides": overrides,
             "loss_real": breakdown["loss"],
             "loss_search": margined,
+            "loss_search_far": far_margined,
+            "far_panels": far_panels,
             "statistics": {k: {kk: vv for kk, vv in v.items()
                                if kk != "band"}
                            for k, v in breakdown["statistics"].items()},
@@ -748,6 +783,18 @@ def main() -> None:
                              "the box and not one beat pt-v1.")
     parser.add_argument("--degeneracy-probe", action="store_true",
                         help="re-measure phase 2's zero-memory corner here")
+    parser.add_argument("--dual-horizon", type=int, default=None,
+                        metavar="DAYS",
+                        help="price every candidate at 252 days AND at this "
+                             "horizon, summing the two margined losses. The "
+                             "second horizon is scored against its OWN bands "
+                             "(facts.REAL_MARKETS_504) and its own noise "
+                             "scale (facts.SEED_SD_504) -- pairing one "
+                             "horizon's measurement with the other's ruler "
+                             "is the error this flag exists to avoid. Costs "
+                             "roughly three times the panel runs per "
+                             "candidate, because a 504-day panel is twice "
+                             "the work of a 252-day one.")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
@@ -798,7 +845,19 @@ def main() -> None:
         per_key_margin[name] = float(value)
     margin = margined_bands(facts.REAL_MARKETS, facts.SEED_SD, in_loss,
                             args.margin_sd, per_key_margin)
-    ev = Evaluator(args.workers, args.budget_panel_runs, margin)
+    margin_far = None
+    if args.dual_horizon:
+        if args.dual_horizon != 504:
+            raise SystemExit(
+                f"--dual-horizon is only calibrated for 504 (got "
+                f"{args.dual_horizon}); facts.REAL_MARKETS_504 and "
+                "facts.SEED_SD_504 are the only horizon-matched ruler this "
+                "library ships, and scoring another horizon against them "
+                "would be the wrong-ruler error in a new dress")
+        margin_far = margined_bands(facts.REAL_MARKETS_504, facts.SEED_SD_504,
+                                    in_loss, args.margin_sd, per_key_margin)
+    ev = Evaluator(args.workers, args.budget_panel_runs, margin,
+                   days_far=args.dual_horizon, margin_far=margin_far)
     started = time.perf_counter()
     trace: list[dict] = []
 

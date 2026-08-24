@@ -1,0 +1,12 @@
+{
+ "annualised_vol_pct": 5.143321577776335,
+ "excess_kurtosis": 3.7816354775284697,
+ "return_acf1": 0.05966799830524074,
+ "abs_return_acf1": 0.11985095171591595,
+ "abs_return_acf5": 0.09079536421437259,
+ "abs_return_acf20": 0.05491287245948211,
+ "cross_sectional_corr": 0.09997681730327354,
+ "volume_abs_return_corr": 0.04210394785443068,
+ "leverage_effect": 0.0833854454249348,
+ "volume_change_acf1": 0.011830445239658477
+}

@@ -76,7 +76,8 @@ import statistics
 from typing import Any, Mapping, Sequence
 
 from ._core import ValidationError
-from .facts import REAL_MARKETS, SEED_SD, SEED_SD_PROVENANCE, band_distance
+from .facts import (REAL_MARKETS, REAL_MARKETS_504, SEED_SD, SEED_SD_504,
+                    SEED_SD_PROVENANCE, band_distance)
 
 #: The statistics the calibration search is trying to move into band. This
 #: is the ONE tuple to edit when a model change makes a structural statistic
@@ -180,6 +181,7 @@ def band_distance_loss(
     panel: Mapping[str, Any] | Sequence[Mapping[str, Any]],
     *,
     seed_sd: Mapping[str, float] | None = None,
+    bands: Mapping[str, tuple[float, float]] | None = None,
 ) -> dict[str, Any]:
     """L_real: the squared, noise-scaled band distances, summed over the live set.
 
@@ -232,10 +234,19 @@ def band_distance_loss(
         scales = seed_sd
         provenance = "caller-supplied"
 
+    # `bands` exists so a horizon can be scored against its OWN ruler. The
+    # default is the 252-day set, which is what every existing caller means.
+    # Passing `facts.REAL_MARKETS_504` alongside `facts.SEED_SD_504` scores a
+    # 504-day panel; passing one without the other is the mistake this
+    # parameter was added to make avoidable, not to make easy.
+    table: Mapping[str, tuple[float, float]] = (
+        REAL_MARKETS if bands is None else bands
+    )
+
     rows: dict[str, dict[str, Any]] = {}
     total = 0.0
     used: dict[str, float] = {}
-    for key, (low, high) in REAL_MARKETS.items():
+    for key, (low, high) in table.items():
         in_loss = key in LIVE_TARGETS or key in CONSTRAINTS
         role = (
             "live target" if key in LIVE_TARGETS
@@ -297,4 +308,77 @@ def band_distance_loss(
         "seed_sd": used,
         "seed_sd_provenance": provenance,
         "panels": len(panels),
+    }
+
+
+def dual_horizon_loss(
+    panels_252: Sequence[Mapping[str, Any]],
+    panels_504: Sequence[Mapping[str, Any]],
+    *,
+    weight_504: float = 1.0,
+) -> dict[str, Any]:
+    """L_real at BOTH horizons, each against its own ruler, summed.
+
+    Three consecutive calibration searches bought 252-day realism by
+    spending 504-day realism, by a different route each time, and the last
+    of them was rejected by its own overfitting control on the horizon axis
+    after producing the best 252-day fit this project had seen. The cause is
+    structural rather than unlucky: the objective read one horizon and the
+    validation read the other, so trading the second for the first was free
+    to the optimiser and only visible afterwards.
+
+    This is the fix, prescribed twice in the record before it was built. The
+    252-day panel is scored against `facts.REAL_MARKETS` with
+    `facts.SEED_SD`; the 504-day panel against `facts.REAL_MARKETS_504` with
+    `facts.SEED_SD_504`. Each horizon carries its own bands AND its own
+    noise scale, because both are horizon-dependent and pairing one with the
+    other's is the wrong-ruler error in a subtler dress: measured, the
+    504-day scales differ from the 252-day ones by factors from 0.80 to
+    3.23, so reusing `SEED_SD` there would over-penalise excess kurtosis
+    threefold while under-penalising volatility.
+
+    # The weighting is a choice, and it is stated rather than hidden
+
+    `weight_504` defaults to 1.0 -- equal weight -- and that is a judgement,
+    not a derivation. There is no principled exchange rate between a
+    252-day band exit and a 504-day one. Equal weighting says "a
+    seed-sd of miss matters the same at either horizon", which is defensible
+    and revisitable; what would not be defensible is an unstated weighting
+    buried in a scalar. The result carries both components separately, so a
+    reader can re-weight without re-running.
+
+    Returns::
+
+        {
+          "loss":        combined = loss_252 + weight_504 * loss_504,
+          "loss_252":    the 252-day component,
+          "loss_504":    the 504-day component, UNWEIGHTED,
+          "weight_504":  the weighting actually applied,
+          "horizon_252": the full band_distance_loss breakdown,
+          "horizon_504": the same at 504 days,
+        }
+
+    Both breakdowns ride along in full, because a combined number that
+    cannot be decomposed is exactly the single realism score this module
+    refuses to publish.
+    """
+    if not panels_252 or not panels_504:
+        raise ValidationError(
+            "dual_horizon_loss needs panels at both horizons; scoring one "
+            "and validating on the other is the failure this function exists "
+            "to prevent"
+        )
+    if weight_504 < 0:
+        raise ValidationError(f"weight_504 must be >= 0, got {weight_504}")
+
+    near = band_distance_loss(panels_252)
+    far = band_distance_loss(panels_504, seed_sd=SEED_SD_504,
+                             bands=REAL_MARKETS_504)
+    return {
+        "loss": near["loss"] + weight_504 * far["loss"],
+        "loss_252": near["loss"],
+        "loss_504": far["loss"],
+        "weight_504": weight_504,
+        "horizon_252": near,
+        "horizon_504": far,
     }
