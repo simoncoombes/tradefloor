@@ -32,7 +32,7 @@ use pyo3::types::PyBytes;
 use crate::economy::{create_initial_central_bank_state, create_initial_economy_state};
 use crate::economy::{CyclePhase, ForwardGuidance, InitialEconomyOptions};
 use crate::engine::{Engine, PriceField, SessionBuffer, SessionRequest, TickRequest};
-use crate::engine::{DayAdvanceRequest, DayCloseRequest, TickOutcome};
+use crate::engine::{TickOutcome};
 use crate::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany, TickStock};
 use crate::python::ValidationError;
 
@@ -488,70 +488,6 @@ impl PyEngine {
     /// `close_market` and the `close_at_end` session path alike, so the two
     /// spellings of one close roll one world.
     ///
-    /// Not exposed to Python: the boundary owns it.
-    fn advance_macro_day(&mut self) {
-        // Inputs assembled the way the reference implementation's day
-        // transition assembles them (`tick/daily.ts:87-98`):
-        //
-        // - `market_pe`: market-cap-weighted trailing PE over public,
-        //   solvent, positive-earnings names, with the same 0 < pe < 200
-        //   filter. Written before the step because the cycle-transition
-        //   logic reads it; the TypeScript computes it in the same breath.
-        // - `market_return_pct`: the reference feeds the average of its
-        //   indices' per-TICK `changePercent` (percent units, so a routine
-        //   value is a few hundredths). There is no index state on this
-        //   surface, so the closest faithful quantity is the cap-weighted
-        //   cross-section of the roster's final tick, in percent. Feeding the
-        //   DAY return instead would run two orders of magnitude hot against
-        //   the `+-0.03` clamp the VIX update applies to this input.
-        // - `volatility`: 1.0, `update_economy_daily`'s own default. The
-        //   game scales this by difficulty (0.3 to 0.9); the library has no
-        //   difficulty setting and takes the function's default.
-        // - no active shocks: the shock system is not part of this surface.
-        let mut total_mcap = 0.0;
-        let mut weighted_pe = 0.0;
-        let mut last_tick_mcap = 0.0;
-        let mut last_tick_return_pct = 0.0;
-        for c in self.inner.companies() {
-            if !c.is_public || c.is_bankrupt {
-                continue;
-            }
-            if let Some(eps) = c.eps {
-                if eps > 0.0 {
-                    let pe = c.stock.price / eps;
-                    if pe > 0.0 && pe < 200.0 {
-                        total_mcap += c.stock.market_cap;
-                        weighted_pe += pe * c.stock.market_cap;
-                    }
-                }
-            }
-            if let Some(prev) = c.stock.previous_tick_price {
-                if prev > 0.0 {
-                    let ret_pct = (c.stock.price - prev) / prev * 100.0;
-                    last_tick_return_pct += ret_pct * c.stock.market_cap;
-                    last_tick_mcap += c.stock.market_cap;
-                }
-            }
-        }
-        if total_mcap > 0.0 {
-            self.inner.economy_mut().market_pe = Some(weighted_pe / total_mcap);
-        }
-        let market_return_pct = if last_tick_mcap > 0.0 {
-            last_tick_return_pct / last_tick_mcap
-        } else {
-            0.0
-        };
-        self.day_count += 1;
-        self.inner.advance_day(&DayAdvanceRequest {
-            volatility: 1.0,
-            active_shocks: &[],
-            market_return_pct,
-            game_day: i64::from(self.day_count),
-            timestamp: i64::from(self.day_count) * 24 * 60,
-        });
-    }
-
-
     fn written<'a>(&self, buf: &'a [f64]) -> &'a [f64] {
         let n = self.buffer.ticks_written * self.buffer.companies;
         let end = if n > buf.len() { buf.len() } else { n };
@@ -1054,7 +990,8 @@ impl PyEngine {
             // `run_session(); close_market()` -- would roll different
             // worlds, which is exactly the divergence the equivalence tests
             // exist to forbid.
-            self.advance_macro_day();
+            self.day_count += 1;
+            self.inner.advance_macro_day(i64::from(self.day_count));
         }
         Ok(self.buffer.ticks_written)
     }
@@ -1258,29 +1195,12 @@ impl PyEngine {
         self.log.push(crate::python_log::LogEntry::CloseMarket);
         // The day is over, so the next session opens a new one.
         self.market_open = false;
-        // The engine's own accumulator, rather than a value the caller has to
-        // supply and keep in step. A second copy of engine state on the
-        // embedder's side is a divergence waiting for the first day the two
-        // disagree.
-        let noise = self.inner.attribution_column(random_noise_index());
-        let innovations: Vec<Option<f64>> = noise.into_iter().map(Some).collect();
-        let variances: Vec<f64> = self
-            .inner
-            .companies()
-            .iter()
-            .map(|c| {
-                crate::sectors::by_key(&c.sector)
-                    .map(|s| s.base_daily_variance())
-                    .unwrap_or(0.000225)
-            })
-            .collect();
-        self.inner.close_market(&DayCloseRequest {
-            daily_innovations: &innovations,
-            sector_base_variances: &variances,
-            avg_volume: crate::market::AvgVolumePolicy::Hold,
-        });
-
-        self.advance_macro_day();
+        // The settle-and-advance is `Engine::close_day` in the core, so the
+        // WebAssembly binding runs the same day loop rather than a second
+        // implementation of it. This surface keeps only the day COUNTER,
+        // which is bookkeeping rather than a modelling decision.
+        self.day_count += 1;
+        self.inner.close_day(i64::from(self.day_count));
     }
 
     /// One column across every instrument, as little-endian f64 bytes.

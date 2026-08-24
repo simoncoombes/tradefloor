@@ -1041,6 +1041,122 @@ impl Engine {
         }
     }
 
+    // ── The day loop ──────────────────────────────────────────────────────
+    //
+    // This lived in `python_engine.rs` until the WebAssembly binding needed
+    // it too. That is the whole argument for moving it: the crate's own
+    // header says the price model is "compiled once and consumed twice",
+    // and a day loop implemented separately in each binding is a fork of
+    // the model wearing the costume of glue code. The divergence would be
+    // invisible until a whole simulated market had drifted apart -- which
+    // is exactly the failure this crate was written to end.
+    //
+    // A binding still owns its own day COUNTER, because counting is not a
+    // modelling decision. Everything below is.
+
+    /// Each company's sector base daily variance, in roster order.
+    ///
+    /// The fallback matches the reference implementation's default for a
+    /// sector it does not recognise; a roster is validated on construction,
+    /// so it is unreachable in practice and present so this cannot panic on
+    /// a surface that has no way to report the error.
+    pub fn sector_base_variances(&self) -> Vec<f64> {
+        self.companies
+            .iter()
+            .map(|c| {
+                crate::sectors::by_key(&c.sector)
+                    .map(|s| s.base_daily_variance())
+                    .unwrap_or(0.000225)
+            })
+            .collect()
+    }
+
+    /// Close the trading day: settle the day, then step the macro chain.
+    ///
+    /// `game_day` is the day being closed, one-based. The caller keeps the
+    /// count; the arithmetic on it is here so both bindings agree about
+    /// what a day means.
+    ///
+    /// Daily innovations come from the engine's OWN accumulated noise
+    /// rather than from the caller. A second copy of engine state on the
+    /// embedder's side is a divergence waiting for the first day the two
+    /// disagree, and the caller cannot supply it correctly in any case --
+    /// the value being asked for is the noise the session just accumulated.
+    pub fn close_day(&mut self, game_day: i64) {
+        let noise = self.attribution_column(random_noise_index());
+        let innovations: Vec<Option<f64>> = noise.into_iter().map(Some).collect();
+        let variances = self.sector_base_variances();
+        self.close_market(&DayCloseRequest {
+            daily_innovations: &innovations,
+            sector_base_variances: &variances,
+            avg_volume: crate::market::AvgVolumePolicy::Hold,
+        });
+        self.advance_macro_day(game_day);
+    }
+
+    /// Step the macro chain into the next day.
+    ///
+    /// Inputs assembled the way the reference implementation's day
+    /// transition assembles them (`tick/daily.ts:87-98`):
+    ///
+    /// - `market_pe`: market-cap-weighted trailing PE over public, solvent,
+    ///   positive-earnings names, with the same `0 < pe < 200` filter.
+    ///   Written BEFORE the step because the cycle-transition logic reads
+    ///   it; the TypeScript computes it in the same breath.
+    /// - `market_return_pct`: the reference feeds the average of its
+    ///   indices' per-TICK `changePercent` (percent units, so a routine
+    ///   value is a few hundredths). There is no index state on this
+    ///   surface, so the closest faithful quantity is the cap-weighted
+    ///   cross-section of the roster's final tick, in percent. Feeding the
+    ///   DAY return instead would run two orders of magnitude hot against
+    ///   the +-0.03 clamp the VIX update applies to this input.
+    /// - `volatility`: 1.0, `update_economy_daily`'s own default. The game
+    ///   scales this by difficulty (0.3 to 0.9); the library has no
+    ///   difficulty setting and takes the function's default.
+    /// - no active shocks: the shock system is not part of this surface.
+    pub fn advance_macro_day(&mut self, game_day: i64) -> DayAdvanceOutcome {
+        let mut total_mcap = 0.0;
+        let mut weighted_pe = 0.0;
+        let mut last_tick_mcap = 0.0;
+        let mut last_tick_return_pct = 0.0;
+        for c in self.companies() {
+            if !c.is_public || c.is_bankrupt {
+                continue;
+            }
+            if let Some(eps) = c.eps {
+                if eps > 0.0 {
+                    let pe = c.stock.price / eps;
+                    if pe > 0.0 && pe < 200.0 {
+                        total_mcap += c.stock.market_cap;
+                        weighted_pe += pe * c.stock.market_cap;
+                    }
+                }
+            }
+            if let Some(prev) = c.stock.previous_tick_price {
+                if prev > 0.0 {
+                    let ret_pct = (c.stock.price - prev) / prev * 100.0;
+                    last_tick_return_pct += ret_pct * c.stock.market_cap;
+                    last_tick_mcap += c.stock.market_cap;
+                }
+            }
+        }
+        if total_mcap > 0.0 {
+            self.economy_mut().market_pe = Some(weighted_pe / total_mcap);
+        }
+        let market_return_pct = if last_tick_mcap > 0.0 {
+            last_tick_return_pct / last_tick_mcap
+        } else {
+            0.0
+        };
+        self.advance_day(&DayAdvanceRequest {
+            volatility: 1.0,
+            active_shocks: &[],
+            market_return_pct,
+            game_day,
+            timestamp: game_day * 24 * 60,
+        })
+    }
+
     // ── State access ──────────────────────────────────────────────────────
 
     pub fn economy(&self) -> &EconomyState {
