@@ -190,49 +190,22 @@ impl PyInstrument {
     }
 
     fn to_core(&self, index: usize) -> TickCompany {
-        let sector = crate::sectors::by_key(&self.sector).expect("validated at construction");
-        TickCompany {
-            id: format!("{}-{index}", self.ticker),
+        // The mapping is `InstrumentInit::to_tick_company` in the core, so
+        // the browser surface starts a market from the same initial state
+        // rather than a second copy of these decisions.
+        crate::universe::InstrumentInit {
             ticker: self.ticker.clone(),
             sector: self.sector.clone(),
-            is_bankrupt: false,
-            is_public: true,
-            stock: TickStock {
-                price: self.initial_price,
-                // A fresh instrument has not traded, so yesterday's close is
-                // today's opening mark rather than a fabricated gap.
-                previous_close: self.initial_price,
-                // None, NOT the price. The reference field is optional and
-                // absent until the first tick prints; substituting a value
-                // here diverges on tick zero of every freshly built roster.
-                previous_tick_price: None,
-                open: self.initial_price,
-                high: self.initial_price,
-                low: self.initial_price,
-                volume: 0.0,
-                avg_volume: self.avg_volume,
-                shares_outstanding: self.shares_outstanding,
-                market_cap: self.market_cap(),
-                mispricing_s: None,
-                mispricing_s_prev_close: None,
-                mispricing_momentum: None,
-                maker_inventory: None,
-                // From daily_sigma squared, never from the relative
-                // `volatility` multiplier -- see the sector table.
-                garch_variance: sector.base_daily_variance(),
-                last_daily_return: None,
-                beta: Some(self.beta),
-                short_interest: self.short_interest,
-                // Full float unless told otherwise. Only the squeeze path
-                // reads it, via short_interest / float.
-                float: self.shares_outstanding,
-            },
-            sector_volatility: Some(sector.volatility),
-            sector_avg_pe: Some(sector.avg_pe),
+            initial_price: self.initial_price,
+            shares_outstanding: self.shares_outstanding,
             eps: self.eps,
             book_value_per_share: self.book_value_per_share,
             revenue_growth: self.revenue_growth,
+            avg_volume: self.avg_volume,
+            beta: self.beta,
+            short_interest: self.short_interest,
         }
+        .to_tick_company(index)
     }
 }
 

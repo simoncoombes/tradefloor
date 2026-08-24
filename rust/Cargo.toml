@@ -50,11 +50,24 @@ pyo3 = { version = "0.22", features = ["abi3-py311"], optional = true }
 # pandas, pyarrow and duckdb without this crate depending on any of them.
 arrow = { version = "53", default-features = false, features = ["ffi"], optional = true }
 
+# The browser binding. Optional for the same reason as pyo3: a `cargo test`
+# or a Python wheel build must not drag in wasm-bindgen, and the wasm build
+# must not drag in arrow. See `wasm` under [features].
+wasm-bindgen = { version = "0.2", optional = true }
+
 [features]
 # abi3-py311: one wheel per platform covers CPython 3.11 and every later
 # version. The floor is 3.11 rather than WP7's "CPython 3.9+" sketch, which
 # is stale -- 3.9 is past EOL and SPEC 0 has dropped 3.10.
 python = ["dep:pyo3", "pyo3/extension-module", "dep:arrow"]
+
+# The browser surface. Deliberately does NOT pull arrow: a columnar C Data
+# Interface is meaningless in a browser and would be a large dependency
+# compiled into a payload that never calls it.
+#
+# Both bindings drive `Engine::close_day`, so the day loop they run is one
+# implementation rather than two. That is the whole point -- see lib.rs.
+wasm = ["dep:wasm-bindgen"]
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }

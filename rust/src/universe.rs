@@ -266,3 +266,91 @@ mod tests {
         assert_ne!(UNIVERSE_STREAM, 99, "must not be the MAIN stream");
     }
 }
+
+/// One instrument's initial state, independent of any binding.
+///
+/// The mapping below decides a market's STARTING CONDITIONS -- that the
+/// previous close is the opening price, that GARCH variance begins at the
+/// sector's base, that float equals shares outstanding. Those are modelling
+/// decisions, not glue, and a binding that re-made them would fork the
+/// initial state while looking like it was only copying fields. Both the
+/// Python and WebAssembly surfaces build this and call `to_tick_company`.
+pub struct InstrumentInit {
+    pub ticker: String,
+    pub sector: String,
+    pub initial_price: f64,
+    pub shares_outstanding: f64,
+    pub eps: Option<f64>,
+    pub book_value_per_share: Option<f64>,
+    pub revenue_growth: Option<f64>,
+    pub avg_volume: f64,
+    pub beta: f64,
+    pub short_interest: f64,
+}
+
+impl InstrumentInit {
+    pub fn market_cap(&self) -> f64 {
+        self.initial_price * self.shares_outstanding
+    }
+
+    /// The engine's view of this instrument on day zero.
+    ///
+    /// `index` disambiguates the id when a roster repeats a ticker; roster
+    /// order is contractual, so it is the position and not a hash.
+    pub fn to_tick_company(&self, index: usize) -> crate::market::TickCompany {
+        let sector = crate::sectors::by_key(&self.sector)
+            .expect("validated at construction");
+        crate::market::TickCompany {
+            id: format!("{}-{index}", self.ticker),
+            ticker: self.ticker.clone(),
+            sector: self.sector.clone(),
+            is_bankrupt: false,
+            is_public: true,
+            stock: crate::market::TickStock {
+                price: self.initial_price,
+                previous_close: self.initial_price,
+                previous_tick_price: None,
+                open: self.initial_price,
+                high: self.initial_price,
+                low: self.initial_price,
+                volume: 0.0,
+                avg_volume: self.avg_volume,
+                shares_outstanding: self.shares_outstanding,
+                market_cap: self.market_cap(),
+                mispricing_s: None,
+                mispricing_s_prev_close: None,
+                mispricing_momentum: None,
+                maker_inventory: None,
+                garch_variance: sector.base_daily_variance(),
+                last_daily_return: None,
+                beta: Some(self.beta),
+                short_interest: self.short_interest,
+                float: self.shares_outstanding,
+            },
+            sector_volatility: Some(sector.volatility),
+            sector_avg_pe: Some(sector.avg_pe),
+            eps: self.eps,
+            book_value_per_share: self.book_value_per_share,
+            revenue_growth: self.revenue_growth,
+        }
+    }
+}
+
+impl GeneratedInstrument {
+    /// The generated roster's instruments carry every field, so the
+    /// optional ones are always present.
+    pub fn to_init(&self) -> InstrumentInit {
+        InstrumentInit {
+            ticker: self.ticker.clone(),
+            sector: self.sector.to_string(),
+            initial_price: self.initial_price,
+            shares_outstanding: self.shares_outstanding,
+            eps: Some(self.eps),
+            book_value_per_share: Some(self.book_value_per_share),
+            revenue_growth: Some(self.revenue_growth),
+            avg_volume: self.avg_volume,
+            beta: self.beta,
+            short_interest: self.short_interest,
+        }
+    }
+}

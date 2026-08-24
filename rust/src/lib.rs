@@ -41,6 +41,8 @@ pub mod params;
 pub mod rng;
 /// The twelve sectors and their model parameters.
 pub mod sectors;
+#[cfg(feature = "wasm")]
+pub mod wasm;
 pub mod types;
 /// Universe generation - plausible rosters, deterministically.
 pub mod universe;
