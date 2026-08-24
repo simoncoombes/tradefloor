@@ -211,10 +211,58 @@ PARAM_SPECS: dict[str, dict] = {
     "price_breaker_fraction":   {"kind": "abs", "step_unit": 0.1,
                                  "hard_range": (0.0, 1.0)},
     # -- bounded multiples (absolute deviation, proportionate step) -------
-    "garch_ceiling_multiple":   {"kind": "abs", "step_unit": None},
-    "garch_floor_multiple":     {"kind": "abs", "step_unit": None},
-    "market_vol_ceiling_multiple": {"kind": "abs", "step_unit": None},
-    "market_vol_floor_multiple": {"kind": "abs", "step_unit": None},
+    # The four variance clamps carry an EXPLICIT hard range, and the reason
+    # is a defect that survived every calibration this project has run.
+    #
+    # `calibrate.calibration_box` reads `spec.get("hard_range", (0.0, 0.999))`
+    # -- a default that is correct for a bounded SHARE and wrong for a
+    # MULTIPLE. For a ceiling shipped at 8.0 it computed
+    # `hi = min(8 * 4, 0.999) = 0.999` and `lo = max(8 / 4, 0.0) = 2.0`, so
+    # LOW EXCEEDED HIGH. Probed through `DevSpace.repair`, every search
+    # coordinate from -2.0 to +2.0 mapped to one identical point: the
+    # parameter was not searched, it was FROZEN, at a value produced by
+    # clamping the shipped 8.0 into an inverted box.
+    #
+    # That is why `ptv4`'s certificate reported `market_vol_ceiling_multiple`
+    # = 2.0 "driven to its box floor". Nothing drove it. The clamp put it
+    # there before the first search step ran, and CALIBRATION-FOLLOWUPS §16
+    # attributed a halved crisis lever to an optimiser trade that never
+    # happened. §24 retracts that.
+    #
+    # The ranges below are floors and ceilings on a variance clamp expressed
+    # as a multiple of the long-run level, so the honest bound is "wide
+    # enough to contain any defensible clamp, narrow enough that a search
+    # cannot disable the clamp entirely". A ceiling below 1.0 would put the
+    # cap under the mean it is a multiple of; a floor above 1.0 would do the
+    # reverse. The ordering constraint between floor and ceiling is enforced
+    # separately, by the repair step in `calibrate.py`.
+    # LOG, not "abs", and the reclassification is forced by the ranges above.
+    #
+    # §6.3's rule of thumb is "log for scale parameters, absolute for bounded
+    # shares and multiples", and these were classed "abs" on the strength of
+    # the word "multiples". That was harmless only while the default hard
+    # range silently clipped their boxes below 1.0, which made them behave
+    # like bounded shares. Give them the honest ranges above and the raw
+    # deviation carries their magnitude straight into a squared penalty: a
+    # ceiling shipped at 8.0 with a box to 32 reads a deviation of 24,
+    # squared 576, against a median squared box deviation of 0.998. The
+    # penalty-dominance guard in `tests/test_model_params.py` caught it at
+    # 576x and 225x the median.
+    #
+    # §6.3's INTENT is that deviation units be comparable across parameters,
+    # and a quantity spanning [2, 32] is a scale. Under log the same box-edge
+    # move costs ln(32/8)^2 = 1.92, which is what every other scale parameter
+    # here costs. Following the rule's letter would have reproduced, in a new
+    # place, exactly the mis-scaled penalty that made a 96-core search
+    # optimise its own regulariser.
+    "garch_ceiling_multiple":   {"kind": "log",
+                                 "hard_range": (1.0, 50.0)},
+    "garch_floor_multiple":     {"kind": "log",
+                                 "hard_range": (0.001, 1.0)},
+    "market_vol_ceiling_multiple": {"kind": "log",
+                                    "hard_range": (1.0, 50.0)},
+    "market_vol_floor_multiple": {"kind": "log",
+                                  "hard_range": (0.001, 1.0)},
 }
 
 #: §3.9's searched set — the identifiability filter the SVD tests.
