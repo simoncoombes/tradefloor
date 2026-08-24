@@ -52,8 +52,16 @@ the absolute path instead:
 }
 ```
 
-`python -c "import shutil; print(shutil.which('pretium-mcp'))"` inside the
-environment prints exactly what to paste.
+To find that path, ask the interpreter you installed into:
+
+```
+python -c "import sys, pathlib; print(pathlib.Path(sys.prefix) / ('Scripts' if sys.platform == 'win32' else 'bin') / 'pretium-mcp')"
+```
+
+Derived from `sys.prefix` rather than looked up on `PATH` deliberately.
+`shutil.which` is the obvious thing to reach for and it returns `None`
+unless the environment happens to be activated — which is exactly the
+situation someone hits this problem in.
 
 Running `pretium-mcp` in a terminal is a useful check on its own. With the
 extra missing it says so and names the fix; with everything present it
