@@ -276,11 +276,14 @@ class Survey:
     Rows are appended by `record` (or by `survey`), carry the plan index
     they came from, and are either measured -- parameters plus outputs --
     or errored: parameters plus the error string, kept because a parameter
-    region that breaks the model is a fact about the model. Every analysis
-    method reports how many rows it used and how many it dropped, because a
-    statistic computed over a quietly shrunken sample carries the full
-    sample's authority -- a bug this project has been bitten by more than
-    once.
+    region that breaks the model is a fact about the model. The analysis
+    methods that return numbers (`sensitivity`, `profile`, `pareto`,
+    `attribution`) report how many rows they used and how many they
+    dropped, because a statistic computed over a quietly shrunken sample
+    carries the full sample's authority -- a bug this project has been
+    bitten by more than once. `unidentified` returns bare names; its
+    basis is the `sensitivity` result it is derived from, and anything
+    quoted from it should quote that.
     """
 
     axes: list[Axis]
@@ -496,6 +499,8 @@ class Survey:
 
             {"param", "output", "log",
              "bins": [{"low", "high", "n", "median", "p10", "p90"}, ...],
+             "rows_outside_range",   # values off the axis: counted, never
+                                     # clamped into an edge bin
              "rows_total", "rows_used", ...drop tally..., "where"}
         """
         axis = self.axis(param)
@@ -508,8 +513,17 @@ class Survey:
                 "three rows a bin; a marginal that thin describes the "
                 "sample, not the model. Use fewer bins or more rows.")
         buckets: list[list[float]] = [[] for _ in range(bins)]
+        outside = 0
         for params, value in vals:
-            u = axis.unit(params[param])
+            x = params[param]
+            # `record` and `load` accept rows from anywhere, so a value
+            # outside the axis is reachable; clamping it into an edge bin
+            # (as an early version did) would silently move a measurement
+            # to a place it was not taken. Counted out instead.
+            if x < axis.low or x > axis.high:
+                outside += 1
+                continue
+            u = axis.unit(x)
             buckets[min(max(int(u * bins), 0), bins - 1)].append(value)
         rows = []
         for i, bucket in enumerate(buckets):
@@ -523,7 +537,8 @@ class Survey:
                 "p90": _percentile(ordered, 0.90) if ordered else None,
             })
         return {"param": param, "output": output, "log": axis.log,
-                "bins": rows, "where": dict(where) if where else None,
+                "bins": rows, "rows_outside_range": outside,
+                "where": dict(where) if where else None,
                 **counts}
 
     def pareto(self, objectives: Mapping[str, str]) -> dict[str, Any]:
@@ -706,7 +721,12 @@ class Survey:
         hand), and any confirmation seed found in that list -- or shared
         between blocks -- is REFUSED, not warned about, because a warning
         is a thing people read past and this is the one mistake that has
-        to be impossible.
+        to be impossible. An empty seed record is refused the same way: an
+        empty list is the absence of a record wearing the key. Stated
+        limit: the gate can only see the integers it is handed. It
+        normalises types so '101' cannot slip past 101, but nothing here
+        can detect a `measure` that ignores its `seed` argument and runs
+        whatever paths it likes -- that honesty stays with the caller.
 
         `measure(vector, seed)` returns the full-resolution outputs for
         one vector on one seed; both vectors are measured on the SAME
@@ -715,7 +735,11 @@ class Survey:
         whose measurement raises fails the whole call rather than being
         recorded: a confirmation with quietly missing paths would carry
         the full block's authority, and unlike a survey row, there is no
-        analysis downstream to skip it honestly.
+        analysis downstream to skip it honestly. The output set is the
+        UNION over every measurement, and every output must be finite at
+        every seed on both vectors -- an output that vanishes or goes
+        non-finite at one seed, the first included, is a hole to refuse,
+        not a smaller answer to return.
 
         Several DISJOINT blocks, not one: one block tells you a number,
         several tell you whether it is a property of the model, and the
@@ -733,14 +757,20 @@ class Survey:
                                                "baseline", "gap"}, ...]}},
              "seed_blocks", "survey_seeds", "summary"}
         """
-        if "seeds" not in self.meta:
+        recorded = self.meta.get("seeds")
+        if not recorded:
+            # Absent OR empty: an empty list is not a record, it is the
+            # absence of one wearing the key -- and an early version
+            # accepted it, ran a vacuous overlap check, and then RENDERED
+            # "disjoint from the survey's: checked" over a check that had
+            # checked nothing.
             raise ValidationError(
                 "this survey does not record which seeds measured it "
-                "(meta['seeds']), so the seed-overlap check cannot run -- "
-                "and it runs on records, not on trust. Set meta['seeds'] "
-                "when building the survey.")
-        survey_seeds = set(self.meta["seeds"])
-        blocks = [list(b) for b in seed_blocks]
+                "(meta['seeds'] is missing or empty), so the seed-overlap "
+                "check cannot run -- and it runs on records, not on "
+                "trust. Set meta['seeds'] when building the survey.")
+        survey_seeds = set(_seed_ints(recorded, "meta['seeds']"))
+        blocks = [_seed_ints(b, "a seed block") for b in seed_blocks]
         if not blocks or any(not b for b in blocks):
             raise ValidationError("confirm needs at least one non-empty "
                                   "seed block")
@@ -761,16 +791,20 @@ class Survey:
                 "candidate and baseline are identical; there is no effect "
                 "to confirm")
 
-        per_block: list[dict[str, Any]] = []
-        keys: list[str] | None = None
-        for block in blocks:
-            cand = [dict(measure(candidate, s)) for s in block]
-            base = [dict(measure(baseline, s)) for s in block]
-            if keys is None:
-                keys = sorted(k for k in cand[0] if _finite(cand[0][k]))
-                if not keys:
-                    raise ValidationError(
-                        "measure returned no finite outputs")
+        # Measure everything first, THEN fix the output set as the union
+        # over every measurement. Deriving the keys from any single
+        # measurement is the hole an early version had: an output
+        # non-finite at the first candidate seed simply vanished from the
+        # whole confirmation, with no error -- a quietly missing PATH was
+        # refused while a quietly missing OUTPUT sailed through.
+        measured = [( [dict(measure(candidate, s)) for s in block],
+                      [dict(measure(baseline, s)) for s in block])
+                    for block in blocks]
+        keys = sorted({k for cand, base in measured
+                       for row in (*cand, *base) for k in row})
+        if not keys:
+            raise ValidationError("measure returned no outputs")
+        for block, (cand, base) in zip(blocks, measured):
             for rows, label in ((cand, "candidate"), (base, "baseline")):
                 for row, seed in zip(rows, block):
                     missing = [k for k in keys if not _finite(row.get(k))]
@@ -778,14 +812,16 @@ class Survey:
                         raise ValidationError(
                             f"{label} measurement at seed {seed} has no "
                             f"finite value for {missing}; a confirmation "
-                            "with holes is not a confirmation")
-            per_block.append({
-                "seeds": list(block),
-                "medians": {
-                    k: (statistics.median(r[k] for r in cand),
-                        statistics.median(r[k] for r in base))
-                    for k in keys},
-            })
+                            "with holes is not a confirmation, and "
+                            "dropping the output instead would hide the "
+                            "hole")
+        per_block = [{
+            "seeds": list(block),
+            "medians": {
+                k: (statistics.median(r[k] for r in cand),
+                    statistics.median(r[k] for r in base))
+                for k in keys},
+        } for block, (cand, base) in zip(blocks, measured)]
 
         outputs: dict[str, Any] = {}
         for k in keys or ():
@@ -847,7 +883,15 @@ class Survey:
                          "range:")
             for name, r in drivers[:top]:
                 axis = self.axis(name)
-                shape = _shape(self.profile(name, output), axis)
+                # `sensitivity` stands on 8 rows; a marginal needs 3 per
+                # bin. Between the two floors the correlation is still
+                # worth printing, so the shape degrades to a stated
+                # absence instead of this method dying with a refusal
+                # from a function the caller never called.
+                try:
+                    shape = _shape(self.profile(name, output), axis)
+                except ValidationError:
+                    shape = "shape not read (too few rows for a marginal)"
                 span = (f"({_fmt(axis.low)} to {_fmt(axis.high)}"
                         f"{', log' if axis.log else ''})")
                 lines.append(f"  {name:28s} rho {r:+.2f}  {shape}  {span}")
@@ -941,9 +985,21 @@ class Survey:
         }
 
     def save(self, path: str) -> str:
-        """Write the survey to JSON, measurement once, questions forever."""
+        """Write the survey to JSON -- measured once, questions forever.
+
+        STRICT JSON: a non-finite output (a NaN from a degenerate run) is
+        stored as null. Python's serialiser would happily emit a bare
+        `NaN` token, which Python then reads back while `jq` and every
+        non-Python consumer refuse the whole file -- a survey that only
+        its author's runtime can open is not a shared measurement. The
+        analysis methods already treat null and NaN identically (both are
+        non-finite and dropped, counted), so nothing is lost in the
+        translation; `allow_nan=False` enforces the promise rather than
+        trusting it.
+        """
         with open(path, "w", encoding="utf-8") as handle:
-            json.dump(self.to_dict(), handle, indent=1)
+            json.dump(_jsonsafe(self.to_dict()), handle, indent=1,
+                      allow_nan=False)
             handle.write("\n")
         return path
 
@@ -1047,14 +1103,22 @@ def _bin_noise(b: Mapping[str, Any]) -> float:
     Normal-theory arithmetic (p10-p90 span is 2.56 sd; a median's standard
     error is 1.25 sd/sqrt(n)) applied to data nobody claims is normal:
     an order-of-magnitude device for separating signal from coin flips,
-    not an inference. Degenerate bins get an infinite scale, so nothing
-    read from them ever clears a noise gate.
+    not an inference.
+
+    A bin with fewer than four rows gets an INFINITE scale, so nothing
+    read from it ever clears a noise gate. The cut is not cosmetic: a
+    one-row bin has p10 == p90, so the formula below would report it as
+    infinitely PRECISE -- and an early version did exactly that, letting a
+    lone row in a thin bin (which is what a `where=` filter or an errored
+    region produces) present a coin flip as a confirmed driver of pure
+    noise. Below four rows the interpolated p10-p90 span is mostly the
+    rows themselves, not a spread. Four or more IDENTICAL values are
+    taken at face value (scale 0): repeated agreement is evidence of a
+    genuinely deterministic response, not a degeneracy.
     """
-    if not b["n"] or b["p90"] is None or b["p10"] is None:
+    if b["n"] < 4 or b["p90"] is None or b["p10"] is None:
         return math.inf
     sd = (b["p90"] - b["p10"]) / 2.563
-    if sd == 0.0:
-        return 0.0
     return 1.253 * sd / math.sqrt(b["n"])
 
 
@@ -1089,17 +1153,22 @@ def _marginal_at(prof: Mapping[str, Any], axis: Axis, value: float
 def _shape(prof: Mapping[str, Any], axis: Axis) -> str:
     """A conservative word for a marginal's shape.
 
-    Reads the non-empty bin medians against the marginal's own noise scale
-    and names only what exceeds it: "flat at this resolution" when the
-    whole range of medians is within noise, an interior extremum only when
-    the rise and the fall EACH exceed twice the noise, "saturating" only
-    when the second half of the move is under a quarter of the first.
+    Reads the bin medians against the marginal's own noise scale and
+    names only what exceeds it: "flat at this resolution" when the whole
+    range of medians is within noise, an interior extremum only when the
+    rise and the fall EACH exceed twice the noise, "saturating" only when
+    the second half of the move is under a quarter of the first.
     Everything fuzzier degrades to plain "rising"/"falling". The bias is
     deliberate: a shape word that overclaims gets quoted, and this project
     has already paid for one confidently wrong mechanism sentence.
+
+    Bins too thin to carry a noise estimate (under four rows -- see
+    `_bin_noise`) are excluded outright rather than allowed to vote: a
+    lone row's median is mostly that row.
     """
     pts = [(i, b["median"], _bin_noise(b))
-           for i, b in enumerate(prof["bins"]) if b["n"]]
+           for i, b in enumerate(prof["bins"])
+           if b["n"] and math.isfinite(_bin_noise(b))]
     if len(pts) < 4:
         return "too few populated bins to name a shape"
     medians = [m for _, m, _ in pts]
@@ -1126,6 +1195,39 @@ def _shape(prof: Mapping[str, Any], axis: Axis) -> str:
     return direction
 
 
+def _jsonsafe(value: Any) -> Any:
+    """`value` with every non-finite float replaced by None, recursively.
+
+    Applied on save so the file is strict JSON (see `Survey.save`). Pure:
+    the in-memory survey keeps its NaNs, since replacing them under the
+    caller would be mutation-by-persistence.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {k: _jsonsafe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonsafe(v) for v in value]
+    return value
+
+
+def _seed_ints(values: Iterable[Any], label: str) -> list[int]:
+    """Seeds as ints, or a refusal. A '101' beside a 101 would defeat the
+    set intersection the disjointness gate is built on, so mixed types are
+    normalised before any set touches them."""
+    out = []
+    for v in values:
+        if isinstance(v, bool) or not isinstance(v, (int, str)):
+            raise ValidationError(f"{label} contains {v!r}, which is not a "
+                                  "seed; seeds are integers")
+        try:
+            out.append(int(v))
+        except ValueError:
+            raise ValidationError(f"{label} contains {v!r}, which is not a "
+                                  "seed; seeds are integers") from None
+    return out
+
+
 def _confirm_summary(outputs: Mapping[str, Mapping[str, Any]],
                      blocks: Sequence[Sequence[int]]) -> str:
     """The confirmation as text: what reproduced, what reversed, and the
@@ -1147,6 +1249,14 @@ def _confirm_summary(outputs: Mapping[str, Mapping[str, Any]],
         elif row["reverses_sign"]:
             verdict = ("sign REVERSES across blocks -- indistinguishable "
                        "from path luck")
+        elif not row["consistent_sign"]:
+            # One or more gaps are exactly zero beside signed ones. The
+            # prose is derived from the same field the structured result
+            # carries, because an early version computed them separately
+            # and printed "consistent sign" over consistent_sign: False.
+            zeros = sum(1 for g in row["gaps"] if g == 0)
+            verdict = (f"gap vanishes in {zeros} of {k} blocks -- not a "
+                       "consistent effect")
         else:
             sd = row["sd_gap"] or 0.0
             if abs(row["mean_gap"]) > 2.0 * sd / math.sqrt(k):
@@ -1186,8 +1296,11 @@ def _attribution_summary(output: str, changed: Mapping[str, tuple],
                 f"parameter, so the survey attributes no difference in "
                 f"{output!r} to them")
     if measured_delta is not None:
+        residual = measured_delta - predicted
         head = (f"{output!r} moves {measured_delta:+.4g} from A to B "
-                f"(marginals predict {predicted:+.4g})")
+                f"(marginals predict {predicted:+.4g}; the residual "
+                f"{residual:+.4g} is what the additivity assumption "
+                "missed)")
     else:
         head = (f"the marginals predict {output!r} moves {predicted:+.4g} "
                 "from A to B")
@@ -1203,6 +1316,18 @@ def _attribution_summary(output: str, changed: Mapping[str, tuple],
              "rows under an additivity assumption, at screening "
              "resolution -- confirm any decision-bearing number with a "
              "full-seed measurement.")
+    if measured_delta is None:
+        # The one honest signal that additivity failed is the residual,
+        # and without measured endpoints there is none. Said in the text
+        # itself, because this exact sentence class -- "B beats A
+        # because..." rendered with no measured check behind it -- is how
+        # a design document acquired a confidently backwards mechanism
+        # claim.
+        basis += (" No measured endpoints were supplied (measured=), so "
+                  "the additivity assumption is UNCHECKED here: an "
+                  "interaction between the changed parameters would be "
+                  "attributed to neither and leave no trace in these "
+                  "numbers.")
     return head + ": " + body + tail + basis
 
 

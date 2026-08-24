@@ -78,11 +78,17 @@ ranges), with three classes of deliberate exception:
 `run` is resumable and streams: every finished task is appended to
 `tasks.jsonl` and fsynced BEFORE progress is printed (persist before you
 print -- two result files were lost to a dead-man switch firing before
-collection). Kill it anywhere; re-running skips finished tasks after
-verifying `meta.json` matches, and `collect` builds a usable
-`atlas-survey.json` + `atlas-report.txt` from whatever is on disk, so the
-survey is readable mid-flight. Progress lines are timestamped; silence
-longer than a few task-lengths IS the hang indicator.
+collection). Kill it anywhere; re-running resumes ONLY under the same
+plan fingerprint -- a changed configuration is refused, and so are rows
+whose `meta.json` is missing, because rows are keyed by plan index and
+must never outlive the plan that names them. A failed task records its
+failure with a kind: a model refusal is deterministic and final, while an
+infrastructure failure (OOM, dead worker) is re-runnable with
+`--retry-errors` -- left final, those cluster in the expensive corners
+and quietly bias the marginals against a region. `collect` builds a
+usable `atlas-survey.json` + `atlas-report.txt` from whatever is on disk,
+so the survey is readable mid-flight. Progress lines are timestamped;
+silence longer than a few task-lengths IS the hang indicator.
 
 Cost, measured (one M-series laptop core, 2026-08-24): panel-252 ~10s,
 panel-504 ~20s, held-VIX ~2.5s, shock ~0.3s; about 4.2 core-minutes per
@@ -253,11 +259,17 @@ def survey_axes() -> list[atlas.Axis]:
     settable = pretium.ModelParams.settable()
     ship = pretium.ModelParams.from_preset(BASE_PRESET).to_dict()
     zeros = {n for n in settable if float(ship[n]) == 0.0}
-    assert zeros == set(ZERO_SHIPPED_RANGES), (
-        "the zero-shipped set moved and ZERO_SHIPPED_RANGES did not: "
-        f"unranged {sorted(zeros - set(ZERO_SHIPPED_RANGES))}, stale "
-        f"{sorted(set(ZERO_SHIPPED_RANGES) - zeros)}. Choose ranges on "
-        "purpose; atlas refuses to guess them.")
+    # These guards are raises, not asserts, on purpose: they are the same
+    # registry-drift class this project added tests for AFTER a missing
+    # PARAM_SPECS entry killed a 96-core search, and an assert vanishes
+    # under `python -O` -- which is exactly the kind of flag a "fast"
+    # production launch might add.
+    if zeros != set(ZERO_SHIPPED_RANGES):
+        raise RuntimeError(
+            "the zero-shipped set moved and ZERO_SHIPPED_RANGES did not: "
+            f"unranged {sorted(zeros - set(ZERO_SHIPPED_RANGES))}, stale "
+            f"{sorted(set(ZERO_SHIPPED_RANGES) - zeros)}. Choose ranges on "
+            "purpose; atlas refuses to guess them.")
 
     raw = sorted(n for n in settable if n not in REPARAMETERISED)
     ranges: dict[str, tuple[float, float]] = {}
@@ -285,22 +297,24 @@ def survey_axes() -> list[atlas.Axis]:
     axes = atlas.axes_for(raw, preset=BASE_PRESET, ranges=ranges, log=log)
     axes += list(TRANSFORMED_AXES)
 
-    # The specific failure this file exists to prevent, asserted rather
+    # The specific failure this file exists to prevent, checked rather
     # than remembered: the best known crisis vector must be inside the box.
     by_name = {a.name: a for a in axes}
     for name, best in (("crisis_blend_ramp", 6.0), ("crisis_blend_cap", 0.98)):
         a = by_name[name]
-        assert a.low <= best <= a.high, (
-            f"{name} range ({a.low}, {a.high}) excludes the best known "
-            f"value {best} -- the crisisearch4 failure, again")
+        if not a.low <= best <= a.high:
+            raise RuntimeError(
+                f"{name} range ({a.low}, {a.high}) excludes the best known "
+                f"value {best} -- the crisisearch4 failure, again")
     # And the preset itself must be on the map, or nothing found on it can
     # be anchored to the model actually being run.
     ship_vector = params_to_vector({n: ship[n] for n in settable})
     for a in axes:
         v = ship_vector[a.name]
-        assert a.low <= v <= a.high, (
-            f"{a.name} range ({a.low}, {a.high}) excludes the "
-            f"{BASE_PRESET} value {v}")
+        if not a.low <= v <= a.high:
+            raise RuntimeError(
+                f"{a.name} range ({a.low}, {a.high}) excludes the "
+                f"{BASE_PRESET} value {v}")
     return axes
 
 
@@ -328,10 +342,55 @@ def task_list(index: int, overrides: dict[str, float]) -> list[dict]:
     return tasks
 
 
+def error_kind(exc: BaseException) -> str:
+    """Which of two very different things an exception is.
+
+    "model" -- the library refused the vector's region (its ValidationError
+    / OrderError). Deterministic: re-running reproduces it, so resume may
+    treat it as final, and it is a finding about the model.
+
+    "infrastructure" -- the MACHINE failed (out of memory, a dead worker,
+    an interrupted syscall). Not a property of the vector, except that it
+    correlates with one: OOMs cluster in the expensive high-volatility,
+    high-jump corners, so treating these as final quietly biases every
+    marginal against exactly a REGION while the drop tally looks benign.
+    `--retry-errors` re-runs these.
+
+    Everything else is "unclassified" and retried with infrastructure,
+    because the safe default for an unknown failure is to look again.
+    """
+    if isinstance(exc, (pretium.ValidationError, pretium.OrderError)):
+        return "model"
+    if isinstance(exc, (MemoryError, OSError, TimeoutError,
+                        ConnectionError)):
+        return "infrastructure"
+    return "unclassified"
+
+
+def completed_ids(rows: list[dict], retry_errors: bool = False) -> set[str]:
+    """The task ids a resume may skip.
+
+    Successes and infeasible markers are always done. Errored tasks are
+    done ONLY when they are model refusals or the caller did not ask to
+    retry: with `retry_errors`, infrastructure and unclassified failures
+    are re-run, because a transient failure recorded as permanent is a
+    dropped measurement wearing a legitimate-looking error string.
+    """
+    done = set()
+    for row in rows:
+        if (retry_errors and "error" in row
+                and row.get("error_kind", "unclassified") != "model"):
+            continue
+        done.add(row["id"])
+    return done
+
+
 def run_task(task: dict) -> dict:
     """One task, in a worker process. Never raises: an exception is the
     task's RESULT (a region that breaks the model is a fact about the
-    model), and a raise here would take the whole pool's future with it."""
+    model), and a raise here would take the whole pool's future with it.
+    The result carries `error_kind` so a model refusal and a machine
+    failure -- which deserve opposite treatment on resume -- never blur."""
     started = time.perf_counter()
     out = {"id": task["id"], "index": task["index"], "kind": task["kind"],
            "seed": task["seed"]}
@@ -354,6 +413,7 @@ def run_task(task: dict) -> dict:
             raise ValueError(f"unknown task kind {task['kind']!r}")
     except Exception as exc:  # noqa: BLE001 - the error IS the result
         out["error"] = f"{type(exc).__name__}: {exc}"
+        out["error_kind"] = error_kind(exc)
     out["seconds"] = round(time.perf_counter() - started, 3)
     return out
 
@@ -398,6 +458,28 @@ def plan_fingerprint(axes, samples: int, plan_seed: int) -> str:
            "gate_universe": [sr.UNIVERSE_N, sr.UNIVERSE_SEED]}
     return hashlib.sha256(
         json.dumps(doc, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def build_meta(axes, samples: int, plan_seed: int, fingerprint: str) -> dict:
+    """The survey's identity, written once per outdir and verified on
+    every resume. One constructor, shared with the tests that exercise
+    `collect` against fabricated rows, so a drift between what `run`
+    writes and what `collect` reads fails in CI rather than on a box."""
+    return {
+        "plan_fingerprint": fingerprint,
+        "base_preset": BASE_PRESET,
+        "samples": samples,
+        "plan_seed": plan_seed,
+        "seeds": list(SCREEN_SEEDS),
+        "horizons": list(HORIZONS),
+        "axes": [{"name": a.name, "low": a.low, "high": a.high,
+                  "log": a.log} for a in axes],
+        "panel_universe": f"Universe.random({lib.PANEL_UNIVERSE_N}, "
+                          f"seed={lib.PANEL_UNIVERSE_SEED})",
+        "gate_universe": f"Universe.random({sr.UNIVERSE_N}, "
+                         f"seed={sr.UNIVERSE_SEED})",
+        "provenance": lib.provenance(),
+    }
 
 
 def build_plan(samples: int, plan_seed: int):
@@ -451,21 +533,7 @@ def cmd_run(args) -> int:
     fingerprint = plan_fingerprint(axes, args.samples, args.plan_seed)
 
     meta_path = outdir / "meta.json"
-    meta = {
-        "plan_fingerprint": fingerprint,
-        "base_preset": BASE_PRESET,
-        "samples": args.samples,
-        "plan_seed": args.plan_seed,
-        "seeds": list(SCREEN_SEEDS),
-        "horizons": list(HORIZONS),
-        "axes": [{"name": a.name, "low": a.low, "high": a.high,
-                  "log": a.log} for a in axes],
-        "panel_universe": f"Universe.random({lib.PANEL_UNIVERSE_N}, "
-                          f"seed={lib.PANEL_UNIVERSE_SEED})",
-        "gate_universe": f"Universe.random({sr.UNIVERSE_N}, "
-                         f"seed={sr.UNIVERSE_SEED})",
-        "provenance": lib.provenance(),
-    }
+    meta = build_meta(axes, args.samples, args.plan_seed, fingerprint)
     rows_exist = (outdir / "tasks.jsonl").exists()
     if meta_path.exists():
         existing = json.loads(meta_path.read_text())
@@ -500,7 +568,8 @@ def cmd_run(args) -> int:
 
     limit = args.limit if args.limit else len(vectors)
     rows_path = outdir / "tasks.jsonl"
-    done = {r["id"] for r in read_rows(rows_path)}
+    done = completed_ids(read_rows(rows_path),
+                         retry_errors=args.retry_errors)
 
     pending: list[dict] = []
     n_infeasible = 0
@@ -559,20 +628,33 @@ def cmd_collect(args) -> int:
     meta = json.loads((outdir / "meta.json").read_text())
     axes = [atlas.Axis(**a) for a in meta["axes"]]
     vectors = atlas.plan(axes, meta["samples"], meta["plan_seed"])
-    assert plan_fingerprint(axes, meta["samples"], meta["plan_seed"]) \
-        == meta["plan_fingerprint"], "meta.json does not reproduce its plan"
+    if plan_fingerprint(axes, meta["samples"], meta["plan_seed"]) \
+            != meta["plan_fingerprint"]:
+        # A raise, not an assert: this is the guard against reading rows
+        # under the wrong plan, and it must not vanish under `python -O`.
+        raise RuntimeError(
+            f"{outdir / 'meta.json'} does not reproduce its own plan "
+            "fingerprint; the rows cannot be attributed to vectors")
 
     by_index: dict[int, dict[str, dict]] = {}
     for row in read_rows(outdir / "tasks.jsonl"):
-        # First write wins: a duplicated task (two runs against one outdir)
-        # must not let a later measurement silently replace an earlier one.
-        by_index.setdefault(row["index"], {}).setdefault(row["id"], row)
+        # Among successes, first write wins: a duplicated task (two runs
+        # against one outdir) must not let a later measurement silently
+        # replace an earlier one. The one sanctioned replacement is a
+        # success over an error -- that is what `--retry-errors` appends,
+        # and keeping the stale error over its retried measurement would
+        # undo the retry.
+        existing = by_index.setdefault(row["index"], {})
+        prev = existing.get(row["id"])
+        if prev is None or ("error" in prev and "error" not in row):
+            existing[row["id"]] = row
 
     seeds = meta["seeds"]
     expected = (len(meta["horizons"]) * len(seeds)
                 + len(sr.HELD_VIX) * len(seeds) + len(seeds))
     survey = atlas.Survey(axes=axes)
     pending = 0
+    errors_by_kind: dict[str, int] = {}
     market_draws: dict[tuple, dict[int, int]] = {}
     for index, vector in enumerate(vectors):
         rows = by_index.get(index)
@@ -586,9 +668,17 @@ def cmd_collect(args) -> int:
             continue
         failed = [r for r in rows.values() if "error" in r]
         if failed:
+            # The kind travels into the survey row, and the row keeps its
+            # full parameter vector -- so a reader can test the drops for
+            # spatial clustering (errors() rows against the axes) instead
+            # of trusting a benign-looking tally. An infrastructure
+            # cluster in one corner of the space biases every marginal
+            # near it.
             first = failed[0]
+            kind = first.get("error_kind", "unclassified")
+            errors_by_kind[kind] = errors_by_kind.get(kind, 0) + 1
             survey.record(index, vector,
-                          error=f"{first['id']}: {first['error']}")
+                          error=f"[{kind}] {first['id']}: {first['error']}")
             continue
         if len(rows) < expected:
             pending += 1
@@ -650,6 +740,7 @@ def cmd_collect(args) -> int:
             "alpha/beta/gamma axes; atlas_survey.vector_to_params is the "
             "pure translation"),
         "vectors_pending": pending,
+        "errors_by_kind": errors_by_kind,
         "crn_market_deviations": sorted(deviating)[:50],
         "crn_market_deviation_count": len(deviating),
     }
@@ -718,6 +809,13 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=None,
                         help="run only the first N vectors -- a smoke run "
                              "before committing a big box to the rest")
+    parser.add_argument("--retry-errors", action="store_true",
+                        help="re-run tasks whose recorded failure was "
+                             "infrastructure (OOM, dead worker) rather "
+                             "than a model refusal. Transient failures "
+                             "cluster in the expensive corners of the "
+                             "space, so leaving them final biases the "
+                             "marginals against a region.")
     args = parser.parse_args()
     if args.command != "plan" and not args.out:
         parser.error(f"{args.command} needs --out")

@@ -42,6 +42,38 @@ def test_the_hypercube_is_actually_stratified_on_every_axis():
         assert strata == list(range(n)), f"axis {dim} missed a stratum"
 
 
+def test_the_shuffle_is_a_real_permutation_not_a_bystander():
+    """Stratification is invariant under ANY permutation, so the test
+    above passes with the Fisher-Yates loop deleted outright -- identity
+    permutation, perfectly correlated columns -- and with a Sattolo
+    off-by-one. Found by review; this pins the shuffle itself.
+
+    Two properties, each killing a specific breakage:
+
+    - Fixed points. A uniform permutation of 32 strata has one fixed
+      point in expectation, so 60 independent draws have ~60. The
+      identity has 32 EVERY time (1,920 total); Sattolo's variant has
+      exactly zero, always. Both land far outside [10, 150].
+    - Column independence. Two axes' rank columns must be uncorrelated;
+      the deleted-shuffle failure makes them identical (r = 1).
+    """
+    total_fixed = 0
+    for seed in range(60):
+        points = atlas.latin_hypercube(32, 1, seed)
+        strata = [int(p[0] * 32) for p in points]
+        total_fixed += sum(1 for i, s in enumerate(strata) if i == s)
+    assert 10 <= total_fixed <= 150, total_fixed
+
+    points = atlas.latin_hypercube(2000, 2, seed=17)
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+    num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    den = math.sqrt(sum((x - mx) ** 2 for x in xs)
+                    * sum((y - my) ** 2 for y in ys))
+    assert abs(num / den) < 0.1, "columns must be independent draws"
+
+
 def test_the_plan_is_reproducible_from_its_seed_alone():
     # A survey that cannot be re-derived from (axes, samples, seed) is a
     # measurement nobody can check. GameRng is used for exactly this.
@@ -260,6 +292,17 @@ def test_a_marginal_too_thin_for_its_bins_is_refused():
         result.profile("x1", "y", bins=12)
 
 
+def test_profile_counts_an_off_axis_value_instead_of_clamping_it():
+    # `record` and `load` accept rows from anywhere, so an off-axis value
+    # is reachable; clamping it into an edge bin (the old behaviour)
+    # silently moved a measurement to a place it was not taken.
+    result = synthetic(lambda v: {"y": v["x1"]}, names=("x1",), samples=48)
+    result.record(48, {"x1": 5.0}, outputs={"y": 5.0})
+    prof = result.profile("x1", "y", bins=12)
+    assert prof["rows_outside_range"] == 1
+    assert sum(b["n"] for b in prof["bins"]) == 48, "not smuggled into a bin"
+
+
 # -- pareto -----------------------------------------------------------------
 
 def hand_survey(points):
@@ -350,6 +393,50 @@ def test_attribution_refuses_extrapolation_and_one_sided_vectors():
         result.attribution({"x9": 0.5}, {"x9": 0.6}, "y")
 
 
+def test_a_lone_row_in_a_bin_cannot_certify_a_driver_of_pure_noise():
+    """The review's demonstration, pinned: a one-row bin has p10 == p90,
+    and an early `_bin_noise` read that as INFINITELY PRECISE (sd 0.0) --
+    so on a 48-row survey of pure noise, attribution reported the lone
+    first-bin row as a confirmed driver (delta +1.24, se 0.26,
+    within_noise empty). Thin bins are exactly what a `where=` filter or
+    an errored region produces, so the failure aims at real use. A bin
+    under four rows now carries an infinite noise scale, and nothing read
+    from it can clear a gate."""
+    s = Survey(axes=unit_axes("x1"))
+    xs = [0.02] + [0.5 + 0.5 * (i + 0.5) / 47 for i in range(47)]
+    for i, x in enumerate(xs):
+        s.record(i, {"x1": x}, outputs={"y": math.sin(i * 12.9898)})
+    att = s.attribution({"x1": 0.02}, {"x1": 0.75}, "y")
+    assert att["contributions"]["x1"]["se"] == math.inf
+    assert att["within_noise"] == ["x1"]
+    assert "no single parameter's contribution clears its noise" \
+        in att["summary"]
+
+
+def test_attribution_on_an_interacting_surface_owns_its_blindness():
+    """Verified failure mode: on y = x1*x2 the marginal attributes an
+    x1 move at E[x2], understating or overstating by whatever the true
+    x2 is -- and the ONLY honest signal is the residual, which needs
+    measured endpoints. Without them the summary must say the assumption
+    went unchecked, because 'B beats A because...' with no measured check
+    behind it is the exact sentence class that put a confidently wrong
+    mechanism claim in a design document."""
+    result = synthetic(lambda v: {"y": v["x1"] * v["x2"]},
+                       samples=480, seed=13)
+    a = {"x1": 0.2, "x2": 0.8, "x3": 0.5}
+    b = {"x1": 0.8, "x2": 0.8, "x3": 0.5}
+    blind = result.attribution(a, b, "y")
+    assert blind["measured_delta"] is None and blind["residual"] is None
+    assert "UNCHECKED" in blind["summary"]
+    # True delta is 0.6 * 0.8 = 0.48; the marginal predicts ~0.6 * E[x2].
+    checked = result.attribution(a, b, "y", measured=(0.16, 0.64))
+    assert checked["predicted_delta"] == pytest.approx(0.30, abs=0.08)
+    assert checked["residual"] == pytest.approx(
+        0.48 - checked["predicted_delta"])
+    assert checked["residual"] > 0.1, "the interaction lands in the residual"
+    assert "residual" in checked["summary"]
+
+
 def test_a_within_noise_contribution_is_flagged_not_ranked():
     # x2 moves y by a hair against a unit-wide spread from x1: real
     # arithmetic would print "+0.001" to four decimals; the flag is the
@@ -383,6 +470,19 @@ def test_explain_says_so_when_nothing_moves_the_output():
     result = synthetic(lambda v: {"y": 1.0})
     text = result.explain("y")
     assert "nothing moves this output" in text
+
+
+def test_explain_degrades_between_the_sensitivity_and_marginal_floors():
+    # `sensitivity` stands on 8 rows; a 12-bin marginal needs 36. In
+    # between, explain used to die with profile's refusal -- a confusing
+    # error from a method the caller never called. The correlation is
+    # still worth printing; only the shape word is absent, and it says so.
+    s = Survey(axes=unit_axes("x1"))
+    for i in range(12):
+        s.record(i, {"x1": i / 12.0}, outputs={"y": i / 12.0})
+    text = s.explain("y")
+    assert "x1" in text
+    assert "shape not read" in text
 
 
 def test_explain_carries_the_meta_resolution_note():
@@ -495,6 +595,72 @@ def test_a_measurement_hole_fails_the_confirmation_loudly():
                   seed_blocks=[range(201, 206)])
 
 
+def test_a_hole_at_the_first_seed_is_a_refusal_not_a_smaller_answer():
+    """The review's exact hole: the output set was once derived from the
+    FIRST candidate measurement alone, so an output non-finite there --
+    and only there -- silently vanished from the whole confirmation while
+    the same NaN at any later seed raised. The suite was blind to it
+    because its only hole test put the NaN at seed 203."""
+    s = screened()
+
+    def measure(v, seed):
+        y = float("nan") if seed == 201 else v["x1"]
+        return {"y": y, "z": v["x1"]}
+
+    with pytest.raises(pretium.ValidationError, match="seed 201") as err:
+        s.confirm({"x1": 0.8}, {"x1": 0.2}, measure,
+                  seed_blocks=[range(201, 206)])
+    assert "'y'" in str(err.value), "the refusal names the holed output"
+
+
+def test_an_empty_seed_record_cannot_vouch_for_disjointness():
+    """`meta['seeds'] = []` once slid past a presence check, ran a vacuous
+    overlap test, and the summary then PRINTED 'checked, not trusted' over
+    a check that had checked nothing. An empty record is the absence of a
+    record wearing the key."""
+    result = synthetic(lambda v: {"y": v["x1"]}, names=("x1",), samples=32)
+    result.meta["seeds"] = []
+    with pytest.raises(pretium.ValidationError, match="missing or empty"):
+        result.confirm({"x1": 0.8}, {"x1": 0.2},
+                       lambda v, seed: {"y": v["x1"]},
+                       seed_blocks=[[201, 202]])
+
+
+def test_seed_types_are_normalised_before_the_overlap_check():
+    # '101' beside 101 defeats a set intersection; the gate normalises
+    # both sides so a JSON round trip cannot re-open it. Anything that is
+    # not a seed at all is refused.
+    s = screened(seeds=(101, 102, 103))
+    with pytest.raises(pretium.ValidationError, match="confirm itself"):
+        s.confirm({"x1": 0.8}, {"x1": 0.2},
+                  lambda v, seed: {"y": v["x1"]},
+                  seed_blocks=[["101", 202]])
+    with pytest.raises(pretium.ValidationError, match="not a\\s+seed"):
+        s.confirm({"x1": 0.8}, {"x1": 0.2},
+                  lambda v, seed: {"y": v["x1"]},
+                  seed_blocks=[["twelve"]])
+
+
+def test_a_vanishing_gap_is_never_described_as_a_consistent_sign():
+    """With gaps [0.0, +0.6] the structured result says consistent_sign
+    False; the prose once said 'consistent sign in 2/2 blocks' beside it.
+    A rendered sentence contradicting the data it travels with is the
+    worst artifact this module can produce, because the sentence is the
+    part people quote."""
+    s = screened()
+
+    def measure(v, seed):  # the effect exists only in the second block
+        return {"y": v["x1"] if seed >= 300 else 0.0}
+
+    out = s.confirm({"x1": 0.8}, {"x1": 0.2}, measure,
+                    seed_blocks=[range(201, 206), range(301, 306)])
+    row = out["outputs"]["y"]
+    assert row["gaps"][0] == 0.0 and row["gaps"][1] == pytest.approx(0.6)
+    assert not row["consistent_sign"]
+    assert "vanishes in 1 of 2 blocks" in out["summary"]
+    assert "consistent sign" not in out["summary"]
+
+
 # -- persistence ------------------------------------------------------------
 
 def test_a_saved_survey_reloads_and_answers_identically(tmp_path):
@@ -511,6 +677,27 @@ def test_a_saved_survey_reloads_and_answers_identically(tmp_path):
     assert loaded.sensitivity("y") == result.sensitivity("y")
     with open(path, encoding="utf-8") as handle:
         json.load(handle)  # it is real JSON, not repr
+
+
+def test_save_writes_strict_json_even_when_an_output_is_nan(tmp_path):
+    """Python's serialiser emits a bare `NaN` token that only Python reads
+    back; `jq` and every non-Python consumer refuse the file, and a survey
+    only its author's runtime can open is not a shared measurement. A
+    non-finite output is stored as null -- the analysis already treats the
+    two identically -- and allow_nan=False enforces it."""
+    def measure(v):
+        return {"y": float("nan") if v["x1"] > 0.5 else v["x1"]}
+
+    result = synthetic(measure, names=("x1",), samples=32)
+    path = str(tmp_path / "s.json")
+    result.save(path)
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    assert "NaN" not in text
+    json.loads(text, parse_constant=lambda c: pytest.fail(
+        f"non-strict JSON token {c!r} in a saved survey"))
+    loaded = Survey.load(path)
+    assert loaded.sensitivity("y")["rows_nonfinite"] == 16
 
 
 # -- the survey driver's configuration ---------------------------------------
@@ -583,7 +770,115 @@ def test_every_planned_vector_passes_the_stationarity_gate():
 
 
 def test_the_planned_ranges_all_contain_the_base_preset():
-    # survey_axes() asserts this internally; exercised here so a range
+    # survey_axes() raises on this internally; exercised here so a range
     # edit that orphans the preset fails in CI rather than at launch.
     drv = _driver()
     drv.survey_axes()
+
+
+def test_resume_skips_model_refusals_but_can_retry_infrastructure():
+    """A model refusal is deterministic: re-running reproduces it, so it
+    is final. An OOM under 88-way contention is not a property of the
+    vector -- except that it clusters in the expensive corners, so
+    recording it as permanent quietly biases every marginal against a
+    REGION while the drop tally looks benign. Rows without a recorded
+    kind (older files) are retried too: the safe default for an unknown
+    failure is to look again."""
+    drv = _driver()
+    rows = [
+        {"id": "0:panel252:101", "index": 0, "panel": {}},
+        {"id": "0:infeasible", "index": 0, "kind": "infeasible",
+         "violation": "garch"},
+        {"id": "0:panel252:102", "index": 0,
+         "error": "ValidationError: no returns", "error_kind": "model"},
+        {"id": "0:panel252:103", "index": 0,
+         "error": "MemoryError:", "error_kind": "infrastructure"},
+        {"id": "0:panel252:104", "index": 0,
+         "error": "RuntimeError: ?"},  # a row from before kinds existed
+    ]
+    assert drv.completed_ids(rows) == {r["id"] for r in rows}
+    assert drv.completed_ids(rows, retry_errors=True) == {
+        "0:panel252:101", "0:infeasible", "0:panel252:102"}
+
+
+def test_error_kinds_separate_the_model_from_the_machine():
+    drv = _driver()
+    assert drv.error_kind(pretium.ValidationError("no returns")) == "model"
+    assert drv.error_kind(MemoryError()) == "infrastructure"
+    assert drv.error_kind(OSError(12, "cannot allocate")) == "infrastructure"
+    assert drv.error_kind(RuntimeError("?")) == "unclassified"
+
+
+def test_read_rows_drops_a_torn_final_line_with_a_warning(tmp_path, capsys):
+    # A killed run can die mid-write; the torn line must not poison the
+    # resume, and must not vanish silently either.
+    drv = _driver()
+    path = tmp_path / "tasks.jsonl"
+    path.write_text(json.dumps({"id": "a"}) + "\n"
+                    + json.dumps({"id": "b"}) + "\n"
+                    + '{"id": "c", "pan')
+    rows = drv.read_rows(path)
+    assert [r["id"] for r in rows] == ["a", "b"]
+    assert "torn write" in capsys.readouterr().out
+
+
+def test_collect_builds_the_survey_from_streamed_rows_mid_flight(tmp_path):
+    """`cmd_run`'s row contract exercised against `cmd_collect` on
+    fabricated rows -- the streamed-file seam the 96-core run depends on,
+    previously covered only by a manual smoke run. Covers: a retried
+    success replacing its earlier error (keeping the stale error would
+    undo --retry-errors), a model-refused vector recorded with its kind,
+    pending vectors counted rather than invented, and the artifacts being
+    written mid-flight."""
+    import argparse
+    from pretium.facts import REAL_MARKETS
+
+    drv = _driver()
+    axes = drv.survey_axes()
+    samples, plan_seed = 8, drv.DEFAULT_PLAN_SEED
+    fingerprint = drv.plan_fingerprint(axes, samples, plan_seed)
+    outdir = tmp_path / "atlas"
+    outdir.mkdir()
+    (outdir / "meta.json").write_text(json.dumps(
+        drv.build_meta(axes, samples, plan_seed, fingerprint)))
+
+    panel = {k: (low + high) / 2.0 for k, (low, high) in REAL_MARKETS.items()}
+    rows = [{"id": "0:shock:101", "index": 0, "kind": "shock", "seed": 101,
+             "error": "MemoryError: 88 workers", "error_kind": "infrastructure"}]
+    for days in drv.HORIZONS:
+        for s in drv.SCREEN_SEEDS:
+            rows.append({"id": f"0:panel{days}:{s}", "index": 0,
+                         "kind": "panel", "days": days, "seed": s,
+                         "panel": dict(panel),
+                         "draws_by_stream": {"market": 1000}})
+    for vix in drv.sr.HELD_VIX:
+        for s in drv.SCREEN_SEEDS:
+            rows.append({"id": f"0:held{vix:g}:{s}", "index": 0,
+                         "kind": "held", "seed": s, "vix": vix,
+                         "vol": 0.01 * (1.0 + vix / 20.0), "corr": 0.3})
+    for s in drv.SCREEN_SEEDS:  # the retried successes, appended later
+        rows.append({"id": f"0:shock:{s}", "index": 0, "kind": "shock",
+                     "seed": s, "ratio": 1.1})
+    rows.append({"id": "1:panel252:101", "index": 1, "kind": "panel",
+                 "seed": 101, "error": "ValidationError: no instrument "
+                 "produced 30 daily returns", "error_kind": "model"})
+    with open(outdir / "tasks.jsonl", "w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row) + "\n")
+
+    assert drv.cmd_collect(argparse.Namespace(out=str(outdir))) == 0
+    survey = atlas.Survey.load(str(outdir / "atlas-survey.json"))
+    by_index = {r["index"]: r for r in survey.rows}
+    measured = by_index[0]
+    assert "error" not in measured, "the retried success must win"
+    for key in ("loss", "loss_252", "loss_504",
+                "shock_ratio_median", "vol_lever", "corr_blend"):
+        assert key in measured["outputs"], key
+    assert measured["outputs"]["shock_ratio_median"] == pytest.approx(1.1)
+    assert measured["outputs"]["vol_lever"] == pytest.approx(
+        (1.0 + 65 / 20.0) / (1.0 + 5 / 20.0))
+    assert by_index[1]["error"].startswith("[model]")
+    assert survey.meta["vectors_pending"] == samples - 2
+    assert survey.meta["errors_by_kind"] == {"model": 1}
+    assert survey.meta["crn_market_deviation_count"] == 0
+    assert (outdir / "atlas-report.txt").exists()
