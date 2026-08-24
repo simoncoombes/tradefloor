@@ -66,6 +66,24 @@ with the expected digest. `reproduce()` refuses on mismatch and names the
 culprit, because a manifest that silently reproduced a different market
 would manufacture false confidence.
 
+## Driving it from an agent
+
+```
+pip install "pretium[mcp]"
+claude mcp add pretium -- pretium-mcp
+```
+
+Eleven read-only tools over the simulator, so a coding agent can ask *does a
+momentum strategy beat buy-and-hold here, and is the difference real?* and
+get a measured answer. Strategies, universes and scenarios are composed as
+data; there is no path from a tool argument to code execution.
+
+Every result carries computed caveats and full provenance, because a model
+summarising a result has the tool output and nothing else — and will
+otherwise report `return_pct: 88.7` as "the strategy made 88.7%".
+[The MCP server](https://simoncoombes.github.io/pretium/mcp.html) has the
+tool list and the client configuration.
+
 ## What it is bad at
 
 **Good results here don't predict real returns.** The price process comes

@@ -34,6 +34,32 @@ arguments, and it speaks MCP over stdio:
 
 In Claude Code, `claude mcp add pretium -- pretium-mcp` does the same thing.
 
+### If the client cannot find it
+
+This is the usual first failure, and it is not a pretium problem: a desktop
+MCP client does not inherit your shell's `PATH`, so `"command":
+"pretium-mcp"` resolves only if the script sits somewhere the client already
+looks. If you installed into a virtual environment — which you should — give
+the absolute path instead:
+
+```json
+{
+  "mcpServers": {
+    "pretium": {
+      "command": "/path/to/.venv/bin/pretium-mcp"
+    }
+  }
+}
+```
+
+`python -c "import shutil; print(shutil.which('pretium-mcp'))"` inside the
+environment prints exactly what to paste.
+
+Running `pretium-mcp` in a terminal is a useful check on its own. With the
+extra missing it says so and names the fix; with everything present it
+waits silently for a client to speak to it over stdin, which looks like a
+hang and is the server working.
+
 ## This is the opposite of "An LLM agent"
 
 Two pages, two directions, and they are easy to confuse:
