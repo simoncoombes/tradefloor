@@ -25,7 +25,8 @@ and says exactly which runs produced them.
 
 If you want to know what any of these statistics actually measures, and
 what a failure on it means for your results,
-[the realism metrics](realism-metrics.md) is the reference.
+[the realism metrics](realism-metrics.md) is the reference. To ask which
+parameters move them — or which move YOUR result — see [Atlas](atlas.md).
 
 ## The claim, in one sentence
 
