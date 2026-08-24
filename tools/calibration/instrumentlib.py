@@ -133,8 +133,8 @@ PARAM_SPECS: dict[str, dict] = {
     # these was settable and unreachable by any search, because a missing
     # spec is a KeyError in `shipped_values()` -- which is how the first
     # crisis search died one minute in.
-    "universe_stress_weight": {"kind": "abs", "step_unit": 0.1},
-    "universe_stress_decay": {"kind": "abs", "step_unit": 0.02},
+    "universe_stress_weight": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 2.0)},
+    "universe_stress_decay": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.0, 0.995)},
     # Also a level rather than a share, and shipped at 0.0 -- which a log
     # deviation cannot express at all (log of zero). Kept "abs" for that
     # reason, with a step matched to its natural range so the raw deviation
@@ -149,20 +149,37 @@ PARAM_SPECS: dict[str, dict] = {
     # the log/raw split exists for.
     "crisis_vix_threshold": {"kind": "log"},
     "vix_mean_reversion": {"kind": "abs", "step_unit": 0.02},
-    "news_peer_weight": {"kind": "abs", "step_unit": 0.05},
-    "news_peer_weight_down": {"kind": "abs", "step_unit": 0.05},
-    "jump_intensity_market": {"kind": "abs", "step_unit": 0.01},
-    "jump_intensity_idio": {"kind": "abs", "step_unit": 0.01},
-    "jump_mean_market": {"kind": "abs", "step_unit": 0.01},
-    "jump_sigma_market": {"kind": "abs", "step_unit": 0.01},
-    "jump_sigma_idio": {"kind": "abs", "step_unit": 0.01},
-    "volume_persistence": {"kind": "abs", "step_unit": 0.05},
-    "volume_innovation_sigma": {"kind": "abs", "step_unit": 0.05},
-    "size_effect_smoothness": {"kind": "abs", "step_unit": 0.1},
+    "news_peer_weight": {"kind": "abs", "step_unit": 0.05,
+                         "hard_range": (0.0, 1.0)},
+    "news_peer_weight_down": {"kind": "abs", "step_unit": 0.05,
+                              "hard_range": (0.0, 1.0)},
+    # A parameter that SHIPS AT 0.0 has no multiplicative box: `default_box`
+    # returns (0.0, 0.0) and the search explores a single point while looking
+    # exactly like a search that ran. §24 lost a 96-core run to that, and
+    # these seven would have lost another -- every one of them ships inert on
+    # pt-v1, and all seven are wanted for the jump/volume search.
+    #
+    # The ranges are the ones the 4000-vector Atlas survey actually explored,
+    # so the box is traceable to a measurement rather than invented here.
+    "jump_intensity_market": {"kind": "abs", "step_unit": 0.01,
+                              "hard_range": (0.0, 0.25)},
+    "jump_intensity_idio": {"kind": "abs", "step_unit": 0.01,
+                            "hard_range": (0.0, 0.25)},
+    "jump_mean_market": {"kind": "abs", "step_unit": 0.01,
+                         "hard_range": (-0.08, 0.0)},
+    "jump_sigma_market": {"kind": "abs", "step_unit": 0.01,
+                          "hard_range": (0.0, 0.08)},
+    "jump_sigma_idio": {"kind": "abs", "step_unit": 0.01,
+                        "hard_range": (0.0, 0.08)},
+    "volume_persistence": {"kind": "abs", "step_unit": 0.05,
+                           "hard_range": (0.0, 0.99)},
+    "volume_innovation_sigma": {"kind": "abs", "step_unit": 0.05,
+                                "hard_range": (0.0, 0.6)},
+    "size_effect_smoothness": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
     "size_effect_exponent": {"kind": "abs", "step_unit": 0.02},
-    "spread_size_smoothness": {"kind": "abs", "step_unit": 0.1},
+    "spread_size_smoothness": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
     "spread_size_exponent": {"kind": "abs", "step_unit": 0.05},
-    "market_vol_slow_vix_damp": {"kind": "abs", "step_unit": 0.1},
+    "market_vol_slow_vix_damp": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
     # -- scale parameters (log deviation) ---------------------------------
     "market_factor_sigma":      {"kind": "log"},
     "sector_factor_sigma":      {"kind": "log"},
