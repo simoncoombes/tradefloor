@@ -466,6 +466,7 @@ def cmd_run(args) -> int:
                          f"seed={sr.UNIVERSE_SEED})",
         "provenance": lib.provenance(),
     }
+    rows_exist = (outdir / "tasks.jsonl").exists()
     if meta_path.exists():
         existing = json.loads(meta_path.read_text())
         if existing["plan_fingerprint"] != fingerprint:
@@ -475,6 +476,25 @@ def cmd_run(args) -> int:
                   "different plan would silently mislabel every vector. "
                   "Use a fresh --out.")
             return 2
+    elif rows_exist:
+        # Measurements without the plan that produced them. The fingerprint
+        # refusal above cannot fire, so writing a fresh meta here would adopt
+        # every existing row as belonging to THIS configuration -- and the
+        # rows are keyed by index, so vector 0's measurement would be
+        # attributed to a different vector 0 entirely. Demonstrated during
+        # review: deleting meta.json and re-running at a different sample
+        # count adopted 48 rows and mislabelled them on 54 of 54 parameters.
+        #
+        # This is the `model_preset()` failure again -- a record describing a
+        # thing that is no longer the thing -- and it needs exactly the
+        # partial-retrieval mishap this project has already had twice.
+        print(f"REFUSING to resume: {outdir / 'tasks.jsonl'} exists but "
+              f"{meta_path} does not. The rows are keyed by plan index, so "
+              "without the plan that produced them there is no way to tell "
+              "which vector each measurement belongs to -- and adopting them "
+              "under a fresh meta would mislabel every one. Restore "
+              "meta.json, or use a fresh --out and re-measure.")
+        return 2
     else:
         meta_path.write_text(json.dumps(meta, indent=1, sort_keys=True) + "\n")
 
