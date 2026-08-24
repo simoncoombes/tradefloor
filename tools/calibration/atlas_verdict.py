@@ -95,9 +95,16 @@ MECHANISMS = {
     },
     "universe stress memory": {
         "params": ["universe_stress_weight", "universe_stress_decay"],
-        "status": "swept (§19): the ONLY lever that moves the transient "
-                  "(+0.022) without going through variance persistence; "
-                  "costs 0.9887 -> 1.2058 on the combined loss.",
+        "status": "COUPLED -- these two do nothing apart (§29). "
+                  "`universe_stress_decay` ships at 0.0, which destroys the "
+                  "memory every night, and `universe_stress_weight` "
+                  "multiplies exactly that memory -- so the weight is inert "
+                  "at ANY value while decay is 0 (measured identical at 1, "
+                  "3, 5, 7, 10). Swept as a PAIR at decay 0.97 the transient "
+                  "moves +0.021, reproducing §19's 1.084 to three decimals. "
+                  "A flat marginal reading here is the survey averaging over "
+                  "a corner, not evidence about the mechanism.",
+        "coupled": True,
     },
     "cycle reaches market": {
         "params": ["regime_stress_points"],
@@ -111,6 +118,21 @@ MECHANISMS = {
 #: Parameters whose mechanism cannot fire in the survey's configuration, so
 #: a flat sensitivity is a fact about the measurement rather than about them.
 UNTESTABLE_HERE = {"regime_stress_points"}
+
+#: Parameters that do nothing ALONE and something together. A marginal
+#: sensitivity is a statement about one axis at a time, so it is structurally
+#: incapable of seeing these -- and reporting them as "below screening noise"
+#: invites exactly the mistake that produced §28: sweeping one of a pair,
+#: measuring nothing, and concluding the mechanism is dead.
+#:
+#: `universe_stress_weight` multiplies remembered stress; `universe_stress_decay`
+#: is what makes stress persist overnight. At the shipped decay of 0.0 the
+#: weight multiplies zero at any value. Together at decay 0.97 they move the
+#: transient +0.021. See CALIBRATION-FOLLOWUPS §29.
+COUPLED_WITH = {
+    "universe_stress_weight": "universe_stress_decay",
+    "universe_stress_decay": "universe_stress_weight",
+}
 
 #: Parameters a PRIOR measurement has already shown move things the WRONG
 #: WAY. This exists because a sensitivity is |rho| -- direction-agnostic --
@@ -152,6 +174,14 @@ def classify(survey: atlas.Survey, param: str, outputs: list[str],
         # nobody reads a large |rho| as a recommendation.
         verdict = "effect detected, direction refuted"
         action = f"keep at 0.0. {REFUTED_DIRECTION[param]}"
+    elif param in COUPLED_WITH and abs(best_rho) < threshold:
+        # A flat marginal on half of a coupled pair says nothing. Reporting
+        # it as "below screening noise" would recommend excluding from
+        # search the very parameters that have to be searched together.
+        verdict = "flat alone, COUPLED"
+        action = (f"do NOT exclude. Inert alone by construction; search it "
+                  f"WITH {COUPLED_WITH[param]}. A marginal sensitivity "
+                  f"cannot see a pair. See §29.")
     elif abs(best_rho) >= threshold:
         verdict = "effect detected"
         action = ("candidate for a search. Detection is NOT a direction: "
@@ -193,13 +223,14 @@ def main() -> int:
           f"failures cluster in expensive corners and bias every marginal)")
     print()
 
-    keep_search, exclude, untestable, refuted = [], [], [], []
+    keep_search, exclude, untestable, refuted, coupled = [], [], [], [], []
     for mech, spec in MECHANISMS.items():
         print(f"=== {mech} ===")
         print(f"    prior: {spec['status']}")
         for p in spec["params"]:
             r = classify(s, p, outputs, threshold)
             mark = {"effect detected": "LIVE ",
+                    "flat alone, COUPLED": "PAIR ",
                     "effect detected, direction refuted": "WRONG",
                     "below screening noise": "flat ",
                     "untestable here": "n/a  "}[r["verdict"]]
@@ -211,6 +242,7 @@ def main() -> int:
             if r["verdict"] == "effect detected, direction refuted":
                 print(f"            ^ {REFUTED_DIRECTION[p]}")
             {"effect detected": keep_search,
+             "flat alone, COUPLED": coupled,
              "effect detected, direction refuted": refuted,
              "below screening noise": exclude,
              "untestable here": untestable}[r["verdict"]].append(r)
@@ -221,6 +253,8 @@ def main() -> int:
           + ", ".join(r["param"] for r in keep_search))
     print(f"  detected, direction refuted: {len(refuted):2d}  "
           + ", ".join(r["param"] for r in refuted))
+    print(f"  flat alone but COUPLED   : {len(coupled):2d}  "
+          + ", ".join(r["param"] for r in coupled))
     print(f"  below screening noise    : {len(exclude):2d}  "
           + ", ".join(r["param"] for r in exclude))
     print(f"  untestable here          : {len(untestable):2d}  "

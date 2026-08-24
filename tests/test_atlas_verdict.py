@@ -113,12 +113,52 @@ def test_below_threshold_is_a_statement_about_the_measurement():
     assert "EXCLUDE" in r["action"], "the actionable half is search exclusion"
 
 
+def test_half_a_coupled_pair_is_never_recommended_for_exclusion():
+    """§28's mistake, made permanent so it cannot be made a fourth time.
+
+    `universe_stress_weight` multiplies remembered stress and
+    `universe_stress_decay` is what makes stress survive the night. At the
+    shipped decay of 0.0 the weight multiplies zero at ANY value -- measured
+    identical at 1, 3, 5, 7 and 10 -- so a marginal sweep of either reads
+    flat. Together at decay 0.97 they move the transient +0.021.
+
+    A marginal sensitivity is one axis at a time and is structurally
+    incapable of seeing that. Reporting it as "below screening noise" would
+    recommend excluding from search exactly the parameters that have to be
+    searched together, which is how §19's row got mislabelled and how §28
+    then declared a live mechanism dead.
+    """
+    for param in verdict.COUPLED_WITH:
+        r = _classify(param, 0.001)
+        assert r["verdict"] == "flat alone, COUPLED", param
+        assert "do NOT exclude" in r["action"], param
+        assert verdict.COUPLED_WITH[param] in r["action"], (
+            "the action must name the partner, or the reader cannot act on it"
+        )
+
+
+def test_a_coupled_parameter_that_does_move_is_still_reported_as_moving():
+    # The coupling rule only fires BELOW threshold. A real signal must not
+    # be swallowed by it.
+    r = _classify("universe_stress_weight", 0.40)
+    assert r["verdict"] == "effect detected"
+
+
+def test_the_coupling_is_symmetric():
+    # A pair recorded one-way would leave the partner excludable, which
+    # defeats the guard entirely.
+    for a, b in verdict.COUPLED_WITH.items():
+        assert verdict.COUPLED_WITH.get(b) == a, (a, b)
+
+
 def test_the_refuted_registry_names_real_parameters():
     # A typo here would silently disable a refutation.
     import pretium as pt
 
     settable = set(pt.ModelParams.settable())
     for param in verdict.REFUTED_DIRECTION:
+        assert param in settable, param
+    for param in verdict.COUPLED_WITH:
         assert param in settable, param
     for spec in verdict.MECHANISMS.values():
         for param in spec["params"]:
