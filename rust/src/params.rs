@@ -474,6 +474,8 @@ pub const PT_V2: ModelParams = ModelParams::pt_v2();
 /// `emit_preset.py` from the converged certificate and held to by the test
 /// at the bottom of this file, in both directions.
 pub const PT_V3: ModelParams = ModelParams::pt_v3();
+/// The 504-day variant. Selectable, not the default -- see [`ModelParams::pt_v4`].
+pub const PT_V4: ModelParams = ModelParams::pt_v4();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -631,6 +633,41 @@ impl ModelParams {
         p
     }
 
+    /// The 504-day variant: pt-v3 plus endogenous jumps and a live volume
+    /// process. NOT the default, deliberately.
+    ///
+    /// Searched on the dual-horizon objective over nine parameters, all of
+    /// which ship inert on pt-v3 (CALIBRATION-FOLLOWUPS §33). It halves the
+    /// combined loss -- 0.9887 to 0.4863 on the training seeds and 1.3990
+    /// to 0.7493 on thirty seeds it never saw -- and closes the thin-tails
+    /// gap that no calibration had moved: `excess_kurtosis` at 504 days
+    /// goes 5.23 to 9.19, inside the 7.1-22 band for the first time.
+    ///
+    /// It is a TRADE, and that is why it does not take the default. At the
+    /// CERTIFIED horizon of 252 days it is worse than pt-v3: eight of ten
+    /// statistics in band against nine, losing `return_acf1` at 0.074-0.084
+    /// against a ceiling of 0.06 -- out on the training seeds, on held-out
+    /// seeds and on a held-out 60-name universe alike, so a regression
+    /// rather than a fluctuation. At 504 days it is better, seven of ten
+    /// against five.
+    ///
+    /// Choose it when the question is a multi-year one. The envelope
+    /// certifies pt-v3 at 252 days and that claim is not weakened by this
+    /// preset existing beside it.
+    pub const fn pt_v4() -> ModelParams {
+        let mut p = ModelParams::pt_v3();
+        p.jump_intensity_market = 0.086555921159823;
+        p.jump_intensity_idio = 0.02271987289851697;
+        p.jump_mean_market = -0.008521833617959641;
+        p.jump_sigma_market = 0.0023793153879054386;
+        p.jump_sigma_idio = 0.062369653817277396;
+        p.volume_persistence = 0.07231783926786545;
+        p.volume_innovation_sigma = 0.1504517786623244;
+        p.volume_variance_gain = 0.028403829887593345;
+        p.market_factor_sigma = 0.015879388479656826;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -648,13 +685,14 @@ impl ModelParams {
             "pt-v1" => Some(PT_V1),
             "pt-v2" => Some(PT_V2),
             "pt-v3" => Some(PT_V3),
+            "pt-v4" => Some(PT_V4),
             _ => None,
         }
     }
 
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
-        &["pt-v1", "pt-v2", "pt-v3"]
+        &["pt-v1", "pt-v2", "pt-v3", "pt-v4"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -1039,7 +1077,20 @@ mod tests {
         assert_eq!(ModelParams::preset("pt-v2").unwrap().fingerprint(), "pt-v2");
         assert_eq!(PT_V3.fingerprint(), "pt-v3");
         assert_eq!(ModelParams::preset("pt-v3").unwrap().fingerprint(), "pt-v3");
-        assert!(ModelParams::preset("pt-v4").is_none());
+        assert_eq!(PT_V4.fingerprint(), "pt-v4");
+        assert_eq!(ModelParams::preset("pt-v4").unwrap().fingerprint(), "pt-v4");
+        // Re-armed on the next unreleased name. A preset that answers to a
+        // name it does not have is how a vector nobody calibrated presents
+        // as a shipped one.
+        assert!(ModelParams::preset("pt-v5").is_none());
+
+        // Adding a preset must not disturb an existing one. The fingerprint
+        // is taken over the PARAMETERS, not the table, so this holds by
+        // construction -- asserted because the published manifests that cite
+        // "pt-v3" depend on it and the cost of being wrong is orphaning
+        // every one of them.
+        assert_eq!(PT_V3.fingerprint(), "pt-v3");
+        assert_ne!(PT_V3.digest(), PT_V4.digest());
     }
 
     #[test]
