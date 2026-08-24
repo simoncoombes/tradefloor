@@ -32,9 +32,16 @@ library has no dependencies.
 
 ## Kept honest
 
-These notebooks are executed as part of the release check, so a committed
-notebook whose code no longer runs is a failing build rather than something
-a reader discovers. Regenerate with:
+`tests/test_examples.py` executes every notebook and checks the committed
+copies carry their output, so one whose code no longer runs is a failing
+test rather than something a reader discovers. It is opt-in because it takes
+about half a minute and needs `jupyter`:
+
+```
+PRETIUM_SLOW_TESTS=1 pytest tests/test_examples.py
+```
+
+Regenerate the committed output with:
 
 ```
 jupyter nbconvert --to notebook --execute --inplace examples/0*.ipynb
