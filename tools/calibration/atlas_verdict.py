@@ -22,6 +22,14 @@ different actions (CALIBRATION-FOLLOWUPS §25):
    `where=` asks, and a marginal survey will not volunteer it.
 4. **inert** -- nothing, anywhere the survey looked.
 
+5. **detected, direction refuted** -- a real, strong, reproducible effect
+   that a prior measurement showed runs the WRONG WAY.
+   `market_vol_slow_vix_damp` is the worked example: it reads rho 0.274
+   against the crisis lever here, and §14 measured that same effect making
+   BOTH scenario metrics monotonically worse. A sensitivity is |rho|, so
+   helping and harming look identical at this resolution; reporting only
+   the strength would invert the conclusion.
+
 Only (4) is evidence for removal, and even then removal is an era boundary
 rather than a cleanup: the preset fingerprint hashes the sorted parameter
 NAMES, so dropping one changes every preset's fingerprint and orphans every
@@ -104,6 +112,24 @@ MECHANISMS = {
 #: a flat sensitivity is a fact about the measurement rather than about them.
 UNTESTABLE_HERE = {"regime_stress_points"}
 
+#: Parameters a PRIOR measurement has already shown move things the WRONG
+#: WAY. This exists because a sensitivity is |rho| -- direction-agnostic --
+#: so a parameter that reliably makes every metric worse reads as a strong
+#: signal, and "has an effect" would be mistaken for "is worth turning on".
+#:
+#: `market_vol_slow_vix_damp` is the worked example. This survey reads it at
+#: rho 0.274 against the crisis lever, which is a real and detectable effect;
+#: §14 measured that effect and found damping makes BOTH scenario metrics
+#: monotonically worse at every fast persistence and every weight. Both
+#: statements are true, and reporting only the first would invert the
+#: conclusion.
+REFUTED_DIRECTION = {
+    "market_vol_slow_vix_damp":
+        "§14: damping makes BOTH the shock ratio and the steady-state lever "
+        "monotonically worse, at every fast persistence and weight tested. "
+        "A detectable effect in the harmful direction.",
+}
+
 
 def classify(survey: atlas.Survey, param: str, outputs: list[str],
              threshold: float) -> dict:
@@ -121,9 +147,15 @@ def classify(survey: atlas.Survey, param: str, outputs: list[str],
         verdict = "untestable here"
         action = ("keep; a flat reading is the panel's expansion phase, not "
                   "the mechanism. Needs a scenario that leaves expansion.")
+    elif param in REFUTED_DIRECTION:
+        # A detectable effect is not a useful one. Reported separately so
+        # nobody reads a large |rho| as a recommendation.
+        verdict = "effect detected, direction refuted"
+        action = f"keep at 0.0. {REFUTED_DIRECTION[param]}"
     elif abs(best_rho) >= threshold:
-        verdict = "moves something"
-        action = "keep and SEARCH it"
+        verdict = "effect detected"
+        action = ("candidate for a search. Detection is NOT a direction: "
+                  "read the sign and the profile before turning it on.")
     else:
         verdict = "below screening noise"
         action = ("keep at 0.0, document the measurement, EXCLUDE from "
@@ -161,30 +193,45 @@ def main() -> int:
           f"failures cluster in expensive corners and bias every marginal)")
     print()
 
-    keep_search, exclude, untestable = [], [], []
+    keep_search, exclude, untestable, refuted = [], [], [], []
     for mech, spec in MECHANISMS.items():
         print(f"=== {mech} ===")
         print(f"    prior: {spec['status']}")
         for p in spec["params"]:
             r = classify(s, p, outputs, threshold)
-            mark = {"moves something": "MOVES",
+            mark = {"effect detected": "LIVE ",
+                    "effect detected, direction refuted": "WRONG",
                     "below screening noise": "flat ",
                     "untestable here": "n/a  "}[r["verdict"]]
             out = f" via {r['output']}" if r["output"] else ""
-            print(f"    [{mark}] {p:28s} max|rho| {abs(r['rho']):.4f}{out}")
-            {"moves something": keep_search,
+            # SIGNED, not absolute: the sign is half the information, and
+            # printing |rho| is what made a refuted parameter look like a
+            # recommendation.
+            print(f"    [{mark}] {p:28s} rho {r['rho']:+.4f}{out}")
+            if r["verdict"] == "effect detected, direction refuted":
+                print(f"            ^ {REFUTED_DIRECTION[p]}")
+            {"effect detected": keep_search,
+             "effect detected, direction refuted": refuted,
              "below screening noise": exclude,
              "untestable here": untestable}[r["verdict"]].append(r)
         print()
 
     print("=== verdict ===")
-    print(f"  keep and search       : {len(keep_search):2d}  "
+    print(f"  effect detected          : {len(keep_search):2d}  "
           + ", ".join(r["param"] for r in keep_search))
-    print(f"  keep, exclude from search: {len(exclude):2d}  "
+    print(f"  detected, direction refuted: {len(refuted):2d}  "
+          + ", ".join(r["param"] for r in refuted))
+    print(f"  below screening noise    : {len(exclude):2d}  "
           + ", ".join(r["param"] for r in exclude))
-    print(f"  untestable here       : {len(untestable):2d}  "
+    print(f"  untestable here          : {len(untestable):2d}  "
           + ", ".join(r["param"] for r in untestable))
     print()
+    print("  'effect detected' means a monotone relationship was found. It")
+    print("  is NOT a recommendation: a sensitivity is a rank correlation,")
+    print("  and a parameter that reliably makes every metric worse shows")
+    print("  the same strength as one that helps. Read the SIGN, then the")
+    print("  profile, then confirm on disjoint seeds. Nothing here is a")
+    print("  verdict on whether a mechanism should be switched on.")
     print("  'below screening noise' means NO EFFECT DETECTABLE at this")
     print("  resolution over the sampled range. It is not a claim that the")
     print("  parameter does nothing, and it is not grounds for deletion:")
