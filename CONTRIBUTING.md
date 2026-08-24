@@ -19,7 +19,7 @@ In practice:
 - Improving a coefficient is **not** an edit to an existing preset. It is a
   new preset. `pt-v1` still runs today exactly as it did, and will.
 - The known-answer digest in `tests/known_answer.json` must not move without
-  a `KAT_VERSION` bump. If it moves without one, two builds have disagreed —
+  a `KAT_VERSION` bump. If it moves without one, two builds have disagreed,
   which is the thing the gate exists to catch.
 
 ## Setup
@@ -45,8 +45,8 @@ python tests/known_answer.py                    # the determinism digest
 ```
 
 Some suites are opt-in because they need something the default install does
-not have — `pyarrow`, `gymnasium`, the `mcp` package. They skip cleanly
-rather than failing. `PRETIUM_SLOW_TESTS=1` enables a handful that run a
+not have, such as `pyarrow`, `gymnasium` or the `mcp` package. They skip
+cleanly rather than failing. `PRETIUM_SLOW_TESTS=1` enables a handful that run a
 full 252-day evaluation.
 
 The Rust parity suites compare against golden vectors generated from the
@@ -59,9 +59,9 @@ bit-identical, so if you change anything in `rust/src/market/` or
 **If it decides something about the market, it belongs in `rust/src/`, not
 in a binding.**
 
-The engine is consumed twice — as a Python extension and as WebAssembly —
-and a modelling decision implemented separately in each is a fork wearing
-the costume of glue code. The divergence is invisible until a whole
+The engine is consumed twice, as a Python extension and as WebAssembly, and
+a modelling decision implemented separately in each is a fork dressed up as
+glue code. The divergence is invisible until a whole
 simulated market has drifted apart. The day loop lived in the Python binding
 until the browser build needed it too; moving it was a day's work that
 should not have to happen twice.
@@ -72,8 +72,8 @@ Bindings own conversion, error translation and bookkeeping. Nothing else.
 
 The comment density here is higher than most codebases and it is
 deliberate. The convention is that a comment explains **why**, and
-especially why the obvious alternative is wrong — usually because it was
-tried. If you remove a guard that looks redundant, check whether its comment
+especially why the obvious alternative is wrong, which is usually because
+it was tried. If you remove a guard that looks redundant, check whether its comment
 says what happened last time.
 
 Numbers in prose carry their measurement. "Roughly a quarter" is a

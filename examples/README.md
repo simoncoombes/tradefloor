@@ -14,7 +14,7 @@ notebooks carry their output, so you can read them without running anything.
 | [`07-research-workflow.py`](07-research-workflow.py) | A whole study in one file: sweep, evaluation, TCA, replay |
 | [`08-claude-agent.py`](08-claude-agent.py) | An LLM agent scored against the baselines |
 
-Notebooks 05 and 06 map to the two audiences the project is built for — RL
+Notebooks 05 and 06 cover the two audiences the project is built for, RL
 researchers and execution developers.
 
 ## Running them
@@ -30,14 +30,14 @@ dependencies.
 
 `07-research-workflow.py` runs in about five seconds and needs nothing
 extra. `08-claude-agent.py` needs `pretium[claude]` and an API key, and
-spends money per decision, so it is the one file here that is not run
+spends money per decision, so it's the one file here that isn't run
 automatically.
 
-## How they are kept working
+## How they're kept working
 
-`tests/test_examples.py` checks them. The scripts are syntax-checked on
-every test run, which catches a rename that missed a reference. The rest is
-opt-in, because executing six notebooks takes about half a minute:
+`tests/test_examples.py` checks them. The scripts are syntax-checked on every
+test run, which catches a rename that missed a reference. The rest is opt-in,
+because executing six notebooks takes about half a minute:
 
 ```
 PRETIUM_SLOW_TESTS=1 pytest tests/test_examples.py

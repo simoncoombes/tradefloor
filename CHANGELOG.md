@@ -38,20 +38,20 @@ an existing one.
   tool argument to code execution. Every result carries computed caveats
   and full provenance.
 
-- **`envelope.score`** and **`envelope.regressions`** — read a measured
-  panel against the bands for its own horizon, and name the statistics a
-  candidate would surrender relative to the shipped preset.
+- **`envelope.score`** and **`envelope.regressions`**. Read a measured panel
+  against the bands for its own horizon, and name the statistics a candidate
+  would surrender relative to the shipped preset.
 
-- **`engine::fixed_simulation_digest`** — one fixed simulation, hashed, and
+- **`engine::fixed_simulation_digest`**. One fixed simulation, hashed, and
   exposed identically to both bindings, so cross-language determinism is a
   measurement rather than an argument.
 
 ### Changed
 
-- The **day loop** — the macro step, the day close, and the day-zero
-  instrument mapping — moved from the Python binding into the core, so the
-  browser and Python surfaces run one implementation. Behaviour-neutral:
-  the known-answer digest is unchanged.
+- The **day loop** moved from the Python binding into the core, so the
+  browser and Python surfaces run one implementation. That covers the macro
+  step, the day close, and the day-zero instrument mapping. Behaviour is
+  unchanged, and the known-answer digest confirms it.
 
 ### Fixed
 
@@ -64,7 +64,7 @@ an existing one.
   not compiled since the features that changed their option structs, so the
   evidence for the bit-identical-port claim was not running.
 
-## [0.1.0] — unreleased
+## [0.1.0], unreleased
 
 First public release. Pre-release: not yet on PyPI or crates.io, and the
 API may move before 1.0.
@@ -86,4 +86,4 @@ API may move before 1.0.
   bands, with the gaps named rather than hidden. Nine of ten in band at the
   certified 252-day horizon.
 - **Ground truth**: seven factor contributions per instrument per tick that
-  sum to the move — a labelled dataset no historical source can provide.
+  sum to the move. No historical source can provide that labelling.
