@@ -166,11 +166,36 @@ the model or of the paths.
 
 - **A near-zero sensitivity is not proof of inertness.** It means no
   monotone relationship was found *over the sampled range, at this
-  resolution*. A parameter that only acts in combination, or only past a
-  threshold your sample never crossed, appears the same way. Use the
-  `where=` filter to ask that question directly.
+  resolution*. There are at least four ways a real effect reads as flat,
+  and only the first is fixed by sampling harder:
+
+  1. *Below the noise floor* — real but smaller than the seeds can see.
+  2. *Only past a threshold* your sample never crossed.
+  3. **Coupled to another parameter.** A sensitivity is one axis at a time,
+     so a mechanism that needs two parameters is structurally invisible to
+     it. In this simulator `universe_stress_weight` scales *remembered*
+     crisis stress and `universe_stress_decay` is what makes stress survive
+     the night; at the shipped decay of `0.0` the weight multiplies zero, so
+     sweeping it alone measures nothing at **any** value — verified
+     identical at 1, 3, 5, 7 and 10. Set together, they move the crisis
+     transient by +0.021. A calibration note once recorded that gain against
+     the weight alone, and a later replication of the weight alone then
+     declared the mechanism dead. Both were reading a two-parameter
+     mechanism one parameter at a time.
+  4. **Saturating.** If the effect reaches its full size early in the range
+     and then flattens — often because something downstream clamps it — most
+     of your samples sit on a plateau, and a rank correlation over a step
+     followed by a plateau is near zero however real the step is.
+
+  `where=` asks (2) and (3) directly, but only if the sample survives the
+  filter: conditioning the 4,000-vector survey here on `decay > 0.9` left
+  ~380 rows across twelve bins with seventeen other parameters still moving,
+  and the bin medians swung three times wider than the effect. **A filter
+  that leaves too few rows does not answer the question, it just answers a
+  noisier one.** Check the counts.
 - **A rank correlation is not an elasticity.** It ranks influence; it does
-  not measure how much.
+  not measure how much. A one-at-a-time sweep and a marginal correlation
+  measure different things, and disagreeing does not make either wrong.
 - **Errors are not neutral.** A vector whose measurement raises is recorded
   and skipped rather than fatal — a region that breaks the model is a fact
   about the model. But infrastructure failures cluster in expensive corners,
