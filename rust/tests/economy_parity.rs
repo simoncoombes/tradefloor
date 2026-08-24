@@ -520,6 +520,11 @@ fn check_trajectory_mode(file: &str, mode: TrajectoryMode) {
                 active_shocks: &shocks,
                 market_return_pct: market_return,
                 game_day: day,
+                // `crisis_vix_threshold` and `vix_mean_reversion` became
+                // parameters after these vectors were generated. `Default`
+                // carries the constants the TypeScript used, so the parity
+                // contract is unchanged by their promotion.
+                ..Default::default()
             },
             &mut rng,
         );

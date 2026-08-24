@@ -228,6 +228,12 @@ fn pure_functions_match_typescript_bit_for_bit() {
                     difficulty: Some(Difficulty::Hard),
                     levels: f(&b.levels),
                     resting_orders: Vec::new(),
+                    // The goldens were generated from the TypeScript, which
+                    // has the four-tier spread. `Default` carries smoothness
+                    // 0.0 -- the pure step function -- which is that
+                    // behaviour, so the continuous size curve added later
+                    // stays out of the parity contract.
+                    ..Default::default()
                 },
             );
 
@@ -328,6 +334,8 @@ fn settlement_matches_typescript_in_output_and_in_draws_consumed() {
                 vix: maybe(&inputs.vix).unwrap_or(15.0),
                 difficulty: difficulty_of(&inputs.difficulty),
                 flow_lean: maybe(&inputs.flow_lean),
+                // Step function, as above: the vectors predate the curve.
+                ..Default::default()
             },
             &mut rng,
         );

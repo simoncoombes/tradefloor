@@ -1205,10 +1205,39 @@ mod tests {
         let before = names.len();
         names.dedup();
         assert_eq!(before, names.len(), "duplicate names in the preset dict");
-        assert_eq!(
-            before,
-            settable_names().len() + 2 + 18 + 12,
-            "settable + derived bits + carried read-only + sector sigmas"
+
+        // DERIVED from the registries, not a hardcoded count.
+        //
+        // This assertion used to read `settable_names().len() + 2 + 18 + 12`.
+        // Two names left `carried_read_only_pairs` and the 18 stayed, so the
+        // test failed with "left: 84, right: 86" -- which says a count is
+        // wrong and not WHICH NAME, and the arithmetic is equally happy if a
+        // name is added and another dropped in the same change.
+        //
+        // Comparing the sets means the registries themselves are the
+        // expectation: the test cannot go stale, and when it does fail it
+        // names the parameter. That matters here more than most places --
+        // three registries describe the settable surface and all of them
+        // have to move together.
+        let mut expected: Vec<String> =
+            settable_names().iter().map(|n| n.to_string()).collect();
+        expected.push("mispricing_phi".to_string());
+        expected.push("s_phi_tick".to_string());
+        expected.extend(carried_read_only_pairs().into_iter().map(|(n, _)| n));
+        expected.sort();
+
+        let mut got: Vec<String> = names.iter().map(|n| n.to_string()).collect();
+        got.sort();
+
+        let missing: Vec<&String> =
+            expected.iter().filter(|n| !got.contains(n)).collect();
+        let unexpected: Vec<&String> =
+            got.iter().filter(|n| !expected.contains(n)).collect();
+        assert!(
+            missing.is_empty() && unexpected.is_empty(),
+            "the preset dict and the registries disagree. \
+             in a registry but absent from to_pairs: {missing:?}; \
+             emitted by to_pairs but in no registry: {unexpected:?}"
         );
     }
 
