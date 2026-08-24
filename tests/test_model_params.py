@@ -338,6 +338,43 @@ def test_no_parameter_dominates_the_deviation_penalty():
     )
 
 
+def test_the_horizon_axis_holds_out_seeds_as_well_as_the_horizon():
+    """A validation axis that shares the training seeds validates nothing.
+
+    `--holdout-days-seeds` used to default to `TRAIN_SEEDS`, so the
+    `holdout_horizon` axis held out the HORIZON and not the paths. Any
+    effect that was a property of those thirty seeds passed through it
+    unchallenged.
+
+    One did. A candidate was declared shippable on a 13% improvement in the
+    504-day loss; measured on four seed blocks the gap read +0.1297 where it
+    was found, then -0.0315, +0.0209 and +0.0233 -- reversing sign once and
+    five times smaller everywhere else. The discovery sweep and its
+    validation both used the training seeds, so re-measuring reproduced the
+    same fluctuation exactly and reported it as confirmation.
+
+    Asserted here so the default cannot drift back to something that
+    confirms a number instead of testing an effect.
+    """
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent
+                           / "tools" / "calibration"))
+    import instrumentlib as lib
+
+    train = set(lib.TRAIN_SEEDS)
+    confirm = set(lib.CONFIRM_SEEDS)
+    assert not (train & confirm), (
+        f"the confirmation block shares {sorted(train & confirm)} with the "
+        "training seeds; an effect found on those seeds would confirm itself"
+    )
+    assert len(confirm) == len(train), (
+        f"the confirmation block has {len(confirm)} seeds against the "
+        f"training set's {len(train)}; it has to DETECT a difference, and "
+        "less power than the set that found it cannot"
+    )
+
+
 def test_the_calibration_instrument_knows_every_settable_parameter():
     """A settable parameter with no calibration spec cannot be searched.
 

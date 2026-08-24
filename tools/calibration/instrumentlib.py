@@ -91,6 +91,23 @@ TRAIN_SEEDS = tuple(range(101, 131))
 #: The published six-seed panel (held out of any search).
 PUBLISHED_SEEDS = (1, 2, 3, 4, 5, 6)
 
+#: A thirty-seed block disjoint from `TRAIN_SEEDS`, for confirming that an
+#: effect is a property of the MODEL rather than of the paths it was found
+#: on.
+#:
+#: This exists because a candidate was declared shippable on a 13%
+#: improvement that did not survive contact with other seeds. Measured on
+#: four blocks, the gap read +0.1297 on the discovery block, then -0.0315,
+#: +0.0209 and +0.0233 -- reversing sign once, and five times smaller
+#: everywhere it was not found. Both the discovery sweep and its
+#: "validation" used `TRAIN_SEEDS`, so re-measuring reproduced the same
+#: fluctuation exactly and reported it as confirmation. It tested
+#: reproducibility of the MEASUREMENT, not of the EFFECT.
+#:
+#: Thirty rather than six, because this axis has to detect a difference and
+#: `PUBLISHED_SEEDS` has a quarter of the power for that job.
+CONFIRM_SEEDS = tuple(range(201, 231))
+
 
 # ---------------------------------------------------------------------------
 # The parameter surface

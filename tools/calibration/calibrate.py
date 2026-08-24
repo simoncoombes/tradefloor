@@ -764,7 +764,15 @@ def main() -> None:
     # +0.1287 from the choice of those three seeds, so the axis reported a
     # seed effect three times larger than the one it is named for.
     parser.add_argument("--holdout-days-seeds",
-                        default=",".join(str(s) for s in lib.TRAIN_SEEDS))
+                        default=",".join(str(s) for s in lib.CONFIRM_SEEDS),
+                        help="seeds for the held-out HORIZON axis. Defaults "
+                             "to a block DISJOINT from the training seeds. "
+                             "It used to default to the training seeds "
+                             "themselves, so the axis held out the horizon "
+                             "and not the paths -- and every seed-specific "
+                             "effect passed through it unchallenged, "
+                             "including a candidate declared shippable on a "
+                             "13% gain that reversed sign on a fresh block.")
     parser.add_argument("--screen", type=int, default=48)
     parser.add_argument("--population", type=int, default=12)
     parser.add_argument("--generations", type=int, default=26)
