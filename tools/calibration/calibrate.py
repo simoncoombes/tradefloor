@@ -1256,6 +1256,11 @@ def main() -> None:
                                      lib.PANEL_UNIVERSE_SEED, lib.PANEL_DAYS),
             "holdout_universe": measure(vector, train_seeds, hu_n, hu_seed,
                                         lib.PANEL_DAYS),
+            # The SAME horizon on the TRAINING seeds. Without it the
+            # horizon axis has no honest yardstick -- see below.
+            "train_horizon": measure(
+                vector, train_seeds, lib.PANEL_UNIVERSE_N,
+                lib.PANEL_UNIVERSE_SEED, args.holdout_days),
             "holdout_horizon": measure(
                 vector,
                 tuple(int(s) for s in args.holdout_days_seeds.split(",")),
@@ -1281,11 +1286,40 @@ def main() -> None:
         "statistics_in_band_on_train_out_on_validation": [],
     }
     train_stats = axes["candidate"]["train_seeds"]["statistics"]
+    # THE HORIZON AXIS NEEDS ITS OWN YARDSTICK.
+    #
+    # Every axis used to be judged against the TRAIN_SEEDS threshold, and
+    # train_seeds is measured at 252 days while holdout_horizon is measured
+    # at 504 -- against different bands, because each axis is scored on the
+    # ruler cut for its own horizon. So the comparison asked "is the 504-day
+    # problem harder than the 252-day one?", to which the answer is yes for
+    # every vector ever built, and called the difference overfitting.
+    #
+    # Measured: the SHIPPED preset fails its own control this way. pt-v3
+    # scores 0.0000 at 252 on train and 0.9887 at 504, so against a
+    # threshold of 1.0011 its holdout_horizon of 1.3990 is "rejected by §8".
+    # A control that rejects the incumbent is not measuring the candidate.
+    #
+    # The fix is to compare like with like: the horizon axis is judged
+    # against the same horizon on the TRAINING seeds, which isolates the
+    # change of seeds -- the thing §8 is actually about -- from the change
+    # of horizon, which is a property of the problem. See
+    # CALIBRATION-FOLLOWUPS §32.
+    horizon_train = axes["candidate"]["train_horizon"]
+    overfitting["horizon_train_loss_real"] = horizon_train["loss_real"]
+    overfitting["horizon_train_bootstrap_spread"] = \
+        horizon_train["bootstrap_spread"]
+    overfitting["horizon_threshold"] = (
+        horizon_train["loss_real"] + 2.0 * horizon_train["bootstrap_spread"])
+
     for axis in ("holdout_seeds", "holdout_universe", "holdout_horizon"):
         row = axes["candidate"][axis]
+        limit = (overfitting["horizon_threshold"]
+                 if axis == "holdout_horizon" else train_loss + 2.0 * spread)
         overfitting["axes"][axis] = {
             "loss_real": row["loss_real"],
-            "exceeds_threshold": row["loss_real"] > train_loss + 2.0 * spread,
+            "threshold_used": limit,
+            "exceeds_threshold": row["loss_real"] > limit,
         }
         for key in list(loss_mod.LIVE_TARGETS) + list(loss_mod.CONSTRAINTS):
             if (train_stats[key]["distance"] == 0
