@@ -20,7 +20,8 @@
     ]
    }
   ],
-  "note": "Two runs, not one: the first hung at its 1260-day stage (an OOM kill) after persisting everything through 504 days, and the decay curve was re-measured separately. Both built from the same source tarball and report the KAT digest above."
+  "note": "Two runs, not one: the first hung at its 1260-day stage (an OOM kill) after persisting everything through 504 days, and the decay curve was re-measured separately. Both built from the same source tarball and report the KAT digest above.",
+  "gaps_regenerated": "2026-08-24, from pretium.envelope.certified(). The file carried five gaps while the module carried six -- the roster-concentration gap was added to the module and the artifact was not regenerated with it. The envelope page tells readers to cite this file rather than its prose, so a stale artifact is the citable one being wrong."
  },
  "certified": {
   "axis": "252d/30 seeds/40 names",
@@ -523,33 +524,67 @@
  },
  "gaps": [
   {
-   "id": 1,
-   "statistic": "volume_change_acf1",
-   "kind": "structural",
-   "detail": "-0.46 against band -0.32..-0.20, 13.7 seed-sd out; unreachable at any coefficients"
+   "id": "volume-change",
+   "summary": "volume-change autocorrelation is structurally unreachable",
+   "detail": "-0.4598 against a band of -0.32 to -0.20, 13.7 seed-sd out. A held volume level plus independent per-tick noise sits near -0.5 at any coefficients, so no parameter reaches this row. It is excluded from the calibration objective deliberately: an optimiser pointed at an unreachable target does not fail cleanly, it distorts every other parameter chasing it.",
+   "forbids": "strategies trading the day-to-day CHANGE in volume",
+   "statistics": [
+    "volume_change_acf1"
+   ],
+   "beyond_days": null
   },
   {
-   "id": 2,
-   "kind": "horizon",
-   "detail": "5/10 in band at 504 days against horizon-matched bands; not certified beyond 252 days"
+   "id": "horizon",
+   "summary": "the certified horizon is 252 days",
+   "detail": "Against bands re-derived at the matching window, the model holds 5 of 10 at 504 days. Clustering roughly doubles from 252 to 504 and keeps climbing, where real markets move about 14% over the same span. Volatility itself stabilises near 29.3%, so long runs do not drift or blow up -- they stay plausible in LEVEL and become unrealistic in DYNAMICS, which is easy to miss by looking only at the price path.",
+   "forbids": "multi-year backtests, and anything keyed on volatility dynamics beyond one year",
+   "statistics": [
+    "abs_return_acf1",
+    "abs_return_acf5",
+    "return_acf1",
+    "excess_kurtosis"
+   ],
+   "beyond_days": 252
   },
   {
-   "id": 3,
-   "kind": "mechanism",
-   "statistic": "decay shape",
-   "detail": "log-log slope -0.953 vs real -0.436; memory turns negative by lag 30"
+   "id": "decay-shape",
+   "summary": "volatility memory decays exponentially, not hyperbolically",
+   "detail": "Log-log slope over lags 1-20 is -0.953 against real markets' -0.436, about 2.2x steeper, and the curve turns NEGATIVE by lag 30 where real markets remain weakly positive to lag 60. This is a mechanism gap, not a calibration one: the process is built from exponentials, and over one year two of them fake a power law well enough that no panel statistic objects. A two-component mixture was tried and is not sufficient.",
+   "forbids": "strategies whose edge depends on volatility memory beyond about lag 20 -- vol targeting and risk parity on a one-month or longer estimate",
+   "statistics": [
+    "abs_return_acf20"
+   ],
+   "beyond_days": null
   },
   {
-   "id": 4,
-   "kind": "horizon",
-   "statistic": "excess_kurtosis",
-   "detail": "5.23 at 504 days against a horizon-matched band of 7.1-22; tails too thin at long horizons"
+   "id": "thin-tails",
+   "summary": "tails are too thin over multi-year windows",
+   "detail": "Excess kurtosis reads 5.23 at 504 days against a horizon-matched band of 7.1 to 22. The 252-day band's floor of 1.6 is wide enough that this reads as comfortably in band on every 252-day certificate, which is why it went unnoticed: nothing was measuring kurtosis where it fails.",
+   "forbids": "tail-risk or VaR calibration at multi-year horizons",
+   "statistics": [
+    "excess_kurtosis"
+   ],
+   "beyond_days": 252
   },
   {
-   "id": 5,
-   "kind": "magnitude",
-   "statistic": "scenario response",
-   "detail": "VIX shock response directionally right, magnitude not certified"
+   "id": "scenario-magnitude",
+   "summary": "scenario response is directional, not calibrated",
+   "detail": "The VIX shock response is materially weaker than the previous preset's. The direction of response is right; the magnitude is not certified.",
+   "forbids": "sizing a scenario's impact rather than detecting it",
+   "statistics": [],
+   "beyond_days": null
+  },
+  {
+   "id": "roster-concentration",
+   "summary": "certification was measured on a sector-balanced roster",
+   "detail": "`Universe.random()` places exactly five names in each of twelve sectors, and no real index is balanced that way -- the S&P is roughly a third technology and the Nasdaq more so. Varying ONLY sector composition, with every name drawn from one pool: balanced holds 9/10 at L_real 0.0000; an S&P-like mix holds 8/10 at 0.0176, losing abs_return_acf5; an all-technology roster holds 7/10 and runs 32.8% volatility. So part of the certification is an artifact of that balance, and the more concentrated the roster, the less of it transfers.",
+   "forbids": "inheriting this envelope for a sector-concentrated roster -- re-measure the panel on your own universe instead",
+   "statistics": [
+    "abs_return_acf5",
+    "return_acf1",
+    "annualised_vol_pct"
+   ],
+   "beyond_days": null
   }
  ]
 }

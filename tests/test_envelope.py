@@ -113,6 +113,32 @@ def test_intervals_report_the_spread_and_both_containment_tests():
     assert env.report_intervals(rows)
 
 
+def test_the_published_artifact_matches_the_module():
+    """`docs/envelope.json` is what the envelope page tells readers to cite.
+
+    It drifted: the module gained a sixth gap -- certification was measured
+    on a sector-balanced roster, which no real index is -- and the artifact
+    was not regenerated with it. A reader citing the file would have quoted
+    five gaps from a model that has six, and the page directs them to the
+    file precisely BECAUSE prose goes stale.
+
+    Asserted so the citable thing cannot be the wrong thing.
+    """
+    import json
+    from pathlib import Path
+
+    doc = json.loads(
+        (Path(__file__).resolve().parent.parent / "docs" / "envelope.json")
+        .read_text(encoding="utf-8")
+    )
+    assert doc["preset"] == env.PRESET
+    assert doc["certified_horizon_days"] == env.CERTIFIED_HORIZON_DAYS
+    assert [g["id"] for g in doc["gaps"]] == [g.id for g in env.GAPS], (
+        "docs/envelope.json's gap list has drifted from pretium.envelope.GAPS; "
+        "regenerate it from envelope.certified()"
+    )
+
+
 def test_certified_serialises_for_a_manifest():
     d = env.certified()
     assert d["preset"] == env.PRESET
