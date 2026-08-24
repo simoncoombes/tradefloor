@@ -39,6 +39,15 @@ arrow = ["pyarrow>=14"]
 # because nothing in the library calls it -- it is one example, and it needs
 # an API key and spends money per decision.
 claude = ["anthropic>=0.40", "pydantic>=2"]
+# The MCP server, which lets an LLM agent drive the simulator over tool calls.
+# Optional for the same reason as the rest: nothing in the library imports it,
+# and a user who only wants the simulator should not install a server stack.
+mcp = ["mcp>=2.0"]
+
+[project.scripts]
+# Speaks MCP over stdio. Point an MCP client at `pretium-mcp` with no
+# arguments; see docs/mcp.md for a client configuration block.
+pretium-mcp = "pretium.mcp:main"
 
 [tool.maturin]
 manifest-path = "rust/Cargo.toml"
