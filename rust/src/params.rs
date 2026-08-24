@@ -386,6 +386,26 @@ pub struct ModelParams {
     /// $100B.
     pub spread_size_exponent: f64,
 
+    // ── Crisis gates (economy/daily.rs, market/tick.rs, engine.rs) ──────
+    /// How fast VIX reverts toward its target each day.
+    ///
+    /// Promoted from carried-read-only, because a const answers a
+    /// calibration question before anyone asks it. This is the OTHER side of
+    /// the scenario transient: the defect is that a 63-day variance
+    /// half-life cannot track a twenty-day VIX spike, and where a faster
+    /// variance process was measured to cost long-horizon realism, a longer
+    /// SPIKE touches variance persistence not at all.
+    pub vix_mean_reversion: f64,
+    /// VIX level at which crisis behaviour begins.
+    ///
+    /// Gates the sector-to-market correlation blend, the universe stress
+    /// memory and the economy's crisis premium -- three mechanisms whose
+    /// trigger point nobody has ever been able to search. 25.5 is the P94 of
+    /// the long-run endogenous VIX distribution, chosen so the trigger is
+    /// reachable at all; whether it is the RIGHT point is a different
+    /// question and now an answerable one.
+    pub crisis_vix_threshold: f64,
+
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
     /// Trading days for half of a mispricing to decay. The ONE settable
     /// knob for the decay: overriding it recomputes `mispricing_phi` and
@@ -545,6 +565,8 @@ impl ModelParams {
             size_effect_exponent: 0.15,
             spread_size_smoothness: 0.0,
             spread_size_exponent: crate::microstructure::SPREAD_SIZE_EXPONENT,
+            vix_mean_reversion: crate::economy::VIX_MEAN_REVERSION,
+            crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
@@ -686,6 +708,8 @@ impl ModelParams {
             "size_effect_exponent" => self.size_effect_exponent,
             "spread_size_smoothness" => self.spread_size_smoothness,
             "spread_size_exponent" => self.spread_size_exponent,
+            "vix_mean_reversion" => self.vix_mean_reversion,
+            "crisis_vix_threshold" => self.crisis_vix_threshold,
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
@@ -775,6 +799,8 @@ impl ModelParams {
             "size_effect_smoothness" => out.size_effect_smoothness = value,
             "spread_size_exponent" => out.spread_size_exponent = value,
             "spread_size_smoothness" => out.spread_size_smoothness = value,
+            "vix_mean_reversion" => out.vix_mean_reversion = value,
+            "crisis_vix_threshold" => out.crisis_vix_threshold = value,
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
             "momentum_theta" => out.momentum_theta = value,
@@ -885,6 +911,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "crash_amplifier_threshold",
         "crisis_blend_cap",
         "crisis_blend_ramp",
+        "crisis_vix_threshold",
         "crowd_lean_cap",
         "crowd_momentum_gain",
         "crowd_valuation_gain",
@@ -930,6 +957,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "spread_size_smoothness",
         "universe_stress_decay",
         "universe_stress_weight",
+        "vix_mean_reversion",
         "volume_innovation_sigma",
         "volume_persistence",
         "volume_variance_gain",
@@ -948,7 +976,6 @@ fn carried_read_only(name: &str) -> Option<f64> {
     }
     Some(match name {
         "daily_shock_cap" => mispricing::DAILY_SHOCK_CAP,
-        "crisis_vix_threshold" => econ::CRISIS_VIX_THRESHOLD,
         "neutral_discount_rate" => fv::NEUTRAL_DISCOUNT_RATE,
         "rate_pe_sensitivity" => fv::RATE_PE_SENSITIVITY,
         "rate_adjustment_floor" => fv::RATE_ADJUSTMENT_FLOOR,
@@ -963,7 +990,6 @@ fn carried_read_only(name: &str) -> Option<f64> {
         "oil_baseline" => econ::OIL_BASELINE,
         "gold_equilibrium_base" => econ::GOLD_EQUILIBRIUM_BASE,
         "gold_mean_reversion" => econ::GOLD_MEAN_REVERSION,
-        "vix_mean_reversion" => econ::VIX_MEAN_REVERSION,
         "fiscal_multiplier" => econ::FISCAL_MULTIPLIER,
         _ => return None,
     })
@@ -973,7 +999,6 @@ fn carried_read_only(name: &str) -> Option<f64> {
 fn carried_read_only_pairs() -> Vec<(String, f64)> {
     let mut out: Vec<(String, f64)> = [
         "daily_shock_cap",
-        "crisis_vix_threshold",
         "neutral_discount_rate",
         "rate_pe_sensitivity",
         "rate_adjustment_floor",
@@ -988,7 +1013,6 @@ fn carried_read_only_pairs() -> Vec<(String, f64)> {
         "oil_baseline",
         "gold_equilibrium_base",
         "gold_mean_reversion",
-        "vix_mean_reversion",
         "fiscal_multiplier",
     ]
     .iter()

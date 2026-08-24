@@ -61,6 +61,23 @@ pub struct DailyInputs<'a> {
     pub market_return_pct: f64,
     /// `gameDay ?? 0`.
     pub game_day: i64,
+    /// How fast VIX reverts toward its target each day.
+    ///
+    /// Threaded so it can be CALIBRATED. It was a const, and that made it
+    /// unreachable by any search -- which matters because it is the other
+    /// side of the scenario transient. The defect is that a 63-day variance
+    /// half-life cannot track a twenty-day VIX spike; one answer is a faster
+    /// variance process, which was measured and costs long-horizon realism,
+    /// and the other is a LONGER SPIKE, which touches variance persistence
+    /// not at all.
+    pub vix_mean_reversion: f64,
+    /// VIX level at which crisis behaviour begins.
+    ///
+    /// Gates the sector-to-market correlation blend, the universe stress
+    /// memory and the economy's crisis premium. Threaded for the same
+    /// reason: where a crisis STARTS is a calibration question, and a const
+    /// answers it before anyone asks.
+    pub crisis_vix_threshold: f64,
 }
 
 impl<'a> Default for DailyInputs<'a> {
@@ -70,6 +87,8 @@ impl<'a> Default for DailyInputs<'a> {
             active_shocks: &[],
             market_return_pct: 0.0,
             game_day: 0,
+            vix_mean_reversion: VIX_MEAN_REVERSION,
+            crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
         }
     }
 }
@@ -519,10 +538,10 @@ pub fn update_economy_daily(
     // ceiling 26.57). Re-sited at the endogenous P94 so the gate is live;
     // see `CRISIS_VIX_THRESHOLD`. The hinge origin moves with the gate, so
     // the premium stays continuous at the threshold.
-    let crisis_premium = if economy.vix > CRISIS_VIX_THRESHOLD && economy.gdp_growth < -1.0 {
+    let crisis_premium = if economy.vix > inputs.crisis_vix_threshold && economy.gdp_growth < -1.0 {
         mathx::min(
             5.0,
-            economy.gdp_growth.abs() * 1.0 + (economy.vix - CRISIS_VIX_THRESHOLD) * 0.15,
+            economy.gdp_growth.abs() * 1.0 + (economy.vix - inputs.crisis_vix_threshold) * 0.15,
         )
     } else {
         0.0
@@ -622,7 +641,7 @@ pub fn update_economy_daily(
 
     new_state.vix = clamp(
         economy.vix
-            + (target_vix - economy.vix) * VIX_MEAN_REVERSION
+            + (target_vix - economy.vix) * inputs.vix_mean_reversion
             + random_normal(rng, 0.0, 0.15 * volatility),
         10.0,
         80.0,

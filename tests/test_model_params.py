@@ -195,6 +195,14 @@ PERTURBATIONS = [
     # blend is live alone, the exponent waits on it.
     ("spread_size_smoothness", 1.0, True),
     ("spread_size_exponent", 0.80, False),     # needs smoothness > 0
+    # The crisis gates, promoted from carried-read-only (pt-v4). VIX mean
+    # reversion is live in the probe -- it moves the macro chain every day.
+    # The crisis threshold is NOT, for the reason crisis_blend_ramp is not:
+    # a 3-day probe at the default VIX of 15 never reaches 25.5, so moving
+    # the gate moves nothing. Shown live by
+    # `test_the_crisis_threshold_acts_above_itself`.
+    ("vix_mean_reversion", 0.30, True),
+    ("crisis_vix_threshold", 18.0, False),     # needs VIX above the gate
 ]
 
 
@@ -282,6 +290,37 @@ def test_universe_memory_acts_above_the_crisis_threshold():
     assert forgetful != remembering, (
         "universe memory changed nothing across a VIX spike and decay; "
         "the state is not reaching the correlation blend"
+    )
+
+
+def test_the_crisis_threshold_acts_above_itself():
+    """Where a crisis STARTS is now a calibration question, not a const.
+
+    `crisis_vix_threshold` gates three mechanisms at once -- the
+    sector-to-market correlation blend, the universe stress memory, and the
+    economy's crisis premium -- and until pt-v4 it was carried read-only, so
+    no search could reach the trigger point of any of them.
+
+    Measured under a VIX shock that crosses both the shipped gate and a
+    lowered one, because a probe below the gate cannot tell them apart:
+    that is the whole reason this parameter reads inert in the table above.
+    """
+    import pretium.scenario as sc
+
+    def prices(model):
+        shock = sc.Scenario.vix_shock(calm=15.0, peak=40.0, at=3, over=6)
+        engine = sc.run_scenario(shock, seed=42, universe=UNIVERSE, days=18,
+                                 ticks_per_day=40, model=model)
+        return struct.unpack("<%dd" % len(engine.tickers),
+                             engine.column("price"))
+
+    shipped = prices(pretium.ModelParams.from_preset("pt-v3"))
+    earlier = prices(pretium.ModelParams.from_preset(
+        "pt-v3", crisis_vix_threshold=18.0))
+    assert shipped != earlier, (
+        "lowering the crisis threshold changed nothing across a VIX spike "
+        "that crosses both gates; the parameter is not reaching its call "
+        "sites"
     )
 
 

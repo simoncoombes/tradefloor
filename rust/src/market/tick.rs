@@ -461,8 +461,8 @@ pub fn simulate_market_tick(
     // cap by VIX ≈ 26.6, the ceiling of what the macro chain can produce,
     // instead of asking for a VIX of 64 that cannot exist.
     // Today's stress, in VIX points above the crisis threshold.
-    let instant_stress = if economy.vix > crate::economy::CRISIS_VIX_THRESHOLD {
-        economy.vix - crate::economy::CRISIS_VIX_THRESHOLD
+    let instant_stress = if economy.vix > p.crisis_vix_threshold {
+        economy.vix - p.crisis_vix_threshold
     } else {
         0.0
     };

@@ -280,7 +280,7 @@ impl Engine {
     /// 23-day half-life and 0.0 means nothing survives the night, which is
     /// the behaviour of every preset before pt-v4.
     fn update_universe_stress(&mut self) {
-        let threshold = crate::economy::CRISIS_VIX_THRESHOLD;
+        let threshold = self.params.crisis_vix_threshold;
         let from_vix = if self.economy.vix > threshold {
             self.economy.vix - threshold
         } else {
@@ -909,6 +909,8 @@ impl Engine {
         self.economy = update_economy_daily(
             &self.economy,
             &DailyInputs {
+                vix_mean_reversion: self.params.vix_mean_reversion,
+                crisis_vix_threshold: self.params.crisis_vix_threshold,
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,
                 market_return_pct: request.market_return_pct,
