@@ -50,7 +50,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
 from ._core import ValidationError
-from .facts import REAL_MARKETS, SEED_SD, band_distance
+from .facts import REAL_MARKETS, SEED_SD, SEED_SD_504, band_distance
 
 #: The preset these measurements describe.
 PRESET = "pt-v3"
@@ -510,6 +510,110 @@ def check(
         warnings=tuple(warnings),
         gaps=tuple(dict.fromkeys(hit)),
     )
+
+
+def score(panel: Mapping[str, float], *,
+          horizon_days: int = CERTIFIED_HORIZON_DAYS) -> dict[str, Any]:
+    """How a measured panel sits against the bands for its own horizon.
+
+    `panel` maps statistic names to measured values -- what
+    `facts.measure()` returns, or a median across seeds.
+
+    The horizon chooses the ruler, and that is the whole reason this exists
+    as a function rather than a comparison anyone can write inline: a
+    504-day panel scored against the 252-day bands is the wrong-ruler
+    error, and it has been made repeatedly in this project. It flatters the
+    model on kurtosis -- 5.2 reads comfortably inside the 252-day band of
+    1.6 to 41 and is OUT of the horizon-matched 7.1 to 22 -- while being
+    harsher elsewhere.
+
+    `room_sd` is how far inside its band a statistic sits, in that
+    horizon's own seed noise, signed so negative means out. A statistic
+    barely inside is one seed away from not being, and the band loss cannot
+    see the difference.
+    """
+    if horizon_days < 1:
+        raise ValidationError(
+            f"horizon_days must be positive, got {horizon_days}")
+    # `loss.STRUCTURAL` names the statistics excluded from the objective by
+    # design; imported here rather than at module scope because `loss`
+    # imports this module's facts and a top-level import would cycle.
+    from .loss import STRUCTURAL
+
+    far = horizon_days > CERTIFIED_HORIZON_DAYS
+    bands = BANDS_504 if far else REAL_MARKETS
+    noise = SEED_SD_504 if far else SEED_SD
+
+    unknown = sorted(set(panel) - set(REAL_MARKETS))
+    if unknown:
+        raise ValidationError(
+            f"unknown statistics {unknown}; expected keys of "
+            f"facts.REAL_MARKETS: {sorted(REAL_MARKETS)}")
+
+    rows: dict[str, Any] = {}
+    for name, measured in panel.items():
+        low, high = bands[name]
+        sd = noise.get(name)
+        rows[name] = {
+            "measured": measured,
+            "band": (low, high),
+            "distance": band_distance(measured, low, high),
+            "in_band": band_distance(measured, low, high) == 0,
+            "room_sd": (None if not sd
+                        else min(measured - low, high - measured) / sd),
+            "structural": name in STRUCTURAL,
+        }
+    return {
+        "horizon_days": horizon_days,
+        "ruler": "REAL_MARKETS_504" if far else "REAL_MARKETS",
+        "statistics": rows,
+        "in_band": sum(1 for r in rows.values() if r["in_band"]),
+        "of": len(rows),
+    }
+
+
+def regressions(panel: Mapping[str, float], *,
+                horizon_days: int = CERTIFIED_HORIZON_DAYS) -> list[str]:
+    """Statistics the SHIPPED preset holds in band and this panel does not.
+
+    The reconciliation this module was missing. The calibration objective
+    sums two horizons; the envelope certifies one. A search can therefore
+    improve its own score by spending the certification, and the resulting
+    candidate looks like a straightforward win until somebody measures the
+    whole panel by hand.
+
+    That is not hypothetical. `pt-v4` halves the dual-horizon loss and is
+    the first vector ever to close the thin-tails gap -- and it surrenders
+    `return_acf1` at the certified horizon, on training seeds, held-out
+    seeds and a held-out universe alike. It was called a win twice before
+    anyone counted (CALIBRATION-FOLLOWUPS §33).
+
+    So the count is a function now rather than a judgement. An empty list
+    means the candidate certifies at least as well as what ships; a
+    non-empty one names exactly what it costs, and the policy that follows
+    is simple: **a candidate that regresses the certified horizon does not
+    become the default, whatever the objective says.** The objective is the
+    search's proxy. The envelope is the contract.
+
+    Only meaningful at the certified horizon, where a shipped baseline
+    exists to compare against; `CERTIFIED` is measured there.
+    """
+    if horizon_days != CERTIFIED_HORIZON_DAYS:
+        raise ValidationError(
+            f"regressions compares against CERTIFIED, which is measured at "
+            f"{CERTIFIED_HORIZON_DAYS} days, not {horizon_days}. Use "
+            f"`score` to read another horizon on its own ruler.")
+    theirs = score(panel, horizon_days=horizon_days)["statistics"]
+    lost = []
+    for name, row in theirs.items():
+        if row["structural"]:
+            # Out of band by design and excluded from the objective; a
+            # candidate cannot be blamed for it or credited with it.
+            continue
+        low, high = REAL_MARKETS[name]
+        if band_distance(CERTIFIED[name], low, high) == 0 and not row["in_band"]:
+            lost.append(name)
+    return sorted(lost)
 
 
 def certified() -> dict[str, Any]:

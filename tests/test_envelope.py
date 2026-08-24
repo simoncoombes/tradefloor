@@ -146,3 +146,77 @@ def test_certified_serialises_for_a_manifest():
     assert len(d["statistics"]) == len(REAL_MARKETS)
     assert len(d["gaps"]) == len(env.GAPS)
     assert all(g["forbids"] for g in d["gaps"])
+
+
+# -- the objective / certification reconciliation ---------------------------
+
+
+def test_score_reads_a_panel_against_its_own_horizon():
+    """The wrong-ruler error, made hard to commit.
+
+    `excess_kurtosis` at 5.23 is comfortably inside the 252-day band of
+    1.6-41 and OUT of the horizon-matched 504-day band of 7.1-22. Scoring a
+    504-day panel against the 252-day bands has been done repeatedly in this
+    project; the horizon picks the ruler here so a caller cannot pair one
+    with the other by accident.
+    """
+    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    near = env.score(panel, horizon_days=252)
+    far = env.score(panel, horizon_days=504)
+    assert near["ruler"] == "REAL_MARKETS"
+    assert far["ruler"] == "REAL_MARKETS_504"
+    assert near["statistics"]["excess_kurtosis"]["in_band"]
+    assert not far["statistics"]["excess_kurtosis"]["in_band"], (
+        "5.23 is inside the 252-day band and outside the 504-day one; a "
+        "score that missed that is measuring with the wrong ruler"
+    )
+
+
+def test_score_reports_room_not_just_membership():
+    # A statistic barely inside is one seed away from not being, and the
+    # band loss is flat inside a band so it cannot see the difference.
+    rows = env.score({k: env.CERTIFIED[k] for k in REAL_MARKETS})["statistics"]
+    for name, row in rows.items():
+        if row["in_band"]:
+            assert row["room_sd"] is None or row["room_sd"] >= 0, name
+
+
+def test_the_shipped_preset_does_not_regress_itself():
+    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    assert env.regressions(panel) == []
+
+
+def test_a_panel_that_loses_a_statistic_is_named():
+    """pt-v4's actual failure, pinned.
+
+    It halves the dual-horizon objective and is the first vector to close
+    the thin-tails gap -- and it surrenders `return_acf1` at the certified
+    horizon. It was called a win twice before anyone counted the panel
+    (CALIBRATION-FOLLOWUPS §33), which is why this is a function now.
+    """
+    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    low, high = REAL_MARKETS["return_acf1"]
+    panel["return_acf1"] = high + 0.014      # pt-v4 measures 0.0739 vs 0.06
+    assert env.regressions(panel) == ["return_acf1"]
+
+
+def test_a_structural_statistic_is_never_counted_as_a_regression():
+    """`volume_change_acf1` is out of band by design and excluded from the
+    objective. A candidate can neither be blamed for it nor credited with
+    it, and counting it would make every candidate look like a regression."""
+    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    panel["volume_change_acf1"] = -99.0
+    assert env.regressions(panel) == []
+
+
+def test_regressions_refuses_a_horizon_it_has_no_baseline_for():
+    # CERTIFIED is measured at 252. Comparing a 504-day panel against it
+    # would be the wrong-ruler error wearing a different hat.
+    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    with pytest.raises(pretium.ValidationError):
+        env.regressions(panel, horizon_days=504)
+
+
+def test_an_unknown_statistic_is_refused_by_score():
+    with pytest.raises(pretium.ValidationError):
+        env.score({"sharpe_ratio": 1.0})
