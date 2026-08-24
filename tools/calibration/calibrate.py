@@ -220,7 +220,8 @@ def margined_bands(bands: dict, seed_sd: dict, keys: list[str],
     return out
 
 
-def search_loss(panels: list[dict], margin: dict) -> float:
+def search_loss(panels: list[dict], margin: dict,
+                room_target: float = 0.0, room_weight: float = 0.0) -> float:
     """`L_real`'s arithmetic on the shrunk bands: the SEARCH objective.
 
     Deliberately not a call into `pretium.loss.band_distance_loss` with
@@ -243,6 +244,30 @@ def search_loss(panels: list[dict], margin: dict) -> float:
         values = [p[key] for p in panels if p.get(key) is not None]
         median = statistics.median(values)
         total += (band_distance(median, lo, hi) / spec["seed_sd"]) ** 2
+        if room_weight > 0.0:
+            # ROOM: how far inside its band a statistic sits, in its own
+            # seed noise.
+            #
+            # The band loss is FLAT inside the band by design -- there is no
+            # credit for being deeper in. That is right for a published
+            # verdict and wrong for SELECTION, because it cannot rank
+            # candidates that are all inside, and "cannot rank" means the
+            # winner among them is chosen arbitrarily.
+            #
+            # It also has a measured consequence. On the shipped preset,
+            # seven of the ten statistics have their p10-p90 range across
+            # seeds crossing a band edge: the medians are in band and a
+            # large minority of individual seeds are not. A statistic
+            # sitting half a seed-sd inside its band is not safely in band,
+            # it is in band on average. This term prices that.
+            #
+            # One-sided and bounded: a statistic with at least `room_target`
+            # of room contributes NOTHING, so there is no reward for
+            # burrowing toward a band's centre and no fight with the primary
+            # term. Only edge-hugging is penalised.
+            room = min(median - lo, hi - median) / spec["seed_sd"]
+            if room < room_target:
+                total += room_weight * (room_target - room) ** 2
     return total
 
 
@@ -481,6 +506,8 @@ class Evaluator:
                  days: int = lib.PANEL_DAYS,
                  days_far: int | None = None,
                  margin_far: dict | None = None,
+                 room_target: float = 0.0,
+                 room_weight: float = 0.0,
                  universe_n: int = lib.PANEL_UNIVERSE_N,
                  universe_seed: int = lib.PANEL_UNIVERSE_SEED) -> None:
         self.workers = workers
@@ -499,6 +526,10 @@ class Evaluator:
         #: priced at BOTH horizons and the search loss is their sum.
         self.days_far = days_far
         self.margin_far = margin_far
+        #: The edge-proximity tie-breaker. Zero weight reproduces the
+        #: previous objective exactly, so this changes nothing unasked.
+        self.room_target = room_target
+        self.room_weight = room_weight
         self.universe_n = universe_n
         self.universe_seed = universe_seed
         self.cache: dict[tuple[str, str], dict] = {}
@@ -636,7 +667,8 @@ class Evaluator:
         breakdown = band_distance_loss(panels)
         medians = {key: statistics.median(p[key] for p in panels)
                    for key in panels[0]}
-        margined = search_loss(panels, self.margin)
+        margined = search_loss(panels, self.margin,
+                               self.room_target, self.room_weight)
         far_margined = None
         if far_panels is not None and self.margin_far is not None:
             # The second horizon, scored against ITS OWN margined bands and
@@ -644,7 +676,8 @@ class Evaluator:
             # exchange rate between a band exit at one horizon and the other,
             # and an unstated weighting buried in a scalar would be worse
             # than an equal one stated out loud.
-            far_margined = search_loss(far_panels, self.margin_far)
+            far_margined = search_loss(far_panels, self.margin_far,
+                                       self.room_target, self.room_weight)
             margined = margined + far_margined
         row = {
             "overrides": overrides,
@@ -795,6 +828,18 @@ def main() -> None:
                              "roughly three times the panel runs per "
                              "candidate, because a 504-day panel is twice "
                              "the work of a 252-day one.")
+    parser.add_argument("--room-target", type=float, default=0.0,
+                        metavar="SD",
+                        help="prefer candidates whose statistics sit at "
+                             "least this many seed-sds inside their bands. "
+                             "The band loss is flat inside a band, so it "
+                             "cannot rank candidates that are all inside; "
+                             "this breaks that tie toward the one a single "
+                             "seed is least likely to knock out of band. "
+                             "0 disables it.")
+    parser.add_argument("--room-weight", type=float, default=0.0,
+                        help="weight on the room term. Small by intent: it "
+                             "is a tie-breaker, not a second objective.")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
@@ -857,7 +902,8 @@ def main() -> None:
         margin_far = margined_bands(facts.REAL_MARKETS_504, facts.SEED_SD_504,
                                     in_loss, args.margin_sd, per_key_margin)
     ev = Evaluator(args.workers, args.budget_panel_runs, margin,
-                   days_far=args.dual_horizon, margin_far=margin_far)
+                   days_far=args.dual_horizon, margin_far=margin_far,
+                   room_target=args.room_target, room_weight=args.room_weight)
     started = time.perf_counter()
     trace: list[dict] = []
 
