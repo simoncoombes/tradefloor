@@ -162,9 +162,71 @@ band.
 
 ### Gap 5 — scenario response is directional, not calibrated
 
-The VIX shock response is materially weaker than the previous preset's.
-The direction of response is right; the magnitude is not certified. Use
-scenarios to ask *whether* a strategy breaks, not *how much*.
+Two separate quantities, and they fail differently.
+
+**The steady-state lever** — how much more violent a sustained crisis is
+than a calm market — reads about **×3.1** against real markets' **×6.16**.
+Roughly half.
+
+**The transient** — how fast the market *reacts* to a shock, as distinct
+from where it settles — is weaker still. The shipped preset retains **27.6%**
+of the previous preset's shock response, because it raised factor-variance
+persistence to 0.989 to buy volatility clustering, and a 63-day half-life
+cannot track a twenty-day spike.
+
+**This has been attacked directly and the attack failed, which is why it is
+a gap rather than a task.** A two-timescale variance mixture was built to
+separate the two jobs — a fast component to chase spikes, a slow one to
+carry clustering. Measured, capping persistence at a 14-day half-life does
+restore the transient (1.062 → 1.203), and it **doubles** the 504-day loss
+(0.9887 → 2.0164). Raising the slow component's weight to buy that back
+makes the horizon monotonically worse, 2.02 → 4.11 at weight 0.60, while
+the transient stays flat.
+
+So within this model class, **restoring the crisis transient costs
+long-horizon realism, and the mechanism built to buy it back cannot.** That
+is a structural limit, not a calibration that has not been run yet.
+
+**Consequence: use scenarios to ask *whether* a strategy breaks, not *how
+much*.** A crisis here is roughly half as violent as a real one and arrives
+more slowly, so a strategy that survives one has not been tested as hard as
+the label suggests.
+
+### Gap 6 — certification was measured on a sector-balanced roster
+
+`Universe.random()` places exactly five names in each of twelve sectors. No
+real index is balanced that way — the S&P is roughly a third technology and
+the Nasdaq more so. Varying **only** sector composition, with every name
+drawn from one pool:
+
+| roster | in band | `L_real` | vol% |
+|---|---|---|---|
+| balanced (the certified one) | 9/10 | 0.0000 | 27.9 |
+| S&P-like mix | 8/10 | 0.0176 | 27.4 |
+| all technology | 7/10 | 0.0043 | 32.8 |
+
+So part of the certification is an artifact of that balance, and the more
+concentrated the roster, the less of it transfers.
+
+**Consequence: do not inherit this envelope for a sector-concentrated
+roster.** Re-measure the panel on your own universe — `facts.measure()`
+takes it directly, and `envelope.intervals()` will report the spread.
+
+## The numbers above are medians, and one run is not the median
+
+Every figure on this page is a median across thirty seeds. That is not what
+a single run shows you.
+
+Measured on the shipped preset, **seven of the ten statistics have their
+10th-to-90th-percentile range across seeds crossing a band edge**.
+`abs_return_acf1` reads a median of 0.141 against a ceiling of 0.22 — and a
+p90 of 0.426, with an across-seed standard deviation of 0.170, larger than
+the median itself.
+
+A statistic can be comfortably in band on the median and out of band on a
+large minority of individual seeds. `pretium.envelope.intervals()` reports
+the spread beside each median, and reading it before relying on one run is
+the difference between a certified claim and a misread one.
 
 ## What this licenses
 
@@ -186,6 +248,9 @@ scenarios to ask *whether* a strategy breaks, not *how much*.
 **Do not use pretium for:**
 
 - Multi-year backtests (Gap 2).
+- Sizing how badly a crisis hurts, as opposed to detecting that it does
+  (Gap 5) — a crisis here is roughly half as violent as a real one.
+- Inheriting these numbers for a sector-concentrated roster (Gap 6).
 - Strategies keyed on long-horizon volatility memory (Gap 3).
 - Tail-risk or VaR calibration at multi-year horizons (Gap 4).
 - Strategies trading the change in volume (Gap 1).
