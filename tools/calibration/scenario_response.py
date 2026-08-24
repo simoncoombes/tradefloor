@@ -172,21 +172,18 @@ def _as_overrides(model):
             if k in pretium.ModelParams.settable() and v != ship[k]}
 
 
-def measure_vector(model, seeds=DEFAULT_SEEDS, workers: int = 8) -> dict:
-    """Every number here is a median across `seeds`, not a single draw.
+def aggregate(held_rows, shock_rows, seeds) -> dict:
+    """Medians across seeds, from already-measured held and shock rows.
 
-    The medians matter more than the parallelism: a lever is a ratio of
-    two volatilities, so a one-seed lever divides one noisy number by
-    another and reports the result to two decimals.
+    `held_rows` are `_held_job` results -- (vix, seed, vol, corr) -- and
+    `shock_rows` are `_shock_job` results, (seed, ratio). Split out of
+    `measure_vector` so the atlas survey driver (`atlas_survey.py`) can run
+    the SAME jobs on its own worker pool and aggregate identically: its
+    workers are pool processes, and a pool spawned inside a pool worker is
+    refused by multiprocessing ("daemonic processes are not allowed to
+    have children"), so calling `measure_vector` from one is not an
+    option. One aggregation, two schedulers -- the numbers cannot drift.
     """
-    overrides = _as_overrides(model)
-    held_jobs = [(overrides, vix, seed) for vix in HELD_VIX for seed in seeds]
-    shock_jobs = [(overrides, seed) for seed in seeds]
-
-    with multiprocessing.Pool(processes=max(1, workers)) as pool:
-        held_rows = pool.map(_held_job, held_jobs)
-        shock_rows = pool.map(_shock_job, shock_jobs)
-
     held = {}
     for vix in HELD_VIX:
         vols = [v for (x, _s, v, _c) in held_rows if x == vix]
@@ -213,6 +210,24 @@ def measure_vector(model, seeds=DEFAULT_SEEDS, workers: int = 8) -> dict:
                            if len(ratios) > 1 else 0.0),
         "shock_ratio_median": statistics.median(ratios.values()),
     }
+
+
+def measure_vector(model, seeds=DEFAULT_SEEDS, workers: int = 8) -> dict:
+    """Every number here is a median across `seeds`, not a single draw.
+
+    The medians matter more than the parallelism: a lever is a ratio of
+    two volatilities, so a one-seed lever divides one noisy number by
+    another and reports the result to two decimals.
+    """
+    overrides = _as_overrides(model)
+    held_jobs = [(overrides, vix, seed) for vix in HELD_VIX for seed in seeds]
+    shock_jobs = [(overrides, seed) for seed in seeds]
+
+    with multiprocessing.Pool(processes=max(1, workers)) as pool:
+        held_rows = pool.map(_held_job, held_jobs)
+        shock_rows = pool.map(_shock_job, shock_jobs)
+
+    return aggregate(held_rows, shock_rows, seeds)
 
 
 def persistence(model) -> dict:
