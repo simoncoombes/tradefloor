@@ -2524,3 +2524,84 @@ mod tests {
         assert!(e.set_status(&[true; 3], &[true; 4]).is_err());
     }
 }
+
+
+/// A fixed simulation, hashed — the cross-binding determinism probe.
+///
+/// Every binding calls THIS rather than hashing state on its own side. A
+/// check implemented twice is a fork of the check: the first attempt at
+/// this compared a wasm digest against one rebuilt in Python, and the two
+/// disagreed because the Python surface reports rates as fractions while
+/// the core carries percent. That is a units bug in the harness reported as
+/// a determinism failure, which is precisely the confusion a shared
+/// implementation removes.
+///
+/// Hashing rules follow `tests/known_answer.py`: raw big-endian IEEE-754
+/// bytes, no decimal formatting anywhere, because a float formatter would
+/// make the digest depend on something other than the simulation.
+///
+/// Prices are tick-rounded to cents, so a price-only digest can agree while
+/// two builds have drifted below that. The macro state is carried at full
+/// precision and sits downstream of the whole day chain, so it is the part
+/// of this probe that can see a low-bit difference.
+///
+/// Returns `None` for an unknown preset.
+pub fn fixed_simulation_digest(
+    size: usize,
+    universe_seed: u32,
+    seed: u32,
+    days: usize,
+    ticks: usize,
+    preset: &str,
+) -> Option<String> {
+    use sha2::{Digest, Sha256};
+
+    let params = crate::params::ModelParams::preset(preset)?;
+    let generated = crate::universe::random_universe(size, universe_seed);
+    let companies: Vec<TickCompany> = generated
+        .iter()
+        .enumerate()
+        .map(|(i, g)| g.to_init().to_tick_company(i))
+        .collect();
+    let mut engine = Engine::with_params(
+        seed,
+        companies,
+        crate::economy::create_initial_economy_state(
+            &crate::economy::InitialEconomyOptions::default()),
+        crate::economy::create_initial_central_bank_state(0),
+        crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
+        params,
+    );
+    let mut buffer = SessionBuffer::new();
+    for day in 1..=days {
+        engine.open_market();
+        engine.run_session(
+            &SessionRequest {
+                start: crate::market::GameTime { hour: 9, minute: 30, day_of_week: 3 },
+                ticks,
+                volatility_multiplier: 1.0,
+                news: &[],
+                news_impact_queue: &[],
+                order_volumes: &[],
+                close_at_end: false,
+                reopen: false,
+                daily_innovations: &[],
+                sector_base_variances: &[],
+                stop: None,
+            },
+            &mut buffer,
+        );
+        engine.close_day(day as i64);
+    }
+
+    let mut hasher = Sha256::new();
+    for price in engine.prices() {
+        hasher.update(price.to_be_bytes());
+    }
+    let e = engine.economy();
+    for v in [e.vix, e.federal_funds_rate, e.inflation_rate,
+              e.corporate_bond_yield, e.fear_greed_index] {
+        hasher.update(v.to_be_bytes());
+    }
+    Some(format!("{:x}", hasher.finalize()))
+}

@@ -198,28 +198,16 @@ impl Sim {
     }
 }
 
-/// A digest of a fixed simulation's prices, for checking determinism.
+/// The cross-binding determinism probe.
 ///
-/// Not the known-answer test — that lives in `tests/known_answer.py` and
-/// covers the RNG, fair value, the book and the engine in one chain. This is
-/// the cheap comparable: run the same fixed market in the browser and in
-/// Python, and see whether the two agree.
-///
-/// Hashing rules follow the KAT's, because the reason for them is the same:
-/// raw big-endian IEEE-754 bytes, no decimal formatting anywhere. A
-/// `to_string` here would make the digest depend on a float formatter rather
-/// than on the simulation, which can fail for reasons that are not the model
-/// or — far worse — agree while the low bits differ.
+/// Delegates to [`crate::engine::fixed_simulation_digest`] so the browser
+/// and the Python surface hash the same thing the same way. A digest
+/// rebuilt independently on each side would be a fork of the check itself.
 #[wasm_bindgen(js_name = priceDigest)]
 pub fn price_digest(size: usize, universe_seed: u32, seed: u32,
                     days: usize, ticks: usize, preset: &str)
                     -> Result<String, JsError> {
-    use sha2::{Digest, Sha256};
-    let mut sim = Sim::new(size, universe_seed, seed, preset)?;
-    sim.run_days(days, ticks)?;
-    let mut hasher = Sha256::new();
-    for price in sim.inner.prices() {
-        hasher.update(price.to_be_bytes());
-    }
-    Ok(format!("{:x}", hasher.finalize()))
+    crate::engine::fixed_simulation_digest(
+        size, universe_seed, seed, days, ticks, preset)
+        .ok_or_else(|| JsError::new(&format!("unknown preset {preset:?}")))
 }

@@ -83,6 +83,24 @@ pyo3::create_exception!(
 );
 
 /// The package version.
+/// The cross-binding determinism probe: one fixed simulation, hashed.
+///
+/// The same `engine::fixed_simulation_digest` the WebAssembly surface calls,
+/// so "do the browser build and the Python build agree?" is answered by one
+/// implementation rather than by two harnesses that must themselves be kept
+/// in step. See that function for the hashing rules and for why the macro
+/// state is in the digest.
+#[pyfunction]
+#[pyo3(signature = (*, size, universe_seed, seed, days, ticks, preset))]
+fn fixed_simulation_digest(size: usize, universe_seed: u32, seed: u32,
+                           days: usize, ticks: usize, preset: &str)
+                           -> PyResult<String> {
+    crate::engine::fixed_simulation_digest(
+        size, universe_seed, seed, days, ticks, preset)
+        .ok_or_else(|| ValidationError::new_err(
+            format!("unknown preset {preset:?}")))
+}
+
 #[pyfunction]
 fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
@@ -111,6 +129,7 @@ fn check_rate(name: &str, fraction: f64) -> PyResult<f64> {
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGameRng>()?;
     m.add_function(wrap_pyfunction!(version, m)?)?;
+    m.add_function(wrap_pyfunction!(fixed_simulation_digest, m)?)?;
     m.add_function(wrap_pyfunction!(check_rate, m)?)?;
     m.add_function(wrap_pyfunction!(fair_value, m)?)?;
     m.add_function(wrap_pyfunction!(sectors, m)?)?;
