@@ -1181,6 +1181,8 @@ impl Engine {
         Some(crate::microstructure::build_live_book(
             &company.micro_view(company.stock.price),
             &crate::microstructure::LiveBookOptions {
+                spread_size_smoothness: 0.0,
+                spread_size_exponent: crate::microstructure::SPREAD_SIZE_EXPONENT,
                 vix: self.economy.vix,
                 ..Default::default()
             },

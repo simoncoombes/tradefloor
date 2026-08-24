@@ -372,6 +372,19 @@ pub struct ModelParams {
     /// floor, and that departure is the mechanism's purpose rather than an
     /// error in the fit.
     pub size_effect_exponent: f64,
+    /// Blend from the four-tier SPREAD step toward a continuous power law,
+    /// in [0, 1].
+    ///
+    /// The step charges 10 bps at $1B and 30 bps at $0.9B -- a three times
+    /// jump in transaction cost from a rounding error in capitalisation. Any
+    /// execution study spanning that edge measures the tier rather than the
+    /// size effect. 0.0 is the step and is bit-identical.
+    pub spread_size_smoothness: f64,
+    /// Exponent of the continuous spread curve. Ships at 0.455, least-squares
+    /// fitted to the step's own four tiers: 29.65 bps against 30 at $0.5B,
+    /// 10.40 against 10 at $5B, 5.00 against 5 at $25B, 2.66 against 3 at
+    /// $100B.
+    pub spread_size_exponent: f64,
 
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
     /// Trading days for half of a mispricing to decay. The ONE settable
@@ -530,6 +543,8 @@ impl ModelParams {
             volume_innovation_sigma: 0.0,
             size_effect_smoothness: 0.0,
             size_effect_exponent: 0.15,
+            spread_size_smoothness: 0.0,
+            spread_size_exponent: crate::microstructure::SPREAD_SIZE_EXPONENT,
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
@@ -669,6 +684,8 @@ impl ModelParams {
             "volume_innovation_sigma" => self.volume_innovation_sigma,
             "size_effect_smoothness" => self.size_effect_smoothness,
             "size_effect_exponent" => self.size_effect_exponent,
+            "spread_size_smoothness" => self.spread_size_smoothness,
+            "spread_size_exponent" => self.spread_size_exponent,
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
@@ -756,6 +773,8 @@ impl ModelParams {
             "volume_persistence" => out.volume_persistence = value,
             "size_effect_exponent" => out.size_effect_exponent = value,
             "size_effect_smoothness" => out.size_effect_smoothness = value,
+            "spread_size_exponent" => out.spread_size_exponent = value,
+            "spread_size_smoothness" => out.spread_size_smoothness = value,
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
             "momentum_theta" => out.momentum_theta = value,
@@ -907,6 +926,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "sector_factor_sigma",
         "size_effect_exponent",
         "size_effect_smoothness",
+        "spread_size_exponent",
+        "spread_size_smoothness",
         "universe_stress_decay",
         "universe_stress_weight",
         "volume_innovation_sigma",

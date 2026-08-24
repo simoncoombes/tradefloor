@@ -191,6 +191,10 @@ PERTURBATIONS = [
     # an occurrence.
     ("size_effect_smoothness", 1.0, True),
     ("size_effect_exponent", 0.30, False),     # needs smoothness > 0
+    # The continuous SPREAD curve (pt-v4). Same shape of dependency: the
+    # blend is live alone, the exponent waits on it.
+    ("spread_size_smoothness", 1.0, True),
+    ("spread_size_exponent", 0.80, False),     # needs smoothness > 0
 ]
 
 

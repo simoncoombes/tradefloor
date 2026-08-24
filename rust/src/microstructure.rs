@@ -128,13 +128,58 @@ fn truthy(value: Option<f64>) -> Option<f64> {
 ///
 /// Market-cap tier, sector volatility × beta, VIX stress, difficulty-gated
 /// liquidity crisis, and short-interest widening.
+/// Capitalisation, in billions, where the continuous spread curve equals
+/// the step function's third tier exactly.
+pub const SPREAD_SIZE_REFERENCE_B: f64 = 25.0;
+
+/// Spread in basis points at the reference capitalisation.
+pub const SPREAD_SIZE_REFERENCE_BPS: f64 = 5.0;
+
+/// Exponent of the continuous spread curve, least-squares fitted to the
+/// step function's own four tiers: 0.5B reads 29.65 bps against a step of
+/// 30, 5B reads 10.40 against 10, 25B reads 5.00 against 5, and 100B reads
+/// 2.66 against 3.
+pub const SPREAD_SIZE_EXPONENT: f64 = 0.455;
+
+/// Bounds on the continuous spread, in basis points. The curve is unbounded
+/// as capitalisation goes to zero, and a spread of ten thousand basis points
+/// is not a market.
+pub const SPREAD_SIZE_BOUNDS: (f64, f64) = (1.0, 100.0);
+
 pub fn compute_spread_bps(
     company: &CompanyMicrostructure,
     vix: f64,
     difficulty: Option<Difficulty>,
 ) -> f64 {
+    compute_spread_bps_with(company, vix, difficulty, 0.0, SPREAD_SIZE_EXPONENT)
+}
+
+/// Full spread in basis points, with the size curve selectable.
+///
+/// # The tiers are a cliff, and this is how it gets removed
+///
+/// The step function charges 10 bps at $1B and 30 bps at $0.9B -- a THREE
+/// TIMES jump in transaction cost from a rounding error in market
+/// capitalisation. Every execution study run across that boundary is
+/// measuring an artifact of the tier edge rather than a property of size,
+/// and a strategy that happens to trade names near $1B pays a cost that
+/// does not exist.
+///
+/// Real spreads scale continuously with size. The power law fitted here
+/// reproduces all four tiers closely (see [`SPREAD_SIZE_EXPONENT`]) while
+/// removing the cliffs between them.
+///
+/// At smoothness 0.0 this returns the stepped value by branch, so every
+/// preset before pt-v4 is bit-identical.
+pub fn compute_spread_bps_with(
+    company: &CompanyMicrostructure,
+    vix: f64,
+    difficulty: Option<Difficulty>,
+    size_smoothness: f64,
+    size_exponent: f64,
+) -> f64 {
     let mcap_billions = company.market_cap / 1e9;
-    let base_bps = if mcap_billions > 50.0 {
+    let stepped = if mcap_billions > 50.0 {
         3.0
     } else if mcap_billions > 10.0 {
         5.0
@@ -142,6 +187,15 @@ pub fn compute_spread_bps(
         10.0
     } else {
         30.0
+    };
+    let base_bps = if size_smoothness == 0.0 || mcap_billions <= 0.0 {
+        stepped
+    } else {
+        let ratio = mcap_billions / SPREAD_SIZE_REFERENCE_B;
+        let (lo, hi) = SPREAD_SIZE_BOUNDS;
+        let smooth = mathx::clamp(
+            SPREAD_SIZE_REFERENCE_BPS * mathx::pow(ratio, -size_exponent), lo, hi);
+        (1.0 - size_smoothness) * stepped + size_smoothness * smooth
     };
 
     // `?? 1.0`, so a genuine zero volatility or beta is kept as zero.
@@ -217,6 +271,12 @@ pub struct RestingOrder {
 pub struct LiveBookOptions {
     pub vix: f64,
     pub difficulty: Option<Difficulty>,
+    /// Blend from the four-tier spread step toward a continuous power law,
+    /// in [0, 1]. 0.0 is the step and is bit-identical.
+    pub spread_size_smoothness: f64,
+    /// Exponent of the continuous spread curve. Only read when the
+    /// smoothness is non-zero.
+    pub spread_size_exponent: f64,
     /// A JS `number`, not an integer — see `market_maker::LadderParams::levels`.
     pub levels: f64,
     pub resting_orders: Vec<RestingOrder>,
@@ -227,6 +287,8 @@ impl Default for LiveBookOptions {
         Self {
             vix: 15.0,
             difficulty: None,
+            spread_size_smoothness: 0.0,
+            spread_size_exponent: SPREAD_SIZE_EXPONENT,
             levels: BOOK_LEVELS,
             resting_orders: Vec::new(),
         }
@@ -248,7 +310,9 @@ pub fn build_live_book(company: &CompanyMicrostructure, options: &LiveBookOption
         return book;
     }
 
-    let spread_bps = compute_spread_bps(company, options.vix, options.difficulty);
+    let spread_bps = compute_spread_bps_with(
+        company, options.vix, options.difficulty,
+        options.spread_size_smoothness, options.spread_size_exponent);
     let base_size = base_quote_size(company);
     let (bids, asks) = quote_ladder(&LadderParams {
         quote: QuoteParams {
@@ -312,6 +376,10 @@ pub struct SettleOptions {
     /// `mispricing.ts::crowdLean`. `None` means no crowd, matching legacy
     /// callers where behaviour is unchanged.
     pub flow_lean: Option<f64>,
+    /// The size-curve settings, carried so a settlement quotes against the
+    /// same spread the caller asked for rather than a defaulted one.
+    pub spread_size_smoothness: f64,
+    pub spread_size_exponent: f64,
 }
 
 impl Default for SettleOptions {
@@ -320,6 +388,8 @@ impl Default for SettleOptions {
             vix: 15.0,
             difficulty: None,
             flow_lean: None,
+            spread_size_smoothness: 0.0,
+            spread_size_exponent: SPREAD_SIZE_EXPONENT,
         }
     }
 }
@@ -396,6 +466,11 @@ pub fn settle_price_through_book(
         &LiveBookOptions {
             vix: options.vix,
             difficulty: options.difficulty,
+            // Propagated, not defaulted: this inner book must price with the
+            // same size curve as the outer call, or a settlement would quote
+            // against a spread the caller did not ask for.
+            spread_size_smoothness: options.spread_size_smoothness,
+            spread_size_exponent: options.spread_size_exponent,
             levels: levels_needed,
             resting_orders: Vec::new(),
         },
@@ -768,6 +843,8 @@ mod tests {
                     fair_value,
                     50_000.0,
                     &SettleOptions {
+                        spread_size_smoothness: 0.0,
+                        spread_size_exponent: SPREAD_SIZE_EXPONENT,
                         flow_lean: Some(flow_lean),
                         ..SettleOptions::default()
                     },

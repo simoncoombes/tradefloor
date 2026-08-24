@@ -745,6 +745,10 @@ pub fn simulate_market_tick(
             };
             let micro = companies[idx].micro_view(companies[idx].stock.price);
             let options = SettleOptions {
+                // From the params, so a preset that smooths the size curve
+                // smooths it in settlement too rather than only in the book.
+                spread_size_smoothness: inputs.params.spread_size_smoothness,
+                spread_size_exponent: inputs.params.spread_size_exponent,
                 vix: economy.vix,
                 difficulty: None,
                 flow_lean: Some(crowd_leans[i]),
