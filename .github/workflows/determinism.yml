@@ -116,7 +116,7 @@ jobs:
           set -euo pipefail
           echo "Digests reported:"
           for f in digests/*.txt; do
-            printf '  %-20s %s\n' "$(basename "$f" .txt | sed 's/^digest-//')" "$(cat "$f")"
+            printf '  %-20s %s\n' "$(basename "$f" .txt | sed 's/^digest-//')" "$(tr '\n' ' ' < "$f")"
           done
 
           count=$(ls digests/*.txt | wc -l)
@@ -128,10 +128,17 @@ jobs:
             exit 1
           fi
 
-          unique=$(cat digests/*.txt | sort -u | wc -l)
+          # Each file now holds THREE digests -- simulation, metadata and the
+          # combined -- so the comparison is per FILE, not per line. Hashing
+          # each file and counting unique hashes asks the right question
+          # ("does every target report the same three?"); concatenating and
+          # `sort -u` would count three distinct digests as three
+          # disagreements and fail on a green run, which is how a gate stops
+          # meaning anything.
+          unique=$(for f in digests/*.txt; do shasum -a 256 < "$f" | cut -d' ' -f1; done | sort -u | wc -l)
           if [ "$unique" -ne 1 ]; then
             echo
-            echo "PLATFORMS DISAGREE. $unique distinct digests across $count targets."
+            echo "PLATFORMS DISAGREE. $unique distinct digest sets across $count targets."
             echo
             echo "This is the failure the libm-only design exists to prevent."
             echo "Do not ship these wheels. Likely causes, in order:"

@@ -144,7 +144,7 @@ def _opt(buf: bytearray, value) -> None:
         _f64(buf, value)
 
 
-def known_answer_buffer() -> bytes:
+def simulation_buffer() -> bytes:
     """Run the fixed simulation and return its canonical output buffer."""
     buf = bytearray()
 
@@ -313,14 +313,53 @@ def known_answer_buffer() -> bytes:
 
     _f64(buf, float(engine.draws_consumed))
 
-    # --- 6. The model preset ---------------------------------------------
-    #
-    # Sorted by key so the digest cannot depend on dict ordering.
+    return bytes(buf)
+
+
+def metadata_buffer() -> bytes:
+    """The REPORTED model preset, hashed separately from the simulation.
+
+    # Why this is not part of the simulation buffer
+
+    It used to be, and that conflation cost a day. `model_preset()` reports
+    coefficients; it does not run anything. When its default argument was
+    found frozen at "pt-v1" while engines ran pt-v3, fixing the report moved
+    the combined digest -- and the gate could not tell that from a simulation
+    change, because both landed in one hash.
+
+    That left two bad doors. Bumping `KAT_VERSION` would assert the
+    simulation had changed, which was false. Regenerating without a bump
+    would defeat the drift check the version exists to enforce. Neither was
+    right, because the defect was the conflation rather than the choice.
+
+    So the digests are split. `simulation_digest()` is the cross-platform
+    determinism gate and moves ONLY when a trajectory moves.
+    `metadata_digest()` covers what the library says about itself, and can be
+    re-based when a reporting bug is fixed without anyone claiming the market
+    changed.
+
+    Sorted by key so the digest cannot depend on dict ordering.
+    """
+    buf = bytearray()
     preset = pretium.model_preset()
     for key in sorted(k for k in preset if k != "name"):
         _f64(buf, float(preset[key]))
-
     return bytes(buf)
+
+
+def known_answer_buffer() -> bytes:
+    """Both halves, concatenated -- the historical shape, byte for byte."""
+    return simulation_buffer() + metadata_buffer()
+
+
+def simulation_digest() -> str:
+    """The determinism gate. Moves only when a trajectory moves."""
+    return hashlib.sha256(simulation_buffer()).hexdigest()
+
+
+def metadata_digest() -> str:
+    """What the library reports about itself. Not a trajectory claim."""
+    return hashlib.sha256(metadata_buffer()).hexdigest()
 
 
 def known_answer_digest() -> str:
@@ -333,3 +372,5 @@ if __name__ == "__main__":
     print(f"  package  {pretium.version()}")
     print(f"  bytes    {len(data)}")
     print(f"  sha256   {known_answer_digest()}")
+    print(f"  sim      {simulation_digest()}")
+    print(f"  meta     {metadata_digest()}")

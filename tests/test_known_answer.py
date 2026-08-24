@@ -44,6 +44,25 @@ def test_known_answer_digest_matches_the_committed_baseline():
         "simulation was intentionally changed, regenerate the baseline; if not, "
         "this is the drift the gate exists to catch."
     )
+    # The SIMULATION digest is the gate. It covers the trajectory and nothing
+    # else, so a mismatch here means either an intended era boundary (which
+    # bumps KAT_VERSION) or a platform that disagrees about arithmetic --
+    # never a change in what the library reports about itself.
+    assert known_answer.simulation_digest() == baseline["simulationSha256"], (
+        "the SIMULATION digest moved. Either a trajectory changed and "
+        "KAT_VERSION must bump, or a platform disagrees -- which is the "
+        "failure this gate exists to catch."
+    )
+    # The METADATA digest covers `model_preset()`'s report, which runs
+    # nothing. It is asserted so a silent change is still caught, but it can
+    # be re-based on its own when a reporting bug is fixed, without anyone
+    # having to claim the market changed. Before the split, those two cases
+    # were indistinguishable and the choice was between two false statements.
+    assert known_answer.metadata_digest() == baseline["metadataSha256"], (
+        "the reported model preset changed. If that was a deliberate "
+        "reporting fix, re-base metadataSha256 alone and leave KAT_VERSION "
+        "and simulationSha256 untouched."
+    )
     assert known_answer.known_answer_digest() == baseline["sha256"]
 
 
@@ -88,8 +107,18 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     digests = re.findall(r"\b[0-9a-f]{64}\b", result.stdout)
-    # The gate greps exactly one digest out of this output and compares it
-    # across platforms. Two would make the comparison ambiguous; none would
-    # make it vacuous.
-    assert len(digests) == 1, result.stdout
+    # THREE digests, in a fixed order: combined, simulation, metadata. The CI
+    # gate greps all of them and compares the SET across platforms, so the
+    # count and the order are both contractual -- .github/workflows/
+    # determinism.yml hashes each target's file and requires one unique hash.
+    #
+    # It used to be exactly one, and the count was asserted for the same
+    # reason it is asserted now: a gate that greps an ambiguous number of
+    # digests is comparing something nobody specified. When the digest split
+    # landed, this test and that workflow had to move together -- leaving the
+    # workflow alone would have made it count three digests as three
+    # disagreements and fail every green run.
+    assert len(digests) == 3, result.stdout
     assert digests[0] == known_answer.known_answer_digest()
+    assert digests[1] == known_answer.simulation_digest()
+    assert digests[2] == known_answer.metadata_digest()
