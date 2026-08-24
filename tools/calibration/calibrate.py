@@ -1124,7 +1124,21 @@ def main() -> None:
         ev.panel_runs += len(jobs)
         panels = [r["panel"] for r in results]
         lib.crn_streams(results)
-        breakdown = loss_mod.band_distance_loss(panels)
+        # An axis is scored against the ruler cut for ITS OWN horizon.
+        #
+        # This used to score every axis against `facts.REAL_MARKETS`,
+        # including the 504-day one, and that made every horizon-axis figure
+        # this tool has ever produced a wrong-ruler measurement -- the 1.910
+        # that rejected `jointmix` and the 0.0000 that made `ptv4` look
+        # perfect among them. The two differ by a factor of five on the same
+        # panels: 0.4028 against the 252-day bands, 2.0164 against the
+        # matched ones. The `--dual-horizon` flag taught the SEARCH to use
+        # the right bands and left the certificate behind.
+        far = days == 504
+        bands = facts.REAL_MARKETS_504 if far else None
+        scales = facts.SEED_SD_504 if far else None
+        breakdown = loss_mod.band_distance_loss(panels, bands=bands,
+                                                seed_sd=scales)
         stats = {k: {kk: vv for kk, vv in v.items()}
                  for k, v in breakdown["statistics"].items()}
         # `room_sd` is the quantity this whole phase is about: how far
@@ -1134,7 +1148,8 @@ def main() -> None:
         # statistic survives a change of seeds, universe or horizon.
         for key, row in stats.items():
             lo, hi = row["band"]
-            sd = facts.SEED_SD.get(key)
+            # The same horizon's noise scale, for the same reason.
+            sd = (facts.SEED_SD_504 if far else facts.SEED_SD).get(key)
             m = row["measured"]
             row["room_sd"] = (None if m is None or not sd
                               else min(m - lo, hi - m) / sd)
