@@ -12,6 +12,7 @@ CAVEATS and the provenance rather than on the simulation results.
 
 import asyncio
 import json
+import os
 import time
 
 import pytest
@@ -398,14 +399,75 @@ def test_an_unknown_step_kind_names_the_three_that_exist():
 # -- background jobs -------------------------------------------------------
 
 
-def test_a_job_reaches_the_certified_horizon_that_a_direct_call_cannot():
-    """The whole point of having jobs. Without them every result this
-    server can produce is a SHORT WINDOW on an annually-certified market."""
+def test_a_direct_call_past_the_cap_is_refused_and_points_at_start_job():
+    """Named for what it checks.
+
+    An earlier version of this test was called "a job reaches the certified
+    horizon that a direct call cannot" and ran no job at all -- it asserted
+    the REFUSAL and never the reach. The assertions were correct; the name
+    claimed a property nothing here established, which is the exact failure
+    this project keeps hitting in its prose. The reach is tested below.
+    """
     assert mcp.MAX_DAYS < mcp.MAX_DAYS_ASYNC == envelope.CERTIFIED_HORIZON_DAYS
     r = mcp.evaluate_strategies({"m": MOMENTUM},
                                 days=envelope.CERTIFIED_HORIZON_DAYS)
     assert r["ok"] is False
     assert "start_job" in r["error"], "the refusal must say where to go"
+
+
+def test_the_day_cap_is_lifted_only_on_a_job_worker_thread():
+    """The mechanism the horizon claim actually rests on.
+
+    `_day_cap` reads a thread-local that `_run_job` sets, because
+    `ThreadPoolExecutor` does not propagate a context and a cap that
+    silently failed to apply would be worse than no cap. Asserted directly
+    so the property is covered without a 95-second simulation.
+    """
+    import threading
+
+    assert mcp._day_cap() == mcp.MAX_DAYS, "the calling thread stays capped"
+
+    seen = {}
+
+    def worker():
+        mcp._local.async_job = True
+        seen["inside"] = mcp._day_cap()
+
+    t = threading.Thread(target=worker)
+    t.start()
+    t.join()
+    assert seen["inside"] == mcp.MAX_DAYS_ASYNC
+    assert mcp._day_cap() == mcp.MAX_DAYS, (
+        "the worker's flag must not leak back to the calling thread"
+    )
+
+
+@pytest.mark.skipif(not os.environ.get("PRETIUM_SLOW_TESTS"),
+                    reason="a 252-day evaluation is ~95s; "
+                           "set PRETIUM_SLOW_TESTS=1 to run it")
+def test_a_job_really_does_reach_the_certified_horizon():
+    """The claim, measured rather than asserted.
+
+    Opt-in because it costs what it costs: this is the run the SHORT WINDOW
+    caveat exists to describe, and the only way to prove the caveat is
+    absent at the certified horizon is to reach it.
+    """
+    j = mcp.start_job("evaluate_strategies",
+                      {"strategies": {"m": MOMENTUM},
+                       "days": envelope.CERTIFIED_HORIZON_DAYS,
+                       "universe_size": 20})
+    assert j["ok"], j.get("error")
+    for _ in range(3600):
+        c = mcp.check_job(j["job_id"])
+        if c["status"] != "running":
+            break
+        time.sleep(1.0)
+    assert c["status"] == "done", c
+    result = c["result"]
+    assert result["ok"]
+    assert not any("SHORT WINDOW" in x for x in result["caveats"]), (
+        "a result AT the certified horizon is not a slice of one"
+    )
 
 
 def test_a_job_runs_and_its_result_is_collectable():
