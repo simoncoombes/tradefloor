@@ -2594,13 +2594,35 @@ pub fn fixed_simulation_digest(
         engine.close_day(day as i64);
     }
 
+    // NaN IS THE ONE PLACE WEBASSEMBLY IS LOOSE.
+    //
+    // The wasm specification pins IEEE-754 exactly for add, subtract,
+    // multiply, divide and square root, which is why a browser build can
+    // agree with a native one at all. It deliberately does NOT pin NaN
+    // payload bits. So hashing a NaN would compare a bit pattern the spec
+    // permits two engines to choose differently -- a digest that could
+    // disagree for a reason that is not the model, which is precisely the
+    // failure this probe exists to detect.
+    //
+    // Measured: zero NaN and zero infinities across 16,800 price samples
+    // (seven seeds x sixty days x forty names) plus the macro state. So this
+    // does not fire today. It is a guard rather than a hope, because "we
+    // have never seen one" is not the same claim as "there cannot be one",
+    // and the failure it prevents is a determinism report that is wrong in
+    // the reassuring direction.
     let mut hasher = Sha256::new();
     for price in engine.prices() {
+        if !price.is_finite() {
+            return None;
+        }
         hasher.update(price.to_be_bytes());
     }
     let e = engine.economy();
     for v in [e.vix, e.federal_funds_rate, e.inflation_rate,
               e.corporate_bond_yield, e.fear_greed_index] {
+        if !v.is_finite() {
+            return None;
+        }
         hasher.update(v.to_be_bytes());
     }
     Some(format!("{:x}", hasher.finalize()))

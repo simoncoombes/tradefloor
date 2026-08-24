@@ -30,9 +30,40 @@
 //! reason a browser build disagrees with a native one. Between them the main
 //! sources of divergence are removed.
 //!
-//! That is an argument, not a measurement. [`price_digest`] exists so a
-//! browser can produce a number that is comparable with the native build's,
-//! and the claim can be checked rather than believed.
+//! Measured on 2026-08-24: one fixed simulation produces
+//! `2b2f3141...042cfd8f5` under `wasm32-unknown-unknown` on node and under
+//! native macos-arm64, identically. [`price_digest`] is how that is
+//! re-checked rather than believed.
+//!
+//! Two residual looseness points, both handled rather than hoped about:
+//!
+//! - **NaN payload bits are not specified by wasm.** Hashing one would
+//!   compare a pattern two engines may legally choose differently.
+//!   `fixed_simulation_digest` refuses to hash a non-finite value, so that
+//!   becomes a visible failure instead of a wrong "identical" verdict.
+//! - **Relaxed SIMD is non-deterministic by design.** It is off by default
+//!   and must stay off; do not add `-C target-feature=+relaxed-simd`.
+//!
+//! ## What `unknown-unknown` means for a consumer
+//!
+//! The triple is `<arch>-<vendor>-<os>`, and both unknowns are literal:
+//! there is no operating system underneath. No filesystem, no sockets, no
+//! clock, no threads, no environment, no process. A browser supplies host
+//! services through JavaScript, not through a POSIX layer, which is why
+//! this target and not `wasm32-wasip1`.
+//!
+//! The core is unaffected because it asks for none of them -- its only
+//! dependencies are `libm` and `sha2`, and the single `std::fs` call in the
+//! crate is `#[cfg(test)]`. That is not luck; it is what made this binding a
+//! day's work rather than a port.
+//!
+//! One ergonomic consequence worth knowing: a Rust panic compiles to an
+//! `unreachable` trap, which reaches JavaScript as
+//! `RuntimeError: unreachable executed` with no message. This surface
+//! returns `Result` rather than panicking, so a caller sees real errors --
+//! but a consumer debugging their own integration will want
+//! `console_error_panic_hook`, which is one dependency and one call, and is
+//! deliberately not imposed here.
 
 use wasm_bindgen::prelude::*;
 
