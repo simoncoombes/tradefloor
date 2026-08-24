@@ -287,6 +287,54 @@ def persistence_cap(half_life_days: float) -> float:
     return 0.5 ** (1.0 / half_life_days)
 
 
+def statistic_flips(train_stats: dict, axis_stats: dict, keys, margin_sd: float,
+                    axis: str = "") -> list[dict]:
+    """§8's flip test: in band on train, meaningfully out on validation.
+
+    Pure and separate from `main` so it can be tested. It could not be
+    before, which is part of why it carried a defect through several
+    searches -- a control nobody can exercise is one nobody checks.
+
+    THE MARGIN IS THE POINT. "In band on train, out on validation" is the
+    right shape for an overfitting signal, and with no tolerance it fires on
+    statistics that merely landed on the other side of an edge they were
+    already sitting on. The constrained jump/volume search was rejected for
+    `excess_kurtosis` 0.073 seed-sd below its floor and `abs_return_acf5`
+    0.036 above its ceiling (CALIBRATION-FOLLOWUPS §34). A statistic 0.07 sd
+    outside a band is not distinguishable from one 0.07 sd inside.
+
+    Worse, the untolerated form is asymmetric in the direction that punishes
+    progress: a candidate that brings a statistic to just INSIDE the band on
+    train is penalised when it lands just outside on validation, while one
+    that leaves it far outside on BOTH axes is never penalised. The test was
+    hardest on the candidates doing best.
+
+    `margin_sd` is the search's own `--margin-sd`, the same 0.5 seed-sd it
+    treats as "meaningfully inside" when it pulls bands in, so there is one
+    definition of near-an-edge rather than two.
+
+    Not a weakening: a statistic leaving its band by more than the margin on
+    a validation axis while sitting inside on train is what §8 exists to
+    catch, and still is. Verified at 0.51 sd, where it fires.
+    """
+    out: list[dict] = []
+    for key in keys:
+        val = axis_stats[key]
+        if train_stats[key]["distance"] != 0 or val["distance"] <= 0:
+            continue
+        room = val.get("room_sd")
+        # `room_sd` is signed and negative outside the band. Absent it -- no
+        # noise scale for the statistic -- fall back to flagging rather than
+        # silently passing, because an unmeasurable statistic is not a safe
+        # one.
+        if room is not None and room > -margin_sd:
+            continue
+        out.append({"statistic": key, "axis": axis,
+                    "measured": val["measured"], "band": val["band"],
+                    "room_sd": room, "tolerance_sd": -margin_sd})
+    return out
+
+
 def calibration_box(name: str, ship: float) -> tuple[float, float]:
     """§6.3's box: ~[1/4x, 4x] of the shipped value, in raw units.
 
@@ -1321,14 +1369,11 @@ def main() -> None:
             "threshold_used": limit,
             "exceeds_threshold": row["loss_real"] > limit,
         }
-        for key in list(loss_mod.LIVE_TARGETS) + list(loss_mod.CONSTRAINTS):
-            if (train_stats[key]["distance"] == 0
-                    and row["statistics"][key]["distance"] > 0):
-                overfitting[
-                    "statistics_in_band_on_train_out_on_validation"].append(
-                        {"statistic": key, "axis": axis,
-                         "measured": row["statistics"][key]["measured"],
-                         "band": row["statistics"][key]["band"]})
+        overfitting["statistics_in_band_on_train_out_on_validation"].extend(
+            statistic_flips(
+                train_stats, row["statistics"],
+                list(loss_mod.LIVE_TARGETS) + list(loss_mod.CONSTRAINTS),
+                args.margin_sd, axis))
     overfitting["verdict"] = (
         "rejected by §8" if (
             overfitting["statistics_in_band_on_train_out_on_validation"]
