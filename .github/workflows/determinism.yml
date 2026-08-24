@@ -53,10 +53,24 @@ jobs:
       - id: pick
         shell: bash
         run: |
+          # Chosen by EVENT, not by input alone.
+          #
           # A tag push always runs everything: a release must not ship on a
           # partial gate, whatever was cheap to check that week.
+          #
+          # A manual dispatch defaults to `unverified` when no input arrives.
+          # That matters beyond convenience -- a dispatch aimed at a branch
+          # whose workflow definition differs from the default branch's may
+          # not carry the input through at all, and the old fallback
+          # (`|| 'all'`) would then have quietly spent ten times the money.
+          # The cheap set is the safe thing to fall back to; the expensive
+          # one should require asking for it.
           set -euo pipefail
-          MODE="${{ github.event.inputs.targets || 'all' }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            MODE=all
+          else
+            MODE="${{ github.event.inputs.targets || 'unverified' }}"
+          fi
           ALL='[{"os":"ubuntu-latest","target":"linux-x86_64"},
                 {"os":"ubuntu-24.04-arm","target":"linux-aarch64"},
                 {"os":"macos-latest","target":"macos-arm64"},
