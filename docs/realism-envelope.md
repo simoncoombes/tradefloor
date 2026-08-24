@@ -23,6 +23,10 @@ with a verified known-answer digest, so the claims and the caveats share a
 provenance. Numbers here are reproducible; the section at the end says how,
 and says exactly which runs produced them.
 
+If you want to know what any of these statistics actually measures, and
+what a failure on it means for your results,
+[the realism metrics](realism-metrics.md) is the reference.
+
 ## The claim, in one sentence
 
 **At a 252-day measurement horizon, the shipped `pt-v3` preset matches
