@@ -146,7 +146,65 @@ pub struct LiveFactors {
     pub random_noise: f64,
 }
 
+/// Reference capitalisation, in billions, where the continuous size effect
+/// equals exactly 1.0. Chosen as the step function's third tier so the
+/// smooth curve pivots where the discrete one already read 1.0.
+pub const SIZE_EFFECT_REFERENCE_B: f64 = 25.0;
+
+/// Bounds on the continuous size multiplier.
+///
+/// Wider than the step function's own [0.8, 1.6] on purpose -- the extra
+/// spread at the tails is the dispersion this mechanism exists to add --
+/// but bounded, because the power law is unbounded as capitalisation goes
+/// to zero and a degenerate cap would otherwise produce unbounded
+/// idiosyncratic volatility.
+pub const SIZE_EFFECT_BOUNDS: (f64, f64) = (0.5, 3.0);
+
 /// Small-cap size multiplier, applied to the idiosyncratic component only.
+///
+/// # The step function is an artifact, and this is how it gets removed
+///
+/// Four discrete tiers mean a $49B company gets 1.0 and a $51B company gets
+/// 0.8: a 25% jump in idiosyncratic volatility from a $2B difference in
+/// size. Every name in the roster lands on exactly one of four volatility
+/// levels, which puts cliffs in the cross-section that no real market has
+/// and compresses the dispersion of volatility across names into four
+/// spikes.
+///
+/// `size_effect_smoothness` blends toward a continuous power law in size,
+/// which is what the size effect empirically IS. At an exponent of 0.15 the
+/// curve reproduces the step function's own tier values closely where the
+/// steps are informative -- 5B reads 1.273 against 1.3, 25B reads 1.000
+/// against 1.0, 100B reads 0.812 against 0.8 -- and departs below $1B,
+/// where the step function stops being a size effect and becomes a floor.
+/// That departure is the point: a $100M company and a $900M company are not
+/// equally volatile, and the steps said they were.
+///
+/// At smoothness 0.0 this returns the step value by BRANCH, so every preset
+/// before pt-v4 is bit-identical and owes nothing to an argument about how
+/// a blend of `x` and `x` behaves.
+pub fn cap_size_multiplier_with(params: &crate::params::ModelParams,
+                                market_cap: f64) -> f64 {
+    let stepped = cap_size_multiplier(market_cap);
+    let s = params.size_effect_smoothness;
+    if s == 0.0 {
+        return stepped;
+    }
+    let mcap_billions = market_cap / 1e9;
+    // A non-positive cap has no size to speak of; the step function's floor
+    // is the honest answer rather than a power law of zero.
+    if mcap_billions <= 0.0 {
+        return stepped;
+    }
+    let ratio = mcap_billions / SIZE_EFFECT_REFERENCE_B;
+    let (lo, hi) = SIZE_EFFECT_BOUNDS;
+    let smooth = mathx::clamp(
+        mathx::pow(ratio, -params.size_effect_exponent), lo, hi);
+    (1.0 - s) * stepped + s * smooth
+}
+
+/// The original four-tier step. Kept as the shipped behaviour and as the
+/// thing `size_effect_smoothness` blends away from.
 pub fn cap_size_multiplier(market_cap: f64) -> f64 {
     let mcap_billions = market_cap / 1e9;
     if mcap_billions > 50.0 {
@@ -243,7 +301,7 @@ pub fn calculate_live_factors(
 
     // ── Noise ─────────────────────────────────────────────────────────────
     let beta = company.beta.unwrap_or(1.0);
-    let cap_mult = cap_size_multiplier(company.market_cap);
+    let cap_mult = cap_size_multiplier_with(params, company.market_cap);
 
     let market_component = beta * shared.market_factor;
     let sector_component = 0.5 * shared.sector(&company.sector);

@@ -184,6 +184,13 @@ PERTURBATIONS = [
     # is 0.0 forever. Measured, after this table first claimed otherwise.
     ("volume_persistence", 0.9, False),        # needs an innovation
     ("volume_innovation_sigma", 0.3, True),
+    # The continuous size effect (pt-v4). Smoothness is live alone: at the
+    # shipped exponent it immediately moves every name off its tier. The
+    # exponent is NOT, because at zero smoothness the power law is never
+    # evaluated -- it waits on the blend, exactly as the jump sizes wait on
+    # an occurrence.
+    ("size_effect_smoothness", 1.0, True),
+    ("size_effect_exponent", 0.30, False),     # needs smoothness > 0
 ]
 
 

@@ -350,6 +350,29 @@ pub struct ModelParams {
     /// Standard deviation of the daily log-volume innovation.
     pub volume_innovation_sigma: f64,
 
+    // ── Continuous size effect (market/factors.rs) ──────────────────────
+    /// Blend from the four-tier size step toward a continuous power law,
+    /// in [0, 1].
+    ///
+    /// The step function gives a $49B company 1.0 and a $51B company 0.8 --
+    /// a 25% jump in idiosyncratic volatility from a $2B difference. Every
+    /// name lands on one of four levels, which puts cliffs in the
+    /// cross-section that no real market has and compresses the dispersion
+    /// of volatility across names into four spikes.
+    ///
+    /// 0.0 returns the step value by branch, so every preset before pt-v4 is
+    /// bit-identical. 1.0 is the pure power law.
+    pub size_effect_smoothness: f64,
+    /// Exponent of the continuous size effect: `(cap / 25B) ^ -exponent`.
+    ///
+    /// Ships at 0.15, fitted to the step function's own tiers where those
+    /// tiers are informative -- 5B reads 1.273 against a step of 1.3, 25B
+    /// reads 1.000 against 1.0, 100B reads 0.812 against 0.8. It departs
+    /// below $1B, where the step stops being a size effect and becomes a
+    /// floor, and that departure is the mechanism's purpose rather than an
+    /// error in the fit.
+    pub size_effect_exponent: f64,
+
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
     /// Trading days for half of a mispricing to decay. The ONE settable
     /// knob for the decay: overriding it recomputes `mispricing_phi` and
@@ -505,6 +528,8 @@ impl ModelParams {
             jump_sigma_idio: 0.0,
             volume_persistence: 0.0,
             volume_innovation_sigma: 0.0,
+            size_effect_smoothness: 0.0,
+            size_effect_exponent: 0.15,
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
@@ -642,6 +667,8 @@ impl ModelParams {
             "jump_sigma_idio" => self.jump_sigma_idio,
             "volume_persistence" => self.volume_persistence,
             "volume_innovation_sigma" => self.volume_innovation_sigma,
+            "size_effect_smoothness" => self.size_effect_smoothness,
+            "size_effect_exponent" => self.size_effect_exponent,
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
@@ -727,6 +754,8 @@ impl ModelParams {
             "jump_sigma_market" => out.jump_sigma_market = value,
             "volume_innovation_sigma" => out.volume_innovation_sigma = value,
             "volume_persistence" => out.volume_persistence = value,
+            "size_effect_exponent" => out.size_effect_exponent = value,
+            "size_effect_smoothness" => out.size_effect_smoothness = value,
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
             "momentum_theta" => out.momentum_theta = value,
@@ -876,6 +905,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "price_hard_cap",
         "regime_stress_points",
         "sector_factor_sigma",
+        "size_effect_exponent",
+        "size_effect_smoothness",
         "universe_stress_decay",
         "universe_stress_weight",
         "volume_innovation_sigma",
