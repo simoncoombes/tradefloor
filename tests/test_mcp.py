@@ -12,6 +12,7 @@ CAVEATS and the provenance rather than on the simulation results.
 
 import asyncio
 import json
+import time
 
 import pytest
 
@@ -33,7 +34,7 @@ def test_every_tool_registers_with_a_description():
     # opt-in extra already, and a second opt-in test plugin to await two
     # calls is not worth the dependency.
     tools = asyncio.run(mcp.server.list_tools())
-    assert len(tools) == 8
+    assert len(tools) == 11
     for t in tools:
         assert t.description and len(t.description) > 30, t.name
         assert t.input_schema is not None, t.name
@@ -124,10 +125,14 @@ def test_unbounded_leverage_is_called_out():
 
 def test_a_short_run_says_it_is_a_slice_of_an_annual_measurement():
     """MAX_DAYS sits well below the certified horizon because a 252-day
-    evaluation takes ~95 seconds. So every result this server produces is a
-    short window on a market certified annually, and the envelope will not
-    say so -- its gaps are about running LONGER. This caveat covers the
-    direction the envelope does not."""
+    evaluation takes ~95 seconds, so every DIRECT call is a short window on
+    a market certified annually. The envelope will not say so -- its gaps
+    are about running LONGER -- and this caveat covers the direction the
+    envelope does not.
+
+    A background job reaches the certified horizon and correctly does NOT
+    carry this caveat; that is what `start_job` is for.
+    """
     assert mcp.MAX_DAYS < envelope.CERTIFIED_HORIZON_DAYS, (
         "if the cap ever reaches the certified horizon, revisit this caveat"
     )
@@ -164,7 +169,7 @@ def test_a_caveat_that_does_not_apply_is_not_emitted():
     lambda: mcp.check_envelope(horizon_days=252),
     lambda: mcp.validate_strategy(MOMENTUM),
     lambda: mcp.evaluate_strategies({"m": MOMENTUM}, days=1),
-    lambda: mcp.describe_universe(size=8),
+    lambda: mcp.build_universe(size=8),
     lambda: mcp.explain_price_move(universe_size=8, day=1, top_n=2),
 ])
 def test_every_successful_result_carries_its_provenance(call):
@@ -179,7 +184,8 @@ def test_a_scored_result_names_the_seed_and_the_universe():
     r = mcp.evaluate_strategies({"m": MOMENTUM}, seed=11, days=1)
     prov = r["provenance"]
     assert prov["seed"] == 11
-    assert prov["universe"] == {"size": 40, "seed": 111}
+    assert prov["universe"] == {"size": 40, "seed": 111,
+                                "sectors": None}
     assert len(prov["universe_fingerprint"]) > 8
 
 
@@ -290,6 +296,150 @@ def test_the_paired_sign_test_reports_an_identical_strategy_as_all_ties():
     assert same[0]["ties"] == 3 and same[0]["paired_seeds"] == 0
 
 
+# -- universes and scenarios as data ---------------------------------------
+
+
+def test_a_concentrated_roster_is_buildable_and_declares_the_gap():
+    """Sector concentration is one of the SIX NAMED envelope gaps, and
+    `envelope.check` already takes it as an argument. A server that could
+    not build a concentrated roster could not ask about a gap its own
+    product documents."""
+    u = mcp.build_universe(size=20, seed=111,
+                           sectors=["technology", "financial_services"])
+    assert u["ok"]
+    assert set(u["sector_counts"]) == {"technology", "financial_services"}
+    assert any("CONCENTRATED" in c for c in u["caveats"])
+
+    r = mcp.evaluate_strategies({"m": MOMENTUM}, universe=u["universe"],
+                                days=1)
+    assert any("CONCENTRATED" in c for c in r["caveats"]), (
+        "the gap must follow the roster into the result that used it"
+    )
+
+
+def test_a_balanced_roster_says_how_to_ask_the_other_question():
+    u = mcp.build_universe(size=12, seed=111)
+    assert any("BALANCED" in c and "sectors" in c for c in u["caveats"])
+
+
+def test_an_unknown_sector_is_refused_with_the_known_ones():
+    u = mcp.build_universe(size=10, sectors=["crypto"])
+    assert u["ok"] is False
+    assert "technology" in u["error"]
+
+
+def test_a_hand_authored_roster_runs():
+    rows = [{"ticker": "ZZA", "sector": "technology", "initial_price": 100.0,
+             "shares_outstanding": 1e8},
+            {"ticker": "ZZB", "sector": "energy", "initial_price": 50.0,
+             "shares_outstanding": 2e8, "beta": 1.4}]
+    u = mcp.build_universe(instruments=rows)
+    assert u["ok"], u.get("error")
+    assert [i["ticker"] for i in u["instruments"]] == ["ZZA", "ZZB"]
+    x = mcp.explain_price_move(universe=u["universe"], day=1, top_n=2)
+    assert x["ok"]
+    assert {r["ticker"] for r in x["rows"]} == {"ZZA", "ZZB"}
+
+
+def test_an_instrument_field_that_does_not_exist_is_refused_by_name():
+    u = mcp.build_universe(instruments=[
+        {"ticker": "A", "sector": "technology", "initial_price": 1.0,
+         "shares_outstanding": 1e8, "dividend_yield": 0.02},
+        {"ticker": "B", "sector": "energy", "initial_price": 1.0,
+         "shares_outstanding": 1e8}])
+    assert u["ok"] is False
+    assert "dividend_yield" in u["error"]
+
+
+def test_a_scenario_can_be_authored_and_handed_straight_back():
+    """The first thing anyone does is pass a tool its own output."""
+    b = mcp.build_scenario(steps=[
+        {"kind": "ramp", "field": "vix", "start": 15.0, "end": 55.0,
+         "over": 8},
+        {"kind": "step", "field": "federal_funds_rate", "before": 0.025,
+         "after": 0.06, "at": 4}], label="fear and rates", days=10)
+    assert b["ok"], b.get("error")
+    assert set(b["fields_pinned"]) == {"vix", "federal_funds_rate"}
+    assert b["table"][0]["vix"] == 15.0
+
+    r = mcp.run_stress_scenario(b["scenario"], days=6)
+    assert r["ok"], r.get("error")
+    assert r["scenario_authored"] is True
+    assert r["scenario"] == "fear and rates"
+
+
+def test_a_preset_scenario_still_works_and_is_marked_as_one():
+    r = mcp.run_stress_scenario("vix_shock", days=3)
+    assert r["ok"] and r["scenario_authored"] is False
+
+
+def test_an_unknown_macro_field_is_refused_with_the_valid_list():
+    b = mcp.build_scenario(steps=[{"kind": "ramp", "field": "unemployment",
+                                   "start": 1, "end": 2, "over": 3}])
+    assert b["ok"] is False
+    assert "vix" in b["error"] and "unemployment" in b["error"]
+
+
+def test_the_macro_field_list_is_read_from_the_engine():
+    # Typed here, it would drift from what `Scenario` accepts -- which is
+    # exactly how this module came to claim the surface was "40-odd fields"
+    # when it is seven.
+    fields = mcp._macro_fields()
+    assert "vix" in fields and "cycle" in fields
+    assert len(fields) == 7, fields
+
+
+def test_an_unknown_step_kind_names_the_three_that_exist():
+    b = mcp.build_scenario(steps=[{"kind": "teleport", "field": "vix"}])
+    assert b["ok"] is False
+    assert "hold" in b["error"] and "ramp" in b["error"]
+
+
+# -- background jobs -------------------------------------------------------
+
+
+def test_a_job_reaches_the_certified_horizon_that_a_direct_call_cannot():
+    """The whole point of having jobs. Without them every result this
+    server can produce is a SHORT WINDOW on an annually-certified market."""
+    assert mcp.MAX_DAYS < mcp.MAX_DAYS_ASYNC == envelope.CERTIFIED_HORIZON_DAYS
+    r = mcp.evaluate_strategies({"m": MOMENTUM},
+                                days=envelope.CERTIFIED_HORIZON_DAYS)
+    assert r["ok"] is False
+    assert "start_job" in r["error"], "the refusal must say where to go"
+
+
+def test_a_job_runs_and_its_result_is_collectable():
+    j = mcp.start_job("evaluate_strategies",
+                      {"strategies": {"m": MOMENTUM}, "days": 1,
+                       "universe_size": 8})
+    assert j["ok"], j.get("error")
+    for _ in range(600):
+        c = mcp.check_job(j["job_id"])
+        if c["status"] != "running":
+            break
+        time.sleep(0.1)
+    assert c["status"] == "done", c
+    assert c["result"]["ok"]
+    assert c["result"]["caveats"]
+
+
+def test_a_cheap_tool_is_not_jobbable():
+    r = mcp.start_job("describe_simulator", {})
+    assert r["ok"] is False
+    assert "evaluate_strategies" in r["error"]
+
+
+def test_an_unknown_job_says_the_three_reasons_it_might_be_missing():
+    r = mcp.check_job("job-does-not-exist")
+    assert r["ok"] is False
+    assert "restart" in r["error"]
+
+
+def test_listing_jobs_needs_no_id():
+    r = mcp.check_job()
+    assert r["ok"] and isinstance(r["jobs"], list)
+
+
 def test_describe_simulator_reports_the_gap_that_is_out_of_band():
     d = mcp.describe_simulator()
     assert d["certified"]["statistics_out_of_band"] == ["volume_change_acf1"]
@@ -310,7 +460,7 @@ def test_an_unknown_statistic_is_refused_with_the_known_ones():
 @pytest.mark.parametrize("call", [
     lambda: mcp.evaluate_strategies({"m": MOMENTUM}, days=2),
     lambda: mcp.explain_price_move(universe_size=10, day=1),
-    lambda: mcp.describe_universe(size=10),
+    lambda: mcp.build_universe(size=10),
 ])
 def test_a_tool_called_twice_returns_the_same_bytes(call):
     """Determinism is the product's headline claim. A tool that drifted
@@ -325,7 +475,8 @@ def test_a_tool_called_twice_returns_the_same_bytes(call):
     lambda: mcp.rank_strategies({"m": MOMENTUM}, seeds=[1, 2], days=1),
     lambda: mcp.run_stress_scenario("rate_shock", days=3),
     lambda: mcp.explain_price_move(universe_size=8, day=1, top_n=2),
-    lambda: mcp.describe_universe(size=8),
+    lambda: mcp.build_universe(size=8),
+    lambda: mcp.build_scenario(steps=[{'kind': 'hold', 'fields': {'vix': 30.0}}]),
     lambda: mcp.check_envelope(horizon_days=100),
     lambda: mcp.validate_strategy(MOMENTUM),
 ])
