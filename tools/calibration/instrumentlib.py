@@ -112,6 +112,29 @@ PUBLISHED_SEEDS = (1, 2, 3, 4, 5, 6)
 #: range for bounded ones, tightened where a stationarity constraint
 #: lives (enforced separately by `feasibility_violation`).
 PARAM_SPECS: dict[str, dict] = {
+    # Added when the surface grew and PARAM_SPECS did not. Every one of
+    # these was settable and unreachable by any search, because a missing
+    # spec is a KeyError in `shipped_values()` -- which is how the first
+    # crisis search died one minute in.
+    "universe_stress_weight": {"kind": "abs", "step_unit": 0.1},
+    "universe_stress_decay": {"kind": "abs", "step_unit": 0.02},
+    "regime_stress_points": {"kind": "abs", "step_unit": 1.0},
+    "crisis_vix_threshold": {"kind": "abs", "step_unit": 1.0},
+    "vix_mean_reversion": {"kind": "abs", "step_unit": 0.02},
+    "news_peer_weight": {"kind": "abs", "step_unit": 0.05},
+    "news_peer_weight_down": {"kind": "abs", "step_unit": 0.05},
+    "jump_intensity_market": {"kind": "abs", "step_unit": 0.01},
+    "jump_intensity_idio": {"kind": "abs", "step_unit": 0.01},
+    "jump_mean_market": {"kind": "abs", "step_unit": 0.01},
+    "jump_sigma_market": {"kind": "abs", "step_unit": 0.01},
+    "jump_sigma_idio": {"kind": "abs", "step_unit": 0.01},
+    "volume_persistence": {"kind": "abs", "step_unit": 0.05},
+    "volume_innovation_sigma": {"kind": "abs", "step_unit": 0.05},
+    "size_effect_smoothness": {"kind": "abs", "step_unit": 0.1},
+    "size_effect_exponent": {"kind": "abs", "step_unit": 0.02},
+    "spread_size_smoothness": {"kind": "abs", "step_unit": 0.1},
+    "spread_size_exponent": {"kind": "abs", "step_unit": 0.05},
+    "market_vol_slow_vix_damp": {"kind": "abs", "step_unit": 0.1},
     # -- scale parameters (log deviation) ---------------------------------
     "market_factor_sigma":      {"kind": "log"},
     "sector_factor_sigma":      {"kind": "log"},

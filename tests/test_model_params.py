@@ -293,6 +293,38 @@ def test_universe_memory_acts_above_the_crisis_threshold():
     )
 
 
+def test_the_calibration_instrument_knows_every_settable_parameter():
+    """A settable parameter with no calibration spec cannot be searched.
+
+    `instrumentlib.PARAM_SPECS` is a THIRD hand-maintained registry of the
+    settable surface, after `settable_names` and `carried_read_only_pairs`.
+    When the surface grew and this one did not, nineteen parameters became
+    silently unsearchable -- every jump parameter, both size curves, the
+    volume process and all four crisis levers among them.
+
+    The failure mode was not a warning. It was a `KeyError` inside
+    `shipped_values()` that killed a 96-core search one minute after it
+    started, on parameters a hand sweep had just shown carried free gains.
+    Asserted here rather than left for the next search to rediscover.
+    """
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent
+                           / "tools" / "calibration"))
+    from instrumentlib import PARAM_SPECS
+
+    settable = set(pretium.ModelParams.settable())
+    missing = sorted(settable - set(PARAM_SPECS))
+    assert not missing, (
+        f"settable but with no calibration spec, so no search can reach "
+        f"them: {missing}"
+    )
+    orphaned = sorted(set(PARAM_SPECS) - settable)
+    assert not orphaned, (
+        f"specs for parameters that are no longer settable: {orphaned}"
+    )
+
+
 def test_the_crisis_threshold_acts_above_itself():
     """Where a crisis STARTS is now a calibration question, not a const.
 
