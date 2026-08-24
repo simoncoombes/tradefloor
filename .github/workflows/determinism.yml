@@ -10,40 +10,83 @@
 # Each target builds a wheel, runs the known-answer simulation inside it, and
 # reports a digest. The final job fails if any two targets disagree.
 #
-# Note on cost: this repository's Actions usage is billed. The gate is cheap
-# (a few minutes per target) but it is wired to workflow_dispatch and to
-# release tags rather than to every push, so ordinary development does not
-# spend the budget.
+# Note on cost: this repository's Actions usage is billed, and the multipliers
+# are not uniform -- Linux is 1x, Windows 2x, macOS 10x. A full five-target run
+# is roughly 96 billed minutes and is dominated by the two macOS jobs.
+#
+# THREE OF THE FIVE TARGETS ARE ALREADY VERIFIED FOR FREE. Every AWS
+# calibration run in this project builds the crate on Graviton and executes
+# `tests/known_answer.py` before doing its own work, so `linux-aarch64` has
+# been shown to agree with `macos-arm64` repeatedly; an x86_64 run on
+# 2026-08-24 added `linux-x86_64` for about six cents
+# (CALIBRATION-FOLLOWUPS §26).
+#
+# That leaves `macos-x86_64` and `windows-x86_64` genuinely unverified, and
+# they are what the `unverified` target set runs. It is the DEFAULT because
+# spending ten times the money to re-prove three targets that a free run
+# already proves is not diligence, it is habit.
+#
+# Use `all` before a release, where the point is that the artifact set was
+# checked in one place, together, on the commit being shipped.
 
 name: determinism
 
 on:
   workflow_dispatch:
+    inputs:
+      targets:
+        description: "Which targets to run"
+        type: choice
+        default: unverified
+        options: [unverified, all]
   push:
     tags: ["v*"]
 
 jobs:
+  setup:
+    name: choose targets
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      count: ${{ steps.pick.outputs.count }}
+    steps:
+      - id: pick
+        shell: bash
+        run: |
+          # A tag push always runs everything: a release must not ship on a
+          # partial gate, whatever was cheap to check that week.
+          set -euo pipefail
+          MODE="${{ github.event.inputs.targets || 'all' }}"
+          ALL='[{"os":"ubuntu-latest","target":"linux-x86_64"},
+                {"os":"ubuntu-24.04-arm","target":"linux-aarch64"},
+                {"os":"macos-latest","target":"macos-arm64"},
+                {"os":"macos-15-intel","target":"macos-x86_64"},
+                {"os":"windows-latest","target":"windows-x86_64"}]'
+          UNVERIFIED='[{"os":"macos-15-intel","target":"macos-x86_64"},
+                       {"os":"windows-latest","target":"windows-x86_64"}]'
+          if [ "$MODE" = "unverified" ]; then M="$UNVERIFIED"; else M="$ALL"; fi
+          M=$(echo "$M" | tr -d '\n' | tr -s ' ')
+          echo "matrix=$M" >> "$GITHUB_OUTPUT"
+          echo "count=$(echo "$M" | grep -o '"target"' | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE targets=$M"
+
   digest:
     name: ${{ matrix.target }}
+    needs: setup
     runs-on: ${{ matrix.os }}
     strategy:
       # Never cancel siblings: a disagreement is only visible with every
       # target's digest in hand, so a failure on one must not destroy the
       # evidence from the others.
       fail-fast: false
+      # Chosen by `setup`. macos-15-intel, not macos-13: GitHub retired the
+      # macos-13 image, and a job requesting a retired label does not fail --
+      # it queues forever. Both of the first two dispatches sat unscheduled
+      # for half an hour while the others finished, and since compare refuses
+      # to pass without every target, the gate could never have gone green.
+      # A silent queue is a worse failure than a red X.
       matrix:
-        include:
-          - { os: ubuntu-latest,  target: linux-x86_64 }
-          - { os: ubuntu-24.04-arm, target: linux-aarch64 }
-          - { os: macos-latest,   target: macos-arm64 }
-          # macos-15-intel, not macos-13. GitHub retired the macos-13 image,
-          # and a job requesting a retired label does not fail -- it queues
-          # forever. Both of the first two dispatches sat unscheduled for half
-          # an hour while the other four finished, and since the compare job
-          # refuses to pass without all five, the gate could never have gone
-          # green. A silent queue is a worse failure than a red X.
-          - { os: macos-15-intel, target: macos-x86_64 }
-          - { os: windows-latest, target: windows-x86_64 }
+        include: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -101,7 +144,7 @@ jobs:
 
   compare:
     name: all targets agree
-    needs: digest
+    needs: [setup, digest]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -119,10 +162,11 @@ jobs:
             printf '  %-20s %s\n' "$(basename "$f" .txt | sed 's/^digest-//')" "$(tr '\n' ' ' < "$f")"
           done
 
+          expected=${{ needs.setup.outputs.count }}
           count=$(ls digests/*.txt | wc -l)
-          if [ "$count" -lt 5 ]; then
+          if [ "$count" -lt "$expected" ]; then
             echo
-            echo "Only $count of 5 targets reported. A missing target is not a"
+            echo "Only $count of $expected targets reported. A missing target is not a"
             echo "pass: it is a platform whose determinism is unverified, and"
             echo "shipping its wheel would publish an unproven claim."
             exit 1
