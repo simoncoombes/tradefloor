@@ -118,8 +118,19 @@ PARAM_SPECS: dict[str, dict] = {
     # crisis search died one minute in.
     "universe_stress_weight": {"kind": "abs", "step_unit": 0.1},
     "universe_stress_decay": {"kind": "abs", "step_unit": 0.02},
+    # Also a level rather than a share, and shipped at 0.0 -- which a log
+    # deviation cannot express at all (log of zero). Kept "abs" for that
+    # reason, with a step matched to its natural range so the raw deviation
+    # stays the same order as everything else's.
     "regime_stress_points": {"kind": "abs", "step_unit": 1.0},
-    "crisis_vix_threshold": {"kind": "abs", "step_unit": 1.0},
+    # LOG, not abs. `deviation()` returns a RAW difference for "abs", and
+    # this is a LEVEL with magnitude ~25 rather than a bounded share: moving
+    # it to a box edge gives a deviation near 19, squared 372, times a
+    # lambda of 10 -- roughly 3,700 of penalty against a realism loss of
+    # order 1. The first search using it spent its whole budget minimising
+    # my own regulariser. Scale parameters take the log class, which is what
+    # the log/raw split exists for.
+    "crisis_vix_threshold": {"kind": "log"},
     "vix_mean_reversion": {"kind": "abs", "step_unit": 0.02},
     "news_peer_weight": {"kind": "abs", "step_unit": 0.05},
     "news_peer_weight_down": {"kind": "abs", "step_unit": 0.05},

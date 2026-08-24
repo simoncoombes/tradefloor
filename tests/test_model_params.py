@@ -293,6 +293,51 @@ def test_universe_memory_acts_above_the_crisis_threshold():
     )
 
 
+def test_no_parameter_dominates_the_deviation_penalty():
+    """A parameter whose box move costs 400x another's is a regulariser bug.
+
+    The search minimises `L_real + lambda * sum_j dev_j^2`, and `deviation()`
+    returns a LOG ratio for scale parameters and a RAW difference for bounded
+    ones. Classify a level as bounded and the raw difference carries its
+    magnitude straight into a squared penalty: `crisis_vix_threshold` ships
+    at 25.5, so a move to its box edge read a deviation near 19 -- squared
+    372, times a lambda of 10, roughly 3,700 against a realism loss of order
+    one.
+
+    The search that hit it spent its entire budget minimising the
+    regulariser rather than the market, and nothing said so; the only clue
+    was an objective three orders of magnitude larger than the shipped
+    preset's. This asserts the penalties stay comparable, so the next
+    mis-classified parameter fails here instead.
+    """
+    import sys, statistics
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "tools" / "calibration"))
+    from calibrate import calibration_box, deviation
+    from instrumentlib import shipped_values
+
+    ship = shipped_values()
+    costs = {}
+    for name, value in ship.items():
+        lo, hi = calibration_box(name, value)
+        # The worse of the two edges: what a search can actually spend.
+        worst = max(abs(deviation(name, lo, value)),
+                    abs(deviation(name, hi, value))) ** 2
+        if worst > 0:
+            costs[name] = worst
+    assert costs, "no parameter produced a measurable box deviation"
+    median = statistics.median(costs.values())
+    outliers = {n: c for n, c in costs.items() if c > 100 * median}
+    assert not outliers, (
+        f"these parameters cost more than 100x the median squared deviation "
+        f"at their box edge, so the penalty is about them rather than about "
+        f"the model: "
+        + ", ".join(f"{n} {c:.1f} vs median {median:.3f}"
+                    for n, c in sorted(outliers.items()))
+    )
+
+
 def test_the_calibration_instrument_knows_every_settable_parameter():
     """A settable parameter with no calibration spec cannot be searched.
 
