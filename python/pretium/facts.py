@@ -295,7 +295,7 @@ from __future__ import annotations
 
 import math
 import statistics
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
 from .universe_util import fingerprint_of
@@ -777,12 +777,30 @@ def _daily_series(bars: dict) -> dict[int, list[tuple[int, float, float]]]:
 def _dependence(
     series: dict[int, list[tuple[int, float, float]]],
     min_observations: int,
+    sectors: Mapping[int, str] | None = None,
 ) -> dict[str, Any]:
-    """The four statistics for how things move together, from grouped bars.
+    """The statistics for how things move together, from grouped bars.
 
     Median across instruments, like the autocorrelations above and for the
-    same reason. The exception is cross-sectional correlation, which is
-    inherently pairwise and is a mean over all pairs.
+    same reason. The exceptions are the cross-sectional statistics, which are
+    inherently pairwise and are means over pairs.
+
+    Three of them condition the pairwise correlation on something, and exist
+    because the unconditional mean over all pairs is blind to the structure
+    that matters (CORRELATION-REVIEW-2026-08-25.md §1): a single scalar cannot
+    see whether correlation is higher on down days than up days, whether
+    same-sector pairs co-move more than cross-sector pairs, or whether either
+    varies in time. A search cannot preserve what it cannot see, so these are
+    measured BEFORE any mechanism that would move them is built.
+
+    ``corr_asymmetry`` is mean pairwise correlation on days the equal-weight
+    market return is below minus one standard deviation, minus the same on
+    days above plus one. Positive in real markets: downside exceedance
+    correlation exceeds upside. ``corr_asymmetry_lagged`` conditions on the
+    PREVIOUS day's market return instead, which separates a same-day signed
+    factor loading from the lagged volatility route. ``sector_excess_corr``
+    is mean same-sector pairwise correlation minus mean cross-sector, and is
+    None when no sector labels are supplied.
     """
     returns: dict[int, list[float]] = {}
     volumes: dict[int, list[float]] = {}
@@ -804,6 +822,10 @@ def _dependence(
     # pair is compared over the same days rather than over whatever length
     # each series happened to reach.
     pairwise: list[float] = []
+    same_sector: list[float] = []
+    cross_sector: list[float] = []
+    corr_asymmetry: float | None = None
+    corr_asymmetry_lagged: float | None = None
     if len(keys) >= 2 and common >= 3:
         unit = {i: _unit_centred(returns[i][:common]) for i in keys}
         for position, a in enumerate(keys):
@@ -812,7 +834,47 @@ def _dependence(
             for b in keys[position + 1:]:
                 if unit[b] is None:
                     continue
-                pairwise.append(sum(x * y for x, y in zip(unit[a], unit[b])))
+                rho = sum(x * y for x, y in zip(unit[a], unit[b]))
+                pairwise.append(rho)
+                if sectors is not None and a in sectors and b in sectors:
+                    (same_sector if sectors[a] == sectors[b] else cross_sector).append(rho)
+
+        # Conditional correlation: the same pairwise mean, on a subset of
+        # days chosen by the standardised equal-weight market return. The
+        # threshold is one standard deviation each side, so at 252 days each
+        # tail holds roughly forty sessions; expect a wide across-seed spread
+        # and read the band beside its seed-sd rather than as a point.
+        live = [i for i in keys if unit[i] is not None]
+        if len(live) >= 2:
+            market = [statistics.fmean(returns[i][k] for i in live) for k in range(common)]
+            m_mean = statistics.fmean(market)
+            m_sd = statistics.pstdev(market)
+
+            def conditional(select_days: list[int]) -> float | None:
+                if len(select_days) < 3:
+                    return None
+                sub = {i: _unit_centred([returns[i][k] for k in select_days]) for i in live}
+                rhos = []
+                for position, a in enumerate(live):
+                    if sub[a] is None:
+                        continue
+                    for b in live[position + 1:]:
+                        if sub[b] is None:
+                            continue
+                        rhos.append(sum(x * y for x, y in zip(sub[a], sub[b])))
+                return statistics.fmean(rhos) if rhos else None
+
+            if m_sd > 0:
+                z = [(m - m_mean) / m_sd for m in market]
+                down = conditional([k for k in range(common) if z[k] < -1.0])
+                up = conditional([k for k in range(common) if z[k] > 1.0])
+                if down is not None and up is not None:
+                    corr_asymmetry = down - up
+                # Lagged: condition day k on the market return of day k-1.
+                down_l = conditional([k for k in range(1, common) if z[k - 1] < -1.0])
+                up_l = conditional([k for k in range(1, common) if z[k - 1] > 1.0])
+                if down_l is not None and up_l is not None:
+                    corr_asymmetry_lagged = down_l - up_l
 
     volume_corr: list[float | None] = []
     leverage: list[float | None] = []
@@ -850,6 +912,12 @@ def _dependence(
         "dependence_instruments": len(keys),
         "dependence_observations": common,
         "cross_sectional_corr": statistics.fmean(pairwise) if pairwise else None,
+        "corr_asymmetry": corr_asymmetry,
+        "corr_asymmetry_lagged": corr_asymmetry_lagged,
+        "sector_excess_corr": (
+            statistics.fmean(same_sector) - statistics.fmean(cross_sector)
+            if same_sector and cross_sector else None
+        ),
         "volume_abs_return_corr": median_of(volume_corr),
         "leverage_effect": median_of(leverage),
         "volume_change_acf1": median_of(volume_change_acf),
@@ -1015,7 +1083,10 @@ def measure(
     # The four dependence statistics carry the same keys whether or not they
     # could be measured, so a caller reading the result does not have to test
     # for their presence as well as for their value.
-    facts.update(_dependence(series, min_observations))
+    facts.update(_dependence(
+        series, min_observations,
+        sectors={i: inst.sector for i, inst in enumerate(universe)},
+    ))
     return facts
 
 
