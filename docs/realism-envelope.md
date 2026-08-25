@@ -168,6 +168,27 @@ Two separate quantities, and they fail differently.
 than a calm market, reads about **×3.1** against real markets' **×6.16**.
 Roughly half.
 
+**The direction of response is right, and that is measured rather than
+asserted.** Driving the real 2020-21 macro path through the model and
+correlating daily returns against each driver over 504 sessions, beside the
+same correlations computed on real AAPL over the same window:
+
+| channel | simulated | real AAPL | sign fixed in advance |
+|---|---|---|---|
+| return vs change in VIX | -0.423 | -0.622 | negative |
+| return vs change in credit yield | -0.496 | -0.592 | negative |
+| return vs change in valuation | +0.573 | +0.803 | positive |
+| absolute return vs VIX level | +0.512 | +0.489 | positive |
+
+All four carry the right sign, and the volatility-clustering channel is close
+to exact. The three directional channels run at roughly seventy to eighty-five
+percent of the real response, which is this gap from another angle: a shock
+moves this market the right way and not far enough. An event study over the
+five sessions after each of six dated events agrees on sign five times out of
+six; the exception is the Fed's intermeeting cut of 3 March 2020, where an
+announcement-effect channel is missing rather than miscalibrated. Worked
+through in `examples/09-a-pandemic-shaped-market.ipynb`.
+
 **The transient**, how fast the market *reacts* to a shock as distinct from
 where it settles, is weaker still. The shipped preset retains **27.6%**
 of the previous preset's shock response, because it raised factor-variance

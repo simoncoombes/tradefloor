@@ -249,7 +249,26 @@ GAPS: tuple[Gap, ...] = (
         detail=(
             "The VIX shock response is materially weaker than the previous "
             "preset's. The direction of response is right; the magnitude is "
-            "not certified."
+            "not certified.\n\n"
+            "'Direction is right' is measured rather than asserted. Driving "
+            "the real 2020-21 macro path through the model and correlating "
+            "daily returns against each driver, over 504 sessions, against "
+            "the same correlations computed on real AAPL over the same "
+            "window:\n"
+            "  return vs change in VIX             -0.423 (real -0.622)\n"
+            "  return vs change in credit yield    -0.496 (real -0.592)\n"
+            "  return vs change in valuation       +0.573 (real +0.803)\n"
+            "  absolute return vs VIX level        +0.512 (real +0.489)\n\n"
+            "All four carry the sign theory fixes in advance, and the "
+            "volatility-clustering channel is close to exact. The three "
+            "DIRECTIONAL channels run at roughly seventy to eighty-five "
+            "percent of the real response, which is this gap seen from "
+            "another angle: a shock moves this market the right way and not "
+            "far enough. An event study over the five sessions after each of "
+            "six dated 2020-21 events agrees on sign five times out of six. "
+            "The exception is the Fed's intermeeting cut of 3 March 2020, "
+            "where an announcement-effect channel is absent rather than "
+            "miscalibrated; see examples/09-a-pandemic-shaped-market.ipynb."
         ),
         forbids="sizing a scenario's impact rather than detecting it",
     ),
