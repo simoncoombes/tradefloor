@@ -16,14 +16,46 @@ TRAIN = tuple(range(101, 131))
 HOLD_SEEDS = (1, 2, 3, 4, 5, 6)
 CONFIRM = tuple(range(201, 231))   # disjoint from TRAIN, for the horizon axis
 MARGIN = 0.5          # §36's tolerance
-# Overridable so a candidate can be checked without editing the file:
-#   PRETIUM_S8_PRESET=pt-v5 PRETIUM_S8_OVERRIDES='momentum_theta=0.03710312'
+# Overridable so a candidate can be checked without editing the file. Flags
+# take precedence; the environment variables predate them and still work.
+#
+# `--help` used to RUN THE CHECK, because there was no parser and argparse
+# never saw the flag: a reader asking what the tool does got a multi-minute
+# calibration instead of a usage line. tests/test_tool_help.py exists for
+# exactly that and could not see this file, because it collects scripts
+# containing `add_argument`.
+import argparse
 import os
-INCUMBENT = dict(preset=os.environ.get("PRETIUM_S8_PRESET", "pt-v4"))
-_ov = os.environ.get("PRETIUM_S8_OVERRIDES", "jump_momentum_share=0.0")
-for _item in filter(None, _ov.split(",")):
-    _k, _, _v = _item.partition("=")
-    INCUMBENT[_k.strip()] = float(_v)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument(
+        "--preset", default=os.environ.get("PRETIUM_S8_PRESET", "pt-v4"),
+        help="preset the candidate is built from (env PRETIUM_S8_PRESET, "
+             "default: %(default)s)",
+    )
+    p.add_argument(
+        "--overrides",
+        default=os.environ.get("PRETIUM_S8_OVERRIDES", "jump_momentum_share=0.0"),
+        help="comma separated name=value coefficients applied to the preset "
+             "(env PRETIUM_S8_OVERRIDES, default: %(default)s)",
+    )
+    return p
+
+
+def incumbent_from(args) -> dict:
+    out = dict(preset=args.preset)
+    for item in filter(None, args.overrides.split(",")):
+        k, _, v = item.partition("=")
+        out[k.strip()] = float(v)
+    return out
+
+
+INCUMBENT = incumbent_from(build_parser().parse_known_args()[0])
 
 AXES = {
     "train":            (TRAIN,      40, 111, 252),
@@ -143,4 +175,8 @@ def main():
     print(f"\n  VERDICT: {verdict}")
 
 if __name__ == "__main__":
+    # Parsed for real here so an unknown flag is an error rather than ignored;
+    # the module-level parse above is deliberately permissive so that importing
+    # this file for its functions does not depend on argv.
+    build_parser().parse_args()
     main()
