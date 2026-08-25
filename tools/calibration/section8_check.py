@@ -4,6 +4,14 @@ calibrate.py cannot validate a fixed vector: the shrink stage moves it, and
 the §44 run judged share 0.475 rather than the 0.0 asked for. §36 made the
 flip test a pure function precisely so it could be exercised directly, so
 the control runs here on the exact vector instead of near it.
+
+A rejection is not a verdict on the candidate until the base has been run
+through the same check. MEASURED 2026-08-25: pt-v3 with no override is
+REJECTED by the horizon flip test (abs_return_acf5 room -0.76 sd,
+excess_kurtosis -0.60 sd at 504 days), so any pt-v3 based candidate fails
+here whatever it changes. Run the base as a control and compare the rooms;
+the difference between the two is what the candidate did. §60 in
+CALIBRATION-FOLLOWUPS.md records the first time this was nearly misread.
 """
 import sys, statistics, multiprocessing as mp
 import numpy as np
