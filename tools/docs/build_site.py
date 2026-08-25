@@ -490,9 +490,31 @@ def build_index(bundle: str, pages: list[dict]) -> str:
     return out.replace("<body>", "<body>\n" + noscript, 1)
 
 
+def _last_content_change() -> str:
+    """The date the published content last moved, as W3C YYYY-MM-DD.
+
+    Taken from the last commit touching docs/ or this script rather than from
+    the clock, so rebuilding without changing anything does not churn every
+    lastmod and tell Google 24 pages changed when none did. Falls back to
+    omitting the field, which is valid, if git is unavailable.
+    """
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["git", "log", "-1", "--format=%cs", "--", "docs", __file__],
+            cwd=ROOT, capture_output=True, text=True, timeout=10, check=True,
+        )
+        return out.stdout.strip()
+    except Exception:
+        return ""
+
+
 def build_sitemap(pages: list[dict]) -> str:
+    lastmod = _last_content_change()
+    stamp = f"<lastmod>{lastmod}</lastmod>" if lastmod else ""
     urls = "".join(
-        f"<url><loc>{absolute(p['slug'])}</loc>"
+        f"<url><loc>{absolute(p['slug'])}</loc>{stamp}"
         f"<priority>{'1.0' if p['slug'] == 'home' else '0.8'}</priority></url>"
         for p in pages
     )
