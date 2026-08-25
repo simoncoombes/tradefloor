@@ -36,3 +36,15 @@ python/pretium/*.pdb
 .impeccable/
 .ruff_cache/
 .ipynb_checkpoints/
+
+# Editor and OS artefacts. .DS_Store was tracked at the repository root until
+# 0.1.2, which a public repository should not carry: it is a Finder cache,
+# it changes whenever a directory is viewed, and it means nothing to anyone
+# cloning. It never reached the distribution, so this is tidiness rather
+# than a shipped defect.
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
