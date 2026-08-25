@@ -13,7 +13,23 @@
 <meta name="twitter:title" content="pretium docs: repeatable market simulation">
 <meta name="twitter:description" content="Documentation for pretium, a deterministic market simulator with a real limit order book. Rust core, Python API, published realism limits.">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"pretium","description":"Documentation for pretium, a deterministic market simulator with a real limit order book. Rust core, Python API, published realism limits.","url":"https://simoncoombes.github.io/pretium/","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
-
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-1LBM3239ZF', {send_page_view: false});
+function pretiumPageview() {
+  var route = location.hash.replace(/^#\/?/, '') || 'home';
+  gtag('event', 'page_view', {
+    page_title: document.title,
+    page_location: location.href,
+    page_path: '/' + route
+  });
+}
+window.addEventListener('hashchange', pretiumPageview);
+pretiumPageview();
+</script>
 
   <meta charset="utf-8">
   <title>pretium docs: repeatable market simulation</title>

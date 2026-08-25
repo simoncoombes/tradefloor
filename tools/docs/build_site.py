@@ -45,7 +45,7 @@ BASE_URL = "https://simoncoombes.github.io/pretium"
 #: stream. Empty means no analytics: the snippet is omitted entirely rather
 #: than emitted with a placeholder, because a gtag call with a bad ID fails
 #: silently and looks like working analytics that reports nothing.
-GA_MEASUREMENT_ID = ""
+GA_MEASUREMENT_ID = "G-1LBM3239ZF"
 
 SITE_NAME = "pretium docs"
 TAGLINE = "repeatable market simulation"
