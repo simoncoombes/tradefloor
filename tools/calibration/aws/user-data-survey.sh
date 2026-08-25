@@ -62,12 +62,20 @@ while true; do
   # once producing partial/tasks.jsonl. The loop was demonstrably alive, the
   # include pattern was verified correct locally, and out/ demonstrably
   # existed, so the cause sat in output nobody could read. It is uploaded now.
+  # cp, NOT sync. DIAGNOSED 2026-08-25: pretium-calib-role grants s3:PutObject
+  # and s3:GetObject and nothing else, and `aws s3 sync` needs s3:ListBucket on
+  # the destination to compare against. So run.log (a cp) uploaded every 120s
+  # for a whole run while partial/tasks.jsonl (a sync) never appeared once, and
+  # a spot reclaim would have thrown the entire run away. Two plain cps need no
+  # permission the role does not already have.
   {
     echo "=== $(date -u) ==="
-    ls -la /home/ec2-user/out 2>&1 | head -5
-    aws s3 sync /home/ec2-user/out "$BUCKET/partial/" \
-      --exclude "*" --include "tasks.jsonl" --include "meta.json" 2>&1
-    echo "sync exit=$?"
+    for f in tasks.jsonl meta.json; do
+      if [ -f "/home/ec2-user/out/$f" ]; then
+        aws s3 cp "/home/ec2-user/out/$f" "$BUCKET/partial/$f" 2>&1
+        echo "cp $f exit=$?"
+      fi
+    done
   } >> /var/log/pretium-stream.log 2>&1
   aws s3 cp /var/log/pretium-stream.log "$BUCKET/stream.log" || true
 done
@@ -169,8 +177,9 @@ fi
 
 # Final sync, including the partial rows: if this run died mid-way the rows
 # are what the next one resumes from, and they are worth more than the log.
-aws s3 sync /home/ec2-user/out "$BUCKET/partial/" \
-  --exclude "*" --include "tasks.jsonl" --include "meta.json" || true
+for f in tasks.jsonl meta.json; do
+  [ -f "/home/ec2-user/out/$f" ] && aws s3 cp "/home/ec2-user/out/$f" "$BUCKET/partial/$f" || true
+done
 aws s3 cp /var/log/pretium-run.log "$BUCKET/run.log" || true
 aws s3 cp /tmp/DONE "$BUCKET/DONE" || true
 aws s3 cp /home/ec2-user/out/atlas-survey.json "$BUCKET/" || true
