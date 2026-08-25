@@ -37,6 +37,17 @@ The lever, `sector_factor_sigma`, is settable and shipped; the pt-v1 search
 reported it as a null direction, which is what a lever looks like when the
 objective cannot see it.
 
+The dial that would close gap 7 has been measured and is not shipped. At
+`sector_factor_sigma` 0.012 the statistic lands inside its band at 0.155 with
+nothing else on the panel leaving its own, but two things the panel cannot see
+move the wrong way: the crisis volatility lever falls from 3.07x to 2.78x, and
+kurtosis thins by about a third of a seed-sd at two years. And above the crisis
+threshold the engine's blend replaces the sector draw with the market draw, so
+industries dissolve in a panic whatever the dial is set to. The remedies for
+all three are being measured, and any change to the default arrives as a new
+preset. The calibration record has the numbers (§59 and §60) and the design
+for the blend change.
+
 Where these came from: a review of the correlation structure, adversarially
 checked against the calibration record, which rejected five of twelve proposed
 mechanisms on the record's own measurements and ranked the survivors behind the
