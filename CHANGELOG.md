@@ -72,6 +72,31 @@ can ask for. It caught one immediately: the `scenario-magnitude` refusal said
 only that the size "is not certified", with no number, and now gives the 3.07x
 lever against real markets' 6.16x.
 
+### The gap's own advice, tested against 2022
+
+`macro-range` tells a reader to drive an inflation regime through a scenario.
+That advice was checked before shipping it, on real 2022 data over six seeds,
+because a gap that hands out a recipe should have run the recipe.
+
+It works, and the lever is inflation rather than the policy rate. Against a
+real S&P of -20.0%:
+
+| scenario | index, median of 6 seeds |
+|---|---|
+| no scenario at all | -12.6% |
+| the real seven hike path only | -13.1% |
+| the published CPI path | **-23.3%** |
+
+The middle row is the one worth having. Driving the real 2022 hiking cycle,
+0.125% to 4.375% in seven moves, returns the drift and nothing more. Inflation
+works because it steers the central bank's OWN reaction into the corporate bond
+yield, and an externally pinned policy rate does not reproduce that. The gap
+now says so, including that `corporate_bond_yield` must be left free, since
+pinning it severs the channel the inflation path is using.
+
+The control row is the reason any of this is stated. Without it, the hike-path
+run reads as a 13% bear market and looks like a result.
+
 ### What each macro field transmits, and when
 
 `docs/scenarios.md` gains a per field table, measured by introducing each shock

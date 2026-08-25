@@ -301,7 +301,18 @@ GAPS: tuple[Gap, ...] = (
             "unemployment low will not trigger it however high you pin it.\n\n"
             "So a 2022-style inflation shock has to be driven through a "
             "scenario. It will not arise on its own, and neither will the "
-            "policy response to it."
+            "policy response to it.\n\n"
+            "DRIVING ONE WORKS, and the lever is inflation rather than the "
+            "policy rate. Measured on real 2022 data over six seeds, against "
+            "a real S&P of -20.0%: a scenario driving `inflation_rate` with "
+            "the published CPI path returns a median -23.3%, where the same "
+            "run with no scenario at all returns -12.6% and one driving only "
+            "`federal_funds_rate` with the real seven-hike path returns "
+            "-13.1%, which is the drift and nothing more. Inflation works "
+            "because it steers the bank's own reaction into the corporate "
+            "bond yield; an externally pinned policy rate does not reproduce "
+            "that. Leave `corporate_bond_yield` FREE when doing this, since "
+            "pinning it severs the very channel the inflation path is using."
         ),
         forbids="studying inflation regimes or policy crises from the endogenous economy alone",
         statistics=(),
