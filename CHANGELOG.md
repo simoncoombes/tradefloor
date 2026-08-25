@@ -57,6 +57,21 @@ trigger it however high you pin it.
 So a 2022 style inflation shock has to be driven through a scenario, and so
 does the policy response to it.
 
+### `check()` can now refuse a macro-regime question
+
+The `macro-range` gap above was, for one afternoon, invisible to the interface
+users actually call. `envelope.check()` names no route to a gap that names no
+statistics, so someone asking whether they could study an inflation regime was
+told `inside=True` while the documentation page said otherwise. `check()` gains
+a `macro_regime` flag, and the refusal quotes the measurements.
+
+`tests/test_envelope_reachability.py` now requires every gap in `GAPS` to be
+reachable through some argument to `check`, and every refusal to carry a
+figure. Adding a gap fails that file until it is wired to something a caller
+can ask for. It caught one immediately: the `scenario-magnitude` refusal said
+only that the size "is not certified", with no number, and now gives the 3.07x
+lever against real markets' 6.16x.
+
 ### What each macro field transmits, and when
 
 `docs/scenarios.md` gains a per field table, measured by introducing each shock

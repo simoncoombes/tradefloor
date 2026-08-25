@@ -477,6 +477,7 @@ def check(
     statistics: Iterable[str] = (),
     sector_concentrated: bool = False,
     scenario_magnitude: bool = False,
+    macro_regime: bool = False,
 ) -> Verdict:
     """Does this question fall inside the envelope?
 
@@ -486,6 +487,12 @@ def check(
     keys of `facts.REAL_MARKETS`; unknown names are refused rather than
     ignored, because a silently dropped statistic is a silently granted
     certification.
+
+    `macro_regime` says the result depends on the ECONOMY reaching a
+    particular state -- an inflation regime, a policy crisis -- rather than on
+    a scenario you drive yourself. It fires `macro-range`, because the
+    endogenous economy stays in a moderate band and cannot get to its own
+    crisis regimes.
 
     `sector_concentrated` says the roster is not sector-balanced, which a
     real index never is. `scenario_magnitude` says the result depends on
@@ -574,7 +581,29 @@ def check(
         g = by_id["scenario-magnitude"]
         fire(g, (
             "the result depends on the SIZE of a scenario's response, which "
-            "is not certified -- only its direction is"
+            "is not certified -- only its direction is. Measured: the "
+            "steady-state volatility lever from VIX 5 to VIX 65 reads 3.07x "
+            "on the shipped preset against real markets' 6.16x, so a crisis "
+            "here is roughly half as violent as a real one. The direction is "
+            "sound, with all four driver channels carrying the right sign and "
+            "volatility clustering against the VIX level at +0.512 simulated "
+            "against +0.489 for real AAPL, but the three DIRECTIONAL channels "
+            "run at roughly seventy to eighty-five percent of the real "
+            "response. Use a scenario to ask WHETHER a strategy breaks, not "
+            "how much"
+        ))
+
+    if macro_regime:
+        g = by_id["macro-range"]
+        fire(g, (
+            "the result depends on the economy reaching a regime it does not "
+            "reach on its own. Endogenous inflation peaks at 4.06% to 4.11% "
+            "over five seeds and five years, against a 6.0% clamp and a US CPI "
+            "that reached 9.1% in 2022, so the central bank's own inflation "
+            "crisis cadence -- correct, and firing in 22.0% of the parity "
+            "corpus -- is unreachable from a default run. Drive the regime "
+            "through a scenario, and note that the crisis cadence responds to "
+            "STAGFLATION rather than to high inflation alone"
         ))
 
     if not wanted:
