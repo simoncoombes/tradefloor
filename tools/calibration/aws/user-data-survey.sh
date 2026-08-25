@@ -14,6 +14,9 @@ set -x
 
 BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey2
 BRANCH=main
+# 4000 is the tool default and what the 2026-08-25 survey actually ran:
+# 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
+SAMPLES=4000
 
 dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 
@@ -105,15 +108,22 @@ if [ -f /home/ec2-user/out/tasks.jsonl ]; then
   echo "RESUMING from $(wc -l < /home/ec2-user/out/tasks.jsonl) streamed rows"
 fi
 
-python tools/calibration/atlas_survey.py plan --samples 1000 \
+# --samples on BOTH, and they must match. It is one top-level argument that
+# `run` re-reads from its own default of 4000, and `plan` used to write nothing,
+# so `plan --samples 1000` followed by a bare `run` forecast 48000 tasks and
+# then ran 192000 under a different plan fingerprint printed one line later.
+# The dead-man switch is sized off that forecast, which is how launch 1 was
+# killed by its own timeout at 63.9% complete.
+python tools/calibration/atlas_survey.py plan --samples "$SAMPLES" \
   --out /home/ec2-user/out
-python tools/calibration/atlas_survey.py run \
+python tools/calibration/atlas_survey.py run --samples "$SAMPLES" \
   --out /home/ec2-user/out --workers 94
 python tools/calibration/atlas_survey.py collect --out /home/ec2-user/out
 WORK
 
 sed -i "s|BRANCH_PLACEHOLDER|${BRANCH}|" /home/ec2-user/run.sh
 sed -i "s|BUCKET_PLACEHOLDER|${BUCKET}|" /home/ec2-user/run.sh
+sed -i "s|\$SAMPLES|${SAMPLES}|g" /home/ec2-user/run.sh
 chown ec2-user:ec2-user /home/ec2-user/run.sh
 chmod +x /home/ec2-user/run.sh
 

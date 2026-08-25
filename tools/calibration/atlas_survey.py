@@ -572,7 +572,43 @@ def cmd_plan(args) -> int:
     if bad:
         first = next((f, i) for i, f in enumerate(feasibility) if f)
         print(f"first violation: vector {first[1]}: {first[0]}")
-    print(f"plan fingerprint {plan_fingerprint(axes, args.samples, args.plan_seed)}")
+    fingerprint = plan_fingerprint(axes, args.samples, args.plan_seed)
+    print(f"plan fingerprint {fingerprint}")
+
+    # Write the plan out when asked, so that a `run` at a DIFFERENT --samples
+    # hits the fingerprint refusal in cmd_run instead of quietly measuring
+    # something else.
+    #
+    # MEASURED, 2026-08-25: this printed a forecast and wrote nothing, and
+    # `--samples` is one top-level argument that `run` re-reads from its own
+    # default of 4000. So `plan --samples 1000 --out D` followed by `run --out
+    # D` forecast "vectors 1000, tasks 48000, ~71 core-hours" and then ran 4000
+    # vectors and 192000 tasks, four times the size, under a different plan
+    # fingerprint printed one line apart in the same log.
+    #
+    # That is not only a wrong forecast. The operator sizes the dead-man switch
+    # off it: the first survey launch was killed by `shutdown -h +90` at 63.9%
+    # complete having been forecast at a quarter of what it ran. The refusal is
+    # cheap and the guard for it already existed; it simply had nothing to
+    # compare against.
+    if args.out:
+        outdir = Path(args.out)
+        outdir.mkdir(parents=True, exist_ok=True)
+        meta_path = outdir / "meta.json"
+        if meta_path.exists():
+            existing = json.loads(meta_path.read_text())
+            if existing["plan_fingerprint"] != fingerprint:
+                print(f"\nREFUSING to overwrite {meta_path}: it holds plan "
+                      f"{existing['plan_fingerprint']} and this is {fingerprint}. "
+                      "Use a fresh --out rather than mixing two plans in one "
+                      "directory.")
+                return 2
+        else:
+            meta_path.write_text(json.dumps(
+                build_meta(axes, args.samples, args.plan_seed, fingerprint),
+                indent=1, sort_keys=True) + "\n")
+            print(f"wrote {meta_path}; `run` against a different --samples "
+                  "will now refuse rather than measure a different plan")
     return 0
 
 
