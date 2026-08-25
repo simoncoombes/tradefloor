@@ -20,6 +20,12 @@ readme = "README.md"
 exclude = [
     "goldens/**",
     "_keep/**",
+    # Development probes, not user examples: divergence hunts, libm
+    # comparisons, single-function traces. Four of them read the excluded
+    # corpus, so `cargo run --example divergence` on the published crate
+    # fails at the first line, and the other five are noise on a crate page.
+    # They live in the repository, where the corpus is.
+    "examples/**",
     # The parity tests read the excluded corpus and PANIC when it is absent,
     # with a message telling you to regenerate it from a TypeScript script
     # that is not in the package either. Shipping a test that cannot pass is
