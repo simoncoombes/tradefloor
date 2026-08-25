@@ -98,22 +98,72 @@ PROSE_FIXES = [
     ("MIXED — SEE NOTE", "MIXED, SEE NOTE"),
 ]
 
+#: The bundle was authored before anything shipped, so its Release Notes page
+#: still says 0.1.0 is unreleased and nothing has been tagged. Every word of
+#: that is now false, and a documentation page asserting a package is
+#: unpublished while it sits on PyPI is worse than a missing page.
+#:
+#: Corrected here rather than in the bundle, for the same reason as
+#: PROSE_FIXES: a fresh design revision gets the treatment automatically. The
+#: replacements assert, so if a later bundle rewords this section the build
+#: fails loudly instead of quietly shipping a stale claim.
+RELEASE_STATUS_FIXES = [
+    (
+        '<h2 style="font-size:19px;margin:40px 0 4px">0.1.0 '
+        '<span style="font-weight:400;color:var(--faint);font-size:15px">'
+        "- unreleased</span></h2>",
+        '<h2 style="font-size:19px;margin:40px 0 4px">{version} '
+        '<span style="font-weight:400;color:var(--faint);font-size:15px">'
+        "- current</span></h2>",
+    ),
+    (
+        "Pre-release. Everything documented works and is tested. The API may "
+        "move before 1.0. Nothing has been tagged, and there is no DOI yet.",
+        "Published on PyPI as <code style=\"font-size:12.5px\">pretium</code>. "
+        "Everything documented works and is tested. The API may move before "
+        "1.0. Each release is tagged and its wheels are built by the release "
+        "workflow, which runs one fixed simulation inside every wheel and "
+        "compares digests before anything is uploaded. There is no DOI yet.",
+    ),
+]
+
 
 def read_bundle() -> str:
+    """The bundle, with our corrections applied to the readable document.
+
+    The document lives as a JSON string inside a `<script>` tag, so editing
+    the raw file means knowing how the encoder escaped every character: a
+    `/` arrives as `\\u002F`, which is why matching a literal `</span>`
+    silently finds nothing. Decoding first, editing plain text, then
+    re-encoding removes the guesswork.
+    """
     if not DESIGN_BUNDLE.exists():
         sys.exit(f"design bundle not found: {DESIGN_BUNDLE}")
-    text = DESIGN_BUNDLE.read_text(encoding="utf-8")
+    raw = DESIGN_BUNDLE.read_text(encoding="utf-8")
+    payload = script_payload(raw, "template")
+    doc = json.loads(payload)
+
     for old, new in PROSE_FIXES:
-        text = text.replace(old, new)
-    # Version-bearing spots, by their surrounding markup so history is safe.
-    # ">v0.1.0<" rather than the full tag: the template is JSON-encoded
-    # inside the bundle, so "</span>" arrives as "<\\u002Fspan>".
-    text = text.replace(">v0.1.0<", f">v{VERSION}<")
-    text = text.replace("version = {0.1.0}", "version = {%s}" % VERSION)
-    # The fixes land inside a JSON string in the template block, so prove the
-    # block still parses before anything downstream depends on it.
-    json.loads(script_payload(text, "template"))
-    return text
+        doc = doc.replace(old, new)
+    # Two spots track the package version; the rest are history. See VERSION.
+    doc = doc.replace(">v0.1.0<", f">v{VERSION}<")
+    doc = doc.replace("version = {0.1.0}", "version = {%s}" % VERSION)
+    for stale, current in RELEASE_STATUS_FIXES:
+        if stale not in doc:
+            sys.exit(
+                "release-status text not found in the bundle. It was reworded "
+                "upstream, so RELEASE_STATUS_FIXES needs updating rather than "
+                "silently shipping a stale claim:\n  " + stale[:90]
+            )
+        doc = doc.replace(stale, current.format(version=VERSION))
+
+    # Re-encode, then escape every forward slash the way the bundler does.
+    # Without that, a literal "</script>" inside the document would close the
+    # tag early and the page would never boot.
+    encoded = json.dumps(doc).replace("/", "\\u002F")
+    out = raw.replace(payload, encoded, 1)
+    json.loads(script_payload(out, "template"))  # prove it still parses
+    return out
 
 
 def script_payload(bundle: str, kind: str) -> str:

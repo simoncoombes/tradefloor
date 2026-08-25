@@ -31,7 +31,7 @@ against the wrong starting conditions is a thing you have to do on purpose.
 ### 1. Version and preset
 
 ```python
-pt.version()                      # '0.1.1'
+pt.version()                      # '0.1.2'
 pt.model_preset()["name"]         # 'pt-v3', the shipped default
 ```
 

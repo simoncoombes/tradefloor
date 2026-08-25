@@ -20,10 +20,10 @@ happened if I'd traded differently, and what actually caused this price move.
 pip install pretium
 ```
 
-0.1.1 is the current release, and 0.1.0 was the first. The API may still
-move before 1.0, and anything that changes the simulated trajectory arrives
-as a new model preset rather than an edit to an existing one, so a published
-result stays reproducible.
+The API may still move before 1.0. What will not move is a published
+result: anything that changes the simulated trajectory arrives as a new
+model preset rather than an edit to an existing one, so a run you cited last
+month reproduces this month.
 
 ## In thirty seconds
 
@@ -123,17 +123,17 @@ and aggregate flow rather than agents that adapt to you.
 
 ## Worked examples
 
-Six notebooks and two scripts in [`examples/`](examples/), numbered in
+Six notebooks and two scripts in [`examples/`](https://github.com/simoncoombes/pretium/tree/main/examples), numbered in
 reading order and executed as part of the test suite:
 
 | | what it covers |
 |---|---|
-| [`01-first-simulation`](examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
-| [`02-evaluating-a-strategy`](examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
-| [`03-why-did-the-price-move`](examples/03-why-did-the-price-move.ipynb) | The seven factors that sum to every move |
-| [`04-how-realistic-is-this`](examples/04-how-realistic-is-this.ipynb) | The realism panel and the gaps |
-| [`05-training-an-agent`](examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
-| [`06-execution-and-impact`](examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
+| [`01-first-simulation`](https://github.com/simoncoombes/pretium/blob/main/examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
+| [`02-evaluating-a-strategy`](https://github.com/simoncoombes/pretium/blob/main/examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
+| [`03-why-did-the-price-move`](https://github.com/simoncoombes/pretium/blob/main/examples/03-why-did-the-price-move.ipynb) | The seven factors that sum to every move |
+| [`04-how-realistic-is-this`](https://github.com/simoncoombes/pretium/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the gaps |
+| [`05-training-an-agent`](https://github.com/simoncoombes/pretium/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
+| [`06-execution-and-impact`](https://github.com/simoncoombes/pretium/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
 
 Or a whole study in one file. Sweep, evaluation, TCA and replay in about five
 seconds:
@@ -155,18 +155,18 @@ hit them.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). One rule shapes the rest: a change to
+See [CONTRIBUTING.md](https://github.com/simoncoombes/pretium/blob/main/CONTRIBUTING.md). One rule shapes the rest: a change to
 the simulated trajectory is a breaking change, whatever its size. A market
 that runs differently from the same seed invalidates every published result
 that cited it.
 
 ## Citing this
 
-See [CITATION.cff](CITATION.cff), or cite a specific result by its manifest.
+See [CITATION.cff](https://github.com/simoncoombes/pretium/blob/main/CITATION.cff), or cite a specific result by its manifest.
 The seed, the universe fingerprint, the model fingerprint and the strategy
 fingerprint together identify exactly what ran.
 
 ## Licence
 
-MIT OR Apache-2.0, at your option. See [LICENSE-MIT](LICENSE-MIT) and
-[LICENSE-APACHE](LICENSE-APACHE).
+MIT OR Apache-2.0, at your option. See [LICENSE-MIT](https://github.com/simoncoombes/pretium/blob/main/LICENSE-MIT) and
+[LICENSE-APACHE](https://github.com/simoncoombes/pretium/blob/main/LICENSE-APACHE).

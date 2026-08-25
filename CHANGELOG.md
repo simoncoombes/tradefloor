@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.2
+
+Fixes the PyPI project page. Nothing in the engine moved and the digest is
+unchanged.
+
+The README links to the example notebooks, the licences, the contributing
+guide and the citation file by relative path. That is correct on GitHub and
+dead on PyPI, which renders the same file at pypi.org, so
+`examples/01-first-simulation.ipynb` resolved to
+`pypi.org/project/pretium/examples/01-first-simulation.ipynb` and returned a
+404. Eleven links were affected.
+
+The reason it survived two releases is that the file renders correctly
+everywhere an author looks at it. So the rule is now checked rather than
+remembered: a test fails if any README link is relative, and a second one
+fails if an absolute link into this repository names a file that is not
+there, which would leave the project page pointing at a GitHub 404 after a
+rename.
+
 ## 0.1.1
 
 A packaging fix. Nothing in the engine moved, and the digest is unchanged, so
