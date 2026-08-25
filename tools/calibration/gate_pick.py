@@ -69,7 +69,8 @@ def summarise(kind: str, rows: list[dict]) -> str:
     return (f"  {kind:12s} {days}d ({len(rows)} seeds): {n - len(out)}/{n} in band; vol "
             f"{med['annualised_vol_pct']:.1f} kurt {med['excess_kurtosis']:.2f} xs "
             f"{med['cross_sectional_corr']:.3f} sector_ex {med['sector_excess_corr']:+.4f} "
-            f"persist {med['corr_persistence_acf1']:+.3f}  out: {', '.join(out) or '(none)'}")
+            f"persist {med['corr_persistence_acf1']:+.3f} acf1/5/20 {med['abs_return_acf1']:.3f}/"
+            f"{med['abs_return_acf5']:.4f}/{med['abs_return_acf20']:.4f}  out: {', '.join(out) or '(none)'}")
 
 
 def main() -> int:
