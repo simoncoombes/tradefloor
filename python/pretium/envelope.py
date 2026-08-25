@@ -158,14 +158,20 @@ class Gap:
 GAPS: tuple[Gap, ...] = (
     Gap(
         id="volume-change",
-        summary="volume-change autocorrelation is structurally unreachable",
+        summary="volume-change autocorrelation is unreachable without spending a passing statistic",
         detail=(
             "-0.4598 against a band of -0.32 to -0.20, 13.7 seed-sd out. A "
             "held volume level plus independent per-tick noise sits near -0.5 "
-            "at any coefficients, so no parameter reaches this row. It is "
-            "excluded from the calibration objective deliberately: an "
-            "optimiser pointed at an unreachable target does not fail "
-            "cleanly, it distorts every other parameter chasing it."
+            "at any coefficients of the SHIPPED mechanism. It is not "
+            "unreachable outright: the common volume state that ships live "
+            "in pt-v4 reaches the band at volume_persistence 0.7 with "
+            "innovation sigma 0.25, or at volume_variance_gain 1.0 to 2.0, "
+            "and both pay for it with volume_abs_return_corr leaving its own "
+            "band (CALIBRATION-FOLLOWUPS §21 to §23). The row is excluded "
+            "from the calibration objective deliberately: an optimiser "
+            "pointed at a target it can only reach by spending a live one "
+            "does not fail cleanly, it distorts every other parameter "
+            "chasing it."
         ),
         forbids="strategies trading the day-to-day CHANGE in volume",
         statistics=("volume_change_acf1",),
@@ -557,9 +563,11 @@ def check(
         if name == "volume_change_acf1":
             g = by_id["volume-change"]
             fire(g, (
-                f"volume_change_acf1 is structurally unreachable: "
-                f"{CERTIFIED[name]:.4f} against {REAL_MARKETS[name]}, "
-                f"13.7 seed-sd out, and excluded from the objective"
+                f"volume_change_acf1 is unreachable without spending a "
+                f"passing statistic: {CERTIFIED[name]:.4f} against "
+                f"{REAL_MARKETS[name]}, 13.7 seed-sd out. The volume state "
+                f"can reach it and pays with volume_abs_return_corr, so it "
+                f"is excluded from the objective"
             ))
         elif name == "abs_return_acf20":
             g = by_id["decay-shape"]

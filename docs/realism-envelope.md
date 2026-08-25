@@ -72,12 +72,16 @@ search never touched. This is the part of the claim worth trusting.
 
 ## The gaps, measured
 
-### Gap 1: the tenth statistic is structurally unreachable
+### Gap 1: the tenth statistic is unreachable without spending a passing one
 
 `volume_change_acf1` reads −0.46 against a real band of −0.32 to −0.20:
-**13.7 seed-standard-deviations out**, and no parameter setting in the
-model reaches it. A held volume level plus independent per-tick noise sits
-near −0.5 at any coefficients. It is excluded from the calibration
+**13.7 seed-standard-deviations out**. A held volume level plus independent
+per-tick noise sits near −0.5 at any coefficients of the shipped mechanism.
+It is not unreachable outright. The common volume state that ships live in
+pt-v4 reaches the band at persistence 0.7 with innovation sigma 0.25, or at
+`volume_variance_gain` 1.0 to 2.0, and both pay for it with
+`volume_abs_return_corr` leaving its own band. So the row is a trade, not a
+wall, and the trade has not been taken. It is excluded from the calibration
 objective deliberately. An optimiser pointed at an unreachable target does
 not fail cleanly, it distorts every other parameter chasing it and then
 "succeeds" by overfitting. It is reported in every result the library
@@ -166,7 +170,12 @@ Two separate quantities, and they fail differently.
 
 **The steady-state lever**, how much more violent a sustained crisis is
 than a calm market, reads about **×3.1** against real markets' **×6.16**.
-Roughly half.
+Roughly half. This is a ratio of annualised **volatility** at high VIX to
+volatility at low VIX; it is not a correlation lever, and a mechanism that
+only reallocates variance between the market factor and the idiosyncratic
+term cannot move it by construction. Crisis correlation is a separate
+quantity and is already near the real crisis band: pinned VIX 45 reads
+0.66 and VIX 65 reads 0.73.
 
 **The direction of response is right, and that is measured rather than
 asserted.** Driving the real 2020-21 macro path through the model and
