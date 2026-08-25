@@ -182,7 +182,18 @@ GAPS: tuple[Gap, ...] = (
             "become unrealistic in DYNAMICS, which is easy to miss by looking "
             "only at the price path. That count is measured on the shipped "
             "preset. pt-v6, selectable and not certified, holds 8 of 10 at "
-            "504 days and 9 of 10 at the certified horizon."
+            "504 days and 9 of 10 at the certified horizon.\n\n"
+            "pt-v6 buys that at a cost in SCENARIO response, which the band "
+            "counts do not show and which lands on exactly the long-dated "
+            "crisis work it is otherwise the right choice for. Measured "
+            "against pt-v1 over thirty seeds with "
+            "tools/calibration/scenario_response.py: pt-v3 retains 95.2% of "
+            "the steady-state volatility lever and 27.6% of the shock "
+            "transient, where pt-v6 retains 83.3% and 16.7%. A VIX spike "
+            "therefore moves pt-v6 LESS than it moves the default, so a "
+            "scenario study driving a volatility path should prefer pt-v3 "
+            "even over multi-year windows, or say that it accepted the "
+            "weaker response."
         ),
         forbids="multi-year backtests, and anything keyed on volatility dynamics beyond one year",
         statistics=("abs_return_acf1", "abs_return_acf5", "return_acf1", "excess_kurtosis"),

@@ -45,6 +45,30 @@ as one.
 exact day, the immediate half, the fact that pinning the yield severs
 everything upstream of it, and the inertness of `fear_greed_index`.
 
+### pt-v6 responds to a VIX spike LESS than the default does
+
+0.1.3 recommends pt-v6 for multi-year work where the tail matters, on band
+counts: 8 of 10 at 504 days against pt-v3's 5, and 9 of 10 at the certified
+horizon. That recommendation was incomplete, and the missing part lands on
+exactly the long-dated crisis work it is meant for.
+
+Measured against pt-v1 over thirty seeds with
+`tools/calibration/scenario_response.py`:
+
+| preset | steady-state vol lever retained | shock transient retained |
+|---|---|---|
+| pt-v3, the default | 95.2% | 27.6% |
+| pt-v6 | **83.3%** | **16.7%** |
+
+pt-v3's figures reproduce what the realism envelope has always said, so the
+instrument is reading true; pt-v6 is a regression on both. A VIX spike moves
+pt-v6 less than it moves the default, which means a scenario study driving a
+volatility path should prefer pt-v3 even over multi-year windows, or say that
+it accepted the weaker response.
+
+The envelope's horizon gap now carries this, so anyone selecting pt-v6 on the
+band counts reads the cost in the same paragraph.
+
 ### A realism gap: endogenous inflation cannot reach its own crisis regime
 
 The central bank has a crisis cadence that pulls the next meeting in to 21-30
