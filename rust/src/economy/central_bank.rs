@@ -298,6 +298,25 @@ pub fn update_central_bank(
 
     // ── Schedule the next meeting ─────────────────────────────────────────
     new_cb.last_meeting_date = current_timestamp;
+    // Reads the rate this meeting has JUST SET, deliberately. The question is
+    // not "was the bank behind the curve when it walked in", it is "did the
+    // decision it just took leave it behind", and an early follow-up is
+    // warranted only in the second case.
+    //
+    // RETRACTED, 2026-08-25: changed to the pre-decision rate on the belief
+    // that the path was unreachable, having measured zero firings across five
+    // seeds and five years and again under pinned inflation up to 9%. The JS
+    // oracle rejected it, 1618 mismatches, and it was right. Those scenarios
+    // all had low unemployment, so the Taylor rule hiked hard and genuinely
+    // did catch up, and not firing was the correct answer.
+    //
+    // Where it fires is stagflation, which none of those scenarios produced:
+    // at inflation 4.5 with unemployment 9.0 the bank CUTS for the output gap
+    // and leaves itself further behind on inflation, so the post-decision gap
+    // widens past 2pp and the next meeting is pulled in to 21-30 days. The
+    // pre-decision reading gets that case backwards, scheduling a normal
+    // cadence there and a crisis cadence at inflation 7.0 with unemployment
+    // 3.0, where the bank has already caught up. See `economy_parity`.
     let inflation_crisis = new_economy.inflation_rate > new_economy.federal_funds_rate + 2.0
         && new_economy.inflation_rate > 4.0;
     // DRAW SITE — always, on both branches.

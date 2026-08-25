@@ -45,6 +45,32 @@ as one.
 exact day, the immediate half, the fact that pinning the yield severs
 everything upstream of it, and the inertness of `fear_greed_index`.
 
+### A realism gap: endogenous inflation cannot reach its own crisis regime
+
+The central bank has a crisis cadence that pulls the next meeting in to 21-30
+days when a decision leaves it more than 2pp behind an inflation rate above
+4%. It was measured as never firing, across five seeds and five years and
+again under inflation pinned as high as 9%, and changed on the strength of
+that to read the pre-decision rate instead.
+
+**That change was wrong and has been reverted.** The JS oracle rejected it with
+1618 mismatches and was right to. The path is not dead: it fires in 22.0% of
+the 11,898 central-bank cases in the parity corpus. What the scenarios above
+all had in common was low unemployment, where the Taylor rule hikes hard and
+genuinely does catch up, so not firing was the correct answer. It fires in
+stagflation, which none of them produced: at inflation 4.5% with unemployment
+9.0% the bank cuts for the output gap and leaves itself further behind, and the
+follow-up is pulled in. The post-decision reading is the better rule, because
+the question is whether the decision was sufficient.
+
+The gap the episode did find is real and sits elsewhere. Endogenous inflation
+peaks at 4.06% to 4.11% over five seeds and five years, against a hard clamp of
+6.0% and a US CPI that reached 9.1% in June 2022. So an entire regime is
+implemented, correct and parity-tested, and a default run cannot get to it: a
+2022-style inflation shock has to be driven through a scenario. Raising the
+inflation process is an era boundary and belongs to a calibrated change, so it
+is recorded and tested rather than fixed here.
+
 The corrected account is more useful than either version. The model has
 exactly two valuation channels. `corporate_bond_yield` is the discount rate,
 and `federal_funds_rate`, `vix` and `inflation_rate` reach a valuation solely
