@@ -33,14 +33,21 @@ pub struct PyModelParams {
 impl PyModelParams {
     /// Build from a shipped preset, with keyword overrides.
     ///
-    /// `ModelParams.from_preset("pt-v1")` is the shipped model and
+    /// With no name this returns the ENGINE'S DEFAULT preset, the same one
+    /// `Engine(...)` runs and `model_preset()` reports, so the two cannot
+    /// disagree. It read `"pt-v1"` through 0.1.4 while engines ran pt-v3,
+    /// which is a live substitution bug wherever a caller uses the no-arg
+    /// form as "the default model": `Checkpoint.of` did exactly that and
+    /// dropped the model of every pt-v1 run, resuming it as pt-v3.
+    ///
+    /// `ModelParams.from_preset("pt-v1")` still returns pt-v1 and
     /// fingerprints as `"pt-v1"`; any override that changes a bit
     /// fingerprints as `"custom-XXXXXXXX"`. Unknown names, non-finite
     /// values, the derived-bits coefficients (`mispricing_phi`,
     /// `s_phi_tick`, so override `mispricing_half_life_days` instead) and
     /// the carried read-only surface are refused by name.
     #[staticmethod]
-    #[pyo3(signature = (name = "pt-v1", **overrides))]
+    #[pyo3(signature = (name = crate::params::DEFAULT_PRESET_NAME, **overrides))]
     fn from_preset(name: &str, overrides: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
         let mut params = ModelParams::preset(name).ok_or_else(|| {
             ValidationError::new_err(format!(

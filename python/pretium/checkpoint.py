@@ -121,12 +121,18 @@ class Checkpoint:
         and it means a checkpoint records the inputs it will need rather than
         discovering at resume time that it cannot reproduce anything.
         """
-        # Compared against the DEFAULT preset's fingerprint, not against a
+        # Compared against the ENGINE'S default preset, not against a
         # "custom-" prefix: `resume` passes None straight to Engine, so
         # None is only honest for the model Engine defaults to. Under the
-        # prefix test, a run under some future shipped "pt-v2" would
-        # checkpoint as None and silently resume under pt-v1 -- the exact
-        # substitution the fingerprint exists to make impossible.
+        # prefix test, a run under some other shipped preset would
+        # checkpoint as None and silently resume under the default -- the
+        # exact substitution the fingerprint exists to make impossible.
+        #
+        # It happened: through 0.1.4 `ModelParams.from_preset()` with no
+        # name returned pt-v1 while engines default to pt-v3, so a pt-v1 run
+        # checkpointed with no model and resumed as pt-v3. The no-arg form
+        # now follows the engine, and the test below round-trips every
+        # shipped preset rather than trusting that.
         fingerprint = engine.model_fingerprint
         default = ModelParams.from_preset().fingerprint
         return cls(seed=seed, universe=universe, log=engine.order_log,

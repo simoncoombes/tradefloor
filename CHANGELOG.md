@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Fixed: a checkpoint could resume a different market
+
+`Checkpoint.of` decided whether to record the model by comparing the
+engine's fingerprint against `ModelParams.from_preset()`, whose no-arg form
+returned pt-v1 while `Engine` defaults to pt-v3. A pt-v1 run therefore
+checkpointed with no model and resumed as pt-v3, replaying a market it had
+not frozen. Runs under every other preset were unaffected, because their
+fingerprints differed from pt-v1 and the model was carried.
+
+The cause is fixed rather than the symptom: `ModelParams.from_preset()` with
+no name now returns the engine's default preset, the same one `Engine(...)`
+runs and `model_preset()` already reported. Passing a name explicitly is
+unchanged, so `from_preset("pt-v1")` still returns pt-v1. Callers relying on
+the no-arg form to mean pt-v1 will now get pt-v3, and the fingerprint says
+so. `tests/test_checkpoint_model.py` round-trips every shipped preset and
+pins the two defaults together.
+
 `inflation_floor` (-1.0) is a dial, the third and last of the inflation
 clamps. Measured over twelve seeds and three years: dropping it to -3.0 moves
 the mean by 0.01 and the sd by 0.02, so it is not a lever. The reversion is.
