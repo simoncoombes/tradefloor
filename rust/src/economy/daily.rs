@@ -78,6 +78,8 @@ pub struct DailyInputs<'a> {
     pub inflation_reversion: f64,
     /// Hard ceiling on endogenous inflation, percent (shipped 6.0).
     pub inflation_ceiling: f64,
+    /// Hard floor on endogenous inflation, percent (shipped -1.0).
+    pub inflation_floor: f64,
     /// VIX level at which crisis behaviour begins.
     ///
     /// Gates the sector-to-market correlation blend, the universe stress
@@ -97,6 +99,7 @@ impl<'a> Default for DailyInputs<'a> {
             vix_mean_reversion: VIX_MEAN_REVERSION,
             inflation_reversion: INFLATION_MEAN_REVERSION,
             inflation_ceiling: INFLATION_CEILING,
+            inflation_floor: INFLATION_FLOOR,
             crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
         }
     }
@@ -315,7 +318,7 @@ pub fn update_economy_daily(
                 + phillips_curve_effect
                 + wage_pressure
                 + random_normal(rng, 0.0, 0.04 * volatility),
-            -1.0,
+            inputs.inflation_floor,
             inputs.inflation_ceiling,
         );
         new_state.core_inflation = clamp(

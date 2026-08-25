@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+**`inflation_floor` is a dial**, shipped at -1.0, the clamp every preset ran
+under. It completes the trio started in 0.1.4: with the reversion loosened to
+the real dispersion the endogenous series sits on the floor at every setting,
+so all three inflation clamps are calibration questions rather than literals.
+Bit-identical at the shipped value; no preset uses it.
+
+**What a real inflation range does to the equity panel, measured.** 0.1.4
+shipped the inflation dials with the question open. On pt-v8 at thirty
+seeds, `inflation_reversion` 0.20 with `inflation_ceiling` 10 brings lag-5
+clustering at 252 days back over its floor, so the panel reads 13 of 14
+there, and costs the return autocorrelation and the same clustering
+statistic at 504 days, where the panel drops to 11 of 14. The crisis state
+does not move. That trade is the wrong way round for a preset whose case
+rests on the long horizon, so no preset takes the dials; they remain for
+anyone who wants an inflation regime and is scoring at one year.
+Calibration record §65.
+
 ## 0.1.4
 
 Two new model presets, a realism panel that has grown from ten statistics to

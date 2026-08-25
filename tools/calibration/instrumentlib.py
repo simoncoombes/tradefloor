@@ -151,6 +151,12 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_mean_reversion": {"kind": "abs", "step_unit": 0.02},
     "inflation_reversion": {"kind": "abs", "step_unit": 0.05},
     "inflation_ceiling": {"kind": "log"},
+    # Negative-valued, so the multiplicative default box inverts. Real CPI
+    # year-on-year bottomed at -0.2 in 2015-2025 and -2.0 in 2009 (FRED
+    # CPIAUCSL), and the shipped clamp is -1.0, so the box spans a floor
+    # that never binds to one deeper than any modern deflation.
+    "inflation_floor": {"kind": "abs", "step_unit": 0.5,
+                        "hard_range": (-4.0, 0.0)},
     "news_peer_weight": {"kind": "abs", "step_unit": 0.05,
                          "hard_range": (0.0, 1.0)},
     "news_peer_weight_down": {"kind": "abs", "step_unit": 0.05,

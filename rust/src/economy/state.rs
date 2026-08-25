@@ -32,6 +32,8 @@ pub const INFLATION_TARGET: f64 = 2.0;
 pub const INFLATION_MEAN_REVERSION: f64 = 0.55;
 /// Hard ceiling on endogenous inflation, percent; `ModelParams::inflation_ceiling` at runtime.
 pub const INFLATION_CEILING: f64 = 6.0;
+/// Hard floor on endogenous inflation, percent; `ModelParams::inflation_floor` at runtime.
+pub const INFLATION_FLOOR: f64 = -1.0;
 
 /// Phillips-curve coefficient.
 ///

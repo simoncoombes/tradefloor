@@ -224,6 +224,7 @@ PERTURBATIONS = [
     # `test_the_crisis_threshold_acts_above_itself`.
     ("vix_mean_reversion", 0.30, True),
     ("inflation_ceiling", 10.0, False),       # binds only when inflation reaches 6%
+    ("inflation_floor", -3.0, False),         # binds only when inflation reaches -1%
     ("inflation_reversion", 0.15, False),      # monthly; reaches prices via the bond yield at the first meeting (day 45)
     ("crisis_vix_threshold", 18.0, False),     # needs VIX above the gate
 ]
