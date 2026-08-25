@@ -1,6 +1,6 @@
 """pt-v7: pt-v6 with industries that survive a crisis.
 
-Five coefficients move from pt-v6 and nothing else does. What these tests pin
+Six coefficients move from pt-v6 and nothing else does. What these tests pin
 is the identity contract every preset carries: it is exactly the vector the
 calibration record describes (CALIBRATION-FOLLOWUPS.md §62), it answers to
 its own name and to no other, every earlier preset reproduces bit for bit,
@@ -16,6 +16,7 @@ MOVED = {
     "crisis_blend_source": 1.0,
     "sector_vix_coupling": 0.25,
     "crisis_blend_cap": 0.98,
+    "market_vol_ceiling_multiple": 16.0,
 }
 
 

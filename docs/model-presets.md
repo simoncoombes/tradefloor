@@ -23,6 +23,27 @@ market. If every user ran a bespoke coefficient set, no two published
 results would be comparable, and "tested on the pretium simulator" would
 mean nothing.
 
+## Which preset to use
+
+Seven presets ship. Two are recommendations; the rest exist so that
+results already published on them keep reproducing bit for bit, and a
+new preset never moves an old one.
+
+| preset | use it for | status |
+|---|---|---|
+| `pt-v3` | anything: the default, and the one the realism envelope certifies | recommended |
+| `pt-v7` | studies whose thesis is a sector, or a crisis: the first preset with industries that survive a crisis, twelve of thirteen realism statistics in band at both horizons | recommended, opt in by name |
+| `pt-v1`, `pt-v2`, `pt-v4`, `pt-v5`, `pt-v6` | reproducing a run that names them | reproduction only |
+
+`pt-v7` is not the default because the envelope certifies one preset by
+policy, and re-certifying moves every published number at once. On a
+single real name replayed through a real crisis (the pandemic notebook in
+`examples/`) `pt-v3` and `pt-v6` fit the path a touch better than `pt-v7`;
+`pt-v7` earns its keep in the cross-section, which a one-name path does not
+measure. The per-preset record of what moved and what it measured is in the
+[changelog](https://github.com/simoncoombes/pretium/blob/main/CHANGELOG.md)
+and the calibration record it cites.
+
 ## Changing the model
 
 The escape hatch exists and is deliberately ceremonial:

@@ -56,13 +56,16 @@ CORRELATION-REVIEW-2026-08-25.md.
 
 ### pt-v7: the first preset with industries
 
-pt-v6 with five coefficients moved, selectable by name and not the default:
+pt-v6 with six coefficients moved, selectable by name and not the default:
 `sector_factor_sigma` 0.002 to 0.012, `crisis_blend_source` 0.0 to 1.0,
 `sector_vix_coupling` 0.0 to 0.25, `idio_sigma_scale` trimmed by ten percent
 to pay for the added variance, and `crisis_blend_cap` 0.8 to 0.98, which the
 survey over this surface found to be the one dial monotone on crisis
 correlation and crisis magnitude together and which binds only above the
-crisis threshold, so it costs nothing in calm markets. Measured on thirty training seeds
+crisis threshold, so it costs nothing in calm markets, and
+`market_vol_ceiling_multiple` 8 to 16, which also binds only in a crisis and
+lifts the crisis volatility lever from 3.06x to 3.31x with crisis kurtosis
+unchanged. Measured on thirty training seeds
 across all thirteen statistics, it holds **twelve of thirteen at 252 days and
 twelve of thirteen at 504**, the only miss being the structural volume-change
 row; pt-v6 holds eleven and ten, and pt-v3 eleven and six. Sector excess

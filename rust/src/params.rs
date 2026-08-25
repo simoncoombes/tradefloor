@@ -906,8 +906,8 @@ impl ModelParams {
     /// sector co-move more than names in different ones, in calm markets and
     /// in a crisis alike.
     ///
-    /// Five coefficients move from pt-v6 (CALIBRATION-FOLLOWUPS.md §58 to
-    /// §62). `sector_factor_sigma` 0.002 to 0.012 gives the sector draw real
+    /// Six coefficients move from pt-v6 (CALIBRATION-FOLLOWUPS.md §58 to
+    /// §63). `sector_factor_sigma` 0.002 to 0.012 gives the sector draw real
     /// variance. `crisis_blend_source` 0.0 to 1.0 stops the crisis blend
     /// consuming that draw and injects the market factor through the market
     /// component instead. `sector_vix_coupling` 0.0 to 0.25 lets a quarter of
@@ -922,6 +922,13 @@ impl ModelParams {
     /// 0.6 and above, the volatility lever 2.95x to 3.06x, the correlation
     /// blend 2.47x to 2.55x. The §62 survey found the cap to be the one axis
     /// monotone on crisis correlation and the lever together.
+    /// `market_vol_ceiling_multiple` 8 to 16 lets the market factor's variance
+    /// reach sixteen times its calm level before the clamp binds, which it
+    /// does only in a crisis: the calm panels are identical to three places
+    /// across 8, 12, 16 and 24 (§63), the lever rises 3.06x to 3.31x, and
+    /// crisis kurtosis, the number that could have refused it, holds at 3.0.
+    /// At 24 the 504-day panel loses `abs_return_acf5`, so 16 is the last
+    /// free rung.
     ///
     /// MEASURED, thirty training seeds, thirteen statistics: twelve of
     /// thirteen in band at 252 days and at 504, the only miss being the
@@ -941,6 +948,7 @@ impl ModelParams {
         // pt-v6's 0.8146007420925029 times 0.90, asserted in tests.
         p.idio_sigma_scale = 0.7331406678832526;
         p.crisis_blend_cap = 0.98;
+        p.market_vol_ceiling_multiple = 16.0;
         p
     }
 
