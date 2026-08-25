@@ -7,9 +7,9 @@
 # whole. That deposit is the next step for citability, and when it happens the
 # `doi:` field and a `date-released:` for the tagged version belong here.
 #
-# `version:` tracks the `version` field in pyproject.toml. `date-released:` is
-# omitted because nothing has been tagged or released yet, and a plausible date
-# for a release that did not happen is worse than no date.
+# `version:` tracks the `version` field in pyproject.toml, and
+# `date-released:` is the day that version was tagged. Both move together at
+# a release; a version without the date it shipped is half a citation.
 #
 # A citation identifies the software. It does not identify a RUN. Reproducing a
 # published result needs the seed, the universe fingerprint, the model preset
@@ -29,6 +29,7 @@ authors:
     given-names: Simon
     email: simon@coombes.io
 version: 0.1.0
+date-released: "2026-08-24"
 license:
   - MIT
   - Apache-2.0
