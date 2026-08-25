@@ -24,6 +24,10 @@ dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 cat > /home/ec2-user/stream.sh <<'STREAM'
 #!/bin/bash
 BUCKET="$1"
+# Proof of life before the first sleep, so "the streamer is dead" and "the
+# streamer has not ticked yet" are distinguishable from outside the box.
+date -u > /tmp/stream-alive
+aws s3 cp /tmp/stream-alive "$BUCKET/STREAM-ALIVE" 2>&1 || echo "STREAM UPLOAD FAILED"
 while true; do
   # 120, not 300. A spot reclaim gives two minutes of warning, so the sync
   # interval is the upper bound on how many rows a reclaim throws away.
@@ -40,7 +44,14 @@ while true; do
 done
 STREAM
 chmod +x /home/ec2-user/stream.sh
-nohup /home/ec2-user/stream.sh "$BUCKET" >/var/log/pretium-stream.log 2>&1 &
+# setsid, and an immediate proof-of-life upload. The first streamed run wrote
+# NOTHING to S3 for its whole life while the survey ran perfectly: the run was
+# visible only through `aws ec2 get-console-output`, which needs no SSH and is
+# now the primary monitor. The cause was never isolated, so this does three
+# things rather than guess: detaches properly, writes a marker before the
+# first sleep so a dead streamer is distinguishable from a slow one within a
+# minute, and logs its own failures somewhere they can be read.
+setsid nohup /home/ec2-user/stream.sh "$BUCKET" >/var/log/pretium-stream.log 2>&1 < /dev/null &
 
 cat > /home/ec2-user/run.sh <<'WORK'
 #!/bin/bash
