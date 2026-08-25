@@ -20,6 +20,23 @@ SAMPLES=4000
 
 dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 
+# S3 PREFLIGHT, before anything expensive. The 2026-08-25 survey ran 192,000
+# tasks over 2.4 hours on 96 cores with zero errors and produced NOTHING,
+# because the instance was launched without --iam-instance-profile and every
+# `aws s3 cp` died with "Unable to locate credentials". From outside the box
+# that is indistinguishable from a healthy run until the very end, when the
+# certificate does not appear and the instance has already terminated.
+#
+# The script already refuses to spend a Rust build on a missing Python
+# dependency. Credentials deserve the same treatment, and cost one second.
+echo "preflight $(date -u)" > /tmp/PREFLIGHT-S3
+if ! aws s3 cp /tmp/PREFLIGHT-S3 "$BUCKET/PREFLIGHT-S3"; then
+  echo "ABORTING: cannot write to $BUCKET. Almost certainly a missing"
+  echo "--iam-instance-profile Name=pretium-calib-profile on run-instances."
+  shutdown -h now
+  exit 1
+fi
+
 # Stream the work directory to S3 while the run is going, not after it.
 # §6: retrieve as work completes. atlas_survey.py fsyncs tasks.jsonl before it
 # prints progress and resumes from it under a matching plan fingerprint, so a
