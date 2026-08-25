@@ -55,6 +55,23 @@ def show(label: str, obj: object, chars: int) -> None:
     print("  " + json.dumps(obj, default=str, indent=1)[:chars].replace("\n", "\n  "))
 
 
+def attempt(label: str, fn, chars: int) -> None:
+    """Run one query, reporting a refusal rather than dying on it.
+
+    `pretium.atlas` refuses a rank correlation over too few usable rows, which
+    is correct: five points describe the sample rather than the model. But
+    `atlas_survey.py collect` builds a readable survey from whatever is on
+    disk, ON PURPOSE, so that a run can be read mid-flight, and that is exactly
+    when rows are scarce. Dying in a traceback there turns a partial answer
+    into no answer.
+    """
+    try:
+        show(label, fn(), chars)
+    except Exception as exc:                       # noqa: BLE001
+        print(f"\n=== {label} ===")
+        print(f"  unavailable: {type(exc).__name__}: {exc}")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
@@ -70,13 +87,12 @@ def main(argv: list[str] | None = None) -> int:
         print("  than reaching for a different output.")
         return 1
 
-    show(f"what moves {args.target}", survey.sensitivity(args.target), args.chars)
-    show(
-        "frontier: slope toward zero against lowest loss",
-        survey.pareto({args.target: "max", "loss": "min"}),
-        args.chars,
-    )
-    show("moves nothing", survey.unidentified([args.target, "loss"]), args.chars)
+    attempt(f"what moves {args.target}",
+            lambda: survey.sensitivity(args.target), args.chars)
+    attempt("frontier: slope toward zero against lowest loss",
+            lambda: survey.pareto({args.target: "max", "loss": "min"}), args.chars)
+    attempt("moves nothing",
+            lambda: survey.unidentified([args.target, "loss"]), args.chars)
     return 0
 
 

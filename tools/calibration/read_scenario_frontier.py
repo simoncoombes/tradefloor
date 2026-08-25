@@ -61,6 +61,23 @@ def show(label: str, obj: object, chars: int) -> None:
     print("  " + json.dumps(obj, default=str, indent=1)[:chars].replace("\n", "\n  "))
 
 
+def attempt(label: str, fn, chars: int) -> None:
+    """Run one query, reporting a refusal rather than dying on it.
+
+    `pretium.atlas` refuses a rank correlation over too few usable rows, which
+    is correct: five points describe the sample rather than the model. But
+    `atlas_survey.py collect` builds a readable survey from whatever is on
+    disk, ON PURPOSE, so that a run can be read mid-flight, and that is exactly
+    when rows are scarce. Dying in a traceback there turns a partial answer
+    into no answer.
+    """
+    try:
+        show(label, fn(), chars)
+    except Exception as exc:                       # noqa: BLE001
+        print(f"\n=== {label} ===")
+        print(f"  unavailable: {type(exc).__name__}: {exc}")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     survey = Survey.load(args.survey)
@@ -75,27 +92,27 @@ def main(argv: list[str] | None = None) -> int:
               "rather than substituting a different output.")
         return 1
 
-    show("what moves the steady-state lever", survey.sensitivity("vol_lever"),
-         args.chars)
-    show("what moves the shock transient",
-         survey.sensitivity("shock_ratio_median"), args.chars)
+    attempt("what moves the steady-state lever",
+            lambda: survey.sensitivity("vol_lever"), args.chars)
+    attempt("what moves the shock transient",
+            lambda: survey.sensitivity("shock_ratio_median"), args.chars)
 
     # The frontier proper. If Gap 5 is right, every vector with a high lever
     # carries a high loss_504 and this front is empty of anything interesting.
-    show(f"frontier: lever toward {REAL_VOL_LEVER}x against 504-day loss",
-         survey.pareto({"vol_lever": "max", "loss_504": "min"}), args.chars)
-    show("frontier: transient against 504-day loss",
-         survey.pareto({"shock_ratio_median": "max", "loss_504": "min"}),
-         args.chars)
+    attempt(f"frontier: lever toward {REAL_VOL_LEVER}x against 504-day loss",
+            lambda: survey.pareto({"vol_lever": "max", "loss_504": "min"}),
+            args.chars)
+    attempt("frontier: transient against 504-day loss",
+            lambda: survey.pareto({"shock_ratio_median": "max", "loss_504": "min"}), args.chars)
 
     # Both horizons at once is the claim that has never been tested: §14 held
     # 252 and Gap 5 measured 504, on the same experiment, separately.
-    show("frontier: lever against BOTH horizons",
-         survey.pareto({"vol_lever": "max", "loss_252": "min",
+    attempt("frontier: lever against BOTH horizons",
+            lambda: survey.pareto({"vol_lever": "max", "loss_252": "min",
                         "loss_504": "min"}), args.chars)
 
-    show("moves neither the lever nor either loss",
-         survey.unidentified(["vol_lever", "loss_252", "loss_504"]), args.chars)
+    attempt("moves neither the lever nor either loss",
+            lambda: survey.unidentified(["vol_lever", "loss_252", "loss_504"]), args.chars)
     return 0
 
 
