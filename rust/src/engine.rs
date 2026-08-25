@@ -934,6 +934,10 @@ impl Engine {
             &self.economy,
             &DailyInputs {
                 vix_mean_reversion: self.params.vix_mean_reversion,
+                vix_return_gain: self.params.vix_return_gain,
+                vix_return_gain_up: self.params.vix_return_gain_up,
+                vix_return_clamp: self.params.vix_return_clamp,
+                vix_target_shock_cap: self.params.vix_target_shock_cap,
                 inflation_reversion: self.params.inflation_reversion,
                 inflation_ceiling: self.params.inflation_ceiling,
                 inflation_floor: self.params.inflation_floor,

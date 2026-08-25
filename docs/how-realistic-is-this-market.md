@@ -68,7 +68,8 @@ not by tuning harder.
 - **The certified horizon is 252 days.** The statistics are horizon-dependent
   and the model is roughly five times more horizon-sensitive than the market
   it imitates. Measured against bands re-derived at the matching window, the
-  wrong ruler being the easy mistake here, it holds five of ten at 504 days.
+  wrong ruler being the easy mistake here, it holds seven of fourteen at 504
+  days, where the selectable `pt-v7` and `pt-v8` hold thirteen.
 - **Volatility memory has the wrong shape.** Real markets' decays
   hyperbolically; this model's decays exponentially, because it is built from
   exponentials. Over one year two exponentials fake a power law well enough

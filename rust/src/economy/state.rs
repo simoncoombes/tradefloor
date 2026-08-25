@@ -52,6 +52,21 @@ pub const OIL_OPEC_INTERVAL: i64 = 90;
 pub const GOLD_EQUILIBRIUM_BASE: f64 = 2200.0;
 pub const GOLD_MEAN_REVERSION: f64 = 0.002;
 pub const VIX_MEAN_REVERSION: f64 = 0.12;
+/// VIX points added to the target per unit of a DOWN day's index return.
+/// The shipped 25.0 with the clamp below gives a worst-case +0.75 to the
+/// target and about +0.09 on the day; real markets move the VIX a median of
+/// +6.03 points on a session at -3% or worse (FRED VIXCLS against SP500,
+/// 2,511 common days to 2026-08). Carried at runtime as
+/// `ModelParams::vix_return_gain`.
+pub const VIX_RETURN_GAIN: f64 = 25.0;
+/// The same for an UP day, where the real response is about half the size.
+pub const VIX_RETURN_GAIN_UP: f64 = 10.0;
+/// The index return is clamped to this before it drives the VIX, so a -10%
+/// day and a -3% day produce identical fear at the shipped 0.03.
+pub const VIX_RETURN_CLAMP: f64 = 0.03;
+/// Ceiling on the whole target excursion (return spike plus inflation and
+/// shock adjustments), in VIX points.
+pub const VIX_TARGET_SHOCK_CAP: f64 = 12.0;
 pub const FISCAL_MULTIPLIER: f64 = 0.30;
 
 /// The VIX level above which crisis-gated behaviour engages: the gold

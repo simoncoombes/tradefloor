@@ -559,6 +559,34 @@ pub struct ModelParams {
     /// variance process was measured to cost long-horizon realism, a longer
     /// SPIKE touches variance persistence not at all.
     pub vix_mean_reversion: f64,
+    /// VIX points added to its target per unit of a DOWN day's index
+    /// return, before the clamp and cap below.
+    ///
+    /// Shipped 25.0, a literal in the VIX update. MEASURED against real
+    /// markets (FRED VIXCLS and SP500, 2,511 common days to 2026-08): a
+    /// session at -3% or worse moves the VIX a median of +6.03 points, and
+    /// -2% to -1% moves it +1.95. The shipped gain with the shipped clamp
+    /// adds at most 0.75 points to the TARGET, of which the day traverses
+    /// `vix_mean_reversion`, about 0.09 points. The consequence is
+    /// measurable in the panel: over 252 days the endogenous VIX has sd 1.5
+    /// against a real within-year median of 4.0 and crosses its own crisis
+    /// threshold on 0.0% of days against a real 12.5%, so a one-year run
+    /// contains no volatility episode and lag-5 clustering sits on its band
+    /// floor. Calibration record §68.
+    pub vix_return_gain: f64,
+    /// The same for an UP day. Shipped 10.0; the real response to a +2% day
+    /// is about half the size of the response to -2%, which the shipped
+    /// 2.5:1 ratio is already close to.
+    pub vix_return_gain_up: f64,
+    /// The index return is clamped to +/- this before it drives the VIX.
+    ///
+    /// Shipped 0.03, so a -10% day and a -3% day produce identical fear. A
+    /// crash is exactly where that assumption is worst.
+    pub vix_return_clamp: f64,
+    /// Ceiling on the VIX target's whole excursion, in points: the return
+    /// spike plus the inflation and shock adjustments. Shipped 12.0, which
+    /// binds long before a real crisis does.
+    pub vix_target_shock_cap: f64,
     /// VIX level at which crisis behaviour begins.
     ///
     /// Gates the sector-to-market correlation blend, the universe stress
@@ -749,6 +777,10 @@ impl ModelParams {
             spread_size_smoothness: 0.0,
             spread_size_exponent: crate::microstructure::SPREAD_SIZE_EXPONENT,
             vix_mean_reversion: crate::economy::VIX_MEAN_REVERSION,
+            vix_return_gain: crate::economy::VIX_RETURN_GAIN,
+            vix_return_gain_up: crate::economy::VIX_RETURN_GAIN_UP,
+            vix_return_clamp: crate::economy::VIX_RETURN_CLAMP,
+            vix_target_shock_cap: crate::economy::VIX_TARGET_SHOCK_CAP,
             crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
@@ -1116,6 +1148,10 @@ impl ModelParams {
             "spread_size_smoothness" => self.spread_size_smoothness,
             "spread_size_exponent" => self.spread_size_exponent,
             "vix_mean_reversion" => self.vix_mean_reversion,
+            "vix_return_clamp" => self.vix_return_clamp,
+            "vix_return_gain" => self.vix_return_gain,
+            "vix_return_gain_up" => self.vix_return_gain_up,
+            "vix_target_shock_cap" => self.vix_target_shock_cap,
             "crisis_vix_threshold" => self.crisis_vix_threshold,
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
@@ -1215,6 +1251,10 @@ impl ModelParams {
             "spread_size_exponent" => out.spread_size_exponent = value,
             "spread_size_smoothness" => out.spread_size_smoothness = value,
             "vix_mean_reversion" => out.vix_mean_reversion = value,
+            "vix_return_clamp" => out.vix_return_clamp = value,
+            "vix_return_gain" => out.vix_return_gain = value,
+            "vix_return_gain_up" => out.vix_return_gain_up = value,
+            "vix_target_shock_cap" => out.vix_target_shock_cap = value,
             "crisis_vix_threshold" => out.crisis_vix_threshold = value,
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
@@ -1381,6 +1421,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "universe_stress_decay",
         "universe_stress_weight",
         "vix_mean_reversion",
+        "vix_return_clamp",
+        "vix_return_gain",
+        "vix_return_gain_up",
+        "vix_target_shock_cap",
         "volume_innovation_sigma",
         "volume_persistence",
         "volume_variance_gain",

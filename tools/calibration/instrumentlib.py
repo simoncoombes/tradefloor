@@ -149,6 +149,18 @@ PARAM_SPECS: dict[str, dict] = {
     # the log/raw split exists for.
     "crisis_vix_threshold": {"kind": "log"},
     "vix_mean_reversion": {"kind": "abs", "step_unit": 0.02},
+    # The volatility feedback (§68). Real markets move the VIX 165 points
+    # per unit return on a heavy down day against the shipped 25, so the
+    # box reaches well past the shipped value rather than around it.
+    # "log", not "abs": these are scale parameters an order of magnitude
+    # above the panel's other values, and a raw deviation penalty on them
+    # would be about the regulariser rather than the model (trap 4 in the
+    # calibration notes).
+    "vix_return_gain": {"kind": "log", "hard_range": (1.0, 250.0)},
+    "vix_return_gain_up": {"kind": "log", "hard_range": (1.0, 250.0)},
+    "vix_return_clamp": {"kind": "abs", "step_unit": 0.01,
+                         "hard_range": (0.005, 0.25)},
+    "vix_target_shock_cap": {"kind": "log", "hard_range": (1.0, 70.0)},
     "inflation_reversion": {"kind": "abs", "step_unit": 0.05},
     "inflation_ceiling": {"kind": "log"},
     # Negative-valued, so the multiplicative default box inverts. Real CPI

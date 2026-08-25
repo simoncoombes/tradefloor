@@ -223,6 +223,10 @@ PERTURBATIONS = [
     # the gate moves nothing. Shown live by
     # `test_the_crisis_threshold_acts_above_itself`.
     ("vix_mean_reversion", 0.30, True),
+    ("vix_return_gain", 150.0, False),        # needs a DOWN day; the harness's three sessions rise, so only the up gain fires
+    ("vix_return_gain_up", 60.0, True),
+    ("vix_return_clamp", 0.12, True),
+    ("vix_target_shock_cap", 40.0, False),   # binds only past a 12-point excursion
     ("inflation_ceiling", 10.0, False),       # binds only when inflation reaches 6%
     ("inflation_floor", -3.0, False),         # binds only when inflation reaches -1%
     ("inflation_reversion", 0.15, False),      # monthly; reaches prices via the bond yield at the first meeting (day 45)

@@ -17,7 +17,9 @@ band is the same defect as an unreproducible figure, one level up.
 
 ## The headline
 
-**Against re-derived bands, five of the ten statistics are in band: the
+**Against re-derived bands at 504 days, seven of the fourteen statistics are
+in band on the default preset, and thirteen on the selectable pt-v7 and
+pt-v8. Of the original ten, the
 dependence structure mostly holds, and what fails is scale, trend, and
 where the clustering sits.** Volatility runs high, returns trend where
 real ones do not, volatility clustering is concentrated into short lags

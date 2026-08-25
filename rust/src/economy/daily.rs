@@ -71,6 +71,15 @@ pub struct DailyInputs<'a> {
     /// and the other is a LONGER SPIKE, which touches variance persistence
     /// not at all.
     pub vix_mean_reversion: f64,
+    /// VIX points per unit of a down day's index return (shipped 25.0), of
+    /// an up day's (10.0), the clamp on that return (0.03) and the ceiling
+    /// on the whole target excursion (12.0). Threaded for the reason
+    /// `vix_mean_reversion` is: a literal here decides how violent a crisis
+    /// can be, which is a calibration question. See §68.
+    pub vix_return_gain: f64,
+    pub vix_return_gain_up: f64,
+    pub vix_return_clamp: f64,
+    pub vix_target_shock_cap: f64,
     /// Monthly fraction of the inflation gap closed toward the 2% target.
     /// Threaded like `vix_mean_reversion`: the shipped 0.55 was a literal
     /// inside the inflation update, which made inflation's persistence and
@@ -97,6 +106,10 @@ impl<'a> Default for DailyInputs<'a> {
             market_return_pct: 0.0,
             game_day: 0,
             vix_mean_reversion: VIX_MEAN_REVERSION,
+            vix_return_gain: VIX_RETURN_GAIN,
+            vix_return_gain_up: VIX_RETURN_GAIN_UP,
+            vix_return_clamp: VIX_RETURN_CLAMP,
+            vix_target_shock_cap: VIX_TARGET_SHOCK_CAP,
             inflation_reversion: INFLATION_MEAN_REVERSION,
             inflation_ceiling: INFLATION_CEILING,
             inflation_floor: INFLATION_FLOOR,
@@ -633,15 +646,20 @@ pub fn update_economy_daily(
     };
     // The CURRENT day's return, not the previous one, so VIX reacts same-day
     // and the negative correlation is real.
-    let current_mkt_ret_vix = mathx::max(-0.03, mathx::min(0.03, inputs.market_return_pct));
+    let clamp_vix = inputs.vix_return_clamp;
+    let current_mkt_ret_vix =
+        mathx::max(-clamp_vix, mathx::min(clamp_vix, inputs.market_return_pct));
     let return_spike = if current_mkt_ret_vix < 0.0 {
-        -current_mkt_ret_vix * 25.0
+        -current_mkt_ret_vix * inputs.vix_return_gain
     } else {
-        -current_mkt_ret_vix * 10.0
+        -current_mkt_ret_vix * inputs.vix_return_gain_up
     };
     let inflation_adj = mathx::max(0.0, (economy.inflation_rate - 3.0) * 0.2);
     let shock_adj = shock_gdp_impact.abs() * 2.0;
-    target_vix += mathx::min(12.0, return_spike + inflation_adj + shock_adj);
+    target_vix += mathx::min(
+        inputs.vix_target_shock_cap,
+        return_spike + inflation_adj + shock_adj,
+    );
 
     // Earnings-season bump. The 30.44 is a mean month length, so this is not
     // the same day-of-month the month-start blocks above use.

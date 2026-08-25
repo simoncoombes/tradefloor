@@ -97,29 +97,31 @@ costs.
 
 **Realism is a stated envelope, not a score.** `pt.facts.measure()` reports
 fourteen statistics against real-market bands. At 252 days the shipped `pt-v3`
-preset holds twelve of the fourteen in band, and holds the original eleven on
-axes the calibration never saw: fresh seeds, and a fresh 60-name universe. The
-two it misses are both stated as gaps: volume shocks do not persist, and names in
-the same sector do not co-move more than names in different ones. Two further
-presets close those on their own terms and are selectable by name, never the
-default: `pt-v7` gives the market industries that survive a crisis, and
-`pt-v8` gives the market factor's variance a memory, so correlation that rose
-last month is still elevated this month and a crisis is a third more violent.
-Every earlier preset keeps reproducing bit for bit.
+preset holds twelve of the fourteen in band, and holds the same statistics on
+axes the calibration never saw: fresh seeds, and a fresh 60-name universe. It
+misses two, both stated as gaps: volume shocks do not persist, and names in the
+same sector do not co-move more than names in different ones.
 
-The tenth is the autocorrelation of volume changes, which misses by 13.7
-seed-standard-deviations. It's excluded from the calibration objective
-deliberately, because an optimiser pointed at an unreachable target doesn't
-fail cleanly, it distorts every other parameter chasing it. In practice a
-volume forecast here is never wrong twice running, so an execution algorithm
-faces an easier scheduling problem than the one it was written for.
+`pt-v7` closes the sector one and `pt-v8` closes it and gives the market
+factor's variance a memory, so correlation that rose last month is still
+elevated this month and a crisis is 70% as violent as a real one against the
+default's 50%. Both are selectable by name and neither is the default. No
+preset closes the volume one: the autocorrelation of volume changes misses by
+13.7 seed standard deviations on every preset, and it is excluded from the
+calibration objective deliberately, because an optimiser pointed at an
+unreachable target does not fail cleanly, it distorts every other parameter
+chasing it. In practice a volume forecast here is never wrong twice running, so
+an execution algorithm faces an easier scheduling problem than the one it was
+written for. Every earlier preset keeps reproducing bit for bit.
 
-**Six gaps are measured and named rather than assumed.** The certified
+**Eight gaps are measured and named rather than assumed.** The certified
 horizon is 252 days and the model doesn't hold beyond it. Volatility memory
 decays exponentially where real markets decay hyperbolically. Tails are too
 thin over multi-year windows. Scenario response is directionally right but
-not calibrated in magnitude. And certification was measured on a
-sector-balanced roster, which no real index is.
+not calibrated in magnitude, at seventy to eighty five percent of the real
+size. The endogenous economy cannot reach its own crisis regimes, so an
+inflation regime has to be driven through a scenario. And certification was
+measured on a sector-balanced roster, which no real index is.
 [The realism envelope](https://simoncoombes.github.io/pretium/trust.html)
 states each gap and what it forbids. `pt.envelope.check()` refuses to certify
 a question that falls outside one.
@@ -130,7 +132,7 @@ and aggregate flow rather than agents that adapt to you.
 
 ## Worked examples
 
-Six notebooks and two scripts in [`examples/`](https://github.com/simoncoombes/pretium/tree/main/examples), numbered in
+Seven notebooks and two scripts in [`examples/`](https://github.com/simoncoombes/pretium/tree/main/examples), numbered in
 reading order and executed as part of the test suite:
 
 | | what it covers |

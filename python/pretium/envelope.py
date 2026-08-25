@@ -385,7 +385,7 @@ GAPS: tuple[Gap, ...] = (
         ),
         forbids="sector rotation, sector-neutral construction, industry diversification, and any long/short pair whose thesis is the sector",
         statistics=("sector_excess_corr",),
-        closed_by=("pt-v7",),
+        closed_by=("pt-v7", "pt-v8"),
     ),
     Gap(
         id="roster-concentration",
@@ -799,7 +799,8 @@ def regressions(panel: Mapping[str, float], *,
     already recorded the pre-jump level, so herding read the jump as a
     re-rating and continued it: fattening the tail and adding return
     continuation were the same write. `pt-v5` separates them and holds both,
-    nine of ten at the certified horizon with the 504-day tail closed (§38,
+    nine of the original ten at the certified horizon with the 504-day tail
+    closed (§38,
     §45). That does not soften the policy below. pt-v5 passes the controls
     and is still not the default, because passing §8 is not certification
     and `CERTIFIED` is measured on the shipped preset.

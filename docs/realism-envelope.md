@@ -31,8 +31,9 @@ parameters move them, or which move YOUR result, see [Atlas](atlas.md).
 ## The claim, in one sentence
 
 **At a 252-day measurement horizon, the shipped `pt-v3` preset matches
-nine of the ten realism statistics pretium measures, and the tenth fails
-structurally and is named below.**
+twelve of the fourteen realism statistics pretium measures. The two it
+misses are named below, and one of them, sector co-movement, is closed by
+the selectable `pt-v7` and `pt-v8`.**
 
 ## What is certified
 
@@ -55,9 +56,14 @@ of the same length by the method in the calibration docs.
 | `corr_asymmetry` | +0.0036 | −0.25 to 0.45 | in band |
 | `corr_asymmetry_lagged` | −0.0330 | −0.20 to 0.55 | in band |
 | `sector_excess_corr` | +0.0037 | 0.11 to 0.23 | **out, 15 sd** |
+| `corr_persistence_acf1` | +0.0413 | −0.19 to 0.54 | in band |
 
-Band-distance loss `L_real` = **0.0000**. The last three rows were added on
+Band-distance loss `L_real` = **0.0000**. The last four rows were added on
 2026-08-25; see gap 7 for why the panel grew and what the new miss means.
+`corr_persistence_acf1` also carries a 504-day band of 0.19 to 0.49, which is
+the one that can judge it: twelve 21-day windows in a year cannot, and the
+252-day band above is wide because the real windows themselves are. At 504
+days `pt-v3` reads +0.225, inside that band and on its floor.
 
 ## The claim survives the axes it was not fitted to
 
@@ -82,7 +88,7 @@ search never touched. This is the part of the claim worth trusting.
 
 ## The gaps, measured
 
-### Gap 1: the tenth statistic is unreachable without spending a passing one
+### Gap 1: volume change is unreachable without spending a passing statistic
 
 `volume_change_acf1` reads −0.46 against a real band of −0.32 to −0.20:
 **13.7 seed-standard-deviations out**. A held volume level plus independent
@@ -279,16 +285,58 @@ by adding a statistic the panel did not have, and the two other statistics
 added beside it, downside correlation asymmetry same-day and lagged, both sit
 inside their bands.
 
-The dial has been measured. At `sector_factor_sigma` 0.012 the statistic lands
-inside its band at one year on training seeds, held-out seeds and a held-out
-universe, and on the pt-v6 base it clears the §8 overfitting control. It pays
-twice, on every base, for one reason: the sector draw is the only variance
-term that does not scale with VIX, so it dilutes the crisis volatility lever
-by a tenth in calm markets and is consumed by the crisis blend in stressed
-ones, where sector excess reads zero at a held VIX 45 against a real +0.10.
-Two parameters that remove both causes, `sector_vix_coupling` and
-`crisis_blend_source`, ship inert in 0.1.4. No preset uses them until the
-thirty-seed measurement is in; the calibration record carries it as §61.
+**Two selectable presets close it.** The dial alone pays twice, on every
+base, for one reason: the sector draw is the only variance term that does not
+scale with VIX, so it dilutes the crisis volatility lever in calm markets and
+is consumed by the crisis blend in stressed ones, where sector excess reads
+zero at a held VIX 45. `sector_vix_coupling` and `crisis_blend_source` remove
+both causes and ship inert; `pt-v7` and `pt-v8` use them.
+
+| preset | sector excess, 252 / 504 days | at a held VIX 45 |
+|---|---|---|
+| real | 0.11 to 0.23 / 0.11 to 0.22 | +0.103 in the 2020 window |
+| `pt-v3` (default) | +0.004 / +0.005 | +0.000 |
+| `pt-v7` | +0.128 / +0.118 | +0.079 |
+| `pt-v8` | +0.146 / +0.129 | +0.053 |
+
+Thirty training seeds, `Universe.random(40, seed=111)`. Both presets hold
+thirteen of fourteen statistics at 504 days where the default holds seven.
+Neither is the default, because the envelope certifies one preset and
+re-certifying moves every published number at once; naming them here is a
+statement about those presets, not a certification. Calibration record §58 to
+§67.
+
+### Gap 8: the endogenous economy cannot reach its own crisis regimes
+
+Left to itself the macro state stays in a moderate band. Endogenous inflation
+peaks at 4.06% to 4.11% over five seeds and five years against a clamp of
+6.0% and a US CPI that reached 9.1% in June 2022. The cause is dispersion, sd
+1.23 around a mean of 1.99%, not persistence: the monthly series has AR(1)
++0.936 against +0.894 for real CPI across 2020 and 2021.
+
+The central bank's crisis cadence depends on it, so it is unreachable too.
+That path pulls the next meeting in to 21 to 30 days when a decision leaves
+the bank more than 2pp behind an inflation rate above 4%, and it fires in
+22.0% of the 11,898 central-bank cases in the parity corpus, but a default run
+never gets there. It also fires in stagflation rather than in high inflation
+as such, so pinning inflation high with unemployment low will not trigger it
+however high you pin it.
+
+**Consequence: an inflation regime or a policy crisis has to be driven
+through a scenario, and so does the policy response to it.** The recipe was
+run before it was published, on real 2022 data over six seeds against a real
+S&P of -20.0%: no scenario returns -12.6%, the real seven-hike path alone
+returns -13.1%, and the published CPI path returns -23.3%. Inflation is the
+lever because it steers the bank's own reaction into the corporate bond
+yield; a pinned policy rate does not reproduce that, and `corporate_bond_yield`
+must be left free or the channel is severed. `envelope.check(macro_regime=True)`
+refuses the question and quotes these figures.
+
+`inflation_reversion`, `inflation_ceiling` and `inflation_floor` are dials
+since 0.1.4, shipped at the values every preset ran on. At reversion 0.20 with
+the ceiling at 10 the endogenous series matches the real 2015 to 2025 mean and
+dispersion, and the long-horizon equity panel pays two statistics for it, so
+no preset takes them. Calibration record §65.
 
 ## The numbers above are medians, and one run is not the median
 
@@ -332,6 +380,11 @@ the difference between a certified claim and a misread one.
 - Strategies keyed on long-horizon volatility memory (Gap 3).
 - Tail-risk or VaR calibration at multi-year horizons (Gap 4).
 - Strategies trading the change in volume (Gap 1).
+- Sector rotation, sector-neutral construction, industry diversification or
+  any long/short pair whose thesis is the sector, on the default preset
+  (Gap 7). `pt-v7` and `pt-v8` close it.
+- Studying an inflation regime or a policy crisis from the endogenous
+  economy alone (Gap 8).
 - Sizing a scenario's impact rather than detecting it (Gap 5).
 - Any claim that absolute simulated performance forecasts live results.
   That is not a gap in this model; it is true of every market simulator,
