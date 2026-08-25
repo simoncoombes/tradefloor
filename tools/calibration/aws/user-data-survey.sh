@@ -12,17 +12,20 @@ shutdown -h +240
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey4
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey5
 BRANCH=main
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
 SAMPLES=3000
-# The §64 surface: the market factor's GARCH memory freed, its level and the
-# market jumps able to take over the tails, with the idio scale and sector
-# sigma able to re-pay for it, on the pt-v7 base. Seven axes, 3000 LHS
-# points, 144000 tasks, about 1.8 hours on 94 workers.
-BASE=pt-v7
-ONLY=market_vol_persistence,market_vol_alpha_frac,market_factor_sigma,jump_intensity_market,jump_sigma_market,idio_sigma_scale,sector_factor_sigma
+# The §66 surface: the crisis state on the pt-v8 base. pt-v8 gave back a
+# third of the crisis-state sector excess pt-v7 bought (+0.053 against
+# +0.079, real +0.10) and carries a lever of 4.34x against 6.16x. The axes
+# are the ones that act in a crisis: sector sigma and its VIX coupling, the
+# blend cap and ramp, the factor's persistence and ceiling, and the idio
+# scale to pay. Seven axes, 3000 LHS points, 144000 tasks, about 70 minutes
+# on 94 workers; sector_ex_45 and vol_lever are the columns to read.
+BASE=pt-v8
+ONLY=sector_factor_sigma,sector_vix_coupling,crisis_blend_cap,crisis_blend_ramp,market_vol_persistence,market_vol_ceiling_multiple,idio_sigma_scale
 
 dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 
