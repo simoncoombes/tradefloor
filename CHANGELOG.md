@@ -54,6 +54,23 @@ mechanisms on the record's own measurements and ranked the survivors behind the
 statistics needed to see them. It is in the design repository as
 CORRELATION-REVIEW-2026-08-25.md.
 
+### Two parameters that let sector structure survive a crisis, inert at 0.0
+
+Measuring the fix for gap 7 found that the coefficient alone pays twice, on
+every base, for one reason: the sector draw is the only variance term on the
+tick path that does not scale with VIX, so it dilutes the crisis lever in calm
+markets and is thrown away by the crisis blend in stressed ones, where
+`sector_excess_corr` reads zero at a held VIX 45 against a real +0.10.
+
+`sector_vix_coupling` lets the sector draw's variance follow VIX on the market
+factor's own target shape. `crisis_blend_source` moves the crisis injection off
+the sector slot and onto the market component, leaving the sector draw whole.
+Both ship at 0.0, bit-identical by branch on every preset; the known-answer
+digest is unchanged and every parity suite passes. At six seeds under a held
+crisis, moving the blend off the sector slot restores sector structure and the
+coupling raises it further; the thirty-seed measurement is in the calibration
+record. No preset uses either yet.
+
 ### `fair_value_book_floor`, and the discontinuity it exists for
 
 Fair value jumps UP as earnings fall through zero. Profitable companies are

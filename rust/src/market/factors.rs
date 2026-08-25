@@ -97,6 +97,9 @@ pub struct SharedFactors {
     pub market_factor: f64,
     /// Indexed by the same sector key order the tick draws them in.
     pub sector_factors: Vec<(String, f64)>,
+    /// The crisis correlation blend weight this tick, 0.0 below the crisis
+    /// threshold. Read only when `crisis_blend_source` is nonzero.
+    pub crisis_spike: f64,
 }
 
 impl SharedFactors {
@@ -303,7 +306,17 @@ pub fn calculate_live_factors(
     let beta = company.beta.unwrap_or(1.0);
     let cap_mult = cap_size_multiplier_with(params, company.market_cap);
 
-    let market_component = beta * shared.market_factor;
+    // With `crisis_blend_source` at 1.0 the crisis blend no longer rides the
+    // sector slot: the market injection every name used to receive through
+    // it (0.5 times the spike times the factor) is added here instead, and
+    // the sector draw arrives intact. A branch, not arithmetic, so 0.0 is
+    // bit-identical.
+    let market_component = if params.crisis_blend_source == 0.0 {
+        beta * shared.market_factor
+    } else {
+        beta * shared.market_factor
+            + params.crisis_blend_source * 0.5 * shared.crisis_spike * shared.market_factor
+    };
     let sector_component = 0.5 * shared.sector(&company.sector);
 
     // `garchVariance` is in DAILY units; the tick needs per-tick sigma.
@@ -476,6 +489,7 @@ mod tests {
         SharedFactors {
             market_factor: 0.0,
             sector_factors: vec![("technology".into(), 0.0)],
+            crisis_spike: 0.0,
         }
     }
 

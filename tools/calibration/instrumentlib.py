@@ -188,6 +188,11 @@ PARAM_SPECS: dict[str, dict] = {
     # A blend weight over its whole domain; 0.1 steps span it in ten.
     "fair_value_book_floor": {"kind": "abs", "step_unit": 0.1,
                               "hard_range": (0.0, 1.0)},
+    # Two blend weights over their whole domain (§60, CRISIS-BLEND-SECTOR.md).
+    "crisis_blend_source": {"kind": "abs", "step_unit": 0.1,
+                            "hard_range": (0.0, 1.0)},
+    "sector_vix_coupling": {"kind": "abs", "step_unit": 0.1,
+                            "hard_range": (0.0, 1.0)},
     "volume_persistence": {"kind": "abs", "step_unit": 0.05,
                            "hard_range": (0.0, 0.99)},
     "volume_innovation_sigma": {"kind": "abs", "step_unit": 0.05,

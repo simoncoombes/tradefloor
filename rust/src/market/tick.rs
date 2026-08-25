@@ -426,6 +426,7 @@ pub fn simulate_market_tick(
             shared_factors: SharedFactors {
                 market_factor: 0.0,
                 sector_factors: Vec::new(),
+                crisis_spike: 0.0,
             },
         };
     }
@@ -486,17 +487,39 @@ pub fn simulate_market_tick(
         0.0
     };
 
+    // The sector draw's sigma follows VIX when coupled, on the market
+    // factor's own target shape: variance scales with (VIX / anchor)^2, so
+    // sigma scales with its square root. A branch at zero keeps every preset
+    // before this parameter bit-identical; at the anchor the ratio is exactly
+    // 1.0 at any coupling. The draw count is unchanged, so the tape is too.
+    let sector_sigma = if p.sector_vix_coupling == 0.0 {
+        p.sector_factor_sigma
+    } else {
+        let ratio = economy.vix / p.market_vol_vix_anchor;
+        p.sector_factor_sigma
+            * mathx::sqrt(1.0 - p.sector_vix_coupling + p.sector_vix_coupling * (ratio * ratio))
+    };
     let mut sector_factors = Vec::with_capacity(inputs.sector_keys.len());
     for sector in inputs.sector_keys {
-        let idiosyncratic = rng.next_normal() * p.sector_factor_sigma * tick_scale;
-        sector_factors.push((
-            sector.clone(),
-            idiosyncratic * (1.0 - vix_correlation_spike) + market_factor * vix_correlation_spike,
-        ));
+        let idiosyncratic = rng.next_normal() * sector_sigma * tick_scale;
+        // Where the blend takes from. At source 0.0 the sector draw is
+        // attenuated and the market factor injected through this slot, the
+        // reference behaviour. At 1.0 the draw is kept whole and the same
+        // injection is applied in factors.rs to the market component, scaled
+        // by the source weight; in between, proportionally.
+        let kept = if p.crisis_blend_source == 0.0 {
+            idiosyncratic * (1.0 - vix_correlation_spike) + market_factor * vix_correlation_spike
+        } else {
+            let consumed = idiosyncratic * (1.0 - vix_correlation_spike)
+                + market_factor * vix_correlation_spike;
+            consumed * (1.0 - p.crisis_blend_source) + idiosyncratic * p.crisis_blend_source
+        };
+        sector_factors.push((sector.clone(), kept));
     }
     let shared = SharedFactors {
         market_factor,
         sector_factors,
+        crisis_spike: vix_correlation_spike,
     };
 
     let intraday_vol_mult = intraday_vol(inputs.intraday_t);

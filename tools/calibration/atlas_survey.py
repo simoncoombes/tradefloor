@@ -166,6 +166,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # A blend weight, so the range is the whole domain by definition. 1.0 is
     # the monotonic valuation; anything between is a partial floor.
     "fair_value_book_floor": (0.0, 1.0),
+    # Where the crisis blend takes from, and whether sector variance follows
+    # VIX. Both blend weights, whole domain (§60, CRISIS-BLEND-SECTOR.md).
+    "crisis_blend_source": (0.0, 1.0),
+    "sector_vix_coupling": (0.0, 1.0),
     # News peer transfer: weights of a peer's surprise, natural unit range.
     "news_peer_weight": (0.0, 1.0),
     "news_peer_weight_down": (0.0, 1.0),

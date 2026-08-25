@@ -101,6 +101,14 @@ PERTURBATIONS = [
     ("crash_amplifier_slope", 0.4, True),
     ("crisis_blend_ramp", 0.7, False),         # needs VIX > 25.5; macro
     ("crisis_blend_cap", 0.4, False),          # starts at the default 15
+    # The crisis blend's source only acts above the crisis threshold, which a
+    # 3-day probe at the default VIX never reaches; it is shown live under a
+    # held VIX 45 in tests/test_sector_crisis.py. The sector draw's VIX
+    # coupling IS live here: the endogenous VIX leaves the anchor on day one,
+    # so the ratio is never exactly 1.0 and the sigma moves. A first draft
+    # marked it False on the anchor argument and the probe disagreed.
+    ("crisis_blend_source", 1.0, False),       # needs VIX > 25.5
+    ("sector_vix_coupling", 1.0, True),
     ("garch_omega", 1e-5, True),
     ("garch_alpha", 0.12, True),
     ("garch_beta", 0.7, True),

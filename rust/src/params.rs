@@ -95,6 +95,18 @@ pub struct ModelParams {
     /// Baseline daily sigma of the shared market factor — the anchor of the
     /// factor's variance process, and the crash amplifier's denomination.
     pub market_factor_sigma: f64,
+    /// How much the sector draw's variance follows VIX, on the same
+    /// `(VIX / anchor)^2` target the market factor's variance uses
+    /// (`factor_vol.rs`). At 0.0 the sector sigma is static, bit-identical by
+    /// branch. At 1.0 it scales fully.
+    ///
+    /// MEASURED 2026-08-25 (§59, §60): a static sector sigma is the one
+    /// variance term on the tick path that does not scale with stress, so any
+    /// positive `sector_factor_sigma` raises calm volatility and leaves crisis
+    /// volatility alone, and the crisis lever falls by a tenth on pt-v3 and
+    /// pt-v6 alike (3.07x to 2.78x, 2.68x to 2.49x). This is the term that
+    /// lets sector structure exist without paying that.
+    pub sector_vix_coupling: f64,
     /// Daily sigma of each shared sector factor, loaded at 0.5 by every
     /// member of the sector (`market/factors.rs`).
     ///
@@ -172,6 +184,19 @@ pub struct ModelParams {
     pub crisis_blend_ramp: f64,
     /// Ceiling of the crisis correlation blend (§5.4 promotion).
     pub crisis_blend_cap: f64,
+    /// Where the crisis blend takes its correlation from. At 0.0 the sector
+    /// draw is attenuated by the spike and the market factor is injected
+    /// through the sector slot, which is the reference behaviour and is
+    /// bit-identical by branch. At 1.0 the sector draw is left intact and the
+    /// same market injection is added to the market component directly.
+    ///
+    /// MEASURED 2026-08-25 (CALIBRATION-FOLLOWUPS.md §60, CRISIS-BLEND-SECTOR.md):
+    /// with the sector draw consumed, `sector_excess_corr` reads -0.007 at a
+    /// held VIX 45 whatever `sector_factor_sigma` is, where the real 2020
+    /// window reads +0.10; and a longer window reads lower sector excess than
+    /// a shorter one on every base, because it contains more crisis days.
+    /// Written when the sector draw carried nothing worth keeping.
+    pub crisis_blend_source: f64,
 
     // ── Per-name GJR-GARCH (market/garch.rs) ────────────────────────────
     pub garch_omega: f64,
@@ -649,6 +674,8 @@ impl ModelParams {
             crash_amplifier_slope: factors::CRASH_AMPLIFIER_SLOPE,
             crisis_blend_ramp: tick::CRISIS_BLEND_RAMP,
             crisis_blend_cap: tick::CRISIS_BLEND_CAP,
+            crisis_blend_source: 0.0,
+            sector_vix_coupling: 0.0,
             garch_omega: garch::OMEGA,
             garch_alpha: garch::ALPHA,
             garch_beta: garch::BETA,
@@ -922,6 +949,8 @@ impl ModelParams {
             "crash_amplifier_slope" => self.crash_amplifier_slope,
             "crisis_blend_ramp" => self.crisis_blend_ramp,
             "crisis_blend_cap" => self.crisis_blend_cap,
+            "crisis_blend_source" => self.crisis_blend_source,
+            "sector_vix_coupling" => self.sector_vix_coupling,
             "garch_omega" => self.garch_omega,
             "garch_alpha" => self.garch_alpha,
             "garch_beta" => self.garch_beta,
@@ -1016,6 +1045,8 @@ impl ModelParams {
             "crash_amplifier_slope" => out.crash_amplifier_slope = value,
             "crisis_blend_ramp" => out.crisis_blend_ramp = value,
             "crisis_blend_cap" => out.crisis_blend_cap = value,
+            "crisis_blend_source" => out.crisis_blend_source = value,
+            "sector_vix_coupling" => out.sector_vix_coupling = value,
             "garch_omega" => out.garch_omega = value,
             "garch_alpha" => out.garch_alpha = value,
             "garch_beta" => out.garch_beta = value,
@@ -1162,6 +1193,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "crash_amplifier_threshold",
         "crisis_blend_cap",
         "crisis_blend_ramp",
+        "crisis_blend_source",
         "crisis_vix_threshold",
         "crowd_lean_cap",
         "crowd_momentum_gain",
@@ -1205,6 +1237,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "price_hard_cap",
         "regime_stress_points",
         "sector_factor_sigma",
+        "sector_vix_coupling",
         "size_effect_exponent",
         "size_effect_smoothness",
         "spread_size_exponent",
