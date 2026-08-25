@@ -217,6 +217,14 @@ jobs:
         with: { name: sdist, path: dist }
       - run: ls -la dist
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # A version's files upload one at a time, so a rejection partway
+          # through leaves some already on PyPI and no way to replace them.
+          # That is what happened to 0.1.0: five wheels landed, the sdist was
+          # refused, and the job failed with the release half-published. With
+          # this set, a re-run after a fix uploads only what is missing
+          # instead of failing on the files that already exist.
+          skip-existing: true
 
   github_release:
     name: GitHub release

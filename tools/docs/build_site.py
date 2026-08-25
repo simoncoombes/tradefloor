@@ -51,6 +51,16 @@ SITE_NAME = "pretium docs"
 TAGLINE = "repeatable market simulation"
 REPO_URL = "https://github.com/simoncoombes/pretium"
 
+#: Tab icon. The SVG is the real one; the .ico exists because browsers ask
+#: for /favicon.ico by default whether or not a page links to it, and that
+#: request 404s otherwise. Both live at the site root, which is also where
+#: every static page sits, so these paths are relative and need no base.
+FAVICON_LINKS = (
+    '<link rel="icon" type="image/svg+xml" href="favicon.svg">\n'
+    '<link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">\n'
+    '<link rel="apple-touch-icon" href="apple-touch-icon.png">'
+)
+
 #: Google Fonts covering the two families the design system asks for. The
 #: bundle inlines them as woff2 blobs that only its own loader can resolve,
 #: so the static pages fetch them the ordinary way and fall back to system
@@ -328,6 +338,7 @@ def build_static_page(page: dict, pages: list[dict], css: str) -> str:
 <meta name="twitter:title" content="{html.escape(page['h1'], quote=True)}">
 <meta name="twitter:description" content="{html.escape(desc, quote=True)}">
 {json_ld(page, desc)}
+{FAVICON_LINKS}
 {FONT_LINK}
 <style>{css}{STATIC_CSS}</style>
 {analytics()}
@@ -386,6 +397,7 @@ def build_index(bundle: str, pages: list[dict]) -> str:
 <meta name="twitter:title" content="{SITE_NAME}: {TAGLINE}">
 <meta name="twitter:description" content="{html.escape(desc, quote=True)}">
 <script type="application/ld+json">{json.dumps(site_ld, separators=(",", ":"))}</script>
+{FAVICON_LINKS}
 {spa_analytics()}
 """
     out = bundle.replace("<head>", "<head>\n" + head_extra, 1)

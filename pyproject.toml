@@ -12,6 +12,14 @@ requires-python = ">=3.11"
 # at the repository root, and DECISIONS.md in pretium-design for the
 # reasoning that superseded an earlier Apache-2.0-only decision.
 license = "MIT OR Apache-2.0"
+# Declared explicitly, and it has to be. Left to itself maturin finds the
+# crate's own copies under rust/, records them in PKG-INFO by basename
+# ("License-File: LICENSE-APACHE") but packages them at rust/LICENSE-APACHE.
+# PyPI checks the declared path, finds nothing there, and rejects the sdist
+# with a 400 while accepting every wheel, because a wheel carries its
+# licences in .dist-info by a different mechanism. That asymmetry is why
+# 0.1.0 published five wheels and no source distribution.
+license-files = ["LICENSE-APACHE", "LICENSE-MIT", "NOTICE"]
 authors = [{ name = "Simon Coombes" }]
 keywords = ["simulation", "finance", "market", "orderbook", "deterministic", "backtesting"]
 classifiers = [
