@@ -1,4 +1,4 @@
-//! The engine surface — Layer 2 — behind the `python` feature.
+//! The engine surface, Layer 2, behind the `python` feature.
 //!
 //! Layer 1 gives you the pieces: a valuation, a mispricing process, a book.
 //! This steps a whole market: many instruments, a shared factor structure, an
@@ -20,7 +20,7 @@
 //! There is no f32 option and there will not be one. Bit-exactness is the
 //! product: the known-answer gate hashes these buffers, and a half-precision
 //! "memory-saving" variant would be a different market that happens to plot
-//! the same — a silent parity-breaking switch in the public API. Downcast
+//! the same: a silent parity-breaking switch in the public API. Downcast
 //! your own copy after the bits leave the library.
 
 #![allow(unexpected_cfgs, clippy::useless_conversion)]
@@ -700,7 +700,7 @@ impl PyEngine {
     ///
     /// `model` selects the coefficient set: a shipped preset's name
     /// (`"pt-v1"`, the default) or a `ModelParams`. The escape hatch is
-    /// deliberately ceremonial — the fingerprint means an overridden run
+    /// deliberately ceremonial, because the fingerprint means an overridden run
     /// can never silently masquerade as the benchmark model (API §3).
     #[new]
     #[pyo3(signature = (*, seed, universe, macro_state = None, model = None))]
@@ -1301,7 +1301,7 @@ impl PyEngine {
     /// The honest name of the model this engine runs: a shipped preset's
     /// name when the coefficients are bit-identical to it, and
     /// `custom-XXXXXXXX` otherwise. Joins `seed` and the universe
-    /// fingerprint in identifying a run — a result under a non-shipped
+    /// fingerprint in identifying a run, since a result under a non-shipped
     /// model can never present as a standard one.
     #[getter]
     fn model_fingerprint(&self) -> String {
@@ -1316,7 +1316,7 @@ impl PyEngine {
         }
     }
 
-    /// The full coefficient dictionary of the model this engine runs —
+    /// The full coefficient dictionary of the model this engine runs,
     /// `ModelParams.to_dict()` of `model`, with `"name"` set to the
     /// fingerprint. What a manifest embeds.
     #[getter]
@@ -1331,8 +1331,8 @@ impl PyEngine {
     ///
     /// The market stream's schedule is a pure function of (market status,
     /// active roster, sector count), so equal `market` counts between two
-    /// runs of the same tick schedule mean the two markets consumed — and
-    /// therefore saw — an identical noise sequence. The economy stream's
+    /// runs of the same tick schedule mean the two markets consumed, and
+    /// therefore saw, an identical noise sequence. The economy stream's
     /// count genuinely varies with macro state (a chain in contraction
     /// draws a shock the expansion never rolls), which is why it is
     /// reported separately instead of polluting the market comparison.
@@ -1357,7 +1357,7 @@ impl PyEngine {
     /// Take one uniform from the engine's EXTERNAL stream.
     ///
     /// For a caller's own subsystems. The draws are derived from the same
-    /// root seed — reproducible run to run — but live on their own
+    /// root seed, so they are reproducible run to run, but live on their own
     /// substream, so taking one (or a thousand) leaves the market's noise
     /// sequence bit-identical. A caller that varies how much it draws no
     /// longer invalidates every seeded trajectory it computed before.
@@ -1577,7 +1577,7 @@ impl PyEngine {
         }
         out.set_item("columns", columns)?;
         let rng = self.inner.rng_state();
-        // Five streams, three numbers each — (state, increment, spare) for
+        // Five streams, three numbers each: (state, increment, spare) for
         // market, economy, external, jumps, volume, in that order. Snapshots
         // written before those last two carry nine or twelve, and restore
         // detects that by LENGTH rather than by a version field. The u64s ride as f64 bit
@@ -1756,7 +1756,7 @@ impl PyEngine {
             // A pre-split snapshot carries ONE stream where this engine has
             // three. Guessing at the other two would restore a market that
             // looks right and silently draws different macro and embedder
-            // sequences — and the trajectory it froze belongs to the old
+            // sequences, and the trajectory it froze belongs to the old
             // era anyway, so it cannot be continued bit-exactly here.
             return Err(ValidationError::new_err(
                 "this snapshot predates the RNG stream split (3 rng numbers, \
@@ -2292,7 +2292,7 @@ impl PyEngine {
     ///
     /// Embedder draws are in here, which is easy to overlook: they move the
     /// EXTERNAL stream, so a replay that skipped one would hand the embedder
-    /// different values than the run it claims to reproduce — the market
+    /// different values than the run it claims to reproduce, because the market
     /// itself no longer depends on them since the stream split.
     #[getter]
     fn order_log(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
@@ -2328,8 +2328,8 @@ pub fn market_status(hour: i64, minute: i64, day_of_week: i64) -> PyResult<Strin
 /// Generate `n` plausible instruments deterministically.
 ///
 /// `seed` is the UNIVERSE seed and is independent of any simulation seed, so
-/// "same universe, different market draws" — the standard design for variance
-/// estimation — is expressible. Generation draws from its own stream and
+/// "same universe, different market draws", the standard design for variance
+/// estimation, is expressible. Generation draws from its own stream and
 /// consumes nothing from an engine's.
 #[pyfunction]
 #[pyo3(signature = (n = 108, *, seed = 0))]

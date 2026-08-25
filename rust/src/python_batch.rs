@@ -2,13 +2,13 @@
 //!
 //! # What this is for, and what it is not for
 //!
-//! It is for vector environments and sweeps — the shape Gymnasium's vector
+//! It is for vector environments and sweeps, the shape Gymnasium's vector
 //! envs consume, and the shape a hyperparameter sweep wants.
 //!
 //! It is NOT primarily a boundary-cost optimisation, and the distinction
 //! matters because the design once assumed otherwise. Measured on this crate,
 //! a boundary crossing costs 0.357 µs against 249 µs of engine work per tick
-//! at a hundred instruments — 0.14%. Batching sixty-four engines into one call
+//! at a hundred instruments, or 0.14%. Batching sixty-four engines into one call
 //! saves sixty-three crossings and roughly twenty microseconds, against
 //! sixteen milliseconds of actual simulation. The saving is real and it is
 //! rounding error.
@@ -22,8 +22,8 @@
 //! Each engine owns its own generators, so members cannot interact. The
 //! stream split gave a run three per-domain substreams (market, economy,
 //! external), but WITHIN each stream the schedule is still strictly
-//! sequential — every company settling on a tick draws from the market
-//! stream in roster order, with the Box-Muller spare cached on it — so
+//! sequential, because every company settling on a tick draws from the market
+//! stream in roster order with the Box-Muller spare cached on it, so
 //! there is still no decomposition within a run that preserves the draw
 //! schedule.
 //!
@@ -243,7 +243,7 @@ impl PyEngineBatch {
     /// Prices across every member: `len(seeds) x len(tickers)`, row-major.
     ///
     /// Row-major with one member per row, so a vectorised policy reads one
-    /// market's cross-section contiguously — which is the direction it
+    /// market's cross-section contiguously, which is the direction it
     /// actually consumes.
     fn prices(&self, py: Python<'_>) -> Py<PyBytes> {
         let mut out = Vec::with_capacity(self.engines.len() * self.tickers.len());
@@ -274,7 +274,7 @@ impl PyEngineBatch {
     }
 
     /// The honest name of the model every member runs: a shipped preset's
-    /// name, or `custom-XXXXXXXX`. One value, not one per member — the
+    /// name, or `custom-XXXXXXXX`. One value rather than one per member, since the
     /// constructor builds every engine from the same coefficient set.
     #[getter]
     fn model_fingerprint(&self) -> String {

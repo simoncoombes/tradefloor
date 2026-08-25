@@ -23,7 +23,7 @@ use pyo3::prelude::*;
 /// many normals have been drawn is part of the generator's state: Box-Muller
 /// produces a PAIR from two uniforms and keeps the second. So two normals cost
 /// two uniform draws, not four, and the second one advances the stream not at
-/// all — a uniform drawn after one normal and after two normals is the same
+/// all: a uniform drawn after one normal and after two normals is the same
 /// value. Draw accounting is therefore not one-uniform-per-value, which
 /// matters to anyone reasoning about where a stream is.
 #[pyclass(name = "GameRng", module = "pretium._core")]
@@ -367,7 +367,7 @@ impl PyMispricingState {
     /// fresh state has zero momentum.
     ///
     /// Passing `s_prev` builds the pair VERBATIM, without clamping. That is
-    /// for resuming a trajectory you already hold — mid-trajectory `s` and
+    /// for resuming a trajectory you already hold, where mid-trajectory `s` and
     /// `s_prev` genuinely differ, and that difference IS the momentum term.
     /// Routing it through the clamping constructor would silently zero the
     /// momentum and produce a different path from the one being resumed.
@@ -503,7 +503,7 @@ fn impulse_response(horizon_days: i64, phi: Option<f64>, theta: Option<f64>) -> 
 /// This dict is the mispricing coefficient table it has always been, and
 /// its shape is LOAD-BEARING: `tests/known_answer.py` section 6 and
 /// `pretium.manifest.era_fingerprint` both hash every value in it, so
-/// growing it moves the committed v8 digest without a simulation change —
+/// growing it moves the committed v8 digest without a simulation change,
 /// exactly what the KAT versioning rule forbids. The FULL preset surface
 /// (CALIBRATION.md Appendix A) lives on `ModelParams.from_preset(name)`
 /// and `.to_dict()` instead; this function gains `name=` so a preset can
@@ -517,7 +517,7 @@ fn impulse_response(horizon_days: i64, phi: Option<f64>, theta: Option<f64>) -> 
 /// consts was the shorter spelling; with a second preset in the table they
 /// are not, and a `model_preset("pt-v2")` that answered with pt-v1's
 /// coefficients under the label "pt-v1" would be the exact substitution the
-/// fingerprint rule exists to make impossible — reached through the one
+/// fingerprint rule exists to make impossible, reached through the one
 /// function on the surface that had not been taught the difference. The
 /// default path is unchanged to the bit, so the KAT's digest does not move.
 /// `daily_shock_cap` still reads its const because it is carried read-only

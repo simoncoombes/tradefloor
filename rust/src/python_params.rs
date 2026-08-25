@@ -1,4 +1,4 @@
-//! `ModelParams` — the settable half of the model preset, on the Python
+//! `ModelParams`, the settable half of the model preset, on the Python
 //! surface (PYTHON-API-DESIGN.md §3, CALIBRATION.md §5.1).
 //!
 //! ```python
@@ -9,7 +9,7 @@
 //! ```
 //!
 //! Immutable after construction (`frozen`), constructed only via
-//! `from_preset` / `from_dict` — the fingerprint must not be able to lie.
+//! `from_preset` / `from_dict`: the fingerprint must not be able to lie.
 //! Everything of substance lives in `crate::params`; this file is the
 //! boundary.
 
@@ -37,7 +37,7 @@ impl PyModelParams {
     /// fingerprints as `"pt-v1"`; any override that changes a bit
     /// fingerprints as `"custom-XXXXXXXX"`. Unknown names, non-finite
     /// values, the derived-bits coefficients (`mispricing_phi`,
-    /// `s_phi_tick` — override `mispricing_half_life_days` instead) and
+    /// `s_phi_tick`, so override `mispricing_half_life_days` instead) and
     /// the carried read-only surface are refused by name.
     #[staticmethod]
     #[pyo3(signature = (name = "pt-v1", **overrides))]
@@ -50,8 +50,8 @@ impl PyModelParams {
         })?;
         if let Some(kwargs) = overrides {
             // Sorted for a deterministic application order. The overrides
-            // commute — each writes one independent field, and the derived
-            // recomputation depends only on the final half-life — but a
+            // commute, since each writes one independent field and the
+            // derived recomputation depends only on the final half-life, but a
             // deterministic order keeps error messages stable too.
             let mut keys: Vec<String> = Vec::new();
             for key in kwargs.keys() {
@@ -80,7 +80,7 @@ impl PyModelParams {
         Ok(Self { inner: params })
     }
 
-    /// Rebuild from a full parameter dictionary — the manifest's embedded
+    /// Rebuild from a full parameter dictionary, the manifest's embedded
     /// form. The inverse of `to_dict`.
     ///
     /// Settable keys are applied as overrides of the shipped preset; a
@@ -141,8 +141,8 @@ impl PyModelParams {
         Ok(Self { inner: params })
     }
 
-    /// The full preset surface as a dict — every settable coefficient, the
-    /// derived-bits pair, and the carried read-only constants — plus
+    /// The full preset surface as a dict: every settable coefficient, the
+    /// derived-bits pair and the carried read-only constants, plus
     /// `"name"`, which is the fingerprint. This is what a manifest embeds.
     pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         let out = PyDict::new_bound(py);
@@ -154,7 +154,7 @@ impl PyModelParams {
     }
 
     /// The honest name: a shipped preset's name when bit-identical to it,
-    /// `custom-XXXXXXXX` otherwise — first 8 hex chars of sha256 over the
+    /// `custom-XXXXXXXX` otherwise, being the first 8 hex chars of sha256 over the
     /// canonical serialisation (names sorted, values as IEEE-754 bit
     /// patterns). A non-shipped preset can never present as a shipped one.
     #[getter]
@@ -162,7 +162,7 @@ impl PyModelParams {
         self.inner.fingerprint()
     }
 
-    /// The runtime-settable parameter names, sorted — what `from_preset`
+    /// The runtime-settable parameter names, sorted. This is what `from_preset`
     /// accepts as keywords.
     #[staticmethod]
     fn settable() -> Vec<String> {
@@ -187,7 +187,7 @@ impl PyModelParams {
         let Ok(other) = other.extract::<PyRef<'_, PyModelParams>>() else {
             return Ok(py.NotImplemented());
         };
-        // Bit-equality via the digest — the same rule the fingerprint uses.
+        // Bit-equality via the digest, the same rule the fingerprint uses.
         let equal = self.inner.digest() == other.inner.digest();
         match op {
             pyo3::basic::CompareOp::Eq => Ok(equal.into_py(py)),
