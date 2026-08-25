@@ -1,0 +1,38 @@
+# Rust
+target/
+Cargo.lock
+
+# Python
+dist/
+build/
+*.egg-info/
+__pycache__/
+.venv/
+
+# Internal design material lives in the private pretium-design repo,
+# never in this one. docs/ holds the public documentation.
+
+# Spike artifacts
+dist-spike/
+.venv-spike/
+
+# Golden vectors ARE committed: they are the parity contract, and a research
+# library whose tests cannot run on a fresh clone is not checkable by anyone.
+# 135 MB raw. See rust/sync-goldens.py for how they are produced, and
+# CONTINUE.md for the compression decision still to make (85% available).
+
+# Build artefacts from `maturin develop`, which writes the compiled extension
+# and its debug symbols straight into the source tree. They are 2 MB, they
+# change on every rebuild, and a wheel is the only thing anyone should be
+# installing.
+python/pretium/*.pyd
+python/pretium/*.so
+python/pretium/*.pdb
+
+# Test and tool caches. `.impeccable` is a product-spec tool's working
+# directory -- a JSON cache and 2.9 MB of docs-site screenshots. Neither is
+# source, and neither belongs in the artifact a user clones to get an engine.
+.pytest_cache/
+.impeccable/
+.ruff_cache/
+.ipynb_checkpoints/

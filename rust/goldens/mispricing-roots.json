@@ -1,0 +1,2385 @@
+{
+  "kind": "mispricing.roots",
+  "meta": {
+    "generator": "scripts/rust-port/generate-goldens.ts",
+    "generatedFrom": "TypeScript (the parity contract — never regenerate from Rust)",
+    "gitCommit": "51e673d3c536ca350a92b97ca7a09f91ed3f5061",
+    "sourceFiles": [
+      {
+        "path": "src/lib/engine/prng.ts",
+        "sha256": "31e7c173c5d62ba0282040ddb46ac4a1c2676448fc767ed60c7723887907e2ab"
+      },
+      {
+        "path": "src/lib/engine/mispricing.ts",
+        "sha256": "513108f9455908fb09e4f8f36d4c3dd25e009a94bfcecb41d0a363dbcb636a24"
+      }
+    ],
+    "sourceModule": "src/lib/engine/mispricing.ts",
+    "covers": ["characteristicRootModuli", "crowdAdjustedRootModuli"],
+    "description": "AR(2) characteristic-root moduli across a grid that exercises BOTH branches, plus the two default-argument entry points. `discriminant` and `branch` are recorded so a divergence can be localised to the branch decision rather than the arithmetic.",
+    "notes": [
+      "Math.sqrt is IEEE-754 exact and correctly rounded in both V8 and Rust, so this function should be bit-exact — provided phi and theta are.", "The branch test is `disc >= 0`, so disc exactly 0 and disc exactly -0 both take the REAL branch (−0 >= 0 is true).", "The default arguments make the default call depend on MISPRICING_PHI, so a phi that is one ULP off shows up here too."
+    ],
+    "floatEncoding": "bits = raw IEEE-754 f64, big-endian, 16 uppercase hex digits. dec = shortest round-trip decimal, informational only.",
+    "nanPolicy": "Every NaN is recorded as 7FF8000000000000 (the pattern of Rust f64::NAN). V8 does not emit a stable NaN sign/payload, so only NaN-ness is contractual — compare NaN results with is_nan(), not with bits."
+  },
+  "cases": [
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "8", "bits": "4020000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.41421356237309515", "bits": "3FDA827999FCEF34" },
+        { "dec": "2.414213562373095", "bits": "4003504F333F9DE6" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "4.25", "bits": "4011000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.28077640640441515", "bits": "3FD1F83D9ABFB41C" },
+        { "dec": "1.7807764064044151", "bits": "3FFC7E0F66AFED07" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "2.5625", "bits": "4004800000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.17539052967910607", "bits": "3FC67332667FFC00" },
+        { "dec": "1.425390529679106", "bits": "3FF6CE664CCFFF80" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "1", "bits": "3FF0000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0", "bits": "0000000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "0.99999994", "bits": "3FEFFFFFDFC9A9AD" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.0000000216781046e-8", "bits": "3E45798EEA000000" },
+        { "dec": "0.9999999799999997", "bits": "3FEFFFFFF543388C" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "0.9400999999999999", "bits": "3FEE154C985F06F6" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.010206229412959567", "bits": "3F84E700EC5A6340" },
+        { "dec": "0.9797937705870404", "bits": "3FEF5A78772FDE21" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "-0.4375", "bits": "BFDC000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5", "bits": "3FE0000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "-0.5471000000000001", "bits": "BFE181D7DBF487FE" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" },
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "-1.75", "bits": "BFFC000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" },
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "-3.5900000000000003", "bits": "C00CB851EB851EB9" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" },
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-3.995999", "bits": "C00FF7CE52DECA25" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-4", "bits": "C010000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-1", "bits": "BFF0000000000000" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "-5.75", "bits": "C017000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" },
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "6.25", "bits": "4019000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.5", "bits": "3FE0000000000000" },
+        { "dec": "2", "bits": "4000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "3", "bits": "4008000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.3660254037844386", "bits": "3FD76CF5D0B09954" },
+        { "dec": "1.3660254037844386", "bits": "3FF5DB3D742C2655" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.5625", "bits": "3FF9000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.25", "bits": "3FD0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "0.25", "bits": "3FD0000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0", "bits": "0000000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "0.2499999500000001", "bits": "3FCFFFFF94A03599" },
+      "branch": "real",
+      "output": [
+        { "dec": "2.000000121071821e-8", "bits": "3E55798EF8000000" },
+        { "dec": "0.4999999699999988", "bits": "3FDFFFFFDFC9A997" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "0.20009999999999997", "bits": "3FC99CE075F6FD21" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.021337307536549582", "bits": "3F95D97278377998" },
+        { "dec": "0.4686626924634504", "bits": "3FDDFE91CE3F17C2" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "-0.9375", "bits": "BFEE000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5", "bits": "3FE0000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "-1.0271000000000001", "bits": "BFF06F0068DB8BAD" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" },
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "-2", "bits": "C000000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" },
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "-3.44", "bits": "C00B851EB851EB85" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" },
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-3.746999", "bits": "C00DF9DA9C99285B" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-3.75", "bits": "C00E000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "-5", "bits": "C014000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" },
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "5", "bits": "4014000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.6180339887498949", "bits": "3FE3C6EF372FE950" },
+        { "dec": "1.618033988749895", "bits": "3FF9E3779B97F4A8" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2.25", "bits": "4002000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.5", "bits": "3FE0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.0625", "bits": "3FF1000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.3903882032022076", "bits": "3FD8FC1ECD5FDA0E" },
+        { "dec": "0.6403882032022076", "bits": "3FE47E0F66AFED07" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "0", "bits": "0000000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0", "bits": "0000000000000000" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "-3.99999999e-8", "bits": "BE65798EE149F6A5" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.0001", "bits": "3F1A36E2EB1C432D" },
+        { "dec": "0.0001", "bits": "3F1A36E2EB1C432D" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "-0.0399", "bits": "BFA46DC5D6388659" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.1", "bits": "3FB999999999999A" },
+        { "dec": "0.1", "bits": "3FB999999999999A" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "-0.9375", "bits": "BFEE000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5", "bits": "3FE0000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "-1.0071", "bits": "BFF01D14E3BCD35B" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" },
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "-1.75", "bits": "BFFC000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" },
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "-2.79", "bits": "C00651EB851EB852" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" },
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-2.997999", "bits": "C007FBE6E6538690" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-3", "bits": "C008000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0", "bits": "0000000000000000" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "-3.75", "bits": "C00E000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" },
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "4.99999998", "bits": "4013FFFFFEA86712" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.6180339915138269", "bits": "3FE3C6EF38ABC886" },
+        { "dec": "1.618033981513827", "bits": "3FF9E37799A6B267" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2.24999999", "bits": "4001FFFFFEA86712" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.5000000033333333", "bits": "3FE0000001CA213D" },
+        { "dec": "0.9999999933333333", "bits": "3FEFFFFFFC6BBD85" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.062499995", "bits": "3FF0FFFFFEA86712" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.3903882069895295", "bits": "3FD8FC1ED170E724" },
+        { "dec": "0.6403881969895295", "bits": "3FE47E0F635A0FDA" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "1.0000000000000001e-16", "bits": "3C9CD2B297D889BD" },
+      "branch": "real",
+      "output": [
+        { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "-3.99999996e-8", "bits": "BE65798EDE9635E7" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.0001", "bits": "3F1A36E2EB1C432D" },
+        { "dec": "0.0001", "bits": "3F1A36E2EB1C432D" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "-0.0398999997999999", "bits": "BFA46DC5D480B84D" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.1", "bits": "3FB999999999999A" },
+        { "dec": "0.1", "bits": "3FB999999999999A" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "-0.9374999949999999", "bits": "BFEDFFFFFD50CE23" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5", "bits": "3FE0000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "-1.0070999945999999", "bits": "BFF01D14E249BD8C" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" },
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "-1.7499999899999998", "bits": "BFFBFFFFFD50CE23" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" },
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "-2.789999982", "bits": "C00651EB82B43EA5" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" },
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-2.9979989800199998", "bits": "C007FBE6E3A5049F" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-2.99999998", "bits": "C007FFFFFD50CE24" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "-3.74999997", "bits": "C00DFFFFFBF93536" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" },
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "4.8100000000000005", "bits": "40133D70A3D70A3E" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.6465856099730656", "bits": "3FE4B0D44E1CC0BE" },
+        { "dec": "1.5465856099730655", "bits": "3FF8BED08D74C6C5" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2.16", "bits": "400147AE147AE148" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.5348469228349535", "bits": "3FE11D774B3E27D2" },
+        { "dec": "0.9348469228349534", "bits": "3FEDEA44180AF49E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.0225", "bits": "3FF05C28F5C28F5C" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.4305937104039171", "bits": "3FDB8ED8EC031461" },
+        { "dec": "0.580593710403917", "bits": "3FE2943942CE56FD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "0.010000000000000002", "bits": "3F847AE147AE147C" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.1", "bits": "3FB999999999999A" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "0.0099999620000001", "bits": "3F847ADC2E028BC9" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.09999990999991", "bits": "3FB99998170D745D" },
+        { "dec": "1.000000900003295e-7", "bits": "3E7AD7F430100000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "-0.0279", "bits": "BF9C91D14E3BCD36" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.1", "bits": "3FB999999999999A" },
+        { "dec": "0.1", "bits": "3FB999999999999A" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "-0.8775000000000001", "bits": "BFEC147AE147AE15" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5", "bits": "3FE0000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "-0.9431", "bits": "BFEE2DE00D1B7176" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" },
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "-1.6400000000000001", "bits": "BFFA3D70A3D70A3E" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" },
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "-2.6", "bits": "C004CCCCCCCCCCCD" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" },
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-2.788199", "bits": "C0064E3B46FDEB53" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-2.79", "bits": "C00651EB851EB852" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "-3.4399999999999995", "bits": "C00B851EB851EB84" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" },
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "4.5625", "bits": "4012400000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.6930004681646913", "bits": "3FE62D0F515C2946" },
+        { "dec": "1.4430004681646913", "bits": "3FF71687A8AE14A3" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2.0625", "bits": "4000800000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.5930703308172536", "bits": "3FE2FA6EA162D0F0" },
+        { "dec": "0.8430703308172536", "bits": "3FEAFA6EA162D0F0" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1", "bits": "3FF0000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.5", "bits": "3FE0000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "0.0625", "bits": "3FB0000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.25", "bits": "3FD0000000000000" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "0.062499965000000095", "bits": "3FAFFFFED35A2FAF" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.2499999699999952", "bits": "3FCFFFFFBF9352AC" },
+        { "dec": "4.000000480841592e-8", "bits": "3E65798F0D800000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "0.027600000000000006", "bits": "3F9C432CA57A786E" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.21306623862918078", "bits": "3FCB45C12765A3DE" },
+        { "dec": "0.04693376137081924", "bits": "3FA807B3B454F5AA" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "-0.75", "bits": "BFE8000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5", "bits": "3FE0000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "-0.8096000000000001", "bits": "BFE9E83E425AEE64" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" },
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "-1.4375", "bits": "BFF7000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" },
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "-2.2775000000000003", "bits": "C0023851EB851EB9" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" },
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-2.435999", "bits": "C0037CED0B30B5AA" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-2.4375", "bits": "C003800000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.25", "bits": "3FD0000000000000" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "-2.9375", "bits": "C007800000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" },
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "4.25", "bits": "4011000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.7807764064044151", "bits": "3FE8FC1ECD5FDA0E" },
+        { "dec": "1.2807764064044151", "bits": "3FF47E0F66AFED07" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2", "bits": "4000000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" },
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.0625", "bits": "3FF1000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.6403882032022076", "bits": "3FE47E0F66AFED07" },
+        { "dec": "0.3903882032022076", "bits": "3FD8FC1ECD5FDA0E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "0.25", "bits": "3FD0000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.5", "bits": "3FE0000000000000" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "0.24999997000000015", "bits": "3FCFFFFFBF93535F" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.4999999899999996", "bits": "3FDFFFFFF5433888" },
+        { "dec": "2.0000000405806517e-8", "bits": "3E55798EE9800000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "0.2201", "bits": "3FCC2C3C9EECBFB1" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.489574082114798", "bits": "3FDF552E87E9BEE4" },
+        { "dec": "0.02042591788520201", "bits": "3F94EA88253B1C08" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "-0.4375", "bits": "BFDC000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5", "bits": "3FE0000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "-0.4871000000000001", "bits": "BFDF2CA57A786C24" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" },
+        { "dec": "0.5196152422706632", "bits": "3FE0A0B02501C79A" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "-1", "bits": "BFF0000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" },
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "-1.6400000000000003", "bits": "BFFA3D70A3D70A3F" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" },
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-1.7489989999999995", "bits": "BFFBFBE6601BC988" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-1.75", "bits": "BFFC000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "-2", "bits": "C000000000000000" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" },
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "4.000305759484219", "bits": "40100050272BF0CE" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9912952293816216", "bits": "3FEFB8B0C5DBFF0B" },
+        { "dec": "1.0087812090287254", "bits": "3FF023F7C3D9903E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2.232819779837115", "bits": "4001DCD09DE21940" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9883881532559471", "bits": "3FEFA0E0313F9EC0" },
+        { "dec": "0.5058741329030509", "bits": "3FE0301EF316C032" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.5365767900135632", "bits": "3FF895D18B4E6A24" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9860506835092684", "bits": "3FEF8DBA29BBDD38" },
+        { "dec": "0.25353666315637224", "bits": "3FD039F1D725FD54" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "0.9653338001900112", "bits": "3FEEE403B5B1438F" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "0.9653337798402919", "bits": "3FEEE403AAC46B76" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9825140201749244", "bits": "3FEF70C13E1068BB" },
+        { "dec": "1.0177971798697172e-8", "bits": "3E45DB6630000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "0.9450840805970692", "bits": "3FEE3E20F8444EF9" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9823341852724068", "bits": "3FEF6F4819EF9BFE" },
+        { "dec": "0.010179835080489363", "bits": "3F84D92A55FEB880" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "0.5190908103664593", "bits": "3FE09C6454C5B2D6" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9764967950303907", "bits": "3FEF3F7634E9BD2E" },
+        { "dec": "0.2560172253225055", "bits": "3FD06296127E42C0" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "0.48879137118057514", "bits": "3FDF485B9A726780" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9758250905200969", "bits": "3FEF39F58A4CCD42" },
+        { "dec": "0.2766889298327992", "bits": "3FD1B5457C3303DF" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "0.19784782054290728", "bits": "3FC95313CF688870" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9636574488804373", "bits": "3FEED648256F9FE8" },
+        { "dec": "0.5188565714724589", "bits": "3FE09A7918B93EA6" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "-0.05614096317477513", "bits": "BFACBE82219A6B40" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" },
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-0.06960218714490285", "bits": "BFB1D172ED847640" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-0.06963815910419635", "bits": "BFB1D3CE6FE7FAA0" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "0.16287586124870046", "bits": "3FC4D91DC0AF7D00" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.4430464185015015", "bits": "3FF716B7D7612E9B" },
+        { "dec": "1.0394676018513949", "bits": "3FF0A1A8C7B340AD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "4.01", "bits": "40100A3D70A3D70A" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9512492197250393", "bits": "3FEE70A2342210E4" },
+        { "dec": "1.0512492197250394", "bits": "3FF0D1EAB3AAA20C" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2.16", "bits": "400147AE147AE148" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9348469228349534", "bits": "3FEDEA44180AF49E" },
+        { "dec": "0.5348469228349535", "bits": "3FE11D774B3E27D2" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.4225", "bits": "3FF6C28F5C28F5C3" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9213430220938281", "bits": "3FED7BA45C894E36" },
+        { "dec": "0.27134302209382816", "bits": "3FD15DAF1F7902D3" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "0.81", "bits": "3FE9EB851EB851EC" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "0.8099999780000002", "bits": "3FE9EB8512E8A9BE" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.8999999988888889", "bits": "3FECCCCCCC34170E" },
+        { "dec": "1.1111111142270147e-8", "bits": "3E47DC65E0000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "0.7881", "bits": "3FE9381D7DBF4880" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.8988749823993238", "bits": "3FECC39577932020" },
+        { "dec": "0.011125017600676246", "bits": "3F86C8B696193FE0" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "0.3224999999999998", "bits": "3FD4A3D70A3D70A0" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.8589454172900135", "bits": "3FEB7C7B1989E8E8" },
+        { "dec": "0.29105458270998635", "bits": "3FD2A0A36685C7C7" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "0.2888999999999997", "bits": "3FD27D566CF41F1C" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.8537470930075336", "bits": "3FEB51E56C70B7B9" },
+        { "dec": "0.31625290699246633", "bits": "3FD43D7CD5330B6E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "-0.04000000000000026", "bits": "BFA47AE147AE14A0" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" },
+        { "dec": "0.7071067811865476", "bits": "3FE6A09E667F3BCD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "-0.3599999999999999", "bits": "BFD70A3D70A3D708" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" },
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-0.389799", "bits": "BFD8F2778140DD40" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-0.3900000000000001", "bits": "BFD8F5C28F5C28F8" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "-0.2400000000000002", "bits": "BFCEB851EB851EC0" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" },
+        { "dec": "1.224744871391589", "bits": "3FF3988E1409212E" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "4.0004", "bits": "40100068DB8BAC71" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9900499987500624", "bits": "3FEFAE7D55C129DA" },
+        { "dec": "1.0100499987500624", "bits": "3FF0292A2FFF4D3F" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2.2304", "bits": "4001D7DBF487FCB9" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9867261881037788", "bits": "3FEF9342CC806630" },
+        { "dec": "0.5067261881037788", "bits": "3FE03719D6BDD6D4" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.5329", "bits": "3FF886C226809D49" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9840516941257814", "bits": "3FEF7D59FA7AFEFD" },
+        { "dec": "0.25405169412578144", "bits": "3FD042620970DF42" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "0.9603999999999999", "bits": "3FEEBB98C7E28240" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "0.9603999796000002", "bits": "3FEEBB98BCEEC112" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9799999997959183", "bits": "3FEF5C28F5A682E0" },
+        { "dec": "1.0204081635212248e-8", "bits": "3E45E9C0D2000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "0.9400999999999999", "bits": "3FEE154C985F06F6" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9797937705870404", "bits": "3FEF5A78772FDE21" },
+        { "dec": "0.010206229412959567", "bits": "3F84E700EC5A6340" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "0.5128999999999999", "bits": "3FE069AD42C3C9EE" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9730851853958775", "bits": "3FEF23838AEFEAA0" },
+        { "dec": "0.25691481460412247", "bits": "3FD0714AD5A54978" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "0.48249999999999993", "bits": "3FDEE147AE147AE0" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9723110997362451", "bits": "3FEF1D2C2ADCF57D" },
+        { "dec": "0.2776889002637549", "bits": "3FD1C5A7AA461506" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "0.1903999999999999", "bits": "3FC85F06F6944670" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9581742422927142", "bits": "3FEEA95D07508986" },
+        { "dec": "0.5218257577072858", "bits": "3FE0B2CBEE7205D6" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "-0.06560000000000032", "bits": "BFB0CB295E9E1B20" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" },
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-0.07955899999999971", "bits": "BFB45DFA871A3B00" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-0.07960000000000012", "bits": "BFB460AA64C2F840" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.98", "bits": "3FEF5C28F5C28F5C" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "0.1504000000000003", "bits": "3FC3404EA4A8C160" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.4339071942966535", "bits": "3FF6F148AB900D4A" },
+        { "dec": "1.0460928057033465", "bits": "3FF0BCCBCF513A64" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "4.000131927728454", "bits": "4010002295851DD8" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9942735010065311", "bits": "3FEFD116A9434778" },
+        { "dec": "1.005759480653635", "bits": "3FF0179740D0C9F6" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2.23864594808135", "bits": "4001E8BF34F2A893" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9923622748420147", "bits": "3FEFC16E87876136" },
+        { "dec": "0.5038482544891185", "bits": "3FE01F865FE5ADAA" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.545402958257798", "bits": "3FF8B9F873CDBE09" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.99082819641697", "bits": "3FEFB4DD557218FD" },
+        { "dec": "0.2523141760640738", "bits": "3FD025EA5BA0CAE2" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "0.977159968434246", "bits": "3FEF44E4FB6C55D8" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "0.9771599482045266", "bits": "3FEF44E4F08FFBDE" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9885140202367018", "bits": "3FEFA1E82791BB52" },
+        { "dec": "1.0116194437692627e-8", "bits": "3E45B96FCC000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "0.9570302488413039", "bits": "3FEE9FFDE681CBEB" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9883966244077287", "bits": "3FEFA0F1F529DB0E" },
+        { "dec": "0.010117395945167473", "bits": "3F84B86DE5A43400" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "0.5339169786106941", "bits": "3FE115D90F3D2F9E" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9846051245176521", "bits": "3FEF81E29B28DFD6" },
+        { "dec": "0.253908895835244", "bits": "3FD0400B18F1A76C" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "0.5038575394248099", "bits": "3FE01F99D8B585DA" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9841716264663418", "bits": "3FEF7E557EAA5EC0" },
+        { "dec": "0.2743423938865544", "bits": "3FD18ED366698AE1" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "0.21567398878714217", "bits": "3FCB9B348C382590" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9764605786175586", "bits": "3FEF3F2A415FDC60" },
+        { "dec": "0.5120534417353375", "bits": "3FE062BDE641D72C" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "-0.033514794930541214", "bits": "BFA128D9E8515100" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" },
+        { "dec": "0.9486832980505138", "bits": "3FEE5B9D136C6D96" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-0.04578801890066719", "bits": "BFA77186F77438C0" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-0.04581199085996168", "bits": "BFA774AB55043100" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "0.19270202949293402", "bits": "3FC8AA75C945C1E0" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.4637462066605427", "bits": "3FF76B8124740475" },
+        { "dec": "1.0247678136923535", "bits": "3FF06572EF5CD551" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "4.000001", "bits": "40100000431BDE83" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9995001249999922", "bits": "3FEFFBE7AFA721D2" },
+        { "dec": "1.000500124999992", "bits": "3FF0020C6B484D53" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2.249001", "bits": "4001FDF43C7D5ED0" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9993334815143959", "bits": "3FEFFA8A359CDE6C" },
+        { "dec": "0.5003334815143958", "bits": "3FE002BB5C865740" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.561001", "bits": "3FF8F9DC2F405F6C" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9992001280614564", "bits": "3FEFF9728C05DADE" },
+        { "dec": "0.25020012806145636", "bits": "3FD0034765DEA765" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "0.998001", "bits": "3FEFEF9FCB0C026D" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "0.9980009799800003", "bits": "3FEFEF9FC04C7B4E" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9989999999899901", "bits": "3FEFF7CED91526FA" },
+        { "dec": "1.0010009987571067e-8", "bits": "3E457F0FAA000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "0.9780809999999998", "bits": "3FEF4C70867AD8E2" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9989898886731658", "bits": "3FEFF7B9A49C5986" },
+        { "dec": "0.010010111326834104", "bits": "3F84802E66397DA0" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "0.5600010000000002", "bits": "3FE1EB8737974604" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9986660727537975", "bits": "3FEFF5128D43462E" },
+        { "dec": "0.2503339272462026", "bits": "3FD0057897A681FC" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "0.5303610000000003", "bits": "3FE0F8B7A1C25D0A" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9986294412705461", "bits": "3FEFF4C5BAE28D4C" },
+        { "dec": "0.270370558729454", "bits": "3FD14DC050E2D507" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "0.24700100000000047", "bits": "3FCF9DBA908A2670" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9979959758225476", "bits": "3FEFEF9541B65180" },
+        { "dec": "0.5010040241774525", "bits": "3FE00839976035AC" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "0.006200999999999901", "bits": "3F796638433D6C00" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9888732142452198", "bits": "3FEFA4D970625B19" },
+        { "dec": "0.9101267857547802", "bits": "3FED1FC23580F8DF" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "-0.0039959999999998885", "bits": "BF705E1C15097C00" },
+      "branch": "complex",
+      "output": [
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" },
+        { "dec": "0.999499874937461", "bits": "3FEFFBE72966CCAD" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "-0.00399899999999942", "bits": "BF70614163779C00" },
+      "branch": "complex",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "0.999", "bits": "3FEFF7CED916872B" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "0.24500100000000025", "bits": "3FCF5C31593E5FC0" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.4969878784910486", "bits": "3FF7F3A98FCA0A24" },
+        { "dec": "1.0020121215089515", "bits": "3FF0083DDCC13972" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "4", "bits": "4010000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2.25", "bits": "4002000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.5625", "bits": "3FF9000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "0.25", "bits": "3FD0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "1", "bits": "3FF0000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "0.9999999799999999", "bits": "3FEFFFFFF543388E" },
+      "branch": "real",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "9.999999994736442e-9", "bits": "3E45798EE2000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "0.9801", "bits": "3FEF5CFAACD9E83E" },
+      "branch": "real",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "0.010000000000000009", "bits": "3F847AE147AE1480" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "0.5625", "bits": "3FE2000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "0.25", "bits": "3FD0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "0.5328999999999999", "bits": "3FE10D844D013A92" },
+      "branch": "real",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "0.25", "bits": "3FD0000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "0.009999999999999787", "bits": "3F847AE147AE1400" },
+      "branch": "real",
+      "output": [
+        { "dec": "0.9999999999999994", "bits": "3FEFFFFFFFFFFFFB" },
+        { "dec": "0.9000000000000005", "bits": "3FECCCCCCCCCCCD1" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "0.0000010000000005838672", "bits": "3EB0C6F7A0E00000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.000000000000146", "bits": "3FF0000000000292" },
+        { "dec": "0.9989999999998541", "bits": "3FEFF7CED9168209" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "0", "bits": "0000000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1", "bits": "3FF0000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1", "bits": "3FF0000000000000" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "0.25", "bits": "3FD0000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.5", "bits": "3FF8000000000000" },
+        { "dec": "1", "bits": "3FF0000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "4.000001", "bits": "40100000431BDE83" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.000500124999992", "bits": "3FF0020C6B484D53" },
+        { "dec": "0.9995001249999922", "bits": "3FEFFBE7AFA721D2" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "2.251001", "bits": "4002020CCFF21B3B" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.0006668147818858", "bits": "3FF002BB34BAE41A" },
+        { "dec": "0.4996668147818858", "bits": "3FDFFA8A85189EBE" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "1.5640009999999998", "bits": "3FF90625E99E94AA" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.0008001279385763", "bits": "3FF00346FEB542C5" },
+        { "dec": "0.24980012793857642", "bits": "3FCFF9735A0432D8" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "1.0020009999999997", "bits": "3FF008323358F2DF" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "1.0020009800199998", "bits": "3FF008322DFBEEFF" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.00100000000999", "bits": "3FF0041893756C29" },
+        { "dec": "9.990009930405108e-9", "bits": "3E457410E8000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "0.9821209999999998", "bits": "3FEF6D8904F6DFC4" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.001010090714609", "bits": "3FF0042328295D23" },
+        { "dec": "0.009989909285391063", "bits": "3F847596ED5DB820" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "0.5650009999999996", "bits": "3FE2147CFA26A228" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.001332742054228", "bits": "3FF005757B389732" },
+        { "dec": "0.24966725794577188", "bits": "3FCFF518C1E129BE" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "0.5354409999999996", "bits": "3FE1225529FE0048" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.001369170606106", "bits": "3FF0059BADEF9D2A" },
+        { "dec": "0.26963082939389393", "bits": "3FD141A1AA8F5E4A" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "0.2530009999999998", "bits": "3FD0312B1B36BD28" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.0019960238254273", "bits": "3FF0082CFB90D601" },
+        { "dec": "0.49900397617457254", "bits": "3FDFEFAE5F8F99A3" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "0.013800999999999064", "bits": "3F8C43B2DD377C00" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.0092388287251266", "bits": "3FF025D79D33A4EC" },
+        { "dec": "0.8917611712748732", "bits": "3FEC894EB94EFBC8" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "0.0040000000000000036", "bits": "3F70624DD2F1AA00" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.0316227766016839", "bits": "3FF08186E27501D4" },
+        { "dec": "0.9683772233983162", "bits": "3FEEFCF23B15FC59" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "0.004000999999999699", "bits": "3F70635A426BB400" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.0321267292017358", "bits": "3FF083975133FB82" },
+        { "dec": "0.9688732707982642", "bits": "3FEF0102848181D1" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "1.001", "bits": "3FF004189374BC6A" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "0.25500099999999915", "bits": "3FD051EFB6DCA070" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.5029881185323375", "bits": "3FF80C3D44F5F7A6" },
+        { "dec": "0.9980118814676623", "bits": "3FEFEFB69CFD8987" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "discriminant": { "dec": "5", "bits": "4014000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.618033988749895", "bits": "3FF9E3779B97F4A8" },
+        { "dec": "0.6180339887498949", "bits": "3FE3C6EF372FE950" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "discriminant": { "dec": "4.25", "bits": "4011000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.7807764064044151", "bits": "3FFC7E0F66AFED07" },
+        { "dec": "0.28077640640441515", "bits": "3FD1F83D9ABFB41C" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "-0.25", "bits": "BFD0000000000000" }
+      },
+      "discriminant": { "dec": "4.0625", "bits": "4010400000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "1.8827822185373186", "bits": "3FFE1FE03F61BAD0" },
+        { "dec": "0.13278221853731864", "bits": "3FC0FF01FB0DD680" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "discriminant": { "dec": "4", "bits": "4010000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "2", "bits": "4000000000000000" },
+        { "dec": "0", "bits": "0000000000000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "discriminant": { "dec": "3.9999999999999996", "bits": "400FFFFFFFFFFFFF" },
+      "branch": "real",
+      "output": [
+        { "dec": "2.000000005", "bits": "4000000000ABCC77" },
+        { "dec": "5.000000080634948e-9", "bits": "3E35798EE8000000" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+      },
+      "discriminant": { "dec": "4.000099999999999", "bits": "4010001A36E2EB1B" },
+      "branch": "real",
+      "output": [
+        { "dec": "2.0050124999218757", "bits": "40000A43FE59E2A1" },
+        { "dec": "0.004987500078124096", "bits": "3F746DC5DB96E600" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "0.25", "bits": "3FD0000000000000" }
+      },
+      "discriminant": { "dec": "4.0625", "bits": "4010400000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "2.1327822185373186", "bits": "40010FF01FB0DD68" },
+        { "dec": "0.11721778146268136", "bits": "3FBE01FC09E45300" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+      },
+      "discriminant": { "dec": "4.0729", "bits": "40104AA64C2F837B" },
+      "branch": "real",
+      "output": [
+        { "dec": "2.1440713552569015", "bits": "4001270EE1F8F348" },
+        { "dec": "0.1259286447430985", "bits": "3FC01E6E09668E10" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "discriminant": { "dec": "4.25", "bits": "4011000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "2.2807764064044154", "bits": "40023F07B357F684" },
+        { "dec": "0.21922359359558485", "bits": "3FCC0F84CA8097C8" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "discriminant": { "dec": "4.8100000000000005", "bits": "40133D70A3D70A3E" },
+      "branch": "real",
+      "output": [
+        { "dec": "2.5465856099730653", "bits": "40045F6846BA6362" },
+        { "dec": "0.3534143900269344", "bits": "3FD69E5763C67E84" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "0.999", "bits": "3FEFF7CED916872B" }
+      },
+      "discriminant": { "dec": "4.998001", "bits": "4013FDF3F961804E" },
+      "branch": "real",
+      "output": [
+        { "dec": "2.6173104714127526", "bits": "4004F04078F191A5" },
+        { "dec": "0.3816895285872475", "bits": "3FD86D99EAA08130" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "discriminant": { "dec": "5", "bits": "4014000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "2.618033988749895", "bits": "4004F1BBCDCBFA54" },
+        { "dec": "0.3819660112501051", "bits": "3FD8722191A02D60" }
+      ]
+    },
+    {
+      "input": {
+        "phi": { "dec": "2", "bits": "4000000000000000" },
+        "theta": { "dec": "1.5", "bits": "3FF8000000000000" }
+      },
+      "discriminant": { "dec": "6.25", "bits": "4019000000000000" },
+      "branch": "real",
+      "output": [
+        { "dec": "3", "bits": "4008000000000000" },
+        { "dec": "0.5", "bits": "3FE0000000000000" }
+      ]
+    }
+  ],
+  "defaults": {
+    "input": "defaults (MISPRICING_PHI, MOMENTUM_THETA)",
+    "output": [
+      { "dec": "0.9846051245176521", "bits": "3FEF81E29B28DFD6" },
+      { "dec": "0.253908895835244", "bits": "3FD0400B18F1A76C" }
+    ]
+  },
+  "crowdAdjusted": {
+    "input": {
+      "phi": { "dec": "0.9825140203528961", "bits": "3FEF70C13E28DE8E" },
+      "theta": { "dec": "0.27", "bits": "3FD147AE147AE148" }
+    },
+    "output": [
+      { "dec": "0.9758250905200969", "bits": "3FEF39F58A4CCD42" },
+      { "dec": "0.2766889298327992", "bits": "3FD1B5457C3303DF" }
+    ]
+  }
+}

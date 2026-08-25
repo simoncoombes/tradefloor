@@ -1,0 +1,2653 @@
+{
+  "kind": "mispricing.apply",
+  "meta": {
+    "generator": "scripts/rust-port/generate-goldens.ts",
+    "generatedFrom": "TypeScript (the parity contract — never regenerate from Rust)",
+    "gitCommit": "51e673d3c536ca350a92b97ca7a09f91ed3f5061",
+    "sourceFiles": [
+      {
+        "path": "src/lib/engine/prng.ts",
+        "sha256": "31e7c173c5d62ba0282040ddb46ac4a1c2676448fc767ed60c7723887907e2ab"
+      },
+      {
+        "path": "src/lib/engine/mispricing.ts",
+        "sha256": "513108f9455908fb09e4f8f36d4c3dd25e009a94bfcecb41d0a363dbcb636a24"
+      }
+    ],
+    "sourceModule": "src/lib/engine/mispricing.ts",
+    "covers": ["applyMispricing"],
+    "description": "price = max(0.01, fairValue × exp(clamp(s, ±MISPRICING_CAP))), across a spread of fair values including zero, subnormal, negative and non-finite.",
+    "notes": [
+      "Math.exp IS A PARITY RISK. It is the only transcendental in the mispricing hot path and its argument is bounded to [-0.9, 0.9], so a shared correctly-rounded exp over that narrow range is a realistic fix if Rust disagrees.", "Math.max(0.01, NaN) is NaN in JS. Rust f64::max(0.01, NaN) returns 0.01. This differs and the port must special-case it, or guarantee its inputs are never NaN.", "Negative fair values survive the multiply but are then floored to 0.01, so applyMispricing never returns a negative price — except for NaN."
+    ],
+    "floatEncoding": "bits = raw IEEE-754 f64, big-endian, 16 uppercase hex digits. dec = shortest round-trip decimal, informational only.",
+    "nanPolicy": "Every NaN is recorded as 7FF8000000000000 (the pattern of Rust f64::NAN). V8 does not emit a stable NaN sign/payload, so only NaN-ness is contractual — compare NaN results with is_nan(), not with bits."
+  },
+  "cases": [
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0", "bits": "0000000000000000" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "5e-324", "bits": "0000000000000001" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e-300", "bits": "01A56E1FC2F8F359" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01015113064615719", "bits": "3F84CA1DB1242F5F" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.011051709180756477", "bits": "3F86A2474BF852FB" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01648721270700128", "bits": "3F90E2061D83DB45" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.024596031111569494", "bits": "3F992FB3B4F13E60" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.024596031111569498", "bits": "3F992FB3B4F13E61" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.024596031111569498", "bits": "3F992FB3B4F13E61" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "0.024596031111569498", "bits": "3F992FB3B4F13E61" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "0.024596031111569498", "bits": "3F992FB3B4F13E61" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.024596031111569498", "bits": "3F992FB3B4F13E61" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.01", "bits": "3F847AE147AE147B" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.0100000002", "bits": "3F847AE14E8D4C71" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.010151130747668496", "bits": "3F84CA1DB4A11683" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.01105170929127357", "bits": "3F86A2474FC47159" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.016487212871873408", "bits": "3F90E2062058F8C8" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.024596031357529805", "bits": "3F992FB3B92AFD11" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.02459603135752981", "bits": "3F992FB3B92AFD12" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.02459603135752981", "bits": "3F992FB3B92AFD12" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "0.02459603135752981", "bits": "3F992FB3B92AFD12" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "0.02459603135752981", "bits": "3F992FB3B92AFD12" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02459603135752981", "bits": "3F992FB3B92AFD12" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "0.0100000001", "bits": "3F847AE14B1DB076" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "0.4065696597405991", "bits": "3FDA053CC0086E1E" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "0.4065696597405991", "bits": "3FDA053CC0086E1E" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "0.4065696597405991", "bits": "3FDA053CC0086E1E" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.4065696597405991", "bits": "3FDA053CC0086E1E" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.4065696597405991", "bits": "3FDA053CC0086E1E" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.40656965974059917", "bits": "3FDA053CC0086E1F" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "0.6065306597126334", "bits": "3FE368B2FC6F960A" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.9048374180359595", "bits": "3FECF46D99D52B3A" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.9851119396030626", "bits": "3FEF8609796FD127" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.9999999900000001", "bits": "3FEFFFFFFAA19C48" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "1", "bits": "3FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "1", "bits": "3FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "1", "bits": "3FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "1", "bits": "3FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "1.00000001", "bits": "3FF0000002AF31DC" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "1.015113064615719", "bits": "3FF03DE732644502" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "1.1051709180756477", "bits": "3FF1AEC7B35A00D4" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "1.6487212707001282", "bits": "3FFA61298E1E069C" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "2.4596031111569494", "bits": "4003AD44655C78BB" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "2.45960311115695", "bits": "4003AD44655C78BC" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "2.45960311115695", "bits": "4003AD44655C78BC" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "2.45960311115695", "bits": "4003AD44655C78BC" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "2.45960311115695", "bits": "4003AD44655C78BC" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "2.45960311115695", "bits": "4003AD44655C78BC" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1", "bits": "3FF0000000000000" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "5.017069601198993", "bits": "4014117AB18B9F2B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "5.017069601198993", "bits": "4014117AB18B9F2B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "5.017069601198993", "bits": "4014117AB18B9F2B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "5.017069601198993", "bits": "4014117AB18B9F2B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "5.017069601198993", "bits": "4014117AB18B9F2B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "5.017069601198994", "bits": "4014117AB18B9F2C" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "7.484588340853897", "bits": "401DF037ED0FF628" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "11.165693738563741", "bits": "402654D5CF489105" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "12.156281334701793", "bits": "402850041B6B09F3" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "12.3399998766", "bits": "4028AE1476BD4836" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "12.34", "bits": "4028AE147AE147AE" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "12.34", "bits": "4028AE147AE147AE" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "12.34", "bits": "4028AE147AE147AE" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "12.34", "bits": "4028AE147AE147AE" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "12.3400001234", "bits": "4028AE147F054726" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "12.526495217357972", "bits": "40290D90C7F81B16" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "13.637809129053492", "bits": "402B468EEB0CBFFF" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "20.345220480439583", "bits": "403458605E9165BD" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "30.351502391676757", "bits": "403E59FC0F8CB7AB" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "30.35150239167676", "bits": "403E59FC0F8CB7AC" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "30.35150239167676", "bits": "403E59FC0F8CB7AC" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "30.35150239167676", "bits": "403E59FC0F8CB7AC" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "30.35150239167676", "bits": "403E59FC0F8CB7AC" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "30.35150239167676", "bits": "403E59FC0F8CB7AC" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "12.34", "bits": "4028AE147AE147AE" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "40.65696597405991", "bits": "4044541776069607" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "40.65696597405991", "bits": "4044541776069607" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "40.65696597405991", "bits": "4044541776069607" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "40.65696597405991", "bits": "4044541776069607" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "40.65696597405991", "bits": "4044541776069607" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "40.656965974059915", "bits": "4044541776069608" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "60.653065971263345", "bits": "404E5397AA6E5A70" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "90.48374180359595", "bits": "40569EF5A02E89C5" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "98.51119396030626", "bits": "4058A0B766DF5B66" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "99.999999", "bits": "4058FFFFFBCE4218" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "100", "bits": "4059000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "100", "bits": "4059000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "100", "bits": "4059000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "100", "bits": "4059000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "100.000001", "bits": "405900000431BDE8" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "101.51130646157189", "bits": "405960B93EBCABD3" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "110.51709180756477", "bits": "405BA118083CA14B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "164.87212707001282", "bits": "40649BE87707752A" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "245.96031111569494", "bits": "406EBEBADE607CA4" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "245.960311115695", "bits": "406EBEBADE607CA6" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "245.960311115695", "bits": "406EBEBADE607CA6" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "245.960311115695", "bits": "406EBEBADE607CA6" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "245.960311115695", "bits": "406EBEBADE607CA6" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "245.960311115695", "bits": "406EBEBADE607CA6" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "100", "bits": "4059000000000000" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "406569.6597405991", "bits": "4118D0A6A3930A24" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "406569.6597405991", "bits": "4118D0A6A3930A24" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "406569.6597405991", "bits": "4118D0A6A3930A24" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "406569.6597405991", "bits": "4118D0A6A3930A24" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "406569.6597405991", "bits": "4118D0A6A3930A24" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "406569.65974059916", "bits": "4118D0A6A3930A25" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "606530.6597126335", "bits": "4122828551C5DAB3" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "904837.4180359595", "bits": "412B9D0AD608CF2D" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "985111.9396030627", "bits": "412E102FE113A713" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "999999.9900000001", "bits": "412E847FFAE147AF" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "1000000", "bits": "412E848000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "1000000", "bits": "412E848000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "1000000", "bits": "412E848000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "1000000", "bits": "412E848000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "1000000.0099999999", "bits": "412E8480051EB851" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "1015113.0646157189", "bits": "412EFA9221154FBF" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "1105170.9180756477", "bits": "4130DD12EB070172" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "1648721.2707001283", "bits": "41392851454C9A86" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "2459603.1111569493", "bits": "4142C3E98E3A6413" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "2459603.11115695", "bits": "4142C3E98E3A6414" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "2459603.11115695", "bits": "4142C3E98E3A6414" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "2459603.11115695", "bits": "4142C3E98E3A6414" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "2459603.11115695", "bits": "4142C3E98E3A6414" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "2459603.11115695", "bits": "4142C3E98E3A6414" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1000000", "bits": "412E848000000000" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "4.065696597405991e+299", "bits": "7E236D5A3346D518" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "4.065696597405991e+299", "bits": "7E236D5A3346D518" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "4.065696597405991e+299", "bits": "7E236D5A3346D518" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "4.065696597405991e+299", "bits": "7E236D5A3346D518" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "4.065696597405991e+299", "bits": "7E236D5A3346D518" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "4.065696597405992e+299", "bits": "7E236D5A3346D519" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "6.065306597126334e+299", "bits": "7E2CFB5EAF075077" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "9.048374180359596e+299", "bits": "7E359E3318D6028E" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "9.851119396030627e+299", "bits": "7E37892D74157AD8" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "9.9999999e+299", "bits": "7E37E43C83FE5341" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "1e+300", "bits": "7E37E43C8800759C" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "1e+300", "bits": "7E37E43C8800759C" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "1e+300", "bits": "7E37E43C8800759C" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "1e+300", "bits": "7E37E43C8800759C" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "1.00000001e+300", "bits": "7E37E43C8C0297F7" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "1.015113064615719e+300", "bits": "7E3840ABE92FD992" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "1.1051709180756478e+300", "bits": "7E3A677C954827BD" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "1.6487212707001282e+300", "bits": "7E43B1FC0C8566B7" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "2.4596031111569494e+300", "bits": "7E4D61C1D15B2560" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "2.45960311115695e+300", "bits": "7E4D61C1D15B2562" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "2.45960311115695e+300", "bits": "7E4D61C1D15B2562" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "2.45960311115695e+300", "bits": "7E4D61C1D15B2562" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "2.45960311115695e+300", "bits": "7E4D61C1D15B2562" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "2.45960311115695e+300", "bits": "7E4D61C1D15B2562" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "1e+300", "bits": "7E37E43C8800759C" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-1", "bits": "BFF0000000000000" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "-100", "bits": "C059000000000000" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "Infinity", "bits": "7FF0000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-2", "bits": "C000000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-1", "bits": "BFF0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-0.9000000000000001", "bits": "BFECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-0.8999999999999999", "bits": "BFECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "0.8999999999999999", "bits": "3FECCCCCCCCCCCCC" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "0.9000000000000001", "bits": "3FECCCCCCCCCCCCE" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "1", "bits": "3FF0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "2", "bits": "4000000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "fairValue": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    }
+  ]
+}

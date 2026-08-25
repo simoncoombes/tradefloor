@@ -1,0 +1,78 @@
+{
+ "balanced (envelope)": {
+  "median": {
+   "annualised_vol_pct": 27.8765898943088,
+   "excess_kurtosis": 4.6527284743266675,
+   "return_acf1": 0.046514716384522606,
+   "abs_return_acf1": 0.17252351904572916,
+   "abs_return_acf5": 0.08749868480939309,
+   "abs_return_acf20": -0.01020815560788933,
+   "cross_sectional_corr": 0.29476426472686235,
+   "volume_abs_return_corr": 0.564193801822892,
+   "leverage_effect": -0.05096967357591778,
+   "volume_change_acf1": -0.45838595041500874
+  },
+  "loss": 0.0,
+  "out_of_band": [
+   "volume_change_acf1"
+  ]
+ },
+ "S&P-like mix": {
+  "median": {
+   "annualised_vol_pct": 27.39822847784778,
+   "excess_kurtosis": 4.566473880291337,
+   "return_acf1": 0.04405685410719617,
+   "abs_return_acf1": 0.185566990917205,
+   "abs_return_acf5": 0.09731261193485735,
+   "abs_return_acf20": -0.009291986812954534,
+   "cross_sectional_corr": 0.3115735220751691,
+   "volume_abs_return_corr": 0.5541062032491009,
+   "leverage_effect": -0.05110079565547566,
+   "volume_change_acf1": -0.4553792545108516
+  },
+  "loss": 0.017642919486256754,
+  "out_of_band": [
+   "abs_return_acf5",
+   "volume_change_acf1"
+  ]
+ },
+ "two sectors": {
+  "median": {
+   "annualised_vol_pct": 29.73381944778903,
+   "excess_kurtosis": 4.747614882085481,
+   "return_acf1": 0.05749003322131071,
+   "abs_return_acf1": 0.19178979351537762,
+   "abs_return_acf5": 0.09715412344412966,
+   "abs_return_acf20": -0.011945598741932734,
+   "cross_sectional_corr": 0.32525230181922515,
+   "volume_abs_return_corr": 0.5638153537097013,
+   "leverage_effect": -0.04714827208804748,
+   "volume_change_acf1": -0.45499908675451795
+  },
+  "loss": 0.016886446079056136,
+  "out_of_band": [
+   "abs_return_acf5",
+   "volume_change_acf1"
+  ]
+ },
+ "all technology": {
+  "median": {
+   "annualised_vol_pct": 32.767481993686715,
+   "excess_kurtosis": 5.264273534601002,
+   "return_acf1": 0.06089616413964008,
+   "abs_return_acf1": 0.1887726899947872,
+   "abs_return_acf5": 0.09347920209305793,
+   "abs_return_acf20": -0.009795556513537045,
+   "cross_sectional_corr": 0.2828371680756278,
+   "volume_abs_return_corr": 0.555529625809301,
+   "leverage_effect": -0.0530145334286219,
+   "volume_change_acf1": -0.4518763310592401
+  },
+  "loss": 0.0042775254425811505,
+  "out_of_band": [
+   "return_acf1",
+   "abs_return_acf5",
+   "volume_change_acf1"
+  ]
+ }
+}

@@ -1,0 +1,241 @@
+//! Bit-identical parity for `market_maker`, against the TypeScript.
+//!
+//! **A hard gate.** `marketMaker.ts` has zero imports, zero transcendentals
+//! and zero RNG, so every operation is exactly specified by IEEE-754 and any
+//! mismatch is a defect in the port rather than a rounding disagreement
+//! between engines.
+//!
+//! Vectors: `goldens/marketmaker.json`, generated from the
+//! TypeScript by `scripts/rust-port/marketmaker-vectors.ts`. Never regenerate
+//! them from Rust — that would make the port its own oracle.
+
+use std::fs;
+use std::path::PathBuf;
+
+use pretium::market_maker::{
+    apply_fill_to_inventory, compute_quote, quote_ladder, LadderParams, MakerInventory, QuoteParams,
+};
+use pretium::order_book::Side;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct Vectors {
+    cases: Vec<Case>,
+    #[serde(rename = "applyFillToInventory")]
+    fills: Vec<FillCase>,
+}
+
+#[derive(Deserialize)]
+struct Case {
+    note: String,
+    #[serde(rename = "in")]
+    inputs: Inputs,
+    #[serde(rename = "computeQuote")]
+    quote: ExpectedQuote,
+    #[serde(rename = "quoteLadder")]
+    ladder: ExpectedLadder,
+}
+
+#[derive(Deserialize)]
+struct Inputs {
+    #[serde(rename = "fairValue")]
+    fair_value: String,
+    #[serde(rename = "halfSpreadBps")]
+    half_spread_bps: String,
+    #[serde(rename = "baseSize")]
+    base_size: String,
+    position: String,
+    limit: String,
+    #[serde(rename = "volatilityMultiplier")]
+    volatility_multiplier: Option<String>,
+    #[serde(rename = "maxSkew")]
+    max_skew: Option<String>,
+    levels: String,
+    #[serde(rename = "levelStep")]
+    level_step: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ExpectedQuote {
+    #[serde(rename = "bidPrice")]
+    bid_price: String,
+    #[serde(rename = "askPrice")]
+    ask_price: String,
+    #[serde(rename = "bidSize")]
+    bid_size: String,
+    #[serde(rename = "askSize")]
+    ask_size: String,
+}
+
+#[derive(Deserialize)]
+struct ExpectedLadder {
+    bids: Vec<ExpectedLevel>,
+    asks: Vec<ExpectedLevel>,
+}
+
+#[derive(Deserialize)]
+struct ExpectedLevel {
+    price: String,
+    size: String,
+}
+
+#[derive(Deserialize)]
+struct FillCase {
+    side: String,
+    #[serde(rename = "positionBits")]
+    position: String,
+    #[serde(rename = "quantityBits")]
+    quantity: String,
+    result: String,
+}
+
+fn f(hex: &str) -> f64 {
+    f64::from_bits(u64::from_str_radix(hex, 16).expect("bad bit pattern"))
+}
+
+/// Compare on RAW BITS. A decimal comparison can agree while the doubles
+/// differ, which is the failure this gate exists to catch.
+///
+/// The one exception is NaN, where bit equality would assert a non-fact. The
+/// SIGN and PAYLOAD of a NaN are unspecified by both IEEE-754 and
+/// ECMAScript, and they are architecture-dependent: the default NaN x86
+/// produces for an invalid operation is `fff8…` (sign bit set) while
+/// AArch64's is `7ff8…`. Neither is observable from JavaScript — `NaN === NaN`
+/// is false and every formatting path prints "NaN" — so requiring the bits to
+/// match would make this gate fail on a different machine for a difference
+/// the original cannot express. "Both are NaN" is the whole of the contract.
+fn diff(label: &str, note: &str, got: f64, want_hex: &str) -> Option<String> {
+    let want = f(want_hex);
+    if got.to_bits() == want.to_bits() || (got.is_nan() && want.is_nan()) {
+        return None;
+    }
+    Some(format!(
+        "{note}\n      {label}: rust={got:?} ({:016x})  ts={want:?} ({want_hex})",
+        got.to_bits()
+    ))
+}
+
+#[test]
+fn matches_typescript_bit_for_bit() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("goldens/marketmaker.json");
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
+        panic!(
+            "{}: {e}\nRun: npx tsx scripts/rust-port/marketmaker-vectors.ts",
+            path.display()
+        )
+    });
+    let vectors: Vectors = serde_json::from_str(&raw).expect("malformed marketmaker.json");
+
+    let mut problems: Vec<String> = Vec::new();
+    let mut compared = 0usize;
+
+    for case in &vectors.cases {
+        let i = &case.inputs;
+        let params = QuoteParams {
+            fair_value: f(&i.fair_value),
+            half_spread_bps: f(&i.half_spread_bps),
+            base_size: f(&i.base_size),
+            inventory: MakerInventory {
+                position: f(&i.position),
+                limit: f(&i.limit),
+            },
+            // `None` in the vector means the TypeScript destructuring default
+            // applied, which is 1 for both.
+            volatility_multiplier: i.volatility_multiplier.as_deref().map(f).unwrap_or(1.0),
+            max_skew: i.max_skew.as_deref().map(f).unwrap_or(1.0),
+        };
+
+        let q = compute_quote(&params);
+        for p in [
+            diff("bidPrice", &case.note, q.bid_price, &case.quote.bid_price),
+            diff("askPrice", &case.note, q.ask_price, &case.quote.ask_price),
+            diff("bidSize", &case.note, q.bid_size, &case.quote.bid_size),
+            diff("askSize", &case.note, q.ask_size, &case.quote.ask_size),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            problems.push(p);
+        }
+        compared += 4;
+
+        let (bids, asks) = quote_ladder(&LadderParams {
+            quote: params,
+            levels: f(&i.levels),
+            level_step: i.level_step.as_deref().map(f).unwrap_or(0.5),
+        });
+
+        // Depth counts matter as much as values: the bid side drops levels
+        // once the price reaches zero and the ask side never does, so a
+        // length mismatch is a real behavioural divergence.
+        for (label, got, want) in [
+            ("ladder.bids", bids.len(), case.ladder.bids.len()),
+            ("ladder.asks", asks.len(), case.ladder.asks.len()),
+        ] {
+            if got != want {
+                problems.push(format!(
+                    "{}\n      {label}: rust has {got} levels, ts has {want}",
+                    case.note
+                ));
+            }
+        }
+
+        for (side, got, want) in [
+            ("bid", &bids, &case.ladder.bids),
+            ("ask", &asks, &case.ladder.asks),
+        ] {
+            for (n, (g, w)) in got.iter().zip(want.iter()).enumerate() {
+                for p in [
+                    diff(
+                        &format!("ladder.{side}[{n}].price"),
+                        &case.note,
+                        g.price,
+                        &w.price,
+                    ),
+                    diff(
+                        &format!("ladder.{side}[{n}].size"),
+                        &case.note,
+                        g.size,
+                        &w.size,
+                    ),
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    problems.push(p);
+                }
+                compared += 2;
+            }
+        }
+    }
+
+    for fc in &vectors.fills {
+        let side = match fc.side.as_str() {
+            "buy" => Side::Buy,
+            "sell" => Side::Sell,
+            other => panic!("bad side {other}"),
+        };
+        let inv = MakerInventory {
+            position: f(&fc.position),
+            limit: 1000.0,
+        };
+        let got = apply_fill_to_inventory(inv, side, f(&fc.quantity)).position;
+        if let Some(p) = diff("applyFillToInventory", &fc.side, got, &fc.result) {
+            problems.push(p);
+        }
+        compared += 1;
+    }
+
+    println!(
+        "{compared} bit-exact comparisons across {} cases",
+        vectors.cases.len()
+    );
+
+    assert!(
+        problems.is_empty(),
+        "{} mismatches against the TypeScript:\n\n  {}",
+        problems.len(),
+        problems.join("\n\n  ")
+    );
+}

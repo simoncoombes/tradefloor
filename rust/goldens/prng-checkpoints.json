@@ -1,0 +1,266 @@
+{
+  "kind": "prng.checkpoints",
+  "meta": {
+    "generator": "scripts/rust-port/generate-goldens.ts",
+    "generatedFrom": "TypeScript (the parity contract — never regenerate from Rust)",
+    "gitCommit": "51e673d3c536ca350a92b97ca7a09f91ed3f5061",
+    "sourceFiles": [
+      {
+        "path": "src/lib/engine/prng.ts",
+        "sha256": "31e7c173c5d62ba0282040ddb46ac4a1c2676448fc767ed60c7723887907e2ab"
+      },
+      {
+        "path": "src/lib/engine/mispricing.ts",
+        "sha256": "513108f9455908fb09e4f8f36d4c3dd25e009a94bfcecb41d0a363dbcb636a24"
+      }
+    ],
+    "sourceModule": "src/lib/engine/prng.ts",
+    "covers": ["PCG32 state after N advances"],
+    "description": "Raw u32 output at draw indices up to 10,000,000. The PCG32 state itself is private and cannot be inspected, so the output at a deep index is the proxy: it is a function of the whole state, so agreement here pins the state.",
+    "notes": ["Indices are zero-based: index 0 is the first value returned by a fresh instance."],
+    "floatEncoding": "bits = raw IEEE-754 f64, big-endian, 16 uppercase hex digits. dec = shortest round-trip decimal, informational only.",
+    "nanPolicy": "Every NaN is recorded as 7FF8000000000000 (the pattern of Rust f64::NAN). V8 does not emit a stable NaN sign/payload, so only NaN-ness is contractual — compare NaN results with is_nan(), not with bits."
+  },
+  "series": [
+    {
+      "input": {
+        "seed": 0,
+        "sequence": 1
+      },
+      "samples": [
+        {
+          "index": 0,
+          "output": 257813417
+        },
+        {
+          "index": 1,
+          "output": 407017181
+        },
+        {
+          "index": 2,
+          "output": 896943092
+        },
+        {
+          "index": 999,
+          "output": 632062204
+        },
+        {
+          "index": 9999,
+          "output": 150989326
+        },
+        {
+          "index": 99999,
+          "output": 2326239406
+        },
+        {
+          "index": 999999,
+          "output": 1694369307
+        },
+        {
+          "index": 9999999,
+          "output": 1477642233
+        }
+      ]
+    },
+    {
+      "input": {
+        "seed": 1,
+        "sequence": 1
+      },
+      "samples": [
+        {
+          "index": 0,
+          "output": 3380776849
+        },
+        {
+          "index": 1,
+          "output": 361947764
+        },
+        {
+          "index": 2,
+          "output": 3223725655
+        },
+        {
+          "index": 999,
+          "output": 1092112616
+        },
+        {
+          "index": 9999,
+          "output": 3362417404
+        },
+        {
+          "index": 99999,
+          "output": 951174002
+        },
+        {
+          "index": 999999,
+          "output": 4024706433
+        },
+        {
+          "index": 9999999,
+          "output": 733142481
+        }
+      ]
+    },
+    {
+      "input": {
+        "seed": 42,
+        "sequence": 1
+      },
+      "samples": [
+        {
+          "index": 0,
+          "output": 1307692281
+        },
+        {
+          "index": 1,
+          "output": 3850602322
+        },
+        {
+          "index": 2,
+          "output": 1491967504
+        },
+        {
+          "index": 999,
+          "output": 1154660352
+        },
+        {
+          "index": 9999,
+          "output": 843648187
+        },
+        {
+          "index": 99999,
+          "output": 123112075
+        },
+        {
+          "index": 999999,
+          "output": 3843121025
+        },
+        {
+          "index": 9999999,
+          "output": 2159674619
+        }
+      ]
+    },
+    {
+      "input": {
+        "seed": 2147483648,
+        "sequence": 1
+      },
+      "samples": [
+        {
+          "index": 0,
+          "output": 3083749184
+        },
+        {
+          "index": 1,
+          "output": 2925235642
+        },
+        {
+          "index": 2,
+          "output": 3506504048
+        },
+        {
+          "index": 999,
+          "output": 1782689803
+        },
+        {
+          "index": 9999,
+          "output": 450132924
+        },
+        {
+          "index": 99999,
+          "output": 1145594282
+        },
+        {
+          "index": 999999,
+          "output": 3584923748
+        },
+        {
+          "index": 9999999,
+          "output": 328289939
+        }
+      ]
+    },
+    {
+      "input": {
+        "seed": 3735928559,
+        "sequence": 1
+      },
+      "samples": [
+        {
+          "index": 0,
+          "output": 3227356899
+        },
+        {
+          "index": 1,
+          "output": 555164094
+        },
+        {
+          "index": 2,
+          "output": 978817449
+        },
+        {
+          "index": 999,
+          "output": 4015054796
+        },
+        {
+          "index": 9999,
+          "output": 2413357112
+        },
+        {
+          "index": 99999,
+          "output": 315708522
+        },
+        {
+          "index": 999999,
+          "output": 3050938779
+        },
+        {
+          "index": 9999999,
+          "output": 4181090817
+        }
+      ]
+    },
+    {
+      "input": {
+        "seed": 4294967295,
+        "sequence": 1
+      },
+      "samples": [
+        {
+          "index": 0,
+          "output": 1314271857
+        },
+        {
+          "index": 1,
+          "output": 305501965
+        },
+        {
+          "index": 2,
+          "output": 103033612
+        },
+        {
+          "index": 999,
+          "output": 1333836966
+        },
+        {
+          "index": 9999,
+          "output": 2287370263
+        },
+        {
+          "index": 99999,
+          "output": 3893706038
+        },
+        {
+          "index": 999999,
+          "output": 1534209495
+        },
+        {
+          "index": 9999999,
+          "output": 2123890227
+        }
+      ]
+    }
+  ]
+}

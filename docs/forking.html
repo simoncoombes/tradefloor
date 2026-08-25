@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Checkpoints and Forking · pretium docs</title>
+<meta name="description" content="Freeze a market and resume it later, or split it into several futures from one identical state. This is the machinery for asking what a single decision...">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/forking.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium docs">
+<meta property="og:title" content="Checkpoints and Forking">
+<meta property="og:description" content="Freeze a market and resume it later, or split it into several futures from one identical state. This is the machinery for asking what a single decision...">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/forking.html">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Checkpoints and Forking">
+<meta name="twitter:description" content="Freeze a market and resume it later, or split it into several futures from one identical state. This is the machinery for asking what a single decision...">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Checkpoints and Forking","description":"Freeze a market and resume it later, or split it into several futures from one identical state. This is the machinery for asking what a single decision...","url":"https://simoncoombes.github.io/pretium/forking.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
+<style>:root{
+  --hue:55;
+  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
+  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
+  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
+  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
+  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
+  --bad:oklch(0.52 0.12 25);
+  --navact:oklch(0.945 0.012 var(--hue));
+  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
+  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
+  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
+  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
+}
+html[data-lightcode="true"]:not([data-theme="dark"]){
+  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
+  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
+}
+html[data-theme="dark"]{
+  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
+  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
+  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
+  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
+  --bad:oklch(0.72 0.11 25);
+  --navact:oklch(0.26 0.02 var(--hue));
+  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
+}
+html{scroll-behavior:auto}
+body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+::selection{background:var(--accent-soft)}
+p{margin:0 0 14px;text-wrap:pretty}
+h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
+ul{margin:0 0 14px;padding-left:22px}
+li{margin:0 0 7px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
+pre{margin:0}
+code{font-family:var(--font-mono)}
+summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
+summary::marker{color:var(--faint)}
+details[open] summary{border-bottom:1px solid var(--linesoft)}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+h2[id],h3[id]{scroll-margin-top:80px}
+h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
+h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
+.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
+#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
+#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
+#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
+#hambtn{display:none}
+@media (max-width:920px){
+  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
+  #sbar[data-open="true"]{transform:none}
+  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
+  #hambtn{display:flex}
+  #searchwrap{display:none}
+  #ghlink{display:none}
+}
+.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
+  grid-template-columns:232px minmax(0,1fr);gap:40px}
+.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
+.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
+.sidebar li{margin:0 0 2px}
+.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
+.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
+.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
+main{padding:28px 0 72px;min-width:0}
+main h1{font-size:30px;margin:0 0 18px}
+main h2{font-size:20px;margin:34px 0 12px}
+main h3{font-size:16px;margin:24px 0 8px}
+.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
+.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
+  display:flex;align-items:baseline;gap:12px}
+.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
+.masthead .tag{color:var(--mut);font-size:13px}
+.masthead .spacer{flex:1}
+.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
+  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
+pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
+  padding:13px 16px;overflow-x:auto;font-size:13px}
+pre code{color:inherit}
+.tablewrap{overflow-x:auto}
+footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
+  color:var(--mut);font-size:13px}
+@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
+  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
+</style>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-1LBM3239ZF');
+</script>
+</head>
+<body>
+<header class="masthead"><div class="inner">
+<a class="brand" href="./">pretium</a>
+<span class="tag">repeatable market simulation</span>
+<span class="spacer"></span>
+<a href="https://github.com/simoncoombes/pretium">GitHub</a>
+</div></header>
+<div class="layout">
+<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><span aria-current="page">Checkpoints and forking</span></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The seven components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
+<main>
+<p class="appnote">This is the plain version of the page. The
+<a href="./#/forking">full documentation app</a> adds search, dark mode
+and copy buttons.</p>
+<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">GUIDE</div>
+        <h1 style="font-size:30px">Checkpoints and Forking</h1>
+        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">Freeze a market and resume it later, or split it into several futures from one identical state. This is the machinery for asking what a single decision was worth.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Why You Would Do This</h2>
+        <p>You want to know what one choice cost you, and there is no way to isolate that in a single run. Run a strategy through a crisis and you learn what happened; fork the market the day before the crisis and you learn what would have happened if you had de-risked, on exactly the same tape, with exactly the same noise. The branches share no memory, so nothing you do to one leaks into the other, which is what makes it a controlled experiment rather than two runs that happened to start alike.</p>
+        <p>It is also how you avoid paying for the same hundred days twice. Reaching day 60 costs whatever it costs; forking from there is close to free.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Two Tools, and They Are Not Interchangeable</h2>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">pt.branch(engine, count, universe=, seed=)</td><td>Forks a <em>running</em> engine in constant time by copying its state, columns and generator position included. Measured at under a millisecond for a sixty-day forty-instrument market, against 2,740 ms to reach the same point by replaying its log. Lives in memory, dies with the process.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">pt.Checkpoint</td><td>Serialises the inputs and the order log, so the state survives the process and can be published. Resuming replays the log, so it costs roughly what reaching the state cost the first time.</td></tr>
+          </tbody>
+        </table></div>
+        <p>So: <code style="font-size:13px">branch</code> when the experiment happens now, <code style="font-size:13px">Checkpoint</code> when someone else needs to start where you started.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Forking a Live Engine</h2>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">import pretium as pt
+
+universe = pt.Universe.random(40, seed=7)
+engine = pt.Engine(seed=42, universe=universe)
+engine.run_days(60)                     # the shared history
+
+# both branches carry the full state, including the RNG position
+calm, shocked = pt.branch(engine, 2, universe=universe, seed=42)
+
+shocked.pin_macro(corporate_bond_yield=0.09)   # one thing differs
+calm.run_days(30)
+shocked.run_days(30)
+
+calm_close = calm.bars(grain="day")
+shocked_close = shocked.bars(grain="day")</code></pre>
+        </div>
+        <p><code style="font-size:13px">universe</code> and <code style="font-size:13px">seed</code> are required because an engine carries neither: it is built from them and keeps them nowhere. The seed barely matters here, since the generator position is restored over whatever it produced, but the universe does: the columns are positional, so a mismatched roster would attach every value to the wrong instrument. The engine refuses that rather than doing it quietly.</p>
+        <p>A fork of a custom-model run prices under its parent's coefficients, read off the live engine, so a branch cannot silently revert to the shipped preset.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Checkpoints That Outlive the Process</h2>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">cp = pt.Checkpoint.of(engine, universe=universe, seed=42,
+                      label="pre-shock, day 60")
+
+open("day60.json", "w").write(cp.to_json())
+
+# later, or elsewhere, or in someone else's hands:
+cp = pt.Checkpoint.from_json(open("day60.json").read())
+engine = cp.resume()
+
+# or several futures at once
+futures = cp.branch(3)</code></pre>
+        </div>
+        <p><code style="font-size:13px">Checkpoint.of</code> takes the universe and the seed for the same reason <code style="font-size:13px">branch</code> does, and it records them so the checkpoint carries the inputs it will need rather than discovering at resume time that it cannot reproduce anything.</p>
+        <p><code style="font-size:13px">resume(universe=...)</code> lets you restore onto a roster you already hold. It is checked against the recorded fingerprint and refused on a mismatch, because tickers are generated positionally: two universes can share every name and no fundamentals, so comparing names would be checking almost nothing. The error message says what a mismatch would give you, which is right prices and wrong fair values.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Full Example: What Did De-risking Cost?</h2>
+        <p>Sixty days of shared history, then the same market twice: once holding the book through a rate shock, once cutting exposure the day before it starts. Same seed, same noise, one decision different.</p>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">import pretium as pt
+
+universe = pt.Universe.random(40, seed=7)
+spec = pt.StrategySpec.momentum(lookback_days=1.0, top_k=5)
+
+# 1. shared history
+engine = pt.Engine(seed=42, universe=universe)
+engine.run_days(60)
+print(engine.draws_by_stream())          # the position both branches inherit
+
+# 2. publish the fork point, so the experiment is checkable
+cp = pt.Checkpoint.of(engine, universe=universe, seed=42,
+                      label="day 60, pre-shock")
+open("day60.json", "w").write(cp.to_json())
+
+# 3. two futures from one state
+held, derisked = pt.branch(engine, 2, universe=universe, seed=42)
+
+# 4. the same shock reaches both; only the exposure differs
+shock = pt.Scenario.rate_shock(start=0.025, end=0.05, over=15)
+for eng, gross in ((held, 1.0), (derisked, 0.4)):
+    for day in range(30):
+        shock.apply(eng, day)
+        eng.run_days(1)
+
+# 5. and the counterfactual is exact, because the noise was identical
+print(held.draws_by_stream()["market"] == derisked.draws_by_stream()["market"])</code></pre>
+        </div>
+        <div style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">OUTPUT</span><span title="Shapes and field names are real; the numeric values were composed for the example." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--codemut);border:1px solid var(--codeline)">ILLUSTRATIVE</span></div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);color:var(--codemut)"># 1.
+{'market': 9360000, 'economy': 1440, 'external': 0}
+
+# 5.
+True</code></pre>
+        </div>
+        <p>The last line is the point. Equal market-stream draw counts mean the two branches consumed, and therefore saw, an identical noise sequence, so the difference between their P&amp;Ls is the decision and nothing else. That is a number no backtest can produce, because history only ran once and it ran with your orders in it.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">What Travels, and What Does Not</h2>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">RNG position</td><td>Nine numbers: state, increment and Box-Muller spare for each of the three streams. A pre-split snapshot carrying three is refused on restore with its era named, because it froze a single-stream market this version cannot continue bit-exactly.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">model</td><td>The parent's coefficients. A custom-model checkpoint resumes under the custom model or refuses.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">universe · seed · macro · order log</td><td>Everything a resume needs, which is why they are arguments rather than assumptions.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">schema</td><td>A checkpoint written by a newer version is refused rather than read partially.</td></tr>
+          </tbody>
+        </table></div>
+        <p>Related: <a href="scenarios.html">Scenarios and Crises</a> for the macro paths you fork into, and <a href="citing.html">Citing a Result</a> for publishing the fork point alongside the result.</p>
+</main>
+</div>
+<footer class="site"><div class="layout" style="display:block">
+pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
+</div></footer>
+</body>
+</html>

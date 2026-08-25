@@ -1,0 +1,8123 @@
+{
+ "kind": "marketmaker",
+ "meta": {
+  "sourceModule": "src/lib/engine/marketMaker.ts",
+  "generatedFrom": "TypeScript — the parity contract. Never regenerate from Rust.",
+  "floatEncoding": "raw IEEE-754 f64, big-endian, 16 hex digits",
+  "marketMakerId": "mm"
+ },
+ "cases": [
+  {
+   "note": "envelope fv=0.5 bps=3 pos=0",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=3 pos=250",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=3 pos=-250",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=3 pos=1000",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=3 pos=-1000",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=10 pos=0",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=10 pos=250",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=10 pos=-250",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=10 pos=1000",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=10 pos=-1000",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=30 pos=0",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=30 pos=250",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=30 pos=-250",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=30 pos=1000",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=0.5 bps=30 pos=-1000",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=3 pos=0",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028ae147ae147ae",
+    "askPrice": "4028b33333333333",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028ae147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028a8f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028a3d70a3d70a4",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40289eb851eb851f",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "402899999999999a",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028b33333333333",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028b851eb851eb8",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028bd70a3d70a3d",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4028c7ae147ae148",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=3 pos=250",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028ae147ae147ae",
+    "askPrice": "4028b33333333333",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028ae147ae147ae",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "4028a8f5c28f5c29",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "4028a3d70a3d70a4",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "40289eb851eb851f",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "402899999999999a",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028b33333333333",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028b851eb851eb8",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028bd70a3d70a3d",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4028c7ae147ae148",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=3 pos=-250",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028ae147ae147ae",
+    "askPrice": "4028b33333333333",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028ae147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028a8f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028a3d70a3d70a4",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40289eb851eb851f",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "402899999999999a",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028b33333333333",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "4028b851eb851eb8",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "4028bd70a3d70a3d",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "4028c7ae147ae148",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=3 pos=1000",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028a8f5c28f5c29",
+    "askPrice": "4028ae147ae147ae",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028a8f5c28f5c29",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4028a3d70a3d70a4",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "40289eb851eb851f",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "402899999999999a",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "4028947ae147ae14",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028ae147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028b33333333333",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028b851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4028bd70a3d70a3d",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=3 pos=-1000",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028ae147ae147ae",
+    "askPrice": "4028b33333333333",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028ae147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028a8f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028a3d70a3d70a4",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40289eb851eb851f",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "402899999999999a",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028b33333333333",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4028b851eb851eb8",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4028bd70a3d70a3d",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "4028c7ae147ae148",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=10 pos=0",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028a8f5c28f5c29",
+    "askPrice": "4028b33333333333",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028a8f5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40289eb851eb851f",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "402899999999999a",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4028947ae147ae14",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028b33333333333",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028b851eb851eb8",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028bd70a3d70a3d",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4028c7ae147ae148",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=10 pos=250",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028a3d70a3d70a4",
+    "askPrice": "4028b33333333333",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028a3d70a3d70a4",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "40289eb851eb851f",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "4028947ae147ae14",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "40288f5c28f5c28f",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "4028851eb851eb85",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028b33333333333",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028b851eb851eb8",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4028cccccccccccd",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4028d1eb851eb852",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=10 pos=-250",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028a8f5c28f5c29",
+    "askPrice": "4028b851eb851eb8",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028a8f5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "402899999999999a",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4028947ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "40288a3d70a3d70a",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028b851eb851eb8",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "4028c7ae147ae148",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "4028cccccccccccd",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "4028d70a3d70a3d7",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=10 pos=1000",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028a3d70a3d70a4",
+    "askPrice": "4028ae147ae147ae",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028a3d70a3d70a4",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "40289eb851eb851f",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "402899999999999a",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "4028947ae147ae14",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "40288f5c28f5c28f",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028ae147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028b33333333333",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028b851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4028bd70a3d70a3d",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=10 pos=-1000",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028ae147ae147ae",
+    "askPrice": "4028b851eb851eb8",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028ae147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028a8f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028a3d70a3d70a4",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40289eb851eb851f",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "402899999999999a",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028b851eb851eb8",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4028bd70a3d70a3d",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "4028c7ae147ae148",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "4028cccccccccccd",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=30 pos=0",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "402899999999999a",
+    "askPrice": "4028c28f5c28f5c3",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "402899999999999a",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028851eb851eb85",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "402870a3d70a3d71",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40285c28f5c28f5c",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "402847ae147ae148",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028d70a3d70a3d7",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028eb851eb851ec",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4029000000000000",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4029147ae147ae14",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=30 pos=250",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028947ae147ae14",
+    "askPrice": "4028bd70a3d70a3d",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028947ae147ae14",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "4028800000000000",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "40286b851eb851ec",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "4028570a3d70a3d7",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "4028428f5c28f5c3",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028bd70a3d70a3d",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028d1eb851eb852",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028e66666666666",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4028fae147ae147b",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "40290f5c28f5c28f",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=30 pos=-250",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "40289eb851eb851f",
+    "askPrice": "4028c7ae147ae148",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "40289eb851eb851f",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40288a3d70a3d70a",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "402875c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40286147ae147ae1",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "40284ccccccccccd",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028c7ae147ae148",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "4028dc28f5c28f5c",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "4028f0a3d70a3d71",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "4029051eb851eb85",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "402919999999999a",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=30 pos=1000",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "40288a3d70a3d70a",
+    "askPrice": "4028ae147ae147ae",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "40288a3d70a3d70a",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "40287ae147ae147b",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4028666666666666",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "4028570a3d70a3d7",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "4028428f5c28f5c3",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028ae147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4028c28f5c28f5c3",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4028d1eb851eb852",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4028e66666666666",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4028f5c28f5c28f6",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=12.34 bps=30 pos=-1000",
+   "in": {
+    "fairValue": "4028ae147ae147ae",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4028ae147ae147ae",
+    "askPrice": "4028d1eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4028ae147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40289eb851eb851f",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40288a3d70a3d70a",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40287ae147ae147b",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4028666666666666",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4028d1eb851eb852",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4028e66666666666",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4028f5c28f5c28f6",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "40290a3d70a3d70a",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "402919999999999a",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=3 pos=0",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055de147ae147ae",
+    "askPrice": "4055e1eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055de147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055dc28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055da3d70a3d70a",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055d851eb851eb8",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055d66666666666",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055e1eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055e3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055e5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055e7ae147ae148",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055e9999999999a",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=3 pos=250",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055de147ae147ae",
+    "askPrice": "4055e147ae147ae1",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055de147ae147ae",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "4055dccccccccccd",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "4055dae147ae147b",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "4055d9999999999a",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "4055d7ae147ae148",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055e147ae147ae1",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055e28f5c28f5c3",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055e47ae147ae14",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055e66666666666",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055e7ae147ae148",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=3 pos=-250",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055deb851eb851f",
+    "askPrice": "4055e1eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055deb851eb851f",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055dd70a3d70a3d",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055db851eb851ec",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055da3d70a3d70a",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055d851eb851eb8",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055e1eb851eb852",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "4055e3d70a3d70a4",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "4055e51eb851eb85",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "4055e66666666666",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "4055e851eb851eb8",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=3 pos=1000",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055dccccccccccd",
+    "askPrice": "4055e00000000000",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055dccccccccccd",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4055db851eb851ec",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4055d9999999999a",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "4055d851eb851eb8",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "4055d66666666666",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055e00000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055e1eb851eb852",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055e33333333333",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055e47ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055e66666666666",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=3 pos=-1000",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055e00000000000",
+    "askPrice": "4055e33333333333",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055e00000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055deb851eb851f",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055dccccccccccd",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055db851eb851ec",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055d9999999999a",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055e33333333333",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4055e47ae147ae14",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4055e66666666666",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "4055e851eb851eb8",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "4055e9999999999a",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=10 pos=0",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055da3d70a3d70a",
+    "askPrice": "4055e5c28f5c28f6",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055da3d70a3d70a",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055d47ae147ae14",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055ceb851eb851f",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055c8f5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055c33333333333",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055e5c28f5c28f6",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055eb851eb851ec",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055f147ae147ae1",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055f70a3d70a3d7",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055fccccccccccd",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=10 pos=250",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055d8f5c28f5c29",
+    "askPrice": "4055e47ae147ae14",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055d8f5c28f5c29",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "4055d33333333333",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "4055cd70a3d70a3d",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "4055c7ae147ae148",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "4055c1eb851eb852",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055e47ae147ae14",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055ea3d70a3d70a",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055f00000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055f5c28f5c28f6",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055fb851eb851ec",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=10 pos=-250",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055db851eb851ec",
+    "askPrice": "4055e70a3d70a3d7",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055db851eb851ec",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055d5c28f5c28f6",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055d00000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055ca3d70a3d70a",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055c47ae147ae14",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055e70a3d70a3d7",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "4055eccccccccccd",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "4055f28f5c28f5c3",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "4055f851eb851eb8",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "4055fe147ae147ae",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=10 pos=1000",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055d47ae147ae14",
+    "askPrice": "4055e00000000000",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055d47ae147ae14",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4055ceb851eb851f",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4055c8f5c28f5c29",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "4055c33333333333",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "4055bd70a3d70a3d",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055e00000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055e5c28f5c28f6",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055eb851eb851ec",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055f147ae147ae1",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055f70a3d70a3d7",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=10 pos=-1000",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055e00000000000",
+    "askPrice": "4055eb851eb851ec",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055e00000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055da3d70a3d70a",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055d47ae147ae14",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055ceb851eb851f",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4055c8f5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055eb851eb851ec",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4055f147ae147ae1",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4055f70a3d70a3d7",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "4055fccccccccccd",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "4056028f5c28f5c3",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=30 pos=0",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055cf5c28f5c28f",
+    "askPrice": "4055f0a3d70a3d71",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055cf5c28f5c28f",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055beb851eb851f",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055ae147ae147ae",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40559d70a3d70a3d",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "40558ccccccccccd",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055f0a3d70a3d71",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40560147ae147ae1",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "405611eb851eb852",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4056228f5c28f5c3",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4056333333333333",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=30 pos=250",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055cae147ae147b",
+    "askPrice": "4055eccccccccccd",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055cae147ae147b",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "4055ba3d70a3d70a",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "4055a8f5c28f5c29",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "40559851eb851eb8",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "4055870a3d70a3d7",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055eccccccccccd",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055fe147ae147ae",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40560eb851eb851f",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4056200000000000",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "405630a3d70a3d71",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=30 pos=-250",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055d33333333333",
+    "askPrice": "4055f51eb851eb85",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055d33333333333",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055c28f5c28f5c3",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055b147ae147ae1",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055a0a3d70a3d71",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "40558f5c28f5c28f",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055f51eb851eb85",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "4056066666666666",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "4056170a3d70a3d7",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "40562851eb851eb8",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "405638f5c28f5c29",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=30 pos=1000",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055beb851eb851f",
+    "askPrice": "4055e00000000000",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055beb851eb851f",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4055ae147ae147ae",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "40559d70a3d70a3d",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "40558ccccccccccd",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "40557c28f5c28f5c",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4055e00000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055f0a3d70a3d71",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40560147ae147ae1",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "405611eb851eb852",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4056228f5c28f5c3",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=87.5 bps=30 pos=-1000",
+   "in": {
+    "fairValue": "4055e00000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4055e00000000000",
+    "askPrice": "405601eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4055e00000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4055cf5c28f5c28f",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4055be147ae147ae",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4055ad70a3d70a3d",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "40559c28f5c28f5c",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405601eb851eb852",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4056133333333333",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "405623d70a3d70a4",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "4056351eb851eb85",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "405645c28f5c28f6",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=3 pos=0",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f3dc28f5c28f6",
+    "askPrice": "406f428f5c28f5c3",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f3dc28f5c28f6",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f3b851eb851ec",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f38f5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f36b851eb851f",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f3428f5c28f5c",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f428f5c28f5c3",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f451eb851eb85",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f475c28f5c28f",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f49eb851eb852",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f4c28f5c28f5c",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=3 pos=250",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f3d1eb851eb85",
+    "askPrice": "406f41eb851eb852",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f3d1eb851eb85",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "406f3a8f5c28f5c3",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "406f3851eb851eb8",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "406f36147ae147ae",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "406f33851eb851ec",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f41eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f447ae147ae14",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f46b851eb851f",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f4947ae147ae1",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f4b851eb851ec",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=3 pos=-250",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f3e147ae147ae",
+    "askPrice": "406f42e147ae147b",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f3e147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f3bd70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f3947ae147ae1",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f36b851eb851f",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f347ae147ae14",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f42e147ae147b",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "406f4570a3d70a3d",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "406f47ae147ae148",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "406f4a3d70a3d70a",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "406f4c7ae147ae14",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=3 pos=1000",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f3b3333333333",
+    "askPrice": "406f400000000000",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f3b3333333333",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "406f38a3d70a3d71",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "406f366666666666",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "406f3428f5c28f5c",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "406f31999999999a",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f400000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f428f5c28f5c3",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f44cccccccccd",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f475c28f5c28f",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f49999999999a",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=3 pos=-1000",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f400000000000",
+    "askPrice": "406f44cccccccccd",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f400000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f3dc28f5c28f6",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f3b3333333333",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f38a3d70a3d71",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f366666666666",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f44cccccccccd",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "406f475c28f5c28f",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "406f49999999999a",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "406f4c28f5c28f5c",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "406f4e6666666666",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=10 pos=0",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f380000000000",
+    "askPrice": "406f480000000000",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f380000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f300000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f280000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f200000000000",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f180000000000",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f480000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f500000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f580000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f600000000000",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f680000000000",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=10 pos=250",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f36147ae147ae",
+    "askPrice": "406f46147ae147ae",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f36147ae147ae",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "406f2e147ae147ae",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "406f26147ae147ae",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "406f1e147ae147ae",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "406f16147ae147ae",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f46147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f4e147ae147ae",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f56147ae147ae",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f5e147ae147ae",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f66147ae147ae",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=10 pos=-250",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f39eb851eb852",
+    "askPrice": "406f49eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f39eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f31eb851eb852",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f29eb851eb852",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f21eb851eb852",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f19eb851eb852",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f49eb851eb852",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "406f51eb851eb852",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "406f59eb851eb852",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "406f61eb851eb852",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "406f69eb851eb852",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=10 pos=1000",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f300000000000",
+    "askPrice": "406f400000000000",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f300000000000",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "406f280000000000",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "406f200000000000",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "406f180000000000",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "406f100000000000",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f400000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f480000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f500000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f580000000000",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f600000000000",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=10 pos=-1000",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f400000000000",
+    "askPrice": "406f500000000000",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f400000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f380000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f300000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f280000000000",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406f200000000000",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f500000000000",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "406f580000000000",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "406f600000000000",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "406f680000000000",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "406f700000000000",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=30 pos=0",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f280000000000",
+    "askPrice": "406f580000000000",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f280000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f100000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406ef80000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406ee00000000000",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406ec80000000000",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f580000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f700000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f880000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406fa00000000000",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406fb80000000000",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=30 pos=250",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f21eb851eb852",
+    "askPrice": "406f51eb851eb852",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f21eb851eb852",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "406f09eb851eb852",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "406ef1eb851eb852",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "406ed9eb851eb852",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "406ec1eb851eb852",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f51eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f69eb851eb852",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f81eb851eb852",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f99eb851eb852",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406fb1eb851eb852",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=30 pos=-250",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f2e147ae147ae",
+    "askPrice": "406f5e147ae147ae",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f2e147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f16147ae147ae",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406efe147ae147ae",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406ee6147ae147ae",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406ece147ae147ae",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f5e147ae147ae",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "406f76147ae147ae",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "406f8e147ae147ae",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "406fa6147ae147ae",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "406fbe147ae147ae",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=30 pos=1000",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f100000000000",
+    "askPrice": "406f400000000000",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f100000000000",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "406ef80000000000",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "406ee00000000000",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "406ec80000000000",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "406eb00000000000",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f400000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f580000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f700000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406f880000000000",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406fa00000000000",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=250 bps=30 pos=-1000",
+   "in": {
+    "fairValue": "406f400000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "406f400000000000",
+    "askPrice": "406f700000000000",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "406f400000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "406f280000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "406f100000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "406ef80000000000",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "406ee00000000000",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "406f700000000000",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "406f880000000000",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "406fa00000000000",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "406fb80000000000",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "406fd00000000000",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=3 pos=0",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f3d8f5c28f5c3",
+    "askPrice": "409f425c28f5c28f",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f3d8f5c28f5c3",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f3b28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f38c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f365c28f5c28f",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f33f5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f425c28f5c28f",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f44c28f5c28f6",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f4728f5c28f5c",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f498f5c28f5c3",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f4bf5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=3 pos=250",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f3cf5c28f5c29",
+    "askPrice": "409f41c28f5c28f6",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f3cf5c28f5c29",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "409f3a8f5c28f5c3",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "409f3828f5c28f5c",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "409f35c28f5c28f6",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "409f335c28f5c28f",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f41c28f5c28f6",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f4428f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f468f5c28f5c3",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f48f5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f4b5c28f5c28f",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=3 pos=-250",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f3e28f5c28f5c",
+    "askPrice": "409f42f5c28f5c29",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f3e28f5c28f5c",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f3bc28f5c28f6",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f395c28f5c28f",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f36f5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f348f5c28f5c3",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f42f5c28f5c29",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "409f455c28f5c28f",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "409f47c28f5c28f6",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "409f4a28f5c28f5c",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "409f4c8f5c28f5c3",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=3 pos=1000",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f3b28f5c28f5c",
+    "askPrice": "409f3ff5c28f5c29",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f3b28f5c28f5c",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "409f38c28f5c28f6",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "409f365c28f5c28f",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "409f33f5c28f5c29",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "409f318f5c28f5c3",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f3ff5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f425c28f5c28f",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f44c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f4728f5c28f5c",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f498f5c28f5c3",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=3 pos=-1000",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "4008000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f3ff5c28f5c29",
+    "askPrice": "409f44c28f5c28f6",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f3ff5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f3d8f5c28f5c3",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f3b28f5c28f5c",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f38c28f5c28f6",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f365c28f5c28f",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f44c28f5c28f6",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "409f4728f5c28f5c",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "409f498f5c28f5c3",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "409f4bf5c28f5c29",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "409f4e5c28f5c28f",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=10 pos=0",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f37f5c28f5c29",
+    "askPrice": "409f47f5c28f5c29",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f37f5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f2ff5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f27f5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f1ff5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f17f5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f47f5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f4ff5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f57f5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f5ff5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f67f5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=10 pos=250",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f35f5c28f5c29",
+    "askPrice": "409f45f5c28f5c29",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f35f5c28f5c29",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "409f2df5c28f5c29",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "409f25f5c28f5c29",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "409f1df5c28f5c29",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "409f15f5c28f5c29",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f45f5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f4df5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f55f5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f5df5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f65f5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=10 pos=-250",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f39f5c28f5c29",
+    "askPrice": "409f49f5c28f5c29",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f39f5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f31f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f29f5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f21f5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f19f5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f49f5c28f5c29",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "409f51f5c28f5c29",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "409f59f5c28f5c29",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "409f61f5c28f5c29",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "409f69f5c28f5c29",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=10 pos=1000",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f2ff5c28f5c29",
+    "askPrice": "409f3ff5c28f5c29",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f2ff5c28f5c29",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "409f27f5c28f5c29",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "409f1ff5c28f5c29",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "409f17f5c28f5c29",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "409f0ff5c28f5c29",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f3ff5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f47f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f4ff5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f57f5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f5ff5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=10 pos=-1000",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f3ff5c28f5c29",
+    "askPrice": "409f4ff5c28f5c29",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f3ff5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f37f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f2ff5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f27f5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f1ff5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f4ff5c28f5c29",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "409f57f5c28f5c29",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "409f5ff5c28f5c29",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "409f67f5c28f5c29",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "409f6ff5c28f5c29",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=30 pos=0",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f27f5c28f5c29",
+    "askPrice": "409f57f5c28f5c29",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f27f5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f0ff5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409ef7f5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409edff5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409ec7f5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f57f5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f6ff5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f87f5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f9ff5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409fb7f5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=30 pos=250",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "406f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f21f5c28f5c29",
+    "askPrice": "409f51f5c28f5c29",
+    "bidSize": "4077700000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f21f5c28f5c29",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "409f09f5c28f5c29",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "409ef1f5c28f5c29",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "409ed9f5c28f5c29",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "409ec1f5c28f5c29",
+      "size": "4065400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f51f5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f69f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f81f5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f99f5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409fb1f5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=30 pos=-250",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c06f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f2df5c28f5c29",
+    "askPrice": "409f5df5c28f5c29",
+    "bidSize": "407f400000000000",
+    "askSize": "4077700000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f2df5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f15f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409efdf5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409ee5f5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409ecdf5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f5df5c28f5c29",
+      "size": "4077700000000000"
+     },
+     {
+      "price": "409f75f5c28f5c29",
+      "size": "4072000000000000"
+     },
+     {
+      "price": "409f8df5c28f5c29",
+      "size": "406d400000000000"
+     },
+     {
+      "price": "409fa5f5c28f5c29",
+      "size": "4068a00000000000"
+     },
+     {
+      "price": "409fbdf5c28f5c29",
+      "size": "4065400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=30 pos=1000",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f0ff5c28f5c29",
+    "askPrice": "409f3ff5c28f5c29",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f0ff5c28f5c29",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "409ef7f5c28f5c29",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "409edff5c28f5c29",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "409ec7f5c28f5c29",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "409eaff5c28f5c29",
+      "size": "4041000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f3ff5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f57f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f6ff5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409f87f5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409f9ff5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "envelope fv=1999.99 bps=30 pos=-1000",
+   "in": {
+    "fairValue": "409f3ff5c28f5c29",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "409f3ff5c28f5c29",
+    "askPrice": "409f6ff5c28f5c29",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "409f3ff5c28f5c29",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "409f27f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "409f0ff5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "409ef7f5c28f5c29",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "409edff5c28f5c29",
+      "size": "406c600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "409f6ff5c28f5c29",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "409f87f5c28f5c29",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "409f9ff5c28f5c29",
+      "size": "4047000000000000"
+     },
+     {
+      "price": "409fb7f5c28f5c29",
+      "size": "4043800000000000"
+     },
+     {
+      "price": "409fcff5c28f5c29",
+      "size": "4041000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP saturation pos=1000",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f33333333333",
+    "askPrice": "4059000000000000",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f33333333333",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4058e66666666666",
+      "size": "4047000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4059066666666666",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP saturation pos=1001",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408f480000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f33333333333",
+    "askPrice": "4059000000000000",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f33333333333",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4058e66666666666",
+      "size": "4047000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4059066666666666",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP saturation pos=5000",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "40b3880000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f33333333333",
+    "askPrice": "4059000000000000",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f33333333333",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4058e66666666666",
+      "size": "4047000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4059066666666666",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP saturation pos=1000000",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "412e848000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f33333333333",
+    "askPrice": "4059000000000000",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f33333333333",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "4058e66666666666",
+      "size": "4047000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4059066666666666",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP saturation pos=-1000",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4059000000000000",
+    "askPrice": "40590ccccccccccd",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4059000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058f9999999999a",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "4073800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "40590ccccccccccd",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "405919999999999a",
+      "size": "4047000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP saturation pos=-1001",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c08f480000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4059000000000000",
+    "askPrice": "40590ccccccccccd",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4059000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058f9999999999a",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "4073800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "40590ccccccccccd",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "405919999999999a",
+      "size": "4047000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP saturation pos=-5000",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c0b3880000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4059000000000000",
+    "askPrice": "40590ccccccccccd",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4059000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058f9999999999a",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "4073800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "40590ccccccccccd",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "405919999999999a",
+      "size": "4047000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP saturation pos=-1000000",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "c12e848000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4059000000000000",
+    "askPrice": "40590ccccccccccd",
+    "bidSize": "407f400000000000",
+    "askSize": "4052c00000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4059000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058f9999999999a",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "4073800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "40590ccccccccccd",
+      "size": "4052c00000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "404c800000000000"
+     },
+     {
+      "price": "405919999999999a",
+      "size": "4047000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP half-cent fv=10.005",
+   "in": {
+    "fairValue": "4024028f5c28f5c3",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4010000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4023fae147ae147b",
+    "askPrice": "40240a3d70a3d70a",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4023fae147ae147b",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4023f5c28f5c28f6",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4023eb851eb851ec",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4023e66666666666",
+      "size": "4070700000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "40240a3d70a3d70a",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4024147ae147ae14",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "402419999999999a",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40241eb851eb851f",
+      "size": "4070700000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP half-cent fv=10.015",
+   "in": {
+    "fairValue": "402407ae147ae148",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4010000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4024000000000000",
+    "askPrice": "40240f5c28f5c28f",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4024000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4023fae147ae147b",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4023f0a3d70a3d71",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4023eb851eb851ec",
+      "size": "4070700000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "40240f5c28f5c28f",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4024147ae147ae14",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40241eb851eb851f",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "402423d70a3d70a4",
+      "size": "4070700000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP half-cent fv=10.025",
+   "in": {
+    "fairValue": "40240ccccccccccd",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4010000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4024051eb851eb85",
+    "askPrice": "4024147ae147ae14",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4024051eb851eb85",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4024000000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4023f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4023f0a3d70a3d71",
+      "size": "4070700000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4024147ae147ae14",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40241eb851eb851f",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "402423d70a3d70a4",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "402428f5c28f5c29",
+      "size": "4070700000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP half-cent fv=0.125",
+   "in": {
+    "fairValue": "3fc0000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4010000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fbeb851eb851eb8",
+    "askPrice": "3fc0a3d70a3d70a4",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fbeb851eb851eb8",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fbc28f5c28f5c29",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fb999999999999a",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fb70a3d70a3d70a",
+      "size": "4070700000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fc0a3d70a3d70a4",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fc1eb851eb851ec",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fc3333333333333",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fc47ae147ae147b",
+      "size": "4070700000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP half-cent fv=3.145",
+   "in": {
+    "fairValue": "400928f5c28f5c29",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4010000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "40091eb851eb851f",
+    "askPrice": "4009333333333333",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "40091eb851eb851f",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40090a3d70a3d70a",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4008f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4008e147ae147ae1",
+      "size": "4070700000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4009333333333333",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "400947ae147ae148",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40095c28f5c28f5c",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "400970a3d70a3d71",
+      "size": "4070700000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP half-cent fv=99.995",
+   "in": {
+    "fairValue": "4058ffae147ae148",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4010000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "405905c28f5c28f6",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058f3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058ed70a3d70a3d",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4058e7ae147ae148",
+      "size": "4070700000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405905c28f5c28f6",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590c28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "405911eb851eb852",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40591851eb851eb8",
+      "size": "4070700000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP half-cent fv=100.005",
+   "in": {
+    "fairValue": "40590051eb851eb8",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4010000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059070a3d70a3d7",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058ec28f5c28f5c",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4058e5c28f5c28f6",
+      "size": "4070700000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059070a3d70a3d7",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590e147ae147ae",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4059147ae147ae14",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40591ae147ae147b",
+      "size": "4070700000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP floor-then-max baseSize=1",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "3ff0000000000000",
+    "position": "408db00000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4018000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f3d70a3d70a4",
+    "askPrice": "405900a3d70a3d71",
+    "bidSize": "3ff0000000000000",
+    "askSize": "3ff0000000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f3d70a3d70a4",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058ed70a3d70a3d",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e70a3d70a3d7",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e0a3d70a3d71",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058da3d70a3d70a",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058d3d70a3d70a4",
+      "size": "3ff0000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405900a3d70a3d71",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4059070a3d70a3d7",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "40590d70a3d70a3d",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "405913d70a3d70a4",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "40591a3d70a3d70a",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "405920a3d70a3d71",
+      "size": "3ff0000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP floor-then-max baseSize=2",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "4000000000000000",
+    "position": "408db00000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4018000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f3d70a3d70a4",
+    "askPrice": "405900a3d70a3d71",
+    "bidSize": "3ff0000000000000",
+    "askSize": "4000000000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f3d70a3d70a4",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058ed70a3d70a3d",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e70a3d70a3d7",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e0a3d70a3d71",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058da3d70a3d70a",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058d3d70a3d70a4",
+      "size": "3ff0000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405900a3d70a3d71",
+      "size": "4000000000000000"
+     },
+     {
+      "price": "4059070a3d70a3d7",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "40590d70a3d70a3d",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "405913d70a3d70a4",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "40591a3d70a3d70a",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "405920a3d70a3d71",
+      "size": "3ff0000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP floor-then-max baseSize=3",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "4008000000000000",
+    "position": "408db00000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4018000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f3d70a3d70a4",
+    "askPrice": "405900a3d70a3d71",
+    "bidSize": "3ff0000000000000",
+    "askSize": "4008000000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f3d70a3d70a4",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058ed70a3d70a3d",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e70a3d70a3d7",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e0a3d70a3d71",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058da3d70a3d70a",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058d3d70a3d70a4",
+      "size": "3ff0000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405900a3d70a3d71",
+      "size": "4008000000000000"
+     },
+     {
+      "price": "4059070a3d70a3d7",
+      "size": "4000000000000000"
+     },
+     {
+      "price": "40590d70a3d70a3d",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "405913d70a3d70a4",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "40591a3d70a3d70a",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "405920a3d70a3d71",
+      "size": "3ff0000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP floor-then-max baseSize=7",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "401c000000000000",
+    "position": "408db00000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4018000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f3d70a3d70a4",
+    "askPrice": "405900a3d70a3d71",
+    "bidSize": "3ff0000000000000",
+    "askSize": "401c000000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f3d70a3d70a4",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058ed70a3d70a3d",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e70a3d70a3d7",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e0a3d70a3d71",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058da3d70a3d70a",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058d3d70a3d70a4",
+      "size": "3ff0000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405900a3d70a3d71",
+      "size": "401c000000000000"
+     },
+     {
+      "price": "4059070a3d70a3d7",
+      "size": "4014000000000000"
+     },
+     {
+      "price": "40590d70a3d70a3d",
+      "size": "4010000000000000"
+     },
+     {
+      "price": "405913d70a3d70a4",
+      "size": "4008000000000000"
+     },
+     {
+      "price": "40591a3d70a3d70a",
+      "size": "4008000000000000"
+     },
+     {
+      "price": "405920a3d70a3d71",
+      "size": "4000000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP floor-then-max baseSize=1.9",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "3ffe666666666666",
+    "position": "408db00000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4018000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f3d70a3d70a4",
+    "askPrice": "405900a3d70a3d71",
+    "bidSize": "3ff0000000000000",
+    "askSize": "3ff0000000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f3d70a3d70a4",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058ed70a3d70a3d",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e70a3d70a3d7",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e0a3d70a3d71",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058da3d70a3d70a",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058d3d70a3d70a4",
+      "size": "3ff0000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405900a3d70a3d71",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4059070a3d70a3d7",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "40590d70a3d70a3d",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "405913d70a3d70a4",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "40591a3d70a3d70a",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "405920a3d70a3d71",
+      "size": "3ff0000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP floor-then-max baseSize=0.5",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "3fe0000000000000",
+    "position": "408db00000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4018000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f3d70a3d70a4",
+    "askPrice": "405900a3d70a3d71",
+    "bidSize": "3ff0000000000000",
+    "askSize": "3ff0000000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f3d70a3d70a4",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058ed70a3d70a3d",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e70a3d70a3d7",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058e0a3d70a3d71",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058da3d70a3d70a",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4058d3d70a3d70a4",
+      "size": "3ff0000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405900a3d70a3d71",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "4059070a3d70a3d7",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "40590d70a3d70a3d",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "405913d70a3d70a4",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "40591a3d70a3d70a",
+      "size": "3ff0000000000000"
+     },
+     {
+      "price": "405920a3d70a3d71",
+      "size": "3ff0000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP zero limit (no divide by zero)",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408c200000000000",
+    "limit": "0000000000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "4073800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP collapsing fair value",
+   "in": {
+    "fairValue": "3f50624dd2f1a9fc",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "408c200000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3f847ae147ae147b",
+    "askPrice": "3f947ae147ae147b",
+    "bidSize": "4052c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3f847ae147ae147b",
+      "size": "4052c00000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3f947ae147ae147b",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3f9eb851eb851eb8",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fa47ae147ae147b",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fa999999999999a",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3faeb851eb851eb8",
+      "size": "406c600000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP fair value zero",
+   "in": {
+    "fairValue": "0000000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3f847ae147ae147b",
+    "askPrice": "3f947ae147ae147b",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3f847ae147ae147b",
+      "size": "407f400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3f947ae147ae147b",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3f9eb851eb851eb8",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fa47ae147ae147b",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP zero levels -> one quoted",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "0000000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "407f400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "407f400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP negative levels -> one quoted",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "c014000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "407f400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "407f400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP deep ladder walks the bid to zero",
+   "in": {
+    "fairValue": "3fe0000000000000",
+    "halfSpreadBps": "403e000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4044000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3fe0000000000000",
+    "askPrice": "3fe051eb851eb852",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3fe0000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fdf5c28f5c28f5c",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fdeb851eb851eb8",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fde147ae147ae14",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fdd70a3d70a3d71",
+      "size": "406c600000000000"
+     },
+     {
+      "price": "3fdccccccccccccd",
+      "size": "4069000000000000"
+     },
+     {
+      "price": "3fdc28f5c28f5c29",
+      "size": "4066400000000000"
+     },
+     {
+      "price": "3fdb851eb851eb85",
+      "size": "4064200000000000"
+     },
+     {
+      "price": "3fdae147ae147ae1",
+      "size": "4062600000000000"
+     },
+     {
+      "price": "3fda3d70a3d70a3d",
+      "size": "4060e00000000000"
+     },
+     {
+      "price": "3fd999999999999a",
+      "size": "405f400000000000"
+     },
+     {
+      "price": "3fd8f5c28f5c28f6",
+      "size": "405d000000000000"
+     },
+     {
+      "price": "3fd851eb851eb852",
+      "size": "405b000000000000"
+     },
+     {
+      "price": "3fd7ae147ae147ae",
+      "size": "4059800000000000"
+     },
+     {
+      "price": "3fd70a3d70a3d70a",
+      "size": "4058000000000000"
+     },
+     {
+      "price": "3fd6666666666666",
+      "size": "4056800000000000"
+     },
+     {
+      "price": "3fd5c28f5c28f5c3",
+      "size": "4055800000000000"
+     },
+     {
+      "price": "3fd51eb851eb851f",
+      "size": "4054400000000000"
+     },
+     {
+      "price": "3fd47ae147ae147b",
+      "size": "4053800000000000"
+     },
+     {
+      "price": "3fd3d70a3d70a3d7",
+      "size": "4052800000000000"
+     },
+     {
+      "price": "3fd3333333333333",
+      "size": "4051c00000000000"
+     },
+     {
+      "price": "3fd28f5c28f5c28f",
+      "size": "4051000000000000"
+     },
+     {
+      "price": "3fd1eb851eb851ec",
+      "size": "4050400000000000"
+     },
+     {
+      "price": "3fd147ae147ae148",
+      "size": "404f800000000000"
+     },
+     {
+      "price": "3fd0a3d70a3d70a4",
+      "size": "404e000000000000"
+     },
+     {
+      "price": "3fd0000000000000",
+      "size": "404d000000000000"
+     },
+     {
+      "price": "3fceb851eb851eb8",
+      "size": "404c000000000000"
+     },
+     {
+      "price": "3fcd70a3d70a3d71",
+      "size": "404b000000000000"
+     },
+     {
+      "price": "3fcc28f5c28f5c29",
+      "size": "404a800000000000"
+     },
+     {
+      "price": "3fcae147ae147ae1",
+      "size": "4049800000000000"
+     },
+     {
+      "price": "3fc999999999999a",
+      "size": "4049000000000000"
+     },
+     {
+      "price": "3fc851eb851eb852",
+      "size": "4048000000000000"
+     },
+     {
+      "price": "3fc70a3d70a3d70a",
+      "size": "4047800000000000"
+     },
+     {
+      "price": "3fc5c28f5c28f5c3",
+      "size": "4046800000000000"
+     },
+     {
+      "price": "3fc47ae147ae147b",
+      "size": "4046000000000000"
+     },
+     {
+      "price": "3fc3333333333333",
+      "size": "4045800000000000"
+     },
+     {
+      "price": "3fc1eb851eb851ec",
+      "size": "4045000000000000"
+     },
+     {
+      "price": "3fc0a3d70a3d70a4",
+      "size": "4044800000000000"
+     },
+     {
+      "price": "3fbeb851eb851eb8",
+      "size": "4044000000000000"
+     },
+     {
+      "price": "3fbc28f5c28f5c29",
+      "size": "4043800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3fe051eb851eb852",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3fe0a3d70a3d70a4",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fe0f5c28f5c28f6",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "3fe147ae147ae148",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "3fe199999999999a",
+      "size": "406c600000000000"
+     },
+     {
+      "price": "3fe1eb851eb851ec",
+      "size": "4069000000000000"
+     },
+     {
+      "price": "3fe23d70a3d70a3d",
+      "size": "4066400000000000"
+     },
+     {
+      "price": "3fe28f5c28f5c28f",
+      "size": "4064200000000000"
+     },
+     {
+      "price": "3fe2e147ae147ae1",
+      "size": "4062600000000000"
+     },
+     {
+      "price": "3fe3333333333333",
+      "size": "4060e00000000000"
+     },
+     {
+      "price": "3fe3851eb851eb85",
+      "size": "405f400000000000"
+     },
+     {
+      "price": "3fe3d70a3d70a3d7",
+      "size": "405d000000000000"
+     },
+     {
+      "price": "3fe428f5c28f5c29",
+      "size": "405b000000000000"
+     },
+     {
+      "price": "3fe47ae147ae147b",
+      "size": "4059800000000000"
+     },
+     {
+      "price": "3fe4cccccccccccd",
+      "size": "4058000000000000"
+     },
+     {
+      "price": "3fe51eb851eb851f",
+      "size": "4056800000000000"
+     },
+     {
+      "price": "3fe570a3d70a3d71",
+      "size": "4055800000000000"
+     },
+     {
+      "price": "3fe5c28f5c28f5c3",
+      "size": "4054400000000000"
+     },
+     {
+      "price": "3fe6147ae147ae14",
+      "size": "4053800000000000"
+     },
+     {
+      "price": "3fe6666666666666",
+      "size": "4052800000000000"
+     },
+     {
+      "price": "3fe6b851eb851eb8",
+      "size": "4051c00000000000"
+     },
+     {
+      "price": "3fe70a3d70a3d70a",
+      "size": "4051000000000000"
+     },
+     {
+      "price": "3fe75c28f5c28f5c",
+      "size": "4050400000000000"
+     },
+     {
+      "price": "3fe7ae147ae147ae",
+      "size": "404f800000000000"
+     },
+     {
+      "price": "3fe8000000000000",
+      "size": "404e000000000000"
+     },
+     {
+      "price": "3fe851eb851eb852",
+      "size": "404d000000000000"
+     },
+     {
+      "price": "3fe8a3d70a3d70a4",
+      "size": "404c000000000000"
+     },
+     {
+      "price": "3fe8f5c28f5c28f6",
+      "size": "404b000000000000"
+     },
+     {
+      "price": "3fe947ae147ae148",
+      "size": "404a800000000000"
+     },
+     {
+      "price": "3fe999999999999a",
+      "size": "4049800000000000"
+     },
+     {
+      "price": "3fe9eb851eb851ec",
+      "size": "4049000000000000"
+     },
+     {
+      "price": "3fea3d70a3d70a3d",
+      "size": "4048000000000000"
+     },
+     {
+      "price": "3fea8f5c28f5c28f",
+      "size": "4047800000000000"
+     },
+     {
+      "price": "3feae147ae147ae1",
+      "size": "4046800000000000"
+     },
+     {
+      "price": "3feb333333333333",
+      "size": "4046000000000000"
+     },
+     {
+      "price": "3feb851eb851eb85",
+      "size": "4045800000000000"
+     },
+     {
+      "price": "3febd70a3d70a3d7",
+      "size": "4045000000000000"
+     },
+     {
+      "price": "3fec28f5c28f5c29",
+      "size": "4044800000000000"
+     },
+     {
+      "price": "3fec7ae147ae147b",
+      "size": "4044000000000000"
+     },
+     {
+      "price": "3feccccccccccccd",
+      "size": "4043800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "vol multiplier 0 (floors at 0.1)",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "4079000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": "0000000000000000",
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058ff5c28f5c28f",
+    "askPrice": "405900a3d70a3d71",
+    "bidSize": "4072c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058ff5c28f5c28f",
+      "size": "4072c00000000000"
+     },
+     {
+      "price": "4058feb851eb851f",
+      "size": "406cc00000000000"
+     },
+     {
+      "price": "4058fe147ae147ae",
+      "size": "4067600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405900a3d70a3d71",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590147ae147ae1",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "405901eb851eb852",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "vol multiplier 0.05 (floors at 0.1)",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "4079000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": "3fa999999999999a",
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058ff5c28f5c28f",
+    "askPrice": "405900a3d70a3d71",
+    "bidSize": "4072c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058ff5c28f5c28f",
+      "size": "4072c00000000000"
+     },
+     {
+      "price": "4058feb851eb851f",
+      "size": "406cc00000000000"
+     },
+     {
+      "price": "4058fe147ae147ae",
+      "size": "4067600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405900a3d70a3d71",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590147ae147ae1",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "405901eb851eb852",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "vol multiplier 0.1 (floors at 0.1)",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "4079000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": "3fb999999999999a",
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058ff5c28f5c28f",
+    "askPrice": "405900a3d70a3d71",
+    "bidSize": "4072c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058ff5c28f5c28f",
+      "size": "4072c00000000000"
+     },
+     {
+      "price": "4058feb851eb851f",
+      "size": "406cc00000000000"
+     },
+     {
+      "price": "4058fe147ae147ae",
+      "size": "4067600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405900a3d70a3d71",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590147ae147ae1",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "405901eb851eb852",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "vol multiplier 1 (floors at 0.1)",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "4079000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": "3ff0000000000000",
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f70a3d70a3d7",
+    "askPrice": "405903d70a3d70a4",
+    "bidSize": "4072c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f70a3d70a3d7",
+      "size": "4072c00000000000"
+     },
+     {
+      "price": "4058f0a3d70a3d71",
+      "size": "406cc00000000000"
+     },
+     {
+      "price": "4058ea3d70a3d70a",
+      "size": "4067600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "405903d70a3d70a4",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590a3d70a3d70a",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "405910a3d70a3d71",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "vol multiplier 3 (floors at 0.1)",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "4079000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": "4008000000000000",
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058e51eb851eb85",
+    "askPrice": "40590b851eb851ec",
+    "bidSize": "4072c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058e51eb851eb85",
+      "size": "4072c00000000000"
+     },
+     {
+      "price": "4058d1eb851eb852",
+      "size": "406cc00000000000"
+     },
+     {
+      "price": "4058beb851eb851f",
+      "size": "4067600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "40590b851eb851ec",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40591eb851eb851f",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "405931eb851eb852",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "vol multiplier 12 (floors at 0.1)",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "4079000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": "4028000000000000",
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058947ae147ae14",
+    "askPrice": "40592e147ae147ae",
+    "bidSize": "4072c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058947ae147ae14",
+      "size": "4072c00000000000"
+     },
+     {
+      "price": "405847ae147ae148",
+      "size": "406cc00000000000"
+     },
+     {
+      "price": "4057fae147ae147b",
+      "size": "4067600000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "40592e147ae147ae",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40597ae147ae147b",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4059c7ae147ae148",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "maxSkew -1 (clamps to [0,1])",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "4089000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": "bff0000000000000",
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "4058c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "4058c00000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "4053000000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "404e800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "maxSkew 0 (clamps to [0,1])",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "4089000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": "0000000000000000",
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "4058c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "4058c00000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "4053000000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "404e800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "maxSkew 0.25 (clamps to [0,1])",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "4089000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": "3fd0000000000000",
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f851eb851eb8",
+    "askPrice": "4059051eb851eb85",
+    "bidSize": "4058c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f851eb851eb8",
+      "size": "4058c00000000000"
+     },
+     {
+      "price": "4058f1eb851eb852",
+      "size": "4053000000000000"
+     },
+     {
+      "price": "4058eb851eb851ec",
+      "size": "404e800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059051eb851eb85",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590b851eb851ec",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "405911eb851eb852",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "maxSkew 1 (clamps to [0,1])",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "4089000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": "3ff0000000000000",
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f47ae147ae14",
+    "askPrice": "40590147ae147ae1",
+    "bidSize": "4058c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f47ae147ae14",
+      "size": "4058c00000000000"
+     },
+     {
+      "price": "4058ee147ae147ae",
+      "size": "4053000000000000"
+     },
+     {
+      "price": "4058e7ae147ae148",
+      "size": "404e800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "40590147ae147ae1",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "405907ae147ae148",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40590e147ae147ae",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "maxSkew 5 (clamps to [0,1])",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "4089000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": "4014000000000000",
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f47ae147ae14",
+    "askPrice": "40590147ae147ae1",
+    "bidSize": "4058c00000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f47ae147ae14",
+      "size": "4058c00000000000"
+     },
+     {
+      "price": "4058ee147ae147ae",
+      "size": "4053000000000000"
+     },
+     {
+      "price": "4058e7ae147ae148",
+      "size": "404e800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "40590147ae147ae1",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "405907ae147ae148",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "40590e147ae147ae",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP NaN fairValue",
+   "in": {
+    "fairValue": "7ff8000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "fff8000000000000",
+    "askPrice": "fff8000000000000",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [],
+    "asks": [
+     {
+      "price": "fff8000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP NaN volatilityMultiplier",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": "7ff8000000000000",
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "fff8000000000000",
+    "askPrice": "fff8000000000000",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [],
+    "asks": [
+     {
+      "price": "fff8000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP NaN maxSkew",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "407f400000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": "7ff8000000000000",
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "fff8000000000000",
+    "askPrice": "fff8000000000000",
+    "bidSize": "406f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [],
+    "asks": [
+     {
+      "price": "fff8000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP NaN position",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "7ff8000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "fff8000000000000",
+    "askPrice": "fff8000000000000",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [],
+    "asks": [
+     {
+      "price": "fff8000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP NaN baseSize",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "7ff8000000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "fff8000000000000",
+    "askSize": "fff8000000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "fff8000000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "fff8000000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "fff8000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "fff8000000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "fff8000000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "fff8000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP NaN levelStep",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4010000000000000",
+    "levelStep": "7ff8000000000000"
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [],
+    "asks": [
+     {
+      "price": "fff8000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4070700000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP Infinity fairValue",
+   "in": {
+    "fairValue": "7ff0000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "fff8000000000000",
+    "askPrice": "fff8000000000000",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [],
+    "asks": [
+     {
+      "price": "fff8000000000000",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "fff8000000000000",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP Infinity baseSize",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "7ff0000000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "7ff0000000000000",
+    "askSize": "7ff0000000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "7ff0000000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "7ff0000000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "7ff0000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "7ff0000000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "7ff0000000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "7ff0000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP negative fairValue",
+   "in": {
+    "fairValue": "c059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4008000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "3f847ae147ae147b",
+    "askPrice": "3f947ae147ae147b",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "3f847ae147ae147b",
+      "size": "407f400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "3f947ae147ae147b",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "3f9eb851eb851eb8",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "3fa47ae147ae147b",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP fractional levels 2.5 -> three levels",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4004000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "4073800000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "4073800000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP fractional levels 0.5 -> one level",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "3fe0000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "407f400000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "407f400000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "TRAP NaN levels -> NO levels at all",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "7ff8000000000000",
+    "levelStep": null
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [],
+    "asks": []
+   }
+  },
+  {
+   "note": "levelStep 0.1",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4018000000000000",
+    "levelStep": "3fb999999999999a"
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058f851eb851eb8",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058f70a3d70a3d7",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4058f5c28f5c28f6",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4058f47ae147ae14",
+      "size": "406c600000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "4069000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "405907ae147ae148",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "405908f5c28f5c29",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40590a3d70a3d70a",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "40590b851eb851ec",
+      "size": "406c600000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "4069000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "levelStep 0.5",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4018000000000000",
+    "levelStep": "3fe0000000000000"
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058f33333333333",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4058e66666666666",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4058e00000000000",
+      "size": "406c600000000000"
+     },
+     {
+      "price": "4058d9999999999a",
+      "size": "4069000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40590ccccccccccd",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "405919999999999a",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4059200000000000",
+      "size": "406c600000000000"
+     },
+     {
+      "price": "4059266666666666",
+      "size": "4069000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "levelStep 1",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4018000000000000",
+    "levelStep": "3ff0000000000000"
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058eccccccccccd",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058e00000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4058d33333333333",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4058c66666666666",
+      "size": "406c600000000000"
+     },
+     {
+      "price": "4058b9999999999a",
+      "size": "4069000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4059133333333333",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4059200000000000",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "40592ccccccccccd",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "405939999999999a",
+      "size": "406c600000000000"
+     },
+     {
+      "price": "4059466666666666",
+      "size": "4069000000000000"
+     }
+    ]
+   }
+  },
+  {
+   "note": "levelStep 3",
+   "in": {
+    "fairValue": "4059000000000000",
+    "halfSpreadBps": "4024000000000000",
+    "baseSize": "407f400000000000",
+    "position": "0000000000000000",
+    "limit": "408f400000000000",
+    "volatilityMultiplier": null,
+    "maxSkew": null,
+    "levels": "4018000000000000",
+    "levelStep": "4008000000000000"
+   },
+   "computeQuote": {
+    "bidPrice": "4058f9999999999a",
+    "askPrice": "4059066666666666",
+    "bidSize": "407f400000000000",
+    "askSize": "407f400000000000"
+   },
+   "quoteLadder": {
+    "bids": [
+     {
+      "price": "4058f9999999999a",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "4058d33333333333",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4058accccccccccd",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "4058866666666666",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4058600000000000",
+      "size": "406c600000000000"
+     },
+     {
+      "price": "405839999999999a",
+      "size": "4069000000000000"
+     }
+    ],
+    "asks": [
+     {
+      "price": "4059066666666666",
+      "size": "407f400000000000"
+     },
+     {
+      "price": "40592ccccccccccd",
+      "size": "4078000000000000"
+     },
+     {
+      "price": "4059533333333333",
+      "size": "4073800000000000"
+     },
+     {
+      "price": "405979999999999a",
+      "size": "4070700000000000"
+     },
+     {
+      "price": "4059a00000000000",
+      "size": "406c600000000000"
+     },
+     {
+      "price": "4059c66666666666",
+      "size": "4069000000000000"
+     }
+    ]
+   }
+  }
+ ],
+ "applyFillToInventory": [
+  {
+   "position": 0,
+   "side": "buy",
+   "quantity": 100,
+   "positionBits": "0000000000000000",
+   "quantityBits": "4059000000000000",
+   "result": "c059000000000000"
+  },
+  {
+   "position": 0,
+   "side": "sell",
+   "quantity": 100,
+   "positionBits": "0000000000000000",
+   "quantityBits": "4059000000000000",
+   "result": "4059000000000000"
+  },
+  {
+   "position": -500,
+   "side": "sell",
+   "quantity": 250.5,
+   "positionBits": "c07f400000000000",
+   "quantityBits": "406f500000000000",
+   "result": "c06f300000000000"
+  },
+  {
+   "position": 500,
+   "side": "buy",
+   "quantity": 0,
+   "positionBits": "407f400000000000",
+   "quantityBits": "0000000000000000",
+   "result": "407f400000000000"
+  }
+ ]
+}

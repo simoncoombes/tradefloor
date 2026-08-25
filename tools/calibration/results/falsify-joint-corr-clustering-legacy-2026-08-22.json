@@ -1,0 +1,444 @@
+{
+ "at_best": {
+  "crn_schedule_matches_base": true,
+  "loss": 0.0,
+  "medians": {
+   "abs_return_acf1": 0.18176985089981282,
+   "annualised_vol_pct": 29.985273727904282,
+   "cross_sectional_corr": 0.2518080559714469,
+   "excess_kurtosis": 5.834029813448021,
+   "leverage_effect": 0.009139181211303178,
+   "return_acf1": 0.18154964978129084,
+   "volume_abs_return_corr": 0.526255588151885,
+   "volume_change_acf1": -0.4196618159242335
+  },
+  "rows": {
+   "abs_return_acf1": {
+    "band": [
+     0.15,
+     0.35
+    ],
+    "distance": 0.0,
+    "measured": 0.18176985089981282,
+    "role": "target",
+    "scaled": 0.0
+   },
+   "cross_sectional_corr": {
+    "band": [
+     0.25,
+     0.35
+    ],
+    "distance": 0.0,
+    "measured": 0.2518080559714469,
+    "role": "target",
+    "scaled": 0.0
+   }
+  }
+ },
+ "best_vector": {
+  "garch_alpha": 0.42440083212000224,
+  "garch_beta": 0.09550072478711402,
+  "garch_ceiling_multiple": 19.36860983058969,
+  "garch_floor_multiple": 0.2776388690452455,
+  "garch_omega": 7.026082953676005e-06,
+  "idio_sigma_scale": 0.8620981687675975,
+  "market_factor_sigma": 0.008402614598527243,
+  "momentum_theta": 0.2163464568894143,
+  "sector_factor_sigma": 0.0005957860289774823
+ },
+ "claim": {
+  "base_overrides": {
+   "garch_alpha": 0.09,
+   "garch_beta": 0.9,
+   "garch_gamma": 0.0,
+   "idio_sigma_scale": 1.0,
+   "market_factor_sigma": 0.0075,
+   "market_vol_alpha": 0.0,
+   "market_vol_beta": 0.0,
+   "market_vol_vix_coupling": 0.0
+  },
+  "constraints": [],
+  "flips_verdict": "a conditional-variance process for the shared market factor (market_vol_alpha/beta > 0), funded by idio_sigma_scale < 1 \u2014 landed as the current pt-v1, whose 30-seed baseline has both statistics in band",
+  "min_scaled_loss": 0.0,
+  "model_class": "legacy",
+  "searched_parameters": [
+   "market_factor_sigma",
+   "sector_factor_sigma",
+   "idio_sigma_scale",
+   "garch_alpha",
+   "garch_beta",
+   "garch_omega",
+   "garch_ceiling_multiple",
+   "garch_floor_multiple",
+   "momentum_theta"
+  ],
+  "targets": [
+   "cross_sectional_corr",
+   "abs_return_acf1"
+  ],
+  "verdict": "inconclusive: search minimum 0.000 against held-out losses {'published_seeds': 0.013357722719523646, 'holdout_universe': 0.0} \u2014 where the search is the lower side, treat as overfitting of the search seeds, per section 8"
+ },
+ "evaluations": 840,
+ "first_order_box_bound": {
+  "abs_return_acf1": 3.748733843944791,
+  "cross_sectional_corr": 1.5815369962416173
+ },
+ "grid": null,
+ "jacobian_at_best": {
+  "garch_alpha": {
+   "box_radius_dev_units": 0.5745991678799978,
+   "secants_per_dev_unit": {
+    "abs_return_acf1": 0.6780213857609795,
+    "cross_sectional_corr": -0.2319591156125566
+   }
+  },
+  "garch_beta": {
+   "box_radius_dev_units": 0.903499275212886,
+   "secants_per_dev_unit": {
+    "abs_return_acf1": -1.6162625971198605,
+    "cross_sectional_corr": -0.020541902805332187
+   }
+  },
+  "garch_ceiling_multiple": {
+   "box_radius_dev_units": 18.11860983058969,
+   "secants_per_dev_unit": {
+    "abs_return_acf1": -0.003634006468064351,
+    "cross_sectional_corr": -6.146156046463591e-05
+   }
+  },
+  "garch_floor_multiple": {
+   "box_radius_dev_units": 0.7223611309547545,
+   "secants_per_dev_unit": {
+    "abs_return_acf1": 0.08421271919800292,
+    "cross_sectional_corr": -0.08387259776098452
+   }
+  },
+  "garch_omega": {
+   "box_radius_dev_units": 2.6427765410056736,
+   "secants_per_dev_unit": {
+    "abs_return_acf1": -0.044846543254805915,
+    "cross_sectional_corr": 0.003093299621284018
+   }
+  },
+  "idio_sigma_scale": {
+   "box_radius_dev_units": 1.4122616183430372,
+   "secants_per_dev_unit": {
+    "abs_return_acf1": 0.41895246127300917,
+    "cross_sectional_corr": -0.49528503740054214
+   }
+  },
+  "market_factor_sigma": {
+   "box_radius_dev_units": 2.030340164212853,
+   "secants_per_dev_unit": {
+    "abs_return_acf1": 0.06312847583719389,
+    "cross_sectional_corr": 0.263797510869595
+   }
+  },
+  "momentum_theta": {
+   "box_radius_dev_units": 0.7826535431105857,
+   "secants_per_dev_unit": {
+    "abs_return_acf1": -1.0663837159728071,
+    "cross_sectional_corr": 0.1293112021312048
+   }
+  },
+  "sector_factor_sigma": {
+   "box_radius_dev_units": 2.5973152298395297,
+   "secants_per_dev_unit": {
+    "abs_return_acf1": -0.03819518949743528,
+    "cross_sectional_corr": -0.009064161357812961
+   }
+  }
+ },
+ "method": {
+  "days": 252,
+  "loss": "sum over targets+constraints of (band_distance / seed_sd)^2, medians over search seeds, lambda = 0",
+  "search": {
+   "box": {
+    "garch_alpha": [
+     0.0,
+     0.999
+    ],
+    "garch_beta": [
+     0.0,
+     0.999
+    ],
+    "garch_ceiling_multiple": [
+     1.25,
+     20.0
+    ],
+    "garch_floor_multiple": [
+     0.0625,
+     1.0
+    ],
+    "garch_omega": [
+     5e-07,
+     8e-06
+    ],
+    "idio_sigma_scale": [
+     0.21,
+     3.36
+    ],
+    "market_factor_sigma": [
+     0.004,
+     0.064
+    ],
+    "momentum_theta": [
+     0.0,
+     0.999
+    ],
+    "sector_factor_sigma": [
+     0.0005,
+     0.008
+    ]
+   },
+   "cma": {
+    "generations": 20,
+    "implementation": "standard (mu/mu_w, lambda) equations, this file",
+    "population": 8,
+    "seed": 7,
+    "sigma0": 0.35
+   },
+   "compass_steps": [
+    0.1,
+    0.05,
+    0.025
+   ],
+   "mode": "lhs+cma-es+compass",
+   "screening": 32
+  },
+  "search_seeds": [
+   101,
+   102,
+   103
+  ],
+  "seed_sd_source": "pretium.facts.SEED_SD (shipped)",
+  "universe": "Universe.random(40, seed=111)",
+  "workers": 8
+ },
+ "provenance": {
+  "date": "2026-08-22",
+  "git_rev": "f5f6d8f-dirty",
+  "machine": "arm64",
+  "platform": "macOS-26.6-arm64-arm-64bit",
+  "python": "3.11.15"
+ },
+ "search_wall_seconds": 741.398429333989,
+ "trace": [
+  {
+   "screening_base_loss": 134.20601208082854,
+   "screening_best_loss": 1.4059288594026822e-29
+  },
+  {
+   "best_loss": 229.19162870217167,
+   "generation": 0,
+   "mean_loss": 488.3999165115505,
+   "sigma": 0.35
+  },
+  {
+   "best_loss": 118.12205509846582,
+   "generation": 1,
+   "mean_loss": 456.5005943555388,
+   "sigma": 0.33546746392251814
+  },
+  {
+   "best_loss": 23.19222438312141,
+   "generation": 2,
+   "mean_loss": 183.17175588156118,
+   "sigma": 0.34645422586557945
+  },
+  {
+   "best_loss": 59.84587739928132,
+   "generation": 3,
+   "mean_loss": 575.189762595901,
+   "sigma": 0.34167087197506546
+  },
+  {
+   "best_loss": 25.791512341636615,
+   "generation": 4,
+   "mean_loss": 374.81559584856643,
+   "sigma": 0.3398764203811518
+  },
+  {
+   "best_loss": 6.300270280676366,
+   "generation": 5,
+   "mean_loss": 262.809222677002,
+   "sigma": 0.31555347798490246
+  },
+  {
+   "best_loss": 62.09291541624977,
+   "generation": 6,
+   "mean_loss": 339.33689242561263,
+   "sigma": 0.29070285457104256
+  },
+  {
+   "best_loss": 6.553293503618045,
+   "generation": 7,
+   "mean_loss": 326.4519239909522,
+   "sigma": 0.2628558171349025
+  },
+  {
+   "best_loss": 134.64863650814976,
+   "generation": 8,
+   "mean_loss": 194.53412490910694,
+   "sigma": 0.24689704556574216
+  },
+  {
+   "best_loss": 78.73875534731603,
+   "generation": 9,
+   "mean_loss": 290.1106062018448,
+   "sigma": 0.2322037750881558
+  },
+  {
+   "best_loss": 37.76967878873479,
+   "generation": 10,
+   "mean_loss": 147.43622728814864,
+   "sigma": 0.212856634387639
+  },
+  {
+   "best_loss": 105.16518720428208,
+   "generation": 11,
+   "mean_loss": 204.76661408639012,
+   "sigma": 0.19599869407897963
+  },
+  {
+   "best_loss": 37.14278324018752,
+   "generation": 12,
+   "mean_loss": 164.85523114047106,
+   "sigma": 0.1900037490780357
+  },
+  {
+   "best_loss": 35.9494445330779,
+   "generation": 13,
+   "mean_loss": 204.5007475532699,
+   "sigma": 0.18092443377766923
+  },
+  {
+   "best_loss": 36.19889227476772,
+   "generation": 14,
+   "mean_loss": 82.10624273925245,
+   "sigma": 0.17812967307530905
+  },
+  {
+   "best_loss": 6.285741953278496,
+   "generation": 15,
+   "mean_loss": 63.5614091322895,
+   "sigma": 0.18102451158328478
+  },
+  {
+   "best_loss": 0.8704360126975467,
+   "generation": 16,
+   "mean_loss": 35.53532674818253,
+   "sigma": 0.17909148138430034
+  },
+  {
+   "best_loss": 14.673775580030405,
+   "generation": 17,
+   "mean_loss": 39.151480546307525,
+   "sigma": 0.18778501088112232
+  },
+  {
+   "best_loss": 18.62323836199206,
+   "generation": 18,
+   "mean_loss": 94.96826601509858,
+   "sigma": 0.2033067296776443
+  },
+  {
+   "best_loss": 3.009077553923084,
+   "generation": 19,
+   "mean_loss": 86.49398334349138,
+   "sigma": 0.21167012810295738
+  },
+  {
+   "compass_step": 0.1,
+   "loss": 3.1594880737672604e-27
+  }
+ ],
+ "verification": {
+  "holdout_universe": {
+   "loss": 0.0,
+   "medians": {
+    "abs_return_acf1": 0.19889769104315652,
+    "annualised_vol_pct": 32.62381706467038,
+    "cross_sectional_corr": 0.25046912679563993,
+    "excess_kurtosis": 8.688735313542931,
+    "leverage_effect": -0.012649001049020139,
+    "return_acf1": 0.1791302163341018,
+    "volume_abs_return_corr": 0.5706917300289633,
+    "volume_change_acf1": -0.4302793320882701
+   },
+   "rows": {
+    "abs_return_acf1": {
+     "band": [
+      0.15,
+      0.35
+     ],
+     "distance": 0.0,
+     "measured": 0.19889769104315652,
+     "role": "target",
+     "scaled": 0.0
+    },
+    "cross_sectional_corr": {
+     "band": [
+      0.25,
+      0.35
+     ],
+     "distance": 0.0,
+     "measured": 0.25046912679563993,
+     "role": "target",
+     "scaled": 0.0
+    }
+   },
+   "seeds": [
+    101,
+    102,
+    103
+   ],
+   "universe": "Universe.random(60, seed=222)"
+  },
+  "published_seeds": {
+   "loss": 0.013357722719523646,
+   "medians": {
+    "abs_return_acf1": 0.19848207141762542,
+    "annualised_vol_pct": 30.50082049341387,
+    "cross_sectional_corr": 0.24841623267871152,
+    "excess_kurtosis": 5.602034943496622,
+    "leverage_effect": -0.02883783070757412,
+    "return_acf1": 0.18564710747876959,
+    "volume_abs_return_corr": 0.5532824066476438,
+    "volume_change_acf1": -0.4264677617339442
+   },
+   "rows": {
+    "abs_return_acf1": {
+     "band": [
+      0.15,
+      0.35
+     ],
+     "distance": 0.0,
+     "measured": 0.19848207141762542,
+     "role": "target",
+     "scaled": 0.0
+    },
+    "cross_sectional_corr": {
+     "band": [
+      0.25,
+      0.35
+     ],
+     "distance": 0.0015837673212884817,
+     "measured": 0.24841623267871152,
+     "role": "target",
+     "scaled": 0.11557561472699873
+    }
+   },
+   "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "universe": "Universe.random(40, seed=111)"
+  }
+ },
+ "wall_seconds": 801.8265965000028
+}

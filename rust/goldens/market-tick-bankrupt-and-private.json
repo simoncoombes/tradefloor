@@ -1,0 +1,8690 @@
+{
+ "kind": "market.tick",
+ "meta": {
+  "sourceModule": "src/lib/engine/market.ts",
+  "generatedFrom": "TypeScript — the parity contract. Never regenerate from Rust.",
+  "floatEncoding": "raw IEEE-754 f64, big-endian, 16 hex digits",
+  "wasmReady": false,
+  "rngNote": "seed via initRng(seed + 1); the main stream is sequence 99"
+ },
+ "spec": {
+  "name": "bankrupt-and-private",
+  "seed": 1234,
+  "ticks": 20,
+  "roster": 12,
+  "volatility": "3FE3333333333333",
+  "start": {
+   "hour": 14,
+   "minute": 0,
+   "dayOfWeek": 5
+  },
+  "note": "TRAP: inactive companies are skipped without drawing"
+ },
+ "sectorKeys": [
+  "technology",
+  "financial_services",
+  "healthcare",
+  "energy",
+  "consumer_discretionary",
+  "consumer_staples",
+  "industrials",
+  "materials",
+  "real_estate",
+  "utilities",
+  "telecommunications",
+  "transportation"
+ ],
+ "economy": {
+  "vix": "402E000000000000",
+  "federalFundsRate": "4004000000000000",
+  "corporateBondYield": "40123D70A3D70A3E",
+  "qePeBoost": "0000000000000000",
+  "fearGreedIndex": "404E000000000000"
+ },
+ "initial": [
+  {
+   "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+   "ticker": "AMZN",
+   "sector": "technology",
+   "isBankrupt": false,
+   "isPublic": true,
+   "sectorVolatility": "3FF3333333333333",
+   "sectorAvgPe": "4040000000000000",
+   "eps": "4014DC0D2320B20D",
+   "bookValuePerShare": "40341A30777DC12A",
+   "revenueGrowth": "3FC5C26125E00000",
+   "stock": {
+    "price": "40649FF1B6B026E7",
+    "previousClose": "4064823A151724CA",
+    "previousTickPrice": null,
+    "open": "40649EAFE5E74DFF",
+    "high": "4064BEE5C8BBC815",
+    "low": "40646C4778E1615A",
+    "volume": "4153C321BB1C899D",
+    "avgVolume": "41579C40AB0B53B8",
+    "sharesOutstanding": "41D2721285A0D968",
+    "marketCap": "4247C6FB67ECA14E",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F447AE147AE147C",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FF2391A2F68F5C3",
+    "shortInterest": "4198467BFB2CFAAC",
+    "float": "41D02B2407261A98"
+   }
+  },
+  {
+   "id": "a7c12f81-56be-413d-a279-be16490f8446",
+   "ticker": "GOOGL",
+   "sector": "technology",
+   "isBankrupt": false,
+   "isPublic": true,
+   "sectorVolatility": "3FF3333333333333",
+   "sectorAvgPe": "4040000000000000",
+   "eps": "402A52D25E2E28F2",
+   "bookValuePerShare": "403B564766DF82CB",
+   "revenueGrowth": "3FC156913A733333",
+   "stock": {
+    "price": "407A0AE16CA616DB",
+    "previousClose": "407A2172DCB026F5",
+    "previousTickPrice": null,
+    "open": "4079EACCE99D1A22",
+    "high": "407A1A2CB1E12ED6",
+    "low": "4079C9500F6DF3CD",
+    "volume": "41125A32466681FA",
+    "avgVolume": "4120B613DB9ABEBF",
+    "sharesOutstanding": "419A1C7F0721CA0B",
+    "marketCap": "422540080E828C0F",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F447AE147AE147C",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FEC65AF6A5EB852",
+    "shortInterest": "4158DA1DFD00CD6E",
+    "float": "41962E924935E473"
+   }
+  },
+  {
+   "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+   "ticker": "MSFT",
+   "sector": "technology",
+   "isBankrupt": true,
+   "isPublic": true,
+   "sectorVolatility": "3FF3333333333333",
+   "sectorAvgPe": "4040000000000000",
+   "eps": "4015F005B7CC2A70",
+   "bookValuePerShare": "4039081ACB0BB8D6",
+   "revenueGrowth": "3FC4556F26533333",
+   "stock": {
+    "price": "4065B1DC152E20DE",
+    "previousClose": "4065865AA5BF4C7A",
+    "previousTickPrice": null,
+    "open": "4065997062574AF4",
+    "high": "4065CFAE00A8DF77",
+    "low": "40655AE8144CBBC2",
+    "volume": "414773372767E822",
+    "avgVolume": "4141F7FD11A7AECE",
+    "sharesOutstanding": "41BC137B6B960122",
+    "marketCap": "423308D5D9CB4BF2",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F447AE147AE147C",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FF2D8A272FD70A3",
+    "shortInterest": "4184ADBFD2635A04",
+    "float": "41B57B3808D71364"
+   }
+  },
+  {
+   "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+   "ticker": "AAPL",
+   "sector": "technology",
+   "isBankrupt": false,
+   "isPublic": true,
+   "sectorVolatility": "3FF3333333333333",
+   "sectorAvgPe": "4040000000000000",
+   "eps": "401DDF019E0DE713",
+   "bookValuePerShare": "403D6FE2230A919F",
+   "revenueGrowth": "3FC30A7B57199999",
+   "stock": {
+    "price": "406D8BA9203C3212",
+    "previousClose": "406D8B73B7D3A3BC",
+    "previousTickPrice": null,
+    "open": "406D78C97DC6E923",
+    "high": "406E1E525ED83038",
+    "low": "406D191D5257926B",
+    "volume": "41006E6816984CD2",
+    "avgVolume": "40FB0588208966AD",
+    "sharesOutstanding": "41751C52596B5837",
+    "marketCap": "41F37DCD3994A2F4",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F447AE147AE147C",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FF149B90407AE14",
+    "shortInterest": "4137B9E3B0608CFA",
+    "float": "417262E60BBF2620"
+   }
+  },
+  {
+   "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+   "ticker": "CRM",
+   "sector": "technology",
+   "isBankrupt": false,
+   "isPublic": true,
+   "sectorVolatility": "3FF3333333333333",
+   "sectorAvgPe": "4040000000000000",
+   "eps": "401E491EA104062D",
+   "bookValuePerShare": "4030E818A66C4458",
+   "revenueGrowth": "3FCBDAC9FFD99999",
+   "stock": {
+    "price": "406DEBA60D1F7EC4",
+    "previousClose": "406E30E7F0731C0B",
+    "previousTickPrice": null,
+    "open": "406DC789A86F1FA9",
+    "high": "406E5109B10FA2FE",
+    "low": "406DCD62EF23F12F",
+    "volume": "40F9C576F2680BAF",
+    "avgVolume": "40F79FB494DE4033",
+    "sharesOutstanding": "417274C5144DA228",
+    "marketCap": "41F141BBE70368B2",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F447AE147AE147C",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FF3FC420E8E147B",
+    "shortInterest": "4127CBBFB2AEC109",
+    "float": "416F7015B94763DF"
+   }
+  },
+  {
+   "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+   "ticker": "ADBE",
+   "sector": "technology",
+   "isBankrupt": false,
+   "isPublic": false,
+   "sectorVolatility": "3FF3333333333333",
+   "sectorAvgPe": "4040000000000000",
+   "eps": "400B870DE38B7788",
+   "bookValuePerShare": "40327FA4D5705FAF",
+   "revenueGrowth": "3FC42E63DFA66666",
+   "stock": {
+    "price": "405B3931602016FA",
+    "previousClose": "405B12C9489A10B8",
+    "previousTickPrice": null,
+    "open": "405B3F276AD872F1",
+    "high": "405B8099C1FBABFC",
+    "low": "405AC88619683C95",
+    "volume": "411E2045B703A1C4",
+    "avgVolume": "4118B603EA4C4B21",
+    "sharesOutstanding": "41934E330F0B9AB2",
+    "marketCap": "42006C7C2960BB78",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F447AE147AE147C",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FF65F433F0CCCCD",
+    "shortInterest": "414EB4876A9E6895",
+    "float": "41920D2F7A8ACE85"
+   }
+  },
+  {
+   "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+   "ticker": "AVGO",
+   "sector": "technology",
+   "isBankrupt": false,
+   "isPublic": true,
+   "sectorVolatility": "3FF3333333333333",
+   "sectorAvgPe": "4040000000000000",
+   "eps": "3FFC2DB10E5BAB61",
+   "bookValuePerShare": "400CD50E36BC6FEA",
+   "revenueGrowth": "3FB9CDAC46800000",
+   "stock": {
+    "price": "404BE4E19E2C4CE4",
+    "previousClose": "404C28CCBFF3AAF4",
+    "previousTickPrice": null,
+    "open": "404BE5BAB4BED8A4",
+    "high": "404C65FB2669186B",
+    "low": "404BB1DF562F4CC8",
+    "volume": "40FF3B6C1076ACCD",
+    "avgVolume": "40FCC5ECC6B0E74A",
+    "sharesOutstanding": "41767AA0FB3A34B2",
+    "marketCap": "41D398400C4F9B18",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F447AE147AE147C",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FF46A0C2DDEB852",
+    "shortInterest": "4135376DD85055EF",
+    "float": "4171B763785D4C5A"
+   }
+  },
+  {
+   "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+   "ticker": "NFLX",
+   "sector": "technology",
+   "isBankrupt": false,
+   "isPublic": true,
+   "sectorVolatility": "3FF3333333333333",
+   "sectorAvgPe": "4040000000000000",
+   "eps": "3FF918F537943A56",
+   "bookValuePerShare": "4009234D4C3AF957",
+   "revenueGrowth": "3FBAC9170EC00000",
+   "stock": {
+    "price": "4048D7B1C76593EE",
+    "previousClose": "4048E30487B8F4A9",
+    "previousTickPrice": null,
+    "open": "4048D3E4074018FE",
+    "high": "404910D1D66F14C7",
+    "low": "4048C1A69326CAFA",
+    "volume": "410417EA976D5D69",
+    "avgVolume": "4102640BE99F54C8",
+    "sharesOutstanding": "417CBC529D08F479",
+    "marketCap": "41D64EEEE58D191B",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F447AE147AE147C",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FF71EBFA6AB851F",
+    "shortInterest": "4132E9504290169B",
+    "float": "41785B0EC773CE6B"
+   }
+  },
+  {
+   "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+   "ticker": "TSLA",
+   "sector": "technology",
+   "isBankrupt": false,
+   "isPublic": true,
+   "sectorVolatility": "3FF3333333333333",
+   "sectorAvgPe": "4040000000000000",
+   "eps": "3FF931807A47D8A1",
+   "bookValuePerShare": "401A77F7882C68DB",
+   "revenueGrowth": "3FC03C4B56999999",
+   "stock": {
+    "price": "4048ED952D7DC605",
+    "previousClose": "404905D376E4416A",
+    "previousTickPrice": null,
+    "open": "4048EBDA47ED4279",
+    "high": "4048F14865C14D99",
+    "low": "404885E710D046D7",
+    "volume": "410982E5AF822C7D",
+    "avgVolume": "41035CF3AE2A0231",
+    "sharesOutstanding": "417E413CC021A36D",
+    "marketCap": "41D7918DC4CDB9CD",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F447AE147AE147C",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FF0DC24E0EF5C29",
+    "shortInterest": "413C0BA7585510E4",
+    "float": "417AB9068BD9A9A5"
+   }
+  },
+  {
+   "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+   "ticker": "GS",
+   "sector": "financial_services",
+   "isBankrupt": true,
+   "isPublic": true,
+   "sectorVolatility": "3FF199999999999A",
+   "sectorAvgPe": "4028000000000000",
+   "eps": "401BC6BB88609878",
+   "bookValuePerShare": "40284B91F69BDEFD",
+   "revenueGrowth": "3FB0362D7EE66667",
+   "stock": {
+    "price": "4054A293F9A79049",
+    "previousClose": "40546EF3C006BE33",
+    "previousTickPrice": null,
+    "open": "4054A0AAA51D49C4",
+    "high": "4054EB9584BFBAD6",
+    "low": "405478A47E65D4AD",
+    "volume": "4174E26DCBDF3D73",
+    "avgVolume": "416E2851BA0D6781",
+    "sharesOutstanding": "41E78F7FD95A78DD",
+    "marketCap": "424E62C6A4305BEF",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F2D7DBF487FCB92",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FF15A8AB9A8A3D7",
+    "shortInterest": "41B12177E7F22B56",
+    "float": "41E37C501DFF542F"
+   }
+  },
+  {
+   "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+   "ticker": "WFC",
+   "sector": "financial_services",
+   "isBankrupt": false,
+   "isPublic": true,
+   "sectorVolatility": "3FF199999999999A",
+   "sectorAvgPe": "4028000000000000",
+   "eps": "4000704EB1D8D976",
+   "bookValuePerShare": "40200AF978E55894",
+   "revenueGrowth": "3FB2260524A66667",
+   "stock": {
+    "price": "40386BEB1663C083",
+    "previousClose": "40387B3773E3BB8A",
+    "previousTickPrice": null,
+    "open": "4038866E6FED1372",
+    "high": "4038C24F45F784FC",
+    "low": "403805B249548A76",
+    "volume": "4159D393A2895112",
+    "avgVolume": "4161CB93DC70C01C",
+    "sharesOutstanding": "41DBCE1708702C2C",
+    "marketCap": "42253856A845DAE0",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F2D7DBF487FCB92",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FE8F4031E866666",
+    "shortInterest": "418F4315A160B994",
+    "float": "41D4DAB364A99B05"
+   }
+  },
+  {
+   "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+   "ticker": "BAC",
+   "sector": "financial_services",
+   "isBankrupt": false,
+   "isPublic": true,
+   "sectorVolatility": "3FF199999999999A",
+   "sectorAvgPe": "4028000000000000",
+   "eps": "3FF8BF0346A84CED",
+   "bookValuePerShare": "400AAC18AD528BA0",
+   "revenueGrowth": "3FA7F127E1B33334",
+   "stock": {
+    "price": "4032639DCF03EC80",
+    "previousClose": "4032637EF19B03EB",
+    "previousTickPrice": null,
+    "open": "403279931D889639",
+    "high": "4032A8587AF2FF2A",
+    "low": "40324CFDB2016A2C",
+    "volume": "41759AD21C19CDF2",
+    "avgVolume": "416E1BC19D5D0BEE",
+    "sharesOutstanding": "41E785AF42F0B152",
+    "marketCap": "422B08D857DC09D2",
+    "mispricingS": null,
+    "mispricingSPrevClose": null,
+    "mispricingMomentum": null,
+    "makerInventory": null,
+    "garchVariance": "3F2D7DBF487FCB92",
+    "lastDailyReturn": "0000000000000000",
+    "beta": "3FF29D9D83D8A3D7",
+    "shortInterest": "41A2B7D4FE0E5E15",
+    "float": "41E1D14B6A8FFD98"
+   }
+  }
+ ],
+ "ticks": [
+  {
+   "tick": 0,
+   "time": {
+    "hour": 14,
+    "minute": 0,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "3FF27957A236F4C2"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD782B7E085EE77"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFC31ED0C34CD9B"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE8D203F333D69F"
+    },
+    {
+     "kind": "n",
+     "bits": "3FC939EDE4DA0920"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD66E054BC60F10"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE1307D11E470A1"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDF6FFABB2B6F80"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF083BA9EAC3ADC"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEEA382560C05EE"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD21705A452CB50"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEC953FED57F881"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFABDE62BA98660"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE0C6176DE7AC1B"
+    },
+    {
+     "kind": "u",
+     "bits": "3FECE39BB7C00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE5A002321313DD"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3A8EC2C000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF6B125D4CE069A"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD89A5151400000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE500486221D772"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE05E031E600000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDBAF96AAB6FE5E"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC9B8380E800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF6ECD9918ADA47"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDF3DD30E800000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF52A5AB00A423E"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0D0D467A00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FCAFBDB043E1DDC"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE26DBFCE00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD295146CB0E655"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE060EF7D000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDCFD2A71400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE66AE80C200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE82931AF200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD24B497E800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF4D74B3E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0B45C59A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCEB6A74C800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE97F6697C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE50E0744600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC7B802FE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB81DF65A000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE833DA81600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8FC8E7AE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDD7EDAAEC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDF2BAA8AC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF25B516C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB84044E2000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEAA67476800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE19475FF400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FAF967FB8000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC5482692000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDA6F6A57C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD23EDF42C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDD3938B0800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD22BA13DC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6508382400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC94FF900000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCFB270E2800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDEECFC63800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCB8BF9B9800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC3E70910800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEFBF6036C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC685EE59800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC35B9C35000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2351F1D600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD700CA20800000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A0F5C28F5C29",
+     "previousTickPrice": "40649FF1B6B026E7",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "4153D35FBB1C899D",
+     "marketCap": "4247C82733495CC8",
+     "mispricingS": "3F4071FF7F5668A3",
+     "makerInventory": null
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A091EB851EB85",
+     "previousTickPrice": "407A0AE16CA616DB",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "411275CA466681FA",
+     "marketCap": "42253E984AA33F12",
+     "mispricingS": "BF38C3EF5C8938FE",
+     "makerInventory": "408B900000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D87AE147AE148",
+     "previousTickPrice": "406D8BA9203C3212",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "410076E016984CD2",
+     "marketCap": "41F37B2CF3F50F16",
+     "mispricingS": "BF543B6D72D5106D",
+     "makerInventory": "4060C00000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DE75C28F5C28F",
+     "previousTickPrice": "406DEBA60D1F7EC4",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40F9D856F2680BAF",
+     "marketCap": "41F13F42B0673A53",
+     "mispricingS": "BF3D7559E9F112B8",
+     "makerInventory": "4062C00000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BE8F5C28F5C29",
+     "previousTickPrice": "404BE4E19E2C4CE4",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "40FF4B3C1076ACCD",
+     "marketCap": "41D39B1D86A32A9A",
+     "mispricingS": "BF2D385D8C205DA1",
+     "makerInventory": null
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048DC28F5C28F5C",
+     "previousTickPrice": "4048D7B1C76593EE",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "410424AA976D5D69",
+     "marketCap": "41D652F175D6282A",
+     "mispricingS": "3F5B256E69E79CAF",
+     "makerInventory": "C079800000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4048F0A3D70A3D71",
+     "previousTickPrice": "4048ED952D7DC605",
+     "high": "4048F14865C14D99",
+     "low": "404885E710D046D7",
+     "volume": "41098F1DAF822C7D",
+     "marketCap": "41D79471BF57A82C",
+     "mispricingS": "BF52C253B2310975",
+     "makerInventory": "C068400000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "40386B851EB851EC",
+     "previousTickPrice": "40386BEB1663C083",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "4159F1EC62895112",
+     "marketCap": "422537FE0E997112",
+     "mispricingS": "3F353341609B242D",
+     "makerInventory": "C0CE580000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "4032666666666666",
+     "previousTickPrice": "4032639DCF03EC80",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "4175A6FE7C19CDF2",
+     "marketCap": "422B0CEFF36198B7",
+     "mispricingS": "3F28AD4718E9019F",
+     "makerInventory": "C0D8588000000000"
+    }
+   ]
+  },
+  {
+   "tick": 1,
+   "time": {
+    "hour": 14,
+    "minute": 1,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "BFC640CAC4E2D81A"
+    },
+    {
+     "kind": "n",
+     "bits": "3FC5C99984359B41"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB414995253F0B6"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEFF3468D70CBD1"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE4D229E7ED4ACF"
+    },
+    {
+     "kind": "n",
+     "bits": "C00188526D35E84C"
+    },
+    {
+     "kind": "n",
+     "bits": "3FA1C3E4A186F934"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE0975E43315DED"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC0E996607F7FA1"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD2A4C30E4711FE"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFB7B2F1EF7DA62"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF3305BD321CAA1"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFEBA309F8AA053"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF42BEBB2D76535"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDC1DD662C00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE23D37DCC47A1A"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB4B472B4000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE505B0CDEFB9B9"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB10FB78E00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDFBC62863366C6"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD030CFBF000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFCBF2491C34FB31"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB7455A7F000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FBCF0E3E9044CEE"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE62F3DC7200000"
+    },
+    {
+     "kind": "n",
+     "bits": "4000ECBDF3B573F3"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD0E4E134400000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD241279701D2DA"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDD8194D1000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB5800C0D6B018C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDFC479B3800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3D35B7F800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD7F9C908400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEFF325ACA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED8B620DE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F9AC9B230000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FECB53455C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCC5C329E800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0B057D8600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB5D64AF9000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDD818FA9000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC3A447B5000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7F82876C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8818C5BE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB182B2D600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBB5DBAA7000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE83B0A8D200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0D491F6400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1E90380000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE92115F5000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF1C9C71E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB4A4DA8600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB5DB461000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD914359A000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB5A4B77C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD7C93637C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE3D2A0F600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBD5C57C2000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDDD8E7E5800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC4D44C64800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCD919BEA800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD539D4E6800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDD8F15D1800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA45D5F2E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0997D7C200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB0F4CD17000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE76CC07CE00000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A00000000000",
+     "previousTickPrice": "4064A0F5C28F5C29",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "4153E2BE3B1C899D",
+     "marketCap": "4247C70BE0415840",
+     "mispricingS": "3F547A6FCA45564F",
+     "makerInventory": "40BEBC0000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A075C28F5C28F",
+     "previousTickPrice": "407A091EB851EB85",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "41128DC2466681FA",
+     "marketCap": "42253D28A4EE5FC5",
+     "mispricingS": "BF4B1F190838AC1E",
+     "makerInventory": "408B900000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D83851EB851EC",
+     "previousTickPrice": "406D87AE147AE148",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "41007FF816984CD2",
+     "marketCap": "41F3786E6421C122",
+     "mispricingS": "BF5F3C700E6E06DF",
+     "makerInventory": "4060C00000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DE2E147AE147B",
+     "previousTickPrice": "406DE75C28F5C28F",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40F9E9A6F2680BAF",
+     "marketCap": "41F13CAD38A6F204",
+     "mispricingS": "BF4FA6301833BBCF",
+     "makerInventory": "4072000000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BE51EB851EB85",
+     "previousTickPrice": "404BE8F5C28F5C29",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "40FF5AEC1076ACCD",
+     "marketCap": "41D3986AF8708A04",
+     "mispricingS": "BF3E744A0DED63EA",
+     "makerInventory": "406F000000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E00000000000",
+     "previousTickPrice": "4048DC28F5C28F5C",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "41043232976D5D69",
+     "marketCap": "41D656643811F60A",
+     "mispricingS": "3F5C7EFF3D424A0D",
+     "makerInventory": "C079800000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4048F47AE147AE14",
+     "previousTickPrice": "4048F0A3D70A3D71",
+     "high": "4048F47AE147AE14",
+     "low": "404885E710D046D7",
+     "volume": "41099ADDAF822C7D",
+     "marketCap": "41D798132D08500B",
+     "mispricingS": "3F4E9E6CA9DA1F40",
+     "makerInventory": "C077E00000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "40386E147AE147AE",
+     "previousTickPrice": "40386B851EB851EC",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415A0D54E2895112",
+     "marketCap": "42253A378114FF2A",
+     "mispricingS": "3F3CA9BC25086D11",
+     "makerInventory": "C0E54A0000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "4032666666666666",
+     "previousTickPrice": "4032666666666666",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "4175B32DDC19CDF2",
+     "marketCap": "422B0CEFF36198B7",
+     "mispricingS": "3F292F4045B88A64",
+     "makerInventory": "4038000000000000"
+    }
+   ]
+  },
+  {
+   "tick": 2,
+   "time": {
+    "hour": 14,
+    "minute": 2,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "BFEF14C658D4E573"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD8DECCB10CBE32"
+    },
+    {
+     "kind": "n",
+     "bits": "3FC5B224614BDA46"
+    },
+    {
+     "kind": "n",
+     "bits": "BFB28BDDCE917331"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE5F2C192A5A4A2"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFF2F0BFCDACEC4"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF0A02A847BB962"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE3FC4415A939E7"
+    },
+    {
+     "kind": "n",
+     "bits": "3FC72E575C41F9D9"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF3B4C75C61E9EE"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE3FFDDAC1ED021"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB3E8CB291A8E1D"
+    },
+    {
+     "kind": "n",
+     "bits": "40015460BEF37012"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEC3207873B982B"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE77D2AEBA00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE4420EB233B8C0"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC93D4936800000"
+    },
+    {
+     "kind": "n",
+     "bits": "C0051E81E24BB253"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD2FBC235400000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD1FB14FFC21096"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEFB7D330400000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFBEA265276F5D75"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD904B3EC000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEA0F457F611B34"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD2D525FFC00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF43C957F4504AA"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7D4D57AC00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF128B047362F87"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC59E6324800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF3502B2BF2B9AA"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC38C6727800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED461BA9E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD2390A6C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB34FAA4E000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCB999475800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE7026CF000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB0D2BF63000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD5E5B0DDC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCC39E357000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF61BED6400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD9B166C5400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA9CB3926000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD008DDE9400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE72BD2E3C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC4E0C7F2000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCEDC7B2D800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE0A3A75200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4BD510C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FECC49D35A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FAC6D0216000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF1BB253E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEAE3D755A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3D907F0000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1EC4500C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1852069200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBF3850EC000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE928BE52600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0B39A63A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC49FDB12000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC007CC05000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA1043A7800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE012DBC2400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA042C80800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCDDCBCFF800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE496106C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7B40106800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD733D423000000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A0F5C28F5C29",
+     "previousTickPrice": "4064A00000000000",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "4153F3D0FB1C899D",
+     "marketCap": "4247C82733495CC8",
+     "mispricingS": "3F5AD9672DE9BBC5",
+     "makerInventory": "C08B400000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A08F5C28F5C29",
+     "previousTickPrice": "407A075C28F5C28F",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "4112A57A466681FA",
+     "marketCap": "42253E76DE7B87DC",
+     "mispricingS": "BF574EF091BCA491",
+     "makerInventory": "405F000000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D87AE147AE148",
+     "previousTickPrice": "406D83851EB851EC",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "410088F016984CD2",
+     "marketCap": "41F37B2CF3F50F16",
+     "mispricingS": "BF731CDEFFED3D28",
+     "makerInventory": "4060C00000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DDE6666666666",
+     "previousTickPrice": "406DE2E147AE147B",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40F9FD76F2680BAF",
+     "marketCap": "41F13A17C0E6A9B5",
+     "mispricingS": "BF5719F9B85260A0",
+     "makerInventory": "4072000000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BE147AE147AE1",
+     "previousTickPrice": "404BE51EB851EB85",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "40FF6C8C1076ACCD",
+     "marketCap": "41D395B86A3DE96E",
+     "mispricingS": "BF48AB018E29938E",
+     "makerInventory": "4078400000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048DC28F5C28F5C",
+     "previousTickPrice": "4048E00000000000",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "41043F22976D5D69",
+     "marketCap": "41D652F175D6282A",
+     "mispricingS": "3F63460EB42DEB16",
+     "makerInventory": "4010000000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4048F851EB851EB8",
+     "previousTickPrice": "4048F47AE147AE14",
+     "high": "4048F851EB851EB8",
+     "low": "404885E710D046D7",
+     "volume": "4109A955AF822C7D",
+     "marketCap": "41D79BB49AB8F7EC",
+     "mispricingS": "3F60D12A3CA18C20",
+     "makerInventory": "C083200000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "40386B851EB851EC",
+     "previousTickPrice": "40386E147AE147AE",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415A266CA2895112",
+     "marketCap": "422537FE0E997112",
+     "mispricingS": "3F4AEB00ACC8D982",
+     "makerInventory": "C0E54A0000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "403268F5C28F5C29",
+     "previousTickPrice": "4032666666666666",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "4175BE564C19CDF2",
+     "marketCap": "422B10B36B954459",
+     "mispricingS": "3F3ED5464BBD6604",
+     "makerInventory": "4038000000000000"
+    }
+   ]
+  },
+  {
+   "tick": 3,
+   "time": {
+    "hour": 14,
+    "minute": 3,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "BF753DA93F5CB13E"
+    },
+    {
+     "kind": "n",
+     "bits": "3F83B4FE15533461"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDB29D391F4A824"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF7C3A88DF841C3"
+    },
+    {
+     "kind": "n",
+     "bits": "BFB232ACFC2F841D"
+    },
+    {
+     "kind": "n",
+     "bits": "3F985771BEB34434"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF1E3146699B655"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF43CE42A61F90A"
+    },
+    {
+     "kind": "n",
+     "bits": "BFECEF0A3EFE9D40"
+    },
+    {
+     "kind": "n",
+     "bits": "3F9B0A3FC3B9B04D"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFBBDE16E829A1E"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF852E80E06BA72"
+    },
+    {
+     "kind": "n",
+     "bits": "3FC775CE02DF2E6C"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF629A90B6FD821"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7E26EBC200000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF58A093C81C3E5"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCF555500000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEA93750362D5F6"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE49329CD400000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD3CFE5E329AC7C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7C89FC9600000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE103C0C9B7F2EA"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDBFB0FA1000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFED69FCD90A47D7"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDFE889B7400000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDFC76FA0C14050"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE93C4E49C00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC49EB698833A5E"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE83C15B8E00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3F7FDE89A364652C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE99D487D200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB84037C600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA0FAAF72000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB4C00FF8000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE06FCBB6600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9474ABD600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBFD658B9000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC283AD93000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCA9CAA3E000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE43C6918E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC35A3506000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD8650DB7800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3A521E9C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7D11964200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9A72C8B400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEADD6BD6A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD72DE0EF400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC9468042000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCDED4918800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB2044DFA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA89233D6000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2DF74E3800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE42B3A6C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD64BC184800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD8012AF7800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEAA3BE1BE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE622C431000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBE8A1E0D000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD077E464C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB37494C6000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCAAC13FB800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2BB92FB800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4A5BA0C400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB53D623600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD62567C8C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEDA79382A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD36C216DC00000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A1EB851EB852",
+     "previousTickPrice": "4064A0F5C28F5C29",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "415403FFFB1C899D",
+     "marketCap": "4247C94286516150",
+     "mispricingS": "3F49F5F8681CA6C8",
+     "makerInventory": "C0C1E30000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0AB851EB851F",
+     "previousTickPrice": "407A08F5C28F5C29",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "4112BBD2466681FA",
+     "marketCap": "42253FE684306729",
+     "mispricingS": "BF6413201326F7B0",
+     "makerInventory": "C082700000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D83851EB851EC",
+     "previousTickPrice": "406D87AE147AE148",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "4100934816984CD2",
+     "marketCap": "41F3786E6421C122",
+     "mispricingS": "BF767D533D1D29AF",
+     "makerInventory": "4072A00000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DE28F5C28F5C3",
+     "previousTickPrice": "406DDE6666666666",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FA0FF6F2680BAF",
+     "marketCap": "41F13C7DF93DC848",
+     "mispricingS": "BF5C2470D51029FA",
+     "makerInventory": "407B400000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BE51EB851EB85",
+     "previousTickPrice": "404BE147AE147AE1",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "40FF7F4C1076ACCD",
+     "marketCap": "41D3986AF8708A04",
+     "mispricingS": "BF54FCE93F2D2D30",
+     "makerInventory": "406DC00000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E00000000000",
+     "previousTickPrice": "4048DC28F5C28F5C",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "41044BE2976D5D69",
+     "marketCap": "41D656643811F60A",
+     "mispricingS": "3F579693FD3CD156",
+     "makerInventory": "4010000000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4048FC28F5C28F5C",
+     "previousTickPrice": "4048F851EB851EB8",
+     "high": "4048FC28F5C28F5C",
+     "low": "404885E710D046D7",
+     "volume": "4109B785AF822C7D",
+     "marketCap": "41D79F5608699FCD",
+     "mispricingS": "3F598D7E94958769",
+     "makerInventory": "C083200000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "403868F5C28F5C29",
+     "previousTickPrice": "40386B851EB851EC",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415A4343A2895112",
+     "marketCap": "422535C49C1DE2FA",
+     "mispricingS": "3F492FB6CB703E1E",
+     "makerInventory": "C0E54A0000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "40326B851EB851EC",
+     "previousTickPrice": "403268F5C28F5C29",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "4175CB2CDC19CDF2",
+     "marketCap": "422B1476E3C8EFFC",
+     "mispricingS": "3F402FDBB7988B9B",
+     "makerInventory": "4038000000000000"
+    }
+   ]
+  },
+  {
+   "tick": 4,
+   "time": {
+    "hour": 14,
+    "minute": 4,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "BFC6F94295B892DD"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE26C8811FDBBF5"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF7B2BA93CEDB5F"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF945D5AAF8D8DC"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEAC2763013CD3E"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDEAFC42AA37359"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD93EEED72ABEDA"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF70B56BCE2E5D5"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEEC28A84A48E7E"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDF20BF8B3E4935"
+    },
+    {
+     "kind": "n",
+     "bits": "40004A49F1E3AEBB"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDB0B540976D58B"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF3C6BD3D9A79A5"
+    },
+    {
+     "kind": "n",
+     "bits": "3FED576557EE891F"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB26AD4AE000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFB968E6D733B0BA"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCC479C42800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB87CC5AE84FF00"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE71EB755A00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FCCE5EBFC667A99"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0BC781E600000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FC0113D75C5E5C4"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE460077C200000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFCBEE46174CDB30"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE973EFD6A00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE5879643A2B621"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC996333E000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFB3D46A43E2327"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC39486E1000000"
+    },
+    {
+     "kind": "n",
+     "bits": "C00231E111AB7867"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE27D10F0800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA557DA3E000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE49157A7A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE44E4F03600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDCD5A18D800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE5C02020400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEDD3E89BE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA6857206000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC928E45600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE5FAE998A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF664239400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCAFE6D2A000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC8B87FB0000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE72C5F1D000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE24CCFAF400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD5A2BA2E400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7A1791D800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB196C085000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB8BC1180000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC076E024800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC4F51BC8800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD27FC62AC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2C62A99C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEEC22CD7400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA4802E3C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDD018DF5800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3EAB7F5400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F9244B3E8000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE07690E2800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD9C27AC6000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD7101D59C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD83F321E400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED56D236E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD3C5FE91000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDCC16160000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDBCEDFFC000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD1EC39E7000000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A2E147AE147B",
+     "previousTickPrice": "4064A1EB851EB852",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "41541227BB1C899D",
+     "marketCap": "4247CA5DD95965D8",
+     "mispricingS": "3F552A6EE2A8CD72",
+     "makerInventory": "C0C1E30000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A08F5C28F5C29",
+     "previousTickPrice": "407A0AB851EB851F",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "4112D1EA466681FA",
+     "marketCap": "42253E76DE7B87DC",
+     "mispricingS": "BF652256656C44C9",
+     "makerInventory": "405D000000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D87AE147AE148",
+     "previousTickPrice": "406D83851EB851EC",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "41009DD816984CD2",
+     "marketCap": "41F37B2CF3F50F16",
+     "mispricingS": "BF765749506B9343",
+     "makerInventory": "4072A00000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DDE147AE147AE",
+     "previousTickPrice": "406DE28F5C28F5C3",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FA21E6F2680BAF",
+     "marketCap": "41F139E8817D7FF8",
+     "mispricingS": "BF59829C3A67F1C3",
+     "makerInventory": "4082100000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BE8F5C28F5C29",
+     "previousTickPrice": "404BE51EB851EB85",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "40FF92FC1076ACCD",
+     "marketCap": "41D39B1D86A32A9A",
+     "mispricingS": "BF53FFA1CE84C844",
+     "makerInventory": "C052800000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E3D70A3D70A4",
+     "previousTickPrice": "4048E00000000000",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "4104595A976D5D69",
+     "marketCap": "41D659D6FA4DC3EA",
+     "mispricingS": "3F52E8A2AFE9E342",
+     "makerInventory": "4010000000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4048F851EB851EB8",
+     "previousTickPrice": "4048FC28F5C28F5C",
+     "high": "4048FC28F5C28F5C",
+     "low": "404885E710D046D7",
+     "volume": "4109C46DAF822C7D",
+     "marketCap": "41D79BB49AB8F7EC",
+     "mispricingS": "3F61C546C8C8E79D",
+     "makerInventory": "C083200000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "4038666666666666",
+     "previousTickPrice": "403868F5C28F5C29",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415A5DE4E2895112",
+     "marketCap": "4225338B29A254E1",
+     "mispricingS": "3F0652461E3EF130",
+     "makerInventory": "C0EBF24000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "40326E147AE147AE",
+     "previousTickPrice": "40326B851EB851EC",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "4175D81AFC19CDF2",
+     "marketCap": "422B183A5BFC9B9C",
+     "mispricingS": "BF3369423CB41212",
+     "makerInventory": "4038000000000000"
+    }
+   ]
+  },
+  {
+   "tick": 5,
+   "time": {
+    "hour": 14,
+    "minute": 5,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "3FC88CF24F06DF85"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD1FA39925013B4"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFE9EC265A1354D"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE4779A9DC7A997"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE7B99C14F19F08"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF06A4F20D824DA"
+    },
+    {
+     "kind": "n",
+     "bits": "3FCE2F87E10F27A4"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF82FCD1767A035"
+    },
+    {
+     "kind": "n",
+     "bits": "3FC477AFE72CE865"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE58F566C6B9C9A"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE446FCE39F481A"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF54F2CB83C961A"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEC3322CA30CB31"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE307FE1E83E717"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEBD2F691A00000"
+    },
+    {
+     "kind": "n",
+     "bits": "4004A744417499F1"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB67FCAA200000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEA750F4003BCD6"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6473986800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD86B117260C64E"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD4FE4E51400000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF714DDE99B6ABC"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDEB4D4B0000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDD7F61FFA568F9"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD52A1B4BC00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDC4297C304B745"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC45E97C9000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3F9100C34FE65520"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7C0F551E00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE60D8F2BDC86F7"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD25CC628C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1AC9C96400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE23EB06BE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6FF7F34800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE88C661C200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCABF853D800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCACB3344800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE34C8E99400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEDA802BC000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE15D3C91800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA15F7C5E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7B3B1A8A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1522805C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE13D6607E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC6CDA968800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDE0CBCEFC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCDAEEF53800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA9DCB608000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD0CFB1B3000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE75A2558400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEEC9776B800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6A7A3A6200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC7D07AC9800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEFFBB8D0800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8A882D5800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA7E8FBF800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCA4AB621000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE54299E800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC59199C200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F987A3B40000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6662D30000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8E759E2800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FAE8A20C6000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBA641720000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB7343692000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEFFD48FE400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDDB63A8BC00000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A1EB851EB852",
+     "previousTickPrice": "4064A2E147AE147B",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "415423343B1C899D",
+     "marketCap": "4247C94286516150",
+     "mispricingS": "3F4FFBAA1C6757D6",
+     "makerInventory": "C07AE00000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A073333333333",
+     "previousTickPrice": "407A08F5C28F5C29",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "4112EF2E466681FA",
+     "marketCap": "42253D0738C6A890",
+     "mispricingS": "BF4297A7EAF89A6C",
+     "makerInventory": "405D000000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D83851EB851EC",
+     "previousTickPrice": "406D87AE147AE148",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "4100A82016984CD2",
+     "marketCap": "41F3786E6421C122",
+     "mispricingS": "BF7983BA3B52BFA2",
+     "makerInventory": "4083900000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DE23D70A3D70A",
+     "previousTickPrice": "406DDE147AE147AE",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FA33A6F2680BAF",
+     "marketCap": "41F13C4EB9D49E8B",
+     "mispricingS": "BF5277B5BB92C0D2",
+     "makerInventory": "407B400000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BE51EB851EB85",
+     "previousTickPrice": "404BE8F5C28F5C29",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "40FFA43C1076ACCD",
+     "marketCap": "41D3986AF8708A04",
+     "mispricingS": "3F31474822823380",
+     "makerInventory": "C052800000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E00000000000",
+     "previousTickPrice": "4048E3D70A3D70A4",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "410465EA976D5D69",
+     "marketCap": "41D656643811F60A",
+     "mispricingS": "3F5B55A888A158A2",
+     "makerInventory": "4069800000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4048F47AE147AE14",
+     "previousTickPrice": "4048F851EB851EB8",
+     "high": "4048FC28F5C28F5C",
+     "low": "404885E710D046D7",
+     "volume": "4109D1BDAF822C7D",
+     "marketCap": "41D798132D08500B",
+     "mispricingS": "3F65BB62131FFEA4",
+     "makerInventory": "C079000000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "403868F5C28F5C29",
+     "previousTickPrice": "4038666666666666",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415A7BFD62895112",
+     "marketCap": "422535C49C1DE2FA",
+     "mispricingS": "3F2658A0B6A87EDC",
+     "makerInventory": "C0F1BC2000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "40326E147AE147AE",
+     "previousTickPrice": "40326E147AE147AE",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "4175E470BC19CDF2",
+     "marketCap": "422B183A5BFC9B9C",
+     "mispricingS": "BF3B594A85EB6A5E",
+     "makerInventory": "4038000000000000"
+    }
+   ]
+  },
+  {
+   "tick": 6,
+   "time": {
+    "hour": 14,
+    "minute": 6,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "BFE33625406A0111"
+    },
+    {
+     "kind": "n",
+     "bits": "3F917A9AA577696C"
+    },
+    {
+     "kind": "n",
+     "bits": "BFA0E7796DBE331F"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD0D9EAB94CF7AE"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEFEF20402391EB"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDDF924871D23E7"
+    },
+    {
+     "kind": "n",
+     "bits": "4001ECB6A9CEB4A9"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFC8728844C3D16"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF0894225D8CEAD"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD5B1EF4D84C05F"
+    },
+    {
+     "kind": "n",
+     "bits": "3F9A6CD08EF62A69"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF8F20A93B85222"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF3BF0EDD0AE86F"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE6F8026ECEE6C1"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC4E2DC36800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE1D0EACB74423C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD7EB1355800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF84546FC2E0684"
+    },
+    {
+     "kind": "u",
+     "bits": "3F96931E8C000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFBECA5A0778BB77"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2A5F9BD000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FCE7AF646368F4B"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2B2A5EB000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3F84734ABD99BED8"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9ADF4B4E00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD26ED17EAD4C0D"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDD4FDD9C000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF21373CECFFC11"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9EEB0C0C00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEE2D5BEE5796BE"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDAF0B531800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE755E49C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDDBF324FC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEBB0747A200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD061A6E6800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE090EBBAA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC373DC7000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCE035877000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD295661CC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F6C124740000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8E1D147000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDE1E0DF8800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE5458938A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC55EC1C1000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE799A199C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA13E126E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9EA9344A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD201F66F000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE174A006C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF1F0BB3800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC638CD69800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE96571BB000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEBDABCA2600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDA3D32F8C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD8E9EC4B000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE1EDB4FA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD40C449F800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCF999336000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC4D7A9A9800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCB011CB0000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE56EEA14E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEAB74626A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD0D30143800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDDEC23D8400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA438EA04000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6E388C6400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD212BE9F800000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A2E147AE147B",
+     "previousTickPrice": "4064A1EB851EB852",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "415431E17B1C899D",
+     "marketCap": "4247CA5DD95965D8",
+     "mispricingS": "3F557B451A0F9636",
+     "makerInventory": "C07AE00000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A08F5C28F5C29",
+     "previousTickPrice": "407A073333333333",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "41130A6A466681FA",
+     "marketCap": "42253E76DE7B87DC",
+     "mispricingS": "BF2D2A4E1C4B1704",
+     "makerInventory": "405D000000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D7F5C28F5C28F",
+     "previousTickPrice": "406D83851EB851EC",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "4100B0B816984CD2",
+     "marketCap": "41F375AFD44E732D",
+     "mispricingS": "BF73BE862EBD0EB0",
+     "makerInventory": "4087D00000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DDDC28F5C28F6",
+     "previousTickPrice": "406DE23D70A3D70A",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FA4636F2680BAF",
+     "marketCap": "41F139B94214563C",
+     "mispricingS": "BF564997DFFCF4D7",
+     "makerInventory": "4082400000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BE8F5C28F5C29",
+     "previousTickPrice": "404BE51EB851EB85",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "40FFB63C1076ACCD",
+     "marketCap": "41D39B1D86A32A9A",
+     "mispricingS": "3F392A277A98B64C",
+     "makerInventory": "C052800000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E3D70A3D70A4",
+     "previousTickPrice": "4048E00000000000",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "410473EA976D5D69",
+     "marketCap": "41D659D6FA4DC3EA",
+     "mispricingS": "3F59568C823DAA22",
+     "makerInventory": "4069800000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4048F851EB851EB8",
+     "previousTickPrice": "4048F47AE147AE14",
+     "high": "4048FC28F5C28F5C",
+     "low": "404885E710D046D7",
+     "volume": "4109DFBDAF822C7D",
+     "marketCap": "41D79BB49AB8F7EC",
+     "mispricingS": "3F629A407040718B",
+     "makerInventory": "C083800000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "40386B851EB851EC",
+     "previousTickPrice": "403868F5C28F5C29",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415A99D422895112",
+     "marketCap": "422537FE0E997112",
+     "mispricingS": "3F44288FDA57BCC1",
+     "makerInventory": "C0F1BC2000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "403270A3D70A3D71",
+     "previousTickPrice": "40326E147AE147AE",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "4175F0FEAC19CDF2",
+     "marketCap": "422B1BFDD430473E",
+     "mispricingS": "BF2792C043A68B58",
+     "makerInventory": "C0D9158000000000"
+    }
+   ]
+  },
+  {
+   "tick": 7,
+   "time": {
+    "hour": 14,
+    "minute": 7,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "3FFEF6689E84EB8C"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF019E8C00EB546"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE68F5722164CEB"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE5A5D059902E10"
+    },
+    {
+     "kind": "n",
+     "bits": "BFED7C753471DEE4"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEB607478AC2F78"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE853529BE67ACD"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDEFD3EC9D4BC0C"
+    },
+    {
+     "kind": "n",
+     "bits": "BFB20B140C53457D"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB16FEFD10D3327"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC6684DEAC176F1"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF628874967F9BC"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF349794E926230"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF23BEDFF6AF31E"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4D6E99E200000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDFBB8A25E49CBD"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB0A6342F000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE0C344C4FA8633"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEDDE43F6800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF92362F07C6A94"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD20A75C5800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD921FAA54E72F1"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDA367159800000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE6CCF3D0153EF5"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDFFF2D59000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB84C9EED753718"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6051F3FE00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEA4532401A5DAC"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3A45E2F600000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF4566130FD6DD0"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED23D9BFE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDFAF9243000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE97A7F21A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1A2B0A7400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD4F9460BC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE794CB04800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDD3F32CE800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEFC5B9B3C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6EB1893400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0ABA707E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3A6C003200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC0AB9D56000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEBE7AEAFA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD4D91785000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD76B5FC5C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE13809CA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC96C62CF800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9225BA2400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD2D37605C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3D01BABE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDE55184D400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE57D3A3AC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8235F59A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1A39127000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE13813F4000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEAC75266E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1181E53200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE71627FD000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6F0A30D200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCFE5276B800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD8EA47CB800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDFB28730800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4EDDC7B000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE300D0FC400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC7DCDE1C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC4141669000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1B68C91A00000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A3D70A3D70A4",
+     "previousTickPrice": "4064A2E147AE147B",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "4154423B7B1C899D",
+     "marketCap": "4247CB792C616A60",
+     "mispricingS": "3F506C845052DD2E",
+     "makerInventory": "C07AE00000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0AB851EB851F",
+     "previousTickPrice": "407A08F5C28F5C29",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "411323E2466681FA",
+     "marketCap": "42253FE684306729",
+     "mispricingS": "BF32DA797618469C",
+     "makerInventory": "405D000000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D7AE147AE147B",
+     "previousTickPrice": "406D7F5C28F5C28F",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "4100BB9016984CD2",
+     "marketCap": "41F372BB396AE426",
+     "mispricingS": "BF745B25758C547D",
+     "makerInventory": "408D300000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DE1EB851EB852",
+     "previousTickPrice": "406DDDC28F5C28F6",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FA5A16F2680BAF",
+     "marketCap": "41F13C1F7A6B74CE",
+     "mispricingS": "3F445E41E75AE8EE",
+     "makerInventory": "407AA00000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BECCCCCCCCCCD",
+     "previousTickPrice": "404BE8F5C28F5C29",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "40FFC8AC1076ACCD",
+     "marketCap": "41D39DD014D5CB2F",
+     "mispricingS": "3F53B51A7C156076",
+     "makerInventory": "C052800000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E00000000000",
+     "previousTickPrice": "4048E3D70A3D70A4",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "410480CA976D5D69",
+     "marketCap": "41D656643811F60A",
+     "mispricingS": "3F5594C9BD5375AD",
+     "makerInventory": "4083400000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4048F47AE147AE14",
+     "previousTickPrice": "4048F851EB851EB8",
+     "high": "4048FC28F5C28F5C",
+     "low": "404885E710D046D7",
+     "volume": "4109EF05AF822C7D",
+     "marketCap": "41D798132D08500B",
+     "mispricingS": "3F66590E7C004CCC",
+     "makerInventory": "C077C00000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "403868F5C28F5C29",
+     "previousTickPrice": "40386B851EB851EC",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415AB6CD62895112",
+     "marketCap": "422535C49C1DE2FA",
+     "mispricingS": "3F408E9480070069",
+     "makerInventory": "C0F55B4000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "403270A3D70A3D71",
+     "previousTickPrice": "403270A3D70A3D71",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "4175FEF15C19CDF2",
+     "marketCap": "422B1BFDD430473E",
+     "mispricingS": "BF316FE858888132",
+     "makerInventory": "40A67C0000000000"
+    }
+   ]
+  },
+  {
+   "tick": 8,
+   "time": {
+    "hour": 14,
+    "minute": 8,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "3FE4390D4ADB4561"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE00B1DD90B450D"
+    },
+    {
+     "kind": "n",
+     "bits": "4000602EAE649FB7"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD82708C26FDC17"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF9E08C4C425B7D"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFE4706EE8845CF"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE2D9CB46CE320B"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE21C1C20AE9F42"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEAB61B61693B52"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE803EE71B18267"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB07560B7DDA17D"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE4D553A68B518A"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD895504BA424EC"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEE5DD35DE29F29"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE343FD4DE00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD0EE9347BFB28C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7F5CB08800000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD918A08C7E8FF6"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEAD141CE600000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD8E20AA67F9C5D"
+    },
+    {
+     "kind": "u",
+     "bits": "3FAE0932AA000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD404955A70B7A1"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCD7F3F75800000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFA35E469B918DEB"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCBCBD134000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD5D2C58E351BBD"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDB062BD8000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FA3F387E2117A46"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDAAD7B09800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD5E74E2913F1CC"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE855EB1C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD69682C1800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDDBD6CC3C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC9FAC97E000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEDD2C2AFE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE161F027800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD5ACA00D400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEDCC7869400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7713FA8800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD73D6ED4000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3433140E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD451FB95000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB1F8851600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE599A995400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE793E2C5200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F8A162850000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD2756658400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA77494B000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE313344C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD65995F4000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDD4C6264400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8A93DB6800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0187932400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3C40E80C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD923927B400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEEE1054E600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB8E8E004000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0707B7DA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDD6C3D6D800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD86B0B3B000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE8B1AF3800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCF3B35EA000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE569BA7AA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3CBE194000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF649A96A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE69EEC05800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD27CBE4E800000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A2E147AE147B",
+     "previousTickPrice": "4064A3D70A3D70A4",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "415451E9BB1C899D",
+     "marketCap": "4247CA5DD95965D8",
+     "mispricingS": "3F42456AF8288B04",
+     "makerInventory": "C0C0850000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A08F5C28F5C29",
+     "previousTickPrice": "407A0AB851EB851F",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "411341FA466681FA",
+     "marketCap": "42253E76DE7B87DC",
+     "mispricingS": "3EFB2A77C744A1A0",
+     "makerInventory": "4090D80000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D766666666666",
+     "previousTickPrice": "406D7AE147AE147B",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "4100C67016984CD2",
+     "marketCap": "41F36FC69E87551E",
+     "mispricingS": "BF756B4D77A8B37A",
+     "makerInventory": "408D300000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DE6147AE147AE",
+     "previousTickPrice": "406DE1EB851EB852",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FA6DC6F2680BAF",
+     "marketCap": "41F13E85B2C29361",
+     "mispricingS": "3F52E93DF9F48B92",
+     "makerInventory": "407AA00000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BF0A3D70A3D71",
+     "previousTickPrice": "404BECCCCCCCCCCD",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "40FFDA1C1076ACCD",
+     "marketCap": "41D3A082A3086BC5",
+     "mispricingS": "3F510D49E2591C4C",
+     "makerInventory": "C052800000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E3D70A3D70A4",
+     "previousTickPrice": "4048E00000000000",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "41048CF2976D5D69",
+     "marketCap": "41D659D6FA4DC3EA",
+     "mispricingS": "3F57ABB151247BD0",
+     "makerInventory": "4083400000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4048F851EB851EB8",
+     "previousTickPrice": "4048F47AE147AE14",
+     "high": "4048FC28F5C28F5C",
+     "low": "404885E710D046D7",
+     "volume": "4109FD45AF822C7D",
+     "marketCap": "41D79BB49AB8F7EC",
+     "mispricingS": "3F649D3005228893",
+     "makerInventory": "C083000000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "4038666666666666",
+     "previousTickPrice": "403868F5C28F5C29",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415AD255A2895112",
+     "marketCap": "4225338B29A254E1",
+     "mispricingS": "3F4707A593357E3D",
+     "makerInventory": "C0F55B4000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "4032733333333333",
+     "previousTickPrice": "403270A3D70A3D71",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "41760C4C7C19CDF2",
+     "marketCap": "422B1FC14C63F2DF",
+     "mispricingS": "3F1400777F77CA44",
+     "makerInventory": "40DD858000000000"
+    }
+   ]
+  },
+  {
+   "tick": 9,
+   "time": {
+    "hour": 14,
+    "minute": 9,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "3FF1B44E594049AC"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFB307C7F01B9FA"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD3B6DE5AF96B96"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF51502D283CC4D"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFFFCEC5ABCDAD0"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC330897A720F3B"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE8641FD4157745"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDC55F93816D174"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDCC67AE9C4C9B6"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFBBFC81046B7DF"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD347510E080693"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC9CAC88765B370"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE33E0AAE20C3B1"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEB61BD9984025A"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4CD51DCA00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFB71A91B11C10C0"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE422B963200000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFBDD68286690692"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE9169AEA00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF88354BA4F93A4"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBD2FA503000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE3EB5C41B62E2A"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB0BA4C66000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE455FC28300CD9"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDEBAAC6B400000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEAA85D7EF36B82"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE91B1FED200000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE69ABF85EE9794"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0437F08800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FCBAB48DDDD0EBC"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7CA22B3C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1B176C9000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD404F71F800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE35DC4C5000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD50FCC1CC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE5D2BA30A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD87D4E6D000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB82C0139000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD106C6E5000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC0FCF1CE000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA35D0494000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED81A547C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7E09225E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F9429A9C4000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE7C5F80C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE67006C5600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4705979400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC0CDA07A000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE483AA69200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0965940000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB651C8D5000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC62D922C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA5A9C71A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDE896846C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA6F3E83600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCDDD6782800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD4CA43B6800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6B09151A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD5B941B5000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD303BC32800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE336C026600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE489A6AD800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC40DEDD7800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3E18C3F000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEAD20546200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEBB74FE2E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE93C9D5CA00000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A3D70A3D70A4",
+     "previousTickPrice": "4064A2E147AE147B",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "415462DA7B1C899D",
+     "marketCap": "4247CB792C616A60",
+     "mispricingS": "3F564A5E4BED3576",
+     "makerInventory": "C0C0850000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0A8F5C28F5C3",
+     "previousTickPrice": "407A08F5C28F5C29",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "41135FCE466681FA",
+     "marketCap": "42253FC51808AFF4",
+     "mispricingS": "3F296437831A9260",
+     "makerInventory": "405F000000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D71EB851EB852",
+     "previousTickPrice": "406D766666666666",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "4100D18816984CD2",
+     "marketCap": "41F36CD203A3C617",
+     "mispricingS": "BF74C9F511D4617E",
+     "makerInventory": "408D300000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DEA3D70A3D70A",
+     "previousTickPrice": "406DE6147AE147AE",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FA8406F2680BAF",
+     "marketCap": "41F140EBEB19B1F3",
+     "mispricingS": "3F685FF8279A184C",
+     "makerInventory": "407AA00000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BF47AE147AE14",
+     "previousTickPrice": "404BF0A3D70A3D71",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "40FFEA4C1076ACCD",
+     "marketCap": "41D3A335313B0C5A",
+     "mispricingS": "3F47BCE527683AF0",
+     "makerInventory": "C052800000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E00000000000",
+     "previousTickPrice": "4048E3D70A3D70A4",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "410499BA976D5D69",
+     "marketCap": "41D656643811F60A",
+     "mispricingS": "3F52BE8D6F35C271",
+     "makerInventory": "4090000000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4048FC28F5C28F5C",
+     "previousTickPrice": "4048F851EB851EB8",
+     "high": "4048FC28F5C28F5C",
+     "low": "404885E710D046D7",
+     "volume": "410A0C3DAF822C7D",
+     "marketCap": "41D79F5608699FCD",
+     "mispricingS": "3F5FFF75BEB3A471",
+     "makerInventory": "C08A700000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "403868F5C28F5C29",
+     "previousTickPrice": "4038666666666666",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415AEEF1E2895112",
+     "marketCap": "422535C49C1DE2FA",
+     "mispricingS": "3F4037A736778D2B",
+     "makerInventory": "C0F55B4000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "4032733333333333",
+     "previousTickPrice": "4032733333333333",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "417619780C19CDF2",
+     "marketCap": "422B1FC14C63F2DF",
+     "mispricingS": "3F3613A61BFE0910",
+     "makerInventory": "40F48CE000000000"
+    }
+   ]
+  },
+  {
+   "tick": 10,
+   "time": {
+    "hour": 14,
+    "minute": 10,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "BFFC3A37AB4DD3DA"
+    },
+    {
+     "kind": "n",
+     "bits": "3F6E7C5F56D86B68"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC68EF1CCF67BBD"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEB91D7D2B1D3B1"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD4277924283918"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD9C578F1819BF1"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC568D52E00CE9F"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD87AA366173F31"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF408F2113A34B4"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDBCA1B00A873CE"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDB43DDDCCA177C"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF5AEE76310607A"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF849EA0FC96872"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC23A1AAE007F40"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD861D587800000"
+    },
+    {
+     "kind": "n",
+     "bits": "C00188F994E01080"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED8E86E7C00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEB0024336A53BB"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEFF5ACB5800000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEE113D209147B5"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB1710E5200000"
+    },
+    {
+     "kind": "n",
+     "bits": "C00216D951C64F62"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDFFE7104C00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF5E30177F55B41"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC5CB8B22000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF22AEEE8B355AE"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB828563D000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE0A0F3F92CB93C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3AADE2E000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE6D870C41229C5"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC41EE861800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE30E204200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA7B484D000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD428EAC4000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEEBBC9C7600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD503933C800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4DAF31CC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC9DDFED7000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF170981800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD0263BC0000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2D33CC0C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE81E191E000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDB85B60B800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB9DC9859000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD206D750800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7BE22A8800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE010F239600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCCED4395800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD2E07EBFC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD39A2EAB000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE5D34CBDC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE07B9D48E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDEC52E32000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA885FE0A000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDE87DF18C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEDA78416C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEDE61E93400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC19D1E5600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCC78F781000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7203563800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD7F9E68EC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBB45BE5C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC341289600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDB17ECEE800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB2D63C20000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD573C6A3800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCFC47A44000000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A2E147AE147B",
+     "previousTickPrice": "4064A3D70A3D70A4",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "41547246BB1C899D",
+     "marketCap": "4247CA5DD95965D8",
+     "mispricingS": "3F4FA7B449D195F4",
+     "makerInventory": "C081900000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A08CCCCCCCCCD",
+     "previousTickPrice": "407A0A8F5C28F5C3",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "41137C1E466681FA",
+     "marketCap": "42253E557253D0A7",
+     "mispricingS": "BF5C38C4FE53DA62",
+     "makerInventory": "405F000000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D6D70A3D70A3D",
+     "previousTickPrice": "406D71EB851EB852",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "4100DD9016984CD2",
+     "marketCap": "41F369DD68C03710",
+     "mispricingS": "BF796B499CBD0813",
+     "makerInventory": "4091980000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DEE6666666666",
+     "previousTickPrice": "406DEA3D70A3D70A",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FA9BD6F2680BAF",
+     "marketCap": "41F143522370D086",
+     "mispricingS": "3F5BEA716A9C0FB0",
+     "makerInventory": "406D800000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BF0A3D70A3D71",
+     "previousTickPrice": "404BF47AE147AE14",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "40FFFEDC1076ACCD",
+     "marketCap": "41D3A082A3086BC5",
+     "mispricingS": "BF5E9DC1C6AA8BAD",
+     "makerInventory": "C06DC00000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E3D70A3D70A4",
+     "previousTickPrice": "4048E00000000000",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "4104A682976D5D69",
+     "marketCap": "41D659D6FA4DC3EA",
+     "mispricingS": "3F6152A6B66C5656",
+     "makerInventory": "4083400000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4049000000000000",
+     "previousTickPrice": "4048FC28F5C28F5C",
+     "high": "4049000000000000",
+     "low": "404885E710D046D7",
+     "volume": "410A177DAF822C7D",
+     "marketCap": "41D7A2F7761A47AD",
+     "mispricingS": "3F41AC75C0FA0852",
+     "makerInventory": "C084D00000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "4038666666666666",
+     "previousTickPrice": "403868F5C28F5C29",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415B0C50E2895112",
+     "marketCap": "4225338B29A254E1",
+     "mispricingS": "3F40D73F8C613B95",
+     "makerInventory": "C0F55B4000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "403275C28F5C28F6",
+     "previousTickPrice": "4032733333333333",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "417625355C19CDF2",
+     "marketCap": "422B2384C4979E81",
+     "mispricingS": "3F3215CE6417CF64",
+     "makerInventory": "40ED5C8000000000"
+    }
+   ]
+  },
+  {
+   "tick": 11,
+   "time": {
+    "hour": 14,
+    "minute": 11,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "3FB749702E5C15D3"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE372600565F1A2"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDFD664457D5382"
+    },
+    {
+     "kind": "n",
+     "bits": "4004C951EAE7EFA7"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC41B9CCF743984"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE7202FF286ED99"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE2F42C6056D76F"
+    },
+    {
+     "kind": "n",
+     "bits": "3F9CD917C65AFFEA"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE4004A1D986B18"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF36BFE14D72C95"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC96553E044CE52"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDBD61A30467900"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDAEA33860E32FA"
+    },
+    {
+     "kind": "n",
+     "bits": "BFA6C192D47AEDB5"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4208432C00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE951F604F9C64C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEBB4FD7EE00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC183BD61FB8107"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCA20EBFF000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD4E4351AC9A8D0"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCBFDB0A2800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFA88D70D6B0007"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1A478FEA00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE752D33924EF17"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE79923D4E00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BF81085C20C5C75C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDB9710E5000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFBFC05AE20C24C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE87F01B7600000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF0190B7C2083B6"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDEC99497000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1797CF8000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6B3D4E5200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD9A42B3F400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED0122A3A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE04B81A9800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD63B4D5C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD06D013C400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC65D500E800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB8B5B4F400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE5ABA2D400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1FB8A25800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE76E1BDAC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEBF86400400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD95CC8D4400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCF8F3532800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD8221BD7000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCDCAEEAC000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE228CAB5400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC84DE01A800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA9AECD4E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE701E71D200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB202658200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE250B5BD800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC71A83AA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE14D1697A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE64A6C7B200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7231FFD000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD49878DF800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8BCF414200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC6C56121000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD00ED830000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD0718B83C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE58E992B000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF388F56800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB56CF3C0000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD9C2B2B8800000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A1EB851EB852",
+     "previousTickPrice": "4064A2E147AE147B",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "415482BF3B1C899D",
+     "marketCap": "4247C94286516150",
+     "mispricingS": "3F4E4400B6FB12CE",
+     "makerInventory": "40BEBE0000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0A8F5C28F5C3",
+     "previousTickPrice": "407A08CCCCCCCCCD",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "41139946466681FA",
+     "marketCap": "42253FC51808AFF4",
+     "mispricingS": "BF529AD02081EB2A",
+     "makerInventory": "C089400000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D68F5C28F5C29",
+     "previousTickPrice": "406D6D70A3D70A3D",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "4100E7E016984CD2",
+     "marketCap": "41F366E8CDDCA809",
+     "mispricingS": "BF7A0A7A80BB0F02",
+     "makerInventory": "4096B80000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DF28F5C28F5C3",
+     "previousTickPrice": "406DEE6666666666",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FAB0B6F2680BAF",
+     "marketCap": "41F145B85BC7EF19",
+     "mispricingS": "3F565EDEE3BED014",
+     "makerInventory": "4051800000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BECCCCCCCCCCD",
+     "previousTickPrice": "404BF0A3D70A3D71",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "410008A6083B5666",
+     "marketCap": "41D39DD014D5CB2F",
+     "mispricingS": "BF2E64D557F1B988",
+     "makerInventory": "C06DC00000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E00000000000",
+     "previousTickPrice": "4048E3D70A3D70A4",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "4104B47A976D5D69",
+     "marketCap": "41D656643811F60A",
+     "mispricingS": "3F5695CB5650B838",
+     "makerInventory": "4090900000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "404903D70A3D70A4",
+     "previousTickPrice": "4049000000000000",
+     "high": "404903D70A3D70A4",
+     "low": "404885E710D046D7",
+     "volume": "410A23EDAF822C7D",
+     "marketCap": "41D7A698E3CAEF8E",
+     "mispricingS": "3F40DDD36E0D738B",
+     "makerInventory": "C07D400000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "403868F5C28F5C29",
+     "previousTickPrice": "4038666666666666",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415B2C32E2895112",
+     "marketCap": "422535C49C1DE2FA",
+     "mispricingS": "BF30940EAD43BC3E",
+     "makerInventory": "C0F9578000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "403275C28F5C28F6",
+     "previousTickPrice": "403275C28F5C28F6",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "4176321E0C19CDF2",
+     "marketCap": "422B2384C4979E81",
+     "mispricingS": "BF0B4C233855ABA0",
+     "makerInventory": "40F5228000000000"
+    }
+   ]
+  },
+  {
+   "tick": 12,
+   "time": {
+    "hour": 14,
+    "minute": 12,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "BFDDA060C66A2E48"
+    },
+    {
+     "kind": "n",
+     "bits": "C004A7FDD44D9FBD"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEB22A92C1EF5B4"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF96914E85F97C2"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEF8D388EE0F590"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF3BCB6E1C8EE25"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE616F6C2C3E09E"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD8FA0FE7734DBD"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFAD8C1D1AE96DB"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDF2FDB718B8843"
+    },
+    {
+     "kind": "n",
+     "bits": "3FC7966D47B86A5E"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE6D85A0E5D55E9"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE69C3CEECD8FE9"
+    },
+    {
+     "kind": "n",
+     "bits": "BFCA7C895E28E1B9"
+    },
+    {
+     "kind": "u",
+     "bits": "3F945DDDF0000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FC133BF52CD0B63"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCE23CB5E800000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEF2CBC58F1F9B7"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBBF272F2000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF54C615C0C0A51"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB7974D07000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF661AF281F71EC"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6E6E88D800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FBB59FEB3869379"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2B8B307800000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFE5818338F2191"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD1B1F5BDC00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFB7B1ACCF15867"
+    },
+    {
+     "kind": "u",
+     "bits": "3F673EB5E0000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD0D25DD1AE1EA9"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6AB45C9400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD9E67304800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDB683B38800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7645895000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD79E3DA5800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE53039C7200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7DC2074A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD88642E6C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC0BDC525000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDFFA37D0800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD1A9FEFBC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD444604E800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBDA105A8000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F61C6ECE0000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC59B1EDE000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEBDF8850200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6327BF4400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBC9E2734000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA97B304A000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6CD51A9000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE32A3C2AA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4FB3457C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA9B37CB600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F9255A120000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE058F616600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCE1D4FE9800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA07FAED6000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE1EF017E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCFE4FD16800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB3A611B4000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC8893530800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE5430764000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEBED0411000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCE41B7A1000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F87EE0978000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD81EC866000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7C74160200000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A2E147AE147B",
+     "previousTickPrice": "4064A1EB851EB852",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "415490567B1C899D",
+     "marketCap": "4247CA5DD95965D8",
+     "mispricingS": "3F4325E1F896E482",
+     "makerInventory": "408C800000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0C51EB851EB8",
+     "previousTickPrice": "407A0A8F5C28F5C3",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "4113B2AE466681FA",
+     "marketCap": "42254134BDBD8F3F",
+     "mispricingS": "BF541B9C8A5E2A7B",
+     "makerInventory": "C089400000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D6C7AE147AE14",
+     "previousTickPrice": "406D68F5C28F5C29",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "4100F2D816984CD2",
+     "marketCap": "41F3693B478F73D7",
+     "mispricingS": "BF7EDD581ED8070C",
+     "makerInventory": "4094000000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DEE147AE147AE",
+     "previousTickPrice": "406DF28F5C28F5C3",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FAC696F2680BAF",
+     "marketCap": "41F14322E407A6C9",
+     "mispricingS": "3F643B9DE0CC3B16",
+     "makerInventory": "4051800000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BE8F5C28F5C29",
+     "previousTickPrice": "404BECCCCCCCCCCD",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "410012AE083B5666",
+     "marketCap": "41D39B1D86A32A9A",
+     "mispricingS": "3F4EBD66C560D7A0",
+     "makerInventory": "C078E00000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048DC28F5C28F5C",
+     "previousTickPrice": "4048E00000000000",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "4104C1E2976D5D69",
+     "marketCap": "41D652F175D6282A",
+     "mispricingS": "3F547D36D673DA18",
+     "makerInventory": "4093E80000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "404907AE147AE148",
+     "previousTickPrice": "404903D70A3D70A4",
+     "high": "404907AE147AE148",
+     "low": "404885E710D046D7",
+     "volume": "410A306DAF822C7D",
+     "marketCap": "41D7AA3A517B976E",
+     "mispricingS": "BF59DFE4EF4AFAB6",
+     "makerInventory": "C084E00000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "4038666666666666",
+     "previousTickPrice": "403868F5C28F5C29",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415B462822895112",
+     "marketCap": "4225338B29A254E1",
+     "mispricingS": "3F3CAB1AD8DE2F44",
+     "makerInventory": "C0F9578000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "403275C28F5C28F6",
+     "previousTickPrice": "403275C28F5C28F6",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "41763FB6CC19CDF2",
+     "marketCap": "422B2384C4979E81",
+     "mispricingS": "BF154AB54576812C",
+     "makerInventory": "40F5228000000000"
+    }
+   ]
+  },
+  {
+   "tick": 13,
+   "time": {
+    "hour": 14,
+    "minute": 13,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "3FDC09F31AF51FBA"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEDC0D550D4D37C"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE57098411ED527"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE4909000547A3C"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE960448E3E3526"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEB7EA59B9524BD"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF2F392152B80CA"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFCC3F0C9259578"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF30BEE4B3C5757"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF483B5A48DB41B"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEA27C52863A332"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF0A1DDE2D7A1DF"
+    },
+    {
+     "kind": "n",
+     "bits": "3FED27EBE9C44B95"
+    },
+    {
+     "kind": "n",
+     "bits": "C00216B5899E5DA5"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDCA345E2000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFE0529AF18EF50"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDEC79108000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FA6E2EDBCA92A7B"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE5FFBEAA200000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC03C21EC414569"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC02A11B200000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF0F222D966E977"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDB00BBDE400000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE033B6259BB184"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEEAD52F4000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FBF31ADF78EC20B"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1C54A17000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD528F82023095A"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9692129E00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE58B59401B9D9B"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB6BB4CC3000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD812A21D400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB8BEC093000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE18B9BFD600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB5F283F400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDDE3562A400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC36193DA000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0E765D2000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB0CA9D87000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD284931F400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6ECF951000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1CE0BA2A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED41AD7AE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCD22255D000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE58597C0A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCFD73EA3000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE301AF22200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE75F4337800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCE9F40BC000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD66B1354C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6E7412B000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD436C573C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD10C5ACEC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDF01B527400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEADD9A14A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA26DB7A0000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE48F4C8C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE125423D200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDEE1B33DC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB9126C23000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD71FCD4D800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB61212EC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC1809C63000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE41A55C7400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2C379A8C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9D631E9200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDDA7F5D4000000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A1EB851EB852",
+     "previousTickPrice": "4064A2E147AE147B",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "41549F6B3B1C899D",
+     "marketCap": "4247C94286516150",
+     "mispricingS": "BF494C721D4305C2",
+     "makerInventory": "408C800000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0E147AE147AE",
+     "previousTickPrice": "407A0C51EB851EB8",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "4113CB22466681FA",
+     "marketCap": "422542A463726E8C",
+     "mispricingS": "BF65B9D99C8BD9C1",
+     "makerInventory": "C089400000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D680000000000",
+     "previousTickPrice": "406D6C7AE147AE14",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "4100FF3816984CD2",
+     "marketCap": "41F36646ACABE4D1",
+     "mispricingS": "BF7E9412613639C8",
+     "makerInventory": "4094000000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DE9999999999A",
+     "previousTickPrice": "406DEE147AE147AE",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FADFB6F2680BAF",
+     "marketCap": "41F1408D6C475E7B",
+     "mispricingS": "3F637EC93130D887",
+     "makerInventory": "4051800000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BECCCCCCCCCCD",
+     "previousTickPrice": "404BE8F5C28F5C29",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "41001B86083B5666",
+     "marketCap": "41D39DD014D5CB2F",
+     "mispricingS": "BF1483BF97059B50",
+     "makerInventory": "C080D00000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048D851EB851EB8",
+     "previousTickPrice": "4048DC28F5C28F5C",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "4104D022976D5D69",
+     "marketCap": "41D64F7EB39A5A4A",
+     "mispricingS": "3F4A14893191CC9C",
+     "makerInventory": "4090580000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "404903D70A3D70A4",
+     "previousTickPrice": "404907AE147AE148",
+     "high": "404907AE147AE148",
+     "low": "404885E710D046D7",
+     "volume": "410A3DCDAF822C7D",
+     "marketCap": "41D7A698E3CAEF8E",
+     "mispricingS": "BF578147ED8ED2E4",
+     "makerInventory": "C07C600000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "403868F5C28F5C29",
+     "previousTickPrice": "4038666666666666",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415B655922895112",
+     "marketCap": "422535C49C1DE2FA",
+     "mispricingS": "3F3861B20DD36168",
+     "makerInventory": "C0FD3DA000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "403275C28F5C28F6",
+     "previousTickPrice": "403275C28F5C28F6",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "41764BD4FC19CDF2",
+     "marketCap": "422B2384C4979E81",
+     "mispricingS": "BF2C5E41A5C262DF",
+     "makerInventory": "4100A04000000000"
+    }
+   ]
+  },
+  {
+   "tick": 14,
+   "time": {
+    "hour": 14,
+    "minute": 14,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "3FF6353306144F5C"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEA9001EF81CECC"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEC5F913FA36C0D"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD6DF097BCBA506"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF617CF4169E59E"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFB68484691C265"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE0230370FCF640"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEAAF8C22D5D315"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF9849A4FD6CB87"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF616AB2780570D"
+    },
+    {
+     "kind": "n",
+     "bits": "3FAE90E11EF9064B"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD7B9AD905069BA"
+    },
+    {
+     "kind": "n",
+     "bits": "BFED69F48B349FC8"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDABE1DE4869751"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE557250B800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEBA01F544B23C8"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC5003B72000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF07633DA5B1460"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9F0ECD8400000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FCBD69900AC4DEA"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA757386C000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFED7FCB57DE837C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEFE444D4800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE10BBECDE3FCEE"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB97E9D98000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FBB574F0770C7FA"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCA5A16D2000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE011391F859D4F"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2E2396B400000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD6787110A42907"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6736FE1C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6C4B3D1C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF3A615FA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA32AFC3C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF43D927000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6151E87200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE57D73CD800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDF9C8D96400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6405127800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDBF465B7400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8BB8EA3800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE25276A6400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE48AE8B5400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC837A43C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD35C270AC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE562B3F3400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0642BBA400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEBF664B4C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE40A8B7E400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE755C50400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F9E19B7C8000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBE502EA2000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2EA399AA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED30CB4E400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEACBB2E5E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB4E392E4000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEFF3644C600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD24C75FC400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA441E33E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDECC0CC2400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA46C54D6000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDF1698C4400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8810746C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8EC2CBF600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F8A550E78000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE36A96AC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE53CC643800000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A0F5C28F5C29",
+     "previousTickPrice": "4064A1EB851EB852",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "4154AED47B1C899D",
+     "marketCap": "4247C82733495CC8",
+     "mispricingS": "BF2E50789EA05808",
+     "makerInventory": "408C800000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0FD70A3D70A4",
+     "previousTickPrice": "407A0E147AE147AE",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "4113E36A466681FA",
+     "marketCap": "4225441409274DD9",
+     "mispricingS": "BF5CD399269B3878",
+     "makerInventory": "C040000000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D63851EB851EC",
+     "previousTickPrice": "406D680000000000",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "41010B0016984CD2",
+     "marketCap": "41F3635211C855CA",
+     "mispricingS": "BF7943C9E6D11E5F",
+     "makerInventory": "4096F00000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DEE147AE147AE",
+     "previousTickPrice": "406DE9999999999A",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FAF626F2680BAF",
+     "marketCap": "41F14322E407A6C9",
+     "mispricingS": "3F67CADEC449645E",
+     "makerInventory": "C05B000000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BF0A3D70A3D71",
+     "previousTickPrice": "404BECCCCCCCCCCD",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "4100265E083B5666",
+     "marketCap": "41D3A082A3086BC5",
+     "mispricingS": "BF465E81C051824B",
+     "makerInventory": "C076E00000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048D47AE147AE14",
+     "previousTickPrice": "4048D851EB851EB8",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "4104DC82976D5D69",
+     "marketCap": "41D64C0BF15E8C6A",
+     "mispricingS": "3F5B763CE945FBB7",
+     "makerInventory": "4093700000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "4049000000000000",
+     "previousTickPrice": "404903D70A3D70A4",
+     "high": "404907AE147AE148",
+     "low": "404885E710D046D7",
+     "volume": "410A49A5AF822C7D",
+     "marketCap": "41D7A2F7761A47AD",
+     "mispricingS": "BF51650842FE9AD7",
+     "makerInventory": "C07C600000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "4038666666666666",
+     "previousTickPrice": "403868F5C28F5C29",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415B82BBE2895112",
+     "marketCap": "4225338B29A254E1",
+     "mispricingS": "3F47B43223F8310C",
+     "makerInventory": "C10074F000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "403275C28F5C28F6",
+     "previousTickPrice": "403275C28F5C28F6",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "417658A6DC19CDF2",
+     "marketCap": "422B2384C4979E81",
+     "mispricingS": "BF22CAF915DC6360",
+     "makerInventory": "4103D4B000000000"
+    }
+   ]
+  },
+  {
+   "tick": 15,
+   "time": {
+    "hour": 14,
+    "minute": 15,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "BFDB91C438DC2AF0"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE82475186947B8"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE4FF4F0D7452EB"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFF26D02465CE5A"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE53D9A0CCE1240"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD9B905DBAE1D61"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEC55EC655EDDFD"
+    },
+    {
+     "kind": "n",
+     "bits": "BFBF3514D2A27EAB"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEF50FE0C688201"
+    },
+    {
+     "kind": "n",
+     "bits": "3FA95B24D5788764"
+    },
+    {
+     "kind": "n",
+     "bits": "BF961842D160501A"
+    },
+    {
+     "kind": "n",
+     "bits": "3FCD077990F79533"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF7195D10F427A6"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEAFDF4E138A755"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0830498A00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFC086C099D0C54"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBEAFD5B8000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEC572551AB7B6F"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA1B34F56000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEB5D2AB9E4E752"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDDAF25A5400000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF548DE5CE0BC11"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDB757D21400000"
+    },
+    {
+     "kind": "n",
+     "bits": "4009F2066B326A2A"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC3D0D8A1000000"
+    },
+    {
+     "kind": "n",
+     "bits": "400507E2466B2DBA"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE9C97D2200000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FC63771EB8AD9B9"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED6DE1C7800000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE587B1023CF82A"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE49F8ECDA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE5246E2E600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCBBD56E6800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD282AF25400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEAAA7B2C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA889B27C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCE3D7D90000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3F41B2D400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED0DEFF4000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC57B702C000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE79FC5B5800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE7E566A2C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE87BA948000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC052B852000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE73CE14FA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA98CB52C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEAA11A82400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDE7E5300400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA00F648800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB7D6B36600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD5D1C5E1400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD00988F6400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE783E9AD000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDBB976A5800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD5DDF31A800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3B99EB0200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE97791A4C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCC42A2B7000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDB887ED2400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB2BB94E400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD7820453C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FECE29857200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6D89312C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FECB51CB6C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE684B1AEE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2B1890C400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3B41A1EC00000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A00000000000",
+     "previousTickPrice": "4064A0F5C28F5C29",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "4154BE49BB1C899D",
+     "marketCap": "4247C70BE0415840",
+     "mispricingS": "3F305616A9E6677A",
+     "makerInventory": "408C800000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0E147AE147AE",
+     "previousTickPrice": "407A0FD70A3D70A4",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "4113FDEE466681FA",
+     "marketCap": "422542A463726E8C",
+     "mispricingS": "BF3C9BFB1F006634",
+     "makerInventory": "C040000000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D5F0A3D70A3D7",
+     "previousTickPrice": "406D63851EB851EC",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "410115A016984CD2",
+     "marketCap": "41F3605D76E4C6C2",
+     "mispricingS": "BF7D03302F19B21F",
+     "makerInventory": "4099980000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DE9999999999A",
+     "previousTickPrice": "406DEE147AE147AE",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FB0F76F2680BAF",
+     "marketCap": "41F1408D6C475E7B",
+     "mispricingS": "3F6E694D005237A2",
+     "makerInventory": "4057800000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BF47AE147AE14",
+     "previousTickPrice": "404BF0A3D70A3D71",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "410030D6083B5666",
+     "marketCap": "41D3A335313B0C5A",
+     "mispricingS": "BF60D32196CC0CA7",
+     "makerInventory": "C069000000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048D851EB851EB8",
+     "previousTickPrice": "4048D47AE147AE14",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "4104EC42976D5D69",
+     "marketCap": "41D64F7EB39A5A4A",
+     "mispricingS": "3F73DE4354E90971",
+     "makerInventory": "408F000000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "404903D70A3D70A4",
+     "previousTickPrice": "4049000000000000",
+     "high": "404907AE147AE148",
+     "low": "404885E710D046D7",
+     "volume": "410A5935AF822C7D",
+     "marketCap": "41D7A698E3CAEF8E",
+     "mispricingS": "3F59034FE746F4AE",
+     "makerInventory": "C07C600000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "403868F5C28F5C29",
+     "previousTickPrice": "4038666666666666",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415BA23DE2895112",
+     "marketCap": "422535C49C1DE2FA",
+     "mispricingS": "3F49BACB53E3D812",
+     "makerInventory": "C10074F000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "403275C28F5C28F6",
+     "previousTickPrice": "403275C28F5C28F6",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "4176668EDC19CDF2",
+     "marketCap": "422B2384C4979E81",
+     "mispricingS": "BF3C749C588156F3",
+     "makerInventory": "410AC8B000000000"
+    }
+   ]
+  },
+  {
+   "tick": 16,
+   "time": {
+    "hour": 14,
+    "minute": 16,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "3FE18C6CADEC0078"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDA76A7A9A54380"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF6C81834356031"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD4A2847DB58D2D"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDE8BDF506EF09F"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFF026B4F0CFEF8"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF79EDA2CBDC7B1"
+    },
+    {
+     "kind": "n",
+     "bits": "3FA3597E381F4BBF"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDF0899F86193A4"
+    },
+    {
+     "kind": "n",
+     "bits": "BFAA46E8F596F5CF"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF270284E2F509A"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB06D5EE2288FA6"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE548F08018FAA3"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF156BBAD8F5A21"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE89692DE200000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFCF4D9199D3FA41"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE19A7534400000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEA66C5D19B04DD"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD1C86748800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDC8312DC401E7C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE01F6A6CE00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDE4C01D663DF2F"
+    },
+    {
+     "kind": "u",
+     "bits": "3F9393418C000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEA92419F405ACE"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDDB3EB64000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FCDB07B64C1ADFA"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDB5F7272800000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEC0FE08C793EA6"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEEBFCFB3C00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF13282E460276C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD85A5457800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF7C4689A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD4841443000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE72700DBA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDC869287000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB2663A4800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED38E59B400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE84A54DE000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4587C42E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC4704F51000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD4D5002A000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC4097D2400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDF15F1E0C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3522191200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD73187F9800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB4EF6E4F000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD68EB4C7C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD736A9A8800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE1AE528CA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA22A175200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FECE5297A000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC2167495800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCF1830C2000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC2A05B3D800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBC711DFD000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB93CBFA600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE27AC882200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4A4011A800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC9717D77000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB9039991000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC665CF1400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9E229E1C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD7105A46800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD82E318D400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F8F3A38D8000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE45FA214000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE98D0D54E00000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A0F5C28F5C29",
+     "previousTickPrice": "4064A00000000000",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "4154CFE33B1C899D",
+     "marketCap": "4247C82733495CC8",
+     "mispricingS": "3F50E3F658B965F1",
+     "makerInventory": "408C800000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0C51EB851EB8",
+     "previousTickPrice": "407A0E147AE147AE",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "41141AFE466681FA",
+     "marketCap": "42254134BDBD8F3F",
+     "mispricingS": "BF414F7998DA3CEF",
+     "makerInventory": "409C900000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D5A8F5C28F5C3",
+     "previousTickPrice": "406D5F0A3D70A3D7",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "4101216816984CD2",
+     "marketCap": "41F35D68DC0137BB",
+     "mispricingS": "BF7FEBC0DE87DD34",
+     "makerInventory": "4099980000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DEE147AE147AE",
+     "previousTickPrice": "406DE9999999999A",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FB29D6F2680BAF",
+     "marketCap": "41F14322E407A6C9",
+     "mispricingS": "3F718A6CDA9D8146",
+     "makerInventory": "C074600000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BF0A3D70A3D71",
+     "previousTickPrice": "404BF47AE147AE14",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "41003A96083B5666",
+     "marketCap": "41D3A082A3086BC5",
+     "mispricingS": "BF63A32B364ADD3E",
+     "makerInventory": "405C000000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048DC28F5C28F5C",
+     "previousTickPrice": "4048D851EB851EB8",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "4104FE12976D5D69",
+     "marketCap": "41D652F175D6282A",
+     "mispricingS": "3F77D78323E7B9E3",
+     "makerInventory": "407A800000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "404907AE147AE148",
+     "previousTickPrice": "404903D70A3D70A4",
+     "high": "404907AE147AE148",
+     "low": "404885E710D046D7",
+     "volume": "410A675DAF822C7D",
+     "marketCap": "41D7AA3A517B976E",
+     "mispricingS": "3F5E9919463F76ED",
+     "makerInventory": "C06C800000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "40386B851EB851EC",
+     "previousTickPrice": "403868F5C28F5C29",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415BC2F3A2895112",
+     "marketCap": "422537FE0E997112",
+     "mispricingS": "3F388B7FA037E425",
+     "makerInventory": "C10074F000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "403275C28F5C28F6",
+     "previousTickPrice": "403275C28F5C28F6",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "4176737A7C19CDF2",
+     "marketCap": "422B2384C4979E81",
+     "mispricingS": "BEEC5FA0DB8471E0",
+     "makerInventory": "410E039000000000"
+    }
+   ]
+  },
+  {
+   "tick": 17,
+   "time": {
+    "hour": 14,
+    "minute": 17,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "3FF45E3E60EF44E9"
+    },
+    {
+     "kind": "n",
+     "bits": "3FEE26769008E928"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF2310640B1B4E9"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF1715D56B2CADA"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF0E9F46A3118AD"
+    },
+    {
+     "kind": "n",
+     "bits": "C00219428DF6E003"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB14D4096F537E4"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF0CD20E6704789"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE628A8E71DDB89"
+    },
+    {
+     "kind": "n",
+     "bits": "4002B15D1CB26E86"
+    },
+    {
+     "kind": "n",
+     "bits": "C00087E92376E087"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF0B1798C8F0D35"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD8C3A50EECBE5A"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF504E0A4020BF7"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE273F396A00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE186283CA2B37B"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD8C04CDB000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE3DF14D003ECFC"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB4E0BF3200000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE045ED0FF8BA4C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEFDDBAF1400000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDABBC873973362"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEDA0D61AC00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF465FB963B997C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD0B0F7F2400000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFCDD0F3D9A63777"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE64EB0C0200000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE6D5DEBEEA108C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC3FA441A00000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE1565056588C2C"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC9D196D2800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE074AF3F600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3B0EA88600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDF475A2D800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE31F1727600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2708B2E400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCE912E30800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA3CE98B6000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8BC0E3B800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE00A8D16A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2C645D1200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBE21A4B7000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF61F357C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE332862C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8EABE71600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD30D1C47000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE29C776AA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB2A12F4400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE65C201DC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0C27B95A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8BEBEE3400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCF91D010000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE04BCDC3E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDBBE5EF1800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC764966D800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED0BD904600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDF12A299400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCF4B6F85000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB3B8C930000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA28DA92A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB372666600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6770A14E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8CD35BBA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA0FA1AEA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBB1B3D1E000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2CD4D23A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB4681FD000000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A00000000000",
+     "previousTickPrice": "4064A0F5C28F5C29",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "4154E0123B1C899D",
+     "marketCap": "4247C70BE0415840",
+     "mispricingS": "3F403B08B381A88A",
+     "makerInventory": "40C1F70000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0A8F5C28F5C3",
+     "previousTickPrice": "407A0C51EB851EB8",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "411436DA466681FA",
+     "marketCap": "42253FC51808AFF4",
+     "mispricingS": "BF47D114C0D6848B",
+     "makerInventory": "409C900000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D56147AE147AE",
+     "previousTickPrice": "406D5A8F5C28F5C3",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "41012EE816984CD2",
+     "marketCap": "41F35A74411DA8B4",
+     "mispricingS": "BF80B2756090637B",
+     "makerInventory": "409CF80000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DF28F5C28F5C3",
+     "previousTickPrice": "406DEE147AE147AE",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FB4626F2680BAF",
+     "marketCap": "41F145B85BC7EF19",
+     "mispricingS": "3F70A8CB7197443E",
+     "makerInventory": "C074600000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BECCCCCCCCCCD",
+     "previousTickPrice": "404BF0A3D70A3D71",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "4100462E083B5666",
+     "marketCap": "41D39DD014D5CB2F",
+     "mispricingS": "BF5B93893AC8DE89",
+     "makerInventory": "407E000000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E00000000000",
+     "previousTickPrice": "4048DC28F5C28F5C",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "410510EA976D5D69",
+     "marketCap": "41D656643811F60A",
+     "mispricingS": "3F7E66C57CF37B11",
+     "makerInventory": "C066000000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "40490B851EB851EC",
+     "previousTickPrice": "404907AE147AE148",
+     "high": "40490B851EB851EC",
+     "low": "404885E710D046D7",
+     "volume": "410A768DAF822C7D",
+     "marketCap": "41D7ADDBBF2C3F4F",
+     "mispricingS": "3F5EF3B9CD528F26",
+     "makerInventory": "C06C800000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "403868F5C28F5C29",
+     "previousTickPrice": "40386B851EB851EC",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415BE28262895112",
+     "marketCap": "422535C49C1DE2FA",
+     "mispricingS": "3F4A1E84637CF242",
+     "makerInventory": "C0F9066000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "403275C28F5C28F6",
+     "previousTickPrice": "403275C28F5C28F6",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "417680004C19CDF2",
+     "marketCap": "422B2384C4979E81",
+     "mispricingS": "BF070818F8C82E12",
+     "makerInventory": "4110928000000000"
+    }
+   ]
+  },
+  {
+   "tick": 18,
+   "time": {
+    "hour": 14,
+    "minute": 18,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "BFE7B0B6593ACBA1"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB52ECAD748A3E7"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF67929B10007D5"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD1CFD1CD955738"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD8BCD5F2D578A2"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF1D07C6F146071"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFB0E80437DEDF8"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDFD4DAF658BB2B"
+    },
+    {
+     "kind": "n",
+     "bits": "BFDDC9440B0DCBB5"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB713556CBBA471"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE56B5F0338E9C9"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB1F5F91DD097F3"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF73C07A53A568D"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC0037EBB9AE1B2"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD6F7D57DC00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FA76612E39E4E97"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDEC7E9EB800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FDCD25925D705AF"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3F7085F200000"
+    },
+    {
+     "kind": "n",
+     "bits": "3F95AE53075DA0B8"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDC9DBCB2400000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FB0A15317FDE2C1"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD0E9DB35C00000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF75B0A50C6F4C3"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA0468F40000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FD0BDF242EE1D56"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4B15E76400000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF28CEFFF5AFEAC"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE08EC592400000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE11AAEAAA7E4CD"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD579F48FC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA842F89A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC38ED78C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD7137423C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB48C3BDB000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCF82B488800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FA4876954000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE2E54C44C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCEBFEA4D000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC5285821000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEED9EC2A400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD998AD39000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBD5BECA2000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4359E81C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCC8412AE000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE84B4A7B400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCC4383EE000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA2DD3F4E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEFFE9460600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB2C403D6000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDB27515B000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD552B3BFC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDA2F4FE0C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE38A4A21E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC290AF72800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FECB35843A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEA81BCAEC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDD5188D0400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE43C8A77000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6C6EA73600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9CDEDEEA00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEF0BD27BE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE5C86BC8000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED71FAAA600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FB0CDCAE0000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD52AA468400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD0D46A45C00000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A0F5C28F5C29",
+     "previousTickPrice": "4064A00000000000",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "4154EF243B1C899D",
+     "marketCap": "4247C82733495CC8",
+     "mispricingS": "3F3338E803941950",
+     "makerInventory": "40C1F70000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0C28F5C28F5C",
+     "previousTickPrice": "407A0A8F5C28F5C3",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "4114534E466681FA",
+     "marketCap": "422541135195D80A",
+     "mispricingS": "BF49D4F31ABC4346",
+     "makerInventory": "408CB00000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D59999999999A",
+     "previousTickPrice": "406D56147AE147AE",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "41013BB016984CD2",
+     "marketCap": "41F35CC6BAD07483",
+     "mispricingS": "BF8004DDA5161B66",
+     "makerInventory": "4099C80000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DF70A3D70A3D7",
+     "previousTickPrice": "406DF28F5C28F5C3",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FB6016F2680BAF",
+     "marketCap": "41F1484DD3883767",
+     "mispricingS": "3F702E5DE8062AB6",
+     "makerInventory": "C074600000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BE8F5C28F5C29",
+     "previousTickPrice": "404BECCCCCCCCCCD",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "41005026083B5666",
+     "marketCap": "41D39B1D86A32A9A",
+     "mispricingS": "BF5CD1B4ECEF0385",
+     "makerInventory": "4083F00000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E3D70A3D70A4",
+     "previousTickPrice": "4048E00000000000",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "41052462976D5D69",
+     "marketCap": "41D659D6FA4DC3EA",
+     "mispricingS": "3F81DADB24E83E91",
+     "makerInventory": "C088E00000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "404907AE147AE148",
+     "previousTickPrice": "40490B851EB851EC",
+     "high": "40490B851EB851EC",
+     "low": "404885E710D046D7",
+     "volume": "410A85C5AF822C7D",
+     "marketCap": "41D7AA3A517B976E",
+     "mispricingS": "3F60AAC4B391364A",
+     "makerInventory": "4070000000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "4038666666666666",
+     "previousTickPrice": "403868F5C28F5C29",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415BFF2462895112",
+     "marketCap": "4225338B29A254E1",
+     "mispricingS": "3F532D31384CDCD0",
+     "makerInventory": "C0F1DDE000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "40327851EB851EB8",
+     "previousTickPrice": "403275C28F5C28F6",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "41768CF4FC19CDF2",
+     "marketCap": "422B27483CCB4A22",
+     "mispricingS": "BF0ACA6372289B56",
+     "makerInventory": "410DE7E000000000"
+    }
+   ]
+  },
+  {
+   "tick": 19,
+   "time": {
+    "hour": 14,
+    "minute": 19,
+    "dayOfWeek": 5
+   },
+   "draws": [
+    {
+     "kind": "n",
+     "bits": "3FF8057F639E8E64"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF101E93029CC3D"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE9CC308009B89A"
+    },
+    {
+     "kind": "n",
+     "bits": "BFC0EC8E45A32586"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFBB5876B99DD48"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF401DF9BC54C10"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE364E6744C7D64"
+    },
+    {
+     "kind": "n",
+     "bits": "3FC3EC90ADF246E6"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE261F85B309F74"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE56F1F58A90A78"
+    },
+    {
+     "kind": "n",
+     "bits": "BFFF322B97EF113C"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD1F9FBAD30F037"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE6C1747BE0A2A1"
+    },
+    {
+     "kind": "n",
+     "bits": "C00447A11D3354BF"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCD3E7D7C800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FE58AFAF20F3333"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE468D234800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF7572F2C818DF3"
+    },
+    {
+     "kind": "u",
+     "bits": "3F9D99070C000000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FFBACCD47D2EBDC"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE759C163600000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFE3AB45E54C8B46"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC222DA6B800000"
+    },
+    {
+     "kind": "n",
+     "bits": "3FF1D4131E51227E"
+    },
+    {
+     "kind": "u",
+     "bits": "3FECFCD90E600000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFEB9A8DAB3152CB"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC2CC2EA3800000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFD404D6FF41D1C9"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD8636B0B000000"
+    },
+    {
+     "kind": "n",
+     "bits": "BFF4A0F666CE1C0E"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD0792713800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD4192C08C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCC778C4E000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD71D1E67C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FBF122347000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD0374A2C400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE68E1E73600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD9C109E8800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FED996219600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD461B7C2800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEE8A8A28000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE6FFE783E00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE0C656E5800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC5FCA7F3000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDE62328A000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCEC59ADC800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDC8FD5A0400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDE110C31800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD4FC061AC00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEB0FDA68800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FD81C03FF400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE9C98C42800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F908BF3CC000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3F94417824000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE48CD9EA200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE4CE779FE00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE8323FE6000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE65A6092400000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FDF90E020C00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE5118851200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FCED83613800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE3554941A00000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEC3334D2200000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FEBBD63F2600000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC0DE1E13000000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FE72ABC82800000"
+    },
+    {
+     "kind": "u",
+     "bits": "3FC699E29A000000"
+    }
+   ],
+   "companies": [
+    {
+     "id": "cdbce3fe-bd36-442d-8e3b-7dbc4bb2c791",
+     "price": "4064A1EB851EB852",
+     "previousTickPrice": "4064A0F5C28F5C29",
+     "high": "4064BEE5C8BBC815",
+     "low": "40646C4778E1615A",
+     "volume": "4154FDF43B1C899D",
+     "marketCap": "4247C94286516150",
+     "mispricingS": "BF4F05C03B0E601E",
+     "makerInventory": "C0B7520000000000"
+    },
+    {
+     "id": "a7c12f81-56be-413d-a279-be16490f8446",
+     "price": "407A0A6666666666",
+     "previousTickPrice": "407A0C28F5C28F5C",
+     "high": "407A1A2CB1E12ED6",
+     "low": "4079C9500F6DF3CD",
+     "volume": "4114724A466681FA",
+     "marketCap": "42253FA3ABE0F8BD",
+     "mispricingS": "BEEA15F375282AC0",
+     "makerInventory": "408CB00000000000"
+    },
+    {
+     "id": "0a648c23-8678-4e2c-87ff-c3749939057d",
+     "price": "4065B1DC152E20DE",
+     "previousTickPrice": null,
+     "high": "4065CFAE00A8DF77",
+     "low": "40655AE8144CBBC2",
+     "volume": "414773372767E822",
+     "marketCap": "423308D5D9CB4BF2",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "fe2ac9c1-a575-48f8-8805-8f99620f1e3a",
+     "price": "406D551EB851EB85",
+     "previousTickPrice": "406D59999999999A",
+     "high": "406E1E525ED83038",
+     "low": "406D191D5257926B",
+     "volume": "410145C016984CD2",
+     "marketCap": "41F359D21FECE57B",
+     "mispricingS": "BF78D467AE04BA1F",
+     "makerInventory": "409C480000000000"
+    },
+    {
+     "id": "7cd45934-7188-4f8b-ad06-fd014cc90721",
+     "price": "406DFB851EB851EC",
+     "previousTickPrice": "406DF70A3D70A3D7",
+     "high": "406E5109B10FA2FE",
+     "low": "406DCD62EF23F12F",
+     "volume": "40FB7E16F2680BAF",
+     "marketCap": "41F14AE34B487FB7",
+     "mispricingS": "3F78A768AA6D8176",
+     "makerInventory": "C089300000000000"
+    },
+    {
+     "id": "99a66835-0683-4dd8-bb47-c1963838954b",
+     "price": "405B3931602016FA",
+     "previousTickPrice": null,
+     "high": "405B8099C1FBABFC",
+     "low": "405AC88619683C95",
+     "volume": "411E2045B703A1C4",
+     "marketCap": "42006C7C2960BB78",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "360afa8f-8876-4fb8-bb1c-d5f5e5342705",
+     "price": "404BECCCCCCCCCCD",
+     "previousTickPrice": "404BE8F5C28F5C29",
+     "high": "404C65FB2669186B",
+     "low": "404BB1DF562F4CC8",
+     "volume": "41005A0E083B5666",
+     "marketCap": "41D39DD014D5CB2F",
+     "mispricingS": "BF60944D7F64CFA0",
+     "makerInventory": "4083F00000000000"
+    },
+    {
+     "id": "65a3514f-fa5e-4cf7-8421-69265e0c5020",
+     "price": "4048E7AE147AE148",
+     "previousTickPrice": "4048E3D70A3D70A4",
+     "high": "404910D1D66F14C7",
+     "low": "4048C1A69326CAFA",
+     "volume": "41053C6A976D5D69",
+     "marketCap": "41D65D49BC8991CA",
+     "mispricingS": "3F84ECE8DBCEBE2D",
+     "makerInventory": "C098700000000000"
+    },
+    {
+     "id": "21f40e1a-98ba-480e-ab7d-85d21672d056",
+     "price": "404903D70A3D70A4",
+     "previousTickPrice": "404907AE147AE148",
+     "high": "40490B851EB851EC",
+     "low": "404885E710D046D7",
+     "volume": "410A92B5AF822C7D",
+     "marketCap": "41D7A698E3CAEF8E",
+     "mispricingS": "3F581919E4491D40",
+     "makerInventory": "4084E00000000000"
+    },
+    {
+     "id": "54a89855-4934-43c4-adc5-180f6ec93ded",
+     "price": "4054A293F9A79049",
+     "previousTickPrice": null,
+     "high": "4054EB9584BFBAD6",
+     "low": "405478A47E65D4AD",
+     "volume": "4174E26DCBDF3D73",
+     "marketCap": "424E62C6A4305BEF",
+     "mispricingS": null,
+     "makerInventory": null
+    },
+    {
+     "id": "7300d163-50de-4bf1-b3e2-feac8d95defa",
+     "price": "403863D70A3D70A4",
+     "previousTickPrice": "4038666666666666",
+     "high": "4038C24F45F784FC",
+     "low": "403805B249548A76",
+     "volume": "415C1B0B22895112",
+     "marketCap": "42253151B726C6CA",
+     "mispricingS": "3F531589BBC2132C",
+     "makerInventory": "C0ECC24000000000"
+    },
+    {
+     "id": "c4ef53b4-877b-4bc7-b942-d74135c312d5",
+     "price": "40327AE147AE147B",
+     "previousTickPrice": "40327851EB851EB8",
+     "high": "4032A8587AF2FF2A",
+     "low": "40324CFDB2016A2C",
+     "volume": "417699F74C19CDF2",
+     "marketCap": "422B2B0BB4FEF5C4",
+     "mispricingS": "BF339D01B198FE6C",
+     "makerInventory": "410DE7E000000000"
+    }
+   ]
+  }
+ ],
+ "summary": {
+  "totalDraws": 1340,
+  "drawShapes": [
+   67
+  ]
+ }
+}

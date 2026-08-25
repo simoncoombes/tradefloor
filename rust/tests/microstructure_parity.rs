@@ -1,0 +1,440 @@
+//! Parity for `microstructure`, against the TypeScript.
+//!
+//! Two tiers, gated differently:
+//!
+//! - `compute_spread_bps` / `base_quote_size` / `build_live_book` are pure,
+//!   so they are held to BIT equality — including order ids, owner ids and
+//!   sequence numbers, because queue position is what a book is for.
+//! - `settle_price_through_book` draws from the generator. Its output is
+//!   compared bitwise AND its DRAW COUNT is compared, because a port that
+//!   returns the right price on the wrong number of draws has silently
+//!   reshuffled every later company sharing the stream. That failure is
+//!   invisible in the return value and catastrophic in aggregate.
+//!
+//! Vectors: `goldens/microstructure.json`, generated from the
+//! TypeScript by `scripts/rust-port/microstructure-vectors.ts`. Never
+//! regenerate them from Rust — that would make the port its own oracle.
+
+use std::fs;
+use std::path::PathBuf;
+
+use pretium::microstructure::{
+    base_quote_size, build_live_book, compute_spread_bps, settle_price_through_book,
+    CompanyMicrostructure, LiveBookOptions, SettleOptions,
+};
+
+use pretium::rng::GameRng;
+use pretium::types::Difficulty;
+use serde::Deserialize;
+
+/// The main stream's sequence, from `rng.ts`.
+const MAIN_STREAM: u32 = 99;
+
+#[derive(Deserialize)]
+struct Vectors {
+    pure: Vec<PureCase>,
+    settle: Vec<SettleCase>,
+}
+
+#[derive(Deserialize)]
+struct Fixture {
+    #[serde(rename = "sectorVolatility")]
+    sector_volatility: Option<String>,
+    price: String,
+    #[serde(rename = "marketCap")]
+    market_cap: String,
+    beta: Option<String>,
+    float: Option<String>,
+    #[serde(rename = "shortInterest")]
+    short_interest: Option<String>,
+    #[serde(rename = "avgVolume")]
+    avg_volume: Option<String>,
+    volume: Option<String>,
+    #[serde(rename = "sharesOutstanding")]
+    shares_outstanding: Option<String>,
+    #[serde(rename = "makerInventory")]
+    maker_inventory: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct PureCase {
+    note: String,
+    #[serde(rename = "in")]
+    inputs: Fixture,
+    #[serde(rename = "baseQuoteSize")]
+    base_quote_size: String,
+    spreads: Vec<SpreadCase>,
+    books: Vec<BookCase>,
+}
+
+#[derive(Deserialize)]
+struct SpreadCase {
+    vix: String,
+    difficulty: Option<String>,
+    bps: String,
+}
+
+#[derive(Deserialize)]
+struct BookCase {
+    levels: String,
+    bids: Vec<ExpectedOrder>,
+    asks: Vec<ExpectedOrder>,
+    sequence: u64,
+    #[serde(rename = "lastPrice")]
+    last_price: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ExpectedOrder {
+    id: String,
+    #[serde(rename = "ownerId")]
+    owner_id: String,
+    price: String,
+    quantity: String,
+    remaining: String,
+    sequence: u64,
+}
+
+#[derive(Deserialize)]
+struct SettleCase {
+    note: String,
+    #[serde(rename = "in")]
+    inputs: SettleInputs,
+    out: SettleOut,
+    #[serde(rename = "drawsConsumed")]
+    draws_consumed: usize,
+}
+
+#[derive(Deserialize)]
+struct SettleInputs {
+    fixture: Fixture,
+    #[serde(rename = "fairValue")]
+    fair_value: String,
+    #[serde(rename = "tickVolume")]
+    tick_volume: String,
+    seed: u32,
+    vix: Option<String>,
+    difficulty: Option<String>,
+    #[serde(rename = "flowLean")]
+    flow_lean: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct SettleOut {
+    price: String,
+    #[serde(rename = "tradedVolume")]
+    traded_volume: String,
+    traded: bool,
+    #[serde(rename = "makerInventoryDelta")]
+    maker_inventory_delta: String,
+}
+
+fn f(hex: &str) -> f64 {
+    f64::from_bits(u64::from_str_radix(hex, 16).expect("bad bit pattern"))
+}
+fn maybe(hex: &Option<String>) -> Option<f64> {
+    hex.as_deref().map(f)
+}
+
+fn difficulty_of(name: &Option<String>) -> Option<Difficulty> {
+    match name.as_deref() {
+        None => None,
+        Some("easy") => Some(Difficulty::Easy),
+        Some("normal") => Some(Difficulty::Normal),
+        Some("hard") => Some(Difficulty::Hard),
+        Some("expert") => Some(Difficulty::Expert),
+        Some(other) => panic!("unknown difficulty {other}"),
+    }
+}
+
+fn company_of(fx: &Fixture) -> CompanyMicrostructure {
+    CompanyMicrostructure {
+        // The generator builds every fixture with this id, and the book bakes
+        // it into order ids, so it is part of the comparison.
+        id: "ACME".to_string(),
+        sector_volatility: maybe(&fx.sector_volatility),
+        price: f(&fx.price),
+        market_cap: f(&fx.market_cap),
+        beta: maybe(&fx.beta),
+        float: maybe(&fx.float),
+        short_interest: maybe(&fx.short_interest),
+        avg_volume: maybe(&fx.avg_volume),
+        volume: maybe(&fx.volume),
+        shares_outstanding: maybe(&fx.shares_outstanding),
+        maker_inventory: maybe(&fx.maker_inventory),
+    }
+}
+
+/// Bit comparison, with NaN treated as equal to NaN.
+///
+/// The sign and payload of a NaN are unspecified by IEEE-754 and ECMAScript
+/// and differ by architecture (x86 produces `fff8…`, AArch64 `7ff8…`), and
+/// neither is observable from JavaScript. Requiring them to match would
+/// assert a non-fact and fail on a different machine.
+fn agrees(got: f64, want: f64) -> bool {
+    got.to_bits() == want.to_bits() || (got.is_nan() && want.is_nan())
+}
+
+fn check(problems: &mut Vec<String>, note: &str, label: &str, got: f64, want_hex: &str) {
+    let want = f(want_hex);
+    if !agrees(got, want) {
+        problems.push(format!(
+            "{note}\n      {label}: rust={got:?} ({:016x})  ts={want:?} ({want_hex})",
+            got.to_bits()
+        ));
+    }
+}
+
+#[test]
+fn pure_functions_match_typescript_bit_for_bit() {
+    let vectors = load();
+    let mut problems: Vec<String> = Vec::new();
+    let mut compared = 0usize;
+
+    for case in &vectors.pure {
+        let company = company_of(&case.inputs);
+
+        check(
+            &mut problems,
+            &case.note,
+            "baseQuoteSize",
+            base_quote_size(&company),
+            &case.base_quote_size,
+        );
+        compared += 1;
+
+        for s in &case.spreads {
+            let got = compute_spread_bps(&company, f(&s.vix), difficulty_of(&s.difficulty));
+            check(
+                &mut problems,
+                &case.note,
+                &format!("computeSpreadBps(vix={:?}, {:?})", f(&s.vix), s.difficulty),
+                got,
+                &s.bps,
+            );
+            compared += 1;
+        }
+
+        for b in &case.books {
+            // The generator builds every book at VIX 22 on hard. That is
+            // BELOW the difficulty threshold of 25, so the difficulty arms
+            // do not fire here — the difficulty sweep lives in `spreads`,
+            // which covers all five settings at seven VIX points either side
+            // of both thresholds.
+            let book = build_live_book(
+                &company,
+                &LiveBookOptions {
+                    vix: 22.0,
+                    difficulty: Some(Difficulty::Hard),
+                    levels: f(&b.levels),
+                    resting_orders: Vec::new(),
+                    // The goldens were generated from the TypeScript, which
+                    // has the four-tier spread. `Default` carries smoothness
+                    // 0.0 -- the pure step function -- which is that
+                    // behaviour, so the continuous size curve added later
+                    // stays out of the parity contract.
+                    ..Default::default()
+                },
+            );
+
+            let note = format!("{} [levels={:?}]", case.note, f(&b.levels));
+
+            for (label, got, want) in [
+                ("bids", book.bids.len(), b.bids.len()),
+                ("asks", book.asks.len(), b.asks.len()),
+            ] {
+                if got != want {
+                    problems.push(format!(
+                        "{note}\n      {label}: rust has {got} levels, ts has {want}"
+                    ));
+                }
+            }
+
+            if book.sequence != b.sequence {
+                problems.push(format!(
+                    "{note}\n      book.sequence: rust={} ts={}",
+                    book.sequence, b.sequence
+                ));
+            }
+
+            for (side_label, got_side, want_side) in
+                [("bid", &book.bids, &b.bids), ("ask", &book.asks, &b.asks)]
+            {
+                for (i, (got, want)) in got_side.iter().zip(want_side.iter()).enumerate() {
+                    // Identity and ORDER, not just prices: position is priority.
+                    if got.id != want.id
+                        || got.owner_id != want.owner_id
+                        || got.sequence != want.sequence
+                    {
+                        problems.push(format!(
+                            "{note}\n      {side_label}[{i}] identity — rust id={} owner={} seq={} / ts id={} owner={} seq={}",
+                            got.id, got.owner_id, got.sequence, want.id, want.owner_id, want.sequence
+                        ));
+                    }
+                    for (field, g, w) in [
+                        ("price", got.price, &want.price),
+                        ("quantity", got.quantity, &want.quantity),
+                        ("remaining", got.remaining, &want.remaining),
+                    ] {
+                        check(
+                            &mut problems,
+                            &note,
+                            &format!("{side_label}[{i}].{field}"),
+                            g,
+                            w,
+                        );
+                        compared += 1;
+                    }
+                }
+            }
+
+            let last_agrees = match (book.last_price, maybe(&b.last_price)) {
+                (None, None) => true,
+                (Some(g), Some(w)) => agrees(g, w),
+                _ => false,
+            };
+            if !last_agrees {
+                problems.push(format!(
+                    "{note}\n      book.lastPrice: rust={:?} ts={:?}",
+                    book.last_price,
+                    maybe(&b.last_price)
+                ));
+            }
+        }
+    }
+
+    println!(
+        "{compared} bit-exact comparisons across {} fixtures",
+        vectors.pure.len()
+    );
+    report(problems);
+}
+
+#[test]
+fn settlement_matches_typescript_in_output_and_in_draws_consumed() {
+    let vectors = load();
+    let mut problems: Vec<String> = Vec::new();
+
+    for case in &vectors.settle {
+        let inputs = &case.inputs;
+        let company = company_of(&inputs.fixture);
+
+        // `initRng(seed)` in the TypeScript is `new GameRng(seed, MAIN_STREAM)`
+        // — sequence 99, NOT the sequence-0 stream `from_seed` produces.
+        // Getting this wrong yields a plausible but entirely different stream.
+        let mut rng = GameRng::new(inputs.seed, MAIN_STREAM);
+        let before = rng.clone();
+
+        let result = settle_price_through_book(
+            &company,
+            f(&inputs.fair_value),
+            f(&inputs.tick_volume),
+            &SettleOptions {
+                // `None` in the vector means the TypeScript default applied.
+                vix: maybe(&inputs.vix).unwrap_or(15.0),
+                difficulty: difficulty_of(&inputs.difficulty),
+                flow_lean: maybe(&inputs.flow_lean),
+                // Step function, as above: the vectors predate the curve.
+                ..Default::default()
+            },
+            &mut rng,
+        );
+
+        check(
+            &mut problems,
+            &case.note,
+            "price",
+            result.price,
+            &case.out.price,
+        );
+        check(
+            &mut problems,
+            &case.note,
+            "tradedVolume",
+            result.traded_volume,
+            &case.out.traded_volume,
+        );
+        check(
+            &mut problems,
+            &case.note,
+            "makerInventoryDelta",
+            result.maker_inventory_delta,
+            &case.out.maker_inventory_delta,
+        );
+        if result.traded != case.out.traded {
+            problems.push(format!(
+                "{}\n      traded: rust={} ts={}",
+                case.note, result.traded, case.out.traded
+            ));
+        }
+
+        // The half of the contract the return value cannot express.
+        let draws = draws_consumed(&before, &rng);
+        if draws != case.draws_consumed {
+            problems.push(format!(
+                "{}\n      DRAW SCHEDULE: rust consumed {draws} draws, ts consumed {} — \
+                 the stream is shared, so this desynchronises every later company on the tick",
+                case.note, case.draws_consumed
+            ));
+        }
+    }
+
+    let histogram = vectors
+        .settle
+        .iter()
+        .fold((0, 0, 0), |(z, four, other), c| match c.draws_consumed {
+            0 => (z + 1, four, other),
+            4 => (z, four + 1, other),
+            _ => (z, four, other + 1),
+        });
+    println!(
+        "{} settlement cases — {} consumed 0 draws, {} consumed 4, {} consumed something else",
+        vectors.settle.len(),
+        histogram.0,
+        histogram.1,
+        histogram.2
+    );
+    // The TypeScript's own behaviour, asserted rather than assumed: if the
+    // original ever grows a third draw count, this corpus must be rebuilt and
+    // the port's contract revisited, not quietly widened.
+    assert_eq!(
+        histogram.2, 0,
+        "the TypeScript consumed a draw count other than 0 or 4 — \
+         the documented contract in microstructure.rs no longer holds"
+    );
+
+    report(problems);
+}
+
+/// Recover how far a call advanced the stream, by replaying a clone.
+fn draws_consumed(before: &GameRng, after: &GameRng) -> usize {
+    let mut probe = before.clone();
+    for n in 0..64 {
+        if probe == *after {
+            return n;
+        }
+        probe.next_f64();
+    }
+    panic!("generator advanced more than 64 draws");
+}
+
+fn load() -> Vectors {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("goldens/microstructure.json");
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
+        panic!(
+            "{}: {e}\nRun: npx tsx scripts/rust-port/microstructure-vectors.ts",
+            path.display()
+        )
+    });
+    serde_json::from_str(&raw).expect("malformed microstructure.json")
+}
+
+fn report(problems: Vec<String>) {
+    assert!(
+        problems.is_empty(),
+        "{} mismatches against the TypeScript:\n\n  {}",
+        problems.len(),
+        problems.join("\n\n  ")
+    );
+}
