@@ -20,9 +20,10 @@ happened if I'd traded differently, and what actually caused this price move.
 pip install pretium
 ```
 
-0.1.0 is the first release. The API may still move before 1.0, and anything
-that changes the simulated trajectory arrives as a new model preset rather
-than an edit to an existing one, so a published result stays reproducible.
+0.1.1 is the current release, and 0.1.0 was the first. The API may still
+move before 1.0, and anything that changes the simulated trajectory arrives
+as a new model preset rather than an edit to an existing one, so a published
+result stays reproducible.
 
 ## In thirty seconds
 

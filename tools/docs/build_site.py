@@ -47,6 +47,20 @@ BASE_URL = "https://simoncoombes.github.io/pretium"
 #: silently and looks like working analytics that reports nothing.
 GA_MEASUREMENT_ID = "G-1LBM3239ZF"
 
+#: Read from pyproject so the site cannot drift from the package. Only two
+#: places in the bundle should follow the version: the nav badge and the
+#: BibTeX block. The release-notes headings and the "measured on pretium
+#: 0.1.0" provenance lines are history and must stay where they are.
+def _project_version() -> str:
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
+    if not m:
+        sys.exit("no version in pyproject.toml")
+    return m.group(1)
+
+
+VERSION = _project_version()
+
 SITE_NAME = "pretium docs"
 TAGLINE = "repeatable market simulation"
 REPO_URL = "https://github.com/simoncoombes/pretium"
@@ -91,6 +105,11 @@ def read_bundle() -> str:
     text = DESIGN_BUNDLE.read_text(encoding="utf-8")
     for old, new in PROSE_FIXES:
         text = text.replace(old, new)
+    # Version-bearing spots, by their surrounding markup so history is safe.
+    # ">v0.1.0<" rather than the full tag: the template is JSON-encoded
+    # inside the bundle, so "</span>" arrives as "<\\u002Fspan>".
+    text = text.replace(">v0.1.0<", f">v{VERSION}<")
+    text = text.replace("version = {0.1.0}", "version = {%s}" % VERSION)
     # The fixes land inside a JSON string in the template block, so prove the
     # block still parses before anything downstream depends on it.
     json.loads(script_payload(text, "template"))

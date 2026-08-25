@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.1
+
+A packaging fix. Nothing in the engine moved, and the digest is unchanged, so
+a result produced under 0.1.0 reproduces here exactly.
+
+0.1.0 published five wheels and no source distribution. PyPI refused the
+sdist because it declared its licence files at the package root while the
+build had put them under `rust/`, and it checks that the declared path
+exists. The wheels were never affected: a wheel carries its licences in
+`.dist-info` by a different mechanism, so the fault showed up on one
+artefact out of six and the release went out half finished.
+
+This release ships the source distribution, with the licence paths declared
+explicitly rather than inferred.
+
+The v0.1.0 tag was left where it is. Moving it to pick up the fix would have
+broken the link between that tag and the wheels already published from it,
+and that link is the point.
+
+Two smaller things. The publish step now skips files already present, so a
+rejection partway through a release can be re-run instead of leaving the
+version stranded. And the determinism gate runs on pushes to the main
+branch, not only on tags, because the badge could otherwise report a result
+from a tree that no longer existed.
+
 ## 0.1.0
 
 First release.
