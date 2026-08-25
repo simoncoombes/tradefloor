@@ -45,7 +45,7 @@ and says what to write instead, so they have stopped being traps and become
 rules. Read the rules anyway, because they are what makes a composed timeline
 expressible at all, and every recipe below is shaped or sized by one of them.
 
-### The trap: nothing transmits before day 45
+### The trap: a policy-only rate path does nothing before day 45
 
 A policy-only rate path moves nothing until the first central-bank meeting,
 because the corporate bond yield, the rate equities actually discount off,
@@ -65,6 +65,14 @@ measurement: a policy-rate `ramp` from 2.5% to 5% over thirty days moves every
 price by exactly 0.00% over 40 days, and a median −4.29% once the run is long
 enough to cross day 45. It is not restated here; go and read it, because
 every rate-bearing recipe below is sized around it.
+
+**Read the heading precisely.** It says a *policy-only rate path*, and the
+qualifier is the whole content. Most of the macro surface transmits the day you
+move it: a VIX shock on day 5 has moved prices by a median 39% at day 25, and
+`qe_pe_boost` and `corporate_bond_yield` both act immediately. Only
+`federal_funds_rate` and `inflation_rate` wait for a meeting, because both work
+by steering the corporate bond yield and nothing else. The per-field table is
+on [Scenarios](scenarios.html).
 
 The consequence for this page is a rule: **run rate and inflation recipes for
 at least 90 days.** A 30-day study of a hiking cycle measures nothing and

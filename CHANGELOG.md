@@ -6,10 +6,44 @@
 
 The transmission sweep in that notebook ran its probe over two days and
 concluded from it that `federal_funds_rate` and `vix` have no effect on a
-valuation. Both statements were wrong, and wrong for the same reason: the
-policy rate reaches fundamental value with a lag of roughly thirty to sixty
-sessions, so a two day window measures the lag and reports it as an absence.
-Unpinned, a policy rate of 10% is worth about 11% of fundamental value.
+valuation. Both statements were wrong, and wrong for the same already
+documented reason. The corporate bond yield, which is the rate equities
+discount off, is recomputed only at central bank meetings, and the first is
+scheduled 45 days out. A two day probe measures the meeting schedule and
+reports it as an absence. The boundary is sharp: a policy rate of 0.5% against
+10% gives bit identical valuations through day 45 and a 12.8% gap on day 46.
+Unpinned, a 10% policy rate is worth about 11% of fundamental value.
+
+`docs/scenario-recipes.md` has led with this trap since before the notebook was
+written, states the rule that rate recipes must run at least 90 days, and gives
+the measurement. The error was writing a probe without reading it.
+
+### The transmission map, written down where it can be found
+
+That page's heading said "nothing transmits before day 45", which is false and
+was believed anyway. The sentence beneath it has always been correctly narrow,
+a *policy-only* rate path, but the heading is what gets remembered. It now
+carries the qualifier, and Scenarios has gained a per-field table measured by
+introducing each shock on day 5 and reading day 25:
+
+| field | median price move by day 25 | fair value |
+|---|---|---|
+| `vix` 15 to 60 | 39.2% | unchanged |
+| `qe_pe_boost` 0 to -0.30 | 38.3% | -30.0% |
+| `corporate_bond_yield` 5.5% to 11.4% | 28.3% | -9.9% |
+| `federal_funds_rate` 1.6% to 10% | 0.00% | unchanged |
+| `inflation_rate` 2% to 9% | 0.00% | unchanged |
+| `fear_greed_index` 50 to 0 | 0.00% | unchanged |
+
+Three fields act on the day you move them, two wait for a meeting because both
+work only by steering the corporate bond yield, and one does nothing ever. The
+split that matters is that `vix` moves prices hard without moving fair value at
+all, so "transmits" and "re-rates" are different questions and were being asked
+as one.
+
+`tests/test_macro_transmission.py` pins the map: the meeting boundary at its
+exact day, the immediate half, the fact that pinning the yield severs
+everything upstream of it, and the inertness of `fear_greed_index`.
 
 The corrected account is more useful than either version. The model has
 exactly two valuation channels. `corporate_bond_yield` is the discount rate,

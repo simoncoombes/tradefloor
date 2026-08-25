@@ -44,6 +44,53 @@ Equities discount off the corporate bond yield, so a short policy-only study
 sees nothing, silently. `rate_shock` moves the whole curve for an immediate
 repricing; `ramp` isolates a single lever when that is what you want.
 
+## What each field transmits, and when
+
+The trap above is narrow and it is easy to over-read. "Nothing happens before
+day 45" is false; **"a policy-only rate path does nothing before day 45"** is
+true. Most of the macro surface transmits on the day you move it.
+
+The difference matters because two questions get conflated. A field can move
+what a company is *worth*, or it can move the *path* a price takes without
+touching fair value, and VIX does the second while the policy rate does the
+first. Both are transmission; only one is a re-rating.
+
+Measured by holding a 20-name universe fixed, introducing each shock on **day
+5**, and reading day 25, which is deliberately before the first meeting:
+
+| field | median price move by day 25 | fair value | route |
+|---|---|---|---|
+| `vix` 15 to 60 | 39.2% | unchanged | volatility of the market factor, immediate |
+| `qe_pe_boost` 0 to -0.30 | 38.3% | -30.0% | a direct multiple on fair value, immediate |
+| `corporate_bond_yield` 5.5% to 11.4% | 28.3% | -9.9% | the discount rate itself, immediate |
+| `federal_funds_rate` 1.6% to 10% | 0.00% | unchanged | only by steering the yield, at the next meeting |
+| `inflation_rate` 2% to 9% | 0.00% | unchanged | only by steering the reaction function, at the next meeting |
+| `fear_greed_index` 50 to 0 | 0.00% | unchanged | none. Nothing reads it |
+
+Three consequences worth stating separately.
+
+**`corporate_bond_yield` is the discount rate, and it is the only route the
+slow fields have.** Pin it to a path of your own and `federal_funds_rate` and
+`inflation_rate` are severed completely, because the thing they steer is no
+longer free to move. That is usually what you want when you have a real credit
+series to drive, and it is worth knowing you have done it.
+
+**`qe_pe_boost` is the only field that can express a re-rating on its own.** It
+moves fair value one for one, it takes negative values, and it bypasses the
+yield. A market that falls a third because the multiple compressed cannot be
+built out of the rate fields; the yield's whole journey from 5.5% to 11.4%,
+which is the 2020 credit seizure end to end, is worth about 10%.
+
+**`fear_greed_index` is inert.** It is settable, range-validated and reported
+in `macro_table`, and no pricing code reads it. It is computed as a diagnostic
+and exposed as though it were a lever. `tests/test_macro_transmission.py` pins
+that as current behaviour rather than leaving it to be rediscovered; wiring
+sentiment to price would be a new mechanism needing calibration.
+
+Worked through end to end, on real 2020-21 data, in
+[notebook 09](https://github.com/simoncoombes/pretium/blob/main/examples/09-a-pandemic-shaped-market.ipynb),
+which got this wrong first and shows the diagnosis.
+
 ## The second trap, retired: VIX drives volatility now
 
 This page used to state, in bold, that VIX does not drive volatility, and it
