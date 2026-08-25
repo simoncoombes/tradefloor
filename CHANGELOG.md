@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### A correction to notebook 09, which shipped in 0.1.3 with a wrong claim
+
+The transmission sweep in that notebook ran its probe over two days and
+concluded from it that `federal_funds_rate` and `vix` have no effect on a
+valuation. Both statements were wrong, and wrong for the same reason: the
+policy rate reaches fundamental value with a lag of roughly thirty to sixty
+sessions, so a two day window measures the lag and reports it as an absence.
+Unpinned, a policy rate of 10% is worth about 11% of fundamental value.
+
+The corrected account is more useful than either version. The model has
+exactly two valuation channels. `corporate_bond_yield` is the discount rate,
+and `federal_funds_rate`, `vix` and `inflation_rate` reach a valuation solely
+by moving it, so pinning that yield severs all three at once. `qe_pe_boost` is
+a direct multiple that bypasses the yield entirely and moves value one for one.
+
+The notebook's own conclusion survives the correction unchanged. Its credit leg
+is pinned to real HYG derived data, which is the right choice and which does
+shadow the policy and volatility legs, so `qe_pe_boost` really was the only
+lever left able to express a re-rating. What changed is the reason, from "those
+fields do nothing" to "those fields were severed by a choice made three cells
+earlier". The sweep now runs 120 days and shows both the pinned and unpinned
+cases.
+
+`fear_greed_index` is confirmed genuinely inert rather than merely slow: bit
+identical prices at every value from 0 to 100 out to 504 days, and no pricing
+code in the engine reads it.
+
 ## 0.1.3
 
 Two new model presets and the mechanism behind them. Nothing existing moves:
