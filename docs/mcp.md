@@ -12,7 +12,7 @@ short: MCP server
 `pretium` is a Python library, so its usual audience is a person writing
 code. The MCP server adds an audience that cannot: a model that calls tools
 and reads back JSON. Point Claude Code, Claude Desktop or any MCP client at
-it and ask questions in English — *does a momentum strategy beat buy-and-hold
+it and ask questions in English: *does a momentum strategy beat buy-and-hold
 here, and is the difference real?*
 
 ```
@@ -39,7 +39,7 @@ In Claude Code, `claude mcp add pretium -- pretium-mcp` does the same thing.
 This is the usual first failure, and it is not a pretium problem: a desktop
 MCP client does not inherit your shell's `PATH`, so `"command":
 "pretium-mcp"` resolves only if the script sits somewhere the client already
-looks. If you installed into a virtual environment — which you should — give
+looks. If you installed into a virtual environment, which you should, give
 the absolute path instead:
 
 ```json
@@ -60,7 +60,7 @@ python -c "import sys, pathlib; print(pathlib.Path(sys.prefix) / ('Scripts' if s
 
 Derived from `sys.prefix` rather than looked up on `PATH` deliberately.
 `shutil.which` is the obvious thing to reach for and it returns `None`
-unless the environment happens to be activated — which is exactly the
+unless the environment happens to be activated, which is exactly the
 situation someone hits this problem in.
 
 Running `pretium-mcp` in a terminal is a useful check on its own. With the
@@ -83,15 +83,15 @@ Two pages, two directions, and they are easy to confuse:
 | Tool | What it answers |
 |---|---|
 | `describe_simulator` | What is this, what is it certified to reproduce, what can it not do |
-| `check_envelope` | Is my question inside the certified envelope — *before* I spend anything |
+| `check_envelope` | Is my question inside the certified envelope, *before* I spend anything |
 | `validate_strategy` | Is this spec well-formed, and what is its fingerprint |
-| `build_universe` | What roster shall I run against — generated, concentrated, or hand-authored |
+| `build_universe` | What roster shall I run against: generated, concentrated, or hand-authored |
 | `build_scenario` | What macro path shall I run through, and what does it look like day by day |
 | `evaluate_strategies` | How do these strategies do on one identical market |
 | `rank_strategies` | Which is really better, across seeds, with a paired sign test |
 | `run_stress_scenario` | What a shock does, always against the same market unshocked |
-| `explain_price_move` | Why did this price move — the seven factors that sum to it |
-| `start_job` | Run something too slow to answer inline — including a full certified year |
+| `explain_price_move` | Why did this price move, via the seven factors that sum to it |
+| `start_job` | Run something too slow to answer inline, including a full certified year |
 | `check_job` | Is it done, and what did it find |
 
 Start with `describe_simulator`. Everything else reads better afterwards.
@@ -107,7 +107,7 @@ There is no way to submit Python to this server. A tool call cannot carry a
 callable, and accepting a string of code would make this a remote code
 execution endpoint with a market simulator attached.
 
-Instead the server speaks [strategy specs](strategy-specs.md) — the same
+Instead the server speaks [strategy specs](strategy-specs.md), the same
 declarative grammar that makes a result citable:
 
 ```json
@@ -143,7 +143,7 @@ A sector-**concentrated** roster is not a convenience setting. "Certification
 was measured on a sector-balanced roster, which no real index is" is one of
 the six named gaps in [the realism envelope](realism-envelope.md), and
 `envelope.check` already takes `sector_concentrated` as an argument. So
-concentrating a roster is the honest way to ask a real question — and the
+concentrating a roster is the honest way to ask a real question, and the
 answer comes back labelled uncertified, automatically, in the caveats of
 every result that used it.
 
@@ -154,13 +154,13 @@ you did not describe.
 
 Either way you get back a `universe` document. Pass it to any run tool as
 `universe` and it supersedes that tool's inline arguments, so a roster is
-composed once and reused rather than re-specified per call — and the
-provenance records the document, not just the fingerprint. A fingerprint
+composed once and reused rather than re-specified per call, and the
+provenance records the document rather than just the fingerprint. A fingerprint
 identifies a roster to someone who already has it; a document reconstructs
 it.
 
-**Scenarios.** Three presets exist by name — `rate_shock`, `vix_shock`,
-`vol_shock` — but you are not limited to them. `build_scenario` composes one
+**Scenarios.** Three presets exist by name (`rate_shock`, `vix_shock` and
+`vol_shock`) but you are not limited to them. `build_scenario` composes one
 from `hold`, `ramp` and `step` instructions over the seven macro fields
 (`vix`, `federal_funds_rate`, `corporate_bond_yield`, `inflation_rate`,
 `qe_pe_boost`, `fear_greed_index`, `cycle`):
@@ -192,8 +192,9 @@ conversation.
 
 That cap had a consequence worth stating plainly: **every result a direct
 call can produce is a SHORT WINDOW** on a market whose realism is certified
-over 252 days. The statistics that make this market credible — volatility,
-autocorrelation, cross-sectional co-movement — are annual measurements.
+over 252 days. The statistics that make this market credible, meaning
+volatility, autocorrelation and cross-sectional co-movement, are annual
+measurements.
 
 `start_job` is what removes that ceiling:
 
@@ -207,14 +208,14 @@ check_job("job-1")
 → {"status": "done", "result": {...}}
 ```
 
-A job may run to 252 days — the certified horizon itself — and a result at
+A job may run to 252 days, the certified horizon itself, and a result at
 that horizon correctly does **not** carry the SHORT WINDOW caveat, because
 it is no longer a slice. This is the point of having jobs at all; the
 convenience of not blocking is secondary.
 
 Jobs run inside the server process. Two run at once (a third would slow both
 without finishing sooner), finished results are kept for later collection,
-and **nothing survives a server restart** — there is no queue and no
+and **nothing survives a server restart**. There is no queue and no
 database, and `check_job` says so rather than leaving you to infer it. The
 `estimated_seconds` figure comes from measured cost and is an estimate, not
 a promise: a long overrun usually means the machine is loaded, not that the
@@ -227,7 +228,7 @@ tells you.
 
 A person calling `pt.evaluate` has the docstrings and this documentation in
 reach. A model calling `evaluate_strategies` has the tool result and nothing
-else — and it will summarise that result to a human who has even less. Hand
+else, and it will summarise that result to a human who has even less. Hand
 a model `{"return_pct": 88.7}` and it will report that the strategy made
 88.7%.
 
@@ -257,8 +258,8 @@ realism envelope at call time. This rule paid for itself immediately: while
 this server was being written, `PRODUCT.md` and `README.md` were both found
 still asserting a return autocorrelation of `+0.219` and `+0.249` from a
 superseded preset. The shipped `pt-v3` certifies `return_acf1` at `0.0375`,
-and re-measuring it across the README's own published method — 40 names,
-universe seed 111, 252 days, sim seeds 1 to 6 — gives a median of `0.0485`.
+and re-measuring it across the README's own published method (40 names,
+universe seed 111, 252 days, sim seeds 1 to 6) gives a median of `0.0485`.
 Both are comfortably *inside* the real-market band of −0.08 to 0.06, and
 both are a fifth of the figure the prose still quotes. A hardcoded caveat is
 how a caveat becomes false, and a false caveat told to a model is worse than
@@ -285,7 +286,7 @@ strategy.
 `paired_sign_tests`: both entrants traded the **same** market on each seed,
 so pairing removes the market from the question.
 
-Read `pooled_capture` — total P&L over the reference's total — rather than
+Read `pooled_capture`, which is total P&L over the reference's total, rather than
 `seeds_first`, which counts league positions among all entrants and splits
 arbitrarily on a tie. A submitted momentum spec compared against the
 momentum baseline comes back as all ties and zero paired seeds, which is the
@@ -296,14 +297,14 @@ correct answer for two identical strategies rather than a coin-flip winner.
 | Limit | Value |
 |---|---|
 | `max_days` (direct call) | 60 |
-| `max_days` (background job) | 252 — the certified horizon |
+| `max_days` (background job) | 252, the certified horizon |
 | `max_universe` | 120 |
 | `max_strategies` | 8 |
 | `max_seeds` | 12 |
 | concurrent jobs | 2 |
 
-These are wall-clock decisions, not modelling ones — the library imposes
-none of them. Forty names with the baselines takes about 0.5s at 5 days,
+These are wall-clock decisions rather than modelling ones, and the library
+imposes none of them. Forty names with the baselines takes about 0.5s at 5 days,
 20s at 60, and 95s at 252, and a tool call has to answer inside a
 conversation.
 
@@ -327,7 +328,7 @@ every platform.
 
 ## Related
 
-- [Strategy specs](strategy-specs.md) — the grammar the server speaks
-- [An LLM agent](an-llm-agent.md) — a model trading *inside* the market
-- [The realism envelope](realism-envelope.md) — where the caveats come from
-- [Agents and evaluation](agents-and-evaluation.md) — the library API underneath
+- [Strategy specs](strategy-specs.md), the grammar the server speaks
+- [An LLM agent](an-llm-agent.md), a model trading *inside* the market
+- [The realism envelope](realism-envelope.md), where the caveats come from
+- [Agents and evaluation](agents-and-evaluation.md), the library API underneath

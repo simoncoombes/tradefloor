@@ -1,5 +1,5 @@
 ---
-title: Atlas — mapping what the model responds to
+title: Atlas, mapping what the model responds to
 nav_order: 17
 rack: reference
 short: Atlas
@@ -12,7 +12,7 @@ short: Atlas
 A backtest cannot answer that, because a backtest has one market. Atlas
 answers it by measuring many: it samples the simulator's parameter space,
 measures whatever *you* care about at every point, and then describes the
-response surface — which parameters move your outcome, what shape the
+response surface: which parameters move your outcome, what shape the
 effect has, and what trades are available between the things you want.
 
 It is deliberately **not** an optimiser. `survey` measures; the analysis
@@ -25,8 +25,8 @@ You do not need Atlas to run a simulation or test a strategy. That is
 [Agents and evaluation](agents-and-evaluation.md), and most users never go
 further.
 
-You need Atlas for the second-order question — *if the market were
-somewhat different, would my edge survive?* — and for calibration work,
+You need Atlas for the second-order question, *if the market were somewhat
+different, would my edge survive?*, and for calibration work,
 where you need to know which knobs matter before you turn any.
 
 ## Why it exists
@@ -77,7 +77,7 @@ Then interrogate it:
 
 ```python
 s.sensitivity("sharpe")            # which parameters move it, ranked
-s.profile("momentum_theta", "sharpe")   # what SHAPE — monotone? an optimum?
+s.profile("momentum_theta", "sharpe")   # what shape: monotone? an optimum?
 s.unidentified(["sharpe", "drawdown"])  # which move nothing at all
 s.pareto({"sharpe": "max", "drawdown": "min"})
 print(s.explain("sharpe"))
@@ -93,7 +93,7 @@ known value of a parameter sat just outside the default ceiling.
 
 Override any range you have real information about. A parameter that ships
 at exactly `0.0` has no multiplicative box at all and Atlas refuses to guess
-one — you must give it an explicit range, because guessing would silently
+one. You must give it an explicit range, because guessing would silently
 decide what the map can see.
 
 ### Sampling
@@ -105,7 +105,7 @@ dimensions rather than merely scattered. Sampling is seeded and
 reproducible.
 
 `plan(axes, samples)` returns the vectors *without* measuring them, so you
-can check them before spending anything — a sampled vector can easily be
+can check them before spending anything, since a sampled vector can easily be
 outside the region your model is stationary over.
 
 ## Explanations, and why they carry their own limits
@@ -116,19 +116,19 @@ its own caveats inline.
 
 That register was fixed by a specific failure. A candidate model was
 described in a design document as delivering crisis severity "through
-correlation" — correct for one of its two parameters and *backwards* for the
+correlation", correct for one of its two parameters and *backwards* for the
 other. Every number involved was right; the connecting sentence was
 invented. **A number invites scepticism and a sentence does not**, so the
 sentence has to carry its own.
 
-### `attribution` — why does B beat A?
+### `attribution`, or why does B beat A?
 
 ```python
 s.attribution(vector_a, vector_b, "sharpe", measured=(y_a, y_b))
 ```
 
 Decomposes the difference across the parameters that differ. It **assumes
-approximate additivity**, and strong interactions break it — on a purely
+approximate additivity**, and strong interactions break it. On a purely
 multiplicative surface it can overstate a contribution several-fold.
 
 Pass `measured=` whenever you can. It supplies the true endpoint values, and
@@ -138,7 +138,7 @@ rather than quietly presenting an unchecked number.
 
 ## Confirmation: the step that is not optional
 
-A survey runs at **screening resolution** — few seeds per point, chosen so
+A survey runs at **screening resolution**, few seeds per point, chosen so
 the map is affordable. That is enough to rank and describe. It is not enough
 to believe.
 
@@ -152,7 +152,7 @@ the survey's, and reports the paired difference in each block. It refuses to
 run on overlapping seeds.
 
 That refusal exists because of a real loss. A candidate here was declared
-shippable on a 13% improvement — then measured on fresh seeds it read
+shippable on a 13% improvement. Measured on fresh seeds it read
 +0.1297 where it was found, and −0.0315, +0.0209, +0.0233 elsewhere,
 reversing sign once. Discovery and validation had used the same thirty
 seeds, so re-measuring reproduced the same fluctuation exactly and reported
@@ -169,21 +169,21 @@ the model or of the paths.
   resolution*. There are at least four ways a real effect reads as flat,
   and only the first is fixed by sampling harder:
 
-  1. *Below the noise floor* — real but smaller than the seeds can see.
+  1. *Below the noise floor*, real but smaller than the seeds can see.
   2. *Only past a threshold* your sample never crossed.
   3. **Coupled to another parameter.** A sensitivity is one axis at a time,
      so a mechanism that needs two parameters is structurally invisible to
      it. In this simulator `universe_stress_weight` scales *remembered*
      crisis stress and `universe_stress_decay` is what makes stress survive
      the night; at the shipped decay of `0.0` the weight multiplies zero, so
-     sweeping it alone measures nothing at **any** value — verified
+     sweeping it alone measures nothing at **any** value, verified
      identical at 1, 3, 5, 7 and 10. Set together, they move the crisis
      transient by +0.021. A calibration note once recorded that gain against
      the weight alone, and a later replication of the weight alone then
      declared the mechanism dead. Both were reading a two-parameter
      mechanism one parameter at a time.
   4. **Saturating.** If the effect reaches its full size early in the range
-     and then flattens — often because something downstream clamps it — most
+     and then flattens, often because something downstream clamps it, most
      of your samples sit on a plateau, and a rank correlation over a step
      followed by a plateau is near zero however real the step is.
 
@@ -197,13 +197,13 @@ the model or of the paths.
   not measure how much. A one-at-a-time sweep and a marginal correlation
   measure different things, and disagreeing does not make either wrong.
 - **Errors are not neutral.** A vector whose measurement raises is recorded
-  and skipped rather than fatal — a region that breaks the model is a fact
+  and skipped rather than fatal, because a region that breaks the model is a fact
   about the model. But infrastructure failures cluster in expensive corners,
   so check *where* the drops are, not just how many.
 
 ## Related
 
-- [The realism envelope](realism-envelope.md) — what this simulator is
-  certified to reproduce, and where it is not
-- [The realism metrics](realism-metrics.md) — what each measured statistic
+- [The realism envelope](realism-envelope.md), what this simulator is
+  certified to reproduce and where it is not
+- [The realism metrics](realism-metrics.md), what each measured statistic
   means

@@ -7,8 +7,8 @@ rack: reference
 # RNG streams
 
 One seed drives the whole simulation, but not through one generator. The
-engine derives **three independent substreams** from the root seed — market,
-economy, external — so that changing what one consumer draws cannot shift
+engine derives **three independent substreams** from the root seed, one each
+for market, economy and external, so that changing what one consumer draws cannot shift
 any other consumer's sequence. This page is the derivation contract: what a
 reader needs to reproduce every stream from the seed, and the argument for
 why the streams are independent.
@@ -33,7 +33,7 @@ sequence for everyone after it. Three consumers hit exactly this wall:
   trajectory.
 
 The split landed inside the 2026-08 era boundary, regenerating the
-known-answer baseline — `KAT_VERSION = 5` at the split; the era's later
+known-answer baseline. `KAT_VERSION` was 5 at the split; the era's later
 model changes have since taken it to 8: every trajectory changed, once, and
 these three questions became answerable.
 
@@ -51,13 +51,13 @@ zero*, decided by guards that read the trajectory; since the split the four
 are drawn unconditionally per active company per open tick, whether or not
 the settle uses them. No price, no macro value and no order flow can move
 the market stream's position. The economy stream's count still varies with
-macro state — a chain in contraction draws a shock the expansion never
-rolls — which is precisely why it has its own stream.
+macro state, since a chain in contraction draws a shock the expansion never
+rolls, which is precisely why it has its own stream.
 
 `Engine.draws_by_stream()` reports the per-stream counts:
 `{"market": n, "economy": n, "external": n}`. Equal `market` counts between
-two runs of the same tick schedule mean the two markets consumed — and
-therefore saw — an identical noise sequence.
+two runs of the same tick schedule mean the two markets consumed, and
+therefore saw, an identical noise sequence.
 
 ## The derivation contract
 
@@ -88,7 +88,7 @@ golden test against hand-computed values
 is an era boundary in its own right: every seeded trajectory would change.
 
 Everything above is integer arithmetic, exactly specified on every
-platform — no floats, no platform-dependent hashing — so the derivation
+platform, with no floats and no platform-dependent hashing, so the derivation
 adds nothing for the cross-OS bit-identity claim to trip on.
 
 ## Why the streams are independent
@@ -102,15 +102,15 @@ one:
    time-shifted copy of the other. This holds by construction, not
    probabilistically.
 
-2. **Decorrelated states, by mixing.** The lazy derivation —
-   `GameRng(s, k)` with the root seed used raw — is refused deliberately.
+2. **Decorrelated states, by mixing.** The lazy derivation, `GameRng(s, k)`
+   with the root seed used raw, is refused deliberately.
    Two PCG streams seeded with the same state and different increments
    `c, c′` have states related by the affine identity
    `state′ₙ − stateₙ = (c′ − c)(aⁿ⁻¹ + ⋯ + 1)`: a deterministic
    cross-stream structure that the output permutation only obscures.
    Passing `(s, k)` through an avalanche finalizer first gives every
-   stream an unrelated starting state — a one-bit change in either input
-   flips each output bit with probability ≈ ½ — so no such relation exists
+   stream an unrelated starting state, since a one-bit change in either
+   input flips each output bit with probability about ½, so no such relation exists
    between any two substreams.
 
 The sequence base 256 keeps derived sequences visibly clear of every
@@ -121,8 +121,8 @@ recorded sequence number identifies its era at a glance.
 ## What is deliberately not derived this way
 
 - **Universe generation** keeps its original `GameRng(seed, 21)`. Its seed
-  is a *universe* seed — a different input domain from the simulation
-  seed — so it shares no root with the engine streams, and re-deriving it
+  is a *universe* seed, a different input domain from the simulation seed,
+  so it shares no root with the engine streams, and re-deriving it
   would churn every published universe fingerprint for no independence
   gain.
 - **`GameRng(seed, sequence)`** stays public and raw: it is the Layer-1
@@ -136,7 +136,7 @@ recorded sequence number identifies its era at a glance.
 `state_snapshot()["rng"]` is nine numbers: `(state, increment, spare)` for
 the market, economy and external streams, in that order. The u64 halves
 ride as f64 bit patterns so they round-trip exactly. Each stream carries
-its own Box-Muller spare — the parity of normal draws is per-stream state
+its own Box-Muller spare, because the parity of normal draws is per-stream state
 and never crosses domains. A pre-split snapshot (three numbers) is refused
 on restore with its era named: it froze a single-stream market that this
 version cannot continue bit-exactly.

@@ -7,7 +7,7 @@ short: Envelope
 
 # The realism envelope
 
-What pretium certifies, at what horizon, and — just as precisely — what it
+What pretium certifies, at what horizon, and, just as precisely, what it
 does not.
 
 This page exists because "realistic" is not a property a simulator either
@@ -26,7 +26,7 @@ and says exactly which runs produced them.
 If you want to know what any of these statistics actually measures, and
 what a failure on it means for your results,
 [the realism metrics](realism-metrics.md) is the reference. To ask which
-parameters move them — or which move YOUR result — see [Atlas](atlas.md).
+parameters move them, or which move YOUR result, see [Atlas](atlas.md).
 
 ## The claim, in one sentence
 
@@ -42,16 +42,16 @@ of the same length by the method in the calibration docs.
 
 | statistic | measured | band | verdict |
 |---|---|---|---|
-| `annualised_vol_pct` | 24.10 | 15.0 – 36.0 | in band |
-| `excess_kurtosis` | 2.53 | 1.6 – 41.0 | in band |
-| `return_acf1` | +0.0375 | −0.08 – 0.06 | in band |
-| `abs_return_acf1` | +0.1413 | 0.02 – 0.22 | in band |
-| `abs_return_acf5` | +0.0496 | 0.02 – 0.09 | in band |
-| `abs_return_acf20` | +0.0082 | −0.04 – 0.08 | in band |
-| `cross_sectional_corr` | +0.2558 | 0.08 – 0.56 | in band |
-| `volume_abs_return_corr` | +0.5339 | 0.46 – 0.66 | in band |
-| `leverage_effect` | −0.0349 | −0.16 – 0.00 | in band |
-| `volume_change_acf1` | −0.4598 | −0.32 – −0.20 | **out, 13.7 sd** |
+| `annualised_vol_pct` | 24.10 | 15.0 to 36.0 | in band |
+| `excess_kurtosis` | 2.53 | 1.6 to 41.0 | in band |
+| `return_acf1` | +0.0375 | −0.08 to 0.06 | in band |
+| `abs_return_acf1` | +0.1413 | 0.02 to 0.22 | in band |
+| `abs_return_acf5` | +0.0496 | 0.02 to 0.09 | in band |
+| `abs_return_acf20` | +0.0082 | −0.04 to 0.08 | in band |
+| `cross_sectional_corr` | +0.2558 | 0.08 to 0.56 | in band |
+| `volume_abs_return_corr` | +0.5339 | 0.46 to 0.66 | in band |
+| `leverage_effect` | −0.0349 | −0.16 to 0.00 | in band |
+| `volume_change_acf1` | −0.4598 | −0.32 to −0.20 | **out, 13.7 sd** |
 
 Band-distance loss `L_real` = **0.0000**.
 
@@ -63,8 +63,8 @@ calibration never saw:
 
 | axis | result | `L_real` |
 |---|---|---|
-| training seeds (101–130), 40 names | 9/10 in band | 0.0000 |
-| **held-out seeds** (1–6), 40 names | 9/10 in band | 0.0000 |
+| training seeds (101-130), 40 names | 9/10 in band | 0.0000 |
+| **held-out seeds** (1-6), 40 names | 9/10 in band | 0.0000 |
 | **held-out universe** (60 names, different draw) | 9/10 in band | 0.0000 |
 
 The same nine statistics, the same zero loss, on instruments and seeds the
@@ -72,43 +72,42 @@ search never touched. This is the part of the claim worth trusting.
 
 ## The gaps, measured
 
-### Gap 1 — the tenth statistic is structurally unreachable
+### Gap 1: the tenth statistic is structurally unreachable
 
 `volume_change_acf1` reads −0.46 against a real band of −0.32 to −0.20:
 **13.7 seed-standard-deviations out**, and no parameter setting in the
 model reaches it. A held volume level plus independent per-tick noise sits
 near −0.5 at any coefficients. It is excluded from the calibration
-objective deliberately — an optimiser pointed at an unreachable target
-does not fail cleanly, it distorts every other parameter chasing it and
-then "succeeds" by overfitting — and it is reported in every result the
-library produces, as a standing falsification verdict rather than a
-footnote.
+objective deliberately. An optimiser pointed at an unreachable target does
+not fail cleanly, it distorts every other parameter chasing it and then
+"succeeds" by overfitting. It is reported in every result the library
+produces, as a standing falsification verdict rather than a footnote.
 
 **Consequence: do not trust strategies that trade the day-to-day *change*
 in volume.** The volume *level*'s relationship to volatility is in band
 and is fine to use.
 
-### Gap 2 — the certified horizon is 252 days, and the model does not hold beyond it
+### Gap 2: the certified horizon is 252 days, and the model does not hold beyond it
 
 The statistics are horizon-dependent, and the model is roughly five times
 more horizon-sensitive than the market it imitates. Measured against
-bands re-derived at the *matching* 504-day window — not the 252-day bands,
-which would be the wrong ruler — the shipped model holds **5 of 10**:
+bands re-derived at the *matching* 504-day window, not the 252-day bands,
+which would be the wrong ruler, the shipped model holds **5 of 10**:
 
 | statistic | 252d | 504d | 504-matched band | verdict at 504d |
 |---|---|---|---|---|
-| `abs_return_acf1` | 0.141 | 0.289 | 0.04 – 0.22 | out |
-| `abs_return_acf5` | 0.050 | 0.152 | 0.02 – 0.10 | out |
-| `return_acf1` | 0.037 | 0.057 | −0.03 – 0.04 | out |
-| `excess_kurtosis` | 2.53 | 5.23 | **7.1 – 22** | out |
-| `annualised_vol_pct` | 24.1 | 29.3 | 16 – 34 | in |
+| `abs_return_acf1` | 0.141 | 0.289 | 0.04 to 0.22 | out |
+| `abs_return_acf5` | 0.050 | 0.152 | 0.02 to 0.10 | out |
+| `return_acf1` | 0.037 | 0.057 | −0.03 to 0.04 | out |
+| `excess_kurtosis` | 2.53 | 5.23 | **7.1 to 22** | out |
+| `annualised_vol_pct` | 24.1 | 29.3 | 16 to 34 | in |
 
 **Consequence: pretium is not certified for multi-year backtests.** A
 strategy evaluated over two years or more is being evaluated in a market
 whose volatility clustering is roughly twice real, and whose tails are too
 thin (see Gap 4).
 
-### Gap 3 — volatility memory has the wrong *shape*, not the wrong length
+### Gap 3: volatility memory has the wrong *shape* rather than the wrong length
 
 Real markets' volatility autocorrelation decays hyperbolically. The
 model's decays exponentially, because it is built from exponentials: a
@@ -129,27 +128,27 @@ Measured at the certified horizon, 30 seeds, median across instruments:
 | 60 | **−0.0142** | +0.0054 |
 
 On log-log axes, where a power law is a straight line, real markets fit a
-slope of **−0.436** over lags 1–20 — inside the 0.2–0.4 exponent range
-the literature publishes. The model fits **−0.953**, about 2.2 times
+slope of **−0.436** over lags 1-20, inside the 0.2-0.4 exponent range the
+literature publishes. The model fits **−0.953**, about 2.2 times
 steeper. In plain terms: slightly too much clustering at lag 1, tracking
 real closely at lag 5, crossing below at about lag 8, and **negative** by
 lag 30, where real markets stay weakly positive out to lag 60.
 
-The model's volatility memory does not merely fade early — it changes
+The model's volatility memory does not merely fade early. It changes
 sign. Where a real market still says "yesterday's turbulence makes today's
 more likely" a month later, pretium says the mild opposite.
 
 This is a **mechanism** gap, not a calibration one. No parameter setting
 turns one slope into the other; it has been tried, and a two-component
-variance mixture — the obvious fix — lands lag 20 while getting lag 60
-wrong in both directions at once.
+variance mixture, the obvious fix, lands lag 20 while getting lag 60 wrong
+in both directions at once.
 
 **Consequence: do not trust strategies whose edge depends on volatility
 memory beyond about two weeks.** Vol-targeting and risk-parity overlays
 that use a one-month or longer volatility estimate are outside the
 envelope.
 
-### Gap 4 — tails are too thin at long horizons
+### Gap 4: tails are too thin at long horizons
 
 Over 504-day windows real markets show excess kurtosis of **7.1 to 22**.
 The model shows **5.2**. The 252-day band's floor of 1.6 is wide enough
@@ -161,23 +160,23 @@ kurtosis where it fails.
 multi-year horizons.** At the certified 252-day horizon, kurtosis is in
 band.
 
-### Gap 5 — scenario response is directional, not calibrated
+### Gap 5: scenario response is directional rather than calibrated
 
 Two separate quantities, and they fail differently.
 
-**The steady-state lever** — how much more violent a sustained crisis is
-than a calm market — reads about **×3.1** against real markets' **×6.16**.
+**The steady-state lever**, how much more violent a sustained crisis is
+than a calm market, reads about **×3.1** against real markets' **×6.16**.
 Roughly half.
 
-**The transient** — how fast the market *reacts* to a shock, as distinct
-from where it settles — is weaker still. The shipped preset retains **27.6%**
+**The transient**, how fast the market *reacts* to a shock as distinct from
+where it settles, is weaker still. The shipped preset retains **27.6%**
 of the previous preset's shock response, because it raised factor-variance
 persistence to 0.989 to buy volatility clustering, and a 63-day half-life
 cannot track a twenty-day spike.
 
 **This has been attacked directly and the attack failed, which is why it is
 a gap rather than a task.** A two-timescale variance mixture was built to
-separate the two jobs — a fast component to chase spikes, a slow one to
+separate the two jobs: a fast component to chase spikes, a slow one to
 carry clustering. Measured, capping persistence at a 14-day half-life does
 restore the transient (1.062 → 1.203), and it **doubles** the 504-day loss
 (0.9887 → 2.0164). Raising the slow component's weight to buy that back
@@ -193,10 +192,10 @@ much*.** A crisis here is roughly half as violent as a real one and arrives
 more slowly, so a strategy that survives one has not been tested as hard as
 the label suggests.
 
-### Gap 6 — certification was measured on a sector-balanced roster
+### Gap 6: certification was measured on a sector-balanced roster
 
 `Universe.random()` places exactly five names in each of twelve sectors. No
-real index is balanced that way — the S&P is roughly a third technology and
+real index is balanced that way. The S&P is roughly a third technology and
 the Nasdaq more so. Varying **only** sector composition, with every name
 drawn from one pool:
 
@@ -210,7 +209,7 @@ So part of the certification is an artifact of that balance, and the more
 concentrated the roster, the less of it transfers.
 
 **Consequence: do not inherit this envelope for a sector-concentrated
-roster.** Re-measure the panel on your own universe — `facts.measure()`
+roster.** Re-measure the panel on your own universe. `facts.measure()`
 takes it directly, and `envelope.intervals()` will report the spread.
 
 ## The numbers above are medians, and one run is not the median
@@ -220,8 +219,8 @@ a single run shows you.
 
 Measured on the shipped preset, **seven of the ten statistics have their
 10th-to-90th-percentile range across seeds crossing a band edge**.
-`abs_return_acf1` reads a median of 0.141 against a ceiling of 0.22 — and a
-p90 of 0.426, with an across-seed standard deviation of 0.170, larger than
+`abs_return_acf1` reads a median of 0.141 against a ceiling of 0.22, with a
+p90 of 0.426 and an across-seed standard deviation of 0.170, larger than
 the median itself.
 
 A statistic can be comfortably in band on the median and out of band on a
@@ -250,7 +249,7 @@ the difference between a certified claim and a misread one.
 
 - Multi-year backtests (Gap 2).
 - Sizing how badly a crisis hurts, as opposed to detecting that it does
-  (Gap 5) — a crisis here is roughly half as violent as a real one.
+  (Gap 5). A crisis here is roughly half as violent as a real one.
 - Inheriting these numbers for a sector-concentrated roster (Gap 6).
 - Strategies keyed on long-horizon volatility memory (Gap 3).
 - Tail-risk or VaR calibration at multi-year horizons (Gap 4).
@@ -262,7 +261,7 @@ the difference between a certified claim and a misread one.
 
 ## Why "done" is defined this way
 
-An earlier definition of done — every statistic in band at every horizon —
+An earlier definition of done, every statistic in band at every horizon,
 turned out to be a treadmill. Three successive calibration searches each
 bought 252-day realism by spending 504-day realism, by a different route
 each time, and the overfitting control correctly rejected the last of
@@ -295,7 +294,7 @@ source and report the same known-answer digest,
 reporting bug was fixed: `model_preset()`'s default argument was the
 literal `"pt-v1"` and had not moved when the engine's default became
 `pt-v3`, so the library reported the wrong preset name and one wrong
-coefficient (`momentum_theta`) for every run — and `manifest.py` folded
+coefficient (`momentum_theta`) for every run, and `manifest.py` folded
 those into the run digest whose purpose is catching precisely that
 substitution. The fix changes no simulated value: the engine had always
 run `pt-v3`, and the only coefficient that differs between the two presets

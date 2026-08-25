@@ -14,7 +14,7 @@ been measured rather than assumed. It is regenerated from a machine-readable
 artifact, [`envelope.json`](envelope.json), whenever the shipped preset
 changes.
 
-This page is the narrative behind it — what the model could not do, what
+This page is the narrative behind it: what the model could not do, what
 fixing each thing took, and what is left. It carries no measured figures of
 its own on purpose: two realism pages quoting different numbers is how a
 project ends up contradicting itself, and this one did exactly that for a
@@ -29,11 +29,12 @@ Beyond 252 days it is not certified, and the envelope says why.
 
 The gaps earlier versions of this page documented were investigated with the
 intent of correcting them. Each closure is recorded here because the *kind*
-of change it needed is the useful part — most were not calibration at all.
+of change it needed is the useful part, and most were not calibration at
+all.
 
 - **Cross-sectional correlation** was proven unreachable by the factor's
   constant sigma: the band arrived only where kurtosis collapsed. Closed by
-  a model change — conditional volatility on the factor, funded from the
+  a model change: conditional volatility on the factor, funded from the
   idiosyncratic side.
 - **Volatility clustering** resisted every calibration lever. Persistence
   was already at the reference's 0.99, and raising the variance ceiling
@@ -66,15 +67,15 @@ not by tuning harder.
   deliberately.
 - **The certified horizon is 252 days.** The statistics are horizon-dependent
   and the model is roughly five times more horizon-sensitive than the market
-  it imitates. Measured against bands re-derived at the matching window — the
-  wrong ruler being the easy mistake here — it holds five of ten at 504 days.
+  it imitates. Measured against bands re-derived at the matching window, the
+  wrong ruler being the easy mistake here, it holds five of ten at 504 days.
 - **Volatility memory has the wrong shape.** Real markets' decays
   hyperbolically; this model's decays exponentially, because it is built from
   exponentials. Over one year two exponentials fake a power law well enough
   that no statistic in the panel objects. The fake thins out as the window
   grows, and the memory goes mildly *negative* around lag 30 where a real
   market is still weakly positive. No parameter setting turns one slope into
-  the other — this is a mechanism gap, and a two-component variance mixture,
+  the other. This is a mechanism gap, and a two-component variance mixture,
   the obvious fix, was tried and is not sufficient.
 - **Tails are too thin at long horizons.** Over two-year windows real markets
   are far more kurtotic than this model. The 252-day band is wide enough that
@@ -85,12 +86,12 @@ not by tuning harder.
 ## What this market is good for
 
 Read that as scope rather than apology, and read
-[the envelope](realism-envelope.md) for the precise version — it states what
-the model licenses and what it does not, in those terms.
+[the envelope](realism-envelope.md) for the precise version, which states
+what the model licenses and what it does not, in those terms.
 
 The engine reproduces microstructure honestly: a real limit order book,
 honest impact, partial fills, spreads that widen under stress. On top of it
-there is a genuine factor structure — market beta exists, diversification
+there is a genuine factor structure. Market beta exists, diversification
 behaves like a market's including its failure under stress, and systematic
 risk is real. Use it for order-level mechanics, for cost and shortfall
 against a known counterfactual, for reproducibility and forking experiments,

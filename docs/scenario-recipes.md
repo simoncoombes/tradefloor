@@ -24,13 +24,13 @@ argue with it.
 
 Every recipe below carries four things, and the order matters:
 
-1. **The config** — runnable, and run.
-2. **What it is anchored on** — the historical figures behind each number,
+1. **The config**, runnable and run.
+2. **What it is anchored on**, meaning the historical figures behind each number,
    with sources, and an explicit list of the numbers that are *not* anchored
    on anything.
 3. **What it does not claim.** A recipe is a macro path. It is not a theory of
    the episode it is named after, and it is certainly not evidence about one.
-4. **What it measures in this model** — with the method, so you can see what
+4. **What it measures in this model**, with the method, so you can see what
    the configuration actually produces here rather than what it ought to.
 
 Copy a recipe, change the numbers you disagree with, and the disagreement is
@@ -42,13 +42,13 @@ Exactly one thing on this page can still hand you a plausible wrong answer
 without saying a word, and it is the first item below. The other three used to
 behave that way too; the `Scenario` surface now refuses each of them by name
 and says what to write instead, so they have stopped being traps and become
-rules. Read the rules anyway — they are what makes a composed timeline
+rules. Read the rules anyway, because they are what makes a composed timeline
 expressible at all, and every recipe below is shaped or sized by one of them.
 
 ### The trap: nothing transmits before day 45
 
 A policy-only rate path moves nothing until the first central-bank meeting,
-because the corporate bond yield — the rate equities actually discount off —
+because the corporate bond yield, the rate equities actually discount off,
 is only recomputed at meetings, and the first one is scheduled 45 days out.
 Then it transmits, hard.
 
@@ -105,15 +105,15 @@ day 120: 22.0
 ```
 
 All three clauses are visible there. The `step` is the first pin, so its
-`before=15.0` covers days 0 to 59. It owns days 60 to 74 as well — the plateau
-— because that is where the next pin begins. And the `ramp` does **not** hold
+`before=15.0` covers days 0 to 59. It owns days 60 to 74 as well, the
+plateau, because that is where the next pin begins. And the `ramp` does **not** hold
 its `start` value over the days before day 75, the way a lone ramp would:
 those days already belong to the step. A ramp's pre-`begin` hold is the
 first-pin clause, not a property of ramps.
 
 That last point is the one worth internalising, because it is what turns
-`hold` then `ramp` into a jump followed by a decay — the shape most macro
-episodes actually have.
+`hold` then `ramp` into a jump followed by a decay, which is the shape most
+macro episodes actually have.
 
 **Start days must strictly increase within a field.** The two other orderings
 are refused by name, with both calls reconstructed as you wrote them, because
@@ -159,22 +159,22 @@ print([f"day {d}: {spike.at(d)['vix']:.1f}" for d in (0, 30, 59, 60, 80, 100)])
 ['day 0: 15.0', 'day 30: 15.0', 'day 59: 15.0', 'day 60: 48.0', 'day 80: 33.0', 'day 100: 18.0']
 ```
 
-Calm until day 60, a jump to 48, a decay reaching 18 on day 100 — which is the
+Calm until day 60, a jump to 48, a decay reaching 18 on day 100, which is the
 path the two-pins-on-day-60 version was reaching for. The `hold` states the
 level and the `ramp` states the episode, each exactly once. Moving the ramp to
 `begin=61` composes as well and is a legitimate answer, but it buys the
 composition with a path one day out of step with the arithmetic you wrote;
 saying the level separately is the form that means what it says.
 
-The other refused ordering is a pin declared *after* one that begins later —
-`ramp(..., begin=75)` and then `step(..., at=60)`. That message says the pins
+The other refused ordering is a pin declared *after* one that begins later,
+as in `ramp(..., begin=75)` and then `step(..., at=60)`. That message says the pins
 `are out of order`, that they `must be declared in the order they happen`, and
 names the swap. Declared that way round the earlier pin would have to back-fill
 days the later one already owns, which is a whole run under the wrong path.
 
 **And check before you run.** `Scenario.table(days)` exists for this, and one
 glance at day zero is still the cheapest check on this page. It will not catch
-an ordering mistake any more — those raise — but it catches a `begin` off by a
+an ordering mistake any more, since those raise, but it catches a `begin` off by a
 factor of ten, or a level you meant to change and did not:
 
 ```python
@@ -236,7 +236,7 @@ not.
 
 ### Rule 3: `compare()` needs a scenario that moves
 
-`compare()` defaults to `baseline=Scenario().hold(**scenario.at(0))` — the
+`compare()` defaults to `baseline=Scenario().hold(**scenario.at(0))`, the
 scenario's own day-zero values held flat. That is the right default for a
 *path*, because it isolates the movement from the level it started at. For a
 scenario that never moves inside the horizon it *is* the scenario, and every
@@ -251,7 +251,7 @@ Three shapes reach that refusal and your next move differs:
   is already the *after* value: there is no path to isolate, only a level, so
   name the world **without** it and pass that as `baseline=`;
 - a shock whose start day falls at or after `days`: the path is real, but the
-  run ends before it begins. Run it longer — the message names the day the
+  run ends before it begins. Run it longer, and the message names the day the
   shock starts and the run length it needs;
 - a scenario driving nothing at all.
 
@@ -283,23 +283,23 @@ single seed is simply the wrong instrument for a volatility scenario: what a
 VIX pin changes is the *variance* of the shared market factor, and one seed's
 realisation of a higher variance is a coin flip with a wide edge. Measure
 volatility scenarios with `pt.facts.measure`, as recipe 3 does. Measure rate
-and credit scenarios — which move fair value directionally — with
+and credit scenarios, which move fair value directionally, with
 `compare()`.
 
 ## How the measured effects below were produced
 
 Every "in this model" figure on this page was measured on engine commit
 `9b485a0`, pretium 0.1.0, under model preset `pt-v1`, which was the default
-at the time and is not any more — the shipped default is now `pt-v3`, so
-these figures describe an earlier era — and every one of them is an
-inventory row in the re-measurement harness under the group `recipes`:
+at the time and is not any more. The shipped default is now `pt-v3`, so
+these figures describe an earlier era. Every one of them is an inventory row
+in the re-measurement harness under the group `recipes`:
 
 ```
 .venv/bin/python tools/remeasure/remeasure.py --only recipes
 ```
 
 That is deliberate, because the two halves of this page age at completely
-different rates. The configs and their historical anchors are durable — the
+different rates. The configs and their historical anchors are durable. The
 Federal Reserve raised its target range eleven times between March 2022 and
 July 2023 regardless of what this engine does next week. The measured effects
 are this build's answer, and a calibration change moves all of them. If you
@@ -317,7 +317,7 @@ set of habits covers both pages:
 Single seeds, stated. Nothing on this page is a distribution, and the
 dispersion across seeds is generally larger than the effects.
 
-## Recipe 1 — A rate-hiking cycle
+## Recipe 1: A rate-hiking cycle
 
 ```python
 import pretium as pt
@@ -339,10 +339,10 @@ median -9.26%  worst -13.21%  best +0.26%  exact=True
 
 ### What it is anchored on
 
-The 2022–23 US tightening cycle. The Federal Reserve raised its target range
-from 0–0.25% to 5.25–5.50% across eleven increases between 17 March 2022 and
+The 2022-23 US tightening cycle. The Federal Reserve raised its target range
+from 0-0.25% to 5.25-5.50% across eleven increases between 17 March 2022 and
 27 July 2023, including four consecutive 75bp moves in June, July, September
-and November 2022 — the fastest stretch of the cycle. The start and end
+and November 2022, the fastest stretch of the cycle. The start and end
 values here are the midpoints of the first and last ranges: 0.125% and 5.375%,
 which is where `start=0.00125` and `end=0.0538` come from. Both are read
 directly off the Fed's own record of open market operations.
@@ -355,26 +355,26 @@ single number in this recipe most worth changing. If you want the real pace,
 use `over=340` and run 400 days.
 
 `credit_spread=0.02` is the constructor's default and is **not** anchored to
-2022–23. It holds the corporate yield exactly 200bp above the policy rate for
+2022-23. It holds the corporate yield exactly 200bp above the policy rate for
 the whole path, which means this recipe has spreads *constant* through a
 tightening cycle. Real spreads generally widen into one. The effect below is
 therefore an understatement, and the `rate_shock` docstring says so too.
 
 ### What it does not claim
 
-This is not what the 2022–23 hiking cycle did, and running it does not
+This is not what the 2022-23 hiking cycle did, and running it does not
 produce evidence about that cycle. It is one defensible way to represent a
 tightening of that magnitude: a linear walk, at four times the real pace, with
 a frozen credit spread. Each of those three is a choice, and a reader who
 disagrees with any of them is disagreeing with me rather than with the model.
-In particular the linearity is wrong in a specific and knowable way — the real
-cycle front-loaded its 75bp moves and decelerated to 25bp — and recipe 5 shows
+In particular the linearity is wrong in a specific and knowable way, since
+the real cycle front-loaded its 75bp moves and decelerated to 25bp, and recipe 5 shows
 how to express a path with genuine structure if that matters to you.
 
 ### What it measures in this model
 
 The median instrument reprices **−9.26%** over 120 days, the most rate-sensitive
-name **−13.21%**, and the least sensitive one **+0.26%** — essentially unmoved.
+name **−13.21%**, and the least sensitive one **+0.26%**, essentially unmoved.
 That dispersion is the point of running a cross-section at all: a scenario that
 moved every name identically would tell a stock-picking strategy nothing.
 
@@ -385,7 +385,7 @@ Note the horizon. At 120 days the run crosses two central-bank meetings; the
 same config measured at 40 days would report roughly nothing, for the reason
 in the meeting trap.
 
-## Recipe 2 — An inflation shock
+## Recipe 2: An inflation shock
 
 ```python
 import pretium as pt
@@ -409,8 +409,8 @@ print(f"120 days: median {late['median_pct']:+.2f}%")
 
 ### What it is anchored on
 
-The 2021–22 US inflation episode. CPI-U rose 1.4% over the twelve months to
-January 2021 and peaked at 9.1% over the twelve months to June 2022 — the
+The 2021-22 US inflation episode. CPI-U rose 1.4% over the twelve months to
+January 2021 and peaked at 9.1% over the twelve months to June 2022, the
 largest twelve-month increase since the period ending November 1981, per the
 Bureau of Labor Statistics. `start=0.014` and `end=0.091` are those two
 prints.
@@ -422,7 +422,7 @@ sensible level to hold; it carries no meaning.
 
 ### What it does not claim
 
-It does not claim that inflation rose linearly, which it did not — the path
+It does not claim that inflation rose linearly, which it did not. The path
 from 1.4% to 9.1% had a visible acceleration through late 2021 and a plateau
 either side of the peak. It does not claim that this is what an inflation
 shock does to equities. And it very specifically does not model the thing that
@@ -433,7 +433,7 @@ engine's reaction function is not calibrated to the FOMC.
 ### What it measures in this model
 
 This recipe exists mainly to show that **the meeting trap is not about the
-policy rate.** `inflation_rate` never reaches fair value directly — the valuation
+policy rate.** `inflation_rate` never reaches fair value directly. The valuation
 takes earnings, growth, the corporate bond yield, the policy rate and the QE
 multiple adjustment, and inflation is not among them. Inflation transmits only
 by steering the macro chain into a central-bank reaction, and that reaction
@@ -446,7 +446,7 @@ that stops early sees a *small* effect rather than a literally absent one,
 which is arguably worse: a small effect looks like a finding. It is a
 thirty-eight-fold understatement of where the path ends up.
 
-## Recipe 3 — A liquidity crisis
+## Recipe 3: A liquidity crisis
 
 ```python
 import pretium as pt
@@ -487,11 +487,11 @@ spreads, which both set records in **December 2008**: the ICE BofA US
 Corporate (investment grade) index at **6.56%** and the US High Yield index at
 **21.82%**.
 
-`calm=18.0` is a judgement call, not a measurement — a plausible pre-crisis
-level rather than the engine's endogenous mean of 15.
+`calm=18.0` is a judgement call rather than a measurement: a plausible
+pre-crisis level rather than the engine's endogenous mean of 15.
 
 The corporate yield leg is the weakest-sourced number here and I want to be
-precise about why. **I could not retrieve a corporate bond *yield* series** —
+precise about why. **I could not retrieve a corporate bond *yield* series.**
 FRED's series pages and CSV endpoints were unreachable from this environment,
 and searches returned the series' landing pages without values. So
 `start=0.055` and `end=0.095` are not read off anything. They are constructed:
@@ -505,7 +505,7 @@ numbers as the most arguable on this page.
 ### What it does not claim
 
 It does not claim this is what 2008 was. 2008 was a solvency crisis with a
-funding run inside it, and this configuration contains neither — it is a
+funding run inside it, and this configuration contains neither. It is a
 volatility path and a discount-rate path, which is a *shape*, not a mechanism.
 Nothing here models a bank failing, a money-market fund breaking the buck, or
 a counterparty vanishing. It does not claim the VIX peak and the spread peak
@@ -522,7 +522,7 @@ Annualised realised volatility rises from **61.76% to 82.16%**, an uplift of
 rises from **0.493 to 0.636**. The second number is the one worth having.
 Above VIX 25.5 the model blends idiosyncratic sector factors toward the shared
 market factor, so a crisis VIX is a correlation regime as well as a volatility
-regime, and diversification measurably stops working — which is what a real
+regime, and diversification measurably stops working, which is what a real
 crisis does to a portfolio.
 
 The response saturates: the factor's variance is clamped at 8× its baseline,
@@ -530,11 +530,11 @@ so pushing `peak` from 80 to 120 buys almost nothing. Recipe 3 sits near the
 top of the usable range already.
 
 Measured on price instead, the same config reports a median **−8.29%** and a
-worst name at **−13.07%** on sim seed 5 — but per the seed band under rule 3,
+worst name at **−13.07%** on sim seed 5, but per the seed band under rule 3,
 do not lean on that. The price consequence of a volatility regime is seed-dependent in
 sign; the volatility and correlation numbers are the claim.
 
-## Recipe 4 — A contraction regime
+## Recipe 4: A contraction regime
 
 ```python
 import pretium as pt
@@ -564,13 +564,14 @@ median +2.85%  exact=True
 
 ### What it is anchored on
 
-The duration and shape of US contractions as dated by the NBER: the 2007–09
+The duration and shape of US contractions as dated by the NBER: the 2007-09
 recession ran December 2007 to June 2009 (eighteen months, the longest of the
 post-war period), the 2001 recession March to November 2001, and the 2020
-recession February to April 2020 — two months, the shortest on record.
+recession February to April 2020, which at two months is the shortest on
+record.
 
 A 120-day horizon at 252 sessions a year is about six months, which sits
-between the 2020 and 2001 durations and well short of 2007–09. `cycle` is
+between the 2020 and 2001 durations and well short of 2007-09. `cycle` is
 held for the whole run rather than entered and exited, which is a
 simplification: the recipe represents being *inside* a contraction, not a
 cycle turning.
@@ -584,8 +585,8 @@ not be read as referring to it.
 ### What it does not claim
 
 It does not claim to be a recession. Neither `cycle` nor `fear_greed_index`
-reaches fair value directly — the valuation function does not take either —
-so this recipe cannot and does not model falling earnings, which is the main
+reaches fair value directly, because the valuation function does not take
+either, so this recipe cannot and does not model falling earnings, which is the main
 thing a contraction does to equities. What it models is a contraction's effect
 on the *macro chain*, and nothing else.
 
@@ -605,7 +606,7 @@ recorded macro at day 119 in both worlds:
 | expansion | 2.75% | 4.91% | 3.09% |
 
 Both channels are live and they pull against each other. The contraction
-world's central bank **eases** — 2.00% against the expansion world's 2.75% —
+world's central bank **eases**, 2.00% against the expansion world's 2.75%,
 and inflation falls to 1.00% against 3.09%, both of which support valuations.
 Against that, the contraction widens the credit spread hard: the corporate
 yield ends 150bp *higher* at 6.41%, and that is the rate equities discount
@@ -615,13 +616,13 @@ The net on this seed is a small positive. Do not read a sign off one seed.
 The mechanism table is the durable finding here; the +2.85% is close to noise
 against the seed dispersion, and I did not measure a seed band for it.
 
-## Recipe 5 — A compound episode
+## Recipe 5: A compound episode
 
 This is the one where the surface earns itself. Four fields move on four
 different schedules, the policy rate takes three levels of its own, and the
-credit leg blows out and then retraces. Rule 1 means all of that is chainable
-— ten pins, in start-day order, four fields deep — and the equivalence is
-demonstrated below rather than asserted.
+credit leg blows out and then retraces. Rule 1 means all of that is
+chainable, ten pins in start-day order and four fields deep, and the
+equivalence is demonstrated below rather than asserted.
 
 The path is nevertheless built as data and loaded through
 `Scenario.from_json`, for a reason that has nothing to do with what chaining
@@ -685,7 +686,7 @@ median +9.79%  worst -0.67%  best +12.04%  exact=True
 ```
 
 `from_json` holds each field's final value beyond the recorded horizon, so a
-longer run is defined rather than an `IndexError` — `pandemic_shape(120)`
+longer run is defined rather than an `IndexError`, so `pandemic_shape(120)`
 queried at day 500 still returns the day-119 policy rate. It is worth checking
 the path before running it, as always:
 
@@ -731,8 +732,8 @@ True
 
 Identical on all 120 days, so the two spellings are the same scenario and
 either would produce the figures below. Every `before=` on those two `step`
-calls is inert — the pin ahead of each one already owns the days it names —
-which is the segment rule stated in the least convenient possible way, and a
+calls is inert, because the pin ahead of each one already owns the days it
+names. That is the segment rule stated in the least convenient possible way, and a
 good reason to prefer the `from_json` version for a path this long.
 
 ### What it is anchored on
@@ -743,10 +744,10 @@ different clocks and in different directions.
 - **VIX**: `peak=82.0` is the record closing high of **82.69 on 16 March
   2020**, the highest close in the index's history, above 2008's 80.86.
 - **Policy**: two cuts, ten sessions apart, mirroring the Federal Reserve's
-  two intermeeting moves — **50bp on 3 March 2020** taking the target range to
-  1.00–1.25%, then **100bp on 15 March 2020** taking it to 0–0.25%. The three
-  levels `0.0155 → 0.01125 → 0.00125` are the midpoints of 1.50–1.75%,
-  1.00–1.25% and 0–0.25%.
+  two intermeeting moves: **50bp on 3 March 2020** taking the target range to
+  1.00-1.25%, then **100bp on 15 March 2020** taking it to 0-0.25%. The three
+  levels `0.0155 → 0.01125 → 0.00125` are the midpoints of 1.50-1.75%,
+  1.00-1.25% and 0-0.25%.
 - **Credit**: the blow-out-then-compression shape follows the US High Yield
   option-adjusted spread, which peaked around **10.9% on 23 March 2020**
   before the Fed's corporate credit facilities were announced, and then
@@ -759,7 +760,7 @@ to choose which part of that curve it represents. This one represents the
 sourced 10.9% spread over a near-zero Treasury base, and it is deliberately
 not an investment-grade yield, which stayed far lower. Sources also differ on
 the 2020 high-yield peak depending on whether a daily observation or a monthly
-average is quoted — I found both ~10.9% and ~8.8% — and I used the daily
+average is quoted. I found both ~10.9% and ~8.8%, and I used the daily
 figure.
 
 `qe_pe_boost` ramping to **0.10 is not anchored on anything at all.** It is a
@@ -773,7 +774,7 @@ Everything above, and one thing more that matters more than the rest.
 
 This recipe produces a market that **ends higher than it started**, which is
 also what happened in 2020. That agreement is not evidence of anything. It is
-a consequence of the `qe_pe_boost=0.10` I typed in — I assumed policy support
+a consequence of the `qe_pe_boost=0.10` I typed in. I assumed policy support
 lifted multiples, and the model duly lifted multiples. Take that one line out
 and the result changes character completely.
 
@@ -784,13 +785,13 @@ discovered. Behind a method name you could not have.
 
 ### What it measures in this model
 
-Median **+9.79%** at 120 days, best name **+12.04%**, worst **−0.67%** — a
+Median **+9.79%** at 120 days, best name **+12.04%**, worst **−0.67%**, a
 narrow cross-section, because the dominant channels here (the policy rate, the
 QE multiple) move every name in the same direction, unlike recipe 1's
 rate-sensitivity dispersion.
 
 Realised volatility over the run, measured on the volatility convention, is
-**80.79%**, against recipe 3's 82.16% — a comparable stress despite the very
+**80.79%**, against recipe 3's 82.16%, a comparable stress despite the very
 different price outcome, which is the point of measuring both. The two
 recipes describe markets that were about equally violent and ended in
 completely different places.
@@ -814,7 +815,7 @@ print(compound.to_json(days=120)[:120], "...")
 which is the honest direction: the path is reproducible whatever any later
 version of `pandemic_shape` does, and `Scenario.from_json` will replay it
 exactly. Publish that alongside your seed and universe fingerprint, and a
-reader can disagree with your assumptions and re-run them at the same time —
+reader can disagree with your assumptions and re-run them at the same time,
 which is the entire point of keeping the assumption and the finding in
 separate columns.
 
@@ -823,21 +824,21 @@ separate columns.
 Historical figures cited above, with what was actually retrieved:
 
 - Federal Reserve, [Open Market Operations](https://www.federalreserve.gov/monetarypolicy/openmarket.htm)
-  — the 2022–23 target-range changes and the two March 2020 intermeeting cuts.
+  the 2022-23 target-range changes and the two March 2020 intermeeting cuts.
 - Bureau of Labor Statistics, [Consumer prices up 9.1 percent over the year ended June 2022](https://www.bls.gov/opub/ted/2022/consumer-prices-up-9-1-percent-over-the-year-ended-june-2022-largest-increase-in-40-years.htm)
-  — the June 2022 peak and the comparison to November 1981.
+  the June 2022 peak and the comparison to November 1981.
 - Bureau of Labor Statistics, [CPI news release, 10 February 2021](https://www.bls.gov/news.release/archives/cpi_02102021.htm)
-  — the January 2021 1.4% twelve-month figure.
+  the January 2021 1.4% twelve-month figure.
 - [Macroption, VIX all-time highs](https://www.macroption.com/vix-all-time-high/)
   and [CNBC, 16 March 2020](https://www.cnbc.com/2020/03/16/wall-streets-fear-gauge-hits-highest-level-ever.html)
-  — the 89.53 intraday high of 24 October 2008, the 80.86 close of 20 November
+  the 89.53 intraday high of 24 October 2008, the 80.86 close of 20 November
   2008, and the 82.69 record close of 16 March 2020.
 - [Trading Economics / FRED BAMLH0A0HYM2](https://tradingeconomics.com/united-states/bofa-merrill-lynch-us-high-yield-option-adjusted-spread-fed-data.html)
   and [BAMLC0A0CM](https://tradingeconomics.com/united-states/bofa-merrill-lynch-us-corporate-master-option-adjusted-spread-fed-data.html)
-  — the December 2008 record spreads of 21.82% and 6.56%, and the March 2020
+  the December 2008 record spreads of 21.82% and 6.56%, and the March 2020
   high-yield peak.
 - [NBER business cycle dating](https://www.nber.org/research/business-cycle-dating/business-cycle-dating-committee-announcements)
-  — the 2001, 2007–09 and 2020 recession dates.
+  the 2001, 2007-09 and 2020 recession dates.
 
 **Numbers I could not source, and did not pretend to.** No corporate bond
 *yield* series was retrievable from this environment: FRED's series pages and

@@ -29,9 +29,9 @@ outstanding, with roughly one name in eleven above the 20% squeeze threshold.
 **Roster order is contractual.** A re-sorted universe is a different market.
 `universe.fingerprint` covers order as well as content.
 
-**Coefficients ship as a preset.** Named and versioned — `pt-v3` is the
-current default — rather than as constructor keywords, so two published
-results can be compared.
+**Coefficients ship as a preset.** They are named and versioned rather than
+passed as constructor keywords, so two published results can be compared.
+`pt-v3` is the current default.
 `model_preset()` returns it, and the returned values are folded into the
 known-answer digest and parity-tested against the reference implementation.
 

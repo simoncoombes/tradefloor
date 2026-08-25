@@ -46,16 +46,16 @@ repricing; `ramp` isolates a single lever when that is what you want.
 
 ## The second trap, retired: VIX drives volatility now
 
-This page used to state, in bold, that VIX does not drive volatility — and it
-was true, measured, and tested when it said so. The 2026-08 era coupled the
+This page used to state, in bold, that VIX does not drive volatility, and it
+was true, measured and tested when it said so. The 2026-08 era coupled the
 market factor's conditional-variance process to VIX after measuring both
 variants, and this section was rewritten in the same change that flipped the
 constant, because a page that quietly stops saying something is worse than
 one that never said it.
 
 **VIX is the market factor's implied volatility.** The factor's variance
-reverts to a target proportional to `(vix / 15)^2`, anchored so that VIX 15 —
-the endogenous mean — reproduces the uncoupled process exactly. The per-name
+reverts to a target proportional to `(vix / 15)^2`, anchored so that VIX 15,
+the endogenous mean, reproduces the uncoupled process exactly. The per-name
 GARCH recursion (`omega + alpha * r^2 + beta * v`) still has no VIX term:
 what VIX scales is the shared component of every return, so a crisis VIX is a
 volatility regime and a correlation regime at once, which is what a real
@@ -72,8 +72,8 @@ scenario API:
 
 A thirteenfold move in VIX moves realised volatility by a factor of 2.5, and
 a sub-15 pin now calms the market rather than doing nothing. VIX 5, 10 and 15
-produce identical prices only for the first day — the first close is where a
-pin first enters the variance target — and diverge from the second:
+produce identical prices only for the first day, since the first close is
+where a pin first enters the variance target, and diverge from the second:
 re-measured on the same universe at sim seed 3, day one's closes are
 bit-identical across all three pins and day two's differ for every pair. (An
 earlier version of this page claimed bit-identity over 60 days; even before
@@ -85,13 +85,13 @@ its baseline for reasons independent of the coupling (the clamp carries the
 process's fourth moment), so above VIX ~42 a harder pin buys almost no
 additional factor variance: quadratic inside the plausible band, flat beyond.
 A researcher pinning VIX 65 for a year gets a market realising roughly twice
-its calm volatility with crisis-level correlation — 2008 sustained, not a
-numerical blow-up.
+its calm volatility with crisis-level correlation. That is 2008 sustained,
+not a numerical blow-up.
 
 Four channels:
 
 1. **The factor's variance target**, above. The channel that answers "what
-   happens when volatility triples" — and, through the same mechanism,
+   happens when volatility triples", and, through the same mechanism,
    the crisis-correlation channel.
 2. **Quoted bid-ask**, through a multiplier `1 + max(0, (vix - 15) / 30)`.
    Mean quoted spread across `Universe.random(25, seed=11)` after five days,
@@ -106,12 +106,12 @@ Four channels:
    [How realistic is this market](how-realistic-is-this-market.html).
 4. **Credit spreads** in the daily economy step, recomputed at central-bank
    meetings (the first sits at day 45), so a VIX path also reprices the
-   yield equities discount off — at meeting cadence. See
+   yield equities discount off, at meeting cadence. See
    [Core concepts](core-concepts.html).
 
 So a VIX path stresses execution and strategy at once: spreads widen,
 volatility rises, and the cross-section starts moving together. What it does
-not move is any single name's idiosyncratic variance — VIX sizes the shared
+not move is any single name's idiosyncratic variance. VIX sizes the shared
 factor's share, not each name's own noise.
 
 ## Scenarios reach every entry point
@@ -126,12 +126,12 @@ spike = pt.tca.analyse(agent, seed=s, universe=u, days=10,
 Does execution cost more when VIX is high? Measured with `BuyAndHold` over
 `Universe.random(20, seed=11)`, ten days, seeds 1 to 12: the VIX 45 regime
 costs more in 12 of 12, median shortfall 11.69 bps against 6.06, paired median
-delta +5.62 bps. That is mostly the spread channel — `BuyAndHold` trades on
-day one, before a pin has reached the variance process — and the figures
+delta +5.62 bps. That is mostly the spread channel, because `BuyAndHold`
+trades on day one, before a pin has reached the variance process, and the figures
 re-verified bit-for-bit after the volatility coupling for exactly that
 reason. An agent trading through the following days pays the volatility
 channel too. A pinned VIX also closes the one macro feedback channel the
-TCA counterfactual now has — see
+TCA counterfactual now has. See
 [Transaction cost analysis](transaction-cost-analysis.html) for the
 boundary and its measurement.
 
@@ -140,12 +140,12 @@ boundary and its measurement.
 Macro counterfactuals are exact on the market stream, and `compare()` reports
 it. Before the 2026-08 RNG stream split this paragraph said "near-exact": a
 macro path changed prices, prices changed which settlement branch drew four
-uniforms, and the shared draw schedule could shift — an older build measured
+uniforms, and the shared draw schedule could shift. An older build measured
 -4 in 425,600 draws. The split removed that mechanism: settlement's uniforms
 are drawn unconditionally, and the market stream's schedule is a pure
 function of (market status, active roster, sector count), so two runs under
 different macro paths see identical market noise, draw for draw. The VIX
-volatility coupling preserves this — the variance target reads macro state
+volatility coupling preserves this, because the variance target reads macro state
 already evolved, never a new draw. `compare()` reports `draw_delta` from the
 market stream rather than asserting zero: a non-zero delta means the scenario
 changed the market's own draw schedule (a halt, a delisting, a roster
