@@ -176,6 +176,14 @@ directly, so `--help` opened a file named `--help` and died in a traceback.
 containing `add_argument` and a tool with no parser is not an entry point as
 far as it is concerned. Entry points go from 21 to 22.
 
+**The AWS survey launcher can now survive a spot reclaim.** Its row stream
+used `aws s3 sync`, which lists the destination to compare and so needs
+`s3:ListBucket`, a permission the instance role does not have. Every sync
+failed silently while every `cp` in the same loop succeeded, so a reclaimed run
+resumed from nothing. The rows are copied with `cp` now, and the launcher also
+refuses to start a run at all if a one-byte write to the bucket fails, which is
+what a missing instance profile looks like and what cost one full survey.
+
 **`read_scenario_frontier.py`** is new, and reads the survey for the frontier
 between scenario response and horizon realism.
 
