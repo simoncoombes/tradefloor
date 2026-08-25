@@ -1,6 +1,6 @@
 [package]
 name = "pretium"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 description = "Deterministic market simulation with a real limit order book."
 # Dual-licensed, the Rust-ecosystem norm (serde, tokio, rand): a downstream

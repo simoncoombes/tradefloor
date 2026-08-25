@@ -1,30 +1,66 @@
 # Changelog
 
-## Unreleased
+## 0.1.4
 
-### A correction to notebook 09, which shipped in 0.1.3 with a wrong claim
+Nothing in the engine moves. The known-answer digest is unchanged, pt-v1
+through pt-v6 reproduce exactly, and pt-v3 is still the default, so every
+published result still reproduces. This release adds one inert mechanism, and
+otherwise turns several claims the documentation was making into measurements
+a reader can check.
 
-The transmission sweep in that notebook ran its probe over two days and
-concluded from it that `federal_funds_rate` and `vix` have no effect on a
-valuation. Both statements were wrong, and wrong for the same already
-documented reason. The corporate bond yield, which is the rate equities
-discount off, is recomputed only at central bank meetings, and the first is
-scheduled 45 days out. A two day probe measures the meeting schedule and
-reports it as an absence. The boundary is sharp: a policy rate of 0.5% against
-10% gives bit identical valuations through day 45 and a 12.8% gap on day 46.
-Unpinned, a 10% policy rate is worth about 11% of fundamental value.
+### `fair_value_book_floor`, and the discontinuity it exists for
 
-`docs/scenario-recipes.md` has led with this trap since before the notebook was
-written, states the rule that rate recipes must run at least 90 days, and gives
-the measurement. The error was writing a probe without reading it.
+Fair value jumps UP as earnings fall through zero. Profitable companies are
+valued on earnings times a multiple and loss makers at book times 1.2, so with
+a book value of 20.00 a company earning 1.00 is worth 14.90, one earning 0.50
+is worth 7.45, and one losing 19.49 is worth 24.00. A barely profitable company
+is worth less than a bankrupt one.
 
-### The transmission map, written down where it can be found
+That is close to harmless today, because earnings are fixed when an instrument
+is built and nothing walks them through zero. It stops being harmless the
+moment anything does: an airline going from 4.30 to a loss across a year would
+watch its fair value slide, invert and jump, with the price chasing it.
 
-That page's heading said "nothing transmits before day 45", which is false and
-was believed anyway. The sentence beneath it has always been correctly narrow,
-a *policy-only* rate path, but the heading is what gets remembered. It now
-carries the qualifier, and Scenarios has gained a per-field table measured by
-introducing each shock on day 5 and reading day 25:
+The new parameter applies the book floor on both sides, which makes fair value
+continuous at zero and non decreasing in earnings. **It ships at 0.0, off, and
+is bit identical there.** That is not caution for its own sake: 42.8% of
+instruments from `Universe.random` have `eps * pe` below `book * 1.2`, some at
+a fifth of it, so switching it on re-values a large part of a typical universe
+and re-bases every calibrated statistic. Adopting it is an era boundary and a
+recalibration rather than a bug fix, and this release only makes it available
+to measure.
+
+### A new envelope gap: the macro state cannot reach its own crisis regimes
+
+`macro-range` records something the envelope did not say and users were
+entitled to know, namely that left to itself the economy stays in a moderate
+band.
+
+Endogenous inflation peaks at 4.06% to 4.11% over five seeds and five years,
+against a hard clamp of 6.0% and a US CPI that reached 9.1% in June 2022. The
+obvious explanation is wrong, and the gap says so, because the next person will
+otherwise start there: `inflation_mean_rev_coeff` is 0.55 a month and looks
+like it should pin inflation to its 2% target, but the monthly series has
+AR(1) +0.936 against +0.894 for real CPI year on year across 2020 and 2021. The
+model's inflation is if anything MORE persistent than the real thing. The
+defect is dispersion, sd 1.23 around a mean of 1.99%, which puts 9% at 4.6
+sigma.
+
+The consequence reaches the central bank. Its crisis cadence pulls the next
+meeting in to 21 to 30 days when a decision leaves it more than 2pp behind an
+inflation rate above 4%, and that path is correct and well exercised, firing in
+22.0% of the 11,898 central bank cases in the parity corpus. A default run
+simply cannot reach it. It also fires in STAGFLATION rather than in high
+inflation as such, so pinning inflation high with unemployment low will not
+trigger it however high you pin it.
+
+So a 2022 style inflation shock has to be driven through a scenario, and so
+does the policy response to it.
+
+### What each macro field transmits, and when
+
+`docs/scenarios.md` gains a per field table, measured by introducing each shock
+on day 5 of a run and reading day 25.
 
 | field | median price move by day 25 | fair value |
 |---|---|---|
@@ -35,110 +71,84 @@ introducing each shock on day 5 and reading day 25:
 | `inflation_rate` 2% to 9% | 0.00% | unchanged |
 | `fear_greed_index` 50 to 0 | 0.00% | unchanged |
 
-Three fields act on the day you move them, two wait for a meeting because both
-work only by steering the corporate bond yield, and one does nothing ever. The
-split that matters is that `vix` moves prices hard without moving fair value at
-all, so "transmits" and "re-rates" are different questions and were being asked
-as one.
+Three act on the day you move them, two wait for a central bank meeting because
+both work only by steering the corporate bond yield, and one does nothing at
+all. `fear_greed_index` is settable, range validated and reported in
+`macro_table`, and no pricing code reads it. That is now stated rather than
+left to be discovered.
 
-`tests/test_macro_transmission.py` pins the map: the meeting boundary at its
-exact day, the immediate half, the fact that pinning the yield severs
-everything upstream of it, and the inertness of `fear_greed_index`.
+The scenario recipes page previously headed this "nothing transmits before day
+45". The sentence beneath it was correctly narrow, a POLICY ONLY rate path, but
+the heading is what gets remembered and it is false. It now carries the
+qualifier, and `tests/test_macro_transmission.py` pins the whole map: the
+meeting boundary at its exact day, the fields that act immediately, the fact
+that pinning the yield severs everything upstream of it, and the inertness of
+`fear_greed_index`.
 
-### pt-v6 responds to a VIX spike LESS than the default does
+### Two claims in the realism envelope are now measurements
 
-0.1.3 recommends pt-v6 for multi-year work where the tail matters, on band
-counts: 8 of 10 at 504 days against pt-v3's 5, and 9 of 10 at the certified
-horizon. That recommendation was incomplete, and the missing part lands on
-exactly the long-dated crisis work it is meant for.
+**"The direction of response is right"** was asserted with no number behind it.
+Driving the real 2020 to 2021 macro path through the model and correlating
+daily returns against each driver over 504 sessions, beside the same
+correlations computed on real AAPL:
 
-Measured over thirty seeds with `tools/calibration/scenario_response.py`, the
-steady-state volatility lever from VIX 5 to VIX 65:
-
-| preset | vol lever | note |
+| channel | simulated | real AAPL |
 |---|---|---|
-| real markets | 6.16x | the target nothing is close to |
-| pt-v3, the default | 3.07x | |
-| pt-v4 | 2.67x | jumps arrive, and the lever is spent here |
-| pt-v5 | 2.69x | |
-| pt-v6 | 2.68x | inherited |
+| return vs change in VIX | -0.423 | -0.622 |
+| return vs change in credit yield | -0.496 | -0.592 |
+| return vs change in valuation | +0.573 | +0.803 |
+| absolute return vs VIX level | +0.512 | +0.489 |
 
-A sustained crisis is about an eighth less violent under pt-v6 than under the
-default, so a scenario study turning on crisis MAGNITUDE should prefer pt-v3
-even over multi-year windows, or say that it accepted the weaker response. The
-envelope's horizon gap now carries this, so anyone selecting pt-v6 on the band
-counts reads the cost in the same paragraph.
+All four carry the sign theory fixes in advance, and the volatility clustering
+channel is close to exact. The three directional channels run at roughly
+seventy to eighty five percent of the real response, which is the
+scenario magnitude gap from another angle: a shock moves this market the right
+way and not far enough.
 
-**Two corrections to how that was first written here.** The cost is not
-pt-v6's to answer for. The chain above puts the drop at pt-v3 to pt-v4, when
-jumps arrived; pt-v5 and pt-v6 inherit it and pt-v6 changes it by 0.01x.
-Attributing it to the newest preset was wrong.
+**pt-v6's scenario cost** is now in the horizon gap, so a reader selecting it on
+band counts reads the cost in the same paragraph. The steady state volatility
+lever from VIX 5 to VIX 65 runs 3.07x at pt-v3, 2.67x at pt-v4, 2.69x at pt-v5
+and 2.68x at pt-v6, against real markets' 6.16x. A sustained crisis is about an
+eighth less violent under pt-v6 than under the default, so a study turning on
+crisis magnitude should prefer pt-v3 even over multi year windows. The cost was
+spent when jumps arrived at pt-v4; every preset since inherits it.
 
-And the harness's "shock response retained" percentage was quoted, at 27.6%
-against 16.7%, which the calibration record says plainly should not be done.
-That figure divides two small excesses over 1.0, so shock ratios of 1.062 and
-1.038 become an eleven-point headline. The transient difference between the
-two presets is real and it is 0.024. Quoting the percentage is a real number
-at a resolution it does not have.
+### Calibration tooling
 
-### A realism gap: endogenous inflation cannot reach its own crisis regime
+**`atlas_survey.py plan` now binds.** `--samples` is a single top level argument
+that `run` re-reads from its own default of 4000, and `plan` wrote nothing to
+disk, so `plan --samples 1000` followed by a bare `run` forecast 48,000 tasks
+and then ran 192,000 under a different plan fingerprint printed one line later.
+The forecast is what an operator sizes a dead man switch against, and one
+survey run was killed by its own timeout at 63.9% complete for exactly this
+reason. `plan --out` now writes `meta.json`, which lets the refusal `run`
+already had actually fire, and `tests/test_survey_plan_guard.py` pins it.
 
-The central bank has a crisis cadence that pulls the next meeting in to 21-30
-days when a decision leaves it more than 2pp behind an inflation rate above
-4%. It was measured as never firing, across five seeds and five years and
-again under inflation pinned as high as 9%, and changed on the strength of
-that to read the pre-decision rate instead.
+**`scenario_response.py` no longer prints a number that should not be quoted.**
+"Shock response retained" divides two small excesses over 1.0, so a difference
+of 0.024 in the shock ratio becomes an eleven point headline, and it has been
+quoted that way twice in this project's own record. The tool now prints the
+excesses it is built from and names the shock ratios to quote instead.
 
-**That change was wrong and has been reverted.** The JS oracle rejected it with
-1618 mismatches and was right to. The path is not dead: it fires in 22.0% of
-the 11,898 central-bank cases in the parity corpus. What the scenarios above
-all had in common was low unemployment, where the Taylor rule hikes hard and
-genuinely does catch up, so not firing was the correct answer. It fires in
-stagflation, which none of them produced: at inflation 4.5% with unemployment
-9.0% the bank cuts for the output gap and leaves itself further behind, and the
-follow-up is pulled in. The post-decision reading is the better rule, because
-the question is whether the decision was sufficient.
+**`read_decay_survey.py` gained an argument parser.** It read `sys.argv[1]`
+directly, so `--help` opened a file named `--help` and died in a traceback.
+`tests/test_tool_help.py` could not see it, because that test collects scripts
+containing `add_argument` and a tool with no parser is not an entry point as
+far as it is concerned. Entry points go from 21 to 22.
 
-The gap the episode did find is real and sits elsewhere. Endogenous inflation
-peaks at 4.06% to 4.11% over five seeds and five years, against a hard clamp of
-6.0% and a US CPI that reached 9.1% in June 2022. So an entire regime is
-implemented, correct and parity-tested, and a default run cannot get to it: a
-2022-style inflation shock has to be driven through a scenario. Raising the
-inflation process is an era boundary and belongs to a calibrated change, so it
-is recorded and tested rather than fixed here.
+**`read_scenario_frontier.py`** is new, and reads the survey for the frontier
+between scenario response and horizon realism.
 
-The obvious explanation for that ceiling is also wrong, and worth writing down
-so the next attempt does not start there. `inflation_mean_rev_coeff` is 0.55 a
-month, which looks like it should pin inflation to its 2% target and implies an
-AR(1) of 0.45. Measured over eight seeds and five years the monthly series has
-AR(1) **+0.936**, against **+0.894** for real US CPI year-on-year across
-2020-21: the model's inflation is if anything slightly more persistent than the
-real thing, because the drivers around the reversion term carry their own
-persistence.
+### Worked example
 
-So the defect is dispersion, not persistence. Model monthly inflation has sd
-1.23 around a mean of 1.99% and spans -0.12% to 4.14%, where real CPI spanned
-0.1% to 7.0% in 2020-21 alone, and 9.1% at the 2022 peak. Reaching that from
-here is a 4.6 sigma excursion. A calibrated change should go after the driver
-and shock magnitudes and leave the mean reversion alone.
-
-The corrected account is more useful than either version. The model has
-exactly two valuation channels. `corporate_bond_yield` is the discount rate,
-and `federal_funds_rate`, `vix` and `inflation_rate` reach a valuation solely
-by moving it, so pinning that yield severs all three at once. `qe_pe_boost` is
-a direct multiple that bypasses the yield entirely and moves value one for one.
-
-The notebook's own conclusion survives the correction unchanged. Its credit leg
-is pinned to real HYG derived data, which is the right choice and which does
-shadow the policy and volatility legs, so `qe_pe_boost` really was the only
-lever left able to express a re-rating. What changed is the reason, from "those
-fields do nothing" to "those fields were severed by a choice made three cells
-earlier". The sweep now runs 120 days and shows both the pinned and unpinned
-cases.
-
-`fear_greed_index` is confirmed genuinely inert rather than merely slow: bit
-identical prices at every value from 0 to 100 out to 504 days, and no pricing
-code in the engine reads it.
+`examples/09-a-pandemic-shaped-market.ipynb`, which shipped in 0.1.3, gains a
+section testing whether its effects follow its causes rather than only whether
+its path resembles the real one. It carries the channel table above and an
+event study over the five sessions after each of six dated events, which agrees
+on sign five times out of six. The exception is the Fed's intermeeting cut of
+3 March 2020, where the model has the textbook channel by which a cut helps
+equities and no representation of an emergency cut reading as a panic signal.
+That channel is missing rather than miscalibrated, and the notebook says so.
 
 ## 0.1.3
 
