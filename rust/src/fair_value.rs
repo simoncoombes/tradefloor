@@ -178,12 +178,69 @@ pub fn compute_fair_value(
     company: &CompanyValuationInputs,
     economy: &EconomyValuationInputs,
 ) -> FairValueBreakdown {
+    compute_fair_value_with(company, economy, 0.0)
+}
+
+/// [`compute_fair_value`] with the book floor extended to profitable companies.
+///
+/// `book_floor` is `ModelParams::fair_value_book_floor`. At 0.0 this is exactly
+/// the function above and the TypeScript's behaviour; `fair_value_parity` calls
+/// the two-argument form and is untouched.
+///
+/// # The discontinuity this exists to close
+///
+/// The reference switches hard at `eps > 0`. Measured, book value 20.00 and a
+/// transportation anchor:
+///
+/// | eps | fair value |
+/// |---|---|
+/// | 4.30 | 64.07 |
+/// | 1.00 | 14.90 |
+/// | 0.00 | 24.00 |
+/// | -19.49 | 24.00 |
+///
+/// Fair value FALLS to 14.90 and then JUMPS UP to 24.00 as earnings cross into
+/// loss, so a barely profitable company is worth less than a bankrupt one with
+/// the same book. Today that is close to harmless, because `eps` is fixed when
+/// an instrument is built and nothing walks it through zero. A time-varying
+/// earnings path -- an airline going 4.30 to -19.49 across 2020 -- drives
+/// straight through it, and the price chases a fair value that dips and then
+/// inverts.
+///
+/// At 1.0 the floor applies on both sides, so fair value is continuous at zero
+/// and non-decreasing in earnings.
+///
+/// # Why it is off by default
+///
+/// It is not a small correction. 42.8% of instruments from `Universe.random`
+/// have `eps * pe` BELOW `book * LOSS_MAKING_PRICE_TO_BOOK`, some at a fifth of
+/// it, so switching it on re-values a large part of a typical universe and
+/// re-bases every calibrated statistic. Adopting it is an era boundary and a
+/// recalibration, not a bug fix, and it ships inert until that work is done.
+pub fn compute_fair_value_with(
+    company: &CompanyValuationInputs,
+    economy: &EconomyValuationInputs,
+    book_floor: f64,
+) -> FairValueBreakdown {
     let eps = company.eps.unwrap_or(0.0);
 
     if eps > 0.0 {
         let pe = compute_target_pe(company, economy);
+        // The floor is a BRANCH at zero, not arithmetic, for the same reason
+        // `market_vol_slow_weight` is: every preset before this parameter
+        // existed must reproduce bit for bit, and that is the only spelling
+        // that owes nothing to an argument about how floats behave.
+        let earnings_value = mathx::max(FAIR_VALUE_FLOOR, eps * pe.target_pe);
+        let fair_value = if book_floor == 0.0 {
+            earnings_value
+        } else {
+            let floor = company.book_value_per_share.unwrap_or(0.0)
+                * LOSS_MAKING_PRICE_TO_BOOK
+                * book_floor;
+            mathx::max(earnings_value, floor)
+        };
         return FairValueBreakdown {
-            fair_value: mathx::max(FAIR_VALUE_FLOOR, eps * pe.target_pe),
+            fair_value,
             target_pe: pe.target_pe,
             sector_anchor_pe: pe.sector_anchor_pe,
             rate_adjustment: pe.rate_adjustment,

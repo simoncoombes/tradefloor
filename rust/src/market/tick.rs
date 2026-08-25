@@ -36,7 +36,7 @@
 //! and not the tape is not a breaker. See D6 in the port notes.
 
 use crate::economy::EconomyState;
-use crate::fair_value::{compute_fair_value, CompanyValuationInputs, EconomyValuationInputs};
+use crate::fair_value::{compute_fair_value_with, CompanyValuationInputs, EconomyValuationInputs};
 use crate::mathx;
 use crate::microstructure::{settle_price_through_book, CompanyMicrostructure, SettleOptions};
 use crate::mispricing::crowd_lean_with;
@@ -602,7 +602,8 @@ pub fn simulate_market_tick(
 
     for i in 0..active_count {
         let idx = active_indices[i];
-        let breakdown = compute_fair_value(&companies[idx].valuation(), &econ_view);
+        let breakdown = compute_fair_value_with(
+            &companies[idx].valuation(), &econ_view, p.fair_value_book_floor);
         let fv = breakdown.fair_value;
 
         // Lazy init: adopt the current premium/discount as the starting `s`,

@@ -183,6 +183,25 @@ pub struct ModelParams {
     pub market_vol_slow_gain: f64,
     /// How much of the slow component's deviation from baseline reaches
     /// the realised variance. 0.0 disables it.
+    /// Applies the loss-maker book floor to PROFITABLE companies too.
+    ///
+    /// At 0.0 this is off and the valuation is bit-identical to the TypeScript
+    /// reference, which switches hard at `eps > 0`: a company earning 0.01 is
+    /// valued on earnings and one earning exactly 0 is valued at
+    /// `book * LOSS_MAKING_PRICE_TO_BOOK`. Fair value therefore JUMPS UP as
+    /// earnings fall through zero, and a barely profitable company is worth
+    /// less than a loss-making one with the same book.
+    ///
+    /// At 1.0 the floor applies on both sides, `max(eps * pe, book * 1.2)`, so
+    /// fair value is continuous at zero and non-decreasing in earnings.
+    ///
+    /// Inert by default because it is NOT a small correction: 42.8% of
+    /// instruments from `Universe.random` sit below the floor, some at a fifth
+    /// of it, so switching it on re-values a large part of any universe and
+    /// re-bases every calibrated statistic. It exists so that a time-varying
+    /// earnings path has somewhere monotonic to run; adopting it is an era
+    /// boundary and a recalibration, not a bug fix.
+    pub fair_value_book_floor: f64,
     pub market_vol_slow_weight: f64,
     /// How strongly realised volume tracks the market factor's variance.
     ///
@@ -623,6 +642,7 @@ impl ModelParams {
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
             market_vol_slow_gain: 0.0,
+            fair_value_book_floor: 0.0,
             market_vol_slow_weight: 0.0,
             volume_variance_gain: 0.0,
             universe_stress_decay: 0.0,
@@ -893,6 +913,7 @@ impl ModelParams {
             "market_vol_vix_anchor" => self.market_vol_vix_anchor,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
+            "fair_value_book_floor" => self.fair_value_book_floor,
             "market_vol_slow_weight" => self.market_vol_slow_weight,
             "volume_variance_gain" => self.volume_variance_gain,
             "universe_stress_decay" => self.universe_stress_decay,
@@ -986,6 +1007,7 @@ impl ModelParams {
             "market_vol_vix_anchor" => out.market_vol_vix_anchor = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
+            "fair_value_book_floor" => out.fair_value_book_floor = value,
             "market_vol_slow_weight" => out.market_vol_slow_weight = value,
             "volume_variance_gain" => out.volume_variance_gain = value,
             "universe_stress_decay" => out.universe_stress_decay = value,
@@ -1121,6 +1143,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "crowd_lean_cap",
         "crowd_momentum_gain",
         "crowd_valuation_gain",
+        "fair_value_book_floor",
         "garch_alpha",
         "garch_beta",
         "garch_beta_dispersion",
