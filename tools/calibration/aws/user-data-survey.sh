@@ -25,7 +25,9 @@ cat > /home/ec2-user/stream.sh <<'STREAM'
 #!/bin/bash
 BUCKET="$1"
 while true; do
-  sleep 300
+  # 120, not 300. A spot reclaim gives two minutes of warning, so the sync
+  # interval is the upper bound on how many rows a reclaim throws away.
+  sleep 120
   # The log upload is NOT gated on the work directory existing. Gating it
   # there cost the first streamed run its visibility for the whole build:
   # out/ is created after maturin finishes, so a failure during provisioning
