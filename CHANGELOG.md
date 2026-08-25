@@ -2,11 +2,30 @@
 
 ## 0.1.4
 
-Nothing in the engine moves. The known-answer digest is unchanged, pt-v1
-through pt-v6 reproduce exactly, and pt-v3 is still the default, so every
-published result still reproduces. This release adds one inert mechanism, and
-otherwise turns several claims the documentation was making into measurements
-a reader can check.
+Two new model presets, a realism panel that has grown from ten statistics to
+fourteen, and a calibration record that says where every number came from.
+Nothing that already shipped moves: the known-answer digest is unchanged,
+pt-v1 through pt-v6 reproduce exactly, and pt-v3 is still the default and
+the preset the envelope certifies, so every published result still
+reproduces.
+
+`pt-v7` is the first preset in which names in the same industry co-move
+more than names in different ones, in calm markets and in a crisis alike.
+`pt-v8` is the first whose correlation has a memory: the market factor's
+variance now remembers, so correlation that rose last month is still
+elevated this month, and a crisis is a third more violent than under any
+earlier preset. Both are selectable by name and every gate they passed is
+in the record. The panel's four new statistics (three conditional
+correlation measures and correlation persistence) come with real-market
+bands at both horizons, and the two misses the default preset now shows
+against them are stated as gaps with the mechanism that closes each.
+
+Five parameters ship inert at their old values, each replacing a literal
+that was deciding a calibration question before anyone asked it: the two
+that let sector structure survive a crisis, the fair-value book floor, and
+the two inflation dials. The calibration tooling that produced all of this,
+including the first full-width AWS survey and a one-command thirty-seed
+gate, is in the tree. The sections below give the measurements.
 
 ### The realism panel grows from ten statistics to thirteen
 
