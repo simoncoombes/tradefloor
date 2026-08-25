@@ -148,7 +148,7 @@ def test_band_distance_agrees_with_the_verdict_wording_on_every_band():
 # --------------------------------------------------------------------------
 
 
-def test_the_loss_covers_nine_statistics_and_reports_ten():
+def test_the_loss_covers_nine_statistics_and_reports_thirteen():
     # Five live targets: lag-5 clustering joined when the instrument found
     # the corner with in-band lag-1 clustering and zero memory behind it.
     assert set(LIVE_TARGETS) == {
@@ -167,7 +167,14 @@ def test_the_loss_covers_nine_statistics_and_reports_ten():
     # The structurally unreachable remainder, derived as the complement of
     # the membership tuples so nothing else needs editing when one is
     # promoted.
-    assert set(STRUCTURAL) == {"volume_change_acf1"}
+    # Structural now also holds the three conditional correlation statistics
+    # added 2026-08-25. They enter here by default, outside the objective,
+    # until each has been shown to be something a lever can move; promoting
+    # one is a decision recorded in loss.py, not a side effect of measuring it.
+    assert set(STRUCTURAL) == {
+        "volume_change_acf1", "corr_asymmetry", "corr_asymmetry_lagged",
+        "sector_excess_corr",
+    }
     assert set(LIVE_TARGETS) | set(CONSTRAINTS) | set(STRUCTURAL) == set(
         REAL_MARKETS
     )
@@ -191,7 +198,10 @@ def test_structural_statistics_ride_along_but_cannot_steer():
     for key in STRUCTURAL:
         assert rows[key]["role"] == "structural"
         assert rows[key]["contribution"] is None
-        assert rows[key]["distance"] > 0.0  # out of band, and visibly so
+    # The committed sweep artifact predates the three conditional correlation
+    # statistics, so those rows carry no distance here. The two structural
+    # rows that are out of band on the shipped model must read as such.
+    assert rows["volume_change_acf1"]["distance"] > 0.0
     contributions = [
         row["contribution"] for row in rows.values()
         if row["contribution"] is not None
@@ -425,6 +435,29 @@ THIRTY_SEED_PANELS = {
         -0.4381135315, -0.4582469152, -0.4477784396, -0.4465225235,
         -0.4755706407, -0.4503070863, -0.4447755028, -0.4492209396,
         -0.4600876586, -0.4571319669],
+    # Added 2026-08-25, same protocol: pt-v1, Universe.random(40, seed=111),
+    # 252 days, seeds 101-130.
+    "corr_asymmetry": [
+        -0.01365476924, -0.00834635591, 0.06222762397, 0.1190977984, -0.06324637696,
+        0.05027069753, 0.06570576659, -0.04349753816, -0.3160592531, 0.2473170714,
+        -0.00517798245, -0.2951636733, -0.103984396, -0.2066443852, -0.1855401327,
+        -0.1554541687, -0.0021549148, -0.0685582711, 0.022526707, 0.02075095195,
+        0.4122293921, -0.0473880765, -0.009813444639, -0.01168205867, -0.01720350705,
+        0.1103438107, 0.0547970315, -0.008400141022, -0.1795532574, -0.4143334701],
+    "corr_asymmetry_lagged": [
+        -0.1160630718, -0.07268273244, -0.03658823623, -0.02186244437, -0.1059864783,
+        -0.1641807344, 0.0502616688, -0.345662804, -0.19382567, -0.2797250792,
+        -0.08028657311, -0.3013900432, -0.009493447994, -0.168872869, -0.0817376553,
+        -0.2455154498, -0.07204271813, 0.01555778191, -0.05734860038, -0.001139803166,
+        0.2290532256, -0.02063011745, -0.04431581296, -0.04918075595, -0.2220106683,
+        -0.03783869171, -0.00747182418, -0.09232110532, -0.09027983227, -0.2232747464],
+    "sector_excess_corr": [
+        -0.008836742098, -0.01325986894, 0.005803277982, -0.0111010954, -0.003408248454,
+        -0.001695591556, -0.01299047893, -0.004138401078, -0.003529321169, -0.003379570898,
+        -0.005679370339, -0.01290213722, -0.006933603972, -0.01145232241, -0.01161478735,
+        -0.005665862101, -0.004701784142, -0.006498673397, 0.004440110519, 0.009890681251,
+        -0.005962604283, -0.004584106038, -0.004668588491, -0.01574369628, -0.003724421431,
+        -0.01386166151, -0.003509095508, 0.01124697953, 0.003895012394, -0.008910727055],
 }
 
 

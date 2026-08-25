@@ -32,6 +32,7 @@ ROUTES: dict[str, dict] = {
     "scenario-magnitude": dict(horizon_days=252, scenario_magnitude=True),
     "roster-concentration": dict(horizon_days=252, sector_concentrated=True),
     "macro-range": dict(horizon_days=252, macro_regime=True),
+    "sector-structure": dict(horizon_days=252, statistics=("sector_excess_corr",)),
 }
 
 

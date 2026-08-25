@@ -206,7 +206,7 @@ autocorrelation: own measurement only, no published figure for the
 estimator was recoverable). The full derivation record, window tables
 and verdict moves are in pretium-design/REALISM-BANDS.md.
 
-## Why there are ten statistics and not four
+## Why there are thirteen statistics and not four
 
 The first four this module reported were chosen before anyone looked at
 dependence, and all four come from one instrument's price series taken on its
@@ -322,6 +322,12 @@ REAL_MARKETS = {
     "volume_abs_return_corr": (0.46, 0.66),
     "leverage_effect": (-0.16, 0.00),
     "volume_change_acf1": (-0.32, -0.20),
+    # Conditional correlation, added 2026-08-25 (pretium-design/REALISM-BANDS.md,
+    # "Conditional correlation"). The unconditional mean over all pairs cannot
+    # see sign, sector or time, and a search cannot preserve what it cannot see.
+    "corr_asymmetry": (-0.25, 0.45),
+    "corr_asymmetry_lagged": (-0.20, 0.55),
+    "sector_excess_corr": (0.11, 0.23),
 }
 
 #: Where each band comes from, carried as data so a reader can ask the
@@ -555,6 +561,38 @@ REAL_MARKETS_PROVENANCE = {
                          "because real volume shocks partly persist",
         "supersedes": (-0.05, 0.15),
     },
+    "corr_asymmetry": {
+        "claim": "mean pairwise correlation on days the equal-weight market "
+                 "return is below -1 sd minus the same above +1 sd, 40-name "
+                 "US large-cap roster, 252-day windows 2015-2025",
+        "windows": (-0.154, 0.083, 0.348),
+        "crisis_window": 0.167,
+        "sources": (
+            "pretium-design/realism_bands_reference_panel.py, run 2026-08-25; "
+            "no literature reconciliation applied, the record carries no "
+            "verified exceedance-correlation number for single stocks",
+        ),
+    },
+    "corr_asymmetry_lagged": {
+        "claim": "as corr_asymmetry, conditioned on the previous day's "
+                 "equal-weight market return",
+        "windows": (-0.092, 0.111, 0.438),
+        "crisis_window": 0.074,
+        "sources": (
+            "pretium-design/realism_bands_reference_panel.py, run 2026-08-25",
+        ),
+    },
+    "sector_excess_corr": {
+        "claim": "mean same-sector pairwise correlation minus mean cross-sector, "
+                 "GICS labels for the same 40 names, 252-day windows 2015-2025",
+        "windows": (0.133, 0.164, 0.200),
+        "crisis_window": 0.103,
+        "sources": (
+            "pretium-design/realism_bands_reference_panel.py, run 2026-08-25. "
+            "Every one of ten windows including the 2020 crisis sits between "
+            "+0.10 and +0.20; trimmed noise scale 0.021",
+        ),
+    },
 }
 
 #: The across-seed standard deviation of each statistic at the shipped
@@ -600,6 +638,17 @@ SEED_SD = {
     "volume_abs_return_corr": 0.0433524,
     "leverage_effect": 0.0759765,
     "volume_change_acf1": 0.0102341,
+    # Added 2026-08-25 on the SAME protocol as the rest of this table: pt-v1,
+    # Universe.random(40, seed=111), 252 days, seeds 101-130, sample sd. Not
+    # pt-v3, deliberately: this table is the frozen denominator of every
+    # "seed-sd out" figure the project has published, and it is re-derived
+    # from the committed per-seed table in tests/test_loss.py. A first draft
+    # measured these three on pt-v3 with the population estimator and was
+    # caught by that test; the pt-v3 values (0.1435, 0.1451, 0.0071) are
+    # recorded in the calibration record beside the certification medians.
+    "corr_asymmetry": 0.1614765,
+    "corr_asymmetry_lagged": 0.1178216,
+    "sector_excess_corr": 0.0068036,
 }
 
 #: Real-market bands re-derived at a 504-DAY measurement window.
@@ -630,6 +679,10 @@ REAL_MARKETS_504 = {
     "volume_abs_return_corr": (0.48, 0.65),
     "leverage_effect": (-0.13, 0.02),
     "volume_change_acf1": (-0.29, -0.21),
+    # Five non-crisis 505-bar windows, same rule; pretium-design/bands-504-conditional-corr.json.
+    "corr_asymmetry": (-0.04, 0.13),
+    "corr_asymmetry_lagged": (-0.10, 0.47),
+    "sector_excess_corr": (0.11, 0.22),
 }
 
 #: The across-seed noise scale at 504 days, the companion to `SEED_SD`.
@@ -649,6 +702,12 @@ SEED_SD_504 = {
     "volume_abs_return_corr": 0.04210395,
     "leverage_effect": 0.08338545,
     "volume_change_acf1": 0.01183045,
+    # 2026-08-25, pt-v3, same protocol, sample sd across the thirty seeds;
+    # the run reproduced MEASURED_504's cross_sectional_corr 0.4057 to four
+    # places.
+    "corr_asymmetry": 0.14982,
+    "corr_asymmetry_lagged": 0.13171,
+    "sector_excess_corr": 0.00539,
 }
 
 #: Where SEED_SD_504 came from.
@@ -704,6 +763,9 @@ LABELS = {
     "volume_abs_return_corr": "volume vs |return|",
     "leverage_effect": "leverage, r vs |r+1|",
     "volume_change_acf1": "volume change acf(1)",
+    "corr_asymmetry": "corr, down vs up days",
+    "corr_asymmetry_lagged": "corr, after down vs up",
+    "sector_excess_corr": "same-sector excess corr",
 }
 
 

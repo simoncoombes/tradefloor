@@ -52,8 +52,12 @@ of the same length by the method in the calibration docs.
 | `volume_abs_return_corr` | +0.5339 | 0.46 to 0.66 | in band |
 | `leverage_effect` | −0.0349 | −0.16 to 0.00 | in band |
 | `volume_change_acf1` | −0.4598 | −0.32 to −0.20 | **out, 13.7 sd** |
+| `corr_asymmetry` | +0.0036 | −0.25 to 0.45 | in band |
+| `corr_asymmetry_lagged` | −0.0330 | −0.20 to 0.55 | in band |
+| `sector_excess_corr` | +0.0037 | 0.11 to 0.23 | **out, 15 sd** |
 
-Band-distance loss `L_real` = **0.0000**.
+Band-distance loss `L_real` = **0.0000**. The last three rows were added on
+2026-08-25; see gap 7 for why the panel grew and what the new miss means.
 
 ## The claim survives the axes it was not fitted to
 
@@ -63,11 +67,11 @@ calibration never saw:
 
 | axis | result | `L_real` |
 |---|---|---|
-| training seeds (101-130), 40 names | 9/10 in band | 0.0000 |
-| **held-out seeds** (1-6), 40 names | 9/10 in band | 0.0000 |
-| **held-out universe** (60 names, different draw) | 9/10 in band | 0.0000 |
+| training seeds (101-130), 40 names | 11/13 in band | 0.0000 |
+| **held-out seeds** (1-6), 40 names | 11/13 in band | 0.0000 |
+| **held-out universe** (60 names, different draw) | 11/13 in band | 0.0000 |
 
-The same nine statistics, the same zero loss, on instruments and seeds the
+The same eleven statistics, the same zero loss, on instruments and seeds the
 search never touched. This is the part of the claim worth trusting.
 
 ## The gaps, measured
@@ -96,7 +100,7 @@ and is fine to use.
 The statistics are horizon-dependent, and the model is roughly five times
 more horizon-sensitive than the market it imitates. Measured against
 bands re-derived at the *matching* 504-day window, not the 252-day bands,
-which would be the wrong ruler, the shipped model holds **5 of 10**:
+which would be the wrong ruler, the shipped model holds **6 of 13**, 5 of the original 10:
 
 | statistic | 252d | 504d | 504-matched band | verdict at 504d |
 |---|---|---|---|---|
@@ -231,7 +235,7 @@ drawn from one pool:
 
 | roster | in band | `L_real` | vol% |
 |---|---|---|---|
-| balanced (the certified one) | 9/10 | 0.0000 | 27.9 |
+| balanced (the certified one) | 9 of the original 10 | 0.0000 | 27.9 |
 | S&P-like mix | 8/10 | 0.0176 | 27.4 |
 | all technology | 7/10 | 0.0043 | 32.8 |
 
@@ -242,12 +246,40 @@ concentrated the roster, the less of it transfers.
 roster.** Re-measure the panel on your own universe. `facts.measure()`
 takes it directly, and `envelope.intervals()` will report the spread.
 
+### Gap 7: the model has no sector structure
+
+`sector_excess_corr`, mean same-sector pairwise correlation minus mean
+cross-sector, reads **0.0037** on the shipped preset against a real band of
+**+0.11 to +0.23**: about 15 seed-standard-deviations out at 252 days, and
+about 20 out at 504. Every one of ten real windows, the 2020 crisis included,
+sits between +0.10 and +0.20, which makes this the tightest band on the panel
+after `volume_change_acf1`. The reading holds on held-out seeds (0.012) and on
+a held-out 60-name universe (0.017).
+
+The cause is one scalar. The sector factor is a single normal per sector at
+sigma 0.002 with a loading of 0.5 for every member, and carries about a quarter
+of one percent of a name's daily variance, so residual correlation after the
+market factor is diagonal in practice. The parameter, `sector_factor_sigma`, is
+settable, and the pt-v1 search reported it as a null direction: which is what a
+lever looks like when nothing in the objective can see it. Sector labels are
+not inert elsewhere, since the same company under twelve labels spreads its
+two-year return across ninety points through the valuation anchors. What is
+missing is co-movement.
+
+**Consequence: sector rotation, sector-neutral construction, industry
+diversification, and any long/short pair whose thesis is the sector are all
+being tested in a market that does not have industries.** This gap was found
+by adding a statistic the panel did not have, and the two other statistics
+added beside it, downside correlation asymmetry same-day and lagged, both sit
+inside their bands. The first experiment against it is a `sector_factor_sigma`
+sweep at thirty seeds, reported in the calibration record.
+
 ## The numbers above are medians, and one run is not the median
 
 Every figure on this page is a median across thirty seeds. That is not what
 a single run shows you.
 
-Measured on the shipped preset, **seven of the ten statistics have their
+Measured on the shipped preset, **seven of the original ten statistics have their
 10th-to-90th-percentile range across seeds crossing a band edge**.
 `abs_return_acf1` reads a median of 0.141 against a ceiling of 0.22, with a
 p90 of 0.426 and an across-seed standard deviation of 0.170, larger than

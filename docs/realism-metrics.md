@@ -18,7 +18,7 @@ Five families, and they answer different questions:
 
 | family | question it answers |
 |---|---|
-| [the ten panel statistics](#the-ten-panel-statistics) | does a simulated market look like a real one? |
+| [the thirteen panel statistics](#the-thirteen-panel-statistics) | does a simulated market look like a real one? |
 | [uncertainty](#uncertainty-what-a-single-run-actually-shows-you) | how much does a single run differ from the headline? |
 | [the aggregate losses](#the-aggregate-losses) | how far off is it, in one number a search can minimise? |
 | [the validation axes](#the-validation-axes) | does the answer survive conditions the calibration never saw? |
@@ -28,7 +28,7 @@ There is also [the decay curve](#the-decay-curve), which is not a family so
 much as the one measurement that reads the panel's three clustering lags as
 a *shape* rather than three unrelated numbers.
 
-## The ten panel statistics
+## The thirteen panel statistics
 
 `pretium.facts.measure()` returns these. Every band in
 `facts.REAL_MARKETS` was derived from **ten 252-day windows of 40 US large
@@ -105,6 +105,42 @@ cross-sectional correlation makes any long/short or portfolio result
 meaningless, because the risk being diversified away was never shared.
 Real windows: 0.169 / 0.346 / 0.477.
 
+That single mean is blind to three things a portfolio cares about, and the
+three statistics below exist because a search cannot preserve what it cannot
+see. Each conditions the same pairwise correlation on something.
+
+**`corr_asymmetry`**: mean pairwise correlation on days the equal-weight
+market return is below minus one standard deviation, minus the same on days
+above plus one.
+
+Whether stocks move together **more on the way down**. In real markets they
+do: diversification is weakest exactly when it is needed. A model whose
+factor loading is symmetric in sign reads near zero here. The band is wide,
+because a one standard deviation threshold leaves about forty sessions per
+tail in a year, and it admits zero. Real windows: −0.154 / +0.083 / +0.348.
+
+**`corr_asymmetry_lagged`**: the same, conditioned on the previous day's
+market return.
+
+Separates a same-day signed loading from the lagged route through
+volatility, where yesterday's fall raises today's factor variance. The model
+has the second route and not the first. Real windows: −0.092 / +0.111 /
++0.438.
+
+**`sector_excess_corr`**: mean same-sector pairwise correlation minus mean
+cross-sector, using each instrument's sector label.
+
+Whether names in the same industry co-move more than names in different
+ones. **This decides whether a sector bet is a bet at all**: a long energy,
+short tech position in a model with no sector structure is a random pair of
+names with a label. Real windows: +0.133 / +0.164 / +0.200, and every one of
+ten windows including the 2020 crisis sits between +0.10 and +0.20, which
+makes this the tightest band on the panel after `volume_change_acf1`.
+
+**Consequence if it fails: any result that depends on sector rotation,
+sector-neutral construction or industry diversification was produced by a
+market that does not have industries.**
+
 ### Volume
 
 **`volume_abs_return_corr`**: median across names of the correlation
@@ -175,7 +211,7 @@ eighty percent crosses, so a user running one seed is *likely*, not merely
 able, to measure out of band on a statistic whose median sits comfortably
 inside.
 
-Measured on the shipped preset, **7 of the 10 statistics straddle by that
+Measured on the shipped preset, **7 of the original 10 statistics straddle by that
 test**. `abs_return_acf1` has a median of 0.141 against a ceiling of 0.22,
 a p90 of 0.426, and an across-seed standard deviation of 0.170, larger
 than the median itself.
@@ -284,7 +320,7 @@ in band on training and out of band on any validation axis.
 
 Measured by `tools/calibration/scenario_response.py`, and **invisible to
 the panel**, because the panel is measured at a single flat VIX on one horizon, so
-a vector can be perfect on all ten statistics while the market's response
+a vector can be perfect on all thirteen statistics while the market's response
 to a crisis changes underneath it. That is not hypothetical: it happened,
 and this instrument exists because of it.
 

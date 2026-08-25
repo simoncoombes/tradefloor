@@ -96,9 +96,11 @@ informative, because it broke against a live order book under honest impact
 costs.
 
 **Realism is a stated envelope, not a score.** `pt.facts.measure()` reports
-ten statistics against real-market bands. At 252 days the shipped `pt-v3`
-preset holds nine of the ten in band, and holds the same nine on axes the
-calibration never saw: fresh seeds, and a fresh 60-name universe.
+thirteen statistics against real-market bands. At 252 days the shipped `pt-v3`
+preset holds eleven of the thirteen in band, and holds the same eleven on axes
+the calibration never saw: fresh seeds, and a fresh 60-name universe. The two
+it misses are both stated as gaps: volume shocks do not persist, and names in
+the same sector do not co-move more than names in different ones.
 
 The tenth is the autocorrelation of volume changes, which misses by 13.7
 seed-standard-deviations. It's excluded from the calibration objective

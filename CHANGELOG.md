@@ -8,6 +8,41 @@ published result still reproduces. This release adds one inert mechanism, and
 otherwise turns several claims the documentation was making into measurements
 a reader can check.
 
+### The realism panel grows from ten statistics to thirteen
+
+The one cross-sectional statistic the panel had, mean pairwise correlation over
+all pairs, is blind to sign, sector and time, and a search cannot preserve what
+it cannot see. Three conditional statistics are added, each banded on the same
+forty-name reference roster by the same rule as the original ten:
+
+| statistic | what it conditions on | real band at 252 days | pt-v3 |
+|---|---|---|---|
+| `corr_asymmetry` | days the market fell more than one sd, minus days it rose more | -0.25 to +0.45 | +0.004, in band |
+| `corr_asymmetry_lagged` | the same, on the previous day's market return | -0.20 to +0.55 | -0.033, in band |
+| `sector_excess_corr` | same-sector pairs minus cross-sector pairs | **+0.11 to +0.23** | **+0.004, 15 seed-sd out** |
+
+The certified count is now **eleven of thirteen** at 252 days, on training
+seeds, held-out seeds and a held-out 60-name universe alike, and six of
+thirteen at 504. Nothing in the engine moved; the two new misses were always
+there and are now measured.
+
+The new miss is a real finding. Every one of ten real windows including the
+2020 crisis has same-sector pairs co-moving between 0.10 and 0.20 more than
+cross-sector pairs, the tightest band on the panel after volume change, and the
+model reads 0.004 because its sector factor is a single scalar at sigma 0.002.
+That is recorded as gap 7, `sector-structure`, which `envelope.check()` now
+fires for any question naming `sector_excess_corr`, and its `forbids` field
+names sector rotation, sector-neutral construction and industry diversification.
+The lever, `sector_factor_sigma`, is settable and shipped; the pt-v1 search
+reported it as a null direction, which is what a lever looks like when the
+objective cannot see it.
+
+Where these came from: a review of the correlation structure, adversarially
+checked against the calibration record, which rejected five of twelve proposed
+mechanisms on the record's own measurements and ranked the survivors behind the
+statistics needed to see them. It is in the design repository as
+CORRELATION-REVIEW-2026-08-25.md.
+
 ### `fair_value_book_floor`, and the discontinuity it exists for
 
 Fair value jumps UP as earnings fall through zero. Profitable companies are

@@ -74,6 +74,10 @@ CERTIFIED: dict[str, float] = {
     "volume_abs_return_corr": 0.5339,
     "leverage_effect": -0.0349,
     "volume_change_acf1": -0.4598,
+    # 2026-08-25, same protocol, 30 seeds: two in band, one 15 seed-sd out.
+    "corr_asymmetry": 0.0036,
+    "corr_asymmetry_lagged": -0.0330,
+    "sector_excess_corr": 0.0037,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -91,6 +95,9 @@ BANDS_504: dict[str, tuple[float, float]] = {
     "volume_abs_return_corr": (0.48, 0.65),
     "leverage_effect": (-0.13, 0.02),
     "volume_change_acf1": (-0.29, -0.21),
+    "corr_asymmetry": (-0.04, 0.13),
+    "corr_asymmetry_lagged": (-0.10, 0.47),
+    "sector_excess_corr": (0.11, 0.22),
 }
 
 #: The same panel at 504 days. Five of ten in band against `BANDS_504`.
@@ -105,6 +112,11 @@ MEASURED_504: dict[str, float] = {
     "volume_abs_return_corr": 0.6301,
     "leverage_effect": -0.0461,
     "volume_change_acf1": -0.4327,
+    # 2026-08-25. corr_asymmetry sits 0.0024 below its floor, 0.02 seed-sd:
+    # on the edge, and counted out because the rule is the rule.
+    "corr_asymmetry": -0.0424,
+    "corr_asymmetry_lagged": -0.0763,
+    "sector_excess_corr": 0.0051,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
@@ -181,14 +193,16 @@ GAPS: tuple[Gap, ...] = (
         summary="the certified horizon is 252 days",
         detail=(
             "Against bands re-derived at the matching window, the model holds "
-            "5 of 10 at 504 days. Clustering roughly doubles from 252 to 504 "
+            "5 of the original 10 at 504 days, 6 of 13 with the conditional "
+            "correlation statistics added in 0.1.4. Clustering roughly doubles from 252 to 504 "
             "and keeps climbing, where real markets move about 14% over the "
             "same span. Volatility itself stabilises near 29.3%, so long runs "
             "do not drift or blow up -- they stay plausible in LEVEL and "
             "become unrealistic in DYNAMICS, which is easy to miss by looking "
             "only at the price path. That count is measured on the shipped "
-            "preset. pt-v6, selectable and not certified, holds 8 of 10 at "
-            "504 days and 9 of 10 at the certified horizon.\n\n"
+            "preset. pt-v6, selectable and not certified, holds 10 of 13 at "
+            "504 days and 11 of 13 at the certified horizon, against pt-v3's "
+            "6 and 11.\n\n"
             "pt-v6 buys that at a cost in SCENARIO response, which the band "
             "counts do not show and which lands on exactly the long-dated "
             "crisis work it is otherwise the right choice for. Measured over "
@@ -324,6 +338,35 @@ GAPS: tuple[Gap, ...] = (
         statistics=(),
     ),
     Gap(
+        id="sector-structure",
+        summary="names in the same sector do not co-move more than names in different ones",
+        detail=(
+            "sector_excess_corr, mean same-sector pairwise correlation minus "
+            "mean cross-sector, reads 0.0037 on the shipped preset against a "
+            "real band of 0.11 to 0.23: about 15 seed-sd out at 252 days, and "
+            "0.0051 against 0.11 to 0.22 at 504 days, about 20 out. Every one "
+            "of ten real windows, the 2020 crisis included, sits between 0.10 "
+            "and 0.20, so this is the tightest band on the panel after "
+            "volume_change_acf1 and the model is nowhere near it. The same "
+            "reading holds on held-out seeds (0.012) and a held-out 60-name "
+            "universe (0.017).\n\n"
+            "The cause is a single scalar. The sector factor is one normal per "
+            "sector at sigma 0.002 with a fixed loading of 0.5 for every "
+            "member (market/tick.rs, market/factors.rs), which carries about a "
+            "quarter of one percent of a name's daily variance, so residual "
+            "correlation after the market factor is diagonal in practice. The "
+            "parameter is settable as sector_factor_sigma and was reported as "
+            "a null direction by the pt-v1 search, which is exactly what a "
+            "lever invisible to the objective looks like; it was never "
+            "measured against a statistic that could see it until now. "
+            "Sector labels do move prices elsewhere: the same company under "
+            "twelve labels spreads two-year returns across ninety points "
+            "through the valuation anchors. What is missing is co-movement."
+        ),
+        forbids="sector rotation, sector-neutral construction, industry diversification, and any long/short pair whose thesis is the sector",
+        statistics=("sector_excess_corr",),
+    ),
+    Gap(
         id="roster-concentration",
         summary="certification was measured on a sector-balanced roster",
         detail=(
@@ -331,7 +374,7 @@ GAPS: tuple[Gap, ...] = (
             "sectors, and no real index is balanced that way -- the S&P is "
             "roughly a third technology and the Nasdaq more so. Varying ONLY "
             "sector composition, with every name drawn from one pool: "
-            "balanced holds 9/10 at L_real 0.0000; an S&P-like mix holds 8/10 "
+            "balanced holds 9 of the original 10 at L_real 0.0000; an S&P-like mix holds 8 "
             "at 0.0176, losing abs_return_acf5; an all-technology roster "
             "holds 7/10 and runs 32.8% volatility. So part of the "
             "certification is an artifact of that balance, and the more "
@@ -543,7 +586,7 @@ def check(
         g = by_id["horizon"]
         fire(g, (
             f"horizon {horizon_days}d exceeds the certified "
-            f"{CERTIFIED_HORIZON_DAYS}d. At 504 days the model holds 5 of 10 "
+            f"{CERTIFIED_HORIZON_DAYS}d. At 504 days the model holds 6 of 13 "
             f"against horizon-matched bands: abs_return_acf1 "
             f"{MEASURED_504['abs_return_acf1']:.3f} against "
             f"{BANDS_504['abs_return_acf1']}, abs_return_acf5 "
@@ -568,6 +611,15 @@ def check(
                 f"{REAL_MARKETS[name]}, 13.7 seed-sd out. The volume state "
                 f"can reach it and pays with volume_abs_return_corr, so it "
                 f"is excluded from the objective"
+            ))
+        elif name == "sector_excess_corr":
+            g = by_id["sector-structure"]
+            fire(g, (
+                f"sector_excess_corr reads {CERTIFIED[name]:.4f} against "
+                f"{REAL_MARKETS[name]}, about 15 seed-sd out: the model has "
+                "no sector co-movement, only a market factor and a sector "
+                "sigma of 0.002 that carries a quarter of one percent of "
+                "variance"
             ))
         elif name == "abs_return_acf20":
             g = by_id["decay-shape"]

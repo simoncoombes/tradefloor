@@ -21,11 +21,16 @@ def test_the_certified_panel_covers_every_measured_statistic():
     assert sorted(env.MEASURED_504) == sorted(REAL_MARKETS)
 
 
-def test_nine_of_ten_are_in_band_at_the_certified_horizon():
+def test_eleven_of_thirteen_are_in_band_at_the_certified_horizon():
+    """Nine of ten until 2026-08-25, when three conditional correlation
+    statistics joined the panel. Two of them are in band; the third,
+    sector_excess_corr, is 15 seed-sd out and is gap 7. The count is pinned
+    so that a change to it is a decision, not a drift."""
     in_band = [k for k, v in env.CERTIFIED.items()
                if band_distance(v, *REAL_MARKETS[k]) == 0]
-    assert len(in_band) == 9
+    assert len(in_band) == 11
     assert "volume_change_acf1" not in in_band
+    assert "sector_excess_corr" not in in_band
 
 
 def test_every_gap_says_what_it_forbids():

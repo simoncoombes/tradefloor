@@ -210,7 +210,7 @@ def band_distance_loss(
           "panels":     how many per-seed panels were aggregated,
         }
 
-    All ten panel statistics appear in `"statistics"`, in panel order.
+    All thirteen panel statistics appear in `"statistics"`, in panel order.
     Structural rows carry their measured value and band distance --
     the standing falsification verdict rides along with every loss
     evaluation -- but their `"contribution"` is None and they are absent
