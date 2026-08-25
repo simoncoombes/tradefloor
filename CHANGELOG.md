@@ -54,6 +54,18 @@ mechanisms on the record's own measurements and ranked the survivors behind the
 statistics needed to see them. It is in the design repository as
 CORRELATION-REVIEW-2026-08-25.md.
 
+### A fourteenth statistic: correlation persistence
+
+`corr_persistence_acf1`, the lag-1 autocorrelation of mean pairwise
+correlation over non-overlapping 21-day windows, joins `facts.REAL_MARKETS`
+with real bands at both horizons: (-0.19, 0.54) at 252 days, where twelve
+windows cannot judge anything and the band says so, and (0.19, 0.49) at 504
+days, where it can. pt-v3 reads +0.04 and +0.22, in band at both, at the
+floor of the second. Its seed noise (0.28 and 0.20) is the largest of any
+correlation-type statistic, so it sits outside the objective; the atlas survey records it per
+horizon beside the thirteen. The certified count is now twelve of fourteen
+at 252 days and seven of fourteen at 504. Calibration record §64.
+
 ### pt-v7: the first preset with industries
 
 pt-v6 with six coefficients moved, selectable by name and not the default:

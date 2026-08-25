@@ -67,9 +67,15 @@ calibration never saw:
 
 | axis | result | `L_real` |
 |---|---|---|
-| training seeds (101-130), 40 names | 11/13 in band | 0.0000 |
+| training seeds (101-130), 40 names | 12/14 in band | 0.0000 |
 | **held-out seeds** (1-6), 40 names | 11/13 in band | 0.0000 |
 | **held-out universe** (60 names, different draw) | 11/13 in band | 0.0000 |
+
+The fourteenth statistic, correlation persistence, joined on 2026-08-25
+(calibration record §64) with a 252-day band wide enough to admit every
+preset and a 504-day band that is the ruler; it is in band on the training
+seeds at both horizons and has not been measured on the held-out axes, so
+those two rows count the thirteen.
 
 The same eleven statistics, the same zero loss, on instruments and seeds the
 search never touched. This is the part of the claim worth trusting.
@@ -100,7 +106,7 @@ and is fine to use.
 The statistics are horizon-dependent, and the model is roughly five times
 more horizon-sensitive than the market it imitates. Measured against
 bands re-derived at the *matching* 504-day window, not the 252-day bands,
-which would be the wrong ruler, the shipped model holds **6 of 13**, 5 of the original 10:
+which would be the wrong ruler, the shipped model holds **7 of 14**, 5 of the original 10:
 
 | statistic | 252d | 504d | 504-matched band | verdict at 504d |
 |---|---|---|---|---|

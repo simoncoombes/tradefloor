@@ -148,7 +148,7 @@ def test_band_distance_agrees_with_the_verdict_wording_on_every_band():
 # --------------------------------------------------------------------------
 
 
-def test_the_loss_covers_nine_statistics_and_reports_thirteen():
+def test_the_loss_covers_nine_statistics_and_reports_fourteen():
     # Five live targets: lag-5 clustering joined when the instrument found
     # the corner with in-band lag-1 clustering and zero memory behind it.
     assert set(LIVE_TARGETS) == {
@@ -173,7 +173,7 @@ def test_the_loss_covers_nine_statistics_and_reports_thirteen():
     # one is a decision recorded in loss.py, not a side effect of measuring it.
     assert set(STRUCTURAL) == {
         "volume_change_acf1", "corr_asymmetry", "corr_asymmetry_lagged",
-        "sector_excess_corr",
+        "sector_excess_corr", "corr_persistence_acf1",
     }
     assert set(LIVE_TARGETS) | set(CONSTRAINTS) | set(STRUCTURAL) == set(
         REAL_MARKETS
@@ -458,6 +458,13 @@ THIRTY_SEED_PANELS = {
         -0.005665862101, -0.004701784142, -0.006498673397, 0.004440110519, 0.009890681251,
         -0.005962604283, -0.004584106038, -0.004668588491, -0.01574369628, -0.003724421431,
         -0.01386166151, -0.003509095508, 0.01124697953, 0.003895012394, -0.008910727055],
+    "corr_persistence_acf1": [
+        -0.3101607106, 0.0296032378, 0.2336341743, -0.1532579933, -0.3372388224,
+        -0.3438487689, -0.3149657536, 0.6031159151, 0.2528660755, 0.4114381002,
+        0.0548199152, -0.1634116113, 0.0441356735, 0.4900642238, 0.0703426628,
+        0.2905811568, 0.1579750515, -0.0161867044, -0.3213533903, -0.3313429604,
+        0.0666826828, 0.0983032762, -0.5087298249, -0.0266807109, 0.1668224035,
+        -0.2633223184, -0.2100823914, -0.194234567, 0.2557422289, 0.1914423215],
 }
 
 

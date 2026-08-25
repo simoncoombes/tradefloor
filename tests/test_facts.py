@@ -433,14 +433,16 @@ def test_the_report_names_the_mismatches_rather_than_scoring_them():
     assert "momentum is mechanically" in text
 
 
-def test_correlation_persistence_is_reported_and_not_judged():
-    """A diagnostic: present, None when the run is too short for six windows,
-    a float when it is not, and absent from every judged table.
+def test_correlation_persistence_is_reported_and_judged_with_its_noise_stated():
+    """The fourteenth statistic: present, None when the run is too short for
+    six windows, a float when it is not, and in every judged table.
 
-    Twelve non-overlapping 21-day windows in a year is a noisy series, so the
-    statistic is measured and reported without a band until a thirty-seed
-    baseline and a reference band exist together. Pinned so it cannot slip
-    into REAL_MARKETS by accident and start steering a search.
+    It joined REAL_MARKETS on 2026-08-25 with a thirty-seed baseline and a
+    reference band at both horizons (CALIBRATION-FOLLOWUPS.md §64). Twelve
+    non-overlapping 21-day windows in a year is a noisy series and the real
+    windows scatter from -0.05 to +0.40, so the 252-day band is wide enough
+    to admit every preset; the 504-day band is the ruler. Its seed sd is the
+    largest in the table, which is why it sits outside the objective.
     """
     short = measure(seed=2, universe=UNIVERSE, days=60)
     assert "corr_persistence_acf1" in short
@@ -448,5 +450,15 @@ def test_correlation_persistence_is_reported_and_not_judged():
     year = measure(seed=2, universe=UNIVERSE, days=252)
     assert isinstance(year["corr_persistence_acf1"], float)
     assert -1.0 <= year["corr_persistence_acf1"] <= 1.0
-    assert "corr_persistence_acf1" not in pretium.facts.REAL_MARKETS
-    assert "corr_persistence_acf1" not in compare_to_real_markets(year)
+    lo, hi = pretium.facts.REAL_MARKETS["corr_persistence_acf1"]
+    assert lo < 0.0 < hi, "the 252-day band is wide by measurement, and pinned so"
+    assert pretium.facts.REAL_MARKETS_504["corr_persistence_acf1"][0] > 0.0
+    # The largest seed sd of any correlation-type statistic at both horizons
+    # (volatility and kurtosis are in other units). Relative to its band it
+    # is NOT the noisiest: abs_return_acf5 is, because the 252-day band here
+    # is so wide. Both facts are why it sits outside the objective.
+    corr_type = [k for k in pretium.facts.REAL_MARKETS
+                 if k not in ("annualised_vol_pct", "excess_kurtosis")]
+    for table in (pretium.facts.SEED_SD, pretium.facts.SEED_SD_504):
+        assert max(corr_type, key=table.get) == "corr_persistence_acf1"
+    assert "corr_persistence_acf1" in compare_to_real_markets(year)

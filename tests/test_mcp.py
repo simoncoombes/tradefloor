@@ -506,7 +506,7 @@ def test_describe_simulator_reports_the_gap_that_is_out_of_band():
     d = mcp.describe_simulator()
     assert set(d["certified"]["statistics_out_of_band"]) == {
         "volume_change_acf1", "sector_excess_corr"}
-    assert len(d["certified"]["statistics_in_band"]) == 11
+    assert len(d["certified"]["statistics_in_band"]) == 12
     assert d["structural_limitations"]
     assert "atlas" in d["not_exposed_here"]
 

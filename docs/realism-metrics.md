@@ -18,7 +18,7 @@ Five families, and they answer different questions:
 
 | family | question it answers |
 |---|---|
-| [the thirteen panel statistics](#the-thirteen-panel-statistics) | does a simulated market look like a real one? |
+| [the fourteen panel statistics](#the-fourteen-panel-statistics) | does a simulated market look like a real one? |
 | [uncertainty](#uncertainty-what-a-single-run-actually-shows-you) | how much does a single run differ from the headline? |
 | [the aggregate losses](#the-aggregate-losses) | how far off is it, in one number a search can minimise? |
 | [the validation axes](#the-validation-axes) | does the answer survive conditions the calibration never saw? |
@@ -28,7 +28,7 @@ There is also [the decay curve](#the-decay-curve), which is not a family so
 much as the one measurement that reads the panel's three clustering lags as
 a *shape* rather than three unrelated numbers.
 
-## The thirteen panel statistics
+## The fourteen panel statistics
 
 `pretium.facts.measure()` returns these. Every band in
 `facts.REAL_MARKETS` was derived from **ten 252-day windows of 40 US large
@@ -181,14 +181,17 @@ that asymmetry, and `skew` is what would prove it.
 **`corr_persistence_acf1`**: mean pairwise correlation on non-overlapping
 21-day windows, then the lag-1 autocorrelation of that series.
 
-Whether a panic leaves a trace. Real markets on the reference roster read
-0.388 with a half-life near fifteen days: correlation that rose last month is
-still elevated this month. A model whose correlation is a lookup on today's
-VIX reads near zero, because the cross-section decouples the moment the VIX
-falls. Twelve windows in a year is a noisy estimate per seed, so this is
-reported and not yet banded; it is the honest test of the universe-stress
-memory mechanism, which ships inert, and of the crisis-blend change measured
-in the calibration record.
+Whether a panic leaves a trace: correlation that rose last month is still
+elevated this month. Real windows at 252 days read -0.05 / 0.23 / 0.40 (min /
+median / max), so the band there, (-0.19, 0.54), admits every preset and is
+recorded as a ruler that cannot read: twelve windows in a year is too few. At
+504 days the four non-crisis windows read 0.25 to 0.43 and the band is (0.19,
+0.49). The shipped preset reads +0.04 and +0.22, in band at both, at the
+floor of the second, and its seed noise (0.28 and 0.20) is the largest of
+any correlation-type statistic, so the statistic is outside the objective. In this model window
+correlation is almost exactly the market factor's variance (r = 0.92 within
+a run), so this statistic measures how much memory that variance has; the
+calibration record's §64 is the account.
 
 ### Provenance fields, not statistics
 
@@ -332,7 +335,7 @@ in band on training and out of band on any validation axis.
 
 Measured by `tools/calibration/scenario_response.py`, and **invisible to
 the panel**, because the panel is measured at a single flat VIX on one horizon, so
-a vector can be perfect on all thirteen statistics while the market's response
+a vector can be perfect on all fourteen statistics while the market's response
 to a crisis changes underneath it. That is not hypothetical: it happened,
 and this instrument exists because of it.
 

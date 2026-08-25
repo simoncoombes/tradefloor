@@ -105,6 +105,14 @@
     0.23
    ],
    "in_band": false
+  },
+  "corr_persistence_acf1": {
+   "measured": 0.0413,
+   "band": [
+    -0.19,
+    0.54
+   ],
+   "in_band": true
   }
  },
  "gaps": [
@@ -122,7 +130,7 @@
   {
    "id": "horizon",
    "summary": "the certified horizon is 252 days",
-   "detail": "Against bands re-derived at the matching window, the model holds 5 of the original 10 at 504 days, 6 of 13 with the conditional correlation statistics added in 0.1.4. Clustering roughly doubles from 252 to 504 and keeps climbing, where real markets move about 14% over the same span. Volatility itself stabilises near 29.3%, so long runs do not drift or blow up -- they stay plausible in LEVEL and become unrealistic in DYNAMICS, which is easy to miss by looking only at the price path. That count is measured on the shipped preset. pt-v6, selectable and not certified, holds 10 of 13 at 504 days and 11 of 13 at the certified horizon, against pt-v3's 6 and 11.\n\npt-v6 buys that at a cost in SCENARIO response, which the band counts do not show and which lands on exactly the long-dated crisis work it is otherwise the right choice for. Measured over thirty seeds with tools/calibration/scenario_response.py, the steady-state volatility lever from VIX 5 to VIX 65 reads 3.07x on pt-v3 and 2.68x on pt-v6, against real markets' 6.16x. So a sustained crisis is about an eighth less violent under pt-v6 than under the default, and a scenario study turning on crisis MAGNITUDE should prefer pt-v3 even over multi-year windows, or say that it accepted the weaker response.\n\nTwo things that reading invites and the measurements do not support. The cost is NOT pt-v6's to answer for: the lever runs 3.07x at pt-v3, 2.67x at pt-v4, 2.69x at pt-v5 and 2.68x at pt-v6, so it was spent when jumps arrived at pt-v4 and every preset since has inherited it. And the harness's 'shock response retained' percentage should not be quoted for this: it divides two small excesses over 1.0, so shock ratios of 1.062 and 1.038 become a headline gap of 27.6% against 16.7%. The transient difference between the two presets is real and it is 0.024, not eleven points.",
+   "detail": "Against bands re-derived at the matching window, the model holds 5 of the original 10 at 504 days, 7 of 14 with the conditional correlation and persistence statistics added in 0.1.4. Clustering roughly doubles from 252 to 504 and keeps climbing, where real markets move about 14% over the same span. Volatility itself stabilises near 29.3%, so long runs do not drift or blow up -- they stay plausible in LEVEL and become unrealistic in DYNAMICS, which is easy to miss by looking only at the price path. That count is measured on the shipped preset. pt-v6, selectable and not certified, holds 10 of the thirteen measured on it at 504 days and 11 at the certified horizon, against pt-v3's 6 and 11 of the same thirteen.\n\npt-v6 buys that at a cost in SCENARIO response, which the band counts do not show and which lands on exactly the long-dated crisis work it is otherwise the right choice for. Measured over thirty seeds with tools/calibration/scenario_response.py, the steady-state volatility lever from VIX 5 to VIX 65 reads 3.07x on pt-v3 and 2.68x on pt-v6, against real markets' 6.16x. So a sustained crisis is about an eighth less violent under pt-v6 than under the default, and a scenario study turning on crisis MAGNITUDE should prefer pt-v3 even over multi-year windows, or say that it accepted the weaker response.\n\nTwo things that reading invites and the measurements do not support. The cost is NOT pt-v6's to answer for: the lever runs 3.07x at pt-v3, 2.67x at pt-v4, 2.69x at pt-v5 and 2.68x at pt-v6, so it was spent when jumps arrived at pt-v4 and every preset since has inherited it. And the harness's 'shock response retained' percentage should not be quoted for this: it divides two small excesses over 1.0, so shock ratios of 1.062 and 1.038 become a headline gap of 27.6% against 16.7%. The transient difference between the two presets is real and it is 0.024, not eleven points.",
    "forbids": "multi-year backtests, and anything keyed on volatility dynamics beyond one year",
    "statistics": [
     "abs_return_acf1",

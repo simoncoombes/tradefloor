@@ -206,7 +206,7 @@ autocorrelation: own measurement only, no published figure for the
 estimator was recoverable). The full derivation record, window tables
 and verdict moves are in pretium-design/REALISM-BANDS.md.
 
-## Why there are thirteen statistics and not four
+## Why there are fourteen statistics and not four
 
 The first four this module reported were chosen before anyone looked at
 dependence, and all four come from one instrument's price series taken on its
@@ -328,6 +328,11 @@ REAL_MARKETS = {
     "corr_asymmetry": (-0.25, 0.45),
     "corr_asymmetry_lagged": (-0.20, 0.55),
     "sector_excess_corr": (0.11, 0.23),
+    # Correlation persistence: acf1 of mean pairwise correlation over
+    # non-overlapping 21-day sub-windows. Twelve sub-windows at 252 days,
+    # and the real windows themselves scatter from -0.05 to +0.40, so this
+    # band admits everything and says so; the 504-day band is the ruler.
+    "corr_persistence_acf1": (-0.19, 0.54),
 }
 
 #: Where each band comes from, carried as data so a reader can ask the
@@ -593,6 +598,18 @@ REAL_MARKETS_PROVENANCE = {
             "+0.10 and +0.20; trimmed noise scale 0.021",
         ),
     },
+    "corr_persistence_acf1": {
+        "claim": "acf1 of mean pairwise correlation on non-overlapping 21-day "
+                 "sub-windows; nine non-crisis 252-day windows -0.05 to +0.40, "
+                 "four non-crisis 504-day windows +0.25 to +0.43",
+        "windows": (-0.050, 0.229, 0.402),
+        "crisis_window": 0.374,
+        "sources": (
+            "pretium-design/real_corr_persistence_bands.py, run 2026-08-25, "
+            "same roster and estimator as facts.measure; the 252-day band is "
+            "wide enough to admit every preset and is recorded as such.",
+        ),
+    },
 }
 
 #: The across-seed standard deviation of each statistic at the shipped
@@ -649,6 +666,9 @@ SEED_SD = {
     "corr_asymmetry": 0.1614765,
     "corr_asymmetry_lagged": 0.1178216,
     "sector_excess_corr": 0.0068036,
+    # 2026-08-25, same protocol. The largest seed sd of any correlation-type
+    # statistic: a twelve-point acf1 per seed. See CALIBRATION-FOLLOWUPS.md §64.
+    "corr_persistence_acf1": 0.2789932,
 }
 
 #: Real-market bands re-derived at a 504-DAY measurement window.
@@ -683,6 +703,9 @@ REAL_MARKETS_504 = {
     "corr_asymmetry": (-0.04, 0.13),
     "corr_asymmetry_lagged": (-0.10, 0.47),
     "sector_excess_corr": (0.11, 0.22),
+    # Twenty-four sub-windows; four non-crisis windows +0.25 to +0.43,
+    # median +0.31 (pretium-design/real-corr-persistence-bands.json).
+    "corr_persistence_acf1": (0.19, 0.49),
 }
 
 #: The across-seed noise scale at 504 days, the companion to `SEED_SD`.
@@ -708,6 +731,8 @@ SEED_SD_504 = {
     "corr_asymmetry": 0.14982,
     "corr_asymmetry_lagged": 0.13171,
     "sector_excess_corr": 0.00539,
+    # 2026-08-25, pt-v3, same protocol; twenty-four points per seed.
+    "corr_persistence_acf1": 0.1972443,
 }
 
 #: Where SEED_SD_504 came from.
@@ -766,6 +791,7 @@ LABELS = {
     "corr_asymmetry": "corr, down vs up days",
     "corr_asymmetry_lagged": "corr, after down vs up",
     "sector_excess_corr": "same-sector excess corr",
+    "corr_persistence_acf1": "corr persistence acf(1)",
 }
 
 
@@ -1005,7 +1031,6 @@ def _dependence(
         "cross_sectional_corr": statistics.fmean(pairwise) if pairwise else None,
         "corr_asymmetry": corr_asymmetry,
         "corr_asymmetry_lagged": corr_asymmetry_lagged,
-        # Measured, not judged: no band yet. See the note where it is computed.
         "corr_persistence_acf1": corr_persistence_acf1,
         "sector_excess_corr": (
             statistics.fmean(same_sector) - statistics.fmean(cross_sector)

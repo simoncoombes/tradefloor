@@ -78,6 +78,7 @@ CERTIFIED: dict[str, float] = {
     "corr_asymmetry": 0.0036,
     "corr_asymmetry_lagged": -0.0330,
     "sector_excess_corr": 0.0037,
+    "corr_persistence_acf1": 0.0413,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -98,6 +99,7 @@ BANDS_504: dict[str, tuple[float, float]] = {
     "corr_asymmetry": (-0.04, 0.13),
     "corr_asymmetry_lagged": (-0.10, 0.47),
     "sector_excess_corr": (0.11, 0.22),
+    "corr_persistence_acf1": (0.19, 0.49),
 }
 
 #: The same panel at 504 days. Five of ten in band against `BANDS_504`.
@@ -117,6 +119,7 @@ MEASURED_504: dict[str, float] = {
     "corr_asymmetry": -0.0424,
     "corr_asymmetry_lagged": -0.0763,
     "sector_excess_corr": 0.0051,
+    "corr_persistence_acf1": 0.2249,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
@@ -193,16 +196,16 @@ GAPS: tuple[Gap, ...] = (
         summary="the certified horizon is 252 days",
         detail=(
             "Against bands re-derived at the matching window, the model holds "
-            "5 of the original 10 at 504 days, 6 of 13 with the conditional "
-            "correlation statistics added in 0.1.4. Clustering roughly doubles from 252 to 504 "
+            "5 of the original 10 at 504 days, 7 of 14 with the conditional "
+            "correlation and persistence statistics added in 0.1.4. Clustering roughly doubles from 252 to 504 "
             "and keeps climbing, where real markets move about 14% over the "
             "same span. Volatility itself stabilises near 29.3%, so long runs "
             "do not drift or blow up -- they stay plausible in LEVEL and "
             "become unrealistic in DYNAMICS, which is easy to miss by looking "
             "only at the price path. That count is measured on the shipped "
-            "preset. pt-v6, selectable and not certified, holds 10 of 13 at "
-            "504 days and 11 of 13 at the certified horizon, against pt-v3's "
-            "6 and 11.\n\n"
+            "preset. pt-v6, selectable and not certified, holds 10 of the "
+            "thirteen measured on it at 504 days and 11 at the certified "
+            "horizon, against pt-v3's 6 and 11 of the same thirteen.\n\n"
             "pt-v6 buys that at a cost in SCENARIO response, which the band "
             "counts do not show and which lands on exactly the long-dated "
             "crisis work it is otherwise the right choice for. Measured over "
@@ -599,7 +602,7 @@ def check(
         g = by_id["horizon"]
         fire(g, (
             f"horizon {horizon_days}d exceeds the certified "
-            f"{CERTIFIED_HORIZON_DAYS}d. At 504 days the model holds 6 of 13 "
+            f"{CERTIFIED_HORIZON_DAYS}d. At 504 days the model holds 7 of 14 "
             f"against horizon-matched bands: abs_return_acf1 "
             f"{MEASURED_504['abs_return_acf1']:.3f} against "
             f"{BANDS_504['abs_return_acf1']}, abs_return_acf5 "
