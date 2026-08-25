@@ -132,6 +132,13 @@ from pretium.loss import dual_horizon_loss  # noqa: E402
 #: is fully overridden -- calibration trap #1 ("the search builds from
 #: pt-v1") cannot bite a survey that leaves nothing to the base.
 BASE_PRESET = "pt-v3"
+#: A restriction of the survey to named axes, or None for all of them. Set
+#: from `--only`. Every parameter NOT surveyed is pinned at BASE_PRESET's
+#: value inside each vector, so a task still sets every parameter and the
+#: pt-v1 base inside `instrumentlib.evaluate_panel` never shows through
+#: (calibration trap #1). Added 2026-08-25 for the §62 sector surface on the
+#: pt-v6 base.
+ONLY: tuple[str, ...] | None = None
 
 #: Screening seeds: the first six TRAINING seeds. See the module header
 #: for why the published held-out seeds are not used.
@@ -204,6 +211,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 #: header. Both known-good values (ramp 6.0, cap 0.98) are asserted inside
 #: these ranges at plan time.
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
+    # The sector draw's sigma. Shipped 0.002 gives a [1/4x, 4x] box topping
+    # out at 0.008, and §59 measured the band reached at 0.012 and overshot
+    # at 0.020, so the box is the range that can see the answer.
+    "sector_factor_sigma": (0.0, 0.02),
+    # The idiosyncratic scale. Its [1/4x, 4x] box around 0.81 spans 0.2 to
+    # 3.3, most of which is annualised volatility far outside any band; §60
+    # measured 0.65 to 0.81 as the region where the trim is a trade rather
+    # than a wreck, so the range is the one a retrim can use.
+    "idio_sigma_scale": (0.5, 1.0),
     "crisis_blend_ramp": (0.35, 50.0),
     "crisis_blend_cap": (0.0, 1.0),
     # Ships at 1.0, so it has a multiplicative box in principle, and that box
@@ -322,12 +338,21 @@ def survey_axes() -> list[atlas.Axis]:
     # PARAM_SPECS entry killed a 96-core search, and an assert vanishes
     # under `python -O` -- which is exactly the kind of flag a "fast"
     # production launch might add.
-    if zeros != set(ZERO_SHIPPED_RANGES):
+    #
+    # Only the UNRANGED direction is an error. A base other than pt-v3 ships
+    # some of these nonzero (pt-v6 carries jumps), and for those the explicit
+    # zero range is simply not used: the convention box around the base's
+    # value takes over below.
+    unranged = zeros - set(ZERO_SHIPPED_RANGES) - set(EXPLICIT_RANGES)
+    if unranged:
         raise RuntimeError(
             "the zero-shipped set moved and ZERO_SHIPPED_RANGES did not: "
-            f"unranged {sorted(zeros - set(ZERO_SHIPPED_RANGES))}, stale "
-            f"{sorted(set(ZERO_SHIPPED_RANGES) - zeros)}. Choose ranges on "
-            "purpose; atlas refuses to guess them.")
+            f"unranged {sorted(unranged)}. Choose ranges on purpose; atlas "
+            "refuses to guess them.")
+    if BASE_PRESET == "pt-v3" and zeros != set(ZERO_SHIPPED_RANGES):
+        raise RuntimeError(
+            "stale ZERO_SHIPPED_RANGES entries for pt-v3: "
+            f"{sorted(set(ZERO_SHIPPED_RANGES) - zeros)}")
 
     raw = sorted(n for n in settable if n not in REPARAMETERISED)
     ranges: dict[str, tuple[float, float]] = {}
@@ -335,7 +360,7 @@ def survey_axes() -> list[atlas.Axis]:
         spec = lib.PARAM_SPECS[name]
         if name in EXPLICIT_RANGES:
             ranges[name] = EXPLICIT_RANGES[name]
-        elif name in ZERO_SHIPPED_RANGES:
+        elif name in ZERO_SHIPPED_RANGES and float(ship[name]) == 0.0:
             ranges[name] = ZERO_SHIPPED_RANGES[name]
         elif spec["kind"] == "abs" and spec.get("step_unit") is None:
             # A bounded MULTIPLE (the garch/market-vol ceiling and floor
@@ -350,15 +375,31 @@ def survey_axes() -> list[atlas.Axis]:
             ranges[name] = (float(ship[name]) / 4.0, float(ship[name]) * 4.0)
         else:
             ranges[name] = calibration_box(name, float(ship[name]))
+        # A multiplicative box around a NEGATIVE base value comes out
+        # inverted, (base/4, base*4) with base*4 the smaller number. pt-v3
+        # ships no negative coefficient, so the full survey never saw this;
+        # pt-v6 ships jump_mean_market at -0.85 percent and did.
+        lo, hi = ranges[name]
+        if lo > hi:
+            ranges[name] = (hi, lo)
     log = tuple(n for n in raw
                 if lib.PARAM_SPECS[n]["kind"] == "log" and ranges[n][0] > 0)
     axes = atlas.axes_for(raw, preset=BASE_PRESET, ranges=ranges, log=log)
     axes += list(TRANSFORMED_AXES)
+    if ONLY is not None:
+        known = {a.name for a in axes}
+        unknown = sorted(set(ONLY) - known)
+        if unknown:
+            raise RuntimeError(f"--only names axes that do not exist: {unknown}; "
+                               f"axes are {sorted(known)}")
+        axes = [a for a in axes if a.name in ONLY]
 
     # The specific failure this file exists to prevent, checked rather
     # than remembered: the best known crisis vector must be inside the box.
     by_name = {a.name: a for a in axes}
     for name, best in (("crisis_blend_ramp", 6.0), ("crisis_blend_cap", 0.98)):
+        if name not in by_name:
+            continue
         a = by_name[name]
         if not a.low <= best <= a.high:
             raise RuntimeError(
@@ -511,6 +552,7 @@ def read_rows(path: Path) -> list[dict]:
 def plan_fingerprint(axes, samples: int, plan_seed: int) -> str:
     doc = {"axes": [[a.name, a.low, a.high, a.log] for a in axes],
            "samples": samples, "plan_seed": plan_seed,
+           "base_preset": BASE_PRESET, "only": list(ONLY) if ONLY else None,
            "seeds": list(SCREEN_SEEDS), "horizons": list(HORIZONS),
            "panel_universe": [lib.PANEL_UNIVERSE_N, lib.PANEL_UNIVERSE_SEED],
            "gate_universe": [sr.UNIVERSE_N, sr.UNIVERSE_SEED]}
@@ -526,6 +568,7 @@ def build_meta(axes, samples: int, plan_seed: int, fingerprint: str) -> dict:
     return {
         "plan_fingerprint": fingerprint,
         "base_preset": BASE_PRESET,
+        "only": list(ONLY) if ONLY else None,
         "samples": samples,
         "plan_seed": plan_seed,
         "seeds": list(SCREEN_SEEDS),
@@ -543,6 +586,14 @@ def build_meta(axes, samples: int, plan_seed: int, fingerprint: str) -> dict:
 def build_plan(samples: int, plan_seed: int):
     axes = survey_axes()
     vectors = atlas.plan(axes, samples, plan_seed)
+    if ONLY is not None:
+        # Complete every vector with the base preset's coordinates on the
+        # axes not surveyed, so `vector_to_params` yields the full override
+        # set and nothing falls through to evaluate_panel's pt-v1 base.
+        base = pretium.ModelParams.from_preset(BASE_PRESET).to_dict()
+        pinned = params_to_vector({n: base[n] for n in pretium.ModelParams.settable()})
+        vectors = [dict({k: v for k, v in pinned.items() if k not in ONLY}, **vec)
+                   for vec in vectors]
     ship = lib.shipped_values()
     feasibility = [lib.feasibility_violation(vector_to_params(v), ship)
                    for v in vectors]
@@ -897,6 +948,7 @@ def write_report(survey: atlas.Survey, outdir: Path) -> Path:
 
 
 def main() -> int:
+    global BASE_PRESET, ONLY
     parser = argparse.ArgumentParser(
         description=__doc__.split("\n", 1)[0],
         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -904,6 +956,14 @@ def main() -> int:
     parser.add_argument("--out", default=None,
                         help="result directory (required for run/collect)")
     parser.add_argument("--samples", type=int, default=DEFAULT_SAMPLES)
+    parser.add_argument("--base", default=BASE_PRESET,
+                        help="preset the ranges are centred on and every "
+                             "unsurveyed parameter is pinned to (default: "
+                             "%(default)s)")
+    parser.add_argument("--only", default=None,
+                        help="comma list of axes to survey; every other "
+                             "parameter is pinned at --base's value inside "
+                             "each vector, so a task still sets all of them")
     parser.add_argument("--plan-seed", type=int, default=DEFAULT_PLAN_SEED)
     parser.add_argument("--workers", type=int, default=os.cpu_count() or 4)
     parser.add_argument("--limit", type=int, default=None,
@@ -917,6 +977,8 @@ def main() -> int:
                              "space, so leaving them final biases the "
                              "marginals against a region.")
     args = parser.parse_args()
+    BASE_PRESET = args.base
+    ONLY = tuple(x.strip() for x in args.only.split(",") if x.strip()) if args.only else None
     if args.command != "plan" and not args.out:
         parser.error(f"{args.command} needs --out")
     return {"plan": cmd_plan, "run": cmd_run,
