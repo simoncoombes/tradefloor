@@ -105,6 +105,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import dataclasses
 import json
 import math
 import os
@@ -125,6 +126,10 @@ from calibrate import calibration_box     # noqa: E402
 import pretium                            # noqa: E402
 from pretium import atlas                 # noqa: E402
 from pretium.facts import REAL_MARKETS    # noqa: E402
+
+#: Measured by `facts.measure`, judged by nothing yet, recorded per horizon
+#: as `<stat>_<days>` beside the thirteen. See CALIBRATION-FOLLOWUPS.md §64.
+DIAGNOSTIC_STATS = ("corr_persistence_acf1",)
 from pretium.loss import dual_horizon_loss  # noqa: E402
 
 #: Ranges centred here. The vectors themselves set every parameter, so the
@@ -220,6 +225,23 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     # measured 0.65 to 0.81 as the region where the trim is a trade rather
     # than a wreck, so the range is the one a retrim can use.
     "idio_sigma_scale": (0.5, 1.0),
+    # The market factor's GARCH memory (§64), in the survey's own transformed
+    # axes (persistence is alpha + beta, alpha_frac is alpha's share, so
+    # every point maps to a stationary process). Shipped 0.989 and 0.473
+    # has no fourth moment (3a^2 + 2ab + b^2 = 1.42); the textbook region is
+    # persistence 0.95 to 0.995 at a share of 0.05 to 0.15. Narrower than
+    # the published TRANSFORMED_AXES box on purpose.
+    "market_vol_persistence": (0.90, 0.998),
+    "market_vol_alpha_frac": (0.03, 0.55),
+    # The factor's calm sigma. A freed memory raises the factor's typical
+    # variance (the heavy-tailed process spent most days below its mean),
+    # so the level has to be able to come down: half of shipped to 1.5x.
+    "market_factor_sigma": (0.006, 0.024),
+    # Market jumps take over the tails the old alpha was making. Shipped
+    # sigma 0.0024 is a quarter-percent jump; real index jumps run to a few
+    # percent, so the box reaches 3 percent; it starts at zero because pt-v3
+    # ships jumps off and every range must contain its base.
+    "jump_sigma_market": (0.0, 0.03),
     "crisis_blend_ramp": (0.35, 50.0),
     "crisis_blend_cap": (0.0, 1.0),
     # Ships at 1.0, so it has a multiplicative box in principle, and that box
@@ -385,7 +407,14 @@ def survey_axes() -> list[atlas.Axis]:
     log = tuple(n for n in raw
                 if lib.PARAM_SPECS[n]["kind"] == "log" and ranges[n][0] > 0)
     axes = atlas.axes_for(raw, preset=BASE_PRESET, ranges=ranges, log=log)
-    axes += list(TRANSFORMED_AXES)
+    # A transformed axis keeps its published box unless EXPLICIT_RANGES
+    # names it: §64's survey wants the market factor's memory sampled where
+    # the answer can be, not across the 0.25 to 0.90 of persistence that
+    # every earlier search has already scored as a wreck.
+    axes += [dataclasses.replace(a, low=EXPLICIT_RANGES[a.name][0],
+                                 high=EXPLICIT_RANGES[a.name][1])
+             if a.name in EXPLICIT_RANGES else a
+             for a in TRANSFORMED_AXES]
     if ONLY is not None:
         known = {a.name for a in axes}
         unknown = sorted(set(ONLY) - known)
@@ -502,9 +531,12 @@ def run_task(task: dict) -> dict:
                        fingerprint=row["fingerprint"],
                        draws_by_stream=row["draws_by_stream"])
         elif task["kind"] == "held":
-            vix, seed, vol, corr = sr._held_job(
+            vix, seed, p = sr._held_panel(
                 (task["overrides"], task["vix"], task["seed"]))
-            out.update(vix=vix, vol=vol, corr=corr)
+            out.update(vix=vix, vol=p["annualised_vol_pct"],
+                       corr=p["cross_sectional_corr"],
+                       sector_ex=p["sector_excess_corr"],
+                       kurt=p["excess_kurtosis"])
         elif task["kind"] == "shock":
             seed, ratio = sr._shock_job((task["overrides"], task["seed"]))
             out.update(ratio=ratio)
@@ -836,6 +868,12 @@ def cmd_collect(args) -> int:
             for stat in REAL_MARKETS:
                 outputs[f"{stat}_{days}"] = statistics.median(
                     p[stat] for p in batch)
+            # Diagnostics: measured, unbanded, recorded so the map can see
+            # them. Correlation persistence (§64) is the first.
+            for stat in DIAGNOSTIC_STATS:
+                vals = [p[stat] for p in batch if p.get(stat) is not None]
+                if vals:
+                    outputs[f"{stat}_{days}"] = statistics.median(vals)
         # Free: the slope is a pure function of acf1/5/20, which the panel
         # above already recorded. No extra simulation.
         for _d in meta["horizons"]:
@@ -855,6 +893,14 @@ def cmd_collect(args) -> int:
         outputs["shock_ratio_median"] = gates["shock_ratio_median"]
         outputs["vol_lever"] = gates["vol_lever"]
         outputs["corr_blend"] = gates["corr_blend"]
+        # The crisis state's sector excess and kurtosis at VIX 45, which §62
+        # named as the one column the next survey needed. Rows streamed by
+        # an older driver lack them, so a resume without them is tolerated.
+        for key, name in (("sector_ex", "sector_ex_45"), ("kurt", "kurt_45")):
+            vals = [rows[f"{index}:held45:{s}"].get(key) for s in seeds]
+            vals = [v for v in vals if v is not None]
+            if vals:
+                outputs[name] = statistics.median(vals)
         survey.record(index, vector, outputs=outputs)
 
         for days in meta["horizons"]:

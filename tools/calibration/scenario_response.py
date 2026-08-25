@@ -134,15 +134,27 @@ def pooled_vol(scenario, seed, model) -> float:
     return statistics.pstdev(returns)
 
 
-def _held_job(job):
-    """One (vix, seed) held-VIX panel, in a worker."""
+HELD_KEYS = ("annualised_vol_pct", "cross_sectional_corr",
+             "sector_excess_corr", "excess_kurtosis")
+
+
+def _held_panel(job):
+    """One (vix, seed) held-VIX panel, in a worker: the four numbers a
+    crisis state is judged on. §62 found the survey blind to sector excess
+    in the crisis state because only vol and correlation were kept."""
     overrides, vix, seed = job
     model = _rebuild(overrides)
     panel = facts.measure(
         seed=seed, universe=pretium.Universe.random(UNIVERSE_N,
                                                     seed=UNIVERSE_SEED),
         days=HELD_DAYS, scenario=Scenario().hold(vix=vix), model=model)
-    return vix, seed, panel["annualised_vol_pct"], panel["cross_sectional_corr"]
+    return vix, seed, {k: panel[k] for k in HELD_KEYS}
+
+
+def _held_job(job):
+    """One (vix, seed) held-VIX panel, in a worker."""
+    vix, seed, p = _held_panel(job)
+    return vix, seed, p["annualised_vol_pct"], p["cross_sectional_corr"]
 
 
 def _shock_job(job):

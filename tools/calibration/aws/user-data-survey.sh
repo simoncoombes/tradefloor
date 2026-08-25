@@ -7,22 +7,22 @@
 # ETA of another 0.8h. The job needs about 2.4 hours; the switch was set for a
 # job a third that size. Ninety-one minutes of a 96-core box produced one log
 # file and no measurement.
-shutdown -h +180
+shutdown -h +240
 
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey3
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey4
 BRANCH=main
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
-SAMPLES=2000
-# The §62 surface: six axes on the pt-v6 base (CALIBRATION-FOLLOWUPS.md §61,
-# §62). Every other parameter is pinned at pt-v6 inside each vector by the
-# driver, so a task still sets all of them. 2000 LHS points in six
-# dimensions is ample; 96000 tasks, about 1.2 hours on 94 workers.
-BASE=pt-v6
-ONLY=sector_factor_sigma,sector_vix_coupling,crisis_blend_source,crisis_blend_cap,crisis_blend_ramp,idio_sigma_scale
+SAMPLES=3000
+# The §64 surface: the market factor's GARCH memory freed, its level and the
+# market jumps able to take over the tails, with the idio scale and sector
+# sigma able to re-pay for it, on the pt-v7 base. Seven axes, 3000 LHS
+# points, 144000 tasks, about 1.8 hours on 94 workers.
+BASE=pt-v7
+ONLY=market_vol_persistence,market_vol_alpha_frac,market_factor_sigma,jump_intensity_market,jump_sigma_market,idio_sigma_scale,sector_factor_sigma
 
 dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 
