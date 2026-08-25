@@ -1,0 +1,45 @@
+{
+  "kind": "mispricing.constants",
+  "meta": {
+    "generator": "scripts/rust-port/generate-goldens.ts",
+    "generatedFrom": "TypeScript (the parity contract — never regenerate from Rust)",
+    "gitCommit": "51e673d3c536ca350a92b97ca7a09f91ed3f5061",
+    "sourceFiles": [
+      {
+        "path": "src/lib/engine/prng.ts",
+        "sha256": "31e7c173c5d62ba0282040ddb46ac4a1c2676448fc767ed60c7723887907e2ab"
+      },
+      {
+        "path": "src/lib/engine/mispricing.ts",
+        "sha256": "513108f9455908fb09e4f8f36d4c3dd25e009a94bfcecb41d0a363dbcb636a24"
+      }
+    ],
+    "sourceModule": "src/lib/engine/mispricing.ts",
+    "covers": [
+      "MISPRICING_HALF_LIFE_DAYS", "MISPRICING_PHI", "MOMENTUM_THETA", "MISPRICING_CAP", "DAILY_SHOCK_CAP", "CROWD_VALUATION_GAIN", "CROWD_MOMENTUM_GAIN", "CROWD_LEAN_CAP"
+    ],
+    "description": "The exported constants, at full f64 precision.",
+    "notes": [
+      "MISPRICING_PHI = Math.pow(0.5, 1/60) is a TRANSCENDENTAL RESULT computed by V8 at module load. Rust f64::powf may differ in the last ULP. The port must reproduce these bits — hardcoding the literal from `MISPRICING_PHI.bits` is the safe move, since a one-ULP difference in phi compounds through the whole s-process.", "1/60 is itself inexact; `phiDerivation.exponent` records the exact f64 that Math.pow received."
+    ],
+    "floatEncoding": "bits = raw IEEE-754 f64, big-endian, 16 uppercase hex digits. dec = shortest round-trip decimal, informational only.",
+    "nanPolicy": "Every NaN is recorded as 7FF8000000000000 (the pattern of Rust f64::NAN). V8 does not emit a stable NaN sign/payload, so only NaN-ness is contractual — compare NaN results with is_nan(), not with bits."
+  },
+  "constants": {
+    "MISPRICING_HALF_LIFE_DAYS": { "dec": "60", "bits": "404E000000000000" },
+    "MISPRICING_PHI": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" },
+    "MOMENTUM_THETA": { "dec": "0.25", "bits": "3FD0000000000000" },
+    "MISPRICING_CAP": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+    "DAILY_SHOCK_CAP": { "dec": "0.15", "bits": "3FC3333333333333" },
+    "CROWD_VALUATION_GAIN": { "dec": "0.006", "bits": "3F789374BC6A7EFA" },
+    "CROWD_MOMENTUM_GAIN": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+    "CROWD_LEAN_CAP": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+  },
+  "phiDerivation": {
+    "base": { "dec": "0.5", "bits": "3FE0000000000000" },
+    "exponentNumerator": { "dec": "1", "bits": "3FF0000000000000" },
+    "exponentDenominator": { "dec": "60", "bits": "404E000000000000" },
+    "exponent": { "dec": "0.016666666666666666", "bits": "3F91111111111111" },
+    "result": { "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" }
+  }
+}

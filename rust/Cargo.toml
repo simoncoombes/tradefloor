@@ -1,0 +1,94 @@
+[package]
+name = "pretium"
+version = "0.1.0"
+edition = "2021"
+description = "Deterministic market simulation with a real limit order book."
+# Dual-licensed, the Rust-ecosystem norm (serde, tokio, rand): a downstream
+# user picks whichever term suits their own policy. Supersedes an earlier
+# Apache-2.0-only decision -- see DECISIONS.md in pretium-design for the
+# reasoning. LICENSE-APACHE and LICENSE-MIT carry the full texts; there is no
+# longer a generic LICENSE file, matching the same crates' convention.
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/simoncoombes/pretium"
+homepage = "https://simoncoombes.github.io/pretium"
+keywords = ["simulation", "finance", "market", "orderbook", "deterministic"]
+categories = ["simulation", "science"]
+readme = "README.md"
+# The golden vectors are 135 MB of parity fixtures. They are the test
+# contract, not library content, and must never ride along in a published
+# sdist -- excluded explicitly rather than trusted to a .gitignore.
+exclude = ["goldens/**", "_keep/**"]
+
+[lib]
+name = "pretium"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libm = "0.2.16"
+
+# For the ModelParams fingerprint (CALIBRATION.md §5.1/§9.2): sha256 over the
+# canonical preset serialisation, in the core, so a non-shipped preset can
+# never present as a shipped one on any surface — Rust or Python. Pure Rust,
+# no_std-capable, deterministic; already in the tree as a dev-dependency.
+sha2 = "0.10"
+
+# Optional, and NOT carrying `extension-module` here.
+#
+# `extension-module` tells the linker that Python symbols will be supplied by
+# the interpreter at load time. That is right for a wheel and fatal for
+# `cargo test`, which links a normal binary and would fail to resolve them.
+# So the feature is attached to `python` below, which maturin turns on and
+# `cargo test` leaves off.
+pyo3 = { version = "0.22", features = ["abi3-py311"], optional = true }
+
+# Arrow, for the columnar results surface. OPTIONAL and pulled in only by the
+# `python` feature, deliberately: the WASM consumer needs none of it, and arrow
+# is a large dependency to compile into a browser payload for a surface that
+# build never touches.
+#
+# `ffi` gives the C Data Interface, which is how a record batch reaches polars,
+# pandas, pyarrow and duckdb without this crate depending on any of them.
+arrow = { version = "53", default-features = false, features = ["ffi"], optional = true }
+
+# The browser binding. Optional for the same reason as pyo3: a `cargo test`
+# or a Python wheel build must not drag in wasm-bindgen, and the wasm build
+# must not drag in arrow. See `wasm` under [features].
+wasm-bindgen = { version = "0.2", optional = true }
+
+[features]
+# abi3-py311: one wheel per platform covers CPython 3.11 and every later
+# version. The floor is 3.11 rather than WP7's "CPython 3.9+" sketch, which
+# is stale -- 3.9 is past EOL and SPEC 0 has dropped 3.10.
+python = ["dep:pyo3", "pyo3/extension-module", "dep:arrow"]
+
+# The browser surface. Deliberately does NOT pull arrow: a columnar C Data
+# Interface is meaningless in a browser and would be a large dependency
+# compiled into a payload that never calls it.
+#
+# Both bindings drive `Engine::close_day`, so the day loop they run is one
+# implementation rather than two. That is the whole point -- see lib.rs.
+wasm = ["dep:wasm-bindgen"]
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Only to verify the golden vectors against index.json's SHA-256 manifest.
+# A partially regenerated or truncated vector set is otherwise a silent pass.
+sha2 = "0.10"
+
+# ============================================================================
+# Contractual, not tunable. Nothing here may trade accuracy for speed: float
+# reassociation or FMA contraction would silently produce a different market
+# on a different CPU, which is the exact failure `mul_add` is banned for. No
+# `-C target-cpu=native` in release builds -- wheels compile against baseline
+# target features.
+#
+# WARNING: Cargo honours `[profile.*]` only from the ROOT manifest. This crate
+# is its own root today, so this applies. If it ever becomes a workspace
+# member, this section moves to the workspace root or it silently stops
+# applying.
+# ============================================================================
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3

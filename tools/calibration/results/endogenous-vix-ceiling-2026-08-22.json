@@ -1,0 +1,154 @@
+{
+ "claim": {
+  "current_trigger": 25.5,
+  "old_trigger": 40.0,
+  "pooled_max_vix": 26.51124291097025,
+  "verdict": "endogenous VIX peaked at 26.51 across 24 runs of 2520 days spanning the search box's corners \u2014 the old trigger at 40.0 was unreachable from inside the model at any tested market parameterisation, so the crisis blend it gated was structurally inert without pinned macro; the promoted threshold at 25.5 is crossed endogenously (fraction per vector above)."
+ },
+ "method": {
+  "days": 2520,
+  "macro": "endogenous (no pins, no shocks)",
+  "seeds": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6
+  ],
+  "universe": "Universe.random(40, seed=111)",
+  "workers": 8
+ },
+ "provenance": {
+  "date": "2026-08-22",
+  "git_rev": "f5f6d8f-dirty",
+  "machine": "arm64",
+  "platform": "macOS-26.6-arm64-arm-64bit",
+  "python": "3.11.15"
+ },
+ "vectors": {
+  "legacy": {
+   "draws_consumed_per_seed": {
+    "1": 248672204,
+    "2": 248672272,
+    "3": 248672338,
+    "4": 248672383,
+    "5": 248672217,
+    "6": 248672321
+   },
+   "fingerprint": "custom-d61dce4a",
+   "fraction_above_current": 0.05350529100529101,
+   "fraction_above_old": 0.0,
+   "max_vix": 26.43124820196053,
+   "max_vix_per_seed": {
+    "1": 26.346988949562736,
+    "2": 26.42631081475598,
+    "3": 26.155354481897504,
+    "4": 26.43124820196053,
+    "5": 26.07472043967252,
+    "6": 26.26361140976406
+   },
+   "mean_vix": 18.213326593988832,
+   "overrides": {
+    "garch_alpha": 0.09,
+    "garch_beta": 0.9,
+    "garch_gamma": 0.0,
+    "idio_sigma_scale": 1.0,
+    "market_factor_sigma": 0.0075,
+    "market_vol_alpha": 0.0,
+    "market_vol_beta": 0.0,
+    "market_vol_vix_coupling": 0.0
+   }
+  },
+  "pt-v1": {
+   "draws_consumed_per_seed": {
+    "1": 248672204,
+    "2": 248672272,
+    "3": 248672338,
+    "4": 248672383,
+    "5": 248672217,
+    "6": 248672321
+   },
+   "fingerprint": "pt-v1",
+   "fraction_above_current": 0.05707671957671958,
+   "fraction_above_old": 0.0,
+   "max_vix": 26.51124291097025,
+   "max_vix_per_seed": {
+    "1": 26.268366504928995,
+    "2": 26.449519278914803,
+    "3": 26.16181406112191,
+    "4": 26.51124291097025,
+    "5": 26.2021925613575,
+    "6": 26.336244168887998
+   },
+   "mean_vix": 18.222000576594247,
+   "overrides": {}
+  },
+  "quiet": {
+   "draws_consumed_per_seed": {
+    "1": 248672204,
+    "2": 248672272,
+    "3": 248672338,
+    "4": 248672383,
+    "5": 248672217,
+    "6": 248672321
+   },
+   "fingerprint": "custom-8c5a02dd",
+   "fraction_above_current": 0.051587301587301584,
+   "fraction_above_old": 0.0,
+   "max_vix": 26.40754682315462,
+   "max_vix_per_seed": {
+    "1": 26.268649526806872,
+    "2": 26.40754682315462,
+    "3": 26.138852779266106,
+    "4": 26.345095536848444,
+    "5": 26.14241642349662,
+    "6": 26.247258988606852
+   },
+   "mean_vix": 18.19271468995511,
+   "overrides": {
+    "garch_alpha": 0.01,
+    "garch_beta": 0.6,
+    "garch_gamma": 0.0,
+    "idio_sigma_scale": 0.21,
+    "market_factor_sigma": 0.004,
+    "market_vol_alpha": 0.01,
+    "market_vol_beta": 0.1
+   }
+  },
+  "violent": {
+   "draws_consumed_per_seed": {
+    "1": 248672196,
+    "2": 248672154,
+    "3": 248672275,
+    "4": 248672245,
+    "5": 248672200,
+    "6": 248672199
+   },
+   "fingerprint": "custom-2a49c457",
+   "fraction_above_current": 0.057605820105820105,
+   "fraction_above_old": 0.0,
+   "max_vix": 26.48987929159508,
+   "max_vix_per_seed": {
+    "1": 26.19561230351011,
+    "2": 26.4724495495789,
+    "3": 26.208420837604503,
+    "4": 26.48987929159508,
+    "5": 26.112042133204564,
+    "6": 26.264736331321284
+   },
+   "mean_vix": 18.24246055986459,
+   "overrides": {
+    "garch_alpha": 0.4,
+    "garch_beta": 0.55,
+    "garch_gamma": 0.05,
+    "idio_sigma_scale": 3.36,
+    "market_factor_sigma": 0.064,
+    "market_vol_alpha": 0.9,
+    "market_vol_beta": 0.09,
+    "market_vol_ceiling_multiple": 32.0
+   }
+  }
+ },
+ "wall_seconds": 200.50961537502008
+}

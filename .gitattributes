@@ -1,0 +1,5 @@
+# Golden vectors are a byte-exact parity contract, verified against the
+# SHA-256 manifest in index.json. Git's autocrlf would rewrite line endings on
+# checkout and every one of those hashes would fail on a fresh clone -- a
+# silent, confusing failure on Windows only. Never transform them.
+rust/goldens/** -text

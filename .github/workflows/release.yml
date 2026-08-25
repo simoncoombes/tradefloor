@@ -1,0 +1,292 @@
+# Build the wheels, prove they agree, then publish them.
+#
+# The determinism gate (determinism.yml) answers "do our builds agree?" for a
+# commit. This answers the narrower and more consequential question: do THESE
+# ARTEFACTS, the exact files about to be uploaded, agree?
+#
+# Those are not the same question, and the difference is the whole reason the
+# digest check is repeated here rather than delegated. A gate that verified
+# one set of builds while a different set was published would be a green tick
+# over an unverified upload -- the most expensive kind of false assurance,
+# because nothing downstream would ever catch it.
+#
+# Cost. Linux bills at 1x, Windows 2x, macOS 10x, so a full five-target run is
+# roughly 96 billed minutes and the two macOS jobs dominate. `dry_run` builds
+# ONE Linux target instead -- a few pence -- and is there so the plumbing can
+# be exercised without paying for a release or publishing anything.
+#
+# Publishing uses PyPI Trusted Publishing (OIDC): no API token exists, so
+# none can leak. It requires a one-time configuration on PyPI naming this
+# repository and workflow. The `pypi` environment is declared so a required
+# reviewer can be attached to it in repository settings -- publication is the
+# one step here that cannot be undone.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and verify one Linux target, publish nothing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    name: choose targets
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      count: ${{ steps.pick.outputs.count }}
+      publish: ${{ steps.pick.outputs.publish }}
+    steps:
+      - id: pick
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A tag publishes. A dispatch does not, whatever it is asked for --
+          # the fallback fails toward NOT uploading, because that is the
+          # direction a mistake is recoverable in.
+          if [ "${{ github.event_name }}" = "push" ]; then
+            PUBLISH=true
+            M='[{"os":"ubuntu-latest","target":"linux-x86_64"},
+                {"os":"ubuntu-24.04-arm","target":"linux-aarch64"},
+                {"os":"macos-latest","target":"macos-arm64"},
+                {"os":"macos-15-intel","target":"macos-x86_64"},
+                {"os":"windows-latest","target":"windows-x86_64"}]'
+          else
+            PUBLISH=false
+            M='[{"os":"ubuntu-latest","target":"linux-x86_64"}]'
+          fi
+          M=$(echo "$M" | tr -d '\n' | tr -s ' ')
+          echo "matrix=$M" >> "$GITHUB_OUTPUT"
+          echo "count=$(echo "$M" | grep -o '"target"' | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+          echo "event=${{ github.event_name }} publish=$PUBLISH targets=$M"
+
+  wheels:
+    name: wheel ${{ matrix.target }}
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build the wheel
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip maturin
+          # Release profile is contractual: lto, codegen-units=1, and no
+          # target-cpu=native. A build that let LLVM fuse a multiply-add on
+          # one CPU family would be a different market on that CPU family.
+          maturin build --release --out dist
+
+      - name: Install the wheel and record its digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          # --no-index is load-bearing. Without it pip may resolve the name
+          # from PyPI, and the digest would then describe a package that is
+          # not the one just built -- a green run proving nothing.
+          python -m pip install --no-index --find-links dist --force-reinstall pretium
+          # Run from outside the checkout so the WHEEL is imported rather
+          # than the source tree, which is importable and would say nothing
+          # about the artefact being shipped.
+          cd "${{ runner.temp }}"
+          python "${{ github.workspace }}/tests/known_answer.py" | tee kat.txt
+          grep -oE '[0-9a-f]{64}' kat.txt | head -1 > "digest-${{ matrix.target }}.txt"
+
+      - name: Check the package works from the wheel alone
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${{ runner.temp }}"
+          python - <<'PY'
+          import pretium as pt
+          from pretium import envelope as env
+          u = pt.Universe.random(12, seed=7)
+          e = pt.Engine(universe=u, seed=3)
+          e.run_days(3)
+          assert env.PRESET == pt.model_preset()["name"]
+          for name in ("pt-v1", "pt-v2", "pt-v3", "pt-v4"):
+              assert pt.ModelParams.from_preset(name).fingerprint == name
+          print("smoke OK:", pt.version())
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.target }}
+          path: dist/*.whl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.target }}
+          path: ${{ runner.temp }}/digest-${{ matrix.target }}.txt
+
+  sdist:
+    name: sdist
+    needs: setup
+    if: needs.setup.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: |
+          python -m pip install --upgrade pip maturin
+          maturin sdist --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  verify:
+    name: the artefacts agree
+    needs: [setup, wheels]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: digest-*, merge-multiple: true, path: digests }
+
+      - name: Compare against each other and against the committed baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=${{ needs.setup.outputs.count }}
+          count=$(ls digests/*.txt | wc -l)
+          echo "Digests reported:"
+          for f in digests/*.txt; do
+            printf '  %-20s %s\n' \
+              "$(basename "$f" .txt | sed 's/^digest-//')" "$(tr -d '\n' < "$f")"
+          done
+
+          if [ "$count" -lt "$expected" ]; then
+            echo "Only $count of $expected targets reported. A missing target"
+            echo "is not a pass: it is a platform whose determinism is"
+            echo "unverified, and shipping its wheel would publish an"
+            echo "unproven claim."
+            exit 1
+          fi
+
+          # Agreeing with each other is necessary and not sufficient. Five
+          # builds could agree and all differ from the committed baseline,
+          # which would mean the release changed the simulation -- the one
+          # thing that silently invalidates every published result citing
+          # this model. So compare against tests/known_answer.json too.
+          # `sha256` is the combined digest, and the first 64-hex string the
+          # KAT prints -- which is what the wheel job captured with `head -1`.
+          baseline=$(python -c \
+            "import json;print(json.load(open('tests/known_answer.json'))['sha256'])")
+          echo "  committed baseline   $baseline"
+          for f in digests/*.txt; do
+            got=$(tr -d '\n' < "$f")
+            if [ "$got" != "$baseline" ]; then
+              echo "MISMATCH: $(basename "$f") reported $got"
+              exit 1
+            fi
+          done
+          echo
+          echo "Every artefact reproduces the committed baseline."
+
+  publish:
+    name: publish to PyPI
+    needs: [setup, wheels, sdist, verify]
+    if: needs.setup.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write        # Trusted Publishing; no API token exists
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: wheel-*, merge-multiple: true, path: dist }
+      - uses: actions/download-artifact@v4
+        with: { name: sdist, path: dist }
+      - run: ls -la dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github_release:
+    name: GitHub release
+    needs: [setup, verify, publish]
+    if: needs.setup.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # to create the release and attach artefacts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: wheel-*, merge-multiple: true, path: dist }
+      - uses: actions/download-artifact@v4
+        with: { name: sdist, path: dist }
+
+      - name: Assemble the release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+
+          # The notes are the CHANGELOG section for this version, not a
+          # generated commit list. A commit list tells a reader what was
+          # touched; the CHANGELOG tells them what changed about the
+          # software, which is the only thing a release note is for.
+          python - "$VERSION" > NOTES.md <<'PY'
+          import re, sys
+          version = sys.argv[1]
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          # Sections look like "## [0.1.0]" or "## [0.1.0], unreleased".
+          pattern = rf"^## \[{re.escape(version)}\].*?$(.*?)(?=^## |\Z)"
+          m = re.search(pattern, text, re.S | re.M)
+          if not m:
+              sys.exit(f"CHANGELOG.md has no section for {version}. A release "
+                       f"without notes is a tag, and the point of using "
+                       f"releases is that it is not one.")
+          print(m.group(1).strip())
+          PY
+
+          # The determinism digest belongs in the notes. It is the claim the
+          # project is built around, and a reader checking it later should
+          # not have to dig through a workflow log to find what this
+          # release was supposed to produce.
+          DIGEST=$(python -c \
+            "import json;print(json.load(open('tests/known_answer.json'))['sha256'])")
+          {
+            echo
+            echo "---"
+            echo
+            echo "**Determinism.** Every wheel in this release reproduces the"
+            echo "known-answer digest:"
+            echo
+            echo '```'
+            echo "$DIGEST"
+            echo '```'
+            echo
+            echo "Verified on linux-x86_64, linux-aarch64, macos-arm64,"
+            echo "macos-x86_64 and windows-x86_64 before publication."
+          } >> NOTES.md
+          cat NOTES.md
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file NOTES.md \
+            --verify-tag \
+            dist/*

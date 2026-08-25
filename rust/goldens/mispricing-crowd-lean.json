@@ -1,0 +1,3115 @@
+{
+  "kind": "mispricing.crowdLean",
+  "meta": {
+    "generator": "scripts/rust-port/generate-goldens.ts",
+    "generatedFrom": "TypeScript (the parity contract — never regenerate from Rust)",
+    "gitCommit": "51e673d3c536ca350a92b97ca7a09f91ed3f5061",
+    "sourceFiles": [
+      {
+        "path": "src/lib/engine/prng.ts",
+        "sha256": "31e7c173c5d62ba0282040ddb46ac4a1c2676448fc767ed60c7723887907e2ab"
+      },
+      {
+        "path": "src/lib/engine/mispricing.ts",
+        "sha256": "513108f9455908fb09e4f8f36d4c3dd25e009a94bfcecb41d0a363dbcb636a24"
+      }
+    ],
+    "sourceModule": "src/lib/engine/mispricing.ts",
+    "covers": ["crowdLean"],
+    "description": "clamp(−CROWD_VALUATION_GAIN·s + CROWD_MOMENTUM_GAIN·momentum, ±CROWD_LEAN_CAP) over a full cross product of boundary inputs.",
+    "notes": [
+      "No transcendentals — two multiplies, one add, one clamp. This should port bit-exactly with no libm involvement at all, which makes it the best canary: if this file fails, the problem is structural, not a last-ULP libm difference.", "The unary minus is applied to the CONSTANT (`-CROWD_VALUATION_GAIN * s`), which for s = -0 gives +0 rather than -0.", "-Infinity + Infinity yields NaN, which the clamp passes through."
+    ],
+    "floatEncoding": "bits = raw IEEE-754 f64, big-endian, 16 uppercase hex digits. dec = shortest round-trip decimal, informational only.",
+    "nanPolicy": "Every NaN is recorded as 7FF8000000000000 (the pattern of Rust f64::NAN). V8 does not emit a stable NaN sign/payload, so only NaN-ness is contractual — compare NaN results with is_nan(), not with bits."
+  },
+  "cases": [
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-Infinity", "bits": "FFF0000000000000" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-100", "bits": "C059000000000000" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.012600000000000002", "bits": "BF89CE075F6FD221" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.0046", "bits": "BF72D77318FC5048" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.0034000000000000002", "bits": "3F6BDA5119CE0760" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "0.005", "bits": "3F747AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.0051", "bits": "3F74E3BCD35A8588" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.0053999998", "bits": "3F761E4F68A168C1" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.0054", "bits": "3F761E4F765FD8AE" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.0054", "bits": "3F761E4F765FD8AE" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.0054", "bits": "3F761E4F765FD8AE" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.0054", "bits": "3F761E4F765FD8AE" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.0054000002", "bits": "3F761E4F841E489B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.0057", "bits": "3F7758E219652BD4" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.0058000000000000005", "bits": "3F77C1BDA5119CE1" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.0074", "bits": "3F7E4F765FD8ADAC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.0154", "bits": "3F8F8A0902DE00D2" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.015000000000000003", "bits": "BF8EB851EB851EBA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.007", "bits": "BF7CAC083126E979" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "0.0026", "bits": "3F654C985F06F694" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.0027", "bits": "3F661E4F765FD8AE" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.0029999998", "bits": "3F689374A0ED9F20" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.003", "bits": "3F689374BC6A7EFA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.003", "bits": "3F689374BC6A7EFA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.003", "bits": "3F689374BC6A7EFA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.003", "bits": "3F689374BC6A7EFA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.0030000002", "bits": "3F689374D7E75ED4" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.0033", "bits": "3F6B089A02752546" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.0034000000000000002", "bits": "3F6BDA5119CE0760" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.005", "bits": "3F747AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.013000000000000001", "bits": "3F8A9FBE76C8B43A" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.5", "bits": "BFE0000000000000" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.017400000000000002", "bits": "BF91D14E3BCD35A9" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.0094", "bits": "BF83404EA4A8C155" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.0014", "bits": "BF56F0068DB8BAC7" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "0.00020000000000000004", "bits": "3F2A36E2EB1C432E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.0003000000000000001", "bits": "3F33A92A30553263" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.0005999998000000001", "bits": "3F43A929C261B2FB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.0006000000000000001", "bits": "3F43A92A30553262" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.0006000000000000001", "bits": "3F43A92A30553262" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.0006000000000000001", "bits": "3F43A92A30553262" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.0006000000000000001", "bits": "3F43A92A30553262" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.0006000002", "bits": "3F43A92A9E48B1C9" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.0009", "bits": "3F4D7DBF487FCB92" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.001", "bits": "3F50624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.0026", "bits": "3F654C985F06F694" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.0106", "bits": "3F85B573EAB367A1" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.018600000000000002", "bits": "3F930BE0DED288CF" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.1", "bits": "BFB999999999999A" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.017880000000000004", "bits": "BF924F227D028A1F" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.00988", "bits": "BF843BF727136A40" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.00188", "bits": "BF5ECD4AA10E0221" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.00028000000000000003", "bits": "BF32599ED7C6FBD3" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.00017999999999999998", "bits": "BF2797CC39FFD60E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.0001199998", "bits": "3F1F750CDDB9222E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.00012", "bits": "3F1F75104D551D69" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.00012", "bits": "3F1F75104D551D69" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.00012", "bits": "3F1F75104D551D69" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.00012", "bits": "3F1F75104D551D69" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.0001200002", "bits": "3F1F7513BCF118A4" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.00041999999999999996", "bits": "3F3B866E43AA79BB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.0005200000000000001", "bits": "3F410A137F38C544" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.00212", "bits": "3F615DF6555C52E7" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01012", "bits": "3F84B9CB6848BEB6" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01812", "bits": "3F928E0C9D9D3459" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.02", "bits": "BF947AE147AE147B" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.017910000000000002", "bits": "BF9256FFC115DF66" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.00991", "bits": "BF844BB1AF3A14CF" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.00191", "bits": "BF5F4B1EE2435697" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.00031000000000000005", "bits": "BF3450EFDC9C4DAA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.00020999999999999998", "bits": "BF2B866E43AA79BB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "0.00008999979999999999", "bits": "3F1797C8CA63DAD3" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0.00008999999999999999", "bits": "3F1797CC39FFD60E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0.00008999999999999999", "bits": "3F1797CC39FFD60E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0.00008999999999999999", "bits": "3F1797CC39FFD60E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0.00008999999999999999", "bits": "3F1797CC39FFD60E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "0.00009000019999999999", "bits": "3F1797CFA99BD149" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.00038999999999999994", "bits": "3F398F1D3ED527E4" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.00049", "bits": "3F400E6AFCCE1C58" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.00209", "bits": "3F611F0C34C1A8AC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01009", "bits": "3F84AA10E0221427" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.018090000000000002", "bits": "3F92862F5989DF12" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.01799999994", "bits": "BF926E978C47FD3D" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.00999999994", "bits": "BF847AE1459E507E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.00199999994", "bits": "BF60624DCAB29A07" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.00039999994000000004", "bits": "BF3A36E2A923C389" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.00029999994", "bits": "BF33A929EE5CB2BD" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-1.4e-10", "bits": "BDE33DCFE54A3803" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "6e-11", "bits": "3DD07E1FE91B0B70" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "6e-11", "bits": "3DD07E1FE91B0B70" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "6e-11", "bits": "3DD07E1FE91B0B70" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "6e-11", "bits": "3DD07E1FE91B0B70" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "2.6000000000000003e-10", "bits": "3DF1DDF7E732A1BA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.00030000005999999995", "bits": "3F33A92A724DB205" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.00040000006", "bits": "3F3A36E32D14C2D1" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.0020000000600000002", "bits": "3F60624DDB30B9F1" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01000000006", "bits": "3F847AE149BDD878" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.018000000060000004", "bits": "3F926E978E57C13B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.018000000000000002", "bits": "BF926E978D4FDF3C" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.01", "bits": "BF847AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.002", "bits": "BF60624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.0004", "bits": "BF3A36E2EB1C432D" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.0003", "bits": "BF33A92A30553261" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-2e-10", "bits": "BDEB7CDFD9D7BDBB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "2e-10", "bits": "3DEB7CDFD9D7BDBB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.0003", "bits": "3F33A92A30553261" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.0004", "bits": "3F3A36E2EB1C432D" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.002", "bits": "3F60624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.018000000000000002", "bits": "3F926E978D4FDF3C" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-5e-324", "bits": "8000000000000001" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.018000000000000002", "bits": "BF926E978D4FDF3C" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.01", "bits": "BF847AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.002", "bits": "BF60624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.0004", "bits": "BF3A36E2EB1C432D" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.0003", "bits": "BF33A92A30553261" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-2e-10", "bits": "BDEB7CDFD9D7BDBB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "2e-10", "bits": "3DEB7CDFD9D7BDBB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.0003", "bits": "3F33A92A30553261" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.0004", "bits": "3F3A36E2EB1C432D" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.002", "bits": "3F60624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.018000000000000002", "bits": "3F926E978D4FDF3C" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "-0", "bits": "8000000000000000" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.018000000000000002", "bits": "BF926E978D4FDF3C" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.01", "bits": "BF847AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.002", "bits": "BF60624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.0004", "bits": "BF3A36E2EB1C432D" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.0003", "bits": "BF33A92A30553261" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-2e-10", "bits": "BDEB7CDFD9D7BDBB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "-0", "bits": "8000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "-0", "bits": "8000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "2e-10", "bits": "3DEB7CDFD9D7BDBB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.0003", "bits": "3F33A92A30553261" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.0004", "bits": "3F3A36E2EB1C432D" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.002", "bits": "3F60624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.018000000000000002", "bits": "3F926E978D4FDF3C" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0", "bits": "0000000000000000" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.018000000000000002", "bits": "BF926E978D4FDF3C" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.01", "bits": "BF847AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.002", "bits": "BF60624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.0004", "bits": "BF3A36E2EB1C432D" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.0003", "bits": "BF33A92A30553261" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-2e-10", "bits": "BDEB7CDFD9D7BDBB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "-0", "bits": "8000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "-0", "bits": "8000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "0", "bits": "0000000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "2e-10", "bits": "3DEB7CDFD9D7BDBB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.0003", "bits": "3F33A92A30553261" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.0004", "bits": "3F3A36E2EB1C432D" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.002", "bits": "3F60624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.01", "bits": "3F847AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.018000000000000002", "bits": "3F926E978D4FDF3C" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "5e-324", "bits": "0000000000000001" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.018000000060000004", "bits": "BF926E978E57C13B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.01000000006", "bits": "BF847AE149BDD878" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.0020000000600000002", "bits": "BF60624DDB30B9F1" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.00040000006", "bits": "BF3A36E32D14C2D1" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.00030000005999999995", "bits": "BF33A92A724DB205" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-2.6000000000000003e-10", "bits": "BDF1DDF7E732A1BA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "-6e-11", "bits": "BDD07E1FE91B0B70" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "-6e-11", "bits": "BDD07E1FE91B0B70" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "-6e-11", "bits": "BDD07E1FE91B0B70" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "-6e-11", "bits": "BDD07E1FE91B0B70" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "1.4e-10", "bits": "3DE33DCFE54A3803" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.00029999994", "bits": "3F33A929EE5CB2BD" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.00039999994000000004", "bits": "3F3A36E2A923C389" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.00199999994", "bits": "3F60624DCAB29A07" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.00999999994", "bits": "3F847AE1459E507E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.01799999994", "bits": "3F926E978C47FD3D" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "1e-8", "bits": "3E45798EE2308C3A" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.018090000000000002", "bits": "BF92862F5989DF12" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.01009", "bits": "BF84AA10E0221427" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.00209", "bits": "BF611F0C34C1A8AC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.00049", "bits": "BF400E6AFCCE1C58" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.00038999999999999994", "bits": "BF398F1D3ED527E4" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.00009000019999999999", "bits": "BF1797CFA99BD149" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "-0.00008999999999999999", "bits": "BF1797CC39FFD60E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "-0.00008999999999999999", "bits": "BF1797CC39FFD60E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "-0.00008999999999999999", "bits": "BF1797CC39FFD60E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "-0.00008999999999999999", "bits": "BF1797CC39FFD60E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.00008999979999999999", "bits": "BF1797C8CA63DAD3" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.00020999999999999998", "bits": "3F2B866E43AA79BB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.00031000000000000005", "bits": "3F3450EFDC9C4DAA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.00191", "bits": "3F5F4B1EE2435697" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.00991", "bits": "3F844BB1AF3A14CF" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.017910000000000002", "bits": "3F9256FFC115DF66" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.015", "bits": "3F8EB851EB851EB8" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.01812", "bits": "BF928E0C9D9D3459" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.01012", "bits": "BF84B9CB6848BEB6" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.00212", "bits": "BF615DF6555C52E7" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.0005200000000000001", "bits": "BF410A137F38C544" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.00041999999999999996", "bits": "BF3B866E43AA79BB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.0001200002", "bits": "BF1F7513BCF118A4" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "-0.00012", "bits": "BF1F75104D551D69" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "-0.00012", "bits": "BF1F75104D551D69" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "-0.00012", "bits": "BF1F75104D551D69" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "-0.00012", "bits": "BF1F75104D551D69" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.0001199998", "bits": "BF1F750CDDB9222E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "0.00017999999999999998", "bits": "3F2797CC39FFD60E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "0.00028000000000000003", "bits": "3F32599ED7C6FBD3" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.00188", "bits": "3F5ECD4AA10E0221" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.00988", "bits": "3F843BF727136A40" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.017880000000000004", "bits": "3F924F227D028A1F" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.02", "bits": "3F947AE147AE147B" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.018600000000000002", "bits": "BF930BE0DED288CF" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.0106", "bits": "BF85B573EAB367A1" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.0026", "bits": "BF654C985F06F694" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.001", "bits": "BF50624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.0009", "bits": "BF4D7DBF487FCB92" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.0006000002", "bits": "BF43A92A9E48B1C9" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "-0.0006000000000000001", "bits": "BF43A92A30553262" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "-0.0006000000000000001", "bits": "BF43A92A30553262" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "-0.0006000000000000001", "bits": "BF43A92A30553262" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "-0.0006000000000000001", "bits": "BF43A92A30553262" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.0005999998000000001", "bits": "BF43A929C261B2FB" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.0003000000000000001", "bits": "BF33A92A30553263" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "-0.00020000000000000004", "bits": "BF2A36E2EB1C432E" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "0.0014", "bits": "3F56F0068DB8BAC7" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.0094", "bits": "3F83404EA4A8C155" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.017400000000000002", "bits": "3F91D14E3BCD35A9" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.1", "bits": "3FB999999999999A" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.013000000000000001", "bits": "BF8A9FBE76C8B43A" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.005", "bits": "BF747AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.0034000000000000002", "bits": "BF6BDA5119CE0760" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.0033", "bits": "BF6B089A02752546" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.0030000002", "bits": "BF689374D7E75ED4" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "-0.003", "bits": "BF689374BC6A7EFA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "-0.003", "bits": "BF689374BC6A7EFA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "-0.003", "bits": "BF689374BC6A7EFA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "-0.003", "bits": "BF689374BC6A7EFA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.0029999998", "bits": "BF689374A0ED9F20" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.0027", "bits": "BF661E4F765FD8AE" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "-0.0026", "bits": "BF654C985F06F694" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "-0.001", "bits": "BF50624DD2F1A9FC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.007", "bits": "3F7CAC083126E979" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.015000000000000003", "bits": "3F8EB851EB851EBA" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.5", "bits": "3FE0000000000000" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.0154", "bits": "BF8F8A0902DE00D2" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.0074", "bits": "BF7E4F765FD8ADAC" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.0058000000000000005", "bits": "BF77C1BDA5119CE1" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.0057", "bits": "BF7758E219652BD4" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.0054000002", "bits": "BF761E4F841E489B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "-0.0054", "bits": "BF761E4F765FD8AE" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "-0.0054", "bits": "BF761E4F765FD8AE" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "-0.0054", "bits": "BF761E4F765FD8AE" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "-0.0054", "bits": "BF761E4F765FD8AE" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.0053999998", "bits": "BF761E4F68A168C1" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.0051", "bits": "BF74E3BCD35A8588" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "-0.005", "bits": "BF747AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "-0.0034000000000000002", "bits": "BF6BDA5119CE0760" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "0.0046", "bits": "3F72D77318FC5048" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "0.012600000000000002", "bits": "3F89CE075F6FD221" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "100", "bits": "4059000000000000" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "Infinity", "bits": "7FF0000000000000" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "-Infinity", "bits": "FFF0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "-100", "bits": "C059000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "-0.9", "bits": "BFECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "-0.5", "bits": "BFE0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "-0.1", "bits": "BFB999999999999A" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "-0.02", "bits": "BF947AE147AE147B" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "-0.015", "bits": "BF8EB851EB851EB8" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "-1e-8", "bits": "BE45798EE2308C3A" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "-5e-324", "bits": "8000000000000001" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "-0", "bits": "8000000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "0", "bits": "0000000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "5e-324", "bits": "0000000000000001" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "1e-8", "bits": "3E45798EE2308C3A" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "0.015", "bits": "3F8EB851EB851EB8" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "0.02", "bits": "3F947AE147AE147B" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "0.1", "bits": "3FB999999999999A" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "0.5", "bits": "3FE0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "0.9", "bits": "3FECCCCCCCCCCCCD" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "100", "bits": "4059000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "Infinity", "bits": "7FF0000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    },
+    {
+      "input": {
+        "s": { "dec": "NaN", "bits": "7FF8000000000000" },
+        "momentum": { "dec": "NaN", "bits": "7FF8000000000000" }
+      },
+      "output": { "dec": "NaN", "bits": "7FF8000000000000" }
+    }
+  ]
+}

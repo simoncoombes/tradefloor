@@ -1,0 +1,213 @@
+# The cross-platform determinism gate.
+#
+# This is the workflow that converts the library's headline claim from an
+# argument into a verified artifact. The crate bans std transcendentals and
+# routes everything through libm SPECIFICALLY so that builds on different
+# operating systems agree bit-for-bit. Until this runs, that is enforced by a
+# grep test and a reasoning chain -- neither of which has ever executed on
+# Linux or macOS.
+#
+# Each target builds a wheel, runs the known-answer simulation inside it, and
+# reports a digest. The final job fails if any two targets disagree.
+#
+# Note on cost: this repository's Actions usage is billed, and the multipliers
+# are not uniform -- Linux is 1x, Windows 2x, macOS 10x. A full five-target run
+# is roughly 96 billed minutes and is dominated by the two macOS jobs.
+#
+# THREE OF THE FIVE TARGETS ARE ALREADY VERIFIED FOR FREE. Every AWS
+# calibration run in this project builds the crate on Graviton and executes
+# `tests/known_answer.py` before doing its own work, so `linux-aarch64` has
+# been shown to agree with `macos-arm64` repeatedly; an x86_64 run on
+# 2026-08-24 added `linux-x86_64` for about six cents
+# (CALIBRATION-FOLLOWUPS §26).
+#
+# That leaves `macos-x86_64` and `windows-x86_64` genuinely unverified, and
+# they are what the `unverified` target set runs. It is the DEFAULT because
+# spending ten times the money to re-prove three targets that a free run
+# already proves is not diligence, it is habit.
+#
+# Use `all` before a release, where the point is that the artifact set was
+# checked in one place, together, on the commit being shipped.
+
+name: determinism
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "Which targets to run"
+        type: choice
+        default: unverified
+        options: [unverified, all]
+  push:
+    tags: ["v*"]
+
+jobs:
+  setup:
+    name: choose targets
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      count: ${{ steps.pick.outputs.count }}
+    steps:
+      - id: pick
+        shell: bash
+        run: |
+          # Chosen by EVENT, not by input alone.
+          #
+          # A tag push always runs everything: a release must not ship on a
+          # partial gate, whatever was cheap to check that week.
+          #
+          # A manual dispatch defaults to `unverified` when no input arrives.
+          # That matters beyond convenience -- a dispatch aimed at a branch
+          # whose workflow definition differs from the default branch's may
+          # not carry the input through at all, and the old fallback
+          # (`|| 'all'`) would then have quietly spent ten times the money.
+          # The cheap set is the safe thing to fall back to; the expensive
+          # one should require asking for it.
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            MODE=all
+          else
+            MODE="${{ github.event.inputs.targets || 'unverified' }}"
+          fi
+          ALL='[{"os":"ubuntu-latest","target":"linux-x86_64"},
+                {"os":"ubuntu-24.04-arm","target":"linux-aarch64"},
+                {"os":"macos-latest","target":"macos-arm64"},
+                {"os":"macos-15-intel","target":"macos-x86_64"},
+                {"os":"windows-latest","target":"windows-x86_64"}]'
+          UNVERIFIED='[{"os":"macos-15-intel","target":"macos-x86_64"},
+                       {"os":"windows-latest","target":"windows-x86_64"}]'
+          if [ "$MODE" = "unverified" ]; then M="$UNVERIFIED"; else M="$ALL"; fi
+          M=$(echo "$M" | tr -d '\n' | tr -s ' ')
+          echo "matrix=$M" >> "$GITHUB_OUTPUT"
+          echo "count=$(echo "$M" | grep -o '"target"' | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE targets=$M"
+
+  digest:
+    name: ${{ matrix.target }}
+    needs: setup
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Never cancel siblings: a disagreement is only visible with every
+      # target's digest in hand, so a failure on one must not destroy the
+      # evidence from the others.
+      fail-fast: false
+      # Chosen by `setup`. macos-15-intel, not macos-13: GitHub retired the
+      # macos-13 image, and a job requesting a retired label does not fail --
+      # it queues forever. Both of the first two dispatches sat unscheduled
+      # for half an hour while the others finished, and since compare refuses
+      # to pass without every target, the gate could never have gone green.
+      # A silent queue is a worse failure than a red X.
+      matrix:
+        include: ${{ fromJSON(needs.setup.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # The abi3 floor. One wheel per platform covers this and every
+          # later CPython, so the matrix does not multiply by Python version.
+          python-version: "3.11"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build and install the wheel
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip maturin pytest
+          # Release profile is contractual: lto, codegen-units=1, and NO
+          # target-cpu=native. A build that let LLVM fuse a multiply-add on
+          # one CPU family would be a different market on that CPU family,
+          # which is the whole reason mul_add is banned in the source.
+          # pyproject.toml carries manifest-path, python-source and the
+          # feature, so the layout lives in one place rather than being repeated
+          # in every invocation.
+          maturin build --release --out dist
+          # --no-index is load-bearing, not caution. Without it pip is free to
+          # resolve the name from PyPI, and the gate would then compare
+          # digests from a package that is not the one just built -- a green
+          # run proving nothing at all.
+          python -m pip install --no-index --find-links dist --force-reinstall pretium
+
+      - name: Run the known-answer simulation
+        shell: bash
+        run: |
+          # Run from a directory that is NOT the repo root, so the installed
+          # wheel is imported rather than any source tree that happens to be
+          # importable. A gate that accidentally tested the source would say
+          # nothing about the artifact being shipped.
+          cd "${{ runner.temp }}"
+          python "${{ github.workspace }}/tests/known_answer.py" | tee kat.txt
+          grep -oE '[0-9a-f]{64}' kat.txt > "digest-${{ matrix.target }}.txt"
+
+      - name: Verify against the committed baseline
+        shell: bash
+        run: |
+          cd "${{ github.workspace }}"
+          # test_known_answer.py deliberately does not depend on the golden
+          # corpus, so it runs here where that corpus does not exist.
+          python -m pytest tests/test_known_answer.py -v
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.target }}
+          path: ${{ runner.temp }}/digest-${{ matrix.target }}.txt
+
+  compare:
+    name: all targets agree
+    needs: [setup, digest]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: digests
+
+      - name: Compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Digests reported:"
+          for f in digests/*.txt; do
+            printf '  %-20s %s\n' "$(basename "$f" .txt | sed 's/^digest-//')" "$(tr '\n' ' ' < "$f")"
+          done
+
+          expected=${{ needs.setup.outputs.count }}
+          count=$(ls digests/*.txt | wc -l)
+          if [ "$count" -lt "$expected" ]; then
+            echo
+            echo "Only $count of $expected targets reported. A missing target is not a"
+            echo "pass: it is a platform whose determinism is unverified, and"
+            echo "shipping its wheel would publish an unproven claim."
+            exit 1
+          fi
+
+          # Each file now holds THREE digests -- simulation, metadata and the
+          # combined -- so the comparison is per FILE, not per line. Hashing
+          # each file and counting unique hashes asks the right question
+          # ("does every target report the same three?"); concatenating and
+          # `sort -u` would count three distinct digests as three
+          # disagreements and fail on a green run, which is how a gate stops
+          # meaning anything.
+          unique=$(for f in digests/*.txt; do shasum -a 256 < "$f" | cut -d' ' -f1; done | sort -u | wc -l)
+          if [ "$unique" -ne 1 ]; then
+            echo
+            echo "PLATFORMS DISAGREE. $unique distinct digest sets across $count targets."
+            echo
+            echo "This is the failure the libm-only design exists to prevent."
+            echo "Do not ship these wheels. Likely causes, in order:"
+            echo "  - a std transcendental reached the source (the grep test"
+            echo "    in mathx_parity should have caught it -- check whether"
+            echo "    it was weakened or its walk stopped being recursive)"
+            echo "  - a build flag enabling float reassociation or FMA"
+            echo "    contraction, or target-cpu=native"
+            echo "  - a dependency that is not itself deterministic"
+            exit 1
+          fi
+
+          echo
+          echo "All $count targets produced: $(cat digests/*.txt | head -1)"

@@ -1,0 +1,94 @@
+{
+ "method": {
+  "held_days": 120,
+  "held_vix": [
+   5.0,
+   15.0,
+   25.0,
+   45.0,
+   65.0
+  ],
+  "shock": "vix_shock(calm=15, peak=45, at=10, over=20) over hold(vix=15) on identical draws",
+  "shock_seeds": [
+   3,
+   5,
+   7
+  ],
+  "universe": "Universe.random(20, seed=11)"
+ },
+ "reference": {
+  "corr_blend": 1.5725740154605774,
+  "factor_variance_persistence": 0.95,
+  "half_life_days": 13.513407333964874,
+  "held_vix": {
+   "15.0": {
+    "annualised_vol_pct": 58.7631459118106,
+    "cross_sectional_corr": 0.458492654347794
+   },
+   "25.0": {
+    "annualised_vol_pct": 71.06648020912138,
+    "cross_sectional_corr": 0.5827466789903508
+   },
+   "45.0": {
+    "annualised_vol_pct": 107.06672739304561,
+    "cross_sectional_corr": 0.721013634506889
+   },
+   "5.0": {
+    "annualised_vol_pct": 49.47975066358932,
+    "cross_sectional_corr": 0.3208165709225148
+   },
+   "65.0": {
+    "annualised_vol_pct": 124.31151009260024,
+    "cross_sectional_corr": 0.774332642472845
+   }
+  },
+  "market_vol_alpha": 0.45,
+  "market_vol_beta": 0.5,
+  "shock_ratio": {
+   "3": 1.2650874145841406,
+   "5": 1.2526683319950895,
+   "7": 1.1705519630197811
+  },
+  "shock_ratio_median": 1.2526683319950895,
+  "spec": "pt-v1",
+  "vol_lever": 2.512371392850963
+ },
+ "vector": {
+  "corr_blend": 1.2371454597741944,
+  "factor_variance_persistence": 0.996401784567767,
+  "half_life_days": 192.28959409028417,
+  "held_vix": {
+   "15.0": {
+    "annualised_vol_pct": 44.689919304496655,
+    "cross_sectional_corr": 0.5620112489973742
+   },
+   "25.0": {
+    "annualised_vol_pct": 46.1056317803051,
+    "cross_sectional_corr": 0.5844080202227552
+   },
+   "45.0": {
+    "annualised_vol_pct": 60.0896686713804,
+    "cross_sectional_corr": 0.6952896650391258
+   },
+   "5.0": {
+    "annualised_vol_pct": 44.23323571358804,
+    "cross_sectional_corr": 0.557289168607716
+   },
+   "65.0": {
+    "annualised_vol_pct": 67.9316073924757,
+    "cross_sectional_corr": 0.7322367884014394
+   }
+  },
+  "market_vol_alpha": 0.471269662689196,
+  "market_vol_beta": 0.525132121878571,
+  "shock_ratio": {
+   "3": 1.0535936204738374,
+   "5": 1.0060689172236128,
+   "7": 1.0103034236433468
+  },
+  "shock_ratio_median": 1.0103034236433468,
+  "spec": "results/calibrate-pt-v3-converged-2026-08-22.json",
+  "vol_lever": 1.5357593966748344
+ },
+ "wall_seconds": 17.088420125000994
+}

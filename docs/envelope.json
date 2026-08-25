@@ -1,0 +1,590 @@
+{
+ "preset": "pt-v3",
+ "certified_horizon_days": 252,
+ "provenance": {
+  "kat_sha256_at_measurement": "992ef95d98e075846f13d0a312231642b26c2030833b10bd8536e374bdc185e3",
+  "runs": [
+   {
+    "name": "envelope",
+    "produced": [
+     "certified",
+     "holdout seeds (1-6)",
+     "holdout universe (60 names)",
+     "horizon_504"
+    ]
+   },
+   {
+    "name": "decay252",
+    "produced": [
+     "decay"
+    ]
+   }
+  ],
+  "note": "Two runs, not one: the first hung at its 1260-day stage (an OOM kill) after persisting everything through 504 days, and the decay curve was re-measured separately. Both built from the same source tarball and report the KAT digest above.",
+  "gaps_regenerated": "2026-08-24, from pretium.envelope.certified(). The file carried five gaps while the module carried six -- the roster-concentration gap was added to the module and the artifact was not regenerated with it. The envelope page tells readers to cite this file rather than its prose, so a stale artifact is the citable one being wrong."
+ },
+ "certified": {
+  "axis": "252d/30 seeds/40 names",
+  "statistics": {
+   "annualised_vol_pct": {
+    "measured": 24.097214072272823,
+    "band": [
+     15.0,
+     36.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "excess_kurtosis": {
+    "measured": 2.530521316735698,
+    "band": [
+     1.6,
+     41.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "return_acf1": {
+    "measured": 0.03745060296347685,
+    "band": [
+     -0.08,
+     0.06
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf1": {
+    "measured": 0.14127142910145438,
+    "band": [
+     0.02,
+     0.22
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf5": {
+    "measured": 0.04962379448651105,
+    "band": [
+     0.02,
+     0.09
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf20": {
+    "measured": 0.008165975509233512,
+    "band": [
+     -0.04,
+     0.08
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "cross_sectional_corr": {
+    "measured": 0.25580280330473915,
+    "band": [
+     0.08,
+     0.56
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "volume_abs_return_corr": {
+    "measured": 0.5339084256109392,
+    "band": [
+     0.46,
+     0.66
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "leverage_effect": {
+    "measured": -0.034862857561783395,
+    "band": [
+     -0.16,
+     0.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "volume_change_acf1": {
+    "measured": -0.4598243679770862,
+    "band": [
+     -0.32,
+     -0.2
+    ],
+    "verdict": "OUT",
+    "distance": 0.1398243679770862,
+    "sd_out": 13.662595438493488,
+    "role": "structural"
+   }
+  },
+  "loss": 0.0
+ },
+ "holdout_seeds": {
+  "statistics": {
+   "annualised_vol_pct": {
+    "measured": 23.851589633399684,
+    "band": [
+     15.0,
+     36.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "excess_kurtosis": {
+    "measured": 2.0418087355069012,
+    "band": [
+     1.6,
+     41.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "return_acf1": {
+    "measured": 0.048467658083115144,
+    "band": [
+     -0.08,
+     0.06
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf1": {
+    "measured": 0.13988905798173545,
+    "band": [
+     0.02,
+     0.22
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf5": {
+    "measured": 0.047159466145195825,
+    "band": [
+     0.02,
+     0.09
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf20": {
+    "measured": -0.014347141432983776,
+    "band": [
+     -0.04,
+     0.08
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "cross_sectional_corr": {
+    "measured": 0.25154795237617544,
+    "band": [
+     0.08,
+     0.56
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "volume_abs_return_corr": {
+    "measured": 0.5549501156309857,
+    "band": [
+     0.46,
+     0.66
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "leverage_effect": {
+    "measured": -0.04926514865410652,
+    "band": [
+     -0.16,
+     0.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "volume_change_acf1": {
+    "measured": -0.45125403298480915,
+    "band": [
+     -0.32,
+     -0.2
+    ],
+    "verdict": "OUT",
+    "distance": 0.13125403298480914,
+    "sd_out": 12.825166158705617,
+    "role": "structural"
+   }
+  },
+  "loss": 0.0
+ },
+ "holdout_universe": {
+  "statistics": {
+   "annualised_vol_pct": {
+    "measured": 26.8175320023024,
+    "band": [
+     15.0,
+     36.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "excess_kurtosis": {
+    "measured": 4.024973270960204,
+    "band": [
+     1.6,
+     41.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "return_acf1": {
+    "measured": 0.05075586289566497,
+    "band": [
+     -0.08,
+     0.06
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf1": {
+    "measured": 0.1547851459017016,
+    "band": [
+     0.02,
+     0.22
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf5": {
+    "measured": 0.07872294537720659,
+    "band": [
+     0.02,
+     0.09
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "abs_return_acf20": {
+    "measured": -0.010661280579880741,
+    "band": [
+     -0.04,
+     0.08
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "cross_sectional_corr": {
+    "measured": 0.2812801060767207,
+    "band": [
+     0.08,
+     0.56
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "volume_abs_return_corr": {
+    "measured": 0.5581842974020218,
+    "band": [
+     0.46,
+     0.66
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "leverage_effect": {
+    "measured": -0.04767259664111235,
+    "band": [
+     -0.16,
+     0.0
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "volume_change_acf1": {
+    "measured": -0.4602397201439649,
+    "band": [
+     -0.32,
+     -0.2
+    ],
+    "verdict": "OUT",
+    "distance": 0.1402397201439649,
+    "sd_out": 13.703180557544378,
+    "role": "structural"
+   }
+  },
+  "loss": 0.0
+ },
+ "horizon_504": {
+  "statistics": {
+   "annualised_vol_pct": {
+    "measured": 29.289300720522625,
+    "band": [
+     16,
+     34
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "excess_kurtosis": {
+    "measured": 5.227444947706776,
+    "band": [
+     7.1000000000000005,
+     22
+    ],
+    "verdict": "OUT",
+    "distance": 1.8725550522932242,
+    "sd_out": 1.5980022804833753,
+    "role": "constraint"
+   },
+   "return_acf1": {
+    "measured": 0.05706444563840943,
+    "band": [
+     -0.03,
+     0.04
+    ],
+    "verdict": "OUT",
+    "distance": 0.017064445638409427,
+    "sd_out": 0.32074880104675635,
+    "role": "live target"
+   },
+   "abs_return_acf1": {
+    "measured": 0.28867078274248614,
+    "band": [
+     0.04,
+     0.22
+    ],
+    "verdict": "OUT",
+    "distance": 0.06867078274248614,
+    "sd_out": 0.7261002163629862,
+    "role": "live target"
+   },
+   "abs_return_acf5": {
+    "measured": 0.1524266091550004,
+    "band": [
+     0.02,
+     0.1
+    ],
+    "verdict": "OUT",
+    "distance": 0.05242660915500039,
+    "sd_out": 0.9522795729813452,
+    "role": "live target"
+   },
+   "abs_return_acf20": {
+    "measured": 0.012671879348595644,
+    "band": [
+     -0.02,
+     0.07
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "cross_sectional_corr": {
+    "measured": 0.4057350603766128,
+    "band": [
+     0.23,
+     0.41000000000000003
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "live target"
+   },
+   "volume_abs_return_corr": {
+    "measured": 0.6300893543564667,
+    "band": [
+     0.48,
+     0.65
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "leverage_effect": {
+    "measured": -0.04609670946770761,
+    "band": [
+     -0.13,
+     0.02
+    ],
+    "verdict": "in band",
+    "distance": 0.0,
+    "sd_out": 0.0,
+    "role": "constraint"
+   },
+   "volume_change_acf1": {
+    "measured": -0.4327261554164075,
+    "band": [
+     -0.29,
+     -0.21
+    ],
+    "verdict": "OUT",
+    "distance": 0.14272615541640754,
+    "sd_out": 13.946136486491978,
+    "role": "structural"
+   }
+  },
+  "bands": "504-matched",
+  "curve": {
+   "1": 0.28867078274248614,
+   "2": 0.236341428230591,
+   "3": 0.19831482278475548,
+   "5": 0.1524266091550004,
+   "8": 0.10286853641792057,
+   "12": 0.04893836891079642,
+   "20": 0.012671879348595644,
+   "30": 0.009932897431747306,
+   "45": -0.005251275021286923,
+   "60": -0.0006514656727139456
+  }
+ },
+ "decay": {
+  "curve_252": {
+   "1": 0.14127142910145438,
+   "2": 0.10632118585701743,
+   "3": 0.08971647915760297,
+   "5": 0.04962379448651105,
+   "8": 0.03709219903081132,
+   "12": 0.01728278580930355,
+   "20": 0.008165975509233512,
+   "30": -0.005236479190304647,
+   "45": -0.011964144048419882,
+   "60": -0.014196771934927362
+  },
+  "loglog_slope_1_20": -0.9532749987012988,
+  "real_slope": -0.436,
+  "real_curve": {
+   "1": 0.1071,
+   "5": 0.0518,
+   "8": 0.0453,
+   "12": 0.0295,
+   "20": 0.0286,
+   "30": 0.0179,
+   "60": 0.0054
+  },
+  "seeds": 30
+ },
+ "gaps": [
+  {
+   "id": "volume-change",
+   "summary": "volume-change autocorrelation is structurally unreachable",
+   "detail": "-0.4598 against a band of -0.32 to -0.20, 13.7 seed-sd out. A held volume level plus independent per-tick noise sits near -0.5 at any coefficients, so no parameter reaches this row. It is excluded from the calibration objective deliberately: an optimiser pointed at an unreachable target does not fail cleanly, it distorts every other parameter chasing it.",
+   "forbids": "strategies trading the day-to-day CHANGE in volume",
+   "statistics": [
+    "volume_change_acf1"
+   ],
+   "beyond_days": null
+  },
+  {
+   "id": "horizon",
+   "summary": "the certified horizon is 252 days",
+   "detail": "Against bands re-derived at the matching window, the model holds 5 of 10 at 504 days. Clustering roughly doubles from 252 to 504 and keeps climbing, where real markets move about 14% over the same span. Volatility itself stabilises near 29.3%, so long runs do not drift or blow up -- they stay plausible in LEVEL and become unrealistic in DYNAMICS, which is easy to miss by looking only at the price path.",
+   "forbids": "multi-year backtests, and anything keyed on volatility dynamics beyond one year",
+   "statistics": [
+    "abs_return_acf1",
+    "abs_return_acf5",
+    "return_acf1",
+    "excess_kurtosis"
+   ],
+   "beyond_days": 252
+  },
+  {
+   "id": "decay-shape",
+   "summary": "volatility memory decays exponentially, not hyperbolically",
+   "detail": "Log-log slope over lags 1-20 is -0.953 against real markets' -0.436, about 2.2x steeper, and the curve turns NEGATIVE by lag 30 where real markets remain weakly positive to lag 60. This is a mechanism gap, not a calibration one: the process is built from exponentials, and over one year two of them fake a power law well enough that no panel statistic objects. A two-component mixture was tried and is not sufficient.",
+   "forbids": "strategies whose edge depends on volatility memory beyond about lag 20 -- vol targeting and risk parity on a one-month or longer estimate",
+   "statistics": [
+    "abs_return_acf20"
+   ],
+   "beyond_days": null
+  },
+  {
+   "id": "thin-tails",
+   "summary": "tails are too thin over multi-year windows",
+   "detail": "Excess kurtosis reads 5.23 at 504 days against a horizon-matched band of 7.1 to 22. The 252-day band's floor of 1.6 is wide enough that this reads as comfortably in band on every 252-day certificate, which is why it went unnoticed: nothing was measuring kurtosis where it fails.",
+   "forbids": "tail-risk or VaR calibration at multi-year horizons",
+   "statistics": [
+    "excess_kurtosis"
+   ],
+   "beyond_days": 252
+  },
+  {
+   "id": "scenario-magnitude",
+   "summary": "scenario response is directional, not calibrated",
+   "detail": "The VIX shock response is materially weaker than the previous preset's. The direction of response is right; the magnitude is not certified.",
+   "forbids": "sizing a scenario's impact rather than detecting it",
+   "statistics": [],
+   "beyond_days": null
+  },
+  {
+   "id": "roster-concentration",
+   "summary": "certification was measured on a sector-balanced roster",
+   "detail": "`Universe.random()` places exactly five names in each of twelve sectors, and no real index is balanced that way -- the S&P is roughly a third technology and the Nasdaq more so. Varying ONLY sector composition, with every name drawn from one pool: balanced holds 9/10 at L_real 0.0000; an S&P-like mix holds 8/10 at 0.0176, losing abs_return_acf5; an all-technology roster holds 7/10 and runs 32.8% volatility. So part of the certification is an artifact of that balance, and the more concentrated the roster, the less of it transfers.",
+   "forbids": "inheriting this envelope for a sector-concentrated roster -- re-measure the panel on your own universe instead",
+   "statistics": [
+    "abs_return_acf5",
+    "return_acf1",
+    "annualised_vol_pct"
+   ],
+   "beyond_days": null
+  }
+ ]
+}
