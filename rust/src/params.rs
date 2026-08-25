@@ -95,7 +95,30 @@ pub struct ModelParams {
     /// Baseline daily sigma of the shared market factor — the anchor of the
     /// factor's variance process, and the crash amplifier's denomination.
     pub market_factor_sigma: f64,
-    /// Daily sigma of each shared sector factor.
+    /// Daily sigma of each shared sector factor, loaded at 0.5 by every
+    /// member of the sector (`market/factors.rs`).
+    ///
+    /// Shipped at 0.002 in every preset, which is about a quarter of one
+    /// percent of a name's daily variance: in practice the model has had a
+    /// market factor and nothing else, and residual correlation after it has
+    /// been diagonal. Nothing measured that until 2026-08-25, when
+    /// `sector_excess_corr` (same-sector minus cross-sector mean pairwise
+    /// correlation) joined the panel and read 0.004 on the shipped preset
+    /// against a real band of 0.11 to 0.23, fifteen seed-sd out. The pt-v1
+    /// search had reported this parameter as a null direction, which is what
+    /// a lever looks like when the objective cannot see what it moves.
+    ///
+    /// MEASURED, thirty seeds, pt-v3 base, 252 days
+    /// (CALIBRATION-FOLLOWUPS.md §59 and §60): monotone and roughly
+    /// quadratic in sigma; 0.012 puts `sector_excess_corr` at 0.155, inside
+    /// its band, with no other panel statistic leaving its own; 0.020
+    /// overshoots the band and drops kurtosis through its floor. Two costs the
+    /// panel does not show: the crisis volatility lever falls from 3.07x to
+    /// 2.78x because the added variance is not VIX-coupled, and kurtosis
+    /// thins by about 0.3 seed-sd at 504 days. And above the crisis
+    /// threshold the blend in `market/tick.rs` replaces the sector draw with
+    /// the market draw, so whatever this is set to, sector structure reads
+    /// zero at VIX 45 (CRISIS-BLEND-SECTOR.md). Raising it is an era boundary.
     pub sector_factor_sigma: f64,
     /// Scale on the per-name idiosyncratic GARCH sigma — the funding side
     /// of the factor-variance reallocation. Bit-inert at 1.0.
