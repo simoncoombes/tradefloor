@@ -71,6 +71,21 @@ implemented, correct and parity-tested, and a default run cannot get to it: a
 inflation process is an era boundary and belongs to a calibrated change, so it
 is recorded and tested rather than fixed here.
 
+The obvious explanation for that ceiling is also wrong, and worth writing down
+so the next attempt does not start there. `inflation_mean_rev_coeff` is 0.55 a
+month, which looks like it should pin inflation to its 2% target and implies an
+AR(1) of 0.45. Measured over eight seeds and five years the monthly series has
+AR(1) **+0.936**, against **+0.894** for real US CPI year-on-year across
+2020-21: the model's inflation is if anything slightly more persistent than the
+real thing, because the drivers around the reversion term carry their own
+persistence.
+
+So the defect is dispersion, not persistence. Model monthly inflation has sd
+1.23 around a mean of 1.99% and spans -0.12% to 4.14%, where real CPI spanned
+0.1% to 7.0% in 2020-21 alone, and 9.1% at the 2022 peak. Reaching that from
+here is a 4.6 sigma excursion. A calibrated change should go after the driver
+and shock magnitudes and leave the mean reversion alone.
+
 The corrected account is more useful than either version. The model has
 exactly two valuation channels. `corporate_bond_yield` is the discount rate,
 and `federal_funds_rate`, `vix` and `inflation_rate` reach a valuation solely

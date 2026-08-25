@@ -208,6 +208,21 @@ def test_endogenous_inflation_never_reaches_its_own_crisis_regime() -> None:
     of 6.0% and a real US CPI that reached 9.1% in June 2022. So the ceiling
     is not the clamp, it is the dynamics.
 
+    WHICH part of the dynamics is measured, not guessed, because the obvious
+    guess is wrong. `inflation_mean_rev_coeff` is 0.55 per month, which looks
+    like it should pin inflation to the 2% target and implies an AR(1) of
+    0.45. It does not: over eight seeds and five years the monthly series has
+    AR(1) **+0.936**, against **+0.894** for real US CPI year-on-year over
+    2020-21. The model's inflation is if anything slightly MORE persistent
+    than the real thing, because the drivers around the reversion term carry
+    their own persistence.
+
+    The gap is dispersion, not persistence. The model's monthly inflation has
+    sd 1.23 around a mean of 1.99% and spans -0.12% to 4.14%; real CPI spanned
+    0.1% to 7.0% across 2020-21 alone. Reaching 9% from here is a 4.6 sigma
+    excursion, so it never happens. A calibrated change should therefore go
+    after the driver and shock magnitudes, and leave the mean reversion alone.
+
     This is recorded as a REALISM GAP rather than a defect. A 2022-style
     inflation shock has to be driven through a scenario today; the model will
     not produce one on its own. Raising it is an era boundary and belongs to
