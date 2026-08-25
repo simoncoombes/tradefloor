@@ -41,6 +41,22 @@ on:
         options: [unverified, all]
   push:
     tags: ["v*"]
+    # main as well, now the repository is public and standard runners cost
+    # nothing. Before this the workflow only ever ran on tags and manual
+    # dispatches, so the README badge showed whatever the last dispatch
+    # aimed at main happened to be -- which was a failure from 23 August,
+    # two days and a rebuilt tree out of date, while the v0.1.0 tag was
+    # passing all five targets. A badge that cannot update is worse than no
+    # badge, because it reports with confidence.
+    branches: [main]
+    paths:
+      # Only what can move a trajectory. Documentation and tooling cannot,
+      # and running five targets to prove a prose change is still
+      # deterministic would be theatre.
+      - "rust/**"
+      - "python/**"
+      - "pyproject.toml"
+      - ".github/workflows/determinism.yml"
 
 jobs:
   setup:
