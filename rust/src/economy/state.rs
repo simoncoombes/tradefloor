@@ -27,6 +27,9 @@ pub const DAYS_PER_MONTH: i64 = 30;
 pub const DAYS_PER_QUARTER: i64 = 90;
 
 pub const INFLATION_TARGET: f64 = 2.0;
+/// Monthly fraction of the inflation gap closed toward the target. The
+/// shipped value; `ModelParams::inflation_reversion` carries it at runtime.
+pub const INFLATION_MEAN_REVERSION: f64 = 0.55;
 
 /// Phillips-curve coefficient.
 ///

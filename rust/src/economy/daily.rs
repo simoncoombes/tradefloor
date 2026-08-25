@@ -71,6 +71,11 @@ pub struct DailyInputs<'a> {
     /// and the other is a LONGER SPIKE, which touches variance persistence
     /// not at all.
     pub vix_mean_reversion: f64,
+    /// Monthly fraction of the inflation gap closed toward the 2% target.
+    /// Threaded like `vix_mean_reversion`: the shipped 0.55 was a literal
+    /// inside the inflation update, which made inflation's persistence and
+    /// dispersion a fact of the code rather than a calibration.
+    pub inflation_reversion: f64,
     /// VIX level at which crisis behaviour begins.
     ///
     /// Gates the sector-to-market correlation blend, the universe stress
@@ -88,6 +93,7 @@ impl<'a> Default for DailyInputs<'a> {
             market_return_pct: 0.0,
             game_day: 0,
             vix_mean_reversion: VIX_MEAN_REVERSION,
+            inflation_reversion: INFLATION_MEAN_REVERSION,
             crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
         }
     }
@@ -243,7 +249,7 @@ pub fn update_economy_daily(
 
         // ── Inflation ─────────────────────────────────────────────────────
         let inflation_target = INFLATION_TARGET;
-        let inflation_mean_rev_coeff = 0.55;
+        let inflation_mean_rev_coeff = inputs.inflation_reversion;
 
         // Positive real rates are contractionary.
         let real_rate_suppression = if economy.federal_funds_rate > economy.inflation_rate {

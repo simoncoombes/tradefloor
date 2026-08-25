@@ -139,6 +139,19 @@ pub struct ModelParams {
     pub order_flow_coefficient: f64,
     /// Permanent (information) share of order-flow impact.
     pub informed_flow_fraction: f64,
+    /// How fast endogenous inflation reverts toward its 2% target each
+    /// month, as a fraction of the gap.
+    ///
+    /// Shipped 0.55, the hard-coded value every preset ran on: a half-life
+    /// under a month. Promoted to a dial on 2026-08-25 (calibration record
+    /// §65) because the one coefficient sets both how persistent inflation
+    /// is and how far it can wander, and the endogenous economy reaches
+    /// neither the persistence (monthly acf1 0.936 against real CPI's
+    /// 0.978, FRED CPIAUCSL 2015-2025) nor the dispersion (sd 1.23 against
+    /// 2.18; peak 4.1% against 9.0%) of the real series. Lower is more
+    /// persistent and wider. Nothing else in the economy is touched; at
+    /// 0.55 every preset reproduces bit for bit.
+    pub inflation_reversion: f64,
     /// Weight of sector-scoped news on a member name (§5.4 promotion).
     pub news_sector_weight: f64,
     /// Weight of market-wide news on every name (§5.4 promotion).
@@ -670,6 +683,7 @@ impl ModelParams {
             idio_sigma_scale: factor_vol::IDIO_SIGMA_SCALE,
             order_flow_coefficient: factors::ORDER_FLOW_COEFFICIENT,
             informed_flow_fraction: factors::INFORMED_FLOW_FRACTION,
+            inflation_reversion: crate::economy::INFLATION_MEAN_REVERSION,
             news_sector_weight: factors::NEWS_SECTOR_WEIGHT,
             news_market_weight: factors::NEWS_MARKET_WEIGHT,
             crash_amplifier_threshold: factors::CRASH_AMPLIFIER_THRESHOLD,
@@ -995,6 +1009,7 @@ impl ModelParams {
             "sector_factor_sigma" => self.sector_factor_sigma,
             "idio_sigma_scale" => self.idio_sigma_scale,
             "order_flow_coefficient" => self.order_flow_coefficient,
+            "inflation_reversion" => self.inflation_reversion,
             "informed_flow_fraction" => self.informed_flow_fraction,
             "news_sector_weight" => self.news_sector_weight,
             "news_market_weight" => self.news_market_weight,
@@ -1091,6 +1106,7 @@ impl ModelParams {
             "sector_factor_sigma" => out.sector_factor_sigma = value,
             "idio_sigma_scale" => out.idio_sigma_scale = value,
             "order_flow_coefficient" => out.order_flow_coefficient = value,
+            "inflation_reversion" => out.inflation_reversion = value,
             "informed_flow_fraction" => out.informed_flow_fraction = value,
             "news_sector_weight" => out.news_sector_weight = value,
             "news_market_weight" => out.news_market_weight = value,
@@ -1260,6 +1276,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "garch_gamma",
         "garch_omega",
         "idio_sigma_scale",
+        "inflation_reversion",
         "informed_flow_fraction",
         "jump_intensity_idio",
         "jump_intensity_market",

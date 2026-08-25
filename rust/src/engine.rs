@@ -934,6 +934,7 @@ impl Engine {
             &self.economy,
             &DailyInputs {
                 vix_mean_reversion: self.params.vix_mean_reversion,
+                inflation_reversion: self.params.inflation_reversion,
                 crisis_vix_threshold: self.params.crisis_vix_threshold,
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,

@@ -149,6 +149,7 @@ PARAM_SPECS: dict[str, dict] = {
     # the log/raw split exists for.
     "crisis_vix_threshold": {"kind": "log"},
     "vix_mean_reversion": {"kind": "abs", "step_unit": 0.02},
+    "inflation_reversion": {"kind": "abs", "step_unit": 0.05},
     "news_peer_weight": {"kind": "abs", "step_unit": 0.05,
                          "hard_range": (0.0, 1.0)},
     "news_peer_weight_down": {"kind": "abs", "step_unit": 0.05,
