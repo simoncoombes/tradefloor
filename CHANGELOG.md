@@ -52,22 +52,34 @@ counts: 8 of 10 at 504 days against pt-v3's 5, and 9 of 10 at the certified
 horizon. That recommendation was incomplete, and the missing part lands on
 exactly the long-dated crisis work it is meant for.
 
-Measured against pt-v1 over thirty seeds with
-`tools/calibration/scenario_response.py`:
+Measured over thirty seeds with `tools/calibration/scenario_response.py`, the
+steady-state volatility lever from VIX 5 to VIX 65:
 
-| preset | steady-state vol lever retained | shock transient retained |
+| preset | vol lever | note |
 |---|---|---|
-| pt-v3, the default | 95.2% | 27.6% |
-| pt-v6 | **83.3%** | **16.7%** |
+| real markets | 6.16x | the target nothing is close to |
+| pt-v3, the default | 3.07x | |
+| pt-v4 | 2.67x | jumps arrive, and the lever is spent here |
+| pt-v5 | 2.69x | |
+| pt-v6 | 2.68x | inherited |
 
-pt-v3's figures reproduce what the realism envelope has always said, so the
-instrument is reading true; pt-v6 is a regression on both. A VIX spike moves
-pt-v6 less than it moves the default, which means a scenario study driving a
-volatility path should prefer pt-v3 even over multi-year windows, or say that
-it accepted the weaker response.
+A sustained crisis is about an eighth less violent under pt-v6 than under the
+default, so a scenario study turning on crisis MAGNITUDE should prefer pt-v3
+even over multi-year windows, or say that it accepted the weaker response. The
+envelope's horizon gap now carries this, so anyone selecting pt-v6 on the band
+counts reads the cost in the same paragraph.
 
-The envelope's horizon gap now carries this, so anyone selecting pt-v6 on the
-band counts reads the cost in the same paragraph.
+**Two corrections to how that was first written here.** The cost is not
+pt-v6's to answer for. The chain above puts the drop at pt-v3 to pt-v4, when
+jumps arrived; pt-v5 and pt-v6 inherit it and pt-v6 changes it by 0.01x.
+Attributing it to the newest preset was wrong.
+
+And the harness's "shock response retained" percentage was quoted, at 27.6%
+against 16.7%, which the calibration record says plainly should not be done.
+That figure divides two small excesses over 1.0, so shock ratios of 1.062 and
+1.038 become an eleven-point headline. The transient difference between the
+two presets is real and it is 0.024. Quoting the percentage is a real number
+at a resolution it does not have.
 
 ### A realism gap: endogenous inflation cannot reach its own crisis regime
 
