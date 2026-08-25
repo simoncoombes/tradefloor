@@ -28,6 +28,9 @@ classifiers = [
 Homepage = "https://simoncoombes.github.io/pretium"
 Repository = "https://github.com/simoncoombes/pretium"
 Documentation = "https://simoncoombes.github.io/pretium"
+# PyPI has no changelog field, so a project page can only point at one.
+# Without this a visitor has no route from the package to its release notes.
+Changelog = "https://github.com/simoncoombes/pretium/releases"
 
 [project.optional-dependencies]
 # The core package depends on NOTHING. These are for surfaces that genuinely

@@ -1,87 +1,92 @@
 # Changelog
 
-Notable changes to `pretium`. Dates are the day the work landed.
+## 0.1.0
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project uses [semantic versioning](https://semver.org/). One
-project-specific rule: **a change to the simulated trajectory is a breaking
-change**, whatever its size. A market that runs differently from the same
-seed invalidates every published result that cited it, so those changes are
-called out here explicitly and carry a new model preset rather than editing
-an existing one.
+First release.
 
-## [0.1.0]
+pretium simulates an equity market you can run a strategy against. Give it a
+seed and a roster of companies and it runs prices, a limit order book, fills
+and a macro economy forward. Orders match against real depth, so trading
+moves the price.
 
-First public release. Everything below is new, so the list is what the
-library does rather than what moved.
+### What's in it
 
-### Added
+The engine covers price formation, a limit order book with price-time
+priority and partial fills, and an economy that advances daily under a
+five-phase business cycle.
 
+On top of that sit the things you need to get an answer out of it: agent
+evaluation against reference baselines and an oracle, ranking across seeds
+with paired sign tests, transaction cost analysis, parameter sweeps, replay,
+and checkpointing with branching. There's a Gymnasium environment for RL
+work, five Arrow tables for getting results into polars or pandas, and an
+SEC EDGAR loader if you want real fundamentals instead of generated ones.
 
-- Deterministic equity market simulation: price formation, a real limit
-  order book with queue position and partial fills, macro state, and a
-  five-phase business cycle.
-- Bit-identical determinism across platforms, verified in CI rather than
-  asserted. The crate ships its own `exp`, `log`, `sin` and `cos` rather
-  than calling the platform libm.
-- Agent evaluation with reference baselines and an oracle, ranking with
-  paired sign tests, transaction cost analysis, sweeps, replay, and
-  checkpoint/branch.
-- A Gymnasium environment and five Arrow output tables.
-- An SEC EDGAR loader for real fundamentals.
-- The **realism envelope**: ten statistics measured against real-market
-  bands, with the gaps named rather than hidden. Nine of ten in band at the
-  certified 252-day horizon.
-- **Ground truth**: seven factor contributions per instrument per tick that
-  sum to the move. No historical source can provide that labelling.
+Two things are less usual. The simulator computed every price, so it can
+tell you why one moved: seven factor contributions per instrument per tick
+that add up to the move. And because the same seed reproduces the same
+market, you can run it twice, once with your orders and once without, and
+price every fill against the market where you never traded.
 
+### Determinism
 
-- **`pt-v4` model preset**, selectable and deliberately *not* the default.
-  pt-v3 plus five endogenous jump coefficients, three volume-process
-  parameters and `market_factor_sigma`. It halves the dual-horizon
-  calibration objective (0.9887 → 0.4863 on training seeds, 1.3990 → 0.7493
-  on thirty seeds it never saw) and is the first vector to close the
-  thin-tails gap: `excess_kurtosis` at 504 days moves 5.23 → 9.19, inside
-  the 7.1–22 band.
+The same seed gives the same market on every platform we ship for. That's
+checked on each release rather than asserted: five targets build a wheel,
+run one fixed simulation inside it, and compare digests. A disagreement
+fails the release.
 
-  It is a trade, not a free win. At the certified 252-day horizon it holds
-  eight of ten statistics in band against pt-v3's nine, surrendering
-  `return_acf1`. **pt-v3 for horizons at or under a year; pt-v4 for
-  multi-year questions.**
+Verified for this one on linux-x86_64, linux-aarch64, macos-arm64,
+macos-x86_64 and windows-x86_64, all reproducing
 
-- **WebAssembly build** (`--features wasm`, `wasm32-unknown-unknown`), so
-  the engine runs in a browser. Verified bit-identical with the native
-  build on a fixed simulation. 182 KB raw, 68 KB gzipped. Build and check
-  with `tools/wasm/build.sh`.
+```
+5bd011be292f823ce1c360d1a12bf46de3362deee058a37283c74ab47069d0c1
+```
 
-- **MCP server** (`pip install "pretium[mcp]"`, run `pretium-mcp`), giving
-  an LLM agent eleven read-only tools over the simulator. Strategies,
-  universes and scenarios are composed as data; there is no path from a
-  tool argument to code execution. Every result carries computed caveats
-  and full provenance.
+A WebAssembly build (`--features wasm`) produces the same numbers, which
+means the engine can run in a browser without becoming a second model that
+quietly disagrees with this one.
 
-- **`envelope.score`** and **`envelope.regressions`**. Read a measured panel
-  against the bands for its own horizon, and name the statistics a candidate
-  would surrender relative to the shipped preset.
+### How realistic it is
 
-- **`engine::fixed_simulation_digest`**. One fixed simulation, hashed, and
-  exposed identically to both bindings, so cross-language determinism is a
-  measurement rather than an argument.
+Ten statistics are measured against real-market bands. At the certified
+252-day horizon the shipped `pt-v3` preset holds nine of the ten in band,
+and holds the same nine on seeds and a roster the calibration never saw.
 
-### Changed
+The tenth is the autocorrelation of volume changes, which misses by 13.7
+seed-standard-deviations. It's left out of the calibration objective on
+purpose, because pointing an optimiser at a target it can't reach distorts
+everything else it touches.
 
-- The **day loop** moved from the Python binding into the core, so the
-  browser and Python surfaces run one implementation. That covers the macro
-  step, the day close, and the day-zero instrument mapping. Behaviour is
-  unchanged, and the known-answer digest confirms it.
+Six further gaps are written down with what each one stops you concluding,
+and `envelope.check()` will refuse a question that falls outside them rather
+than answering it anyway.
 
-### Fixed
+### Presets
 
-- The **cross-platform determinism gate** now runs and passes on every
-  shipped target. `macos-x86_64` and `windows-x86_64` were the last two
-  unverified, and both reproduce
-  `5bd011be292f823ce1c360d1a12bf46de3362deee058a37283c74ab47069d0c1`.
+`pt-v3` is the default and is what the envelope certifies.
 
-- Two **parity test suites** (`microstructure_parity`, `economy_parity`) had
-  not compiled since the features that changed their option structs, so the
-  evidence for the bit-identical-port claim was not running.
+`pt-v4` also ships, and is not the default. It halves the calibration
+objective and is the first preset to bring 504-day kurtosis inside its band,
+which no earlier one managed. It pays for that at one year, where it holds
+eight of ten statistics in band instead of nine. Use `pt-v3` for horizons up
+to a year and `pt-v4` for multi-year work.
+
+`pt-v1` and `pt-v2` remain selectable and reproduce exactly what they always
+did.
+
+### Driving it from an agent
+
+`pip install "pretium[mcp]"` adds an MCP server, so a coding agent can use
+the simulator through eleven read-only tools. Strategies, universes and
+scenarios are all composed as data, and there's no way to get from a tool
+argument to running code. Results carry their caveats and provenance with
+them, because a model summarising a result has the tool output and nothing
+else to go on.
+
+### A note on versioning
+
+Anything that changes the simulated trajectory is a breaking change here,
+however small it looks. A market that runs differently from the same seed
+invalidates every published result that cited it. So coefficient changes
+arrive as a new model preset rather than an edit to an existing one, and old
+presets keep running exactly as they did.

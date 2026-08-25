@@ -247,8 +247,10 @@ jobs:
           import re, sys
           version = sys.argv[1]
           text = open("CHANGELOG.md", encoding="utf-8").read()
-          # Sections look like "## [0.1.0]" or "## [0.1.0], unreleased".
-          pattern = rf"^## \[{re.escape(version)}\].*?$(.*?)(?=^## |\Z)"
+          # Headings may be written "## 0.1.0" or "## [0.1.0]", so accept
+          # either. Pinning one spelling means a perfectly good CHANGELOG
+          # fails the release for a bracket.
+          pattern = rf"^## \[?{re.escape(version)}\]?.*?$(.*?)(?=^## \[?\d|\Z)"
           m = re.search(pattern, text, re.S | re.M)
           if not m:
               sys.exit(f"CHANGELOG.md has no section for {version}. A release "
