@@ -171,6 +171,17 @@ trigger it however high you pin it.
 So a 2022 style inflation shock has to be driven through a scenario, and so
 does the policy response to it.
 
+### Two inflation dials, shipped at the values every preset ran on
+
+`inflation_reversion` (0.55) and `inflation_ceiling` (6.0) were a literal
+and a clamp inside the monthly inflation update; they are `ModelParams`
+fields now, bit-identical at their shipped values. The gap above names
+them: at reversion 0.15 the endogenous inflation series matches the real
+2015-2025 mean and dispersion to the second decimal and then sits on the
+clamps, while its persistence does not move, because that comes from the
+cycle, wages and unemployment rather than the reversion. No preset takes
+them; calibration record §65 is the measurement.
+
 ### `check()` can now refuse a macro-regime question
 
 The `macro-range` gap above was, for one afternoon, invisible to the interface
