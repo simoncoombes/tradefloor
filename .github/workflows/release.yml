@@ -217,3 +217,76 @@ jobs:
         with: { name: sdist, path: dist }
       - run: ls -la dist
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github_release:
+    name: GitHub release
+    needs: [setup, verify, publish]
+    if: needs.setup.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # to create the release and attach artefacts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: wheel-*, merge-multiple: true, path: dist }
+      - uses: actions/download-artifact@v4
+        with: { name: sdist, path: dist }
+
+      - name: Assemble the release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+
+          # The notes are the CHANGELOG section for this version, not a
+          # generated commit list. A commit list tells a reader what was
+          # touched; the CHANGELOG tells them what changed about the
+          # software, which is the only thing a release note is for.
+          python - "$VERSION" > NOTES.md <<'PY'
+          import re, sys
+          version = sys.argv[1]
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          # Sections look like "## [0.1.0]" or "## [0.1.0], unreleased".
+          pattern = rf"^## \[{re.escape(version)}\].*?$(.*?)(?=^## |\Z)"
+          m = re.search(pattern, text, re.S | re.M)
+          if not m:
+              sys.exit(f"CHANGELOG.md has no section for {version}. A release "
+                       f"without notes is a tag, and the point of using "
+                       f"releases is that it is not one.")
+          print(m.group(1).strip())
+          PY
+
+          # The determinism digest belongs in the notes. It is the claim the
+          # project is built around, and a reader checking it later should
+          # not have to dig through a workflow log to find what this
+          # release was supposed to produce.
+          DIGEST=$(python -c \
+            "import json;print(json.load(open('tests/known_answer.json'))['sha256'])")
+          {
+            echo
+            echo "---"
+            echo
+            echo "**Determinism.** Every wheel in this release reproduces the"
+            echo "known-answer digest:"
+            echo
+            echo '```'
+            echo "$DIGEST"
+            echo '```'
+            echo
+            echo "Verified on linux-x86_64, linux-aarch64, macos-arm64,"
+            echo "macos-x86_64 and windows-x86_64 before publication."
+          } >> NOTES.md
+          cat NOTES.md
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file NOTES.md \
+            --verify-tag \
+            dist/*

@@ -10,9 +10,31 @@ seed invalidates every published result that cited it, so those changes are
 called out here explicitly and carry a new model preset rather than editing
 an existing one.
 
-## [Unreleased]
+## [0.1.0]
+
+First public release. Everything below is new, so the list is what the
+library does rather than what moved.
 
 ### Added
+
+
+- Deterministic equity market simulation: price formation, a real limit
+  order book with queue position and partial fills, macro state, and a
+  five-phase business cycle.
+- Bit-identical determinism across platforms, verified in CI rather than
+  asserted. The crate ships its own `exp`, `log`, `sin` and `cos` rather
+  than calling the platform libm.
+- Agent evaluation with reference baselines and an oracle, ranking with
+  paired sign tests, transaction cost analysis, sweeps, replay, and
+  checkpoint/branch.
+- A Gymnasium environment and five Arrow output tables.
+- An SEC EDGAR loader for real fundamentals.
+- The **realism envelope**: ten statistics measured against real-market
+  bands, with the gaps named rather than hidden. Nine of ten in band at the
+  certified 252-day horizon.
+- **Ground truth**: seven factor contributions per instrument per tick that
+  sum to the move. No historical source can provide that labelling.
+
 
 - **`pt-v4` model preset**, selectable and deliberately *not* the default.
   pt-v3 plus five endogenous jump coefficients, three volume-process
@@ -63,27 +85,3 @@ an existing one.
 - Two **parity test suites** (`microstructure_parity`, `economy_parity`) had
   not compiled since the features that changed their option structs, so the
   evidence for the bit-identical-port claim was not running.
-
-## [0.1.0], unreleased
-
-First public release. Pre-release: not yet on PyPI or crates.io, and the
-API may move before 1.0.
-
-### Added
-
-- Deterministic equity market simulation: price formation, a real limit
-  order book with queue position and partial fills, macro state, and a
-  five-phase business cycle.
-- Bit-identical determinism across platforms, verified in CI rather than
-  asserted. The crate ships its own `exp`, `log`, `sin` and `cos` rather
-  than calling the platform libm.
-- Agent evaluation with reference baselines and an oracle, ranking with
-  paired sign tests, transaction cost analysis, sweeps, replay, and
-  checkpoint/branch.
-- A Gymnasium environment and five Arrow output tables.
-- An SEC EDGAR loader for real fundamentals.
-- The **realism envelope**: ten statistics measured against real-market
-  bands, with the gaps named rather than hidden. Nine of ten in band at the
-  certified 252-day horizon.
-- **Ground truth**: seven factor contributions per instrument per tick that
-  sum to the move. No historical source can provide that labelling.

@@ -17,7 +17,7 @@ intended guarantees are:
   platform's libm.
 - **Emergent market impact.** Orders match against a real book with
   price-time priority, so a large order pays worse prices because it consumed
-  levels — not because a slippage coefficient said so.
+  levels, rather than because a slippage coefficient said so.
 - **Ground truth.** The simulator knows the fair value it computed and the
   regime it is in, so both are readable. No real market dataset has labels.
 

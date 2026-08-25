@@ -1,4 +1,4 @@
-# Golden vectors — the parity contract
+# Golden vectors
 
 These files record what `src/lib/engine/prng.ts` and `src/lib/engine/mispricing.ts`
 **do**, value by value, at full `f64` precision. They are the reference the Rust
@@ -15,14 +15,14 @@ port must reproduce.
 
 The TypeScript is the only implementation that exists today, which makes it the
 only independent oracle. The moment the Rust regenerates these files, the Rust
-becomes its own oracle and any divergence is silently legitimised — the parity
+becomes its own oracle and any divergence is silently legitimised. The parity
 test then proves nothing except that Rust agrees with Rust.
 
 If the Rust disagrees with a vector, exactly two responses are legitimate:
 
 1. Fix the Rust.
 2. Decide the divergence is acceptable, record *why* in `docs/rust-port/PLAN.md`,
-   and bump `daily_runs.formula_version` — because the daily challenge is the
+   and bump `daily_runs.formula_version`, because the daily challenge is the
    one surface where "same seed, same market" is a promise to users.
 
 Regenerating the vector is not on the list. The only reason to re-run the
@@ -62,7 +62,7 @@ Every file is a single JSON object:
 
 ```jsonc
 {
-  "kind": "mispricing.step",   // dispatch tag — one per generator/checker pair
+  "kind": "mispricing.step",   // dispatch tag: one per generator/checker pair
   "meta": { ... },             // provenance, coverage, and porting notes
   ...                          // payload, shape depends on `kind`
 }
@@ -86,8 +86,9 @@ Two encodings appear:
 | `{ "dec": …, "bits": … }` | individual cases | `{ "dec": "0.9885140203528962", "bits": "3FEFA1E827A1B38C" }` |
 | bare bits string | bulk arrays and row tables | `"3FEFA1E827A1B38C"` |
 
-`dec` is the shortest round-trip decimal, **for humans only**. It is exact — JS
-`Number.prototype.toString()` round-trips `f64` — but `bits` is what a checker
+`dec` is the shortest round-trip decimal, **for humans only**. It is exact
+(JS
+`Number.prototype.toString()` round-trips `f64`) but `bits` is what a checker
 should compare, because it also distinguishes `+0` from `-0` and needs no
 correctly-rounded decimal parser. `dec` spells out `"NaN"`, `"Infinity"`,
 `"-Infinity"` and `"-0"`, which JSON numbers cannot express.
@@ -98,7 +99,7 @@ counts and byte sizes.
 
 ### NaN
 
-Every NaN is recorded as `7FF8000000000000` — the bit pattern of Rust's
+Every NaN is recorded as `7FF8000000000000`, which is the bit pattern of Rust's
 `f64::NAN`.
 
 This is a deliberate normalisation, and it is there because the first run of the
@@ -117,8 +118,8 @@ element of such an array is identical, it collapses to:
 ```
 
 A reader must handle both forms. `mispricing-step-cases.json` uses a third form,
-a **row table** — `columns` names the six positions and `rows` is an array of
-six-element bits arrays — purely because one object per case would have put that
+a **row table**: `columns` names the six positions and `rows` is an array of
+six-element bits arrays, purely because one object per case would have put that
 file at 22 MB.
 
 Where a file uses a compact form it also carries a `decimalPreview` repeating the
@@ -164,54 +165,54 @@ Sequences: `0`, `1`, `2`, `3`, `4`, `2^31-1`, `2^31`, `2^32-1`.
 
 ### PRNG
 
-- **`prng-raw-u32`** — first 10,000 raw 32-bit PCG-XSH-RR outputs for all six
+- **`prng-raw-u32`**, first 10,000 raw 32-bit PCG-XSH-RR outputs for all six
   seeds at sequences 0 and 1, plus 512 each across six further sequences.
   `PCG32` is not exported, so these are recovered as `nextFloat() × 2^32`, which
   is exact because `nextFloat()` divides by a power of two.
-- **`prng-floats`**, **`prng-normals`** — first 10,000 outputs of `nextFloat()`
+- **`prng-floats`**, **`prng-normals`**, first 10,000 outputs of `nextFloat()`
   and `nextNormal()` per seed.
-- **`prng-nextint`** — 18 ranges × 3 seeds × 512 draws, including non-power-of-two
+- **`prng-nextint`**, 18 ranges × 3 seeds × 512 draws, including non-power-of-two
   ranges where the modulo bias is real and must be reproduced, plus three
   `min > max` cases in a separate `pathological` block.
-- **`prng-nextbool`** — 10 probabilities including 0, 1, subnormal and
+- **`prng-nextbool`**, 10 probabilities including 0, 1, subnormal and
   out-of-range, plus the zero-argument default.
-- **`prng-mixed-sequence`** — four scripted 2,000-op interleavings of all four
+- **`prng-mixed-sequence`**, four scripted 2,000-op interleavings of all four
   methods, run against four seeds, plus an explicit `spareProbe` walking the
   Box-Muller spare cache. This is the vector that catches a port whose methods
   are each correct but consume the underlying stream in the wrong order.
-- **`prng-checkpoints`** — raw output at draw indices up to 10,000,000. The
+- **`prng-checkpoints`**, raw output at draw indices up to 10,000,000. The
   PCG32 state is private and cannot be inspected, so a deep output is the proxy:
   it is a function of the entire state, so agreement here pins the state.
-- **`prng-derived`** — `createGameRng`, `createRngStreams` (including the four
+- **`prng-derived`**, `createGameRng`, `createRngStreams` (including the four
   derived child seeds) and `forkRng` at three parent warm-up depths.
 
 ### Mispricing
 
-- **`mispricing-constants`** — all eight exported constants, plus the four
+- **`mispricing-constants`**, all eight exported constants, plus the four
   intermediate values `MISPRICING_PHI` is built from.
-- **`mispricing-step-cases`** — 58,080 single steps: 22 finite boundary-adjacent
+- **`mispricing-step-cases`**, 58,080 single steps: 22 finite boundary-adjacent
   `s` values × 22 `sPrev` × 10 innovations × 12 shocks, covering each cap **at**,
   **one ULP inside** and **one ULP beyond**, plus subnormals and `-0`. The ULP
   neighbours are computed by bit manipulation rather than typed as decimals,
   because `0.14999999999999999` rounds straight back onto `0.15` and would have
-  tested nothing — the first draft did exactly that. A separate `nonFinite`
+  tested nothing, the first draft did exactly that. A separate `nonFinite`
   block records the 396 NaN/Infinity combinations.
-- **`mispricing-trajectory-*`** — five scenarios × 100,000 sequential steps.
+- **`mispricing-trajectory-*`**, five scenarios × 100,000 sequential steps.
   Inputs are recorded explicitly rather than regenerated, so a PRNG bug cannot
   masquerade as a mispricing bug. Every step's `s` is recorded so a harness can
   report the **index** at which divergence starts, not merely that it did:
-  - `calm` — 1.5% innovations, no shocks. sd(s) = 11.1%, which is the ≈10% the
+  - `calm`, 1.5% innovations, no shocks. sd(s) = 11.1%, which is the ≈10% the
     module docstring predicts.
-  - `garch-clustered` — GARCH(1,1)-scaled innovations, volatility clustering.
-  - `news-shocks` — sparse shocks drawn wider than `DAILY_SHOCK_CAP`; the shock
+  - `garch-clustered`, GARCH(1,1)-scaled innovations, volatility clustering.
+  - `news-shocks`, sparse shocks drawn wider than `DAILY_SHOCK_CAP`; the shock
     clamp fires 1,993 times, the `s` clamp 5 times.
-  - `extreme-clamped` — 54,105 of 100,000 steps land exactly on
+  - `extreme-clamped`, 54,105 of 100,000 steps land exactly on
     `±MISPRICING_CAP`. The clamp is the hot path, not an edge case.
-  - `denormal-drift` — starts at `5e-324` with innovations near the denormal
+  - `denormal-drift`, starts at `5e-324` with innovations near the denormal
     floor. 49,018 distinct values out of 100,000 steps, because gradual
     underflow keeps collapsing them, and one exact zero.
 - **`mispricing-apply`**, **`mispricing-crowd-lean`**, **`mispricing-roots`**,
-  **`mispricing-impulse`** — full cross products over boundary inputs
+  **`mispricing-impulse`**, full cross products over boundary inputs
   (15 fair values × 25 `s` values; 21 × 21 crowd-lean inputs; 15 φ × 13 θ).
   `mispricing-roots` covers both branches of the discriminant test (125 real,
   70 complex). `mispricing-impulse` includes a 5,000-step unit-root case.
@@ -240,7 +241,7 @@ cost a day if missed.
 4. **Order of operations in `stepMispricing` is contractual.**
    `((φ·s + momentum) + innovation) + shock`, strictly left to right, with
    `momentum` computed first from the *unclamped* `s` and `sPrev`. Do not
-   reassociate and **do not use `mul_add`** — a fused multiply-add changes the
+   reassociate and **do not use `mul_add`**, a fused multiply-add changes the
    last bit.
 
 5. **`Math.exp` in `applyMispricing` and `Math.log`/`Math.sin`/`Math.cos` in
@@ -256,7 +257,7 @@ cost a day if missed.
 7. **`nextInt` modulo bias is intentional.** `min + (next() % range)` is
    non-uniform for ranges that are not powers of two. Reproduce the bias; do not
    fix it. Note also that `nextInt(0, -1)` gives `NaN` in JS while Rust would
-   panic on `% 0` — the game never calls it that way, but a port should decide
+   panic on `% 0`, the game never calls it that way, but a port should decide
    deliberately rather than by accident.
 
 8. **`createGameRng(seed)` is not `new GameRng(seed)`.** The factory passes
