@@ -57,10 +57,19 @@ while true; do
   # out/ is created after maturin finishes, so a failure during provisioning
   # uploaded nothing at all and looked identical to a slow build.
   aws s3 cp /var/log/pretium-run.log "$BUCKET/run.log" || true
-  if [ -d /home/ec2-user/out ]; then
+  # The sync's own errors went to this log and nowhere else, which is why the
+  # 2026-08-25 run could be watched uploading run.log every 120s while never
+  # once producing partial/tasks.jsonl. The loop was demonstrably alive, the
+  # include pattern was verified correct locally, and out/ demonstrably
+  # existed, so the cause sat in output nobody could read. It is uploaded now.
+  {
+    echo "=== $(date -u) ==="
+    ls -la /home/ec2-user/out 2>&1 | head -5
     aws s3 sync /home/ec2-user/out "$BUCKET/partial/" \
-      --exclude "*" --include "tasks.jsonl" --include "meta.json" || true
-  fi
+      --exclude "*" --include "tasks.jsonl" --include "meta.json" 2>&1
+    echo "sync exit=$?"
+  } >> /var/log/pretium-stream.log 2>&1
+  aws s3 cp /var/log/pretium-stream.log "$BUCKET/stream.log" || true
 done
 STREAM
 chmod +x /home/ec2-user/stream.sh
