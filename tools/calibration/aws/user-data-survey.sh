@@ -1,15 +1,40 @@
 #!/bin/bash
 # Dead-man switch first, before anything that can fail. §10 of the runbook:
 # two failed launches cost six cents precisely because this line ran first.
-shutdown -h +90
+#
+# 240, not 90. The first survey launch was killed by its own switch at t+91m
+# while 63.9% done, running clean at 1383 tasks/min with zero errors and an
+# ETA of another 0.8h. The job needs about 2.4 hours; the switch was set for a
+# job a third that size. Ninety-one minutes of a 96-core box produced one log
+# file and no measurement.
+shutdown -h +240
 
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey
-BRANCH=feat/jump-momentum-decoupling
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey2
+BRANCH=main
 
 dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
+
+# Stream the work directory to S3 while the run is going, not after it.
+# §6: retrieve as work completes. atlas_survey.py fsyncs tasks.jsonl before it
+# prints progress and resumes from it under a matching plan fingerprint, so a
+# synced tasks.jsonl turns a second kill into a resume instead of a restart.
+cat > /home/ec2-user/stream.sh <<'STREAM'
+#!/bin/bash
+BUCKET="$1"
+while true; do
+  sleep 300
+  if [ -d /home/ec2-user/out ]; then
+    aws s3 sync /home/ec2-user/out "$BUCKET/partial/" \
+      --exclude "*" --include "tasks.jsonl" --include "meta.json" || true
+    aws s3 cp /var/log/pretium-run.log "$BUCKET/run.log" || true
+  fi
+done
+STREAM
+chmod +x /home/ec2-user/stream.sh
+nohup /home/ec2-user/stream.sh "$BUCKET" >/var/log/pretium-stream.log 2>&1 &
 
 cat > /home/ec2-user/run.sh <<'WORK'
 #!/bin/bash
@@ -52,8 +77,17 @@ python -c "import numpy, pyarrow, pretium; print('PREFLIGHT OK', pretium.version
 # whose "|| true" swallowed the error, so the check never ran at all.
 python -m pytest tests/test_known_answer.py -q
 
-
 mkdir -p /home/ec2-user/out
+
+# If a previous attempt streamed partial rows, take them and resume. The
+# survey refuses an index-based resume whose plan fingerprint disagrees, so a
+# mismatched restore fails loudly rather than mixing two plans.
+aws s3 cp BUCKET_PLACEHOLDER/partial/meta.json /home/ec2-user/out/meta.json || true
+aws s3 cp BUCKET_PLACEHOLDER/partial/tasks.jsonl /home/ec2-user/out/tasks.jsonl || true
+if [ -f /home/ec2-user/out/tasks.jsonl ]; then
+  echo "RESUMING from $(wc -l < /home/ec2-user/out/tasks.jsonl) streamed rows"
+fi
+
 python tools/calibration/atlas_survey.py plan --samples 1000 \
   --out /home/ec2-user/out
 python tools/calibration/atlas_survey.py run \
@@ -62,7 +96,7 @@ python tools/calibration/atlas_survey.py collect --out /home/ec2-user/out
 WORK
 
 sed -i "s|BRANCH_PLACEHOLDER|${BRANCH}|" /home/ec2-user/run.sh
-sed -i "s|PARAMS_PLACEHOLDER|jump_intensity_market,jump_intensity_idio,jump_mean_market,jump_sigma_market,jump_sigma_idio,volume_persistence,volume_innovation_sigma,volume_variance_gain,market_factor_sigma,jump_momentum_share|" /home/ec2-user/run.sh
+sed -i "s|BUCKET_PLACEHOLDER|${BUCKET}|" /home/ec2-user/run.sh
 chown ec2-user:ec2-user /home/ec2-user/run.sh
 chmod +x /home/ec2-user/run.sh
 
@@ -80,6 +114,10 @@ else
   echo "FAILED exit=$STATUS no certificate" > /tmp/DONE
 fi
 
+# Final sync, including the partial rows: if this run died mid-way the rows
+# are what the next one resumes from, and they are worth more than the log.
+aws s3 sync /home/ec2-user/out "$BUCKET/partial/" \
+  --exclude "*" --include "tasks.jsonl" --include "meta.json" || true
 aws s3 cp /var/log/pretium-run.log "$BUCKET/run.log" || true
 aws s3 cp /tmp/DONE "$BUCKET/DONE" || true
 aws s3 cp /home/ec2-user/out/atlas-survey.json "$BUCKET/" || true
