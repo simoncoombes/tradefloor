@@ -1,4 +1,4 @@
-"""One object a stranger can reproduce a run from — and know that they did.
+"""One object a stranger can reproduce a run from, and know that they did.
 
 `docs/reproducing-a-run.md` lists the five things that identify a run and
 shows a careful reader how to archive and check each one by hand. This module
@@ -16,15 +16,15 @@ same = pt.RunManifest.from_json(open("run.json").read()).reproduce()
 manifest carries, so the reader is TOLD whether they rebuilt the same market
 rather than eyeballing numbers off a page. On success the returned engine is
 the published market, bit for bit. On any mismatch it raises, and the error
-names the component that disagreed — which is why every component carries its
+names the component that disagreed, which is why every component carries its
 own fingerprint rather than one hash over the whole file.
 
 ## The completeness rule
 
 A manifest reproduces if and only if every component is either shipped with
 the library or embedded in the manifest. A fingerprint identifies; it cannot
-reconstruct — you cannot invert a hash. So the manifest EMBEDS everything
-user-supplied: the roster itself (never a recipe for one — generators change
+reconstruct, because you cannot invert a hash. So the manifest EMBEDS
+everything user-supplied: the roster itself (never a recipe for one, since generators change
 across versions, and an EDGAR query is not the data it returned), the macro
 initial conditions, the realised scenario path, the full order log, and the
 strategy when it is a :class:`StrategySpec`.
@@ -32,7 +32,7 @@ strategy when it is a :class:`StrategySpec`.
 The one component that cannot always be embedded is a hand-written Python
 agent, and the manifest says so rather than pretending: pass a reference
 string ("repo X at commit Y") and the manifest records the strategy as
-referenced, not carried. Such a manifest is honestly incomplete — its
+referenced, not carried. Such a manifest is honestly incomplete, and its
 :attr:`~RunManifest.complete` is False and :attr:`~RunManifest.gaps` says
 why. The MARKET still reproduces, because the agent's orders are data in the
 log; what the reader cannot do without the referenced code is re-run the
@@ -47,15 +47,15 @@ ran it. "Across versions, not at all" is the documented guarantee, and the
 hazard is live: one calendar day brought three trajectory-changing fixes
 (the macro-chain and volume fixes, then the market-factor-sigma
 recalibration) while ``pt.version()`` stayed 0.1.0 and the preset stayed
-"pt-v1" — the recalibrated constant is not even in the preset dictionary,
+"pt-v1", and the recalibrated constant is not even in the preset dictionary,
 so a preset-value comparison holds still with them. Every NAME the
 library could quote held still while the numbers moved. A manifest that
 trusted names would replay on the wrong build, produce a plausible market,
 and manufacture exactly the false confidence it exists to prevent.
 
 So the era identity here is behavioural: :func:`era_fingerprint` runs a
-small fixed simulation — generator draws, fair value across every sector,
-the daily mispricing step, and a coupled engine run through day closes — and
+small fixed simulation: generator draws, fair value across every sector,
+the daily mispricing step, and a coupled engine run through day closes, and
 digests it, the same canonical-f64 discipline as ``tests/known_answer.py``.
 The test suite's ``KAT_VERSION`` is the same idea kept by convention, but it
 lives in the test tree, which an installed wheel does not have, and a
@@ -63,25 +63,25 @@ convention depends on a human remembering to bump it. A digest cannot forget.
 Two builds that agree on the probe agree on the arithmetic the probe
 exercises; two that disagree will not reproduce each other's runs, whatever
 their version strings say. ``reproduce()`` checks the probe BEFORE replaying
-and refuses on a mismatch, naming both builds — following ``Checkpoint``'s
+and refuses on a mismatch, naming both builds, following ``Checkpoint``'s
 precedent of refusing over quietly running against the wrong world.
 
 The package version, the preset name and the full coefficient dictionary
-still ride along — they are what a methods section quotes, the coefficient
+still ride along, since they are what a methods section quotes, the coefficient
 values give a mismatch a specific name when the model itself moved, and the
 embedded values are what will let a future custom preset travel without a
-format change — but none of them is trusted as the era. The probe is.
+format change, but none of them is trusted as the era. The probe is.
 
 ## What a successful reproduction proves about platforms
 
 Cross-OS bit-identity is measured by commit. The five-target release gate
 has run: at ``ad91026`` (known-answer v5, the RNG stream split), all five
-targets — Linux x86_64 and aarch64, macOS arm64 and x86_64, Windows
-x86_64 — produced the identical digest, ``76983e65...3180eeb``, each also
+targets (Linux x86_64 and aarch64, macOS arm64 and x86_64, and Windows
+x86_64) produced the identical digest, ``76983e65...3180eeb``, each also
 passing against the committed baseline. It has not yet run against a
 tagged release, and the current digest, ``1ee64998...fe3581c`` at v8, was
 regenerated on macOS arm64 and has one platform's confirmation behind it
-until the gate runs again — ``docs/reproducing-a-run.md`` keeps the full
+until the gate runs again. ``docs/reproducing-a-run.md`` keeps the full
 record. The manifest records the writer's platform and claims nothing
 beyond that. What it offers instead is sharper: the manifest carries the
 expected output digest, so a successful ``reproduce()`` on a different
@@ -120,7 +120,7 @@ from .spec import StrategySpec
 MANIFEST_SCHEMA = 1
 
 #: Version of the fixed probe simulation behind :func:`era_fingerprint`.
-#: Bumped only when the PROBE ITSELF changes — its digests are then a new
+#: Bumped only when the PROBE ITSELF changes, since its digests are then a new
 #: series, and comparing across probe versions is refused as meaningless
 #: rather than reported as an era mismatch it is not.
 ERA_PROBE = 1
@@ -130,7 +130,7 @@ ERA_PROBE = 1
 #: cent grid that can absorb a low-bit divergence, while ``mispricing_s`` and
 #: ``garch_variance`` carry the continuous state where such a divergence
 #: actually lives. A digest over prices alone could pass while the market
-#: state underneath had drifted — confidence it had not earned.
+#: state underneath had drifted, which is confidence it had not earned.
 DIGEST_COLUMNS = (
     "price", "previous_close", "open", "high", "low",
     "volume", "market_cap", "mispricing_s", "garch_variance",
@@ -169,7 +169,7 @@ def market_digest(engine: Engine) -> str:
     """sha256 over an engine's end-of-run market state.
 
     Covers :data:`DIGEST_COLUMNS` for every instrument plus the draw count.
-    Two engines with equal digests ended on the same market to the bit —
+    Two engines with equal digests ended on the same market to the bit,
     including the continuous internals that tomorrow's prices depend on, not
     only the prices a cent grid has already rounded.
     """
@@ -186,7 +186,7 @@ def era_fingerprint() -> str:
     """Digest of a fixed probe simulation: the build's behavioural identity.
 
     Two builds that agree here produce the same numbers for the arithmetic
-    the probe exercises — the generator, fair value across every sector and
+    the probe exercises: the generator, fair value across every sector and
     both valuation paths, the daily mispricing step, and a coupled engine run
     through day closes, where the macro chain advances. Version strings and
     preset names are quoted in a manifest but not trusted as the era, because
@@ -239,7 +239,7 @@ def era_fingerprint() -> str:
             _f64(buf, state.s_prev)
 
     # The coupled system: eight instruments, three sessions, each through the
-    # close — which is where the macro chain advances, where GARCH extracts
+    # close, which is where the macro chain advances, where GARCH extracts
     # its innovation, and where the 2026-08 era boundary's changes all live.
     instruments = [
         Instrument(
@@ -311,14 +311,14 @@ class RunManifest:
         built FROM them and keeps neither.
 
         ``strategy`` is a :class:`StrategySpec` (carried in full, cited by
-        its fingerprint) or a reference string for a hand-written agent —
-        "repo X at commit Y" — which the manifest records as referenced, not
+        its fingerprint) or a reference string for a hand-written agent,
+        "repo X at commit Y", which the manifest records as referenced, not
         carried, and declares in :attr:`gaps`. An agent OBJECT is refused:
         the manifest cannot serialise code, and accepting it would embed a
         ``repr`` while implying it embedded a strategy.
 
-        ``universe_source`` is optional provenance — the ``random(n, seed)``
-        recipe, an EDGAR snapshot hash and as-of date — recorded for the
+        ``universe_source`` is optional provenance (the ``random(n, seed)``
+        recipe, an EDGAR snapshot hash and as-of date) recorded for the
         methods section. The roster itself is always embedded regardless,
         because a recipe reproduces only while the generator behaves the same
         and a query is not the data it returned.
@@ -329,7 +329,7 @@ class RunManifest:
             raise ValidationError(
                 "strategy must be a StrategySpec or a reference string, got "
                 f"{type(strategy).__name__}. A hand-written agent cannot be "
-                "carried as data — pass where its code lives (repo and "
+                "carried as data. Pass where its code lives (repo and "
                 "commit) and the manifest will record it as referenced, not "
                 "carried."
             )
@@ -391,7 +391,7 @@ class RunManifest:
             "strategy": strategy_fp,
             # The model rides beside the strategy: the same honesty
             # mechanism, where a shipped preset is cited by name and a
-            # custom one by custom-XXXXXXXX — never mistakable for a
+            # custom one by custom-XXXXXXXX, never mistakable for a
             # standard model in a published result.
             "model": engine.model_fingerprint,
             "order_log": _sha(_canonical(log)),
@@ -407,7 +407,7 @@ class RunManifest:
                 "platform": {"os": _platform.system(),
                              "machine": _platform.machine()},
                 # The FULL preset surface of the model the engine actually
-                # ran — not the build's default — with "name" as its
+                # ran, not the build's default, with "name" as its
                 # fingerprint. Embedding the values is what lets a custom
                 # preset travel: a fingerprint identifies, it cannot
                 # reconstruct.
@@ -431,7 +431,7 @@ class RunManifest:
         return cls(doc)
 
     def to_json(self) -> str:
-        """The whole manifest as JSON — the artifact you hand over."""
+        """The whole manifest as JSON: the artifact you hand over."""
         return _canonical(self._doc)
 
     # -- reading -----------------------------------------------------------
@@ -490,8 +490,8 @@ class RunManifest:
                 )
 
         if payload.get("scenario") is not None:
-            # Constructing validates the path — contiguous days, fixed
-            # fields, plausible rates — so a coherent-looking but malformed
+            # Constructing validates the path (contiguous days, fixed
+            # fields, plausible rates) so a coherent-looking but malformed
             # scenario is caught here by what is wrong with it.
             Scenario.from_json(json.dumps(payload["scenario"]))
 
@@ -509,7 +509,7 @@ class RunManifest:
         elif recorded.get("strategy") is not None:
             raise ValidationError(
                 "this manifest records a strategy fingerprint but carries no "
-                "spec for it. The carried spec was removed in transit — a "
+                "spec for it. The carried spec was removed in transit; a "
                 "fingerprint identifies, it cannot reconstruct."
             )
 
@@ -541,7 +541,7 @@ class RunManifest:
             raise ValidationError(
                 "the manifest's inputs do not match the fingerprint they "
                 "were written with, and every carried component checks out "
-                "individually — the seed was edited in transit."
+                "individually: the seed was edited in transit."
             )
 
         return cls(payload)
@@ -552,7 +552,7 @@ class RunManifest:
         """Replay the run and verify the result. Returns the rebuilt market.
 
         Refuses BEFORE replaying if this build is a different era from the
-        one that wrote the manifest — a manifest that silently produced
+        one that wrote the manifest, because a manifest that silently produced
         different numbers across an era boundary would manufacture false
         confidence, which is worse than no manifest at all. On a result
         mismatch after every input and the era verified, the error reports
@@ -576,7 +576,7 @@ class RunManifest:
                 f"{engine.draws_consumed} against {recorded['draws_consumed']}"
                 "). Every carried input matched its fingerprint and the era "
                 "probe agreed, so the divergence is in arithmetic the probe "
-                "does not exercise — on an unmeasured platform pair (written "
+                "does not exercise, on an unmeasured platform pair (written "
                 f"on {wrote['os']}-{wrote['machine']}, replayed on "
                 f"{_platform.system()}-{_platform.machine()}) that is the "
                 "leading suspect. Bisect with pretium.replay(log, ..., "
@@ -587,7 +587,7 @@ class RunManifest:
     def _model_for_replay(self) -> ModelParams | None:
         """The model the run was recorded under, rebuilt for the replay.
 
-        ``None`` only for the preset the engine defaults to — including
+        ``None`` only for the preset the engine defaults to, including
         every manifest written before the model dict carried the full
         surface. A ``custom-`` model is rebuilt from the embedded values,
         and a NAMED preset that is not the default is looked up by name;
@@ -598,7 +598,7 @@ class RunManifest:
         The second case is why this is not "not custom, therefore None".
         With more than one shipped preset in the table, returning ``None``
         for a name the engine does not default to would replay the run
-        under a different model and report success — the exact
+        under a different model and report success, which is the exact
         substitution the model fingerprint exists to make impossible,
         reached by way of a shortcut that was correct only while the table
         had one row.
@@ -623,7 +623,7 @@ class RunManifest:
             # check is that this build can run them and that they still
             # hash to the name they were recorded under. from_dict refuses
             # by name any value this build cannot run (a read-only or
-            # derived coefficient that moved — an era boundary for the
+            # derived coefficient that moved, an era boundary for the
             # unthreaded surface).
             rebuilt = ModelParams.from_dict(theirs)
             if rebuilt.fingerprint != name:
@@ -633,7 +633,7 @@ class RunManifest:
                     f"{rebuilt.fingerprint!r} against the recorded "
                     f"{name!r}. Either the dictionary was edited in "
                     "transit, or this build derives different bits from "
-                    "the same inputs — both mean the replay would run a "
+                    "the same inputs; both mean the replay would run a "
                     "model the manifest does not describe."
                 )
         else:
@@ -650,14 +650,14 @@ class RunManifest:
                 raise ValidationError(
                     f"this manifest ran model preset {name!r}, which this "
                     "build does not ship. The coefficients are the model, "
-                    "so the run cannot be checked here — reproduce it on a "
+                    "so the run cannot be checked here. Reproduce it on a "
                     "build that ships the preset it ran."
                 )
             # Compare where both sides carry a value. The intersection
             # rather than the union, deliberately: an older manifest
             # carries the legacy nine-coefficient dict and a newer one the
             # full surface, and a key only one side knows is a difference
-            # of BOOKKEEPING, not of model — the era probe above this
+            # of BOOKKEEPING, not of model, since the era probe above this
             # block is what catches a behavioural change the comparison
             # cannot see.
             full = ModelParams.from_preset(ours["name"]).to_dict()
@@ -700,7 +700,7 @@ class RunManifest:
                 f"this is pretium {version()} on {_platform.system()}-"
                 f"{_platform.machine()}. An engine, calibration or platform "
                 "difference has moved the trajectories, so the run cannot "
-                "be reproduced on this build — and running it anyway would "
+                "be reproduced on this build, and running it anyway would "
                 "produce a market that looks right and is not the one the "
                 "manifest describes."
             )
@@ -743,7 +743,7 @@ class RunManifest:
 
     @property
     def strategy(self) -> StrategySpec | None:
-        """The carried spec, or None — including for a strategy that is only
+        """The carried spec, or None, including for a strategy that is only
         referenced. :attr:`strategy_reference` holds the reference."""
         payload = self._doc.get("strategy")
         if payload is None or "spec" not in payload:
@@ -778,7 +778,7 @@ class RunManifest:
     @property
     def model(self) -> dict[str, Any]:
         """The coefficient dictionary of the model the run ran under, with
-        ``"name"`` as its fingerprint — a shipped preset's name, or
+        ``"name"`` as its fingerprint: a shipped preset's name, or
         ``custom-XXXXXXXX`` for a run that must never be mistaken for one."""
         return dict(self._doc["written_by"].get("model") or {})
 
@@ -798,8 +798,8 @@ class RunManifest:
     def gaps(self) -> list[str]:
         """What a reader needs from OUTSIDE this manifest, spelled out.
 
-        Empty for a complete manifest. A gap is not a defect — a hand-written
-        agent is the escape hatch working as designed — but it is a fact the
+        Empty for a complete manifest. A gap is not a defect, since a
+        hand-written agent is the escape hatch working as designed, but it is a fact the
         reader needs, so the manifest states it rather than leaving it to be
         discovered.
         """
@@ -807,7 +807,7 @@ class RunManifest:
         reference = self.strategy_reference
         if reference is not None:
             out.append(
-                "strategy: referenced, not carried — a hand-written agent. "
+                "strategy: referenced, not carried; a hand-written agent. "
                 "The market replays in full (its orders are data in the "
                 f"log), but re-running the strategy itself needs: {reference}"
             )
@@ -815,7 +815,7 @@ class RunManifest:
 
     @property
     def complete(self) -> bool:
-        """True when every component is embedded or ships with the library —
+        """True when every component is embedded or ships with the library,
         the condition under which this manifest alone reproduces the run."""
         return not self.gaps
 
@@ -850,7 +850,7 @@ class RunManifest:
                 f"({doc['fingerprints']['strategy'][:12]}...)")
         elif self.strategy_reference is not None:
             lines.append(
-                f"  strategy: REFERENCED, not carried — "
+                f"  strategy: REFERENCED, not carried: "
                 f"{self.strategy_reference}")
         else:
             lines.append("  strategy: none")
@@ -858,7 +858,7 @@ class RunManifest:
             f"  result: market digest {doc['result']['digest'][:12]}..., "
             f"{doc['result']['draws_consumed']} draws")
         for gap in self.gaps:
-            lines.append(f"  incomplete — {gap}")
+            lines.append(f"  incomplete: {gap}")
         return "\n".join(lines)
 
     def __repr__(self) -> str:

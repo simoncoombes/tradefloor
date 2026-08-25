@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Presets and Custom Models · pretium docs</title>
+<meta name="description" content="The model&#x27;s coefficients ship as named presets. You can change any settable coefficient at runtime, and the fingerprint makes sure a changed model can...">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/change.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium docs">
+<meta property="og:title" content="Presets and Custom Models">
+<meta property="og:description" content="The model&#x27;s coefficients ship as named presets. You can change any settable coefficient at runtime, and the fingerprint makes sure a changed model can...">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/change.html">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Presets and Custom Models">
+<meta name="twitter:description" content="The model&#x27;s coefficients ship as named presets. You can change any settable coefficient at runtime, and the fingerprint makes sure a changed model can...">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Presets and Custom Models","description":"The model's coefficients ship as named presets. You can change any settable coefficient at runtime, and the fingerprint makes sure a changed model can...","url":"https://simoncoombes.github.io/pretium/change.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
+<style>:root{
+  --hue:55;
+  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
+  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
+  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
+  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
+  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
+  --bad:oklch(0.52 0.12 25);
+  --navact:oklch(0.945 0.012 var(--hue));
+  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
+  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
+  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
+  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
+}
+html[data-lightcode="true"]:not([data-theme="dark"]){
+  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
+  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
+}
+html[data-theme="dark"]{
+  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
+  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
+  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
+  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
+  --bad:oklch(0.72 0.11 25);
+  --navact:oklch(0.26 0.02 var(--hue));
+  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
+}
+html{scroll-behavior:auto}
+body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+::selection{background:var(--accent-soft)}
+p{margin:0 0 14px;text-wrap:pretty}
+h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
+ul{margin:0 0 14px;padding-left:22px}
+li{margin:0 0 7px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
+pre{margin:0}
+code{font-family:var(--font-mono)}
+summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
+summary::marker{color:var(--faint)}
+details[open] summary{border-bottom:1px solid var(--linesoft)}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+h2[id],h3[id]{scroll-margin-top:80px}
+h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
+h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
+.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
+#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
+#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
+#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
+#hambtn{display:none}
+@media (max-width:920px){
+  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
+  #sbar[data-open="true"]{transform:none}
+  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
+  #hambtn{display:flex}
+  #searchwrap{display:none}
+  #ghlink{display:none}
+}
+.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
+  grid-template-columns:232px minmax(0,1fr);gap:40px}
+.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
+.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
+.sidebar li{margin:0 0 2px}
+.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
+.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
+.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
+main{padding:28px 0 72px;min-width:0}
+main h1{font-size:30px;margin:0 0 18px}
+main h2{font-size:20px;margin:34px 0 12px}
+main h3{font-size:16px;margin:24px 0 8px}
+.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
+.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
+  display:flex;align-items:baseline;gap:12px}
+.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
+.masthead .tag{color:var(--mut);font-size:13px}
+.masthead .spacer{flex:1}
+.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
+  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
+pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
+  padding:13px 16px;overflow-x:auto;font-size:13px}
+pre code{color:inherit}
+.tablewrap{overflow-x:auto}
+footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
+  color:var(--mut);font-size:13px}
+@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
+  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
+</style>
+
+</head>
+<body>
+<header class="masthead"><div class="inner">
+<a class="brand" href="./">pretium</a>
+<span class="tag">repeatable market simulation</span>
+<span class="spacer"></span>
+<a href="https://github.com/simoncoombes/pretium">GitHub</a>
+</div></header>
+<div class="layout">
+<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><span aria-current="page">Presets and custom models</span></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The seven components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
+<main>
+<p class="appnote">This is the plain version of the page. The
+<a href="./#/change">full documentation app</a> adds search, dark mode
+and copy buttons.</p>
+<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">GUIDE</div>
+        <h1 style="font-size:30px">Presets and Custom Models</h1>
+        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">The model's coefficients ship as named presets. You can change any settable coefficient at runtime, and the fingerprint makes sure a changed model can never pass as the shipped one.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Reasons to Touch the Model</h2>
+        <p>People change the model for three reasons: they want a calmer or wilder market for a stress study, they are studying the model itself one coefficient at a time, or they are calibrating against their own data. Even if you change nothing, you still quote the preset name, because it is part of what lets someone else rerun your result.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Presets</h2>
+        <p>A preset names the complete coefficient set, frozen and documented. <code style="font-size:13px">pt-v3</code> is the current default; <code style="font-size:13px">pt-v1</code> and <code style="font-size:13px">pt-v2</code> stay selectable and bit-reproducing forever. The reason is comparability: (package version, model, universe fingerprint, seed) is a complete, citable specification of a market. If every user ran a bespoke coefficient set, "tested on the pretium simulator" would mean nothing.</p>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">eng = pt.Engine(seed=42, universe=u, model="pt-v3")  # the default, spelled out
+eng = pt.Engine(seed=42, universe=u, model="pt-v1")  # an earlier era, still exact</code></pre>
+        </div>
+        <p>Three presets ship. All three stay selectable and bit-reproducing forever.</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Preset</th><th>What it is</th><th>Behaviour to know about</th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v1</td>
+              <td style="vertical-align:top">The original reference model, ported from the engine this library grew out of. Uncalibrated.</td>
+              <td>Strong herding (<code style="font-size:12px">momentum_theta</code> 0.25), so returns trend hard: autocorrelation +0.249 at lag one against a real band around zero. Momentum strategies look brilliant here for that reason. No GJR term, so no leverage effect. A constant market-factor sigma, so cross-sectional correlation sits near +0.024 against a real +0.08 to +0.56.</td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v2</td>
+              <td style="vertical-align:top">The first calibrated preset, fitted against the re-derived realism bands. Selectable, never the default.</td>
+              <td>Carries the era's structural changes (GJR asymmetry, a conditional-variance market factor, VIX coupling) at the first converged coefficient set. Stronger scenario response than pt-v3: it retains more of pt-v1's shock transient, at the cost of weaker volatility clustering.</td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v3</td>
+              <td style="vertical-align:top">The current default, and the one the realism numbers describe.</td>
+              <td>Nine of ten statistics in band at 252 days. Herding turned well down (<code style="font-size:12px">momentum_theta</code> 0.0742), so return autocorrelation drops to +0.0375. Factor-variance persistence raised to 0.989 to buy clustering, which is what weakened the crisis transient to 27.6% of pt-v1's. Idiosyncratic noise scaled to 0.84 to fund the bigger market factor.</td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v4</td>
+              <td style="vertical-align:top">Selectable, and deliberately not the default. pt-v3 plus nine parameters that ship inert on pt-v3: five endogenous jump coefficients, three volume-process parameters, and <code style="font-size:12px">market_factor_sigma</code>.</td>
+              <td>Built for long horizons. It halves the dual-horizon objective (0.9887 to 0.4863 on training seeds, 1.3990 to 0.7493 on thirty seeds it never saw) and is the first change in the project's history to move the thin-tails gap: excess kurtosis at 504 days goes from 5.23 to 9.19, inside the 7.1 to 22 band. The cost is at the certified horizon, where it holds 8 of 10 rather than 9, having surrendered <code style="font-size:12px">return_acf1</code>.</td>
+            </tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:21px;margin:46px 0 10px">Custom Models and Fingerprints</h2>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">custom = pt.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+eng = pt.Engine(seed=42, universe=u, model=custom)
+eng.model_fingerprint     # "custom-0c04c4ba" -- never "pt-v1"</code></pre>
+        </div>
+        <p>The fingerprint is the first 8 hex characters of a sha256 over the canonical serialisation: names sorted, values as raw IEEE-754 bit patterns. A coefficient set bit-identical to a shipped preset fingerprints as that preset's name. Anything else fingerprints as <code style="font-size:13px">custom-XXXXXXXX</code>. <code style="font-size:13px">ModelParams</code> is immutable once built, so a fingerprint someone quoted cannot drift afterwards. The rule is simple: you may change the model, and a changed model has a different name.</p>
+        <p>The fingerprint travels everywhere a result does: scorecards, manifests, checkpoints, forks, replay. A manifest for a custom-model run embeds the full coefficient dictionary and <code style="font-size:13px">reproduce()</code> rebuilds that exact market or refuses by name.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Comparing Presets Fairly</h2>
+        <p>Nothing settable may change how many random draws are taken or in what order. Market hours, the 390-tick day, the calendar and the sector key order are the draw schedule, and a preset changes what the draws are multiplied into, never the schedule. Run the same seed under two models and the draw counts match, so every difference in the outcome is a parameter effect, never reshuffled noise.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">What Is Settable</h2>
+        <p><code style="font-size:13px">pt.ModelParams.settable()</code> lists the runtime surface: the two variance processes (per-name GJR-GARCH and the market factor's), the factor sigmas and idiosyncratic scale, the mispricing dynamics, the news and flow coefficients, and the guards in the tick chain. Guards are worst-case guarantees rather than tuning knobs, and a calibration search excludes them.</p>
+        <p>The rest of the surface, such as fair-value coefficients and the macro chain's constants, is visible in <code style="font-size:13px">to_dict()</code> and covered by the fingerprint, and overriding it is refused by name: those constants are compile-time in this build, and accepting an override the engine would ignore would make the fingerprint a lie. Two coefficients are derived: <code style="font-size:13px">mispricing_phi</code> and <code style="font-size:13px">s_phi_tick</code> come from <code style="font-size:13px">mispricing_half_life_days</code> and cannot be set directly.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Example: Calibrating Your Own Market</h2>
+        <p>A model builder wants a market with stronger volatility clustering for a stress study, and wants the result to be citable. The loop: sweep candidate coefficients, score each candidate's realism panel, confirm the pick on fresh seeds, then publish the fingerprint beside the result.</p>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">from pretium import facts, loss
+
+for alpha in (0.02, 0.04, 0.08):
+    params = pt.ModelParams.from_preset("pt-v3", garch_alpha=alpha)
+    panels = [facts.measure(seed=s, universe=u, model=params)
+              for s in range(1, 7)]
+    result = loss.band_distance_loss(panels)
+    print(params.fingerprint, result["loss"])</code></pre>
+        </div>
+        <p><code style="font-size:13px">band_distance_loss</code> prices each statistic's band exit in units of its own seed noise and returns the full per-statistic breakdown with the scalar inside it. The structurally unreachable statistic rides along in every result as a standing falsification verdict, and stays out of the loss, because an optimiser pointed at an unreachable target distorts every other parameter chasing it.</p>
+        <p>When the sweep has more than a handful of knobs, survey first: <a href="atlas.html">Atlas</a> tells you which parameters move your panel before you spend a search on them, and <code style="font-size:13px">confirm</code> re-measures the winner on seeds the sweep never saw. The library consumes presets and does not ship an optimiser; six consecutive searches on this simulator were rejected for trades a scalar objective made silently, and that history is why.</p>
+        <p>Ship the result as <code style="font-size:13px">(package version, custom-XXXXXXXX, universe fingerprint, seed)</code> plus a <code style="font-size:13px">RunManifest</code>. A reader with the package and the manifest rebuilds your market bit for bit, or is told exactly why not. <a href="citing.html">Citing a Result</a> has the full list and a worked methods paragraph.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Turning One Knob Down</h2>
+        <p>One coefficient, honestly named, all the way to a citable result. The library's best-known defect is that returns trend (+0.249 autocorrelation at lag one under pt-v1). One knob controls it, and turning it down is a two-line experiment:</p>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">custom = pt.ModelParams.from_preset("pt-v1", momentum_theta=0.05)
+custom.fingerprint            # "custom-..." -- never "pt-v1"
+
+eng = pt.Engine(seed=42, universe=u, model=custom)
+panel = pt.facts.measure(seed=1, universe=u, model=custom)
+panel["return_acf1"]
+# measured for this counterfactual: +0.034, inside the real band
+# (-0.08, 0.06), where pt-v1 reads +0.249. Volatility and kurtosis
+# essentially unchanged. Measured on an earlier model era; re-measure
+# before leaning on it.
+
+manifest = pt.RunManifest.of(eng, seed=42, universe=u)
+open("run.json", "w").write(manifest.to_json())</code></pre>
+        </div>
+        <p>The pieces working together: the coefficient set is immutable, the fingerprint says loudly that this is not the shipped model, the panel re-measures realism under it instead of inheriting the certificate, and the manifest hands a reader everything needed to rebuild the exact market and check you.</p>
+</main>
+</div>
+<footer class="site"><div class="layout" style="display:block">
+pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
+</div></footer>
+</body>
+</html>

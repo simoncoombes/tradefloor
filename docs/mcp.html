@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The MCP Server · pretium docs</title>
+<meta name="description" content="pretium ships an MCP server, so a coding agent can drive the simulator through tool calls instead of Python. You ask in plain English: does a momentum...">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/mcp.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium docs">
+<meta property="og:title" content="The MCP Server">
+<meta property="og:description" content="pretium ships an MCP server, so a coding agent can drive the simulator through tool calls instead of Python. You ask in plain English: does a momentum...">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/mcp.html">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="The MCP Server">
+<meta name="twitter:description" content="pretium ships an MCP server, so a coding agent can drive the simulator through tool calls instead of Python. You ask in plain English: does a momentum...">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The MCP Server","description":"pretium ships an MCP server, so a coding agent can drive the simulator through tool calls instead of Python. You ask in plain English: does a momentum...","url":"https://simoncoombes.github.io/pretium/mcp.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
+<style>:root{
+  --hue:55;
+  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
+  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
+  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
+  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
+  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
+  --bad:oklch(0.52 0.12 25);
+  --navact:oklch(0.945 0.012 var(--hue));
+  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
+  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
+  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
+  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
+}
+html[data-lightcode="true"]:not([data-theme="dark"]){
+  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
+  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
+}
+html[data-theme="dark"]{
+  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
+  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
+  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
+  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
+  --bad:oklch(0.72 0.11 25);
+  --navact:oklch(0.26 0.02 var(--hue));
+  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
+}
+html{scroll-behavior:auto}
+body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+::selection{background:var(--accent-soft)}
+p{margin:0 0 14px;text-wrap:pretty}
+h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
+ul{margin:0 0 14px;padding-left:22px}
+li{margin:0 0 7px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
+pre{margin:0}
+code{font-family:var(--font-mono)}
+summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
+summary::marker{color:var(--faint)}
+details[open] summary{border-bottom:1px solid var(--linesoft)}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+h2[id],h3[id]{scroll-margin-top:80px}
+h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
+h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
+.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
+#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
+#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
+#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
+#hambtn{display:none}
+@media (max-width:920px){
+  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
+  #sbar[data-open="true"]{transform:none}
+  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
+  #hambtn{display:flex}
+  #searchwrap{display:none}
+  #ghlink{display:none}
+}
+.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
+  grid-template-columns:232px minmax(0,1fr);gap:40px}
+.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
+.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
+.sidebar li{margin:0 0 2px}
+.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
+.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
+.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
+main{padding:28px 0 72px;min-width:0}
+main h1{font-size:30px;margin:0 0 18px}
+main h2{font-size:20px;margin:34px 0 12px}
+main h3{font-size:16px;margin:24px 0 8px}
+.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
+.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
+  display:flex;align-items:baseline;gap:12px}
+.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
+.masthead .tag{color:var(--mut);font-size:13px}
+.masthead .spacer{flex:1}
+.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
+  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
+pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
+  padding:13px 16px;overflow-x:auto;font-size:13px}
+pre code{color:inherit}
+.tablewrap{overflow-x:auto}
+footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
+  color:var(--mut);font-size:13px}
+@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
+  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
+</style>
+
+</head>
+<body>
+<header class="masthead"><div class="inner">
+<a class="brand" href="./">pretium</a>
+<span class="tag">repeatable market simulation</span>
+<span class="spacer"></span>
+<a href="https://github.com/simoncoombes/pretium">GitHub</a>
+</div></header>
+<div class="layout">
+<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><span aria-current="page">The MCP server</span></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The seven components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
+<main>
+<p class="appnote">This is the plain version of the page. The
+<a href="./#/mcp">full documentation app</a> adds search, dark mode
+and copy buttons.</p>
+<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">CONNECT</div>
+        <h1 style="font-size:30px">The MCP Server</h1>
+        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">pretium ships an MCP server, so a coding agent can drive the simulator through tool calls instead of Python. You ask in plain English: does a momentum strategy beat buy-and-hold here, and is the difference real?</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Install and Register</h2>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">SHELL</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="sh" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">pip install "pretium[mcp]"
+claude mcp add pretium -- pretium-mcp</code></pre>
+        </div>
+        <p>Or in a client's config file:</p>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">JSON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">{"mcpServers": {"pretium": {"command": "pretium-mcp"}}}</code></pre>
+        </div>
+        <p>It takes no arguments and speaks MCP over stdio.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">The Tools</h2>
+        <p>Eleven, all read-only. Seven answer a question directly, two compose an input as data, and two run past what a conversation can wait for.</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Tool</th><th>What it answers</th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">describe_simulator()</td><td>What this is, what it reproduces, what it cannot do. Call it first.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">check_envelope(horizon_days, statistics=[], sector_concentrated=false, scenario_magnitude=false)</td><td>Is my question inside the certified range, before I spend anything on it?</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">validate_strategy(spec)</td><td>Is this spec well-formed, and what is its fingerprint?</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">evaluate_strategies(strategies, seed, days, universe_size=…, universe_seed=…, preset=…)</td><td>How do these do on one identical market?</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">rank_strategies(strategies, seeds, days, universe_size=…, universe_seed=…, preset=…)</td><td>Which is really better, across seeds, with a paired sign test?</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">run_stress_scenario(kind, strategies, seed, days, …)</td><td>What a rate, VIX or volatility shock does, always against its own unshocked control. <code style="font-size:12px">kind</code> is one of rate, vix or vol.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">explain_price_move(seed, day, ticker, …)</td><td>Why a price moved: the <a href="factors.html">seven components</a> that sum to it.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">build_universe(size=40, seed=111, sectors=None, instruments=None, limit=20)</td><td>Build a roster and preview it in one call, generated from size and seed with optional sector concentration, or from explicit instruments. Returns a universe document the run tools take, so a roster is composed once and reused rather than re-specified per call. A sector-concentrated roster is one of the six named envelope gaps, and this is what makes it askable.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">build_scenario(steps, label="", ...)</td><td>Compose a macro path as data from a list of steps, the same grammar the Python surface uses. Returns a scenario document the run tools accept.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">start_job(tool, arguments={})</td><td>Run one of the expensive tools in the background. This is how you reach the certified 252-day horizon, which a direct call cannot finish inside a conversation.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">check_job(job_id=None)</td><td>Poll a background run and collect its result. With no id, reports every job.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:21px;margin:46px 0 10px">Sending a Strategy</h2>
+        <p>You cannot send Python to the server. A tool call cannot carry a function, and accepting code as a string would turn this into a remote-code-execution endpoint with a market simulator bolted on. So the server speaks <code style="font-size:13px">StrategySpec</code> documents, the same declarative grammar that makes a result citable. The full grammar, every <code style="font-size:13px">signal.kind</code> and every default is in <a href="schemas.html">Tables and Schemas</a>.</p>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">JSON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">{
+  "signal": {"kind": "momentum", "lookback_days": 1.0},
+  "portfolio": {"top_k": 5, "gross": 1.0}
+}</code></pre>
+        </div>
+        <p>One thing works differently here than in the library: if <code style="font-size:13px">spec_version</code> is missing, the server fills it in. Models writing a spec mid-conversation leave it out every time, and rejecting them for it wastes a round trip. If a spec does name a version, that version is kept, so anything newer than the build is still refused.</p>
+        <p>What the grammar cannot express: path dependence, conditional logic, custom signals. Those need a Python agent, and <a href="simulate.html">Running a Market</a> is where that lives.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Every Result Carries Its Own Caveats</h2>
+        <p>When you call <code style="font-size:13px">pt.evaluate</code> yourself, you have the docstrings and this site to hand. A model calling <code style="font-size:13px">evaluate_strategies</code> has the tool result and nothing else, and it will then summarise that result for someone with even less. Hand it <code style="font-size:13px">{"return_pct": 88.7}</code> and it will say the strategy made 88.7%.</p>
+        <p>So every result carries a <code style="font-size:13px">caveats</code> list beside its numbers. Two properties are worth knowing about.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:20px 0 26px">
+          <div style="border:1px solid var(--line);border-radius:10px;padding:20px;background:var(--panel)">
+            <h3 style="font-size:15px;margin:0 0 8px">Earned per Call</h3>
+            <p style="font-size:13.5px;color:var(--mut);margin:0">Each one fires on something about the call you actually made. A multi-seed run does not get the single-seed warning. A strategy with no momentum in it hears nothing about return autocorrelation. In practice, warnings that never change get skipped.</p>
+          </div>
+          <div style="border:1px solid var(--line);border-radius:10px;padding:20px;background:var(--panel)">
+            <h3 style="font-size:15px;margin:0 0 8px">Computed at Call Time</h3>
+            <p style="font-size:13.5px;color:var(--mut);margin:0">Every number in them is read from the published realism figures when the tool runs, so a warning cannot go stale while the model it describes moves on.</p>
+          </div>
+        </div>
+        <div style="border:1px solid var(--line);border-radius:9px;padding:14px 18px 4px;margin:0 0 26px;background:var(--panel)">
+          <div style="font:600 10.5px/1 var(--font-mono);letter-spacing:0.09em;color:var(--bad);margin:0 0 9px">WHY COMPUTED, AND NOT HARDCODED</div>
+          <p style="font-size:13.5px;color:var(--mut)">While this server was being written, PRODUCT.md and README.md were both found still asserting a return autocorrelation of +0.219 and +0.249, from a superseded preset. The shipped <code style="font-size:12px">pt-v3</code> certifies 0.0375, and re-measuring across the README's own published method gives a median of 0.0485. Both sit comfortably inside the real-market band of −0.08 to 0.06, and both are about a fifth of the quoted figure.</p>
+          <p style="font-size:13.5px;color:var(--mut)">A hardcoded caveat is how a caveat becomes false, and a false caveat told to a model is worse than none.</p>
+        </div>
+        <div style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">SAMPLE OUTPUT</span><span title="Shapes and field names are real; the numeric values were composed for the example." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--codemut);border:1px solid var(--codeline)">ILLUSTRATIVE</span></div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);color:var(--codemut)">{
+  "results": {"momentum": {"return_pct": 88.7, "sharpe": 1.94, ...}},
+  "seed": 42,
+  "days": 5,
+  "caveats": [
+    "SINGLE SEED: one market is one sample. This result measures the
+     seed as much as the strategy. Use rank_strategies across seeds
+     before stating which is better.",
+    "SHORT WINDOW: 5 days. The statistics that make this market
+     credible are 252-day measurements, so this run is a sample of
+     the market rather than a description of it.",
+    "MOMENTUM SIGNAL: returns here autocorrelate at +0.0375 at lag
+     one (pt-v3, band -0.08 to 0.06) and real equities sit near
+     zero. A momentum edge measured here is partly an artefact of
+     the mispricing process and will not transfer.",
+    "NOT A FORECAST: simulated performance does not predict live
+     returns. Read this as a stress test."
+  ]
+}</code></pre>
+        </div>
+        <p>If a summary drops the caveats, it is misreporting the result.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Seeds, and How Many</h2>
+        <p><code style="font-size:13px">evaluate_strategies</code> runs one market. It is fast and a fine first look, but a verdict from one seed is measuring the seed as much as the strategy.</p>
+        <p><code style="font-size:13px">rank_strategies</code> is the honest version. It runs many seeds and reports <code style="font-size:13px">paired_sign_tests</code>, where both entrants traded the same market on each seed. Pairing them takes the market out of the comparison.</p>
+        <p>Quote <code style="font-size:13px">pooled_capture</code>, not <code style="font-size:13px">seeds_first</code>. The latter counts league positions among all entrants and splits arbitrarily on a tie. Try submitting a momentum spec against the momentum baseline: it comes back all ties, zero paired seeds. That is right, because they are the same strategy. A league table would have picked a winner on a coin flip.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Limits, and Why</h2>
+        <div class="tablewrap"><table style="max-width:520px">
+          <thead><tr><th>Limit</th><th style="text-align:right">Value</th></tr></thead>
+          <tbody style="font-family:var(--font-mono);font-size:12.5px">
+            <tr><td>max_days</td><td style="text-align:right">60</td></tr>
+            <tr><td>max_universe</td><td style="text-align:right">120</td></tr>
+            <tr><td>max_strategies</td><td style="text-align:right">8</td></tr>
+            <tr><td>max_seeds</td><td style="text-align:right">12</td></tr>
+          </tbody>
+        </table></div>
+        <p style="margin:14px 0 14px">These are about wall-clock time and the library itself imposes none of them. Forty names with the baselines takes roughly 0.5s at 5 days, 20s at 60, and 95s at 252, and a tool call has to come back while someone is still waiting.</p>
+        <p>That last number is why <code style="font-size:13px">max_days</code> stops short of the tested 252-day horizon on a direct call, and why every scored result gets a SHORT WINDOW warning. The statistics that make this market believable were measured over a year, so a five-day run samples the market rather than describing it. When you need the full horizon, use <code style="font-size:13px">start_job</code> and <code style="font-size:13px">check_job</code>: the run happens in the background and the conversation collects it afterwards.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">What the Server Leaves Out</h2>
+        <ul style="color:var(--mut);font-size:14px">
+          <li><strong style="color:var(--fg)">Atlas.</strong> A survey is thousands of simulations and takes hours, so nothing useful could come back from it inside a conversation. <a href="atlas.html">Run it from Python</a>.</li>
+          <li><strong style="color:var(--fg)">The 54 model coefficients.</strong> You pick presets by name. Coefficients made up on the fly give you a market nobody calibrated, reported as though it were a shipped one.</li>
+          <li><strong style="color:var(--fg)">Writes.</strong> Every tool is read-only and pure: same arguments, same bytes, every platform.</li>
+        </ul>
+        <p style="margin:24px 0 0">Related: <a href="trust.html">Realism and Limits</a> is where the caveats come from, <a href="schemas.html">Tables and Schemas</a> has the spec grammar, <a href="api-run.html">Running and Evaluating</a> has the evaluation API, and <a href="simulate.html">Running a Market</a> is the library underneath.</p>
+</main>
+</div>
+<footer class="site"><div class="layout" style="display:block">
+pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
+</div></footer>
+</body>
+</html>

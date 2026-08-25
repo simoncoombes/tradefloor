@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Atlas · pretium docs</title>
+<meta name="description" content="Atlas runs your measurement in hundreds of slightly different markets and builds a table of what came out. You then ask the table which model settings...">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/atlas.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium docs">
+<meta property="og:title" content="Atlas">
+<meta property="og:description" content="Atlas runs your measurement in hundreds of slightly different markets and builds a table of what came out. You then ask the table which model settings...">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/atlas.html">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Atlas">
+<meta name="twitter:description" content="Atlas runs your measurement in hundreds of slightly different markets and builds a table of what came out. You then ask the table which model settings...">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Atlas","description":"Atlas runs your measurement in hundreds of slightly different markets and builds a table of what came out. You then ask the table which model settings...","url":"https://simoncoombes.github.io/pretium/atlas.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
+<style>:root{
+  --hue:55;
+  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
+  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
+  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
+  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
+  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
+  --bad:oklch(0.52 0.12 25);
+  --navact:oklch(0.945 0.012 var(--hue));
+  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
+  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
+  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
+  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
+}
+html[data-lightcode="true"]:not([data-theme="dark"]){
+  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
+  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
+}
+html[data-theme="dark"]{
+  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
+  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
+  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
+  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
+  --bad:oklch(0.72 0.11 25);
+  --navact:oklch(0.26 0.02 var(--hue));
+  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
+}
+html{scroll-behavior:auto}
+body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+::selection{background:var(--accent-soft)}
+p{margin:0 0 14px;text-wrap:pretty}
+h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
+ul{margin:0 0 14px;padding-left:22px}
+li{margin:0 0 7px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
+pre{margin:0}
+code{font-family:var(--font-mono)}
+summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
+summary::marker{color:var(--faint)}
+details[open] summary{border-bottom:1px solid var(--linesoft)}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+h2[id],h3[id]{scroll-margin-top:80px}
+h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
+h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
+.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
+#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
+#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
+#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
+#hambtn{display:none}
+@media (max-width:920px){
+  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
+  #sbar[data-open="true"]{transform:none}
+  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
+  #hambtn{display:flex}
+  #searchwrap{display:none}
+  #ghlink{display:none}
+}
+.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
+  grid-template-columns:232px minmax(0,1fr);gap:40px}
+.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
+.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
+.sidebar li{margin:0 0 2px}
+.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
+.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
+.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
+main{padding:28px 0 72px;min-width:0}
+main h1{font-size:30px;margin:0 0 18px}
+main h2{font-size:20px;margin:34px 0 12px}
+main h3{font-size:16px;margin:24px 0 8px}
+.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
+.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
+  display:flex;align-items:baseline;gap:12px}
+.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
+.masthead .tag{color:var(--mut);font-size:13px}
+.masthead .spacer{flex:1}
+.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
+  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
+pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
+  padding:13px 16px;overflow-x:auto;font-size:13px}
+pre code{color:inherit}
+.tablewrap{overflow-x:auto}
+footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
+  color:var(--mut);font-size:13px}
+@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
+  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
+</style>
+
+</head>
+<body>
+<header class="masthead"><div class="inner">
+<a class="brand" href="./">pretium</a>
+<span class="tag">repeatable market simulation</span>
+<span class="spacer"></span>
+<a href="https://github.com/simoncoombes/pretium">GitHub</a>
+</div></header>
+<div class="layout">
+<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><span aria-current="page">Atlas reference</span></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The seven components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
+<main>
+<p class="appnote">This is the plain version of the page. The
+<a href="./#/atlas">full documentation app</a> adds search, dark mode
+and copy buttons.</p>
+<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">REFERENCE</div>
+        <h1 style="font-size:30px">Atlas</h1>
+        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">Atlas runs your measurement in hundreds of slightly different markets and builds a table of what came out. You then ask the table which model settings your result actually depends on.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">What It Does, Step by Step</h2>
+        <ol style="color:var(--mut);font-size:14px;padding-left:22px">
+          <li style="margin:0 0 7px">You name some model settings and a range for each. Say herding between 0 and 0.4.</li>
+          <li style="margin:0 0 7px">Atlas picks a few hundred combinations spread evenly across those ranges.</li>
+          <li style="margin:0 0 7px">It runs your own measurement function at each one. Your function decides what gets measured: a return, a drawdown you compute yourself, a fill rate, a realism statistic. Anything you can compute from a run.</li>
+          <li style="margin:0 0 7px">You get back a table with one row per combination: settings in, your numbers out.</li>
+          <li style="margin:0 0 7px">Everything else on this page is a question you ask that table. Which setting moved my number, what shape the effect had, and what trade-offs exist.</li>
+        </ol>
+        <p>You measure once and can then ask as many questions as you like, since the table saves to a file.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">How the Points Are Chosen</h2>
+        <p>Evenly, using Latin hypercube sampling. Each range is cut into as many slices as there are points, and every slice gets exactly one point. That matters because a plain random sample leaves gaps and clumps that look like structure when you analyse them. Even coverage is also what makes a few thousand points useful across fifty settings at once. Sampling is seeded, so the same survey reproduces exactly.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Why Sampling Beats Searching</h2>
+        <p>If you already know which settings matter, run a search. If you do not, a search fails expensively: the optimiser will happily wreck anything your objective does not measure, and you find out afterwards. Six calibration searches on this simulator were rejected in two days, each one revealing a trade the objective had made behind everyone’s back. Anything outside the objective is free for the optimiser to spend.</p>
+        <p>The other half of the problem was that nobody had measured how the settings move the outputs. Every search was a walk across a room no one had mapped, in a direction someone had guessed at. A survey maps it first. A Pareto front then puts every available trade side by side so a person picks, rather than an optimiser picking quietly.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">The Methods</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Method</th><th>Question it answers</th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">sensitivity(output)</td><td>Which parameters move this output, ranked by rank correlation. Curved monotone effects read correctly under ranks; a linear measure would bury them.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">profile(param, output)</td><td>What shape the effect has: monotone, saturating, an interior optimum, nothing. Each bin reports a median with its p10-p90 spread, never a bare mean, because every other parameter is varying inside a bin.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">unidentified(outputs)</td><td>Which parameters move nothing you named, and would waste a search's budget. The threshold tightens as the survey grows.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">pareto(objectives)</td><td>The non-dominated rows over several objectives at once. The method the module exists for.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">attribution(a, b, output)</td><td>Why B beats A, decomposed per changed parameter, with a noise scale beside each contribution.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">explain(output) · report_front(...)</td><td>The findings as prose that carries its own row counts, ranges and caveats inline.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">confirm(candidate, baseline, ...)</td><td>Whether a screening finding survives fresh seeds at full resolution. The check you always run before believing a survey result.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:21px;margin:46px 0 10px">Reading Each Method's Output</h2>
+        <p><strong>sensitivity</strong> returns the correlations inside their provenance, so a number cannot shed its basis:</p>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">s.sensitivity("return_pct")
+# {"output": "return_pct",
+#  "correlations": {"momentum_theta": 0.61, ...},  # sorted by |rho|
+#  "rows_total": 500, "rows_used": 496, "rows_error": 3,
+#  "rows_nonfinite": 1, "rows_outside_where": 0, "where": None}
+
+s.sensitivity("return_pct", where={"garch_alpha": (0.06, 0.16)})
+# the same question, restricted to a region of OTHER parameters</code></pre>
+        </div>
+        <p>A magnitude here ranks influence over the sampled range. It is an ordering, and it says nothing about how much a unit change buys, so quote it as a rank and never as an elasticity.</p>
+        <p><strong>profile</strong> is where decisions usually turn. An interior optimum says ship a tuned value; a monotone slide to the range edge says the mechanism is net harmful here. A rank correlation cannot tell those apart, and the binned marginal can:</p>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">s.profile("momentum_theta", "return_pct", bins=12)
+# each bin: {"low", "high", "n", "median", "p10", "p90"}
+# log axes bin in log space, so bin counts stay near-uniform</code></pre>
+        </div>
+        <p><strong>pareto</strong> and <strong>report_front</strong> lay out every available trade at the same time:</p>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">s.pareto({"return_pct": "max", "impact_bps": "min"})
+print(s.report_front({"return_pct": "max", "impact_bps": "min"}))</code></pre>
+        </div>
+        <p><strong>attribution</strong> decomposes a difference between two vectors across the parameters that differ. It exists because of a specific failure: a candidate was described in a design document as delivering crisis severity "through correlation", which was right for one of its two parameters and backwards for the other. Every number involved was correct. The connecting sentence was invented.</p>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">s.attribution(vector_a, vector_b, "return_pct", measured=(y_a, y_b))
+# contributions per changed parameter, each with a noise scale;
+# contributions inside 2x their noise land in "within_noise"</code></pre>
+        </div>
+        <p><strong>explain</strong> and the other prose renderers state the row counts, ranges and dropped-row tally they stand on, with their own caveats inline. A number invites scepticism and a sentence does not, so the sentence has to carry its own.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">The Failure Modes</h2>
+        <div style="border:1px solid var(--line);border-radius:9px;padding:16px 20px 6px;margin:0 0 12px;background:var(--panel)">
+          <h3 style="font-size:15px;margin:0 0 8px">Ranges Are the Most Consequential Choice</h3>
+          <p style="font-size:13.5px;color:var(--mut)"><code style="font-size:12.5px">axes_for</code> defaults to a quarter to four times a preset's shipped value. That is a convention, and it has been wrong here: a 96-core search once concluded there was nothing to find because the best known value of <code style="font-size:12.5px">crisis_blend_ramp</code> (6.0, four point three times ship) sat just outside the default ceiling of 5.6. Override any range you have real information about. A parameter that ships at exactly 0.0 has no multiplicative box at all, and Atlas refuses to guess one, because guessing would silently decide what the map can see. Typo'd override names are refused too, since a typo would leave a default box silently in place.</p>
+        </div>
+        <div style="border:1px solid var(--line);border-radius:9px;padding:16px 20px 6px;margin:0 0 12px;background:var(--panel)">
+          <h3 style="font-size:15px;margin:0 0 8px">Attribution Assumes Additivity</h3>
+          <p style="font-size:13.5px;color:var(--mut)">Each contribution is a main effect read off a marginal with every other parameter varying. Strong interactions break the assumption: on a purely multiplicative surface attribution can overstate a contribution several-fold, and an interaction between the changed parameters is attributed to neither. Pass <code style="font-size:12.5px">measured=</code> whenever you can. It supplies the true endpoint values, and the residual against the decomposition is the only signal that additivity failed. Without it, the summary says so explicitly rather than presenting an unchecked number.</p>
+        </div>
+        <div style="border:1px solid var(--line);border-radius:9px;padding:16px 20px 6px;margin:0 0 12px;background:var(--panel)">
+          <h3 style="font-size:15px;margin:0 0 8px">Why You Re-measure</h3>
+          <p style="font-size:13.5px;color:var(--mut)">The refusal to reuse seeds exists because of a real loss. A candidate here was declared shippable on a 13% improvement. Measured on fresh seed blocks, the same gap read +0.1297 where it was found, then −0.0315, +0.0209 and +0.0233 elsewhere, reversing sign once. Discovery and validation had used the same thirty seeds, so re-measuring reproduced the same fluctuation exactly and reported it as confirmation. It tested reproducibility of the measurement, and said nothing about the effect. <code style="font-size:12.5px">confirm</code> therefore refuses overlapping seeds outright, refuses a survey with no seed record, and measures both vectors on the same fresh seeds so path noise cancels in the pair. In practice one block gives you a number and several tell you whether it is a property of the model or just of the paths.</p>
+        </div>
+        <h2 style="font-size:21px;margin:46px 0 10px">What Atlas Cannot Tell You</h2>
+        <ul style="color:var(--mut);font-size:14px">
+          <li>A near-zero sensitivity is evidence of no monotone relationship over the sampled range at this resolution, never proof of inertness. A parameter that acts only in combination, or only past a threshold the sample never crossed, reads the same way. Ask the targeted question with <code style="font-size:12.5px">where=</code>.</li>
+          <li>A rank correlation ranks influence. It does not measure how much.</li>
+          <li>Failed runs are kept, not hidden. A vector whose measurement raises is recorded and skipped, because a parameter region that crashes the model is a fact about the model. Infrastructure failures cluster in expensive corners, so check where the drops are, not just how many.</li>
+        </ul>
+</main>
+</div>
+<footer class="site"><div class="layout" style="display:block">
+pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
+</div></footer>
+</body>
+</html>

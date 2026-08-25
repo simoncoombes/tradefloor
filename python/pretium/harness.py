@@ -17,8 +17,8 @@ What it gives you:
   pressure, so size costs money and cannot be ignored.
 
 What it does NOT give you: evidence that an agent would trade real markets
-well. This is a *model* market with knowable structure — a mean-reverting
-mispricing process anchored to a computable fair value — and a determined agent
+well. This is a *model* market with knowable structure, a mean-reverting
+mispricing process anchored to a computable fair value, and a determined agent
 can learn that structure in ways that will not transfer. Use it to rank agents
 against each other, not to certify one as good at trading.
 
@@ -33,7 +33,7 @@ comparison. Identical independent markets keep the contrast clean.
 ## The agent does not see the answer
 
 The observation carries prices, the book and the agent's own portfolio. It does
-NOT carry ``mispricing_s``, fair value, or the factor attribution — those are
+NOT carry ``mispricing_s``, fair value, or the factor attribution. Those are
 what the agent is supposed to infer, and handing them over would make the
 exercise trivial. They are used for SCORING, on the other side of the wall.
 """
@@ -96,7 +96,7 @@ class Observation:
     otherwise.
 
     The library cannot refuse that, because it is arithmetic on an integer
-    and there is no call to intercept — so the answer is to make the
+    and there is no call to intercept, so the answer is to make the
     within-day index a thing you can ASK for rather than a thing you have to
     derive. Use :attr:`step_of_day`, or the two predicates:
 
@@ -108,7 +108,7 @@ class Observation:
     ``step`` itself stays a run-wide counter: it is what makes an
     observation's position in the run unambiguous, it is what the fills table
     stamps, and changing its meaning would silently re-time every agent
-    already written against it — the same defect in a new place.
+    already written against it, which is the same defect in a new place.
     """
 
     __slots__ = ("step", "day", "tickers", "prices", "portfolio", "engine",
@@ -169,7 +169,7 @@ class Observation:
         return self.engine.book(ticker)
 
     def avg_volume(self, ticker: str) -> float:
-        """Average daily volume — public information a real trader has.
+        """Average daily volume, which is public information a real trader has.
 
         Exposed because it is how size should be reasoned about. Impact scales
         with participation, not with notional: 13.7 million shares is 0.05x a
@@ -206,7 +206,7 @@ class Agent(Protocol):
     sells, omitted or zero does nothing.
 
     ``explain`` is optional. When present it returns the factor the agent
-    believes drove the largest recent move — one of ``Engine.FACTORS``. That is
+    believes drove the largest recent move, one of ``Engine.FACTORS``. That is
     what lets the harness ask whether the agent was right for the right
     reasons, rather than only whether it made money.
     """
@@ -358,7 +358,7 @@ def evaluate(
     that is what you want to study.
 
     A value in ``agents`` may be a :class:`pretium.StrategySpec` instead of a
-    built agent. The spec is built HERE, freshly, on every call — which is
+    built agent. The spec is built HERE, freshly, on every call, which is
     both what makes a spec-carrying result citable (the scorecard's
     ``strategy_fingerprint`` names exactly what ran) and what closes a real
     trap: agents are stateful, and a built instance reused across two
@@ -367,7 +367,7 @@ def evaluate(
     instruction for building one.
 
     ``model`` selects the coefficient set every engine in the evaluation
-    runs — a preset name or a :class:`pretium.ModelParams` — and defaults
+    runs, either a preset name or a :class:`pretium.ModelParams`, and defaults
     to the shipped preset. One model for the whole evaluation, baseline
     included: scoring agents across different models would compare markets,
     not agents. Each scorecard records ``model_fingerprint``.
@@ -586,7 +586,7 @@ def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard
        This ranks the seed at least as much as the agents, and the effect is
        not subtle. Measured on the reference agents over twelve ten-day
        markets on ``Universe.random(30, seed=11)``, a single seed usually
-       NAMES the across-seed leader — nine times in twelve — but what it
+       NAMES the across-seed leader, nine times in twelve, but what it
        says that leader is worth ranges from a capture of +0.007 to +2.834
        depending only on which market it drew.
 

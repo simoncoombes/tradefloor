@@ -6,22 +6,22 @@ liquidity dial reads shares and volume. Those are numbers, and the SEC
 publishes them, structured, in the public domain.
 
 Seeding from real filings gives an experiment whose **cross-sectional
-structure is real** — the true dispersion of valuations, actual sector
-weights, real loss-makers in realistic proportion — while every price path
+structure is real**, meaning the true dispersion of valuations, actual sector
+weights and real loss-makers in realistic proportion, while every price path
 stays synthetic. For anything cross-sectional that is a materially better
 test bed than a generated universe, which only has the dispersion its
 generator was told to have.
 
 ## Be precise about which of three things this is
 
-1. **A synthetic universe** — ``Universe.random``. Works.
-2. **Real fundamentals as initial conditions** — this. Works.
-3. **Replicating a specific company's realised behaviour** — does **not**
+1. **A synthetic universe**, via ``Universe.random``. Works.
+2. **Real fundamentals as initial conditions**, which is this. Works.
+3. **Replicating a specific company's realised behaviour**, which does **not**
    work, and this needs saying before a user discovers it. The dynamics are
    the preset's, not the company's: the GARCH coefficients are model-global,
    base variance and anchor P/E are sector-level, and beta and spread are
    fitted to no name's history. A loaded ticker is *a stock with that
-   company's fundamentals under this model's assumptions* — not that company,
+   company's fundamentals under this model's assumptions*, not that company,
    not its volatility, not its microstructure. Making mode 3 real needs a
    per-name calibration layer, which is a different product.
 
@@ -34,7 +34,7 @@ different numbers.
 
 So the *snapshot* is the artifact, not the query. ``fetch`` produces a frozen,
 hashable snapshot; ``Universe.from_edgar`` is pure and takes one. Re-running
-``fetch`` is expected to produce a different hash — that is the design
+``fetch`` is expected to produce a different hash, and that is the design
 working, not failing.
 
 This is the same discipline applied to the golden vectors: pin the artifact,
@@ -60,7 +60,7 @@ from ._core import (
 )
 
 # Bumped when a derivation or the SIC mapping changes. A snapshot records the
-# version that built it, because changing a derivation changes universes — the
+# version that built it, because changing a derivation changes universes: the
 # same reason coefficients ship as a versioned preset rather than as defaults.
 LOADER_VERSION = 1
 
@@ -81,7 +81,7 @@ def _beta_for(sector: str) -> float:
     A flat 1.0 would erase the sector structure the spread model wants. This
     is the deterministic centre of the generator a synthetic universe uses,
     so loaded and generated universes get the same cross-sector beta
-    structure — without consuming an RNG draw, which would make loading a
+    structure, without consuming an RNG draw, which would make loading a
     universe perturb a market.
 
     Fitting real betas needs return history. That is the calibration layer
@@ -200,7 +200,7 @@ def to_instruments(
     a fundamentals-anchored model. The honest cost, stated rather than hidden:
     a universe that starts perfectly priced has **no initial mispricing
     dispersion**, so a strategy that harvests mispricing sees nothing until
-    shocks accumulate — on the order of one 60-day half-life. Run a burn-in
+    shocks accumulate, on the order of one 60-day half-life. Run a burn-in
     before handing control to an agent if that matters.
 
     # initial_s="stationary" starts the universe where a long run would be
@@ -208,7 +208,7 @@ def to_instruments(
     ``"zero"`` (the default) prices everything at fair value, which is honest
     and has the cost above. ``"stationary"`` instead draws each company's
     mispricing from the distribution the process settles into, so the universe
-    begins with realistic cross-sectional dispersion — around 19% for a
+    begins with realistic cross-sectional dispersion, around 19% for a
     technology name and 6% for consumer staples, from each sector's own
     long-run volatility.
 
@@ -219,7 +219,7 @@ def to_instruments(
 
     The macro arguments are the conditions the fair value is computed under.
     They must match the macro the engine then runs, or every company starts
-    mispriced by the difference — which is a subtle way to get a universe
+    mispriced by the difference, which is a subtle way to get a universe
     nobody specified.
     """
     if initial_s not in ("zero", "stationary"):
@@ -280,7 +280,7 @@ def filter_rows(rows: Sequence[dict], *, exclude_negative_equity: bool = True):
 
     Negative-equity loss-makers are excluded by default. A company with
     negative EPS takes the book-value valuation path, and negative book value
-    there produces a negative fair value which the floor then clamps — so the
+    there produces a negative fair value which the floor then clamps, so the
     name would trade at the floor with no fundamental anchor at all. That is
     not a stock, it is a constant.
 

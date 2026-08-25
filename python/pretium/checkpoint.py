@@ -2,7 +2,7 @@
 
 Run to day sixty, then ask two questions of the same market: what happens under
 a rate shock, and what happens without one. Everything before the fork is
-identical — not statistically similar, identical — because both branches are
+identical, not statistically similar but identical, because both branches are
 the same seed replayed to the same point.
 
 ```python
@@ -46,8 +46,8 @@ So restoring costs about what the original run cost, and branching to `n`
 futures costs `n` times that. Stated plainly because the word "checkpoint"
 usually implies cheap restoration and here it does not.
 
-What you get for it is that the checkpoint is DATA — a few kilobytes of JSON,
-about 200 bytes per day — rather than an opaque memory image. It survives the
+What you get for it is that the checkpoint is DATA, a few kilobytes of JSON
+at about 200 bytes per day, rather than an opaque memory image. It survives the
 process, the version and the machine, which an in-memory snapshot of a PCG32
 state and a maker inventory would not.
 

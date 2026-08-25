@@ -2,7 +2,7 @@
 
 A seed reproduces a market only when nothing else varies. It does vary: the
 market an agent trades in depends on the agent's own orders, so one seed with
-different order flow is a different market — correctly. Reproducing a run
+different order flow is a different market, correctly. Reproducing a run
 therefore means reproducing every INPUT, and that sequence is what
 ``Engine.order_log`` holds.
 
@@ -52,10 +52,10 @@ def replay(
 
     An unknown operation raises rather than being skipped. A replay that
     silently ignored an entry would produce a market that is not the one the
-    log describes — and it would look like a successful replay.
+    log describes, and it would look like a successful replay.
 
-    ``model`` is the coefficient set the run was recorded under — a preset
-    name or a :class:`ModelParams` — and defaults to the shipped preset.
+    ``model`` is the coefficient set the run was recorded under, either a
+    preset name or a :class:`ModelParams`, and defaults to the shipped preset.
     Like ``seed`` and ``universe`` it is identity, not history, so it is
     not in the log; replaying a custom-model run under the default would
     produce a plausible market that is not the recorded one, which is why

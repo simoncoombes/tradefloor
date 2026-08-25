@@ -3,7 +3,7 @@
 ``gymnasium`` and ``numpy`` are OPTIONAL. The core package depends on neither,
 and importing this module without them raises a message saying what to install
 rather than an ImportError from three frames down. The environment also works
-without gymnasium installed at all — it only subclasses ``gymnasium.Env`` when
+without gymnasium installed at all, since it only subclasses ``gymnasium.Env`` when
 it is present, so the duck-typed reset/step contract is usable on its own.
 
 ## Actions are target weights, not share counts
@@ -31,8 +31,8 @@ the price it was bought at would pay for trading rather than for being right.
 ## Episodes end; they do not reset in place
 
 ``reset`` builds a new engine, because that is what a reset IS here. A method
-that rewound would either secretly reconstruct — fine, but then it is a
-constructor — or try to restore mutable state and eventually miss a field: the
+that rewound would either secretly reconstruct, which is fine but then it is
+a constructor, or try to restore mutable state and eventually miss a field: the
 maker inventory, the Box-Muller spare, the GARCH state.
 """
 
@@ -77,7 +77,7 @@ class TradingEnv(_Base):
     """A market as a reinforcement-learning environment.
 
     Observation: prices, holdings as fractions of net worth, and cash as a
-    fraction of net worth — all ``float64``, C-contiguous, which is what a
+    fraction of net worth. All ``float64`` and C-contiguous, which is what a
     ``Box`` space wants.
 
     Prices are given as log returns since the previous step rather than as

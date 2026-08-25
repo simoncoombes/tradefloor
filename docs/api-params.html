@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Model Parameters · pretium docs</title>
+<meta name="description" content="Every runtime-settable coefficient and what it controls. pt.ModelParams.settable() lists this surface from your installed wheel; this page explains it.">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/api-params.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium docs">
+<meta property="og:title" content="Model Parameters">
+<meta property="og:description" content="Every runtime-settable coefficient and what it controls. pt.ModelParams.settable() lists this surface from your installed wheel; this page explains it.">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/api-params.html">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Model Parameters">
+<meta name="twitter:description" content="Every runtime-settable coefficient and what it controls. pt.ModelParams.settable() lists this surface from your installed wheel; this page explains it.">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Model Parameters","description":"Every runtime-settable coefficient and what it controls. pt.ModelParams.settable() lists this surface from your installed wheel; this page explains it.","url":"https://simoncoombes.github.io/pretium/api-params.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
+<style>:root{
+  --hue:55;
+  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
+  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
+  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
+  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
+  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
+  --bad:oklch(0.52 0.12 25);
+  --navact:oklch(0.945 0.012 var(--hue));
+  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
+  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
+  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
+  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
+}
+html[data-lightcode="true"]:not([data-theme="dark"]){
+  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
+  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
+}
+html[data-theme="dark"]{
+  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
+  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
+  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
+  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
+  --bad:oklch(0.72 0.11 25);
+  --navact:oklch(0.26 0.02 var(--hue));
+  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
+}
+html{scroll-behavior:auto}
+body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+::selection{background:var(--accent-soft)}
+p{margin:0 0 14px;text-wrap:pretty}
+h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
+ul{margin:0 0 14px;padding-left:22px}
+li{margin:0 0 7px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
+pre{margin:0}
+code{font-family:var(--font-mono)}
+summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
+summary::marker{color:var(--faint)}
+details[open] summary{border-bottom:1px solid var(--linesoft)}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+h2[id],h3[id]{scroll-margin-top:80px}
+h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
+h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
+.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
+#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
+#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
+#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
+#hambtn{display:none}
+@media (max-width:920px){
+  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
+  #sbar[data-open="true"]{transform:none}
+  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
+  #hambtn{display:flex}
+  #searchwrap{display:none}
+  #ghlink{display:none}
+}
+.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
+  grid-template-columns:232px minmax(0,1fr);gap:40px}
+.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
+.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
+.sidebar li{margin:0 0 2px}
+.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
+.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
+.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
+main{padding:28px 0 72px;min-width:0}
+main h1{font-size:30px;margin:0 0 18px}
+main h2{font-size:20px;margin:34px 0 12px}
+main h3{font-size:16px;margin:24px 0 8px}
+.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
+.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
+  display:flex;align-items:baseline;gap:12px}
+.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
+.masthead .tag{color:var(--mut);font-size:13px}
+.masthead .spacer{flex:1}
+.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
+  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
+pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
+  padding:13px 16px;overflow-x:auto;font-size:13px}
+pre code{color:inherit}
+.tablewrap{overflow-x:auto}
+footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
+  color:var(--mut);font-size:13px}
+@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
+  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
+</style>
+
+</head>
+<body>
+<header class="masthead"><div class="inner">
+<a class="brand" href="./">pretium</a>
+<span class="tag">repeatable market simulation</span>
+<span class="spacer"></span>
+<a href="https://github.com/simoncoombes/pretium">GitHub</a>
+</div></header>
+<div class="layout">
+<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The seven components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><span aria-current="page">API Model parameters</span></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
+<main>
+<p class="appnote">This is the plain version of the page. The
+<a href="./#/api-params">full documentation app</a> adds search, dark mode
+and copy buttons.</p>
+<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">API</div>
+        <h1 style="font-size:30px">Model Parameters</h1>
+        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">Every runtime-settable coefficient and what it controls. <code style="font-size:14px">pt.ModelParams.settable()</code> lists this surface from your installed wheel; this page explains it.</p>
+        <p style="margin:20px 0 0">Two rules hold everywhere. Nothing settable changes how many random draws happen or in what order, so two coefficient sets on one seed see identical noise and every difference in the outcome is a parameter effect. And several newer mechanisms ship at 0.0, where the code skips the branch entirely, so earlier presets reproduce bit for bit.</p>
+        <h2 style="font-size:19px;margin:42px 0 8px">The Shared Factors</h2>
+        <p style="color:var(--mut);font-size:14px">Every return has three parts: a move the whole market shares, a move the sector shares, and the name's own private noise. These set the size of each part.</p>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">market_factor_sigma</td><td>How big the shared market-wide move is on a normal day. Every stock feels this one.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">sector_factor_sigma</td><td>The same, for each sector's shared move.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">idio_sigma_scale</td><td>Scales each name's own private volatility. 1.0 leaves it untouched. pt-v3 pays for a bigger market factor by setting this to 0.84.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px">Order Flow and News</h2>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">order_flow_coefficient</td><td>How hard aggregate order flow pushes the price.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">informed_flow_fraction</td><td>The share of that push that sticks. The rest fades back.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">news_sector_weight · news_market_weight</td><td>How much sector-wide and market-wide news events move each name.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">news_peer_weight · news_peer_weight_down</td><td>How much one company's news moves its sector peers. At 0.0 an earnings beat moves only the company that reported it. Bad news gets its own knob because it spreads harder than good news in real markets.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px">Per-Name Volatility: GJR-GARCH</h2>
+        <p style="color:var(--mut);font-size:14px">The recipe behind volatility clustering: a big move today makes a big move tomorrow more likely. Each name runs its own copy.</p>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">garch_omega</td><td>The base level variance returns toward.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">garch_alpha</td><td>How much yesterday's shock raises today's variance. Bigger alpha, jumpier volatility.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">garch_beta</td><td>How much of yesterday's variance carries over. Bigger beta, longer memory.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">garch_gamma</td><td>The extra kick after a down day. This is where the leverage effect comes from. Zero gives plain symmetric GARCH, bit for bit.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">garch_ceiling_multiple · garch_floor_multiple</td><td>Bounds on the variance, as multiples of the sector's long-run level. The ceiling binds on clustering, so it is searched under bounds.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px">The Market Factor's Variance</h2>
+        <p style="color:var(--mut);font-size:14px">The shared factor has its own variance process, and VIX steers it. This is why crisis volatility and crisis correlation arrive together.</p>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">market_vol_alpha · market_vol_beta</td><td>Shock take-up and persistence. pt-v3 runs the persistence at 0.989 to buy clustering, and that one choice is what weakened the crisis transient (gap 5).</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">market_vol_vix_coupling</td><td>How much the variance target follows VIX. 0 ignores it; 1 makes the target proportional to VIX².</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">market_vol_vix_anchor</td><td>The VIX level where the coupled target equals baseline. Ships at 15, so an average VIX reproduces the uncoupled process exactly.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">market_vol_ceiling_multiple · market_vol_floor_multiple</td><td>Clamps on the factor variance. The 8x ceiling is why pinning VIX above about 42 buys almost no extra volatility.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">market_vol_slow_persistence · market_vol_slow_gain · market_vol_slow_weight</td><td>A second, slower variance component: the fast one chases spikes, this one carries long-horizon clustering. All three at 0.0 recover the single-component process bit for bit.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">market_vol_slow_vix_damp</td><td>Decouples the slow component from VIX. Measured, and the measurement refuted the idea behind it: damping makes both the shock response and the steady-state lever worse at every setting tried. Ships inert.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px">Crisis Behaviour</h2>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">crisis_vix_threshold</td><td>The VIX level where crisis behaviour switches on: the correlation blend, the stress memory, the economy's crisis premium. Ships at 25.5, the 94th percentile of the endogenous VIX distribution, chosen so the trigger can actually fire.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">crisis_blend_ramp · crisis_blend_cap</td><td>How many VIX points past the threshold before correlations top out, and where the ceiling sits.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">crash_amplifier_threshold · crash_amplifier_slope</td><td>How big a market shock has to be (in normal-day units) before every name loads harder on the market, and how much harder per extra unit.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">universe_stress_decay · universe_stress_weight</td><td>Fear memory. Without it, correlations decouple the same tick VIX dips back under the threshold. With it, stress ratchets up instantly and fades over weeks, the way real crisis correlation does.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">regime_stress_points</td><td>Stress the business cycle feeds into that same memory, in VIX-equivalent points. At 0.0 the price process behaves as though the economy were always expanding.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">vix_mean_reversion</td><td>How fast VIX falls back toward its target each day. The other half of the transient problem: a longer spike stresses the market without touching variance persistence.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px">Jumps</h2>
+        <p style="color:var(--mut);font-size:14px">Without jumps, prices only diffuse, and nothing ever gaps. That is why 504-day kurtosis reads 5.2 against a real 7.1 to 22: fat tails at that scale need surprises. Jumps draw from their own RNG stream, so a preset with them off is bit-identical to one that predates them.</p>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">jump_intensity_market · jump_sigma_market</td><td>Daily probability and size of a market-wide jump.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">jump_mean_market</td><td>Negative on purpose: real crash jumps point down. A symmetric jump would fix kurtosis on the panel while getting crises backwards.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">jump_intensity_idio · jump_sigma_idio</td><td>Per-name jumps, independent across names: the earnings-surprise channel.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px">Volume</h2>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">volume_variance_gain</td><td>How strongly realised volume tracks the market factor's variance, so busy prices come with busy volume.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">volume_persistence · volume_innovation_sigma</td><td>A shared day-to-day volume process, so a busy day is followed by a busy day. This is the machinery aimed at the one structurally failed statistic: without a volume process, day-to-day volume changes are pure noise and their autocorrelation sits near −0.5 at any coefficients.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px">Size Effects</h2>
+        <p style="color:var(--mut);font-size:14px">Small companies are more volatile and cost more to trade. The original model did this in four hard steps, which put cliffs in the cross-section: a $49B company and a $51B company differed by 25% in volatility. These blend the steps into smooth curves.</p>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">size_effect_smoothness · size_effect_exponent</td><td>Blend from the four-tier volatility step toward a continuous power law (0 = steps, 1 = pure curve), and the curve's slope. The exponent ships at 0.15, fitted to the steps where the steps make sense.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">spread_size_smoothness · spread_size_exponent</td><td>The same for the bid-ask spread, where the steps were worse: 10 bps at $1.0B, 30 bps at $0.9B. The exponent ships at 0.455, fitted the same way.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px">Mispricing Dynamics</h2>
+        <p style="color:var(--mut);font-size:14px">The wedge between price and true value: how far it stretches, how fast it heals, and how much the crowd chases it. This is the layer the truth table records.</p>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">mispricing_half_life_days</td><td>Trading days for half a mispricing to fade. The one knob for the decay: setting it recomputes the two derived values below.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">mispricing_phi · s_phi_tick</td><td>Derived from the half-life (daily and per-tick decay). Carried as recorded bit patterns; you cannot set them directly.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">momentum_theta</td><td>Herding: the fraction of yesterday's re-rating that continues today. The knob behind trending returns. At pt-v1’s 0.25 it measures +0.249 at lag one; pt-v3 ships 0.0742 and measures +0.0375, inside the real band of −0.08 to 0.06. A counterfactual at 0.05 measured +0.034 on an earlier model era.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">crowd_valuation_gain · crowd_momentum_gain</td><td>How hard the crowd leans on cheapness and on yesterday's move.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px">Guards</h2>
+        <p style="color:var(--mut);font-size:14px">Worst-case guarantees. Settable, so you can study them, and excluded from any calibration search, because a guard tuned for realism stops being a guarantee.</p>
+        <div class="tablewrap"><table>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">mispricing_cap</td><td>Hard bound on how far price can stretch from value.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">crowd_lean_cap</td><td>Bound on the crowd's daily push.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">price_breaker_fraction</td><td>The circuit-breaker band around the session open. Ships at ±25%.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">price_hard_cap</td><td>Absolute cap on any model price. Ships at 50,000.</td></tr>
+          </tbody>
+        </table></div>
+        <p style="margin:24px 0 0">To find out which of these move an outcome you care about, and by how much, survey them with <a href="atlas.html">Atlas</a> before you turn anything. To set one: <code style="font-size:13px">pt.ModelParams.from_preset("pt-v3", garch_alpha=0.12)</code>, which fingerprints as custom. The rest of the preset surface (fair-value coefficients, the macro chain's constants, the book geometry) is visible in <code style="font-size:13px">to_dict()</code> and refused by name if you try to set it, because those constants are compiled in and a silently ignored override would make the fingerprint a lie.</p>
+</main>
+</div>
+<footer class="site"><div class="layout" style="display:block">
+pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
+</div></footer>
+</body>
+</html>

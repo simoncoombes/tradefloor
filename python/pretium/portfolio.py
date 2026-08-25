@@ -1,7 +1,7 @@
 """Positions, cash and P&L for one trader.
 
 Deliberately Python rather than engine state. Position accounting is
-arithmetic over IEEE-754 doubles — identical in both languages — and keeping it
+arithmetic over IEEE-754 doubles, identical in both languages, and keeping it
 out of the engine means the engine stays a *market* rather than becoming a
 broker. It also lets a harness hold several portfolios against one market
 without the engine knowing about any of them, which is what running N agents
@@ -9,14 +9,14 @@ on one seed requires.
 
 ## Execution and impact are separate channels, on purpose
 
-:meth:`Portfolio.execute` prices a fill against the instrument's live book —
+:meth:`Portfolio.execute` prices a fill against the instrument's live book,
 the same book the tick settles through, so slippage is real levels consumed.
 That tells you what *you* paid. It tells the market nothing.
 
 The market learns about your trading through ``order_flow`` on the next tick,
 which is what :meth:`Portfolio.pending_flow` accumulates. A harness that
 executes without feeding the flow back has a trader whose fills are realistic
-and whose footprint is invisible — profitable in a way no real trader could be.
+and whose footprint is invisible, profitable in a way no real trader could be.
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ class Portfolio:
                  *, max_leverage: float | None = None) -> None:
         """
         ``max_leverage`` caps gross exposure as a multiple of net worth. It
-        defaults to ``None`` — unconstrained — because a bare simulator should
+        defaults to ``None``, meaning unconstrained, because a bare simulator should
         not impose a broker's risk policy on a researcher studying, say, what
         an unconstrained strategy does.
 
@@ -166,7 +166,7 @@ class Portfolio:
         Average-cost basis. The branch that matters is a trade crossing through
         zero: selling more than you hold flips you short, and only the part
         that actually closed realises P&L. Booking the whole trade as a close
-        would report profit on shares that were never held — and it would look
+        would report profit on shares that were never held, and it would look
         plausible, because the number would still be finite and the direction
         still right.
         """

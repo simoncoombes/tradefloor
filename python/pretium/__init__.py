@@ -1,4 +1,4 @@
-"""pretium — a deterministic market simulator with a real limit order book.
+"""pretium: a deterministic market simulator with a real limit order book.
 
 The compiled engine lives in ``pretium._core``. This package re-exports it and
 adds the parts that are better written in Python than in Rust: JSON
@@ -115,7 +115,7 @@ _UNIVERSE_SCHEMA = 1
 class Universe(list):
     """An ordered sequence of instruments.
 
-    A ``list`` subclass, deliberately. Roster order is contractual — the engine
+    A ``list`` subclass, deliberately. Roster order is contractual, since the engine
     iterates instruments in index order and draws as it goes, so a reordered
     universe is a different market from the same seed. Modelling it as a
     mapping would invite exactly the ``{ticker: instrument}`` dict that has no
@@ -131,7 +131,7 @@ class Universe(list):
         """Generate ``n`` plausible instruments.
 
         A generator is not a convenience here. A realistic study needs on the
-        order of a hundred names, and nobody hand-authors a hundred rosters —
+        order of a hundred names, and nobody hand-authors a hundred rosters,
         so without this the practical universe size is "however many someone
         was willing to type", which is not a modelling choice anyone made.
 
@@ -216,7 +216,7 @@ class Universe(list):
 
         A newer schema is refused rather than read on a best-effort basis. A
         field this version does not know about would silently take a default,
-        and the resulting universe would be one nobody specified — the same
+        and the resulting universe would be one nobody specified, the same
         class of failure as a truncated golden file passing quietly.
         """
         payload = json.loads(text)
@@ -269,7 +269,7 @@ def _run_one(args: tuple) -> Any:
     """One seed, in one worker. Module-level so it is picklable.
 
     The universe crosses as JSON rather than as objects. That is not a
-    workaround — a serialised universe is the same universe by construction
+    workaround, since a serialised universe is the same universe by construction
     (there is a test), and it means a worker rebuilds from a specification
     rather than depending on whatever a pickle happened to preserve.
 
@@ -354,7 +354,7 @@ def run_many(
 ) -> list[Any]:
     """Run one simulation per seed, in parallel, and return results in order.
 
-    ``results[i]`` is always the result for ``seeds[i]`` — ordered by INPUT
+    ``results[i]`` is always the result for ``seeds[i]``, ordered by INPUT
     POSITION, never by completion order. A sweep whose output order depended on
     which worker finished first would be non-deterministic in the one way this
     library exists to avoid, and the bug would look like noise.
@@ -363,10 +363,10 @@ def run_many(
 
     This parallelises across seeds and nothing else, and that survives the
     2026-08 split of the engine's RNG into three per-domain substreams
-    (market, economy, external — ``docs/rng-streams.md``), because the split
+    (market, economy and external, see ``docs/rng-streams.md``), because the split
     is by DOMAIN, not by unit of work. The market stream alone serves every
-    draw in a tick — the market factor, each sector factor, per-company
-    noise, volume, book settlement — in one fixed order across the whole
+    draw in a tick: the market factor, each sector factor, per-company
+    noise, volume and book settlement, in one fixed order across the whole
     roster, with the Box-Muller spare cached per stream so even the parity
     of normal draws is that stream's state. Any within-run decomposition
     would repartition a single sequence, and the draw schedule does not
@@ -388,8 +388,8 @@ def run_many(
     ``"attribution"`` (the seven component columns), or ``"summary"`` (prices,
     draw count and tickers).
 
-    ``model`` selects the coefficient set — a preset name or a
-    :class:`pretium.ModelParams` — and every seed runs it, because a sweep
+    ``model`` selects the coefficient set, either a preset name or a
+    :class:`pretium.ModelParams`, and every seed runs it, because a sweep
     is many draws of ONE market and members under different models would be
     a model comparison presented as a seed distribution. The ``summary``
     and ``attribution`` rows record ``model_fingerprint``.
@@ -507,7 +507,7 @@ class FlowImpact:
        cost scales with size.
 
     
-    Two runs of the SAME seed — one with the trader's order flow, one without —
+    Two runs of the SAME seed, one with the trader's order flow and one without,
     and the difference between them.
 
     This is the measurement no real market can provide. In a real market you
@@ -517,8 +517,8 @@ class FlowImpact:
     estimated from a model of impact.
 
     ``impact[i]`` is ``actual[i] - baseline[i]`` for instrument ``i``: positive
-    means the trader pushed the price up. For a buyer that is a cost — they
-    moved the market against themselves — which is why ``cost_bps`` flips sign
+    means the trader pushed the price up. For a buyer that is a cost, because
+    they moved the market against themselves, which is why ``cost_bps`` flips sign
     by side rather than reporting a signed impact and leaving the reader to
     work out which direction hurt.
     """
@@ -542,7 +542,7 @@ class FlowImpact:
         """Impact in basis points of the baseline price.
 
         Basis points rather than currency because impact is only comparable
-        across instruments once it is relative — a penny on a $3 stock and a
+        across instruments once it is relative, since a penny on a $3 stock and a
         penny on a $600 stock are not the same event.
         """
         return [
@@ -628,11 +628,11 @@ def flow_impact(
 ) -> FlowImpact:
     """Measure what an order-flow imbalance does to the market.
 
-    Runs the same seed twice — once with ``order_flow`` and once without — and
+    Runs the same seed twice, once with ``order_flow`` and once without, and
     returns both worlds plus their difference.
 
     The two runs are otherwise identical by construction: same seed, same
-    universe, same macro, same session, and the same ``model`` — a preset
+    universe, same macro, same session, and the same ``model``, either a preset
     name or a :class:`pretium.ModelParams`, applied to BOTH worlds, since a
     difference against a baseline under other coefficients would measure
     the model rather than the flow. The ONLY difference is the flow, which

@@ -1,6 +1,6 @@
 """Columnar results for many seeds, without holding them all.
 
-`run_many` returns prices or summaries — small things, one per seed. This
+`run_many` returns prices or summaries, small things, one per seed. This
 returns TABLES, which are not small, and the whole point is that you never
 hold more than a few at once.
 
@@ -9,8 +9,8 @@ of `days x ticks x instruments`; at 252 days, 390 ticks and 100 instruments
 that is 9.8 million elements per buffer, about 940 MB retained, and the `truth`
 table it materialises is 9.8 million rows of thirteen columns. A hundred seeds
 held at once is roughly ninety gigabytes. Streamed one at a time it is under a
-gigabyte, and the analysis is usually a reduction anyway — a mean, a
-regression, a count — that never needed the whole thing resident.
+gigabyte, and the analysis is usually a reduction anyway (a mean, a
+regression, a count) that never needed the whole thing resident.
 
 ```python
 for seed, table in pt.sweep(range(100), universe=u, days=252, collect="truth"):
@@ -22,7 +22,7 @@ for seed, table in pt.sweep(range(100), universe=u, days=252, collect="truth"):
 
 Returning a list would defeat the purpose: building it would hold every table
 before the caller saw the first one. The generator runs a seed, hands it over,
-and drops the engine before starting the next — so peak memory is one engine
+and drops the engine before starting the next, so peak memory is one engine
 regardless of how many seeds you ask for.
 
 Which means **consuming it out of order, or keeping the tables, brings the
@@ -93,10 +93,10 @@ def sweep(
     batch-by-batch never materialises a whole seed either.
 
     Peak memory is ``workers`` engines, not ``len(seeds)``. Keeping the tables
-    — ``list(sweep(...))`` — puts it all back.
+    (``list(sweep(...))``) puts it all back.
 
-    ``model`` selects the coefficient set — a preset name or a
-    :class:`pretium.ModelParams` — and every seed runs it, for the reason
+    ``model`` selects the coefficient set, either a preset name or a
+    :class:`pretium.ModelParams`, and every seed runs it, for the reason
     :func:`pretium.run_many` gives: a sweep is many draws of one market.
     The tables carry no provenance columns (they never have; the engine is
     dropped as each yields), so a caller sweeping a custom model should

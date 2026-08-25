@@ -1,10 +1,10 @@
 """Ranking agents across many markets, because one market ranks them wrongly.
 
-`evaluate` scores every agent against one seed. That is the right primitive —
+`evaluate` scores every agent against one seed. That is the right primitive,
 it is what makes a comparison exact, since all agents see the identical market
-— but it is the wrong unit of judgement, and the difference is not small.
+but it is the wrong unit of judgement, and the difference is not small.
 
-Measured on this build — the reference agents over
+Measured on this build, with the reference agents over
 ``Universe.random(30, seed=11)``, ten days, sim seeds 0 through 11:
 
     pooled capture over 12 seeds        per-seed range      wins
@@ -15,15 +15,15 @@ Measured on this build — the reference agents over
 
 **A single seed names the pooled leader nine times in twelve here, and still
 misreports the verdict.** The case for many seeds is not that one seed picks
-the wrong winner — it usually does not. It is that one seed cannot say what
+the wrong winner, since it usually does not. It is that one seed cannot say what
 the winner is WORTH: momentum's own capture runs from +0.007 to +2.834
-depending only on which market it drew — a rounding error above nothing to
-nearly triple the Oracle — and that range is printed next to the verdict for
+depending only on which market it drew, from a rounding error above nothing
+to nearly triple the Oracle, and that range is printed next to the verdict for
 exactly that reason.
 
 So a leaderboard from one call to `evaluate` is a measurement of the seed at
-least as much as of the agents, and anything built on it — a benchmark, a
-regression gate, an agent that tunes itself against this harness — inherits
+least as much as of the agents, and anything built on it (a benchmark, a
+regression gate, an agent that tunes itself against this harness) inherits
 that.
 
 ## And the aggregate can overstate too, which is why `separation` exists
@@ -34,17 +34,17 @@ three: `p = 0.15`, no separation worth the name. Momentum wins by MORE when
 it wins; it does not win often enough for twelve paired trials to call the
 ordering real, and no aggregate of returns can tell those apart.
 
-Against random the same test reads 11–1, `p = 0.006`. That is what a real
+Against random the same test reads 11 to 1, `p = 0.006`. That is what a real
 difference looks like here, and the contrast is the point: two orderings that
 appear on the same table, one of them meaningless.
 
 A p-value also carries its seed window with it: the identical
-momentum-versus-mean-reversion test over seeds 12 to 23 reads 10–2 at
-`p = 0.039`. Twelve paired seeds is a small experiment — even a clean sweep
-only reaches p = 0.0005 — so one window's p is a single draw of a noisy
+momentum-versus-mean-reversion test over seeds 12 to 23 reads 10 to 2 at
+`p = 0.039`. Twelve paired seeds is a small experiment, and even a clean
+sweep only reaches p = 0.0005, so one window's p is a single draw of a noisy
 statistic, and the honest quote names the seeds.
 
-Note that even 11–1 is not `decisive` — that flag is reserved for a clean
+Note that even 11 to 1 is not `decisive`. That flag is reserved for a clean
 sweep, the one verdict that needs no distributional assumption at all. A
 small `p` and a clean sweep are different claims and the result reports both.
 
@@ -56,7 +56,7 @@ version of the single-seed verdict.
 A capture ratio divides by what the reference earned in that market, which on
 a short horizon can be almost nothing. Measured at three days on the same
 universe, sim seeds 0-9: the Oracle's per-seed P&L spans $10.6k to $36.8k,
-and against one thin denominator — 1.1% of the $1M book — mean-reversion's
+and against one thin denominator, 1.1% of the $1M book, mean-reversion's
 ratio is **+3.85**. A single value like that drags a median of ten far
 enough to reorder the whole table: ranked by median of ratios, momentum
 drops below buy-and-hold, which the pooled figure reverses.
@@ -89,8 +89,8 @@ almost nothing.
 
 `Momentum` keeps a rolling window; `RandomTrader` advances a generator. Handing
 the same instances to twelve seeds would carry seed 0's history into seed 1 and
-score something that is not the agent. That failure is silent — the numbers
-look fine — so `rank` refuses a plain mapping rather than accepting one and
+score something that is not the agent. That failure is silent, because the
+numbers look fine, so `rank` refuses a plain mapping rather than accepting one and
 quietly measuring the wrong thing.
 """
 
@@ -419,8 +419,8 @@ def rank(
     per-seed comparison stays exact. What changes is that the verdict is taken
     across seeds, where it is a property of the agents rather than of one draw.
 
-    ``model`` selects the coefficient set every evaluation runs — a preset
-    name or a :class:`pretium.ModelParams` — one model for the whole
+    ``model`` selects the coefficient set every evaluation runs, either a
+    preset name or a :class:`pretium.ModelParams`, one model for the whole
     ranking, agents and seeds alike, because a verdict taken across models
     would rank markets rather than agents. The :class:`Ranking` records
     ``model_fingerprint``, as does every scorecard under it.

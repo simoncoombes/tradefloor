@@ -8,13 +8,13 @@ a tenth of it.
 
 These are the reference points that make a score readable, from the bottom up:
 
-- **BuyAndHold** — did the strategy beat owning the market? The null
+- **BuyAndHold**: did the strategy beat owning the market? The null
   hypothesis, and the one most strategies quietly fail.
-- **RandomTrader** — did it beat noise? A strategy that cannot beat coin flips
+- **RandomTrader**: did it beat noise? A strategy that cannot beat coin flips
   is measuring its own transaction costs.
-- **Momentum** and **MeanReversion** — did it beat the two simplest things
+- **Momentum** and **MeanReversion**: did it beat the two simplest things
   anyone would try first?
-- **Oracle** — how much was available *at all*?
+- **Oracle**: how much was available *at all*?
 
 ## The Oracle is a reference strategy, NOT an upper bound
 
@@ -22,9 +22,9 @@ This needs saying first because the name invites the opposite reading, and I
 made that mistake in this file's own documentation for a week.
 
 The Oracle sees the true mispricing. It does not follow that nothing can beat
-it, and measurably something does. Counted on a fully stated grid — the
+it, and measurably something does. Counted on a fully stated grid, meaning the
 reference agents over ``Universe.random(30, seed=11)``, sim seeds 0 through
-11, ten days each, a beat being a capture ratio above 1.0 — on this build:
+11, ten days each, and a beat being a capture ratio above 1.0, on this build:
 
     beats the Oracle      largest capture 2.83
 
@@ -34,19 +34,19 @@ reference agents over ``Universe.random(30, seed=11)``, sim seeds 0 through
         random            0/12
 
 The breakdown is the whole story, and WHICH agent tells it has already
-inverted once across an engine change — an earlier era's measurement had
+inverted once across an engine change. An earlier era's measurement had
 mean-reversion beating the Oracle in a third of its pairs and momentum
 almost never, and this docstring drew the opposite moral. On the current
 engine only momentum ever beats it: the Oracle knows the *level* of
 mispricing without error, but it spends that knowledge on a fixed rule, and
-this market pays for something the rule ignores — return continuation,
+this market pays for something the rule ignores: return continuation,
 which is all momentum trades. What has held in every era measured is that
 the two agents trading no signal at all never beat it once.
 
 So the durable finding is about constraints, not about the winner's name.
 The default Oracle is long the five most underpriced names and short the
 five most overpriced (``top_k=5`` per side) at equal weight, gross 1.0,
-capped at 2% of ADV — the same budget the trend baselines get. Perfect
+capped at 2% of ADV, the same budget the trend baselines get. Perfect
 information does not make that the best portfolio the same gross can buy,
 and an agent with a better rule under the same constraints out-earns it
 while knowing strictly less.
@@ -60,7 +60,7 @@ agent out-earned that configuration):
     top_k=15, gross=2.0              median P&L 145,506   beaten 1/8
 
 Spreading the same information across more names makes it WORSE, not better.
-What makes it nearly unbeatable is doubling the gross exposure — capital,
+What makes it nearly unbeatable is doubling the gross exposure: capital,
 not information. At equal constraints the Oracle is capital-limited like
 everything else.
 
@@ -84,7 +84,7 @@ captures 60% of the Oracle's P&L is doing well; the same agent in a market
 where the Oracle made twice as much is doing half as well as it looked.
 
 Real markets cannot give you this. You cannot ask what perfect foresight would
-have earned, because you never observe fair value — you only observe price,
+have earned, because you never observe fair value. You only observe price,
 and the difference between them is precisely the unobservable. Here it is a
 column.
 
@@ -103,8 +103,8 @@ in the first place.
 
 ## Every one of these is expressible as data
 
-The five classes here share one grammar — a signal, a concentration, an
-exposure, a participation cap — and :class:`pretium.StrategySpec` writes it
+The five classes here share one grammar (a signal, a concentration, an
+exposure and a participation cap) and :class:`pretium.StrategySpec` writes it
 down as versioned, hashable JSON, so a result built on these agents can cite
 its strategy the way it already cites its seed and universe. Construct the
 spec instead of the class when the result is going anywhere other people
@@ -159,7 +159,7 @@ def rebalance(
     resulting P&L measures the cap that was missing rather than the signal.
 
     **A one-share threshold.** Without it, floating-point dust generates a
-    trade every step, and turnover — a scored metric — becomes noise.
+    trade every step, and turnover, a scored metric, becomes noise.
     """
     worth = obs.portfolio.net_worth(obs.engine)
     orders: dict[str, float] = {}
@@ -228,7 +228,7 @@ class RandomTrader:
     """Uniformly random target weights, redrawn every step.
 
     The noise floor. A strategy that does not beat this is not trading on a
-    signal — it is paying spread and impact to express a coin flip, and
+    signal. It is paying spread and impact to express a coin flip, and
     whatever P&L it shows is the market's drift minus its own costs.
 
     Draws from its own RNG stream rather than from the market's, so a random
@@ -270,9 +270,9 @@ class _Trend:
 
     ## Rebalancing more often costs more than the signal is worth
 
-    Measured on this build — ``evaluate({'m': Momentum(lookback_days=1.0)},
+    Measured on this build, via ``evaluate({'m': Momentum(lookback_days=1.0)},
     seed=2026, universe=Universe.random(40, seed=7), days=30,
-    steps_per_day=S, ticks_per_step=T)``, reading ``return_pct`` — holding
+    steps_per_day=S, ticks_per_step=T)`` and reading ``return_pct``, holding
     the horizon at one day and varying only how often the agent rebalances.
     ``T`` approximates a 390-tick day per cadence (3x130 and 6x65 are
     exact; 12 does not divide 390, so that row runs 12x32 = 384 ticks):
@@ -287,7 +287,7 @@ class _Trend:
     consume real depth more times. This is the impact model making "trade
     more" expensive on its own, which is the same mechanism that makes
     "trade bigger" expensive. (An earlier docstring read +103.13, +59.33
-    and +24.08 here — measured pre-GJR; re-measure after any engine change
+    and +24.08 here, measured pre-GJR. Re-measure after any engine change
     rather than carrying these forward.)
     """
 
@@ -356,7 +356,7 @@ class MeanReversion(_Trend):
 
 
 class Oracle:
-    """Trades the true mispricing. Not a competitor — a measuring instrument.
+    """Trades the true mispricing. A measuring instrument, not a competitor.
 
     Reads ``mispricing_s`` straight out of the engine, so it knows without
     estimation error which instruments sit above and below fair value. Prices
@@ -483,8 +483,8 @@ def reference_agents(*, seed: int = 0) -> dict[str, Any]:
 def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str, float]:
     """Each agent's P&L as a fraction of the Oracle's.
 
-    The number worth reporting. Raw P&L is not comparable across markets —
-    a seed with more dispersion pays every strategy more — and dividing by
+    The number worth reporting. Raw P&L is not comparable across markets,
+    since a seed with more dispersion pays every strategy more, and dividing by
     what a perfectly-informed reference earned in *that* market removes
     exactly that.
 

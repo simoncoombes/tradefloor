@@ -3,7 +3,7 @@
 Real TCA has one irreducible problem: the benchmark does not exist. You want
 to know what you would have paid had you not traded, and you cannot observe it,
 because your trading is part of why the prices you see happened. So the
-industry estimates it — arrival price, VWAP, a fitted impact model — and every
+industry estimates it (arrival price, VWAP, a fitted impact model) and every
 one of those is a proxy standing in for a counterfactual nobody can run.
 
 Here it runs. Same seed, same universe, same macro, same session; in one world
@@ -17,8 +17,8 @@ Trading moves the price twice over, through mechanisms worth keeping apart:
 
 **The book channel.** An order matches against resting liquidity with
 price-time priority. A large order walks up the levels and pays worse prices
-as it goes. This is emergent — nothing multiplies size by a coefficient, the
-order simply consumes what is there — and it is where a big trade's cost
+as it goes. This is emergent, since nothing multiplies size by a coefficient
+and the order simply consumes what is there, and it is where a big trade's cost
 actually comes from.
 
 **The information channel.** Order imbalance feeds the factor model as a
@@ -32,13 +32,13 @@ heroic assumptions. Here both worlds are runnable and the split is measured.
 Be aware of the bounds before sizing an experiment. The information
 channel's imbalance term is clamped per tick: below about 1.33x the
 instrument's average minute volume a floor applies and the term is flat,
-above 10x it is capped and flat again, and between them it scales — both
+above 10x it is capped and flat again, and between them it scales. Both
 constants live in ``order_imbalance`` in ``rust/src/market/factors.rs``. In
 practice an ``analyse`` run hits a harder bound first: the book caps the
 fill at the displayed depth, and identical fills mean identical flow and
-identical numbers. Measured on this build — ``analyse`` with a single
+identical numbers. Measured on this build, with ``analyse`` and a single
 first-step buy of the first name of ``Universe.random(20, seed=7)``, sim
-seed 2026, one six-step day, ``impact_bps`` on that name — requests of 20x
+seed 2026, one six-step day, reading ``impact_bps`` on that name: requests of 20x
 and 100x the average minute volume (498 and 2,490 shares) both fill the
 same 483 shares and land exactly the same 201.52 bps of end-of-run impact.
 The response is linear in what actually fills, not in what you ask for.
@@ -56,27 +56,27 @@ into published numbers.
 
 ## This is an execution measure, not a strategy P&L, and a round trip shows why
 
-Measured on this build — the first instrument of ``Universe.random(20,
+Measured on this build, on the first instrument of ``Universe.random(20,
 seed=7)``, one six-step day, buying 1% of ADV (97 shares) at the first
 step: holding costs **+16.71 bps**, identically on every one of the eight
 suite seeds (2026, 1, 2, 3, 4, 5, 7, 11), because the entry lands at step
 zero, before the two worlds can diverge. Selling the same 97 shares three
 steps later ends anywhere between **-13.25 and +5.76 bps** across those
-seeds — negative on six of the eight, median -8.4. An earlier version of
+seeds, negative on six of the eight, median -8.4. An earlier version of
 this docstring quoted a single round-trip figure (-13.57, at sim seed
 2026, pre-GJR); that same seed now reads +5.76, and the sign genuinely
 flips with the seed, so the seed range is the honest number where the
 entry gets one figure.
 
 Nothing is wrong where the round trip comes back negative. The entry pushed
-the price up, part of that impact persisted, and the exit sold into it — on
+the price up, part of that impact persisted, and the exit sold into it. On
 that leg the agent really did transact at prices better than the untraded
 world offered. How much impact survives three steps is the market's call,
 which is why this is quoted as a range.
 
 What it means is that shortfall answers "what did each execution cost against a
 market where I never traded", which is the execution desk's question. It does
-not answer "did this strategy make money" — for that, read `pnl` from
+not answer "did this strategy make money". For that, read `pnl` from
 :func:`pretium.evaluate`, which marks the portfolio to the market the agent
 actually created. A strategy that round-trips can show a negative shortfall and
 still lose, and the two numbers are not in conflict because they are answers to
@@ -172,7 +172,7 @@ class Execution:
         """The untraded world's price for this instrument at this fill's step.
 
         The fill happened BEFORE the step's session ran, so it is priced
-        against the cross-section the trader saw when deciding — index `step`,
+        against the cross-section the trader saw when deciding, at index `step`,
         not `step + 1`. Using the post-session price would credit the trader
         with the market's own move over the interval they traded in.
         """
@@ -233,14 +233,14 @@ class Execution:
     def moved(self) -> dict[str, float]:
         """Every instrument whose final price differs, in bps.
 
-        Includes names the trader never touched — and since the 2026-08 VIX
+        Includes names the trader never touched, and since the 2026-08 VIX
         coupling those are no longer guaranteed absent. Order flow still
         consumes no RNG draws, so an untraded name sees byte-identical
         noise; what remains is one non-noise channel, the market being
         afraid of the trading: the fear gauge reacts same-day to the
         cap-weighted market return, VIX sets the shared factor's variance
         target, and the nudge reaches every name's volatility two closes
-        later. Measured on this build — ``analyse(Momentum(), seed=7,
+        later. Measured on this build, with ``analyse(Momentum(), seed=7,
         universe=Universe.random(60, seed=11), days=10)``, defaults
         otherwise: 46 names traded, two of the fourteen untouched moved, by
         -6.6 and +3.2 bps, against a 13.0 bps median ``|impact_bps|``
@@ -250,9 +250,9 @@ class Execution:
         (``rust/src/economy/daily.rs``), so a day whose close saturates the
         clamp in both worlds passes nothing; and a one-day analysis is
         structurally immune, its final prices predating the first repriced
-        variance target — which is why ``test_tca.py`` can still assert
+        variance target, which is why ``test_tca.py`` can still assert
         emptiness there. When the untouched names must be byte-exact, pin
-        VIX in both worlds — ``scenario=Scenario().hold(vix=15.0)`` —
+        VIX in both worlds, via ``scenario=Scenario().hold(vix=15.0)``,
         verified empty on the ten-day run above. Anything here that was not
         traded and survives a pinned VIX means something genuinely leaked
         between the worlds.
@@ -324,8 +324,8 @@ def analyse(
     worlds run the identical macro path, so the difference is still the
     trading and not the regime.
 
-    ``model`` selects the coefficient set — a preset name or a
-    :class:`pretium.ModelParams` — and BOTH worlds run it, for the same
+    ``model`` selects the coefficient set, either a preset name or a
+    :class:`pretium.ModelParams`, and BOTH worlds run it, for the same
     reason they share a scenario: a shortfall priced against a baseline
     under a different model would measure the model gap, not the trading.
     The :class:`Execution` records ``model_fingerprint``.

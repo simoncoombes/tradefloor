@@ -914,12 +914,12 @@ def measure(
     asymmetrically with their own sign. The split is the finding, so
     `report` prints it in two sections.
 
-    ``model`` selects the coefficient set the market runs — a preset name or
-    a :class:`pretium.ModelParams` — defaulting to the shipped preset. This
+    ``model`` selects the coefficient set the market runs, either a preset
+    name or a :class:`pretium.ModelParams`, defaulting to the shipped preset. This
     is the seam the calibration search evaluates through: the panel at a
     candidate vector is ``measure(model=candidate)``, no rebuild. The result
     carries ``model_fingerprint`` beside ``universe_fingerprint`` for the
-    same reason that field exists — a realism claim is only checkable
+    same reason that field exists, because a realism claim is only checkable
     against the exact model it measured, and ``custom-XXXXXXXX`` can never
     present as the shipped one.
 

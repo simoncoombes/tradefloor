@@ -112,7 +112,7 @@ decays exponentially where real markets decay hyperbolically. Tails are too
 thin over multi-year windows. Scenario response is directionally right but
 not calibrated in magnitude. And certification was measured on a
 sector-balanced roster, which no real index is.
-[The realism envelope](https://simoncoombes.github.io/pretium/realism-envelope.html)
+[The realism envelope](https://simoncoombes.github.io/pretium/trust.html)
 states each gap and what it forbids. `pt.envelope.check()` refuses to certify
 a question that falls outside one.
 

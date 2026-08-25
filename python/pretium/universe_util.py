@@ -14,8 +14,8 @@ from ._core import Instrument
 def as_universe(universe: Sequence[Instrument]) -> list[Instrument]:
     """Normalise to a list, preserving order.
 
-    Order is contractual — the engine iterates instruments in index order and
-    draws as it goes — so this copies rather than sorting, and refuses an empty
+    Order is contractual, because the engine iterates instruments in index
+    order and draws as it goes, so this copies rather than sorting, and refuses an empty
     roster rather than producing an environment with nothing to trade.
     """
     items = list(universe)

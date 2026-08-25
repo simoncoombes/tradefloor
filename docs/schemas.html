@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tables and Schemas · pretium docs</title>
+<meta name="description" content="Every column a run gives you, plus the enumerations the rest of the docs refer to.">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/schemas.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium docs">
+<meta property="og:title" content="Tables and Schemas">
+<meta property="og:description" content="Every column a run gives you, plus the enumerations the rest of the docs refer to.">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/schemas.html">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Tables and Schemas">
+<meta name="twitter:description" content="Every column a run gives you, plus the enumerations the rest of the docs refer to.">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Tables and Schemas","description":"Every column a run gives you, plus the enumerations the rest of the docs refer to.","url":"https://simoncoombes.github.io/pretium/schemas.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
+<style>:root{
+  --hue:55;
+  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
+  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
+  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
+  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
+  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
+  --bad:oklch(0.52 0.12 25);
+  --navact:oklch(0.945 0.012 var(--hue));
+  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
+  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
+  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
+  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
+}
+html[data-lightcode="true"]:not([data-theme="dark"]){
+  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
+  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
+}
+html[data-theme="dark"]{
+  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
+  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
+  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
+  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
+  --bad:oklch(0.72 0.11 25);
+  --navact:oklch(0.26 0.02 var(--hue));
+  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
+}
+html{scroll-behavior:auto}
+body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+::selection{background:var(--accent-soft)}
+p{margin:0 0 14px;text-wrap:pretty}
+h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
+ul{margin:0 0 14px;padding-left:22px}
+li{margin:0 0 7px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
+pre{margin:0}
+code{font-family:var(--font-mono)}
+summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
+summary::marker{color:var(--faint)}
+details[open] summary{border-bottom:1px solid var(--linesoft)}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+h2[id],h3[id]{scroll-margin-top:80px}
+h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
+h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
+.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
+#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
+#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
+#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
+#hambtn{display:none}
+@media (max-width:920px){
+  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
+  #sbar[data-open="true"]{transform:none}
+  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
+  #hambtn{display:flex}
+  #searchwrap{display:none}
+  #ghlink{display:none}
+}
+.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
+  grid-template-columns:232px minmax(0,1fr);gap:40px}
+.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
+.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
+.sidebar li{margin:0 0 2px}
+.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
+.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
+.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
+main{padding:28px 0 72px;min-width:0}
+main h1{font-size:30px;margin:0 0 18px}
+main h2{font-size:20px;margin:34px 0 12px}
+main h3{font-size:16px;margin:24px 0 8px}
+.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
+.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
+  display:flex;align-items:baseline;gap:12px}
+.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
+.masthead .tag{color:var(--mut);font-size:13px}
+.masthead .spacer{flex:1}
+.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
+  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
+pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
+  padding:13px 16px;overflow-x:auto;font-size:13px}
+pre code{color:inherit}
+.tablewrap{overflow-x:auto}
+footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
+  color:var(--mut);font-size:13px}
+@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
+  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
+</style>
+
+</head>
+<body>
+<header class="masthead"><div class="inner">
+<a class="brand" href="./">pretium</a>
+<span class="tag">repeatable market simulation</span>
+<span class="spacer"></span>
+<a href="https://github.com/simoncoombes/pretium">GitHub</a>
+</div></header>
+<div class="layout">
+<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The seven components</a></li><li><span aria-current="page">Tables and schemas</span></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
+<main>
+<p class="appnote">This is the plain version of the page. The
+<a href="./#/schemas">full documentation app</a> adds search, dark mode
+and copy buttons.</p>
+<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">REFERENCE</div>
+        <h1 style="font-size:30px">Tables and Schemas</h1>
+        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">Every column a run gives you, plus the enumerations the rest of the docs refer to.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">The Output Tables</h2>
+        <p style="color:var(--mut);font-size:14px">All five read zero-copy into polars, pandas, pyarrow and duckdb, and the package depends on none of them. Every table keys its rows by <code style="font-size:12px">instrument_id</code>, which is the roster index, so roster order matters here as it does everywhere else.</p>
+        <h2 style="font-size:19px;margin:42px 0 8px;font-family:var(--font-mono);font-weight:600">bars</h2>
+        <p style="color:var(--mut);font-size:14px">OHLCV. <code style="font-size:12px">grain="tick"</code> gives close and volume per tick; <code style="font-size:12px">grain="day"</code> gives open, high, low, close and volume per bar.</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Column</th><th>Type</th><th></th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">day</td><td style="font-family:var(--font-mono);font-size:12.5px">uint32</td><td>Day index.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">tick</td><td style="font-family:var(--font-mono);font-size:12.5px">uint32</td><td>Tick index. A tick is a minute, and there are 390 in a day. Tick grain only.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">bar</td><td style="font-family:var(--font-mono);font-size:12.5px">uint32</td><td>Bar index within the day. Day grain only.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">instrument_id</td><td style="font-family:var(--font-mono);font-size:12.5px">uint32</td><td>Roster index.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">open · high · low</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>Day grain only.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">close</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>What the book actually settled.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">volume</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>Shares.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px;font-family:var(--font-mono);font-weight:600">truth</h2>
+        <p style="color:var(--mut);font-size:14px">The answer key. Three levels plus the seven factor contributions.</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Column</th><th>Type</th><th></th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">day · tick · instrument_id</td><td style="font-family:var(--font-mono);font-size:12.5px">uint32</td><td>Keys.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">mispricing_s</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>Log gap between price and fair value.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">fundamental_value</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>What the company is worth: earnings, growth, the sector anchor, rates. No mispricing in it.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">anchor_price</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td><code style="font-size:12px">fundamental_value * exp(mispricing_s)</code>: the price the model wanted before the book touched it. So <code style="font-size:12px">close - anchor_price</code> isolates microstructure, and <code style="font-size:12px">mispricing_s</code> isolates the valuation gap.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">reversion · momentum · crowd_lean · company_news · order_flow_impact · short_squeeze_effect · random_noise</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>The <a href="factors.html">seven factors</a>, in this order. They sum to the change in <code style="font-size:12px">mispricing_s</code>.</td></tr>
+          </tbody>
+        </table></div>
+        <p style="color:var(--mut);font-size:14px">A name that did not tick has zeros across the seven and keeps its last two level values, because a valuation does not disappear when trading is quiet.</p>
+        <h2 style="font-size:19px;margin:42px 0 8px;font-family:var(--font-mono);font-weight:600">macro</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Column</th><th>Type</th><th></th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">day</td><td style="font-family:var(--font-mono);font-size:12.5px">uint32</td><td>Day index. The row carries the values the day traded under; the close then advances the chain.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">vix</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>Takes a new value every day.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">federal_funds_rate</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>Fractional: 0.025 is 2.5%. Steps at the central bank's meeting calendar.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">corporate_bond_yield</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>What equities discount off.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">inflation_rate · unemployment_rate · gdp_growth</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>The Taylor/Phillips/Okun loop's state.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">qe_pe_boost</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>Valuation support from policy.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">fear_greed_index</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>Sentiment level.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">universe_stress</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>Remembered stress. Ratchets up on a shock and decays over weeks, which is what keeps correlation elevated after an event.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px;font-family:var(--font-mono);font-weight:600">fills</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Column</th><th>Type</th><th></th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">day · step · tick · instrument_id</td><td style="font-family:var(--font-mono);font-size:12.5px">uint32</td><td>When and what. <code style="font-size:12px">step</code> is the run-wide decision index.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">quantity</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>Shares. Signed.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">price</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>Average fill price.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">worst_price</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>The worst level you reached. The distance from <code style="font-size:12px">price</code> is how far you walked the book.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">notional</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>Traded value.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:19px;margin:42px 0 8px;font-family:var(--font-mono);font-weight:600">book</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Column</th><th>Type</th><th></th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">day · tick · instrument_id</td><td style="font-family:var(--font-mono);font-size:12.5px">uint32</td><td>Keys.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">side</td><td style="font-family:var(--font-mono);font-size:12.5px">uint32</td><td>Bid or ask.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">level</td><td style="font-family:var(--font-mono);font-size:12.5px">uint32</td><td>Depth index from the touch.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">price · size</td><td style="font-family:var(--font-mono);font-size:12.5px">float64</td><td>The resting quote.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:21px;margin:46px 0 10px">Granularities</h2>
+        <p style="color:var(--mut);font-size:14px"><code style="font-size:12px">bars(grain=)</code> takes <code style="font-size:12px">"tick"</code> or <code style="font-size:12px">"day"</code>. Both also accept a <code style="font-size:12px">day=</code> filter, and tick grain accepts <code style="font-size:12px">minutes=</code> to aggregate into bars of that many minutes, which is where intraday grains come from.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">The Twelve Sectors</h2>
+        <p style="color:var(--mut);font-size:14px"><code style="font-size:12px">Universe.random</code> places exactly five names in each, and you pass the key rather than the display name, with a typo refused rather than quietly routed to a generic default. Anchor P/E and daily sigma are what the sector contributes to valuation and to volatility.</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Key</th><th>Name</th><th style="text-align:right">Anchor P/E</th><th style="text-align:right">Vol</th><th style="text-align:right">Daily sigma</th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">technology</td><td>Technology</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">32.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">1.2</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.025</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">financial_services</td><td>Financial Services</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">12.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">1.1</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.015</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">healthcare</td><td>Healthcare</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">24.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.9</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.018</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">energy</td><td>Energy</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">10.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">1.3</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.015</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">consumer_discretionary</td><td>Consumer Discretionary</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">20.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">1</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.018</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">consumer_staples</td><td>Consumer Staples</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">20.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.7</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.008</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">industrials</td><td>Industrials</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">17.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">1</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.015</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">materials</td><td>Materials</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">14.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">1.2</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.015</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">real_estate</td><td>Real Estate</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">35.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.9</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.008</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">utilities</td><td>Utilities</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">16.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.6</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.008</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">telecommunications</td><td>Telecommunications</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">14.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.8</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.01</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">transportation</td><td>Transportation</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">15.0</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">1.1</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0.015</td></tr>
+          </tbody>
+        </table></div>
+        <p style="color:var(--mut);font-size:14px">Gap 6 turns on this table: a perfectly balanced roster is what the realism numbers were measured on, and no real index looks like that.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Instrument</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Field</th><th></th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">ticker · sector</td><td>Name, and one of the twelve keys above.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">initial_price</td><td>Day-zero price.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">shares_outstanding</td><td>Share count. With price, this gives <code style="font-size:12px">market_cap</code>.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">eps</td><td>Earnings per share, or None for a loss-maker, which is then valued off book value and never reprices on rates.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">book_value_per_share</td><td>Balance-sheet value per share.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">revenue_growth</td><td>Growth rate, fractional.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">avg_volume</td><td>Average daily volume. Held fixed through a run, and what participation is measured against.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">beta</td><td>Loading on the shared market factor.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">short_interest</td><td>A <strong>share count</strong>, not a fraction. Values strictly between 0 and 1 are refused for a company with a real share count, because that is what a fraction looks like and the mistake is otherwise silent.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">market_cap</td><td>Derived, read-only.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:21px;margin:46px 0 10px">Macro</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Field</th><th></th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">vix</td><td>Volatility level. Drives factor variance, spreads, correlation and credit spreads.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">federal_funds_rate</td><td>Policy rate, fractional. Moves prices only at a meeting.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">corporate_bond_yield</td><td>What equities discount off. None derives it from the policy rate and the spread.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">inflation_rate</td><td>Fractional.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">qe_pe_boost</td><td>Policy support for valuations.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">fear_greed_index</td><td>Sentiment, 0 to 100.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">cycle</td><td>Business-cycle phase: expansion, peak, contraction, trough or recovery.</td></tr>
+          </tbody>
+        </table></div>
+        <h2 style="font-size:21px;margin:46px 0 10px">StrategySpec Grammar</h2>
+        <p style="color:var(--mut);font-size:14px">A spec is a JSON document and <code style="font-size:12px">SPEC_VERSION</code> is currently 1. Adding a signal kind or a cadence extends the grammar without changing what existing specs mean, whereas changing what an existing kind ranks would be a new version.</p>
+        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
+            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">JSON</span>
+            
+          </div>
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">{
+  "spec_version": 1,
+  "signal":    {"kind": "momentum", "lookback_days": 1.0},
+  "portfolio": {"top_k": 5, "gross": 1.0},
+  "execution": {"max_participation": 0.02},
+  "cadence":   "step"
+}</code></pre>
+        </div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Field</th><th></th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">signal.kind</td><td>One of <code style="font-size:12px">hold</code>, <code style="font-size:12px">random</code>, <code style="font-size:12px">momentum</code>, <code style="font-size:12px">mean_reversion</code>, <code style="font-size:12px">oracle</code>, <code style="font-size:12px">blend</code>.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">signal.lookback_days</td><td>On <code style="font-size:12px">momentum</code> and <code style="font-size:12px">mean_reversion</code>. Days only, never steps, because a step is a harness artifact. Default 1.0.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">signal.components</td><td>On <code style="font-size:12px">blend</code>: a list of <code style="font-size:12px">{kind, weight, lookback_days?}</code>. Blendable kinds are random, momentum, mean_reversion and oracle. Ranks combine first, then <code style="font-size:12px">top_k</code> selects from the blended ranking.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">portfolio.top_k</td><td>How many names to hold. Applies to the ranked kinds only. Default 5.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">portfolio.gross</td><td>Gross exposure. Default 1.0, or 0.5 for <code style="font-size:12px">random</code>.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">execution.max_participation</td><td>Cap on any order as a fraction of average daily volume. Default 0.02, or 0.05 for <code style="font-size:12px">hold</code>.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">cadence</td><td><code style="font-size:12px">"step"</code> re-decides at every decision point; <code style="font-size:12px">"daily"</code> only at each day's first step. <code style="font-size:12px">hold</code> must be <code style="font-size:12px">"step"</code>.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">seed</td><td>Required when the signal contains <code style="font-size:12px">random</code>, and refused otherwise.</td></tr>
+          </tbody>
+        </table></div>
+        <p><code style="font-size:13px">oracle</code> is privileged: it reads the true mispricing. It declares itself as such, which is why it is a reference rather than a competitor.</p>
+        <p>What the grammar cannot express: path dependence, conditional logic ("go flat if drawdown exceeds X"), custom signals, and anything reading engine internals except the oracle. Those need <a href="agents.html">a Python agent</a>, and such a result is reproducible by citing code at a commit rather than by a fingerprint.</p>
+        <h2 style="font-size:21px;margin:46px 0 10px">Exceptions</h2>
+        <p style="color:var(--mut);font-size:14px">Nearly everything raises <code style="font-size:12px">pt.ValidationError</code>, with a message naming the specific thing that was wrong. These are the refusals worth knowing about in advance.</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Where</th><th>What it refuses</th></tr></thead>
+          <tbody style="font-size:13.5px">
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">envelope.check</td><td>A statistic name that is not a key of <code style="font-size:12px">facts.REAL_MARKETS</code>. A silently dropped name would be a silently granted certification.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">envelope.intervals</td><td>Fewer than two panels. A spread over one observation is not a spread.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">atlas.axes_for</td><td>A parameter that ships at zero and has no explicit range; a <code style="font-size:12px">ranges</code> or <code style="font-size:12px">log</code> key not in <code style="font-size:12px">names</code>; a duplicated name. It warns, rather than refusing, when a range excludes the preset's own value.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">atlas.plan</td><td>Fewer than 8 samples.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">Survey.sensitivity</td><td>Fewer than 8 usable rows, or an output no row measured.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">Survey.profile</td><td>Fewer than three rows per bin.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">Survey.attribution</td><td>A vector value outside the surveyed range (extrapolation), a parameter set on one side only, or a parameter that was not surveyed.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">Survey.confirm</td><td>Any seed shared with the survey or between blocks, and a survey with no seed record at all. An empty list is the absence of a record wearing the key.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">ModelParams.from_preset</td><td>An override of a compile-time constant, by name. Accepting one the engine would ignore would make the fingerprint a lie.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">Scenario</td><td>Chaining a shape constructor onto a built scenario; a <code style="font-size:12px">compare()</code> baseline that realises the same path as the scenario.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">RunManifest.reproduce</td><td>A build whose arithmetic does not match the manifest's. It names the culprit rather than replaying a different market.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">Checkpoint restore</td><td>A pre-split snapshot with three RNG numbers instead of nine, naming the era. It cannot be continued bit-exactly.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">Instrument</td><td>A <code style="font-size:12px">short_interest</code> between 0 and 1 on a real share count, and an unknown sector key.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">loss.band_distance_loss</td><td>A missing or zero noise scale. An unweighted sum is a choice, and it will not make it by accident.</td></tr>
+          </tbody>
+        </table></div>
+</main>
+</div>
+<footer class="site"><div class="layout" style="display:block">
+pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
+</div></footer>
+</body>
+</html>
