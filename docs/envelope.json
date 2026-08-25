@@ -1,161 +1,170 @@
 {
+ "preset": "pt-v3",
  "certified_horizon_days": 252,
+ "statistics": {
+  "annualised_vol_pct": {
+   "measured": 24.0972,
+   "band": [
+    15.0,
+    36.0
+   ],
+   "in_band": true
+  },
+  "excess_kurtosis": {
+   "measured": 2.5305,
+   "band": [
+    1.6,
+    41.0
+   ],
+   "in_band": true
+  },
+  "return_acf1": {
+   "measured": 0.0375,
+   "band": [
+    -0.08,
+    0.06
+   ],
+   "in_band": true
+  },
+  "abs_return_acf1": {
+   "measured": 0.1413,
+   "band": [
+    0.02,
+    0.22
+   ],
+   "in_band": true
+  },
+  "abs_return_acf5": {
+   "measured": 0.0496,
+   "band": [
+    0.02,
+    0.09
+   ],
+   "in_band": true
+  },
+  "abs_return_acf20": {
+   "measured": 0.0082,
+   "band": [
+    -0.04,
+    0.08
+   ],
+   "in_band": true
+  },
+  "cross_sectional_corr": {
+   "measured": 0.2558,
+   "band": [
+    0.08,
+    0.56
+   ],
+   "in_band": true
+  },
+  "volume_abs_return_corr": {
+   "measured": 0.5339,
+   "band": [
+    0.46,
+    0.66
+   ],
+   "in_band": true
+  },
+  "leverage_effect": {
+   "measured": -0.0349,
+   "band": [
+    -0.16,
+    0.0
+   ],
+   "in_band": true
+  },
+  "volume_change_acf1": {
+   "measured": -0.4598,
+   "band": [
+    -0.32,
+    -0.2
+   ],
+   "in_band": false
+  }
+ },
  "gaps": [
   {
-   "beyond_days": null,
-   "closed_by": [],
+   "id": "volume-change",
+   "summary": "volume-change autocorrelation is structurally unreachable",
    "detail": "-0.4598 against a band of -0.32 to -0.20, 13.7 seed-sd out. A held volume level plus independent per-tick noise sits near -0.5 at any coefficients, so no parameter reaches this row. It is excluded from the calibration objective deliberately: an optimiser pointed at an unreachable target does not fail cleanly, it distorts every other parameter chasing it.",
    "forbids": "strategies trading the day-to-day CHANGE in volume",
-   "id": "volume-change",
    "statistics": [
     "volume_change_acf1"
    ],
-   "summary": "volume-change autocorrelation is structurally unreachable"
+   "beyond_days": null,
+   "closed_by": []
   },
   {
-   "beyond_days": 252,
-   "closed_by": [],
-   "detail": "Against bands re-derived at the matching window, the model holds 5 of 10 at 504 days. Clustering roughly doubles from 252 to 504 and keeps climbing, where real markets move about 14% over the same span. Volatility itself stabilises near 29.3%, so long runs do not drift or blow up -- they stay plausible in LEVEL and become unrealistic in DYNAMICS, which is easy to miss by looking only at the price path. That count is measured on the shipped preset. pt-v6, selectable and not certified, holds 8 of 10 at 504 days and 9 of 10 at the certified horizon.",
-   "forbids": "multi-year backtests, and anything keyed on volatility dynamics beyond one year",
    "id": "horizon",
+   "summary": "the certified horizon is 252 days",
+   "detail": "Against bands re-derived at the matching window, the model holds 5 of 10 at 504 days. Clustering roughly doubles from 252 to 504 and keeps climbing, where real markets move about 14% over the same span. Volatility itself stabilises near 29.3%, so long runs do not drift or blow up -- they stay plausible in LEVEL and become unrealistic in DYNAMICS, which is easy to miss by looking only at the price path. That count is measured on the shipped preset. pt-v6, selectable and not certified, holds 8 of 10 at 504 days and 9 of 10 at the certified horizon.\n\npt-v6 buys that at a cost in SCENARIO response, which the band counts do not show and which lands on exactly the long-dated crisis work it is otherwise the right choice for. Measured over thirty seeds with tools/calibration/scenario_response.py, the steady-state volatility lever from VIX 5 to VIX 65 reads 3.07x on pt-v3 and 2.68x on pt-v6, against real markets' 6.16x. So a sustained crisis is about an eighth less violent under pt-v6 than under the default, and a scenario study turning on crisis MAGNITUDE should prefer pt-v3 even over multi-year windows, or say that it accepted the weaker response.\n\nTwo things that reading invites and the measurements do not support. The cost is NOT pt-v6's to answer for: the lever runs 3.07x at pt-v3, 2.67x at pt-v4, 2.69x at pt-v5 and 2.68x at pt-v6, so it was spent when jumps arrived at pt-v4 and every preset since has inherited it. And the harness's 'shock response retained' percentage should not be quoted for this: it divides two small excesses over 1.0, so shock ratios of 1.062 and 1.038 become a headline gap of 27.6% against 16.7%. The transient difference between the two presets is real and it is 0.024, not eleven points.",
+   "forbids": "multi-year backtests, and anything keyed on volatility dynamics beyond one year",
    "statistics": [
     "abs_return_acf1",
     "abs_return_acf5",
     "return_acf1",
     "excess_kurtosis"
    ],
-   "summary": "the certified horizon is 252 days"
+   "beyond_days": 252,
+   "closed_by": []
   },
   {
-   "beyond_days": null,
-   "closed_by": [],
+   "id": "decay-shape",
+   "summary": "volatility memory decays exponentially, not hyperbolically",
    "detail": "Log-log slope over lags 1-20 is -0.953 against real markets' -0.436, about 2.2x steeper, and the curve turns NEGATIVE by lag 30 where real markets remain weakly positive to lag 60. This is a mechanism gap, not a calibration one: the process is built from exponentials, and over one year two of them fake a power law well enough that no panel statistic objects. A two-component mixture was tried and is not sufficient.",
    "forbids": "strategies whose edge depends on volatility memory beyond about lag 20 -- vol targeting and risk parity on a one-month or longer estimate",
-   "id": "decay-shape",
    "statistics": [
     "abs_return_acf20"
    ],
-   "summary": "volatility memory decays exponentially, not hyperbolically"
+   "beyond_days": null,
+   "closed_by": []
   },
   {
+   "id": "thin-tails",
+   "summary": "tails are too thin over multi-year windows",
+   "detail": "Excess kurtosis reads 5.23 at 504 days against a horizon-matched band of 7.1 to 22. The 252-day band's floor of 1.6 is wide enough that this reads as comfortably in band on every 252-day certificate, which is why it went unnoticed: nothing was measuring kurtosis where it fails.",
+   "forbids": "tail-risk or VaR calibration at multi-year horizons",
+   "statistics": [
+    "excess_kurtosis"
+   ],
    "beyond_days": 252,
    "closed_by": [
     "pt-v4",
     "pt-v5",
     "pt-v6"
-   ],
-   "detail": "Excess kurtosis reads 5.23 at 504 days against a horizon-matched band of 7.1 to 22. The 252-day band's floor of 1.6 is wide enough that this reads as comfortably in band on every 252-day certificate, which is why it went unnoticed: nothing was measuring kurtosis where it fails.",
-   "forbids": "tail-risk or VaR calibration at multi-year horizons",
-   "id": "thin-tails",
-   "statistics": [
-    "excess_kurtosis"
-   ],
-   "summary": "tails are too thin over multi-year windows"
+   ]
   },
   {
-   "beyond_days": null,
-   "closed_by": [],
-   "detail": "The VIX shock response is materially weaker than the previous preset's. The direction of response is right; the magnitude is not certified.",
-   "forbids": "sizing a scenario's impact rather than detecting it",
    "id": "scenario-magnitude",
+   "summary": "scenario response is directional, not calibrated",
+   "detail": "The VIX shock response is materially weaker than the previous preset's. The direction of response is right; the magnitude is not certified.\n\n'Direction is right' is measured rather than asserted. Driving the real 2020-21 macro path through the model and correlating daily returns against each driver, over 504 sessions, against the same correlations computed on real AAPL over the same window:\n  return vs change in VIX             -0.423 (real -0.622)\n  return vs change in credit yield    -0.496 (real -0.592)\n  return vs change in valuation       +0.573 (real +0.803)\n  absolute return vs VIX level        +0.512 (real +0.489)\n\nAll four carry the sign theory fixes in advance, and the volatility-clustering channel is close to exact. The three DIRECTIONAL channels run at roughly seventy to eighty-five percent of the real response, which is this gap seen from another angle: a shock moves this market the right way and not far enough. An event study over the five sessions after each of six dated 2020-21 events agrees on sign five times out of six. The exception is the Fed's intermeeting cut of 3 March 2020, where an announcement-effect channel is absent rather than miscalibrated; see examples/09-a-pandemic-shaped-market.ipynb.",
+   "forbids": "sizing a scenario's impact rather than detecting it",
    "statistics": [],
-   "summary": "scenario response is directional, not calibrated"
+   "beyond_days": null,
+   "closed_by": []
   },
   {
+   "id": "macro-range",
+   "summary": "the endogenous macro state cannot reach its own crisis regimes",
+   "detail": "Left to itself the economy stays in a moderate band, and two consequences follow that are easy to mistake for defects.\n\nINFLATION. Measured over five seeds and five years, endogenous inflation peaks at 4.06% to 4.11%. The hard clamp is 6.0% and US CPI reached 9.1% in June 2022, so the ceiling is the dynamics rather than the clamp. The obvious explanation is wrong and is worth stating so nobody starts there: `inflation_mean_rev_coeff` is 0.55 a month, which looks like it should pin inflation to its 2% target, but the monthly series has AR(1) +0.936 against +0.894 for real CPI year-on-year across 2020-21. The model's inflation is if anything MORE persistent than the real thing. The gap is dispersion: sd 1.23 around a mean of 1.99%, so 9% is a 4.6 sigma excursion and never happens.\n\nTHE CENTRAL BANK'S CRISIS CADENCE. The bank pulls its next meeting in to 21-30 days when a decision leaves it more than 2pp behind an inflation rate above 4%. That path is correct and well exercised, firing in 22.0% of the 11,898 central-bank cases in the parity corpus, but a default run cannot reach it because inflation does not get there. It also fires in STAGFLATION rather than in high inflation as such: at inflation 4.5% with unemployment 9.0% the bank cuts for the output gap and leaves itself further behind, so pinning inflation high with unemployment low will not trigger it however high you pin it.\n\nSo a 2022-style inflation shock has to be driven through a scenario. It will not arise on its own, and neither will the policy response to it.",
+   "forbids": "studying inflation regimes or policy crises from the endogenous economy alone",
+   "statistics": [],
    "beyond_days": null,
-   "closed_by": [],
+   "closed_by": []
+  },
+  {
+   "id": "roster-concentration",
+   "summary": "certification was measured on a sector-balanced roster",
    "detail": "`Universe.random()` places exactly five names in each of twelve sectors, and no real index is balanced that way -- the S&P is roughly a third technology and the Nasdaq more so. Varying ONLY sector composition, with every name drawn from one pool: balanced holds 9/10 at L_real 0.0000; an S&P-like mix holds 8/10 at 0.0176, losing abs_return_acf5; an all-technology roster holds 7/10 and runs 32.8% volatility. So part of the certification is an artifact of that balance, and the more concentrated the roster, the less of it transfers.",
    "forbids": "inheriting this envelope for a sector-concentrated roster -- re-measure the panel on your own universe instead",
-   "id": "roster-concentration",
    "statistics": [
     "abs_return_acf5",
     "return_acf1",
     "annualised_vol_pct"
    ],
-   "summary": "certification was measured on a sector-balanced roster"
+   "beyond_days": null,
+   "closed_by": []
   }
- ],
- "preset": "pt-v3",
- "statistics": {
-  "abs_return_acf1": {
-   "band": [
-    0.02,
-    0.22
-   ],
-   "in_band": true,
-   "measured": 0.1413
-  },
-  "abs_return_acf20": {
-   "band": [
-    -0.04,
-    0.08
-   ],
-   "in_band": true,
-   "measured": 0.0082
-  },
-  "abs_return_acf5": {
-   "band": [
-    0.02,
-    0.09
-   ],
-   "in_band": true,
-   "measured": 0.0496
-  },
-  "annualised_vol_pct": {
-   "band": [
-    15.0,
-    36.0
-   ],
-   "in_band": true,
-   "measured": 24.0972
-  },
-  "cross_sectional_corr": {
-   "band": [
-    0.08,
-    0.56
-   ],
-   "in_band": true,
-   "measured": 0.2558
-  },
-  "excess_kurtosis": {
-   "band": [
-    1.6,
-    41.0
-   ],
-   "in_band": true,
-   "measured": 2.5305
-  },
-  "leverage_effect": {
-   "band": [
-    -0.16,
-    0.0
-   ],
-   "in_band": true,
-   "measured": -0.0349
-  },
-  "return_acf1": {
-   "band": [
-    -0.08,
-    0.06
-   ],
-   "in_band": true,
-   "measured": 0.0375
-  },
-  "volume_abs_return_corr": {
-   "band": [
-    0.46,
-    0.66
-   ],
-   "in_band": true,
-   "measured": 0.5339
-  },
-  "volume_change_acf1": {
-   "band": [
-    -0.32,
-    -0.2
-   ],
-   "in_band": false,
-   "measured": -0.4598
-  }
- }
+ ]
 }

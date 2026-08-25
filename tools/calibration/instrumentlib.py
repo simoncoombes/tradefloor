@@ -185,6 +185,9 @@ PARAM_SPECS: dict[str, dict] = {
     # the clamp on every large name.
     "garch_beta_dispersion": {"kind": "abs", "step_unit": 0.02,
                               "hard_range": (0.0, 0.15)},
+    # A blend weight over its whole domain; 0.1 steps span it in ten.
+    "fair_value_book_floor": {"kind": "abs", "step_unit": 0.1,
+                              "hard_range": (0.0, 1.0)},
     "volume_persistence": {"kind": "abs", "step_unit": 0.05,
                            "hard_range": (0.0, 0.99)},
     "volume_innovation_sigma": {"kind": "abs", "step_unit": 0.05,

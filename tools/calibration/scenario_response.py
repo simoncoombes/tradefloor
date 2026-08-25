@@ -291,9 +291,21 @@ def main() -> int:
     print()
     print(f"vol lever retained: "
           f"{v['vol_lever'] / r['vol_lever']:.1%} of reference")
-    print(f"shock response retained: "
-          f"{(v['shock_ratio_median'] - 1) / (r['shock_ratio_median'] - 1):.1%} "
-          f"of reference")
+    # NOT printed as a bare percentage, deliberately. It divides two small
+    # excesses over 1.0, so a difference of 0.024 in the shock ratio becomes an
+    # eleven-point headline, and it has been quoted that way twice: once as a
+    # 112.1% "gain" (CALIBRATION-FOLLOWUPS §39) and once as pt-v6 retaining
+    # 16.7% against pt-v3's 27.6% (2026-08-25). Both were a real number quoted
+    # at a resolution it does not have. Printing the excesses it is built from
+    # makes the smallness visible where it is read.
+    v_ex = v["shock_ratio_median"] - 1.0
+    r_ex = r["shock_ratio_median"] - 1.0
+    print(f"shock response: {v_ex:+.1%} above flat, reference {r_ex:+.1%}")
+    if abs(r_ex) > 1e-9:
+        print(f"  their ratio is {v_ex / r_ex:.1%}, and quoting that bare "
+              "overstates a small gap.")
+        print(f"  quote the shock ratios: {v['shock_ratio_median']:.3f}x "
+              f"against {r['shock_ratio_median']:.3f}x.")
     print("\nNo pass/fail: thresholds are the owner's to fix BEFORE this "
           "becomes a gate (CALIBRATION-PTV2.md §10.1).")
 

@@ -185,6 +185,11 @@ PERTURBATIONS = [
     # trajectory on its own: unlike the jump parameters it needs no
     # occurrence, only a roster with more than one market cap in it.
     ("garch_beta_dispersion", 0.05, True),
+    # The book floor extended to profitable companies. Live immediately and
+    # not subtly: 42.8% of instruments from `Universe.random` have
+    # `eps * pe` below `book * 1.2`, so at 1.0 a large part of any universe
+    # is re-valued on the first tick.
+    ("fair_value_book_floor", 1.0, True),
     # The persistent volume component (pt-v4). The innovation is live alone:
     # even at zero persistence it injects a fresh multiplier each day, and
     # that reaches volume on the next tick. Persistence is NOT, because at a

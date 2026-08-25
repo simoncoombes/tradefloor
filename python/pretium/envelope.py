@@ -273,6 +273,40 @@ GAPS: tuple[Gap, ...] = (
         forbids="sizing a scenario's impact rather than detecting it",
     ),
     Gap(
+        id="macro-range",
+        summary="the endogenous macro state cannot reach its own crisis regimes",
+        detail=(
+            "Left to itself the economy stays in a moderate band, and two "
+            "consequences follow that are easy to mistake for defects.\n\n"
+            "INFLATION. Measured over five seeds and five years, endogenous "
+            "inflation peaks at 4.06% to 4.11%. The hard clamp is 6.0% and US "
+            "CPI reached 9.1% in June 2022, so the ceiling is the dynamics "
+            "rather than the clamp. The obvious explanation is wrong and is "
+            "worth stating so nobody starts there: `inflation_mean_rev_coeff` "
+            "is 0.55 a month, which looks like it should pin inflation to its "
+            "2% target, but the monthly series has AR(1) +0.936 against "
+            "+0.894 for real CPI year-on-year across 2020-21. The model's "
+            "inflation is if anything MORE persistent than the real thing. "
+            "The gap is dispersion: sd 1.23 around a mean of 1.99%, so 9% is "
+            "a 4.6 sigma excursion and never happens.\n\n"
+            "THE CENTRAL BANK'S CRISIS CADENCE. The bank pulls its next "
+            "meeting in to 21-30 days when a decision leaves it more than 2pp "
+            "behind an inflation rate above 4%. That path is correct and "
+            "well exercised, firing in 22.0% of the 11,898 central-bank cases "
+            "in the parity corpus, but a default run cannot reach it because "
+            "inflation does not get there. It also fires in STAGFLATION "
+            "rather than in high inflation as such: at inflation 4.5% with "
+            "unemployment 9.0% the bank cuts for the output gap and leaves "
+            "itself further behind, so pinning inflation high with "
+            "unemployment low will not trigger it however high you pin it.\n\n"
+            "So a 2022-style inflation shock has to be driven through a "
+            "scenario. It will not arise on its own, and neither will the "
+            "policy response to it."
+        ),
+        forbids="studying inflation regimes or policy crises from the endogenous economy alone",
+        statistics=(),
+    ),
+    Gap(
         id="roster-concentration",
         summary="certification was measured on a sector-balanced roster",
         detail=(

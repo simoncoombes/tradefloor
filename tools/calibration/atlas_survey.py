@@ -162,6 +162,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # multiplicative box exists; the range is the headroom to the GJR
     # persistence ceiling.
     "garch_beta_dispersion": (0.0, 0.15),
+    # Fraction of the loss-maker book floor applied to profitable companies.
+    # A blend weight, so the range is the whole domain by definition. 1.0 is
+    # the monotonic valuation; anything between is a partial floor.
+    "fair_value_book_floor": (0.0, 1.0),
     # News peer transfer: weights of a peer's surprise, natural unit range.
     "news_peer_weight": (0.0, 1.0),
     "news_peer_weight_down": (0.0, 1.0),
