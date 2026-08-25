@@ -26,10 +26,14 @@ cat > /home/ec2-user/stream.sh <<'STREAM'
 BUCKET="$1"
 while true; do
   sleep 300
+  # The log upload is NOT gated on the work directory existing. Gating it
+  # there cost the first streamed run its visibility for the whole build:
+  # out/ is created after maturin finishes, so a failure during provisioning
+  # uploaded nothing at all and looked identical to a slow build.
+  aws s3 cp /var/log/pretium-run.log "$BUCKET/run.log" || true
   if [ -d /home/ec2-user/out ]; then
     aws s3 sync /home/ec2-user/out "$BUCKET/partial/" \
       --exclude "*" --include "tasks.jsonl" --include "meta.json" || true
-    aws s3 cp /var/log/pretium-run.log "$BUCKET/run.log" || true
   fi
 done
 STREAM
