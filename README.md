@@ -100,7 +100,12 @@ fourteen statistics against real-market bands. At 252 days the shipped `pt-v3`
 preset holds twelve of the fourteen in band, and holds the original eleven on
 axes the calibration never saw: fresh seeds, and a fresh 60-name universe. The
 two it misses are both stated as gaps: volume shocks do not persist, and names in
-the same sector do not co-move more than names in different ones.
+the same sector do not co-move more than names in different ones. Two further
+presets close those on their own terms and are selectable by name, never the
+default: `pt-v7` gives the market industries that survive a crisis, and
+`pt-v8` gives the market factor's variance a memory, so correlation that rose
+last month is still elevated this month and a crisis is a third more violent.
+Every earlier preset keeps reproducing bit for bit.
 
 The tenth is the autocorrelation of volume changes, which misses by 13.7
 seed-standard-deviations. It's excluded from the calibration objective

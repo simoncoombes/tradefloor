@@ -639,6 +639,8 @@ pub const PT_V5: ModelParams = ModelParams::pt_v5();
 pub const PT_V6: ModelParams = ModelParams::pt_v6();
 /// pt-v6 with sector structure that survives a crisis -- see [`ModelParams::pt_v7`].
 pub const PT_V7: ModelParams = ModelParams::pt_v7();
+/// pt-v7 with the market factor's variance given a memory -- see [`ModelParams::pt_v8`].
+pub const PT_V8: ModelParams = ModelParams::pt_v8();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -975,6 +977,45 @@ impl ModelParams {
         p
     }
 
+    /// pt-v7 with the market factor's variance given a memory: the first
+    /// preset in which correlation that rose last month is still elevated
+    /// this month, and the most violent crisis the model has produced.
+    ///
+    /// Seven coefficients move from pt-v7 (CALIBRATION-FOLLOWUPS.md §64).
+    /// The factor GARCH runs alpha 0.298 / beta 0.665 (persistence 0.963,
+    /// alpha share 0.31) in place of pt-v7's 0.468 / 0.521, whose fourth
+    /// moment did not exist and whose variance therefore had no window-to-
+    /// window memory although the VIX it targets has. pt-v8's index
+    /// 3a^2 + 2ab + b^2 is 1.11 against 1.42: closer, still above one, so the
+    /// gain below is measured rather than implied by the moment condition. `market_factor_sigma`
+    /// falls to 0.0088 and `idio_sigma_scale` to 0.653 to re-set the levels
+    /// the old alpha was holding; the market jumps and sector sigma move
+    /// within noise of pt-v7's and are carried at the surveyed values.
+    ///
+    /// MEASURED, thirty training seeds, fourteen statistics: thirteen of
+    /// fourteen at 504 days (volume_change_acf1 out) with correlation
+    /// persistence +0.315 against a real band of 0.19 to 0.49 and pt-v7's
+    /// +0.251; twelve of fourteen at 252 (abs_return_acf5 a quarter of a
+    /// noise unit under its floor, priced by the survey on every qualifying
+    /// vector). Crisis lever 4.34x against pt-v7's 3.31x (real 6.16x),
+    /// correlation blend 3.16x, shock response 1.083, VIX 5 volatility 24.5
+    /// against 28.4. Held-out universe 13/14, held-out seeds 11/14, §8 no
+    /// flips. Cost stated: crisis-state sector excess +0.053 against pt-v7's
+    /// +0.079 (real +0.10).
+    ///
+    /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3.
+    pub const fn pt_v8() -> ModelParams {
+        let mut p = ModelParams::pt_v7();
+        p.market_factor_sigma = 0.008829098749522557;
+        p.market_vol_alpha = 0.2983752950979363;
+        p.market_vol_beta = 0.6647431226131493;
+        p.idio_sigma_scale = 0.6525931444846045;
+        p.jump_intensity_market = 0.07195215610657195;
+        p.jump_sigma_market = 0.0028601822465565054;
+        p.sector_factor_sigma = 0.011863939388471967;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -996,13 +1037,14 @@ impl ModelParams {
             "pt-v5" => Some(PT_V5),
             "pt-v6" => Some(PT_V6),
             "pt-v7" => Some(PT_V7),
+            "pt-v8" => Some(PT_V8),
             _ => None,
         }
     }
 
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
-        &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7"]
+        &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -1422,7 +1464,9 @@ mod tests {
         // Re-armed on the next unreleased name. A preset that answers to a
         // name it does not have is how a vector nobody calibrated presents
         // as a shipped one.
-        assert!(ModelParams::preset("pt-v8").is_none());
+        assert_eq!(PT_V8.fingerprint(), "pt-v8");
+        assert_eq!(ModelParams::preset("pt-v8").unwrap().fingerprint(), "pt-v8");
+        assert!(ModelParams::preset("pt-v9").is_none());
 
         // Adding a preset must not disturb an existing one. The fingerprint
         // is taken over the PARAMETERS, not the table, so this holds by

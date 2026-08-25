@@ -168,5 +168,5 @@ every published result that cited it. Coefficient changes therefore arrive as
 a **new model preset**, never as an edit to an existing one, and old presets
 keep running exactly as they did.
 
-That is why `pt-v1` through `pt-v6` all still exist and reproduce, and why a
+That is why `pt-v1` through `pt-v8` all still exist and reproduce, and why a
 patch release can carry a new preset without being a breaking change.

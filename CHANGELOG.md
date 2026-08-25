@@ -66,6 +66,29 @@ correlation-type statistic, so it sits outside the objective; the atlas survey r
 horizon beside the thirteen. The certified count is now twelve of fourteen
 at 252 days and seven of fourteen at 504. Calibration record §64.
 
+### pt-v8: the first preset whose correlation has a memory
+
+pt-v7 with seven coefficients moved, selectable by name and not the
+default. The market factor's GARCH runs alpha 0.298 / beta 0.665 in place
+of 0.468 / 0.521: the shipped process had no fourth moment (3a^2 + 2ab +
+b^2 = 1.42) and its variance had almost no window-to-window memory although
+the VIX it targets has, and in this model window correlation is that
+variance (r = 0.92 within a run). The factor's calm sigma falls 0.0159 to
+0.0088 and `idio_sigma_scale` 0.733 to 0.653 to re-set the levels; market
+jumps and the sector sigma carry the surveyed values. Found by a 3000-vector
+survey on the pt-v7 base and confirmed at thirty seeds: **thirteen of
+fourteen in band at 504 days** with correlation persistence +0.315 (real
+band 0.19 to 0.49; pt-v7 +0.251), twelve of fourteen at 252 (lag-5
+clustering a quarter of a noise unit under its floor, which the survey
+priced on every qualifying vector), held-out universe 13/14, §8 no flips.
+Crisis lever **4.34x** against pt-v7's 3.31x and a real 6.16x; correlation
+blend 3.16x; shock response 1.083; calm-market volatility at VIX 5 down
+from 28.4% to 24.5%. Costs stated: crisis-state sector excess +0.053 against
+pt-v7's +0.079 (real +0.10); on the one-name pandemic replay in notebook 09
+it tracks the VIX better than pt-v7 on every seed tried and is mixed on the
+rest, with a deeper drawdown on the notebook's own seed. pt-v8's fourth-moment index is 1.11,
+still above one: the gain is measured, not derived. Calibration record §64.
+
 ### pt-v7: the first preset with industries
 
 pt-v6 with six coefficients moved, selectable by name and not the default:
@@ -316,6 +339,21 @@ still sets all of them and nothing falls through to the evaluator's pt-v1
 base. Multiplicative boxes around a negative base value, which pt-v6's jump
 mean is, are ordered rather than refused. `tests/test_survey_only.py` pins the
 completion.
+
+**The survey records what it was blind to.** Correlation persistence at both
+horizons and the held VIX 45 state's sector excess and kurtosis are recorded
+per vector, which is how the factor-memory survey could be read for the
+crisis-state cost of every candidate rather than discovering it at the gate.
+`EXPLICIT_RANGES` now applies to the transformed axes too, so a survey can
+sample the market factor's memory where an answer can be instead of across
+the 0.25 to 0.90 of persistence every earlier search had already scored as a
+wreck, and every range must contain the base preset's value.
+
+**`gate_pick.py`** runs every gate a preset has to pass on one candidate in one
+command: thirty-seed panels at both horizons on the fourteen statistics, the
+held VIX 45 state, held-out seeds, a held-out universe, and the response
+instrument against the base. **`read_factor_memory_survey.py`** reads the
+survey for it. pt-v8 is the first preset registered through that path.
 
 **`read_scenario_frontier.py`** is new, and reads the survey for the frontier
 between scenario response and horizon realism.
