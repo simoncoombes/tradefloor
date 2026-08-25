@@ -1,6 +1,6 @@
 """A strategy as data: declarative, versioned, hashable.
 
-Everything else in a run serialises, hashes and round-trips — the seed, the
+Everything else in a run serialises, hashes and round-trips: the seed, the
 universe fingerprint, the model preset, the scenario, the order log. The
 strategy did not. ``evaluate`` takes any object with an ``act`` method, so the
 moment a result depends on an agent it depends on a Python callable that
@@ -8,8 +8,8 @@ cannot be written into a methods section. A reader could re-run your seed and
 get your market, then had no way to get your strategy.
 
 This module closes that gap for the strategies that are already data. The
-shipped baselines share one grammar — a signal, a concentration (``top_k``),
-an exposure (``gross``), and a participation cap — and a
+shipped baselines share one grammar (a signal, a concentration (``top_k``),
+an exposure (``gross``) and a participation cap) and a
 :class:`StrategySpec` writes that grammar down:
 
 ```python
@@ -26,10 +26,10 @@ Three properties, each load-bearing:
 - **It hashes.** :attr:`StrategySpec.fingerprint` is a sha256 over the
   canonical form, so a result can carry its strategy's identity next to its
   seed and universe fingerprint. The canonical form is what makes the hash
-  mean something — see the property's docstring.
+  mean something. See the property's docstring.
 - **It is versioned on semantics.** ``spec_version`` pins what the words
   mean, exactly as the model preset pins the coefficients. If ``momentum``
-  ever changes what it ranks, that is ``spec_version: 2`` — a spec whose
+  ever changes what it ranks, that is ``spec_version: 2``, because a spec whose
   meaning drifts while its version holds would look reproducible while not
   being, which is worse than no spec at all.
 
@@ -39,7 +39,7 @@ Stated plainly, because the limit is the design rather than an omission:
 path dependence (stop losses, drawdown limits, anything reading its own P&L
 history), conditional logic ("momentum in calm markets, reversion in
 stress"), custom signals, and anything reading engine internals except
-``oracle`` — the one privileged signal, which declares itself as such.
+``oracle``, the one privileged signal, which declares itself as such.
 
 The escape hatch stays open: write a Python agent, as now. The cost is that
 the result is not citable as a spec, and the methods section has to cite
@@ -49,13 +49,13 @@ stops this grammar from sprawling into a programming language.
 ## The decisions the design left open, decided here
 
 **Cadence is in the spec.** Trading frequency moves results more than any
-signal parameter — the measured rebalance table in ``baselines`` swings the
-same one-day signal from +88.7% to -13.2% — so a strategy whose identity
+signal parameter. The measured rebalance table in ``baselines`` swings the
+same one-day signal from +88.7% to -13.2%, so a strategy whose identity
 excluded it would not be identified: two runs of the same fingerprint could
 disagree in sign. But the thing the spec pins is the strategy's own decision
 rule, not the harness's step granularity. ``cadence: "daily"`` re-decides
 once per day whatever ``steps_per_day`` the harness runs; ``cadence:
-"step"`` — the default, and what every shipped baseline does — delegates to
+"step"``, the default and what every shipped baseline does, delegates to
 the harness explicitly, and a methods section quoting such a spec must quote
 ``steps_per_day`` beside ``days`` and the seed. ``steps_per_day`` itself
 stays a harness parameter, because it also sets how often every agent is
@@ -64,8 +64,8 @@ observed, which is experimental apparatus rather than strategy.
 **``evaluate`` accepts specs directly.** A spec in the agents mapping is
 built fresh inside every call, which also closes a real trap: agents are
 stateful, and a reused instance carries one market's history into the next
-with no visible symptom. It is also what an MCP server needs — a tool
-cannot accept a callable — and what stops callers inventing their own
+with no visible symptom. It is also what an MCP server needs, since a tool
+cannot accept a callable, and what stops callers inventing their own
 serialisation on the way to one.
 
 **Blend weights are normalised, canonically.** Selection ranks the blended
@@ -73,11 +73,11 @@ score and takes the top k, so the agent is invariant under any positive
 scaling of the weight vector: weights of 1.2/0.8 and 0.6/0.4 build
 bit-identical agents. Taking weights as given would therefore let two
 textually different specs name the same strategy under different
-fingerprints — identity finer than the thing identified, which defeats
+fingerprints: identity finer than the thing identified, which defeats
 comparability from the opposite direction to semantic drift. Weights are
 divided by the sum of their absolute values at construction; signs and
-ratios — everything behaviourally meaningful, including the net-short-signal
-tilt a negative weight expresses — survive.
+ratios. Everything behaviourally meaningful survives, including the
+net-short-signal tilt a negative weight expresses.
 """
 
 from __future__ import annotations
@@ -93,12 +93,12 @@ from ._core import GameRng, ValidationError
 #: signal kind or cadence value extends the grammar and old specs keep meaning
 #: what they meant; changing what ``momentum`` ranks, how a blend combines, or
 #: how the canonical form is computed changes what existing specs SAY, and
-#: that is a new version — exactly as a coefficient change is a new model
+#: that is a new version, exactly as a coefficient change is a new model
 #: preset rather than an edit to "pt-v1".
 SPEC_VERSION = 1
 
 #: Every signal kind the grammar knows. ``blend`` combines the ranked kinds;
-#: ``oracle`` is privileged and declares itself as such — see this module's
+#: ``oracle`` is privileged and declares itself as such. See this module's
 #: docstring and :class:`pretium.baselines.Oracle`.
 SIGNAL_KINDS = ("hold", "random", "momentum", "mean_reversion", "oracle",
                 "blend")
@@ -115,7 +115,7 @@ _RANKED = ("momentum", "mean_reversion", "oracle", "blend")
 
 #: The kinds a blend may combine. ``hold`` ranks nothing, so blending it is
 #: meaningless; ``random`` as a component contributes a uniformly random
-#: RANKING — noise dilution, a legitimate ablation — which is deliberately
+#: RANKING, which is noise dilution and a legitimate ablation, and is deliberately
 #: not the same strategy as the bare ``random`` signal, whose weights carry
 #: the draws' magnitudes as well as their order.
 _BLENDABLE = ("random", "momentum", "mean_reversion", "oracle")
@@ -205,7 +205,7 @@ def _canonical_component(raw: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _identity_of(component: Mapping[str, Any]) -> str:
-    """What a component IS, weight aside — the merge and sort key."""
+    """What a component IS, weight aside: the merge and sort key."""
     return json.dumps({k: v for k, v in component.items() if k != "weight"},
                       sort_keys=True, separators=(",", ":"))
 
@@ -261,7 +261,7 @@ def _canonical_signal(raw: Any) -> dict[str, Any]:
 
     # Normalise to unit absolute mass. Selection ranks the blended score and
     # takes the top k, so the agent is invariant under positive scaling of
-    # the weight vector — 1.2/0.8 and 0.6/0.4 build bit-identical agents —
+    # the weight vector, so 1.2/0.8 and 0.6/0.4 build bit-identical agents,
     # and an unnormalised form would hash equal strategies apart. Signs and
     # ratios survive, so a net-short-signal tilt is still expressible.
     total = sum(abs(c["weight"]) for c in merged.values())
@@ -272,8 +272,8 @@ def _canonical_signal(raw: Any) -> dict[str, Any]:
     # A blend of one ranked signal at weight +1.0 IS that signal: the rank of
     # a score orders exactly as the score, ties broken the same way, so the
     # collapse is behaviourally exact and keeps the fingerprint honest. A
-    # single 'random' does NOT collapse — the bare signal weights names by
-    # draw magnitude, the component only by draw order — and a single
+    # single 'random' does NOT collapse: the bare signal weights names by
+    # draw magnitude, the component only by draw order. And a single
     # negative weight does not either, because the reversed ordering agrees
     # with the opposite signal only up to tie handling.
     if len(ordered) == 1 and ordered[0]["weight"] == 1.0 \
@@ -298,8 +298,8 @@ class StrategySpec:
 
     Immutable once constructed, for the same reason ``ModelParams`` would be:
     a fingerprint of a mutable object is a lie waiting to be told. Construct
-    through the named constructors — :meth:`hold`, :meth:`random`,
-    :meth:`momentum`, :meth:`mean_reversion`, :meth:`oracle`, :meth:`blend` —
+    through the named constructors (:meth:`hold`, :meth:`random`,
+    :meth:`momentum`, :meth:`mean_reversion`, :meth:`oracle`, :meth:`blend`)
     or pass the parts directly; either way the spec is canonicalised and
     validated here, at construction, where a mistake is visible.
 
@@ -344,7 +344,7 @@ class StrategySpec:
         if kind == "hold" and cadence != "step":
             raise ValidationError(
                 "'hold' trades once and never again, so a cadence on it "
-                "describes nothing — and two spellings of the same strategy "
+                "describes nothing, and two spellings of the same strategy "
                 "must not fingerprint apart"
             )
         participation = _number(
@@ -410,7 +410,7 @@ class StrategySpec:
     def random(cls, *, seed: int = 0, gross: float = 0.5,
                max_participation: float = 0.02,
                cadence: str = "step") -> "StrategySpec":
-        """Uniformly random target weights — the noise floor.
+        """Uniformly random target weights: the noise floor.
 
         ``seed`` seeds the strategy's own draws, on its own stream, exactly
         as :class:`pretium.baselines.RandomTrader` does. It is deliberately
@@ -429,8 +429,8 @@ class StrategySpec:
         """Long the recent winners, short the recent losers.
 
         The lookback is in DAYS, only. The shipped class also accepts a
-        lookback in steps, but a step is a harness artifact — the same number
-        means a different horizon under a different ``steps_per_day`` — and a
+        lookback in steps, but a step is a harness artifact: the same number
+        means a different horizon under a different ``steps_per_day``, and a
         spec that changed meaning with harness configuration would not
         specify anything.
         """
@@ -457,7 +457,7 @@ class StrategySpec:
         """Trades the true mispricing. Privileged, and says so.
 
         A spec naming ``oracle`` declares access to state no real trader
-        has, which is exactly what a reviewer needs to see — leaving it out
+        has, which is exactly what a reviewer needs to see. Leaving it out
         of the grammar would push the one strategy most in need of
         disclosure into the uncitable escape hatch. Its ``top_k`` moves the
         denominator of every capture ratio the library quotes, so a ratio
@@ -491,7 +491,7 @@ class StrategySpec:
         are combined FIRST and ``top_k`` selects from the blended ranking,
         which is a different strategy from selecting top-k from each and
         merging. Weights are normalised to unit absolute mass at
-        construction — see this module's docstring for why taking them as
+        construction. See this module's docstring for why taking them as
         given would hash equal strategies apart.
 
         ``seed`` is required exactly when a ``random`` component is present.
@@ -511,8 +511,8 @@ class StrategySpec:
     def to_json(self, **kwargs: Any) -> str:
         """Serialise the canonical form.
 
-        What is written is the CANONICAL spec — defaults materialised,
-        weights normalised, components merged and sorted — not the keystrokes
+        What is written is the CANONICAL spec, with defaults materialised,
+        weights normalised and components merged and sorted, not the keystrokes
         that built it. A reader of the JSON sees every parameter the strategy
         ran under, including the ones the author never typed.
         """
@@ -527,7 +527,7 @@ class StrategySpec:
 
         A newer ``spec_version`` is refused rather than read on a best-effort
         basis: a field this version does not understand would silently take a
-        default, and the resulting strategy would be one nobody specified —
+        default, and the resulting strategy would be one nobody specified,
         while claiming, via its fingerprint, to be exactly what was written.
         """
         payload = json.loads(text)
@@ -561,7 +561,7 @@ class StrategySpec:
         whitespace, defaults materialised, blend weights normalised and
         components merged and sorted. Whitespace, key order, writing a
         default explicitly, scaling every weight by two, or listing
-        components in a different order all leave it unchanged — a
+        components in a different order all leave it unchanged, which is a
         fingerprint that moved with formatting would be worse than none,
         because it would look stable while identifying nothing.
 
@@ -583,7 +583,7 @@ class StrategySpec:
         """Construct the agent this spec names. Fresh state every call.
 
         For a single ranked or held signal at step cadence this returns the
-        shipped baseline class itself — the spec claims to name those agents,
+        shipped baseline class itself, because the spec claims to name those agents,
         and returning the genuine article makes the claim true by
         construction rather than by parallel implementation. Blends and
         daily cadence return the grammar's own agents. Every returned agent
@@ -672,9 +672,9 @@ class StrategySpec:
 class _BlendAgent:
     """The grammar's own agent: a weighted combination of ranked signals.
 
-    Each component turns the roster into a ranking — most attractive to go
+    Each component turns the roster into a ranking, most attractive to go
     long first, ties broken on ticker exactly as the shipped baselines break
-    them — and the blended score is the weighted sum of ranks. Ranks rather
+    them, and the blended score is the weighted sum of ranks. Ranks rather
     than raw scores, because raw scores have incomparable units: a one-day
     return, a five-day return and a log mispricing would otherwise be
     weighted by their variances rather than by the weights.
@@ -779,9 +779,9 @@ class _BlendAgent:
 class _DailyCadence:
     """Re-decide once per day, whatever the harness's step granularity.
 
-    On the first step of each day the wrapped agent is handed a DAILY view —
+    On the first step of each day the wrapped agent is handed a DAILY view,
     an observation whose ``steps_per_day`` is 1 and whose step counter is the
-    day index — so a one-day lookback resolves to one daily observation
+    day index, so a one-day lookback resolves to one daily observation
     rather than to however many steps the harness happens to run. On every
     other step the strategy holds: no decision, no history, and for a random
     signal no draw, so the strategy's randomness is a function of its

@@ -24,7 +24,7 @@ thirty days moved twenty instruments by exactly 0.00% at 40 days.
 
 That is not a defect, it is the valuation model. Equities are discounted off
 the **corporate bond yield**, and the policy rate is only a fallback used when
-no yield is present — `Some(0.0)` is a real zero yield and must be used, so
+no yield is present. `Some(0.0)` is a real zero yield and must be used, so
 inside the engine, where the economy always carries one, the policy rate never
 reaches fair value directly.
 
@@ -35,12 +35,12 @@ the same policy-only ramp prices the median instrument down 4.19%. So the
 trap is now a horizon trap: a short study sees nothing, silently.
 
 The failure mode survives: you run a month-long rate shock, nothing happens,
-and you conclude the model does not care about rates. It cares — at meeting
+and you conclude the model does not care about rates. It cares, but at meeting
 cadence, through the curve. For an immediate repricing you still have to move
 the yield equities actually discount off.
 
-So :meth:`Scenario.rate_shock` moves the whole curve — policy rate and
-corporate yield together, separated by a credit spread — which is what a rate
+So :meth:`Scenario.rate_shock` moves the whole curve, policy rate and
+corporate yield together separated by a credit spread, which is what a rate
 shock is. Moving one alone is still possible through :meth:`ramp`, because
 isolating a channel is a legitimate experiment, but you have to ask for it.
 
@@ -55,7 +55,7 @@ equally would tell a cross-sectional strategy nothing.
 For most of this model's history the honest answer was "not volatility",
 this section said so, and tests pinned it. That changed in the 2026-08 era:
 the shared market factor carries its own conditional-variance process, and
-its reversion target is now proportional to VIX squared — VIX read as the
+its reversion target is now proportional to VIX squared, with VIX read as the
 factor's implied volatility, anchored so that VIX 15 (the endogenous mean)
 reproduces the autonomous process exactly. The coupling was measured before
 it was switched on, and this section was rewritten in the same change that
@@ -63,7 +63,7 @@ switched it, because the old claims were load-bearing.
 
 What VIX reaches now:
 
-1. **The market factor's variance target** — the volatility channel. Each
+1. **The market factor's variance target**, the volatility channel. Each
    close feeds the day's VIX into the factor's GARCH reversion target as
    ``(vix / 15)^2``. The per-name idiosyncratic GARCH still has no VIX
    term: what VIX scales is the SHARED component of every return, which is
@@ -79,8 +79,8 @@ What VIX reaches now:
    carries a VIX term and is recomputed at central-bank meetings, the first
    of which sits at day 45.
 
-Measured on this build — ``Universe.random(20, seed=11)``, 120 days, sim
-seed 3, pinned through the scenario API — annualised realised volatility:
+Measured on this build, with ``Universe.random(20, seed=11)``, 120 days, sim
+seed 3 and pins through the scenario API, annualised realised volatility:
 
     VIX  5     49.48%
     VIX 15     58.76%   (the anchor; bit-identical to the uncoupled model)
@@ -88,12 +88,12 @@ seed 3, pinned through the scenario API — annualised realised volatility:
     VIX 65    124.31%
 
 A thirteenfold move in VIX now moves realised volatility by a factor of
-2.5. Sub-15 pins are live too — a low VIX CALMS the factor, where before
+2.5. Sub-15 pins are live too: a low VIX CALMS the factor, where before
 the coupling it changed nothing at all. VIX 5, 10 and 15 produce identical
 prices only for the first day (the first close is where a pin first enters
 the variance target); from the second day they diverge. The response to a
 held pin saturates: the factor's variance is clamped at 8x its baseline,
-so above VIX ~42 a harder pin buys almost no additional factor variance —
+so above VIX ~42 a harder pin buys almost no additional factor variance,
 quadratic inside the plausible band, flat beyond it.
 
 Mean quoted spread across ``Universe.random(25, seed=11)`` after five days,
@@ -112,17 +112,17 @@ The correlation channel is no longer smaller than the name suggests. Mean
 pairwise correlation of daily log returns, the same 25 names over 120 days,
 300 pairs: +0.269 at VIX 15, +0.678 at VIX 45, +0.759 at VIX 65. A
 high-variance factor regime IS a high-correlation regime, and at crisis
-VIX diversification genuinely stops working — which is what real crises
+VIX diversification genuinely stops working, which is what real crises
 do, and what this model could not produce before the coupling.
 
 So a VIX path now answers both stress questions: what an execution
 algorithm does when spreads widen, and what a strategy does when
 volatility triples and every name starts moving together. What it still
-does not do is move any single name's IDIOSYNCRATIC variance — sizing a
+does not do is move any single name's IDIOSYNCRATIC variance. It sizes a
 pin to a target per-name volatility goes through the factor's share, not
 one-for-one.
 
-## The macro counterfactual is exact on the market stream — and says so
+## The macro counterfactual is exact on the market stream, and says so
 
 This is the counterfactual real markets cannot offer: you cannot re-run a
 year without its hiking cycle, because your only observation is the one that
@@ -131,11 +131,11 @@ happened. Here both are runnable.
 Before the RNG stream split (2026-08) this was a weaker guarantee than the
 ORDER-FLOW counterfactual in :mod:`pretium.tca`, and this docstring said so:
 a macro path changes prices, prices changed which settlement branch drew
-four uniforms, and the shared draw schedule could shift — measured once at
+four uniforms, and the shared draw schedule could shift. An older build measured
 -4 draws in 425,600 on an older build. The split closed that mechanism. The
 market stream's schedule is now a pure function of (market status, active
-roster, sector count), so two runs under different macro paths consume —
-and therefore see — identical market noise, draw for draw. The economy
+roster, sector count), so two runs under different macro paths consume, and
+therefore see, identical market noise, draw for draw. The economy
 stream MAY branch under a different macro path (a chain in contraction
 draws a shock the expansion never rolls), which is exactly why it is
 counted separately instead of polluting the market comparison.
@@ -155,7 +155,7 @@ either.
 So :func:`compare` reports ``draw_delta`` from the MARKET stream. Zero means
 the two worlds saw an identical market noise sequence and the difference is
 purely the scenario. A non-zero delta is no longer a small approximation to
-tolerate — it means the scenario changed the market's own draw schedule (a
+tolerate. It means the scenario changed the market's own draw schedule (a
 halt, a delisting, a roster change), and the result compares two
 structurally different markets. That is worth surfacing, not averaging
 away.
@@ -166,7 +166,7 @@ Until 2026-08 a second pin on a field simply overwrote the first in a dict,
 and because every driver is a total function of the day the survivor
 back-filled the whole run. ``step(vix, before=15, after=48, at=60)`` followed
 by ``ramp(vix, start=48, end=22, over=45, begin=75)`` opened at VIX 48 on day
-ZERO — a market in crisis for the entire run, no warning — and reversing the
+ZERO, a market in crisis for the entire run with no warning, and reversing the
 two calls produced a crisis that never subsided. No ordering worked, so it was
 not an ordering convention anybody could have documented their way out of.
 
@@ -179,13 +179,13 @@ surface; nothing that worked has changed.
 Start days must therefore be STRICTLY INCREASING within a field, and anything
 else is refused by name. Two pins claiming the same day mean one of them
 states a value that can never be reached, and a pin declared before an earlier
-one would have to back-fill — which is the defect, not a feature. So the
+one would have to back-fill, which is the defect rather than a feature. So the
 step-then-decay path is written in the order it happens::
 
     Scenario().hold(vix=15.0).ramp("vix", start=48.0, end=22.0, over=45,
                                    begin=60)
 
-— calm until day 60, a jump to 48 on day 60 because a ramp starts AT its start
+calm until day 60, a jump to 48 on day 60 because a ramp starts AT its start
 value, then the decay. ``hold`` before ``ramp`` is the general idiom for
 "a level, then an episode".
 
@@ -286,7 +286,7 @@ class _constructor:
     returned a NEW scenario and everything configured on the receiver
     vanished with no error and no symptom until somebody read ``.fields``.
 
-    A plain ``classmethod`` cannot tell the two apart — it is handed ``cls``
+    A plain ``classmethod`` cannot tell the two apart, because it is handed ``cls``
     either way. A descriptor can: ``__get__`` sees the instance. So the
     instance form is the one place this failure can be caught, and it is
     caught here rather than documented, because the documented version was
@@ -477,8 +477,8 @@ class Scenario:
         defined on every day of any run length rather than only inside the
         ramp. A path with holes would make the run length change the scenario.
 
-        As a LATER pin on a field the pre-``begin`` hold never applies —
-        whatever pinned the field before keeps its days — so ``start`` is
+        As a LATER pin on a field the pre-``begin`` hold never applies,
+        because whatever pinned the field before keeps its days, so ``start`` is
         simply the value the field jumps to on day ``begin``. That is what
         makes ``hold`` then ``ramp`` a step followed by a decay.
         """
@@ -507,7 +507,7 @@ class Scenario:
         """Jump ``field`` from ``before`` to ``after`` on day ``at``.
 
         A discontinuity, which a ramp is not. Use this for something that
-        genuinely happens at once — a surprise cut, a regime change — and a
+        genuinely happens at once, such as a surprise cut or a regime change, and a
         ramp for something the market prices in gradually.
 
         As a LATER pin on a field, ``before`` never applies: the pin that
@@ -535,7 +535,7 @@ class Scenario:
         """The pins for one day.
 
         Where a field carries several pins, the one in force is the last one
-        whose start day has arrived — or, before any has, the first, which
+        whose start day has arrived, or before any has the first, which
         holds its own pre-start value.
         """
         return {field: self._value(field, day) for field in self._drivers}
@@ -568,7 +568,7 @@ class Scenario:
 
         ``days`` must be at least one. A zero-day document carries no path,
         and :meth:`from_json` reading it back produced a scenario driving
-        NOTHING — a round trip that quietly discarded every field, and a
+        NOTHING: a round trip that quietly discarded every field, and a
         reproduced run that applied no pins at all.
         """
         if days < 1:
@@ -592,13 +592,13 @@ class Scenario:
         What comes back is the REALISED PATH as an object: a scenario whose
         every day returns exactly the recorded values, whatever constructor
         originally built them. That is the honest direction of the round trip
-        — the serialised form is the path, not the recipe, so the restored
+        The serialised form is the path rather than the recipe, so the restored
         object is the path too. Beyond the recorded horizon it holds its final
         values, the same rule :meth:`ramp` applies after its end, so a longer
         run is defined rather than an IndexError.
 
         A newer schema is refused rather than read on a best-effort basis, and
-        so is an inconsistent document — a day count that disagrees with the
+        so is an inconsistent document, such as a day count that disagrees with the
         path, days out of order, or fields that appear and disappear between
         rows. Each of those describes a scenario nobody constructed, and a
         loader that guessed its way past them would replay a run under pins
@@ -690,7 +690,7 @@ class Scenario:
         Moves the policy rate AND the corporate bond yield, held apart by
         ``credit_spread``. Both, because the valuation discounts off the
         corporate yield and pinning the policy rate alone changes nothing at
-        all — silently. See this module's docstring.
+        all, silently. See this module's docstring.
 
         ``credit_spread`` is held constant, which is a simplification worth
         naming: in a real tightening cycle spreads usually widen as well, so
@@ -722,14 +722,14 @@ class Scenario:
         Up as a step, down as a ramp, because that is the shape a stress
         episode has: it arrives at once and subsides slowly.
 
-        **This raises realised volatility** — since the 2026-08 coupling of
+        **This raises realised volatility**, since the 2026-08 coupling of
         the market factor's variance target to VIX, and not before, which
         is why this docstring once said the opposite and was right then.
         Measured on ``Universe.random(20, seed=11)`` over 120 days, sim
         seed 3: the default spike to 45 moves annualised realised
         volatility from a no-scenario 58.17% to 67.01%, a peak of 80 to
         74.57%, and volatility clustering RISES with it (|r| acf(1) 0.334
-        to 0.357 and 0.378) — where the pre-coupling model measurably
+        to 0.357 and 0.378), where the pre-coupling model measurably
         moved clustering the wrong way. The spike also widens the quoted
         bid-ask and, above VIX 25.5, pulls returns toward the market
         factor. This module's docstring sets out the four channels and
@@ -770,7 +770,7 @@ class Scenario:
         measured that VIX did not drive realised volatility, so "vol_shock"
         was a name making a false claim. The 2026-08 coupling then wired
         VIX into the market factor's variance target, which made the OLD
-        name accurate again — but the rename stands. :meth:`vix_shock`
+        name accurate again, but the rename stands. :meth:`vix_shock`
         names the lever (the path it drives is a VIX path), which stays
         true under any future model change, where a name promising an
         effect has already been wrong once. The path is unchanged, so a
@@ -812,7 +812,7 @@ def run_scenario(
     session, so day zero is already under the path rather than under whatever
     the engine was constructed with.
 
-    ``model`` selects the coefficient set — a preset name or a
+    ``model`` selects the coefficient set, either a preset name or a
     :class:`pretium.ModelParams`, defaulting to the shipped preset. The
     returned engine reports it as ``model_fingerprint``, like any other.
     """
@@ -912,7 +912,7 @@ def compare(
     """Run the same seed under two macro paths and difference them.
 
     The counterfactual real markets cannot offer. You cannot re-run a year
-    without its hiking cycle — your only observation is the one that happened.
+    without its hiking cycle. Your only observation is the one that happened.
     Here both are runnable, holding every noise draw, every news item and every
     shock identical, so the difference is the scenario and nothing else.
 
@@ -922,14 +922,14 @@ def compare(
 
     That default is only meaningful for a scenario that MOVES inside the
     horizon, and a scenario that does not is refused rather than reported.
-    For a ``hold``-only scenario — or a ``step`` at day zero, or any shock
-    whose start day falls outside ``days`` — the default baseline IS the
+    For a ``hold``-only scenario, or a ``step`` at day zero, or any shock
+    whose start day falls outside ``days``, the default baseline IS the
     scenario, and the comparison returns exactly 0.00% on every instrument.
     A confident, meaningless zero reads as "the shock did nothing", which is
     the worst answer available: it is wrong, it looks like a finding, and
     nothing about it looks like a mistake. See :meth:`Scenario.hold`.
 
-    Keyword arguments — ``model=`` among them — pass through to
+    Keyword arguments, ``model=`` among them, pass through to
     :func:`run_scenario` and apply to BOTH worlds, because a shocked world
     differenced against a baseline under a different coefficient set would
     measure the model gap dressed up as the scenario's effect. The result

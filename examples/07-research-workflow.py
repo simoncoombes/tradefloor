@@ -4,9 +4,9 @@ Run it:
 
     python examples/07-research-workflow.py
 
-This exercises all four things the library exists to provide — a reproducible
+This exercises all four things the library exists to provide: a reproducible
 market, ground truth about why prices moved, emergent impact through a real
-book, and a counterfactual — in the order a researcher would actually reach for
+book, and a counterfactual, in the order a researcher would actually reach for
 them.
 
 It is also run by the test suite, deliberately. Running the library the way a
@@ -35,7 +35,7 @@ def main() -> dict:
     report["universe"] = len(universe)
     print(f"1. universe: {len(universe)} instruments")
 
-    # 2. A sweep. Per seed is the only safe parallel boundary — the engine's
+    # 2. A sweep. Per seed is the only safe parallel boundary, because the engine's
     #    three RNG streams split by domain (market, economy, external), not by
     #    unit of work, and the market stream serves every draw in a tick in
     #    one fixed order across the roster, so there is still no decomposition
@@ -47,7 +47,7 @@ def main() -> dict:
     print(f"2. swept {len(sweep)} seeds x 5 days in {time.time() - mark:.1f}s")
 
     # 3. Rank agents on one market. Same seed for every agent, so the
-    #    comparison is between strategies rather than between markets — order
+    #    comparison is between strategies rather than between markets, so order
     #    flow consumes no RNG draws, which is what makes that exact.
     mark = time.time()
     scores = pt.evaluate(reference_agents(seed=3), seed=7, universe=universe,
@@ -57,8 +57,8 @@ def main() -> dict:
         print(f"     {card.name:16s} {card.return_pct:+7.2f}%  "
               f"impact {card.impact_bps:+8.2f} bps")
 
-    # The number worth reporting. Raw P&L is not comparable across markets —
-    # a seed with more dispersion pays every strategy more — and dividing by
+    # The number worth reporting. Raw P&L is not comparable across markets,
+    # since a seed with more dispersion pays every strategy more, and dividing by
     # what a perfectly-informed reference earned in THAT market removes
     # exactly that.
     #
@@ -113,7 +113,7 @@ def main() -> dict:
           f"{margin:.3f} margin over second place")
 
     # 4. What did the winner's trading cost? Every fill priced against a market
-    #    where it never traded — the benchmark real TCA cannot have.
+    #    where it never traded, the benchmark real TCA cannot have.
     mark = time.time()
     execution = pt.tca.analyse(Momentum(), seed=7, universe=universe, days=10)
     report["shortfall_bps"] = execution.shortfall_bps()
@@ -125,13 +125,13 @@ def main() -> dict:
     # Nothing the trader did not touch should have moved through the MARKET:
     # order flow consumes no draws, so the untraded names see identical
     # noise. Since the 2026-08 VIX coupling one indirect channel is open on
-    # purpose — the fear gauge reacts same-day to the cap-weighted market
-    # return, and VIX now reprices the shared factor's variance — so a
+    # purpose. The fear gauge reacts same-day to the cap-weighted market
+    # return, and VIX now reprices the shared factor's variance, so a
     # trader whose flow moves the market return nudges every name's
     # volatility two closes later. Measured here: two untraded names move,
     # by -6.5 and +3.2 bps against a 13 bps median direct impact. That is
     # the market being afraid of your trading, which is a cost, not a leak
-    # in the subtraction — and it must stay well under the direct impact it
+    # in the subtraction, and it must stay well under the direct impact it
     # rides beside, which is asserted.
     leaked = execution.untouched_moved()
     report["leaked"] = leaked
@@ -151,7 +151,7 @@ def main() -> dict:
           "fear gauge, all small against direct impact")
 
     # And with VIX pinned the macro channel is closed, so the subtraction is
-    # byte-exact — the guarantee the RNG stream split actually makes, now
+    # byte-exact, the guarantee the RNG stream split actually makes, now
     # demonstrated at the boundary where it holds.
     pinned = pt.tca.analyse(Momentum(), seed=7, universe=universe, days=10,
                             scenario=pt.Scenario().hold(vix=15.0))
@@ -220,7 +220,7 @@ def main() -> dict:
     print("     what the book quoted is what the portfolio paid, exactly")
 
     # 5. Ground truth for the same market. One row per instrument per tick,
-    #    and the seven components sum to the change in mispricing — so the
+    #    and the seven components sum to the change in mispricing, so the
     #    label can be checked rather than trusted.
     mark = time.time()
     engine = pt.Engine(seed=7, universe=universe)
