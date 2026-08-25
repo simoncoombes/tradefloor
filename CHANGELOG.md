@@ -54,6 +54,38 @@ mechanisms on the record's own measurements and ranked the survivors behind the
 statistics needed to see them. It is in the design repository as
 CORRELATION-REVIEW-2026-08-25.md.
 
+### pt-v7: the first preset with industries
+
+pt-v6 with four coefficients moved, selectable by name and not the default:
+`sector_factor_sigma` 0.002 to 0.012, `crisis_blend_source` 0.0 to 1.0,
+`sector_vix_coupling` 0.0 to 0.25, and `idio_sigma_scale` trimmed by ten
+percent to pay for the added variance. Measured on thirty training seeds
+across all thirteen statistics, it holds **twelve of thirteen at 252 days and
+twelve of thirteen at 504**, the only miss being the structural volume-change
+row; pt-v6 holds eleven and ten, and pt-v3 eleven and six. Sector excess
+correlation reads 0.128 and 0.118 against a band of 0.11 to 0.23, and +0.088
+in a held VIX 45 against the real 2020 window's +0.103, with crisis
+cross-sectional correlation 0.586 against pt-v6's 0.600.
+
+It passed the three gates that have killed candidates before. The response
+instrument reads the crisis volatility lever at 2.95x against pt-v6's 2.68x,
+with calm volatility below the base and the correlation blend held; a
+held-out 60-name universe holds twelve of thirteen; and §8 passes on every
+axis against a base whose own control passes. On six held-out seeds one
+statistic, `abs_return_acf5`, reads 0.012 below its floor where the base
+reads 0.004 above it, a quarter of one seed-sd apart and stated as such.
+
+The trim is the part worth understanding. On pt-v3 the same trim thins the
+tails through their floor, because there the idiosyncratic term is what
+carries kurtosis. On pt-v6 the jumps carry it, and trimming the term that was
+diluting them RAISES kurtosis from 7.15 to 8.52 at one year. That is why the
+sector fix lives on this base and not on the default.
+
+pt-v3 stays the default and the envelope still certifies pt-v3. Gap 7 now
+names pt-v7 as the selectable preset that closes it, which is a statement
+about that preset and not a certification. The calibration record carries the
+whole derivation as §58 to §62.
+
 ### Two parameters that let sector structure survive a crisis, inert at 0.0
 
 Measuring the fix for gap 7 found that the coefficient alone pays twice, on

@@ -186,7 +186,9 @@
     "sector_excess_corr"
    ],
    "beyond_days": null,
-   "closed_by": []
+   "closed_by": [
+    "pt-v7"
+   ]
   },
   {
    "id": "roster-concentration",

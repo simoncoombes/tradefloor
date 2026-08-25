@@ -377,6 +377,7 @@ GAPS: tuple[Gap, ...] = (
         ),
         forbids="sector rotation, sector-neutral construction, industry diversification, and any long/short pair whose thesis is the sector",
         statistics=("sector_excess_corr",),
+        closed_by=("pt-v7",),
     ),
     Gap(
         id="roster-concentration",

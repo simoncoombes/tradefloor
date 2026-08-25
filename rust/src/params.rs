@@ -616,6 +616,8 @@ pub const PT_V5: ModelParams = ModelParams::pt_v5();
 
 /// pt-v5 with the herding term halved -- see [`ModelParams::pt_v6`].
 pub const PT_V6: ModelParams = ModelParams::pt_v6();
+/// pt-v6 with sector structure that survives a crisis -- see [`ModelParams::pt_v7`].
+pub const PT_V7: ModelParams = ModelParams::pt_v7();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -900,6 +902,40 @@ impl ModelParams {
         p
     }
 
+    /// pt-v6 with industries: the first preset in which names in the same
+    /// sector co-move more than names in different ones, in calm markets and
+    /// in a crisis alike.
+    ///
+    /// Four coefficients move from pt-v6 (CALIBRATION-FOLLOWUPS.md §58 to
+    /// §62). `sector_factor_sigma` 0.002 to 0.012 gives the sector draw real
+    /// variance. `crisis_blend_source` 0.0 to 1.0 stops the crisis blend
+    /// consuming that draw and injects the market factor through the market
+    /// component instead. `sector_vix_coupling` 0.0 to 0.25 lets a quarter of
+    /// the sector variance follow VIX, so a crisis is more violent rather than
+    /// less. `idio_sigma_scale` is trimmed by ten percent to pay for the added
+    /// variance, which on this base RAISES kurtosis, because the tails come
+    /// from the jumps and the trimmed term was diluting them.
+    ///
+    /// MEASURED, thirty training seeds, thirteen statistics: twelve of
+    /// thirteen in band at 252 days and at 504, the only miss being the
+    /// structural `volume_change_acf1`; pt-v6 holds eleven and ten. Sector
+    /// excess 0.128 at 252 and 0.118 at 504 against a band of 0.11 to 0.23,
+    /// and +0.088 in a held VIX 45 against the real 2020 window's +0.103, with
+    /// crisis cross-sectional correlation 0.586 against pt-v6's 0.600.
+    /// Gates, in the record: the response instrument against pt-v6, held-out
+    /// seeds and universe, §8 against pt-v6's passing control.
+    ///
+    /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3.
+    pub const fn pt_v7() -> ModelParams {
+        let mut p = ModelParams::pt_v6();
+        p.sector_factor_sigma = 0.012;
+        p.crisis_blend_source = 1.0;
+        p.sector_vix_coupling = 0.25;
+        // pt-v6's 0.8146007420925029 times 0.90, asserted in tests.
+        p.idio_sigma_scale = 0.7331406678832526;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -920,13 +956,14 @@ impl ModelParams {
             "pt-v4" => Some(PT_V4),
             "pt-v5" => Some(PT_V5),
             "pt-v6" => Some(PT_V6),
+            "pt-v7" => Some(PT_V7),
             _ => None,
         }
     }
 
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
-        &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6"]
+        &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -1334,10 +1371,13 @@ mod tests {
         assert_eq!(ModelParams::preset("pt-v6").unwrap().fingerprint(), "pt-v6");
         // The literal must be exactly half of what it claims to halve.
         assert_eq!(PT_V6.momentum_theta * 2.0, PT_V5.momentum_theta);
+        assert_eq!(PT_V7.fingerprint(), "pt-v7");
+        assert_eq!(ModelParams::preset("pt-v7").unwrap().fingerprint(), "pt-v7");
+        assert_eq!(PT_V7.idio_sigma_scale, PT_V6.idio_sigma_scale * 0.9);
         // Re-armed on the next unreleased name. A preset that answers to a
         // name it does not have is how a vector nobody calibrated presents
         // as a shipped one.
-        assert!(ModelParams::preset("pt-v7").is_none());
+        assert!(ModelParams::preset("pt-v8").is_none());
 
         // Adding a preset must not disturb an existing one. The fingerprint
         // is taken over the PARAMETERS, not the table, so this holds by
