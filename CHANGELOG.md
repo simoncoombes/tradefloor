@@ -247,6 +247,14 @@ resumed from nothing. The rows are copied with `cp` now, and the launcher also
 refuses to start a run at all if a one-byte write to the bucket fails, which is
 what a missing instance profile looks like and what cost one full survey.
 
+**`atlas_survey.py` can survey a few axes around a preset other than pt-v3.**
+`--base pt-v6 --only a,b,c` restricts the plan to the named axes and pins
+every other parameter at the base preset's value inside each vector, so a task
+still sets all of them and nothing falls through to the evaluator's pt-v1
+base. Multiplicative boxes around a negative base value, which pt-v6's jump
+mean is, are ordered rather than refused. `tests/test_survey_only.py` pins the
+completion.
+
 **`read_scenario_frontier.py`** is new, and reads the survey for the frontier
 between scenario response and horizon realism.
 
