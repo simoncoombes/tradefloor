@@ -271,8 +271,18 @@ diversification, and any long/short pair whose thesis is the sector are all
 being tested in a market that does not have industries.** This gap was found
 by adding a statistic the panel did not have, and the two other statistics
 added beside it, downside correlation asymmetry same-day and lagged, both sit
-inside their bands. The first experiment against it is a `sector_factor_sigma`
-sweep at thirty seeds, reported in the calibration record.
+inside their bands.
+
+The dial has been measured. At `sector_factor_sigma` 0.012 the statistic lands
+inside its band at one year on training seeds, held-out seeds and a held-out
+universe, and on the pt-v6 base it clears the §8 overfitting control. It pays
+twice, on every base, for one reason: the sector draw is the only variance
+term that does not scale with VIX, so it dilutes the crisis volatility lever
+by a tenth in calm markets and is consumed by the crisis blend in stressed
+ones, where sector excess reads zero at a held VIX 45 against a real +0.10.
+Two parameters that remove both causes, `sector_vix_coupling` and
+`crisis_blend_source`, ship inert in 0.1.4. No preset uses them until the
+thirty-seed measurement is in; the calibration record carries it as §61.
 
 ## The numbers above are medians, and one run is not the median
 

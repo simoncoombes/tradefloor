@@ -361,7 +361,19 @@ GAPS: tuple[Gap, ...] = (
             "measured against a statistic that could see it until now. "
             "Sector labels do move prices elsewhere: the same company under "
             "twelve labels spreads two-year returns across ninety points "
-            "through the valuation anchors. What is missing is co-movement."
+            "through the valuation anchors. What is missing is co-movement.\n\n"
+            "The dial has been measured (CALIBRATION-FOLLOWUPS §59 to §61). "
+            "At 0.012 the statistic lands inside its band at one year on "
+            "training seeds, held-out seeds and a held-out universe, and on "
+            "the pt-v6 base clears the §8 overfitting control. It pays twice, "
+            "on every base, for one reason: the sector draw is the only "
+            "variance term that does not scale with VIX, so it dilutes the "
+            "crisis lever by a tenth in calm markets and is consumed by the "
+            "crisis blend in stressed ones, where sector excess reads zero "
+            "at a held VIX 45 against a real +0.10. Two parameters that "
+            "remove both causes, sector_vix_coupling and crisis_blend_source, "
+            "ship inert at 0.0 in 0.1.4; no preset uses them until the "
+            "thirty-seed measurement is in."
         ),
         forbids="sector rotation, sector-neutral construction, industry diversification, and any long/short pair whose thesis is the sector",
         statistics=("sector_excess_corr",),
