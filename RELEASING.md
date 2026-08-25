@@ -170,3 +170,16 @@ keep running exactly as they did.
 
 That is why `pt-v1` through `pt-v8` all still exist and reproduce, and why a
 patch release can carry a new preset without being a breaking change.
+
+## The release-notes page
+
+`docs/releases.html` renders `CHANGELOG.md`: `build_site.py` parses the file
+and inserts one section per released version into the bundle's Release Notes
+page, above the era-boundary notes. An `## Unreleased` section is skipped, so
+work in flight does not appear on the site. Release dates come from the
+annotated tags, so a version cannot be dated by hand.
+
+That means the changelog is the single source for three destinations: the
+GitHub release body (cut by the release workflow), the docs site, and the
+file itself. It also means a release whose changelog section is thin ships a
+thin page, which is the intended pressure.

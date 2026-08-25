@@ -127,20 +127,159 @@ RELEASE_STATUS_FIXES = [
         '<h2 style="font-size:19px;margin:40px 0 4px">0.1.0 '
         '<span style="font-weight:400;color:var(--faint);font-size:15px">'
         "- unreleased</span></h2>",
-        '<h2 style="font-size:19px;margin:40px 0 4px">{version} '
+        '<h2 style="font-size:19px;margin:40px 0 4px">Status '
         '<span style="font-weight:400;color:var(--faint);font-size:15px">'
-        "- current</span></h2>",
+        "- {version}, current</span></h2>",
     ),
     (
         "Pre-release. Everything documented works and is tested. The API may "
         "move before 1.0. Nothing has been tagged, and there is no DOI yet.",
-        "Published on PyPI as <code style=\"font-size:12.5px\">pretium</code>. "
-        "Everything documented works and is tested. The API may move before "
-        "1.0. Each release is tagged and its wheels are built by the release "
-        "workflow, which runs one fixed simulation inside every wheel and "
-        "compares digests before anything is uploaded. There is no DOI yet.",
+        "Published on PyPI as <code style=\"font-size:12.5px\">pretium</code> "
+        "and on crates.io as the <code style=\"font-size:12.5px\">pretium</code> "
+        "crate. Everything documented works and is tested. The API may move "
+        "before 1.0. Each release is tagged and its wheels are built by the "
+        "release workflow, which runs one fixed simulation inside every wheel "
+        "and compares digests before anything is uploaded. There is no DOI yet.",
     ),
 ]
+
+
+#: The release-notes page in the bundle carries release STATUS (which version
+#: is current, what the era boundary means) and no release notes: a reader
+#: clicking "Release notes" found nothing about what changed in 0.1.1 or
+#: 0.1.3. CHANGELOG.md has all of it and is the file the release workflow
+#: already cuts GitHub release notes from, so the site renders that rather
+#: than keeping a second copy that can disagree with the first.
+CHANGELOG = ROOT / "CHANGELOG.md"
+
+#: The heading the rendered changelog is inserted before, so the page reads
+#: status, then what changed in each release, then the era boundary note.
+#: Asserted at build time: a reworded bundle fails loudly rather than
+#: silently shipping a page with no release notes again.
+CHANGELOG_ANCHOR = (
+    '<h2 style="font-size:19px;margin:40px 0 4px">Known-answer v8 '
+)
+
+_MUT = 'style="color:var(--mut);font-size:14px'
+_CODE = 'style="font-size:12.5px"'
+
+
+def _inline(text: str) -> str:
+    """Markdown inline markup to the design's inline-styled HTML."""
+    out = html.escape(text, quote=False)
+    out = re.sub(r"`([^`]+)`", lambda m: f'<code {_CODE}>{m.group(1)}</code>', out)
+    out = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", out)
+    out = re.sub(r"\[([^\]]+)\]\(([^)]+)\)",
+                 lambda m: f'<a href="{m.group(2)}" style="color:var(--accent)">{m.group(1)}</a>',
+                 out)
+    return out
+
+
+def _table(rows: list[str]) -> str:
+    """A markdown table, minus its separator row."""
+    cells = [[c.strip() for c in r.strip().strip("|").split("|")] for r in rows]
+    body = [r for r in cells[1:] if not all(set(c) <= set("-: ") for c in r)]
+    head = "".join(
+        f'<th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);'
+        f'font:600 12px var(--font-ui)">{_inline(c)}</th>' for c in cells[0])
+    trs = "".join(
+        "<tr>" + "".join(
+            f'<td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);'
+            f'font-size:13px;color:var(--mut)">{_inline(c)}</td>' for c in r) + "</tr>"
+        for r in body)
+    return ('<div style="overflow-x:auto"><table style="border-collapse:collapse;'
+            f'margin:12px 0;min-width:100%">{"<tr>" + head + "</tr>"}{trs}</table></div>')
+
+
+def changelog_html(version: str, dates: dict[str, str]) -> str:
+    """CHANGELOG.md as the release-notes page's body.
+
+    Handles exactly the markup the changelog uses: version and section
+    headings, paragraphs with bold, code and links, tables, and fenced code
+    blocks. An "Unreleased" section is skipped, because the site documents
+    what a reader can install.
+    """
+    if not CHANGELOG.exists():
+        sys.exit("CHANGELOG.md not found; the release-notes page needs it")
+    lines = CHANGELOG.read_text(encoding="utf-8").splitlines()
+    out: list[str] = []
+    para: list[str] = []
+    table: list[str] = []
+    fence: list[str] | None = None
+    skipping = False
+
+    def flush() -> None:
+        nonlocal para, table
+        if table:
+            out.append(_table(table)); table = []
+        if para:
+            out.append(f'<p {_MUT};margin:0 0 12px">{_inline(" ".join(para))}</p>')
+            para = []
+
+    for line in lines:
+        if line.startswith("```"):
+            if fence is None:
+                flush(); fence = []
+            else:
+                if not skipping:
+                    out.append(
+                        '<pre style="background:var(--codebg);color:#e8e8e8;padding:12px 14px;'
+                        'border-radius:6px;overflow-x:auto;font:12.5px/1.6 var(--font-mono)">'
+                        + html.escape("\n".join(fence)) + "</pre>")
+                fence = None
+            continue
+        if fence is not None:
+            fence.append(line); continue
+        if line.startswith("## "):
+            flush()
+            title = line[3:].strip()
+            skipping = title.lower().startswith("unreleased")
+            if skipping:
+                continue
+            when = dates.get(title, "")
+            tag = " - current" if title == version else (f" - {when}" if when else "")
+            out.append(
+                f'<h2 style="font-size:19px;margin:44px 0 4px">{_inline(title)}'
+                f'<span style="font-weight:400;color:var(--faint);font-size:15px">'
+                f"{html.escape(tag)}</span></h2>")
+            continue
+        if skipping:
+            continue
+        if line.startswith("### "):
+            flush()
+            out.append(f'<h3 style="font-size:15px;margin:24px 0 6px">'
+                       f"{_inline(line[4:].strip())}</h3>")
+            continue
+        if line.startswith("# "):
+            continue
+        if line.startswith("|"):
+            if para:
+                flush()
+            table.append(line); continue
+        if not line.strip():
+            flush(); continue
+        if table:
+            flush()
+        para.append(line.strip())
+    flush()
+    return "\n        ".join(out)
+
+
+def tag_dates() -> dict[str, str]:
+    """Release dates from the annotated tags, so the page cannot invent one."""
+    try:
+        import subprocess
+        raw = subprocess.run(
+            ["git", "for-each-ref", "--format=%(refname:short) %(creatordate:short)",
+             "refs/tags"], cwd=ROOT, capture_output=True, text=True, timeout=20).stdout
+    except Exception:  # noqa: BLE001 - a missing git is not a build failure
+        return {}
+    out = {}
+    for row in raw.splitlines():
+        parts = row.split()
+        if len(parts) == 2 and parts[0].startswith("v"):
+            out[parts[0][1:]] = parts[1]
+    return out
 
 
 def read_bundle() -> str:
@@ -172,6 +311,17 @@ def read_bundle() -> str:
         + PRESET_ROWS_FILE.read_text(encoding="utf-8").strip(),
         1,
     )
+    if CHANGELOG_ANCHOR not in doc:
+        sys.exit("the release-notes era-boundary heading was reworded; "
+                 "CHANGELOG_ANCHOR needs updating rather than silently "
+                 "shipping a release-notes page with no release notes")
+    doc = doc.replace(
+        CHANGELOG_ANCHOR,
+        changelog_html(VERSION, tag_dates())
+        + "\n\n        " + CHANGELOG_ANCHOR,
+        1,
+    )
+
     for stale, current in RELEASE_STATUS_FIXES:
         if stale not in doc:
             sys.exit(
