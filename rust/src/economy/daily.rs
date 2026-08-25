@@ -76,6 +76,8 @@ pub struct DailyInputs<'a> {
     /// inside the inflation update, which made inflation's persistence and
     /// dispersion a fact of the code rather than a calibration.
     pub inflation_reversion: f64,
+    /// Hard ceiling on endogenous inflation, percent (shipped 6.0).
+    pub inflation_ceiling: f64,
     /// VIX level at which crisis behaviour begins.
     ///
     /// Gates the sector-to-market correlation blend, the universe stress
@@ -94,6 +96,7 @@ impl<'a> Default for DailyInputs<'a> {
             game_day: 0,
             vix_mean_reversion: VIX_MEAN_REVERSION,
             inflation_reversion: INFLATION_MEAN_REVERSION,
+            inflation_ceiling: INFLATION_CEILING,
             crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
         }
     }
@@ -313,7 +316,7 @@ pub fn update_economy_daily(
                 + wage_pressure
                 + random_normal(rng, 0.0, 0.04 * volatility),
             -1.0,
-            6.0,
+            inputs.inflation_ceiling,
         );
         new_state.core_inflation = clamp(
             economy.core_inflation + (new_state.inflation_rate - economy.core_inflation) * 0.3,

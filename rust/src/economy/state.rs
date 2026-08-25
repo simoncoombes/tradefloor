@@ -30,6 +30,8 @@ pub const INFLATION_TARGET: f64 = 2.0;
 /// Monthly fraction of the inflation gap closed toward the target. The
 /// shipped value; `ModelParams::inflation_reversion` carries it at runtime.
 pub const INFLATION_MEAN_REVERSION: f64 = 0.55;
+/// Hard ceiling on endogenous inflation, percent; `ModelParams::inflation_ceiling` at runtime.
+pub const INFLATION_CEILING: f64 = 6.0;
 
 /// Phillips-curve coefficient.
 ///

@@ -152,6 +152,14 @@ pub struct ModelParams {
     /// persistent and wider. Nothing else in the economy is touched; at
     /// 0.55 every preset reproduces bit for bit.
     pub inflation_reversion: f64,
+    /// The hard ceiling on endogenous inflation, in percent.
+    ///
+    /// Shipped 6.0, the clamp every preset ran under. Promoted with
+    /// `inflation_reversion` (§65): once the reversion is loosened enough
+    /// to give inflation its real dispersion, the series sits on this clamp
+    /// where the real one reached 9.0% in June 2022 (FRED CPIAUCSL). At 6.0
+    /// every preset reproduces bit for bit. The floor stays at -1.0.
+    pub inflation_ceiling: f64,
     /// Weight of sector-scoped news on a member name (§5.4 promotion).
     pub news_sector_weight: f64,
     /// Weight of market-wide news on every name (§5.4 promotion).
@@ -684,6 +692,7 @@ impl ModelParams {
             order_flow_coefficient: factors::ORDER_FLOW_COEFFICIENT,
             informed_flow_fraction: factors::INFORMED_FLOW_FRACTION,
             inflation_reversion: crate::economy::INFLATION_MEAN_REVERSION,
+            inflation_ceiling: crate::economy::INFLATION_CEILING,
             news_sector_weight: factors::NEWS_SECTOR_WEIGHT,
             news_market_weight: factors::NEWS_MARKET_WEIGHT,
             crash_amplifier_threshold: factors::CRASH_AMPLIFIER_THRESHOLD,
@@ -1009,6 +1018,7 @@ impl ModelParams {
             "sector_factor_sigma" => self.sector_factor_sigma,
             "idio_sigma_scale" => self.idio_sigma_scale,
             "order_flow_coefficient" => self.order_flow_coefficient,
+            "inflation_ceiling" => self.inflation_ceiling,
             "inflation_reversion" => self.inflation_reversion,
             "informed_flow_fraction" => self.informed_flow_fraction,
             "news_sector_weight" => self.news_sector_weight,
@@ -1106,6 +1116,7 @@ impl ModelParams {
             "sector_factor_sigma" => out.sector_factor_sigma = value,
             "idio_sigma_scale" => out.idio_sigma_scale = value,
             "order_flow_coefficient" => out.order_flow_coefficient = value,
+            "inflation_ceiling" => out.inflation_ceiling = value,
             "inflation_reversion" => out.inflation_reversion = value,
             "informed_flow_fraction" => out.informed_flow_fraction = value,
             "news_sector_weight" => out.news_sector_weight = value,
@@ -1276,6 +1287,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "garch_gamma",
         "garch_omega",
         "idio_sigma_scale",
+        "inflation_ceiling",
         "inflation_reversion",
         "informed_flow_fraction",
         "jump_intensity_idio",
