@@ -7,16 +7,22 @@
 # ETA of another 0.8h. The job needs about 2.4 hours; the switch was set for a
 # job a third that size. Ninety-one minutes of a 96-core box produced one log
 # file and no measurement.
-shutdown -h +240
+shutdown -h +180
 
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey2
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey3
 BRANCH=main
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
-SAMPLES=4000
+SAMPLES=2000
+# The §62 surface: six axes on the pt-v6 base (CALIBRATION-FOLLOWUPS.md §61,
+# §62). Every other parameter is pinned at pt-v6 inside each vector by the
+# driver, so a task still sets all of them. 2000 LHS points in six
+# dimensions is ample; 96000 tasks, about 1.2 hours on 94 workers.
+BASE=pt-v6
+ONLY=sector_factor_sigma,sector_vix_coupling,crisis_blend_source,crisis_blend_cap,crisis_blend_ramp,idio_sigma_scale
 
 dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 
@@ -148,16 +154,16 @@ fi
 # then ran 192000 under a different plan fingerprint printed one line later.
 # The dead-man switch is sized off that forecast, which is how launch 1 was
 # killed by its own timeout at 63.9% complete.
-python tools/calibration/atlas_survey.py plan --samples "$SAMPLES" \
+python tools/calibration/atlas_survey.py plan --samples "$SAMPLES" --base "$BASE" --only "$ONLY" \
   --out /home/ec2-user/out
-python tools/calibration/atlas_survey.py run --samples "$SAMPLES" \
+python tools/calibration/atlas_survey.py run --samples "$SAMPLES" --base "$BASE" --only "$ONLY" \
   --out /home/ec2-user/out --workers 94
-python tools/calibration/atlas_survey.py collect --out /home/ec2-user/out
+python tools/calibration/atlas_survey.py collect --base "$BASE" --only "$ONLY" --out /home/ec2-user/out
 WORK
 
 sed -i "s|BRANCH_PLACEHOLDER|${BRANCH}|" /home/ec2-user/run.sh
 sed -i "s|BUCKET_PLACEHOLDER|${BUCKET}|" /home/ec2-user/run.sh
-sed -i "s|\$SAMPLES|${SAMPLES}|g" /home/ec2-user/run.sh
+sed -i "s|\$SAMPLES|${SAMPLES}|g; s|\$BASE|${BASE}|g; s|\$ONLY|${ONLY}|g" /home/ec2-user/run.sh
 chown ec2-user:ec2-user /home/ec2-user/run.sh
 chmod +x /home/ec2-user/run.sh
 
