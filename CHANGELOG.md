@@ -2,291 +2,137 @@
 
 ## Unreleased
 
-**`inflation_floor` is a dial**, shipped at -1.0, the clamp every preset ran
-under. It completes the trio started in 0.1.4: with the reversion loosened to
-the real dispersion the endogenous series sits on the floor at every setting,
-so all three inflation clamps are calibration questions rather than literals.
-Bit-identical at the shipped value; no preset uses it.
+`inflation_floor` (-1.0) is a dial, the third and last of the inflation
+clamps. Measured over twelve seeds and three years: dropping it to -3.0 moves
+the mean by 0.01 and the sd by 0.02, so it is not a lever. The reversion is.
 
-**What a real inflation range does to the equity panel, measured.** 0.1.4
-shipped the inflation dials with the question open. On pt-v8 at thirty
-seeds, `inflation_reversion` 0.20 with `inflation_ceiling` 10 brings lag-5
-clustering at 252 days back over its floor, so the panel reads 13 of 14
-there, and costs the return autocorrelation and the same clustering
-statistic at 504 days, where the panel drops to 11 of 14. The crisis state
-does not move. That trade is the wrong way round for a preset whose case
-rests on the long horizon, so no preset takes the dials; they remain for
-anyone who wants an inflation regime and is scoring at one year.
-Calibration record §65.
+What a wider inflation regime costs the equity panel, measured on pt-v8 at
+thirty seeds with `inflation_reversion` 0.20 and `inflation_ceiling` 10: the
+252-day panel gains lag-5 clustering and reads 13 of 14, the 504-day panel
+loses the return autocorrelation and that same statistic and reads 11 of 14,
+and the crisis state does not move. No preset takes the dials. Calibration
+record §65.
 
 ## 0.1.4
 
-Two new model presets, a realism panel that has grown from ten statistics to
-fourteen, and a calibration record that says where every number came from.
-Nothing that already shipped moves: the known-answer digest is unchanged,
-pt-v1 through pt-v6 reproduce exactly, and pt-v3 is still the default and
-the preset the envelope certifies, so every published result still
-reproduces.
+Two new presets, four new panel statistics, five parameters that used to be
+literals, and the measurements behind each. Nothing that already shipped
+moves: the known-answer digest is unchanged, pt-v1 through pt-v6 reproduce
+bit for bit, and pt-v3 remains the default and the certified preset.
 
-`pt-v7` is the first preset in which names in the same industry co-move
-more than names in different ones, in calm markets and in a crisis alike.
-`pt-v8` is the first whose correlation has a memory: the market factor's
-variance now remembers, so correlation that rose last month is still
-elevated this month, and a crisis is a third more violent than under any
-earlier preset. Both are selectable by name and every gate they passed is
-in the record. The panel's four new statistics (three conditional
-correlation measures and correlation persistence) come with real-market
-bands at both horizons, and the two misses the default preset now shows
-against them are stated as gaps with the mechanism that closes each.
+### Presets
 
-Five parameters ship inert at their old values, each replacing a literal
-that was deciding a calibration question before anyone asked it: the two
-that let sector structure survive a crisis, the fair-value book floor, and
-the two inflation dials. The calibration tooling that produced all of this,
-including the first full-width AWS survey and a one-command thirty-seed
-gate, is in the tree. The sections below give the measurements.
+Both are selectable by name, neither is the default, and both were measured
+on thirty training seeds at both horizons.
 
-### The realism panel grows from ten statistics to thirteen
-
-The one cross-sectional statistic the panel had, mean pairwise correlation over
-all pairs, is blind to sign, sector and time, and a search cannot preserve what
-it cannot see. Three conditional statistics are added, each banded on the same
-forty-name reference roster by the same rule as the original ten:
-
-| statistic | what it conditions on | real band at 252 days | pt-v3 |
+| preset | base | coefficients moved | measured |
 |---|---|---|---|
-| `corr_asymmetry` | days the market fell more than one sd, minus days it rose more | -0.25 to +0.45 | +0.004, in band |
+| `pt-v7` | pt-v6 | `sector_factor_sigma` 0.002 to 0.012, `crisis_blend_source` 0 to 1, `sector_vix_coupling` 0 to 0.25, `idio_sigma_scale` down ten percent, `crisis_blend_cap` 0.8 to 0.98, `market_vol_ceiling_multiple` 8 to 16 | 12 of 13 in band at 252 and at 504 days; sector excess 0.128 and 0.118 against a band of 0.11 to 0.23; crisis volatility lever 3.31x |
+| `pt-v8` | pt-v7 | market factor GARCH alpha 0.468 to 0.298 and beta 0.521 to 0.665, `market_factor_sigma` 0.0159 to 0.0088, `idio_sigma_scale` 0.733 to 0.653, market jumps and sector sigma at surveyed values | 13 of 14 at 504 days and 12 of 14 at 252; correlation persistence +0.315 against a band of 0.19 to 0.49; crisis volatility lever 4.34x |
+
+pt-v7 is the first preset in which same-sector pairs co-move more than
+cross-sector pairs, in calm markets and under a held crisis. pt-v8 is the
+first whose correlation has a memory: in this model window correlation is
+the market factor's variance (r = 0.92 within a run), and that variance had
+almost none, because the shipped GARCH ran alpha 0.47.
+
+Costs, measured rather than estimated. pt-v8 misses lag-5 clustering at 252
+days by a quarter of a seed sd, and its crisis-state sector excess is +0.053
+against pt-v7's +0.079 and a real +0.10. Real markets read 6.16x on the
+crisis lever, so both presets remain short of it.
+
+Gates both passed: thirty-seed panels at 252 and 504 days, a held VIX 45
+state, six held-out seeds, a held-out 60-name universe, and the §8
+overfitting control against a base whose own control passes. Derivation in
+the calibration record, §58 to §64.
+
+### Four new panel statistics
+
+Banded on the same forty-name reference roster and by the same rule as the
+original ten.
+
+| statistic | measures | band at 252 days | pt-v3 |
+|---|---|---|---|
+| `corr_asymmetry` | correlation on days the market fell more than one sd, minus days it rose more | -0.25 to +0.45 | +0.004, in band |
 | `corr_asymmetry_lagged` | the same, on the previous day's market return | -0.20 to +0.55 | -0.033, in band |
-| `sector_excess_corr` | same-sector pairs minus cross-sector pairs | **+0.11 to +0.23** | **+0.004, 15 seed-sd out** |
+| `sector_excess_corr` | same-sector pairs minus cross-sector pairs | +0.11 to +0.23 | +0.004, 15 seed sd out |
+| `corr_persistence_acf1` | lag-1 autocorrelation of correlation over 21-day windows | -0.19 to +0.54 | +0.04, in band |
 
-The certified count is now **eleven of thirteen** at 252 days, on training
-seeds, held-out seeds and a held-out 60-name universe alike, and six of
-thirteen at 504. Nothing in the engine moved; the two new misses were always
-there and are now measured.
+`corr_persistence_acf1` also carries a 504-day band of 0.19 to 0.49, which is
+the one that can judge: twelve windows in a year cannot, and the 252-day band
+is wide because the real windows themselves are. Its seed noise is the
+largest of any correlation-type statistic, so it sits outside the objective.
 
-The new miss is a real finding. Every one of ten real windows including the
-2020 crisis has same-sector pairs co-moving between 0.10 and 0.20 more than
-cross-sector pairs, the tightest band on the panel after volume change, and the
-model reads 0.004 because its sector factor is a single scalar at sigma 0.002.
-That is recorded as gap 7, `sector-structure`, which `envelope.check()` now
-fires for any question naming `sector_excess_corr`, and its `forbids` field
-names sector rotation, sector-neutral construction and industry diversification.
-The lever, `sector_factor_sigma`, is settable and shipped; the pt-v1 search
-reported it as a null direction, which is what a lever looks like when the
-objective cannot see it.
+pt-v3 now reads twelve of fourteen in band at 252 days and seven of fourteen
+at 504. Nothing in the engine moved; the misses were always there.
 
-The dial that would close gap 7 has been measured and is not shipped. At
-`sector_factor_sigma` 0.012 the statistic lands inside its band at 0.155 with
-nothing else on the panel leaving its own, but two things the panel cannot see
-move the wrong way: the crisis volatility lever falls from 3.07x to 2.78x, and
-kurtosis thins by about a third of a seed-sd at two years. And above the crisis
-threshold the engine's blend replaces the sector draw with the market draw, so
-industries dissolve in a panic whatever the dial is set to. The remedies for
-all three are being measured, and any change to the default arrives as a new
-preset. The calibration record has the numbers (§59 and §60) and the design
-for the blend change.
+`sector_excess_corr` is recorded as gap 7, `sector-structure`, which
+`envelope.check()` fires for any question naming it, and whose `forbids`
+field names sector rotation, sector-neutral construction and industry
+diversification. pt-v7 closes it.
 
-Where these came from: a review of the correlation structure, adversarially
-checked against the calibration record, which rejected five of twelve proposed
-mechanisms on the record's own measurements and ranked the survivors behind the
-statistics needed to see them. It is in the design repository as
-CORRELATION-REVIEW-2026-08-25.md.
+### Five parameters that used to be literals
 
-### A fourteenth statistic: correlation persistence
+Each shipped at the value every preset already ran on, bit-identical by
+branch. No preset uses any of them.
 
-`corr_persistence_acf1`, the lag-1 autocorrelation of mean pairwise
-correlation over non-overlapping 21-day windows, joins `facts.REAL_MARKETS`
-with real bands at both horizons: (-0.19, 0.54) at 252 days, where twelve
-windows cannot judge anything and the band says so, and (0.19, 0.49) at 504
-days, where it can. pt-v3 reads +0.04 and +0.22, in band at both, at the
-floor of the second. Its seed noise (0.28 and 0.20) is the largest of any
-correlation-type statistic, so it sits outside the objective; the atlas survey records it per
-horizon beside the thirteen. The certified count is now twelve of fourteen
-at 252 days and seven of fourteen at 504. Calibration record §64.
+| parameter | ships at | decides |
+|---|---|---|
+| `crisis_blend_source` | 0.0 | whether the crisis blend takes its injection from the sector draw or the market component |
+| `sector_vix_coupling` | 0.0 | how much of the sector draw's variance follows VIX |
+| `fair_value_book_floor` | 0.0 | whether the book floor applies to profitable companies too |
+| `inflation_reversion` | 0.55 | how fast endogenous inflation reverts to its 2% target each month |
+| `inflation_ceiling` | 6.0 | the hard clamp on endogenous inflation |
 
-### pt-v8: the first preset whose correlation has a memory
+`fair_value_book_floor` exists for a discontinuity: fair value jumps up as
+earnings fall through zero, because profitable companies are valued on
+earnings and loss makers at book times 1.2. On a book of 20.00, a company
+earning 1.00 is worth 14.90 and one losing 19.49 is worth 24.00. The floor
+makes fair value continuous and non-decreasing in earnings, and switching it
+on re-values 42.8% of instruments from `Universe.random`, so adopting it is a
+recalibration rather than a fix.
 
-pt-v7 with seven coefficients moved, selectable by name and not the
-default. The market factor's GARCH runs alpha 0.298 / beta 0.665 in place
-of 0.468 / 0.521: the shipped process had no fourth moment (3a^2 + 2ab +
-b^2 = 1.42) and its variance had almost no window-to-window memory although
-the VIX it targets has, and in this model window correlation is that
-variance (r = 0.92 within a run). The factor's calm sigma falls 0.0159 to
-0.0088 and `idio_sigma_scale` 0.733 to 0.653 to re-set the levels; market
-jumps and the sector sigma carry the surveyed values. Found by a 3000-vector
-survey on the pt-v7 base and confirmed at thirty seeds: **thirteen of
-fourteen in band at 504 days** with correlation persistence +0.315 (real
-band 0.19 to 0.49; pt-v7 +0.251), twelve of fourteen at 252 (lag-5
-clustering a quarter of a noise unit under its floor, which the survey
-priced on every qualifying vector), held-out universe 13/14, §8 no flips.
-Crisis lever **4.34x** against pt-v7's 3.31x and a real 6.16x; correlation
-blend 3.16x; shock response 1.083; calm-market volatility at VIX 5 down
-from 28.4% to 24.5%. Costs stated: crisis-state sector excess +0.053 against
-pt-v7's +0.079 (real +0.10); on the one-name pandemic replay in notebook 09
-it tracks the VIX better than pt-v7 on every seed tried and is mixed on the
-rest, with a deeper drawdown on the notebook's own seed. pt-v8's fourth-moment index is 1.11,
-still above one: the gain is measured, not derived. Calibration record §64.
+The inflation dials were measured after the release and the result is in the
+next section of this file: they buy range and cost the long-horizon panel.
 
-### pt-v7: the first preset with industries
+### New envelope gap: the macro state cannot reach its own crisis regimes
 
-pt-v6 with six coefficients moved, selectable by name and not the default:
-`sector_factor_sigma` 0.002 to 0.012, `crisis_blend_source` 0.0 to 1.0,
-`sector_vix_coupling` 0.0 to 0.25, `idio_sigma_scale` trimmed by ten percent
-to pay for the added variance, and `crisis_blend_cap` 0.8 to 0.98, which the
-survey over this surface found to be the one dial monotone on crisis
-correlation and crisis magnitude together and which binds only above the
-crisis threshold, so it costs nothing in calm markets, and
-`market_vol_ceiling_multiple` 8 to 16, which also binds only in a crisis and
-lifts the crisis volatility lever from 3.06x to 3.31x with crisis kurtosis
-unchanged. Measured on thirty training seeds
-across all thirteen statistics, it holds **twelve of thirteen at 252 days and
-twelve of thirteen at 504**, the only miss being the structural volume-change
-row; pt-v6 holds eleven and ten, and pt-v3 eleven and six. Sector excess
-correlation reads 0.128 and 0.118 against a band of 0.11 to 0.23, and +0.088
-in a held VIX 45 against the real 2020 window's +0.103, with crisis
-cross-sectional correlation 0.610 against pt-v6's 0.600 and the real band's
-0.6 and above.
+Endogenous inflation peaks at 4.06% to 4.11% over five seeds and five years
+against a clamp of 6.0% and a US CPI that reached 9.1% in June 2022. The
+cause is dispersion, sd 1.23 around a mean of 1.99%, not persistence: the
+monthly series has AR(1) +0.936 against +0.894 for real CPI across 2020 and
+2021.
 
-It passed the three gates that have killed candidates before. The response
-instrument reads the crisis volatility lever at 3.06x against pt-v6's 2.68x,
-with calm volatility below the base and the correlation blend held; a
-held-out 60-name universe holds twelve of thirteen; and §8 passes on every
-axis against a base whose own control passes. On six held-out seeds one
-statistic, `abs_return_acf5`, reads 0.012 below its floor where the base
-reads 0.004 above it, a quarter of one seed-sd apart and stated as such.
-
-The trim is the part worth understanding. On pt-v3 the same trim thins the
-tails through their floor, because there the idiosyncratic term is what
-carries kurtosis. On pt-v6 the jumps carry it, and trimming the term that was
-diluting them RAISES kurtosis from 7.15 to 8.52 at one year. That is why the
-sector fix lives on this base and not on the default.
-
-pt-v3 stays the default and the envelope still certifies pt-v3. Gap 7 now
-names pt-v7 as the selectable preset that closes it, which is a statement
-about that preset and not a certification. The calibration record carries the
-whole derivation as §58 to §62.
-
-### Two parameters that let sector structure survive a crisis, inert at 0.0
-
-Measuring the fix for gap 7 found that the coefficient alone pays twice, on
-every base, for one reason: the sector draw is the only variance term on the
-tick path that does not scale with VIX, so it dilutes the crisis lever in calm
-markets and is thrown away by the crisis blend in stressed ones, where
-`sector_excess_corr` reads zero at a held VIX 45 against a real +0.10.
-
-`sector_vix_coupling` lets the sector draw's variance follow VIX on the market
-factor's own target shape. `crisis_blend_source` moves the crisis injection off
-the sector slot and onto the market component, leaving the sector draw whole.
-Both ship at 0.0, bit-identical by branch on every preset; the known-answer
-digest is unchanged and every parity suite passes. At six seeds under a held
-crisis, moving the blend off the sector slot restores sector structure and the
-coupling raises it further; the thirty-seed measurement is in the calibration
-record. No preset uses either yet.
-
-### `fair_value_book_floor`, and the discontinuity it exists for
-
-Fair value jumps UP as earnings fall through zero. Profitable companies are
-valued on earnings times a multiple and loss makers at book times 1.2, so with
-a book value of 20.00 a company earning 1.00 is worth 14.90, one earning 0.50
-is worth 7.45, and one losing 19.49 is worth 24.00. A barely profitable company
-is worth less than a bankrupt one.
-
-That is close to harmless today, because earnings are fixed when an instrument
-is built and nothing walks them through zero. It stops being harmless the
-moment anything does: an airline going from 4.30 to a loss across a year would
-watch its fair value slide, invert and jump, with the price chasing it.
-
-The new parameter applies the book floor on both sides, which makes fair value
-continuous at zero and non decreasing in earnings. **It ships at 0.0, off, and
-is bit identical there.** That is not caution for its own sake: 42.8% of
-instruments from `Universe.random` have `eps * pe` below `book * 1.2`, some at
-a fifth of it, so switching it on re-values a large part of a typical universe
-and re-bases every calibrated statistic. Adopting it is an era boundary and a
-recalibration rather than a bug fix, and this release only makes it available
-to measure.
-
-### A new envelope gap: the macro state cannot reach its own crisis regimes
-
-`macro-range` records something the envelope did not say and users were
-entitled to know, namely that left to itself the economy stays in a moderate
-band.
-
-Endogenous inflation peaks at 4.06% to 4.11% over five seeds and five years,
-against a hard clamp of 6.0% and a US CPI that reached 9.1% in June 2022. The
-obvious explanation is wrong, and the gap says so, because the next person will
-otherwise start there: `inflation_mean_rev_coeff` is 0.55 a month and looks
-like it should pin inflation to its 2% target, but the monthly series has
-AR(1) +0.936 against +0.894 for real CPI year on year across 2020 and 2021. The
-model's inflation is if anything MORE persistent than the real thing. The
-defect is dispersion, sd 1.23 around a mean of 1.99%, which puts 9% at 4.6
-sigma.
-
-The consequence reaches the central bank. Its crisis cadence pulls the next
+The central bank's crisis cadence depends on it. That path pulls the next
 meeting in to 21 to 30 days when a decision leaves it more than 2pp behind an
-inflation rate above 4%, and that path is correct and well exercised, firing in
-22.0% of the 11,898 central bank cases in the parity corpus. A default run
-simply cannot reach it. It also fires in STAGFLATION rather than in high
-inflation as such, so pinning inflation high with unemployment low will not
-trigger it however high you pin it.
+inflation rate above 4%, fires in 22.0% of the 11,898 central-bank cases in
+the parity corpus, and a default run cannot reach it. It also fires in
+stagflation rather than in high inflation as such.
 
-So a 2022 style inflation shock has to be driven through a scenario, and so
-does the policy response to it.
+So an inflation regime has to be driven through a scenario. The gap says how,
+and the recipe was run before it was published, on real 2022 data over six
+seeds against a real S&P of -20.0%:
 
-### Two inflation dials, shipped at the values every preset ran on
-
-`inflation_reversion` (0.55) and `inflation_ceiling` (6.0) were a literal
-and a clamp inside the monthly inflation update; they are `ModelParams`
-fields now, bit-identical at their shipped values. The gap above names
-them: at reversion 0.15 the endogenous inflation series matches the real
-2015-2025 mean and dispersion to the second decimal and then sits on the
-clamps, while its persistence does not move, because that comes from the
-cycle, wages and unemployment rather than the reversion. No preset takes
-them; calibration record §65 is the measurement.
-
-### `check()` can now refuse a macro-regime question
-
-The `macro-range` gap above was, for one afternoon, invisible to the interface
-users actually call. `envelope.check()` names no route to a gap that names no
-statistics, so someone asking whether they could study an inflation regime was
-told `inside=True` while the documentation page said otherwise. `check()` gains
-a `macro_regime` flag, and the refusal quotes the measurements.
-
-`tests/test_envelope_reachability.py` now requires every gap in `GAPS` to be
-reachable through some argument to `check`, and every refusal to carry a
-figure. Adding a gap fails that file until it is wired to something a caller
-can ask for. It caught one immediately: the `scenario-magnitude` refusal said
-only that the size "is not certified", with no number, and now gives the 3.07x
-lever against real markets' 6.16x.
-
-### The gap's own advice, tested against 2022
-
-`macro-range` tells a reader to drive an inflation regime through a scenario.
-That advice was checked before shipping it, on real 2022 data over six seeds,
-because a gap that hands out a recipe should have run the recipe.
-
-It works, and the lever is inflation rather than the policy rate. Against a
-real S&P of -20.0%:
-
-| scenario | index, median of 6 seeds |
+| scenario | index, median of six seeds |
 |---|---|
-| no scenario at all | -12.6% |
-| the real seven hike path only | -13.1% |
-| the published CPI path | **-23.3%** |
+| no scenario | -12.6% |
+| the real seven-hike path only | -13.1% |
+| the published CPI path | -23.3% |
 
-The middle row is the one worth having. Driving the real 2022 hiking cycle,
-0.125% to 4.375% in seven moves, returns the drift and nothing more. Inflation
-works because it steers the central bank's OWN reaction into the corporate bond
-yield, and an externally pinned policy rate does not reproduce that. The gap
-now says so, including that `corporate_bond_yield` must be left free, since
-pinning it severs the channel the inflation path is using.
+Inflation is the lever because it steers the central bank's own reaction into
+the corporate bond yield; a pinned policy rate does not. `corporate_bond_yield`
+must be left free, since pinning it severs that channel. Without the control
+row the hike-path run reads as a 13% bear market.
 
-The control row is the reason any of this is stated. Without it, the hike-path
-run reads as a 13% bear market and looks like a result.
+`envelope.check()` gains a `macro_regime` flag so the gap is reachable, and
+`tests/test_envelope_reachability.py` now requires every gap to be reachable
+and every refusal to carry a figure. It caught one: the `scenario-magnitude`
+refusal quoted no number and now gives 3.07x against a real 6.16x.
 
 ### What each macro field transmits, and when
 
-`docs/scenarios.md` gains a per field table, measured by introducing each shock
-on day 5 of a run and reading day 25.
+`docs/scenarios.md` gains a table, measured by introducing each shock on day
+5 and reading day 25.
 
 | field | median price move by day 25 | fair value |
 |---|---|---|
@@ -297,115 +143,70 @@ on day 5 of a run and reading day 25.
 | `inflation_rate` 2% to 9% | 0.00% | unchanged |
 | `fear_greed_index` 50 to 0 | 0.00% | unchanged |
 
-Three act on the day you move them, two wait for a central bank meeting because
-both work only by steering the corporate bond yield, and one does nothing at
-all. `fear_greed_index` is settable, range validated and reported in
-`macro_table`, and no pricing code reads it. That is now stated rather than
-left to be discovered.
+Three act the day you move them; two wait for a central bank meeting, because
+both work only through the corporate bond yield; `fear_greed_index` is
+settable and validated and no pricing code reads it.
+`tests/test_macro_transmission.py` pins the map, including the meeting
+boundary. The scenario recipes page previously headed this "nothing transmits
+before day 45", which was true only of a policy-rate path and is now
+qualified.
 
-The scenario recipes page previously headed this "nothing transmits before day
-45". The sentence beneath it was correctly narrow, a POLICY ONLY rate path, but
-the heading is what gets remembered and it is false. It now carries the
-qualifier, and `tests/test_macro_transmission.py` pins the whole map: the
-meeting boundary at its exact day, the fields that act immediately, the fact
-that pinning the yield severs everything upstream of it, and the inertness of
-`fear_greed_index`.
+### Two envelope claims replaced by measurements
 
-### Two claims in the realism envelope are now measurements
-
-**"The direction of response is right"** was asserted with no number behind it.
-Driving the real 2020 to 2021 macro path through the model and correlating
-daily returns against each driver over 504 sessions, beside the same
-correlations computed on real AAPL:
+"The direction of response is right" now carries numbers. Driving the real
+2020 to 2021 macro path through the model over 504 sessions, beside the same
+correlations on real AAPL:
 
 | channel | simulated | real AAPL |
 |---|---|---|
-| return vs change in VIX | -0.423 | -0.622 |
-| return vs change in credit yield | -0.496 | -0.592 |
-| return vs change in valuation | +0.573 | +0.803 |
-| absolute return vs VIX level | +0.512 | +0.489 |
+| return against change in VIX | -0.423 | -0.622 |
+| return against change in credit yield | -0.496 | -0.592 |
+| return against change in valuation | +0.573 | +0.803 |
+| absolute return against VIX level | +0.512 | +0.489 |
 
-All four carry the sign theory fixes in advance, and the volatility clustering
-channel is close to exact. The three directional channels run at roughly
-seventy to eighty five percent of the real response, which is the
-scenario magnitude gap from another angle: a shock moves this market the right
-way and not far enough.
+All four signs are right and the three directional channels run at seventy to
+eighty five percent of the real response, which is the scenario-magnitude gap
+from another angle.
 
-**pt-v6's scenario cost** is now in the horizon gap, so a reader selecting it on
-band counts reads the cost in the same paragraph. The steady state volatility
-lever from VIX 5 to VIX 65 runs 3.07x at pt-v3, 2.67x at pt-v4, 2.69x at pt-v5
-and 2.68x at pt-v6, against real markets' 6.16x. A sustained crisis is about an
-eighth less violent under pt-v6 than under the default, so a study turning on
-crisis magnitude should prefer pt-v3 even over multi year windows. The cost was
-spent when jumps arrived at pt-v4; every preset since inherits it.
+pt-v6's scenario cost is now stated in the horizon gap: the volatility lever
+from VIX 5 to 65 runs 3.07x at pt-v3, 2.67x at pt-v4, 2.69x at pt-v5 and
+2.68x at pt-v6 against a real 6.16x, so a study that turns on crisis
+magnitude should prefer pt-v3 even over multi-year windows. The cost was
+spent when jumps arrived at pt-v4.
 
 ### Calibration tooling
 
-**`atlas_survey.py plan` now binds.** `--samples` is a single top level argument
-that `run` re-reads from its own default of 4000, and `plan` wrote nothing to
-disk, so `plan --samples 1000` followed by a bare `run` forecast 48,000 tasks
-and then ran 192,000 under a different plan fingerprint printed one line later.
-The forecast is what an operator sizes a dead man switch against, and one
-survey run was killed by its own timeout at 63.9% complete for exactly this
-reason. `plan --out` now writes `meta.json`, which lets the refusal `run`
-already had actually fire, and `tests/test_survey_plan_guard.py` pins it.
-
-**`scenario_response.py` no longer prints a number that should not be quoted.**
-"Shock response retained" divides two small excesses over 1.0, so a difference
-of 0.024 in the shock ratio becomes an eleven point headline, and it has been
-quoted that way twice in this project's own record. The tool now prints the
-excesses it is built from and names the shock ratios to quote instead.
-
-**`read_decay_survey.py` gained an argument parser.** It read `sys.argv[1]`
-directly, so `--help` opened a file named `--help` and died in a traceback.
-`tests/test_tool_help.py` could not see it, because that test collects scripts
-containing `add_argument` and a tool with no parser is not an entry point as
-far as it is concerned. Entry points go from 21 to 22.
-
-**The AWS survey launcher can now survive a spot reclaim.** Its row stream
-used `aws s3 sync`, which lists the destination to compare and so needs
-`s3:ListBucket`, a permission the instance role does not have. Every sync
-failed silently while every `cp` in the same loop succeeded, so a reclaimed run
-resumed from nothing. The rows are copied with `cp` now, and the launcher also
-refuses to start a run at all if a one-byte write to the bucket fails, which is
-what a missing instance profile looks like and what cost one full survey.
-
-**`atlas_survey.py` can survey a few axes around a preset other than pt-v3.**
-`--base pt-v6 --only a,b,c` restricts the plan to the named axes and pins
-every other parameter at the base preset's value inside each vector, so a task
-still sets all of them and nothing falls through to the evaluator's pt-v1
-base. Multiplicative boxes around a negative base value, which pt-v6's jump
-mean is, are ordered rather than refused. `tests/test_survey_only.py` pins the
-completion.
-
-**The survey records what it was blind to.** Correlation persistence at both
-horizons and the held VIX 45 state's sector excess and kurtosis are recorded
-per vector, which is how the factor-memory survey could be read for the
-crisis-state cost of every candidate rather than discovering it at the gate.
-`EXPLICIT_RANGES` now applies to the transformed axes too, so a survey can
-sample the market factor's memory where an answer can be instead of across
-the 0.25 to 0.90 of persistence every earlier search had already scored as a
-wreck, and every range must contain the base preset's value.
-
-**`gate_pick.py`** runs every gate a preset has to pass on one candidate in one
-command: thirty-seed panels at both horizons on the fourteen statistics, the
-held VIX 45 state, held-out seeds, a held-out universe, and the response
-instrument against the base. **`read_factor_memory_survey.py`** reads the
-survey for it. pt-v8 is the first preset registered through that path.
-
-**`read_scenario_frontier.py`** is new, and reads the survey for the frontier
-between scenario response and horizon realism.
+- `atlas_survey.py plan --out` writes `meta.json`, so `run` refuses a
+  mismatched plan. `--samples` bound nothing before, and one survey was
+  killed by its own dead-man switch at 63.9% because the forecast said 48,000
+  tasks and the run did 192,000.
+- `atlas_survey.py --base <preset> --only a,b,c` surveys a few axes around a
+  preset other than pt-v3, pinning the rest at the base. `EXPLICIT_RANGES`
+  applies to the transformed axes, and every range must contain the base
+  value.
+- The survey records `corr_persistence_acf1` at both horizons and the held
+  VIX 45 state's sector excess and kurtosis, which is how a candidate's
+  crisis-state cost is visible at selection time.
+- `gate_pick.py` runs every gate a candidate preset must pass in one command.
+  `read_factor_memory_survey.py` and `read_scenario_frontier.py` read the
+  survey. pt-v8 was registered through that path.
+- `scenario_response.py` no longer prints "shock response retained", a ratio
+  of two small excesses that turns 0.024 into an eleven point headline.
+- The AWS survey launcher streams rows with `cp` rather than `sync`, which
+  needs a `s3:ListBucket` the instance role does not have, and aborts if a
+  one-byte write to the bucket fails.
+- `read_decay_survey.py` gained an argument parser; entry points go from 21
+  to 22.
 
 ### Worked example
 
-`examples/09-a-pandemic-shaped-market.ipynb`, which shipped in 0.1.3, gains a
-section testing whether its effects follow its causes rather than only whether
-its path resembles the real one. It carries the channel table above and an
-event study over the five sessions after each of six dated events, which agrees
-on sign five times out of six. The exception is the Fed's intermeeting cut of
-3 March 2020, where the model has the textbook channel by which a cut helps
-equities and no representation of an emergency cut reading as a panic signal.
-That channel is missing rather than miscalibrated, and the notebook says so.
+`examples/09-a-pandemic-shaped-market.ipynb` gains a section testing whether
+its effects follow its causes rather than only whether its path resembles the
+real one. It carries the channel table above and an event study over the five
+sessions after each of six dated events, agreeing on sign five times out of
+six. The exception is the Fed's intermeeting cut of 3 March 2020: the model
+has the textbook channel by which a cut helps equities and no representation
+of an emergency cut reading as a panic signal.
 
 ## 0.1.3
 
@@ -456,16 +257,15 @@ does not close it: the log-log slope of the volatility autocorrelation reads
 moves away from the target. It ships at zero and its documentation leads with
 that measurement rather than with what it was for.
 
-It is kept because it does something real and smaller: at 504 days it
-improves room on kurtosis and on annualised volatility. A parameter claiming
-a gap it does not close would be worse than no parameter.
+It is kept for a smaller effect it does have: at 504 days it improves room
+on kurtosis and on annualised volatility.
 
 ### Also
 
 The realism envelope now records which selectable preset closes a gap, so a
 reader who hits "tails are too thin over multi-year windows" can learn that
-three presets do not have it. Naming a preset there is not a certification:
-the reader makes that trade rather than the default moving quietly.
+three presets do not have it. Naming a preset there is not a certification;
+the default does not move.
 
 `docs/envelope.json` carries the same field, so the citable artifact answers
 the question without anyone reading the source.
@@ -478,16 +278,14 @@ real high yield fund prices into a 505 day run, and scores the result against
 what Apple's shares actually did. The daily series it uses are committed
 alongside it, so it runs offline and gives the same answer every time.
 
-It is written around a failure rather than a result. The first attempt puts a
-drawdown of roughly the right depth two months away from the real one, and the
-notebook then sweeps each macro field on its own to find out why. Only
-`qe_pe_boost` moves a valuation, and it had been pinned at zero through the
-entire crash, so nothing could re-rate. Supplying the market's own valuation
-path moves the trough onto the correct day and brings the drawdown within a
-fraction of a percent, at the cost of overshooting volatility, which the
-notebook reports rather than smooths away.
+The first attempt puts a drawdown of roughly the right depth two months away
+from the real one, and the notebook sweeps each macro field to find out why.
+Only `qe_pe_boost` moves a valuation, and it was pinned at zero through the
+crash, so nothing could re-rate. Supplying the market's own valuation path
+moves the trough onto the correct day and brings the drawdown within a
+fraction of a percent, at the cost of overshooting volatility.
 
-Two findings from that sweep are worth having outside the notebook.
+Two findings from that sweep hold outside the notebook.
 `fear_greed_index` is inert with respect to price: pinned anywhere from 0 to
 100 it produces bit identical trajectories. `inflation_rate` reaches prices
 only through `corporate_bond_yield`, so pinning both is the same as pinning the
