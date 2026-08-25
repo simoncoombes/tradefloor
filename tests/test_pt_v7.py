@@ -1,6 +1,6 @@
 """pt-v7: pt-v6 with industries that survive a crisis.
 
-Four coefficients move from pt-v6 and nothing else does. What these tests pin
+Five coefficients move from pt-v6 and nothing else does. What these tests pin
 is the identity contract every preset carries: it is exactly the vector the
 calibration record describes (CALIBRATION-FOLLOWUPS.md §62), it answers to
 its own name and to no other, every earlier preset reproduces bit for bit,
@@ -15,10 +15,11 @@ MOVED = {
     "sector_factor_sigma": 0.012,
     "crisis_blend_source": 1.0,
     "sector_vix_coupling": 0.25,
+    "crisis_blend_cap": 0.98,
 }
 
 
-def test_it_is_pt_v6_with_four_coefficients_moved() -> None:
+def test_it_is_pt_v6_with_five_coefficients_moved() -> None:
     v6 = pt.ModelParams.from_preset("pt-v6").to_dict()
     v7 = pt.ModelParams.from_preset("pt-v7").to_dict()
     for name, value in MOVED.items():
