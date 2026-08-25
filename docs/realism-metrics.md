@@ -178,6 +178,18 @@ fat tails with the *wrong* skew, which would read as "kurtosis improved" on
 the panel while getting crises backwards. `jump_mean_market` exists to carry
 that asymmetry, and `skew` is what would prove it.
 
+**`corr_persistence_acf1`**: mean pairwise correlation on non-overlapping
+21-day windows, then the lag-1 autocorrelation of that series.
+
+Whether a panic leaves a trace. Real markets on the reference roster read
+0.388 with a half-life near fifteen days: correlation that rose last month is
+still elevated this month. A model whose correlation is a lookup on today's
+VIX reads near zero, because the cross-section decouples the moment the VIX
+falls. Twelve windows in a year is a noisy estimate per seed, so this is
+reported and not yet banded; it is the honest test of the universe-stress
+memory mechanism, which ships inert, and of the crisis-blend change measured
+in the calibration record.
+
 ### Provenance fields, not statistics
 
 Every panel also carries `days`, `instruments`, `observations`,

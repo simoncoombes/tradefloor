@@ -431,3 +431,22 @@ def test_the_report_names_the_mismatches_rather_than_scoring_them():
     assert "TOO HIGH" in text
     assert "matches" in text
     assert "momentum is mechanically" in text
+
+
+def test_correlation_persistence_is_reported_and_not_judged():
+    """A diagnostic: present, None when the run is too short for six windows,
+    a float when it is not, and absent from every judged table.
+
+    Twelve non-overlapping 21-day windows in a year is a noisy series, so the
+    statistic is measured and reported without a band until a thirty-seed
+    baseline and a reference band exist together. Pinned so it cannot slip
+    into REAL_MARKETS by accident and start steering a search.
+    """
+    short = measure(seed=2, universe=UNIVERSE, days=60)
+    assert "corr_persistence_acf1" in short
+    assert short["corr_persistence_acf1"] is None
+    year = measure(seed=2, universe=UNIVERSE, days=252)
+    assert isinstance(year["corr_persistence_acf1"], float)
+    assert -1.0 <= year["corr_persistence_acf1"] <= 1.0
+    assert "corr_persistence_acf1" not in pretium.facts.REAL_MARKETS
+    assert "corr_persistence_acf1" not in compare_to_real_markets(year)

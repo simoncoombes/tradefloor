@@ -836,6 +836,11 @@ def _daily_series(bars: dict) -> dict[int, list[tuple[int, float, float]]]:
     return {i: sorted(rows) for i, rows in grouped.items()}
 
 
+#: Window, in sessions, for the correlation-persistence diagnostic. The
+#: real reference (real-corr-persistence.json) was measured at 21.
+CORR_PERSISTENCE_WINDOW = 21
+
+
 def _dependence(
     series: dict[int, list[tuple[int, float, float]]],
     min_observations: int,
@@ -888,6 +893,7 @@ def _dependence(
     cross_sector: list[float] = []
     corr_asymmetry: float | None = None
     corr_asymmetry_lagged: float | None = None
+    corr_persistence_acf1: float | None = None
     if len(keys) >= 2 and common >= 3:
         unit = {i: _unit_centred(returns[i][:common]) for i in keys}
         for position, a in enumerate(keys):
@@ -938,6 +944,29 @@ def _dependence(
                 if down_l is not None and up_l is not None:
                     corr_asymmetry_lagged = down_l - up_l
 
+            # Correlation PERSISTENCE: mean pairwise correlation on
+            # non-overlapping 21-day windows, then the lag-1 autocorrelation
+            # of that series. Real markets on the 40-name reference roster
+            # read 0.388 with a half-life near fifteen days
+            # (pretium-design/real-corr-persistence.json, 126 windows). A
+            # model whose correlation is a lookup on today's VIX reads near
+            # zero here: the cross-section decouples the tick VIX falls.
+            # Non-overlapping windows on purpose; overlapping ones
+            # manufacture persistence out of shared days. Twelve windows in
+            # a 252-day run is a noisy estimate per seed and is reported as a
+            # diagnostic rather than judged against a band.
+            n_windows = common // CORR_PERSISTENCE_WINDOW
+            if n_windows >= 6:
+                per_window = []
+                for w in range(n_windows):
+                    days_w = list(range(w * CORR_PERSISTENCE_WINDOW,
+                                        (w + 1) * CORR_PERSISTENCE_WINDOW))
+                    value = conditional(days_w)
+                    if value is not None:
+                        per_window.append(value)
+                if len(per_window) >= 6:
+                    corr_persistence_acf1 = _autocorrelation(per_window, 1)
+
     volume_corr: list[float | None] = []
     leverage: list[float | None] = []
     volume_change_acf: list[float | None] = []
@@ -976,6 +1005,8 @@ def _dependence(
         "cross_sectional_corr": statistics.fmean(pairwise) if pairwise else None,
         "corr_asymmetry": corr_asymmetry,
         "corr_asymmetry_lagged": corr_asymmetry_lagged,
+        # Measured, not judged: no band yet. See the note where it is computed.
+        "corr_persistence_acf1": corr_persistence_acf1,
         "sector_excess_corr": (
             statistics.fmean(same_sector) - statistics.fmean(cross_sector)
             if same_sector and cross_sector else None
