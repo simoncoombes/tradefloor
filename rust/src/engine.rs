@@ -836,8 +836,32 @@ impl Engine {
             // the state it does not touch bit-identical.
             if total != 0.0 {
                 if let Some(s) = company.stock.mispricing_s {
-                    company.stock.mispricing_s =
-                        Some(crate::market::tick::clamp_s(&self.params, s + total));
+                    let after = crate::market::tick::clamp_s(&self.params, s + total);
+                    company.stock.mispricing_s = Some(after);
+                    // Move the momentum reference with the jump, by the
+                    // share herding must not see.
+                    //
+                    // The momentum roll runs earlier in this same close and
+                    // reads `s - mispricing_s_prev_close`, so a jump added
+                    // here shows up as a re-rating at the NEXT close and
+                    // `momentum_theta` continues it. That is the whole of
+                    // the 504-kurtosis / 252-autocorrelation coupling: the
+                    // one mechanism that reaches the tail is wired into the
+                    // one term that creates continuation.
+                    //
+                    // Advancing the reference by the same amount makes the
+                    // post-jump level the new baseline, so the difference
+                    // the next close measures is the day's diffusion alone.
+                    // The jump still decays back through the existing
+                    // mispricing process; it simply is not amplified on the
+                    // way. `after - s` rather than `total`, because a jump
+                    // the cap truncated must not shield more than it moved.
+                    let carried = (1.0 - self.params.jump_momentum_share) * (after - s);
+                    if carried != 0.0 {
+                        if let Some(prev) = company.stock.mispricing_s_prev_close {
+                            company.stock.mispricing_s_prev_close = Some(prev + carried);
+                        }
+                    }
                 }
             }
         }

@@ -107,6 +107,21 @@ PROSE_FIXES = [
 #: PROSE_FIXES: a fresh design revision gets the treatment automatically. The
 #: replacements assert, so if a later bundle rewords this section the build
 #: fails loudly instead of quietly shipping a stale claim.
+#: The bundle's preset table stops at pt-v4. pt-v5 and pt-v6 exist and are
+#: selectable, and a preset a reader cannot find out about is half shipped.
+#: The rows live in their own file rather than escaped into a Python literal,
+#: because the markup carries the quoting the design uses and fighting that
+#: through two layers of escaping is how a build script grows a syntax error.
+PRESET_ROWS_FILE = ROOT / "tools" / "docs" / "preset-rows.html"
+
+#: The pt-v4 row's closing markup, which the new rows are inserted after.
+#: Asserted at build time so a reworded table fails loudly rather than
+#: silently dropping two presets.
+PRESET_ROWS_ANCHOR = (
+    'having surrendered <code style="font-size:12px">return_acf1</code>.'
+    "</sc-raw-td>\n            </sc-raw-tr>"
+)
+
 RELEASE_STATUS_FIXES = [
     (
         '<h2 style="font-size:19px;margin:40px 0 4px">0.1.0 '
@@ -148,6 +163,15 @@ def read_bundle() -> str:
     # Two spots track the package version; the rest are history. See VERSION.
     doc = doc.replace(">v0.1.0<", f">v{VERSION}<")
     doc = doc.replace("version = {0.1.0}", "version = {%s}" % VERSION)
+    if PRESET_ROWS_ANCHOR not in doc:
+        sys.exit("the pt-v4 row was reworded; PRESET_ROWS_ANCHOR needs "
+                 "updating rather than silently dropping pt-v5 and pt-v6")
+    doc = doc.replace(
+        PRESET_ROWS_ANCHOR,
+        PRESET_ROWS_ANCHOR + "\n            "
+        + PRESET_ROWS_FILE.read_text(encoding="utf-8").strip(),
+        1,
+    )
     for stale, current in RELEASE_STATUS_FIXES:
         if stale not in doc:
             sys.exit(

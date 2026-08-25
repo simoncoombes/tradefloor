@@ -64,10 +64,19 @@ from pretium import atlas  # noqa: E402
 MECHANISMS = {
     "endogenous jumps": {
         "params": ["jump_intensity_market", "jump_intensity_idio",
-                   "jump_mean_market", "jump_sigma_market", "jump_sigma_idio"],
+                   "jump_mean_market", "jump_sigma_market", "jump_sigma_idio",
+                   "jump_momentum_share"],
         "status": "NEVER MEASURED. The only built mechanism that could "
                   "plausibly move excess_kurtosis at 504 days (5.2 against a "
                   "real band of 7.1-22), which nothing else has touched.",
+    },
+    "heterogeneous volatility persistence": {
+        "params": ["garch_beta_dispersion"],
+        "status": "NEVER MEASURED. Aimed at the decay-shape gap, which the "
+                  "envelope records a two-component variance mixture failing "
+                  "to close. That mixture is two timescales WITHIN a name; "
+                  "this is heterogeneity ACROSS names, which is the "
+                  "Granger (1980) route to long memory.",
     },
     "news peer transfer": {
         "params": ["news_peer_weight", "news_peer_weight_down"],

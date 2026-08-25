@@ -158,6 +158,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "jump_mean_market": (-0.08, 0.0),
     "jump_sigma_market": (0.0, 0.08),
     "jump_sigma_idio": (0.0, 0.08),
+    # Volatility-persistence spread across names. Ships at zero, so no
+    # multiplicative box exists; the range is the headroom to the GJR
+    # persistence ceiling.
+    "garch_beta_dispersion": (0.0, 0.15),
     # News peer transfer: weights of a peer's surprise, natural unit range.
     "news_peer_weight": (0.0, 1.0),
     "news_peer_weight_down": (0.0, 1.0),
@@ -194,7 +198,53 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     "crisis_blend_ramp": (0.35, 50.0),
     "crisis_blend_cap": (0.0, 1.0),
+    # Ships at 1.0, so it has a multiplicative box in principle, and that box
+    # is wrong: it is a share on the unit interval and doubling it is not a
+    # defined thing to ask for. The whole interval IS the mechanism. At 1.0 a
+    # jump is a re-rating that momentum_theta continues, which is what
+    # couples 504-day kurtosis to 252-day return autocorrelation. At 0.0 the
+    # jump moves the momentum reference with it, so herding never sees it.
+    "jump_momentum_share": (0.0, 1.0),
 }
+
+
+#: Lags the decay exponent is fitted over. The same three the panel already
+#: measures, so the slope costs no extra simulation: it is a pure function
+#: of numbers every surveyed vector already produces.
+DECAY_LAGS = (1, 5, 20)
+
+
+def decay_slope(panel_medians: dict[str, float], days: int) -> float | None:
+    """Log-log slope of the `|r|` autocorrelation through lags 1, 5 and 20.
+
+    A power law is a straight line on log-log axes and a sum of exponentials
+    bends. Real markets read about -0.436 over these lags; the shipped preset
+    reads about -0.95 (CALIBRATION-FOLLOWUPS §54, §56).
+
+    This exists because the survey measured the region containing the answer
+    and could not report it. `garch_persistence` spans (0.21, 0.99) in
+    TRANSFORMED_AXES, and a vector at 0.94 moves the slope more than a third
+    of the way to real markets, but the decay exponent is not one of the ten
+    panel statistics, so four thousand samples were scored and filed without
+    it. An outcome nobody records cannot be optimised, and looks immovable
+    however much of the space is covered (§56a).
+
+    None when any of the three autocorrelations is non-positive, which
+    happens at long lags in a fast-decaying vector and has no logarithm.
+    """
+    pts = []
+    for lag in DECAY_LAGS:
+        v = panel_medians.get(f"abs_return_acf{lag}_{days}")
+        if v is None or v <= 0.0:
+            return None
+        pts.append((math.log(lag), math.log(v)))
+    mx = sum(x for x, _ in pts) / len(pts)
+    my = sum(y for _, y in pts) / len(pts)
+    den = sum((x - mx) ** 2 for x, _ in pts)
+    if den == 0.0:
+        return None
+    return sum((x - mx) * (y - my) for x, y in pts) / den
+
 
 #: The five raw parameters replaced by (persistence, share) axes.
 REPARAMETERISED = ("garch_alpha", "garch_beta", "garch_gamma",
@@ -691,6 +741,12 @@ def cmd_collect(args) -> int:
             for stat in REAL_MARKETS:
                 outputs[f"{stat}_{days}"] = statistics.median(
                     p[stat] for p in batch)
+        # Free: the slope is a pure function of acf1/5/20, which the panel
+        # above already recorded. No extra simulation.
+        for _d in meta["horizons"]:
+            _sl = decay_slope(outputs, _d)
+            if _sl is not None:
+                outputs[f"decay_slope_{_d}"] = _sl
         loss = dual_horizon_loss(panels[252], panels[504])
         outputs["loss_252"] = loss["loss_252"]
         outputs["loss_504"] = loss["loss_504"]

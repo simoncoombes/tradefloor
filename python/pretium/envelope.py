@@ -144,6 +144,15 @@ class Gap:
     statistics: tuple[str, ...] = ()
     #: None when the gap applies at every horizon.
     beyond_days: int | None = None
+    #: Selectable presets that bring this gap's statistics into band.
+    #:
+    #: Empty for a gap nothing closes. A preset named here is NOT a
+    #: certification: `CERTIFIED` is measured on the shipped preset, and this
+    #: field says only that another one, which a caller has to ask for by
+    #: name, does not carry the gap. A reader who needs it closed can select
+    #: that preset and give up the certification, and that trade is theirs to
+    #: make rather than one this module makes quietly by moving the default.
+    closed_by: tuple[str, ...] = ()
 
 
 GAPS: tuple[Gap, ...] = (
@@ -171,7 +180,9 @@ GAPS: tuple[Gap, ...] = (
             "same span. Volatility itself stabilises near 29.3%, so long runs "
             "do not drift or blow up -- they stay plausible in LEVEL and "
             "become unrealistic in DYNAMICS, which is easy to miss by looking "
-            "only at the price path."
+            "only at the price path. That count is measured on the shipped "
+            "preset. pt-v6, selectable and not certified, holds 8 of 10 at "
+            "504 days and 9 of 10 at the certified horizon."
         ),
         forbids="multi-year backtests, and anything keyed on volatility dynamics beyond one year",
         statistics=("abs_return_acf1", "abs_return_acf5", "return_acf1", "excess_kurtosis"),
@@ -210,6 +221,7 @@ GAPS: tuple[Gap, ...] = (
         forbids="tail-risk or VaR calibration at multi-year horizons",
         statistics=("excess_kurtosis",),
         beyond_days=CERTIFIED_HORIZON_DAYS,
+        closed_by=("pt-v4", "pt-v5", "pt-v6"),
     ),
     Gap(
         id="scenario-magnitude",
@@ -588,6 +600,16 @@ def regressions(panel: Mapping[str, float], *,
     seeds and a held-out universe alike. It was called a win twice before
     anyone counted (CALIBRATION-FOLLOWUPS §33).
 
+    The trade pt-v4 pays was later shown to be a wiring accident rather
+    than a law. A jump landed on `mispricing_s` after the momentum roll had
+    already recorded the pre-jump level, so herding read the jump as a
+    re-rating and continued it: fattening the tail and adding return
+    continuation were the same write. `pt-v5` separates them and holds both,
+    nine of ten at the certified horizon with the 504-day tail closed (§38,
+    §45). That does not soften the policy below. pt-v5 passes the controls
+    and is still not the default, because passing §8 is not certification
+    and `CERTIFIED` is measured on the shipped preset.
+
     So the count is a function now rather than a judgement. An empty list
     means the candidate certifies at least as well as what ships; a
     non-empty one names exactly what it costs, and the policy that follows
@@ -637,6 +659,10 @@ def certified() -> dict[str, Any]:
                 "forbids": g.forbids,
                 "statistics": list(g.statistics),
                 "beyond_days": g.beyond_days,
+                # A reader who cites the artifact and needs a gap closed
+                # should be able to find out whether anything closes it,
+                # without reading the source.
+                "closed_by": list(g.closed_by),
             }
             for g in GAPS
         ],

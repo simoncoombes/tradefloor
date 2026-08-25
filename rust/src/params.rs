@@ -322,6 +322,73 @@ pub struct ModelParams {
     pub jump_intensity_idio: f64,
     /// Standard deviation of the idiosyncratic jump, in log-return units.
     pub jump_sigma_idio: f64,
+    /// Cross-sectional spread in volatility persistence, in raw `beta`
+    /// units. Zero is every preset before pt-v7 and is bit-identical.
+    ///
+    /// Every instrument reads the same `garch_alpha`, `garch_beta` and
+    /// `garch_gamma` off this struct, so volatility memory is homogeneous
+    /// across the cross-section. The decay-shape gap is that real markets'
+    /// volatility autocorrelation decays hyperbolically and this model's
+    /// decays exponentially, and the envelope records a two-component
+    /// variance mixture failing to close it. That mixture is two timescales
+    /// WITHIN a name; this is heterogeneity ACROSS names, which is a
+    /// different mechanism and the one Granger (1980) identifies as
+    /// producing long memory from short-memory components.
+    ///
+    /// Above zero, a name's persistence moves with its size: `beta` plus
+    /// `dispersion * clamp(log(cap / reference) / scale, -1, 1)`, so the reference
+    /// cap gets exactly `garch_beta` and the spread is bounded by
+    /// `dispersion` in both directions. Derived from the roster rather than
+    /// from a draw, so the RNG stream schedule is untouched and no earlier
+    /// preset's trajectory moves.
+    ///
+    /// Clamped so GJR persistence `alpha + beta + gamma/2` stays below
+    /// [`GARCH_PERSISTENCE_CEILING`]. A name whose variance process is not
+    /// stationary does not produce fat tails, it produces a number that
+    /// grows until a guard catches it.
+    ///
+    /// # It does NOT close the decay-shape gap, which is what it was for
+    ///
+    /// Measured, thirty seeds at 504 days (CALIBRATION-FOLLOWUPS §54). The
+    /// log-log slope of the `|r|` autocorrelation over lags 1 to 20 reads
+    /// −0.436 in real markets and −0.933 on pt-v6. At dispersion 0.15 it
+    /// reads −0.944, which is further from real, not closer. The spread
+    /// shaves a little off the short lags and more off the long ones: lag 30
+    /// goes from 0.0026 to 0.0001 against a real 0.0179.
+    ///
+    /// A toy AR/GARCH simulation had it roughly doubling the `acf20/acf1`
+    /// ratio (§52). The engine carries a GJR term, a factor variance process
+    /// and VIX coupling on top, and the result did not transfer.
+    ///
+    /// What it DOES do, measured on the same run, is improve room at 504 on
+    /// `excess_kurtosis`, +0.58 to +0.74 seed-sd, and on
+    /// `annualised_vol_pct`, +0.17 to +0.34. That is the honest claim for it.
+    /// It also moves `abs_return_acf5` across its 504 band edge, but by 0.09
+    /// seed-sd, which §36's flip margin exists to say is not a real crossing.
+    pub garch_beta_dispersion: f64,
+
+    /// How much of a jump the herding term is allowed to continue.
+    ///
+    /// A jump lands on `mispricing_s`, and the momentum term reads the
+    /// change in `s` across closes. So by default a jump is a re-rating like
+    /// any other and `momentum_theta` carries a share of it into the next
+    /// day. That is the coupling behind the trade recorded in §34 and
+    /// reinstated in §37: the only mechanism that reaches the 504-day tail
+    /// also pushes 252-day return autocorrelation out of its band, because
+    /// fattening the tail and adding continuation are the same act.
+    ///
+    /// This splits them. At `1.0` the jump feeds herding exactly as before,
+    /// which is what every shipped preset does and why they reproduce bit
+    /// for bit. Below `1.0` the jump moves the momentum reference point with
+    /// it, so herding sees the post-jump level as the new baseline rather
+    /// than as a change to continue. At `0.0` the jump is invisible to
+    /// momentum: it decays on `s_phi` alone, giving a fat tail with no
+    /// continuation attached to it.
+    ///
+    /// The jump's own mean reversion is unchanged either way -- it always
+    /// decays back through the existing mispricing process. What moves is
+    /// only whether the herding term amplifies it on the way.
+    pub jump_momentum_share: f64,
 
     // ── Persistent volume (engine.rs close, market/tick.rs phase 3) ─────
     /// Day-to-day persistence of the shared volume component, in [0, 1).
@@ -477,6 +544,12 @@ pub const PT_V3: ModelParams = ModelParams::pt_v3();
 /// The 504-day variant. Selectable, not the default -- see [`ModelParams::pt_v4`].
 pub const PT_V4: ModelParams = ModelParams::pt_v4();
 
+/// pt-v4 with the jump decoupled from herding -- see [`ModelParams::pt_v5`].
+pub const PT_V5: ModelParams = ModelParams::pt_v5();
+
+/// pt-v5 with the herding term halved -- see [`ModelParams::pt_v6`].
+pub const PT_V6: ModelParams = ModelParams::pt_v6();
+
 /// The name of the preset an engine runs when none is named.
 ///
 /// This exists because the name and the coefficients drifted apart once
@@ -561,6 +634,8 @@ impl ModelParams {
             jump_sigma_market: 0.0,
             jump_intensity_idio: 0.0,
             jump_sigma_idio: 0.0,
+            garch_beta_dispersion: 0.0,
+            jump_momentum_share: 1.0,
             volume_persistence: 0.0,
             volume_innovation_sigma: 0.0,
             size_effect_smoothness: 0.0,
@@ -668,6 +743,93 @@ impl ModelParams {
         p
     }
 
+    /// pt-v4 with the jump decoupled from the herding term.
+    ///
+    /// pt-v4 reaches the 504-day tail and pays for it at one year: eight of
+    /// ten statistics in band against pt-v3's nine, losing `return_acf1`.
+    /// CALIBRATION-FOLLOWUPS §34 concluded that no search over pt-v4's nine
+    /// parameters escapes that trade, and §37 reinstated the conclusion
+    /// after it was refuted on screening evidence and the refutation was
+    /// wrong. Both stand: the trade is not a search artifact.
+    ///
+    /// §38 located it. A jump is applied to `mispricing_s` at the day
+    /// close, and the momentum roll earlier in the same close has already
+    /// set `mispricing_s_prev_close` to the pre-jump value. So at the next
+    /// close the roll sees the jump as a re-rating and `momentum_theta`
+    /// continues a share of it. Fattening the tail and adding return
+    /// continuation were the same write to the same variable, which is why
+    /// no coefficient could separate them.
+    ///
+    /// `jump_momentum_share` at 0.0 advances the momentum reference with
+    /// the jump, so herding never sees it. The jump still decays back
+    /// through the existing mispricing process; it is simply not amplified
+    /// on the way.
+    ///
+    /// **Nine of ten in band at 252 days AND the 504-day tail held**, which
+    /// no earlier preset manages: pt-v3 holds nine and misses the tail by
+    /// 0.50 sd, pt-v4 reaches the tail and drops to eight. Measured on
+    /// thirty training seeds, on held-out seeds and on a held-out 60-name
+    /// universe (§38). Dual-horizon loss 0.087 against pt-v4's 0.486 and
+    /// pt-v3's 0.989.
+    ///
+    /// Crisis behaviour is unchanged: vol lever retained 100.6% of pt-v4,
+    /// correlation blend identical (§39). It passes §8 on every axis, both
+    /// the loss thresholds and the flip test (§45).
+    ///
+    /// NOT the default. The envelope certifies pt-v3 at 252 days, and
+    /// certification is a separate act from passing the controls.
+    ///
+    /// `volume_change_acf1` remains out of band here as everywhere, for the
+    /// structural reason recorded when it was excluded from the objective.
+    pub const fn pt_v5() -> ModelParams {
+        let mut p = ModelParams::pt_v4();
+        p.jump_momentum_share = 0.0;
+        p
+    }
+
+    /// pt-v5 with the herding term halved.
+    ///
+    /// `momentum_theta` multiplies yesterday's CHANGE in mispricing into
+    /// today's, so it is return continuation by construction. pt-v5 fixed
+    /// one-year continuation by stopping jumps feeding it
+    /// (CALIBRATION-FOLLOWUPS §38) and left the two-year reading at 0.0605
+    /// against a 504-day ceiling of 0.04.
+    ///
+    /// §48 ruled out the macro chain and showed the estimator's
+    /// finite-sample bias cancels against horizon-matched bands, so the miss
+    /// was genuine. §49 ablated the two remaining candidates: lowering
+    /// factor-variance persistence makes continuation WORSE and loses the
+    /// tail, and shortening the mispricing half-life does nothing. Halving
+    /// `momentum_theta` from 0.0742 to 0.0371 moves `return_acf1` at 504
+    /// days from 0.0605 out of band to 0.0346 inside it, and no other
+    /// statistic changes band at either horizon.
+    ///
+    /// **Nine of ten at 252 days and eight of ten at 504**, against pt-v5's
+    /// nine and seven, on thirty training seeds. The two remaining misses at
+    /// 504 are `abs_return_acf5`, which lives inside the decay-shape gap,
+    /// and `volume_change_acf1`, which is structurally unreachable.
+    ///
+    /// Gates: vol lever retained 99.8% of pt-v5 with the correlation blend
+    /// marginally better (§50), and §8 passes on every axis with the horizon
+    /// losses falling from 0.0870 and 0.1192 to 0.0007 and 0.0000.
+    ///
+    /// The obvious objection was that halving the coefficient which makes
+    /// returns trend would remove a momentum strategy's edge. Measured with
+    /// a paired sign test over twenty-four seeds, no preset gives momentum a
+    /// reliable edge over hold: pt-v3 is 8-16, pt-v5 is 13-11, this is
+    /// 10-14, none significant (§51). There is no edge to remove.
+    ///
+    /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3;
+    /// passing the controls is not certification.
+    pub const fn pt_v6() -> ModelParams {
+        let mut p = ModelParams::pt_v5();
+        // Exactly half of pt-v3's 0.07420624999999997, asserted in tests
+        // rather than trusted: a literal that drifted from the value it
+        // claims to halve would be a preset nobody calibrated.
+        p.momentum_theta = 0.03710312499999999;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -686,13 +848,15 @@ impl ModelParams {
             "pt-v2" => Some(PT_V2),
             "pt-v3" => Some(PT_V3),
             "pt-v4" => Some(PT_V4),
+            "pt-v5" => Some(PT_V5),
+            "pt-v6" => Some(PT_V6),
             _ => None,
         }
     }
 
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
-        &["pt-v1", "pt-v2", "pt-v3", "pt-v4"]
+        &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -740,6 +904,8 @@ impl ModelParams {
             "jump_sigma_market" => self.jump_sigma_market,
             "jump_intensity_idio" => self.jump_intensity_idio,
             "jump_sigma_idio" => self.jump_sigma_idio,
+            "garch_beta_dispersion" => self.garch_beta_dispersion,
+            "jump_momentum_share" => self.jump_momentum_share,
             "volume_persistence" => self.volume_persistence,
             "volume_innovation_sigma" => self.volume_innovation_sigma,
             "size_effect_smoothness" => self.size_effect_smoothness,
@@ -829,6 +995,8 @@ impl ModelParams {
             "jump_intensity_idio" => out.jump_intensity_idio = value,
             "jump_intensity_market" => out.jump_intensity_market = value,
             "jump_mean_market" => out.jump_mean_market = value,
+            "garch_beta_dispersion" => out.garch_beta_dispersion = value,
+            "jump_momentum_share" => out.jump_momentum_share = value,
             "jump_sigma_idio" => out.jump_sigma_idio = value,
             "jump_sigma_market" => out.jump_sigma_market = value,
             "volume_innovation_sigma" => out.volume_innovation_sigma = value,
@@ -955,6 +1123,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "crowd_valuation_gain",
         "garch_alpha",
         "garch_beta",
+        "garch_beta_dispersion",
         "garch_ceiling_multiple",
         "garch_floor_multiple",
         "garch_gamma",
@@ -964,6 +1133,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "jump_intensity_idio",
         "jump_intensity_market",
         "jump_mean_market",
+        "jump_momentum_share",
         "jump_sigma_idio",
         "jump_sigma_market",
         "market_factor_sigma",
@@ -1079,10 +1249,16 @@ mod tests {
         assert_eq!(ModelParams::preset("pt-v3").unwrap().fingerprint(), "pt-v3");
         assert_eq!(PT_V4.fingerprint(), "pt-v4");
         assert_eq!(ModelParams::preset("pt-v4").unwrap().fingerprint(), "pt-v4");
+        assert_eq!(PT_V5.fingerprint(), "pt-v5");
+        assert_eq!(ModelParams::preset("pt-v5").unwrap().fingerprint(), "pt-v5");
+        assert_eq!(PT_V6.fingerprint(), "pt-v6");
+        assert_eq!(ModelParams::preset("pt-v6").unwrap().fingerprint(), "pt-v6");
+        // The literal must be exactly half of what it claims to halve.
+        assert_eq!(PT_V6.momentum_theta * 2.0, PT_V5.momentum_theta);
         // Re-armed on the next unreleased name. A preset that answers to a
         // name it does not have is how a vector nobody calibrated presents
         // as a shipped one.
-        assert!(ModelParams::preset("pt-v5").is_none());
+        assert!(ModelParams::preset("pt-v7").is_none());
 
         // Adding a preset must not disturb an existing one. The fingerprint
         // is taken over the PARAMETERS, not the table, so this holds by

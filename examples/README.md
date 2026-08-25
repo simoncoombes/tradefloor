@@ -1,6 +1,6 @@
 # Examples
 
-Six notebooks and two scripts, numbered in reading order. The committed
+Seven notebooks and two scripts, numbered in reading order. The committed
 notebooks carry their output, so you can read them without running anything.
 
 | | what it covers |
@@ -11,6 +11,7 @@ notebooks carry their output, so you can read them without running anything.
 | [`04-how-realistic-is-this.ipynb`](04-how-realistic-is-this.ipynb) | The realism panel, the gaps, choosing a preset |
 | [`05-training-an-agent.ipynb`](05-training-an-agent.ipynb) | The Gymnasium environment, episodes, what size costs |
 | [`06-execution-and-impact.ipynb`](06-execution-and-impact.ipynb) | TCA, the counterfactual run, partial fills |
+| [`09-a-pandemic-shaped-market.ipynb`](09-a-pandemic-shaped-market.ipynb) | Driving a real 2020-21 macro path, and diagnosing why the first attempt missed |
 | [`07-research-workflow.py`](07-research-workflow.py) | A whole study in one file: sweep, evaluation, TCA, replay |
 | [`08-claude-agent.py`](08-claude-agent.py) | An LLM agent scored against the baselines |
 
@@ -24,7 +25,7 @@ pip install pretium jupyter
 jupyter lab
 ```
 
-Notebook 03 also needs `matplotlib` for its chart, and 05 needs
+Notebooks 03 and 09 also need `matplotlib` for their charts, and 05 needs
 `pretium[rl]` for the Gymnasium environment. The core library has no
 dependencies.
 
@@ -37,7 +38,7 @@ automatically.
 
 `tests/test_examples.py` checks them. The scripts are syntax-checked on every
 test run, which catches a rename that missed a reference. The rest is opt-in,
-because executing six notebooks takes about half a minute:
+because executing seven notebooks takes about a minute:
 
 ```
 PRETIUM_SLOW_TESTS=1 pytest tests/test_examples.py

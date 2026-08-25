@@ -820,7 +820,7 @@ def main() -> None:
                              "and not the paths -- and every seed-specific "
                              "effect passed through it unchallenged, "
                              "including a candidate declared shippable on a "
-                             "13% gain that reversed sign on a fresh block.")
+                             "13%% gain that reversed sign on a fresh block.")
     parser.add_argument("--screen", type=int, default=48)
     parser.add_argument("--population", type=int, default=12)
     parser.add_argument("--generations", type=int, default=26)

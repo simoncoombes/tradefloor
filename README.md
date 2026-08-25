@@ -134,6 +134,7 @@ reading order and executed as part of the test suite:
 | [`04-how-realistic-is-this`](https://github.com/simoncoombes/pretium/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the gaps |
 | [`05-training-an-agent`](https://github.com/simoncoombes/pretium/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
 | [`06-execution-and-impact`](https://github.com/simoncoombes/pretium/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
+| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/pretium/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields actually transmit |
 
 Or a whole study in one file. Sweep, evaluation, TCA and replay in about five
 seconds:
@@ -155,7 +156,7 @@ hit them.
 
 ## Contributing
 
-See [CONTRIBUTING.md](https://github.com/simoncoombes/pretium/blob/main/CONTRIBUTING.md). One rule shapes the rest: a change to
+See [CONTRIBUTING.md](https://github.com/simoncoombes/pretium/blob/main/CONTRIBUTING.md), and [RELEASING.md](https://github.com/simoncoombes/pretium/blob/main/RELEASING.md) for how a version reaches PyPI and crates.io. One rule shapes the rest: a change to
 the simulated trajectory is a breaking change, whatever its size. A market
 that runs differently from the same seed invalidates every published result
 that cited it.

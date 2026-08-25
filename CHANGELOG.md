@@ -1,5 +1,92 @@
 # Changelog
 
+## 0.1.3
+
+Two new model presets and the mechanism behind them. Nothing existing moves:
+the known-answer digest is unchanged, pt-v1 through pt-v4 reproduce exactly,
+and pt-v3 remains the default. If you do not ask for a new preset by name,
+this release changes nothing about your results.
+
+### pt-v6
+
+The first preset to hold nine of ten statistics in band at 252 days and
+eight of ten at 504. pt-v3 manages nine and five; pt-v4 eight and seven.
+
+It is not strictly better than pt-v3, and the band counts hide that. At the
+certified horizon the two tie at nine of ten, but pt-v3 sits more
+comfortably inside its bands on six of the ten statistics, and pt-v6 buys
+one large gain for it: kurtosis room goes from 0.80 to 7.20 seed-standard-
+deviations. At two years pt-v6 is clearly ahead, closing kurtosis,
+`abs_return_acf1` and `return_acf1`, which pt-v3 misses.
+
+Choose pt-v6 for multi-year work where the tail matters. pt-v3 is still what
+the realism envelope certifies, and certification is a different claim from
+passing the controls.
+
+### pt-v5, and why the trade it broke was a wiring accident
+
+pt-v4 reached the two-year tail and paid for it at one year, losing
+`return_acf1`. That looked like a property of reaching the tail at all.
+
+It was one line. A jump was applied to the mispricing state at the day close,
+after the momentum roll had already recorded the pre-jump level, so at the
+next close the herding term read the jump as a re-rating and continued it.
+Fattening the tail and adding return continuation were the same write to the
+same variable, which is why no amount of searching those coefficients
+escaped it.
+
+`jump_momentum_share` separates them. pt-v5 is pt-v4 with it at zero: the
+jump still decays through the existing process, it is simply not amplified on
+the way. pt-v6 is pt-v5 with the herding term halved, which fixes the
+two-year reading the same mechanism left behind.
+
+### A parameter that did not work, shipped inert and documented as such
+
+`garch_beta_dispersion` spreads volatility persistence across the
+cross-section with a name's size. It was built for the decay-shape gap and it
+does not close it: the log-log slope of the volatility autocorrelation reads
+-0.944 with it against -0.933 without, where real markets read -0.436, so it
+moves away from the target. It ships at zero and its documentation leads with
+that measurement rather than with what it was for.
+
+It is kept because it does something real and smaller: at 504 days it
+improves room on kurtosis and on annualised volatility. A parameter claiming
+a gap it does not close would be worse than no parameter.
+
+### Also
+
+The realism envelope now records which selectable preset closes a gap, so a
+reader who hits "tails are too thin over multi-year windows" can learn that
+three presets do not have it. Naming a preset there is not a certification:
+the reader makes that trade rather than the default moving quietly.
+
+`docs/envelope.json` carries the same field, so the citable artifact answers
+the question without anyone reading the source.
+
+### A worked example that drives real market data
+
+`examples/09-a-pandemic-shaped-market.ipynb` takes the 2020 to 2021 period,
+feeds the real VIX, the real FOMC target path and a credit path converted from
+real high yield fund prices into a 505 day run, and scores the result against
+what Apple's shares actually did. The daily series it uses are committed
+alongside it, so it runs offline and gives the same answer every time.
+
+It is written around a failure rather than a result. The first attempt puts a
+drawdown of roughly the right depth two months away from the real one, and the
+notebook then sweeps each macro field on its own to find out why. Only
+`qe_pe_boost` moves a valuation, and it had been pinned at zero through the
+entire crash, so nothing could re-rate. Supplying the market's own valuation
+path moves the trough onto the correct day and brings the drawdown within a
+fraction of a percent, at the cost of overshooting volatility, which the
+notebook reports rather than smooths away.
+
+Two findings from that sweep are worth having outside the notebook.
+`fear_greed_index` is inert with respect to price: pinned anywhere from 0 to
+100 it produces bit identical trajectories. `inflation_rate` reaches prices
+only through `corporate_bond_yield`, so pinning both is the same as pinning the
+yield alone. Neither is a change in behaviour, and both are easy to assume
+otherwise.
+
 ## 0.1.2
 
 Fixes the PyPI project page. Nothing in the engine moved and the digest is

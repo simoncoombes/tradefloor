@@ -113,8 +113,19 @@ mod tests {
         // The answer to "isn't this a second source of truth?" -- it is, and
         // this is the gate that keeps the two identical. meta.sectorAnchors is
         // generated from TypeScript and is the parity contract.
-        let raw = std::fs::read_to_string(goldens().join("fairvalue.json"))
-            .expect("fairvalue.json - goldens must be present to run tests");
+        // Skip rather than fail when the corpus is absent. The goldens are
+        // 135 MB and are excluded from the published crate, so a consumer
+        // running `cargo test` would otherwise see a failure that says
+        // nothing about the code. In the repository, where the corpus is
+        // present, this still runs and still gates.
+        let path = goldens().join("fairvalue.json");
+        if !path.exists() {
+            eprintln!("skipping: {} absent (excluded from the published crate)",
+                      path.display());
+            return;
+        }
+        let raw = std::fs::read_to_string(&path)
+            .expect("fairvalue.json present but unreadable");
         let json: serde_json::Value = serde_json::from_str(&raw).unwrap();
         let anchors = json["meta"]["sectorAnchors"]
             .as_object()

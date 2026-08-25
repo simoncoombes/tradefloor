@@ -171,6 +171,20 @@ PARAM_SPECS: dict[str, dict] = {
                           "hard_range": (0.0, 0.08)},
     "jump_sigma_idio": {"kind": "abs", "step_unit": 0.01,
                         "hard_range": (0.0, 0.08)},
+    # How much of a jump the herding term continues. 1.0 is every shipped
+    # preset and is what couples the 504-day tail to 252-day return
+    # autocorrelation; 0.0 lets a jump fatten the tail without being
+    # amplified into continuation. The full unit interval is the whole
+    # mechanism, so the hard range is the whole interval.
+    "jump_momentum_share": {"kind": "abs", "step_unit": 0.1,
+                            "hard_range": (0.0, 1.0)},
+    # Cross-sectional spread in volatility persistence, raw beta units. The
+    # upper bound is the headroom to the GJR persistence ceiling on pt-v6:
+    # 0.97 - alpha 0.0595 - gamma/2 0.0916 leaves beta room to 0.819 against
+    # a shipped 0.685, so 0.15 is about the widest spread that does not spend
+    # the clamp on every large name.
+    "garch_beta_dispersion": {"kind": "abs", "step_unit": 0.02,
+                              "hard_range": (0.0, 0.15)},
     "volume_persistence": {"kind": "abs", "step_unit": 0.05,
                            "hard_range": (0.0, 0.99)},
     "volume_innovation_sigma": {"kind": "abs", "step_unit": 0.05,

@@ -177,6 +177,14 @@ PERTURBATIONS = [
     ("jump_mean_market", -0.05, False),        # needs an occurrence
     ("jump_sigma_market", 0.05, False),        # needs an occurrence
     ("jump_sigma_idio", 0.05, False),          # needs an occurrence
+    # Whether herding continues a jump. Inert for the same reason as the
+    # sizes above and one more: at the default preset no jump ever fires, so
+    # there is nothing for the share to withhold from the momentum term.
+    ("jump_momentum_share", 0.0, False),       # needs an occurrence
+    # A spread across names, applied at the day close. It DOES move the
+    # trajectory on its own: unlike the jump parameters it needs no
+    # occurrence, only a roster with more than one market cap in it.
+    ("garch_beta_dispersion", 0.05, True),
     # The persistent volume component (pt-v4). The innovation is live alone:
     # even at zero persistence it injects a fresh multiplier each day, and
     # that reaches volume on the next tick. Persistence is NOT, because at a

@@ -93,6 +93,61 @@ pub const FLOOR_MULTIPLE: f64 = 0.25;
 /// `sector_base_variance` is the sector's long-run daily variance and sets
 /// both bounds — the process mean-reverts toward its sector rather than
 /// toward a single global level.
+/// The GJR persistence a name's variance process must stay below.
+///
+/// `alpha + beta + gamma/2` at or above one is a variance that grows without
+/// bound. pt-v6 sits at 0.8364, so there is real headroom, but a dispersion
+/// wide enough to spend all of it would produce a name whose volatility only
+/// ever climbs until a guard truncates it, which is not fat tails.
+pub const GARCH_PERSISTENCE_CEILING: f64 = 0.97;
+
+/// Reference capitalisation, in dollars, at which a name gets exactly
+/// `garch_beta`. The median of `Universe.random`'s cap distribution rounds
+/// near here, so the spread is roughly balanced across a generated roster.
+const PERSISTENCE_REFERENCE_CAP: f64 = 2.0e10;
+
+/// How wide a cap range the spread is drawn over, in natural logs. At 3.0 a
+/// name about twenty times smaller or larger than the reference reaches the
+/// bound; everything between is linear in log-cap.
+const PERSISTENCE_CAP_SCALE: f64 = 3.0;
+
+/// This name's `garch_beta`, given its size.
+///
+/// At `garch_beta_dispersion` of zero this returns `params.garch_beta` BY
+/// BRANCH, so every preset before pt-v7 is bit-identical and owes nothing to
+/// an argument about how a zero-width spread rounds. Same discipline as
+/// [`crate::market::factors::cap_size_multiplier_with`] at zero smoothness.
+///
+/// The map is deterministic in the roster, not drawn, so the RNG stream
+/// schedule does not move.
+pub fn garch_beta_for(params: &crate::params::ModelParams, market_cap: f64) -> f64 {
+    let d = params.garch_beta_dispersion;
+    if d == 0.0 {
+        return params.garch_beta;
+    }
+    // A non-positive cap has no size to speak of, so it gets the reference
+    // persistence rather than the log of a non-positive number.
+    if market_cap <= 0.0 {
+        return params.garch_beta;
+    }
+    // A bounded, piecewise-linear map rather than a tanh. `mathx` has no
+    // tanh, and adding one would mean a new transcendental with its own
+    // cross-platform parity surface for a shape nothing here depends on.
+    // `clamp` on the log-ratio gives the same bounded spread from primitives
+    // that already exist.
+    let z = mathx::clamp(
+        mathx::log(market_cap / PERSISTENCE_REFERENCE_CAP) / PERSISTENCE_CAP_SCALE,
+        -1.0,
+        1.0,
+    );
+    let beta = params.garch_beta + d * z;
+    // Stationarity is not negotiable: clamp against the GJR persistence,
+    // and never below zero.
+    let headroom =
+        GARCH_PERSISTENCE_CEILING - params.garch_alpha - 0.5 * params.garch_gamma;
+    mathx::max(0.0, mathx::min(beta, headroom))
+}
+
 pub fn update_garch_variance(
     current_variance: f64,
     last_daily_return: f64,
@@ -116,9 +171,30 @@ pub fn update_garch_variance_with(
     last_daily_return: f64,
     sector_base_variance: f64,
 ) -> f64 {
+    update_garch_variance_for(
+        params,
+        params.garch_beta,
+        current_variance,
+        last_daily_return,
+        sector_base_variance,
+    )
+}
+
+/// [`update_garch_variance_with`] under an explicit per-name `beta`.
+///
+/// The seam heterogeneous persistence needs. Passing `params.garch_beta`
+/// reproduces the homogeneous arithmetic exactly, which is what the wrapper
+/// above does and why no earlier preset moves.
+pub fn update_garch_variance_for(
+    params: &crate::params::ModelParams,
+    garch_beta: f64,
+    current_variance: f64,
+    last_daily_return: f64,
+    sector_base_variance: f64,
+) -> f64 {
     let mut new_var = params.garch_omega
         + params.garch_alpha * last_daily_return * last_daily_return
-        + params.garch_beta * current_variance;
+        + garch_beta * current_variance;
     // The GJR asymmetry: a negative return feeds through with weight
     // ALPHA + GAMMA, a positive one with ALPHA alone. A guarded `+=` after
     // the reference sum, NOT a fourth term inside it: at GAMMA = 0 this adds

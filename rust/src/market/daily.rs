@@ -147,6 +147,9 @@ pub fn close_day_with(
     company: &mut TickCompany,
     inputs: &CloseInputs,
 ) {
+    // Read before the mutable borrow below: per-name persistence needs the
+    // company's size, and `stock` borrows `company` for the rest of the fn.
+    let market_cap = company.stock.market_cap;
     let stock = &mut company.stock;
 
     // Guarded on `previousClose > 0`, so a newly listed name reports a flat
@@ -164,8 +167,12 @@ pub fn close_day_with(
         Some(noise) if noise.is_finite() => noise,
         _ => daily_return,
     };
-    stock.garch_variance = super::garch::update_garch_variance_with(
+    // Per-name persistence. At zero dispersion `garch_beta_for` returns
+    // `params.garch_beta` by branch, so this is the shipped arithmetic.
+    let beta = super::garch::garch_beta_for(params, market_cap);
+    stock.garch_variance = super::garch::update_garch_variance_for(
         params,
+        beta,
         stock.garch_variance,
         innovation,
         inputs.sector_base_daily_variance,

@@ -1,6 +1,6 @@
 [package]
 name = "pretium"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "Deterministic market simulation with a real limit order book."
 # Dual-licensed, the Rust-ecosystem norm (serde, tokio, rand): a downstream
@@ -17,7 +17,36 @@ readme = "README.md"
 # The golden vectors are 135 MB of parity fixtures. They are the test
 # contract, not library content, and must never ride along in a published
 # sdist -- excluded explicitly rather than trusted to a .gitignore.
-exclude = ["goldens/**", "_keep/**"]
+exclude = [
+    "goldens/**",
+    "_keep/**",
+    # The parity tests read the excluded corpus and PANIC when it is absent,
+    # with a message telling you to regenerate it from a TypeScript script
+    # that is not in the package either. Shipping a test that cannot pass is
+    # worse than shipping no test: a consumer running `cargo test` would
+    # conclude the crate is broken.
+    #
+    # What remains is a suite that runs on its own: circuit_breaker,
+    # roster_mutation and stream_alignment, plus the unit tests in 21 source
+    # modules. The parity corpus is the port contract and lives in the
+    # repository, where the release gate runs it.
+    "tests/divergence_statistics.rs",
+    "tests/economy_parity.rs",
+    "tests/fair_value_parity.rs",
+    "tests/garch_regression.rs",
+    "tests/market_daily_parity.rs",
+    "tests/market_islands_parity.rs",
+    "tests/market_maker_parity.rs",
+    "tests/market_tick_parity.rs",
+    "tests/mathx_parity.rs",
+    "tests/microstructure_parity.rs",
+    "tests/mispricing_parity.rs",
+    "tests/order_book_parity.rs",
+    "tests/prng_normals_full.rs",
+    "tests/thirty_day_parity.rs",
+    "tests/tick_regression.rs",
+    "tests/ts_parity_smoke.rs",
+]
 
 [lib]
 name = "pretium"

@@ -28,7 +28,7 @@ authors:
   - family-names: Coombes
     given-names: Simon
     email: simon@coombes.io
-version: 0.1.2
+version: 0.1.3
 date-released: "2026-08-24"
 license:
   - MIT
