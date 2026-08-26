@@ -323,6 +323,8 @@ PARAM_SPECS: dict[str, dict] = {
     # here costs. Following the rule's letter would have reproduced, in a new
     # place, exactly the mis-scaled penalty that made a 96-core search
     # optimise its own regulariser.
+    "garch_vix_coupling": {"kind": "abs", "step_unit": 0.05,
+                          "hard_range": (0.0, 1.0)},
     "garch_ceiling_multiple":   {"kind": "log",
                                  "hard_range": (1.0, 50.0)},
     "garch_floor_multiple":     {"kind": "log",

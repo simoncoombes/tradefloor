@@ -124,6 +124,10 @@ pub struct CloseInputs {
     /// `sectorBaseDailyVariance(sector)` — the sector's long-run daily
     /// variance, which sets both GARCH bounds.
     pub sector_base_daily_variance: f64,
+    /// The day's VIX, read only when `garch_vix_coupling` is non-zero, to
+    /// scale the clamp reference above into the regime the market is in.
+    /// See §78.
+    pub vix: f64,
     /// How the close treats `avg_volume`. [`AvgVolumePolicy::Hold`] unless
     /// you are replaying a reference tape.
     pub avg_volume: AvgVolumePolicy,
@@ -170,12 +174,25 @@ pub fn close_day_with(
     // Per-name persistence. At zero dispersion `garch_beta_for` returns
     // `params.garch_beta` by branch, so this is the shipped arithmetic.
     let beta = super::garch::garch_beta_for(params, market_cap);
+    // THE REGIME A NAME'S OWN VARIANCE IS IN. The clamps inside are multiples
+    // of a STATIC per-sector variance, and the GARCH's own unconditional
+    // level sits under the floor those clamps impose, so without this a
+    // name's variance hovers near a constant whatever the market is doing
+    // while the market factor's tracks the VIX squared. At coupling zero the
+    // branch is not taken and every preset is bit-identical. See §78.
+    let base_variance = if params.garch_vix_coupling == 0.0 {
+        inputs.sector_base_daily_variance
+    } else {
+        let ratio = inputs.vix / params.market_vol_vix_anchor;
+        let c = params.garch_vix_coupling;
+        inputs.sector_base_daily_variance * (1.0 - c + c * ratio * ratio)
+    };
     stock.garch_variance = super::garch::update_garch_variance_for(
         params,
         beta,
         stock.garch_variance,
         innovation,
-        inputs.sector_base_daily_variance,
+        base_variance,
     );
 
     stock.last_daily_return = Some(daily_return);
@@ -276,6 +293,7 @@ mod tests {
         CloseInputs {
             daily_innovation: innovation,
             sector_base_daily_variance: BASE,
+            vix: 15.0,
             avg_volume: AvgVolumePolicy::Hold,
         }
     }

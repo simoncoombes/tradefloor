@@ -43,20 +43,20 @@ of the same length by the method in the calibration docs.
 
 | statistic | measured | band | verdict |
 |---|---|---|---|
-| `annualised_vol_pct` | +31.1614 | 15.0 to 36.0 | in band |
-| `excess_kurtosis` | +7.9713 | 1.6 to 41.0 | in band |
-| `return_acf1` | +0.0191 | -0.08 to 0.06 | in band |
-| `abs_return_acf1` | +0.0954 | 0.02 to 0.22 | in band |
-| `abs_return_acf5` | +0.0502 | 0.02 to 0.09 | in band |
-| `abs_return_acf20` | +0.0071 | -0.04 to 0.08 | in band |
-| `cross_sectional_corr` | +0.3106 | 0.08 to 0.56 | in band |
-| `volume_abs_return_corr` | +0.4824 | 0.46 to 0.66 | in band |
-| `leverage_effect` | -0.0327 | -0.16 to 0.0 | in band |
-| `volume_change_acf1` | -0.3111 | -0.32 to -0.2 | in band |
-| `corr_asymmetry` | -0.0016 | -0.25 to 0.45 | in band |
-| `corr_asymmetry_lagged` | +0.0045 | -0.2 to 0.55 | in band |
-| `sector_excess_corr` | +0.1374 | 0.11 to 0.23 | in band |
-| `corr_persistence_acf1` | +0.1595 | -0.19 to 0.54 | in band |
+| `annualised_vol_pct` | +31.4632 | 15.0 to 36.0 | in band |
+| `excess_kurtosis` | +7.7618 | 1.6 to 41.0 | in band |
+| `return_acf1` | +0.0195 | -0.08 to 0.06 | in band |
+| `abs_return_acf1` | +0.0994 | 0.02 to 0.22 | in band |
+| `abs_return_acf5` | +0.0487 | 0.02 to 0.09 | in band |
+| `abs_return_acf20` | +0.0043 | -0.04 to 0.08 | in band |
+| `cross_sectional_corr` | +0.3063 | 0.08 to 0.56 | in band |
+| `volume_abs_return_corr` | +0.4784 | 0.46 to 0.66 | in band |
+| `leverage_effect` | -0.0336 | -0.16 to 0.0 | in band |
+| `volume_change_acf1` | -0.3130 | -0.32 to -0.2 | in band |
+| `corr_asymmetry` | -0.0034 | -0.25 to 0.45 | in band |
+| `corr_asymmetry_lagged` | +0.0054 | -0.2 to 0.55 | in band |
+| `sector_excess_corr` | +0.1346 | 0.11 to 0.23 | in band |
+| `corr_persistence_acf1` | +0.1622 | -0.19 to 0.54 | in band |
 Band-distance loss `L_real` = **0.0000**, and every statistic is inside its band: pt-v10 is the first preset with no miss at this horizon. The volume-change row was called structurally unreachable until 2026-08-26; gap 1 below says what changed. `corr_persistence_acf1` also carries a 504-day band of 0.19 to 0.49, which is the one that can judge it: twelve 21-day windows in a year cannot.
 
 ## The claim survives the axes it was not fitted to
@@ -230,7 +230,7 @@ long-horizon realism, and the mechanism built to buy it back cannot.** That
 is a structural limit, not a calibration that has not been run yet.
 
 **Consequence: use scenarios to ask *whether* a strategy breaks, not *how
-much*.** A crisis here is about three quarters as violent as a real one and arrives
+much*.** A crisis here is about four fifths as violent as a real one and arrives
 more slowly, so a strategy that survives one has not been tested as hard as
 the label suggests.
 
@@ -371,7 +371,7 @@ the difference between a certified claim and a misread one.
 
 - Multi-year backtests (Gap 2).
 - Sizing how badly a crisis hurts, as opposed to detecting that it does
-  (Gap 5). A crisis here is about three quarters as violent as a real one.
+  (Gap 5). A crisis here is about four fifths as violent as a real one.
 - Inheriting these numbers for a sector-concentrated roster (Gap 6).
 - Strategies keyed on long-horizon volatility memory (Gap 3).
 - Tail-risk or VaR calibration at multi-year horizons (Gap 4).

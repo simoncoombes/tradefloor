@@ -123,6 +123,7 @@ PERTURBATIONS = [
     # ceiling to catch. 0.9 puts the ceiling below that level, which binds
     # on any preset and keeps the parameter's wiring proven rather than
     # excused.
+    ("garch_vix_coupling", 0.8, False),    # scales the clamp reference by (vix/anchor)^2, and the harness runs at the anchor, where that is exactly 1.0 at any coupling
     ("garch_ceiling_multiple", 0.9, False),   # measured not to bind under pt-v10 at 0.9, 1.05, 2.0 or 20.0: the trimmed idio scale keeps per-name variance under the clamp's reference
     ("garch_floor_multiple", 0.99, True),
     ("market_vol_alpha", 0.2, True),

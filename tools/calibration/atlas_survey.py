@@ -165,6 +165,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the implied VIX is the forward coupling's own inverse, so the top of
     # the box is a boundary worth sampling rather than an arbitrary cap.
     "vix_realised_vol_weight": (0.0, 1.0),
+    # A name's own variance following the VIX (§78).
+    "garch_vix_coupling": (0.0, 1.0),
     # Which return the VIX reads: a share between the last tick and the day.
     "vix_return_source": (0.0, 1.0),
     # Jumps. Intensity is per-day probability: 0.25 is roughly one jump a

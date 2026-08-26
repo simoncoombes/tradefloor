@@ -6,6 +6,6 @@
  "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
  "note": "Cross-platform determinism baseline. Regenerated 2026-08-26 for the era boundary that made pt-v10 the default preset: every seeded trajectory changed, deliberately. Runs from before this baseline are not comparable to runs after it unless they name their preset.",
  "seed": 20260820,
- "sha256": "68608ad2562975e9fe32a53964955e086e5fac7c825073dac62e31976cc0837f",
- "simulationSha256": "ce2279324a942a1022abb1804bc6ad0b12eb3595bc3914aa2f13ada2c45d9d9c"
+ "sha256": "4e22d5a6585ff51db9651b19e84492aeb8cbd09f188de9bad680ff3a4e860378",
+ "simulationSha256": "86cfebf6c07b9f3ec16da97d0fd15af7e39d12661679793ea12684d46a11c612"
 }

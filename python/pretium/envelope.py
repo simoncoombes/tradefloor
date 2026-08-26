@@ -64,20 +64,20 @@ CERTIFIED_HORIZON_DAYS = 252
 #: Nine of ten in band, at a band-distance loss of 0.0000, and the same nine
 #: hold on held-out seeds and a held-out 60-name universe.
 CERTIFIED: dict[str, float] = {
-    "annualised_vol_pct": 31.1614,
-    "excess_kurtosis": 7.9713,
-    "return_acf1": 0.0191,
-    "abs_return_acf1": 0.0954,
-    "abs_return_acf5": 0.0502,
-    "abs_return_acf20": 0.0071,
-    "cross_sectional_corr": 0.3106,
-    "volume_abs_return_corr": 0.4824,
-    "leverage_effect": -0.0327,
-    "volume_change_acf1": -0.3111,
-    "corr_asymmetry": -0.0016,
-    "corr_asymmetry_lagged": 0.0045,
-    "sector_excess_corr": 0.1374,
-    "corr_persistence_acf1": 0.1595,
+    "annualised_vol_pct": 31.4632,
+    "excess_kurtosis": 7.7618,
+    "return_acf1": 0.0195,
+    "abs_return_acf1": 0.0994,
+    "abs_return_acf5": 0.0487,
+    "abs_return_acf20": 0.0043,
+    "cross_sectional_corr": 0.3063,
+    "volume_abs_return_corr": 0.4784,
+    "leverage_effect": -0.0336,
+    "volume_change_acf1": -0.313,
+    "corr_asymmetry": -0.0034,
+    "corr_asymmetry_lagged": 0.0054,
+    "sector_excess_corr": 0.1346,
+    "corr_persistence_acf1": 0.1622,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -103,20 +103,20 @@ BANDS_504: dict[str, tuple[float, float]] = {
 
 #: The same panel at 504 days. Five of ten in band against `BANDS_504`.
 MEASURED_504: dict[str, float] = {
-    "annualised_vol_pct": 32.4036,
-    "excess_kurtosis": 8.4139,
-    "return_acf1": 0.0206,
-    "abs_return_acf1": 0.1746,
-    "abs_return_acf5": 0.0864,
-    "abs_return_acf20": 0.0066,
-    "cross_sectional_corr": 0.3572,
-    "volume_abs_return_corr": 0.5171,
-    "leverage_effect": -0.0395,
-    "volume_change_acf1": -0.3134,
-    "corr_asymmetry": 0.0279,
-    "corr_asymmetry_lagged": -0.0234,
-    "sector_excess_corr": 0.1217,
-    "corr_persistence_acf1": 0.2038,
+    "annualised_vol_pct": 32.6919,
+    "excess_kurtosis": 8.2631,
+    "return_acf1": 0.0213,
+    "abs_return_acf1": 0.1749,
+    "abs_return_acf5": 0.083,
+    "abs_return_acf20": 0.0088,
+    "cross_sectional_corr": 0.3533,
+    "volume_abs_return_corr": 0.5174,
+    "leverage_effect": -0.0375,
+    "volume_change_acf1": -0.3156,
+    "corr_asymmetry": 0.0133,
+    "corr_asymmetry_lagged": -0.0247,
+    "sector_excess_corr": 0.1201,
+    "corr_persistence_acf1": 0.1908,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
@@ -658,9 +658,9 @@ def check(
         fire(g, (
             "the result depends on the SIZE of a scenario's response, which "
             "is not certified -- only its direction is. Measured: the "
-            "steady-state volatility lever from VIX 5 to VIX 65 reads 4.75x "
+            "steady-state volatility lever from VIX 5 to VIX 65 reads 5.05x "
             "on the shipped preset against real markets' 6.16x, so a crisis "
-            "here is about three quarters as violent as a real one. The "
+            "here is about four fifths as violent as a real one. The "
             "direction is "
             "sound, with all four driver channels carrying the right sign and "
             "volatility clustering against the VIX level at +0.512 simulated "

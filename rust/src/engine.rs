@@ -785,6 +785,7 @@ impl Engine {
                 &CloseInputs {
                     daily_innovation: request.daily_innovations[i],
                     sector_base_daily_variance: request.sector_base_variances[i],
+                    vix: self.economy.vix,
                     avg_volume: request.avg_volume,
                 },
             );

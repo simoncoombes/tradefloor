@@ -237,6 +237,32 @@ pub struct ModelParams {
     /// Ceiling as a multiple of the sector's long-run variance. A guard,
     /// but searched under bounds — measured as binding on clustering.
     pub garch_ceiling_multiple: f64,
+    /// How much a NAME's own variance follows the VIX, on the market
+    /// factor's own target shape.
+    ///
+    /// Shipped 0.0, bit-identical there by branch, and the last piece of the
+    /// variance model that does not know what regime it is in. The per-name
+    /// GJR-GARCH reads no macro state at all: its clamps are multiples of a
+    /// static per-sector variance, and its own unconditional level sits far
+    /// below the floor those clamps impose (5.6% annualised against a floor
+    /// of 19.8% for technology), so a name's variance hovers near that floor
+    /// whatever the market is doing. That is why `garch_ceiling_multiple`
+    /// was measured not to bind at any value on this preset (§75): the
+    /// variance never gets within twenty times of it.
+    ///
+    /// The consequence is the crisis lever. Total volatility is the market
+    /// factor plus the name's own, the factor scales with the VIX squared
+    /// and the name's does not, so a held VIX 65 raises one term and leaves
+    /// the other where it was: the lever reads 4.75x against a real 6.16x
+    /// with the factor's own clamp already past what a record VIX implies
+    /// (§77). Real single-stock volatility rises with the market's in a
+    /// crisis; here it cannot.
+    ///
+    /// At `c` the clamp reference becomes `base * (1 - c + c * (vix /
+    /// market_vol_vix_anchor)^2)`, the same map the market factor's target
+    /// uses, so at the anchor the reference is exactly the base at any
+    /// coupling and the two variance processes read the regime the same way.
+    pub garch_vix_coupling: f64,
     /// Floor as a multiple of the sector's long-run variance.
     pub garch_floor_multiple: f64,
 
@@ -818,6 +844,7 @@ impl ModelParams {
             garch_beta: garch::BETA,
             garch_gamma: garch::GAMMA,
             garch_ceiling_multiple: garch::CEILING_MULTIPLE,
+            garch_vix_coupling: 0.0,
             garch_floor_multiple: garch::FLOOR_MULTIPLE,
             market_vol_alpha: factor_vol::MARKET_VOL_ALPHA,
             market_vol_beta: factor_vol::MARKET_VOL_BETA,
@@ -1187,8 +1214,18 @@ impl ModelParams {
     /// pt-v9 with volume that remembers: the first preset holding ALL
     /// FOURTEEN realism statistics in band at the certified horizon.
     ///
-    /// Four coefficients move from pt-v9 (CALIBRATION-FOLLOWUPS.md §73, §76,
-    /// §77). `market_vol_ceiling_multiple` 16 to 32 is the physical number
+    /// Five coefficients move from pt-v9 (CALIBRATION-FOLLOWUPS.md §73, §76
+    /// to §78). `garch_vix_coupling` 0.0 to 0.3 lets a NAME's own variance
+    /// follow the VIX, which no earlier preset did: the per-name GJR-GARCH
+    /// read no macro state at all, so the market factor's variance tracked
+    /// the regime and every name's own did not. Total volatility is the sum
+    /// of the two, so a held crisis raised one term and left the other,
+    /// which is what compressed the crisis lever. At 0.3 the lever reads
+    /// 5.05x against 4.75x and a real 6.16x, the shock ratio 1.094 against
+    /// 1.078, and crisis-state cross-sectional correlation moves from 0.740,
+    /// just above the real 0.664 to 0.727, to 0.669 inside it. It costs
+    /// crisis-state sector excess, +0.040 against +0.046 with real at
+    /// +0.103. `market_vol_ceiling_multiple` 16 to 32 is the physical number
     /// rather than a fitted one: the clamp caps the market factor's variance
     /// at N times its calm level, and a real VIX of 82.7 against this model's
     /// anchor of 15 is a variance ratio of 30. At 16 the market could not
@@ -1232,6 +1269,7 @@ impl ModelParams {
         let mut p = ModelParams::pt_v9();
         p.vix_cycle_amplitude = 0.0;
         p.market_vol_ceiling_multiple = 32.0;
+        p.garch_vix_coupling = 0.3;
         p.volume_innovation_sigma = 0.21;
         p.volume_persistence = 0.7;
         p
@@ -1300,6 +1338,7 @@ impl ModelParams {
             "garch_beta" => self.garch_beta,
             "garch_gamma" => self.garch_gamma,
             "garch_ceiling_multiple" => self.garch_ceiling_multiple,
+            "garch_vix_coupling" => self.garch_vix_coupling,
             "garch_floor_multiple" => self.garch_floor_multiple,
             "market_vol_alpha" => self.market_vol_alpha,
             "market_vol_beta" => self.market_vol_beta,
@@ -1406,6 +1445,7 @@ impl ModelParams {
             "garch_beta" => out.garch_beta = value,
             "garch_gamma" => out.garch_gamma = value,
             "garch_ceiling_multiple" => out.garch_ceiling_multiple = value,
+            "garch_vix_coupling" => out.garch_vix_coupling = value,
             "garch_floor_multiple" => out.garch_floor_multiple = value,
             "market_vol_alpha" => out.market_vol_alpha = value,
             "market_vol_beta" => out.market_vol_beta = value,
@@ -1567,6 +1607,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "garch_floor_multiple",
         "garch_gamma",
         "garch_omega",
+        "garch_vix_coupling",
         "idio_sigma_scale",
         "inflation_ceiling",
         "inflation_floor",
