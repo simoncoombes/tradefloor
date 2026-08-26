@@ -1046,6 +1046,8 @@ pub const PT_V10: ModelParams = ModelParams::pt_v10();
 /// pt-v10 with a crisis that behaves like one -- see
 /// [`ModelParams::pt_v11`].
 pub const PT_V11: ModelParams = ModelParams::pt_v11();
+/// [`ModelParams::pt_v12`].
+pub const PT_V12: ModelParams = ModelParams::pt_v12();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -1647,6 +1649,53 @@ impl ModelParams {
         p
     }
 
+    /// pt-v11 plus one number that was never chosen: where volume stops
+    /// responding to the size of a move.
+    ///
+    /// The volume a name trades was `0.6 + 0.6 * min(move, 4.0) + 0.2 * u`
+    /// from the first version of this model, and the `4.0` saturates the
+    /// response at a four percent day. Every crisis session traded exactly
+    /// as much as a bad Tuesday. Raising it to twelve percent, which is
+    /// roughly where a real exchange starts halting, is the whole of this
+    /// preset.
+    ///
+    /// It is the largest single measured gain in the project's record and
+    /// it cost nothing (§114, thirty seeds):
+    ///
+    /// | | pt-v11 | pt-v12 | band |
+    /// |---|---|---|---|
+    /// | in band @252 | 14/14 | 14/14 | |
+    /// | in band @504 | 13/14 | **14/14** | |
+    /// | held-out universe | 13/14 | **14/14** | |
+    /// | `volume_change_acf1` @504 | -0.3156 | -0.2656 | -0.29..-0.21 |
+    /// | `volume_abs_return_corr` @252 | 0.4822 | 0.5599 | 0.46..0.66 |
+    /// | `annualised_vol_pct` @252 | 32.81 | 32.76 | 15..36 |
+    /// | `excess_kurtosis` @252 | 6.66 | 6.70 | 1.6..41 |
+    /// | crisis lever | 6.01 | 6.04 | real 6.16 |
+    /// | crisis co-movement @VIX45 | 0.697 | 0.696 | 0.664..0.727 |
+    /// | crisis sector excess @VIX45 | +0.110 | +0.109 | real +0.103 |
+    ///
+    /// **14 of 14 at two years is the first time this project has measured
+    /// it.** pt-v3 held 7, pt-v10 and pt-v11 hold 13. The row that closed,
+    /// `volume_change_acf1`, is the one the `volume-change` gap was written
+    /// about, and the one §21 through §23 called structurally unreachable.
+    ///
+    /// A region rather than a point: caps of 8, 12 and 20 all read 14/14 at
+    /// both horizons with a held-out universe at 14/14, and the statistics
+    /// differ in the third decimal. Twelve is the middle of that plateau.
+    ///
+    /// One axis moves the wrong way, stated because it is a regression: the
+    /// driven-window noise ratio reads 1.565 against pt-v11's 1.555, both
+    /// against a real 1.00. That axis was already the worst thing about this
+    /// model and this makes it 0.6% worse.
+    ///
+    /// NOT the default. pt-v10 holds that and the envelope certifies pt-v10.
+    pub const fn pt_v12() -> ModelParams {
+        let mut p = ModelParams::pt_v11();
+        p.volume_move_cap = 12.0;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -1672,6 +1721,7 @@ impl ModelParams {
             "pt-v9" => Some(PT_V9),
             "pt-v10" => Some(PT_V10),
             "pt-v11" => Some(PT_V11),
+            "pt-v12" => Some(PT_V12),
             _ => None,
         }
     }
@@ -1679,7 +1729,7 @@ impl ModelParams {
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
-          "pt-v11"]
+          "pt-v11", "pt-v12"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -2175,6 +2225,8 @@ mod tests {
         assert_eq!(PT_V10.fingerprint(), "pt-v10");
         assert_eq!(ModelParams::preset("pt-v10").unwrap().fingerprint(), "pt-v10");
         assert_eq!(PT_V11.fingerprint(), "pt-v11");
+        assert_eq!(PT_V12.fingerprint(), "pt-v12");
+        assert_eq!(ModelParams::preset("pt-v12").unwrap().fingerprint(), "pt-v12");
         assert_eq!(ModelParams::preset("pt-v11").unwrap().fingerprint(), "pt-v11");
         // The sentinel is a name no preset will ever take, not the NEXT one.
         // It used to be the next unreleased name, which meant this guard
