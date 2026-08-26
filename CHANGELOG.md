@@ -21,7 +21,17 @@ typical year against a real 18.3, and the market crossed its own crisis
 threshold on 2.7% of days against a real 12.5%. Without them the level reads
 19.6, the within-year spread 4.54 against a real 4.0, and the threshold is
 crossed on **10.2% of days**: volatility regimes come from the market rather
-than from the calendar. The envelope certifies pt-v10; `envelope.CERTIFIED` and the 504-day
+than from the calendar.
+
+It also raises `market_vol_ceiling_multiple` from 16 to 32, which is a
+physical number rather than a fitted one: the clamp caps the market factor's
+variance at N times its calm level, and a real VIX of 82.7 against this
+model's anchor of 15 is a variance ratio of 30. At 16 the market could not
+reach the variance a record VIX implies. It binds only in a crisis, so calm
+volatility at a held VIX of 5, 15 and 25 is unchanged to a tenth of a point,
+and the crisis volatility lever rises from 4.30x to **4.75x** against a real
+6.16x. A crisis in this market is about three quarters as violent as a real
+one, where it used to be half. The envelope certifies pt-v10; `envelope.CERTIFIED` and the 504-day
 table are re-derived on it, and `envelope.check()` no longer names a
 statistic as out of band at 252 days, because none is.
 

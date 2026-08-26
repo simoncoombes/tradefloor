@@ -11,7 +11,7 @@
    "in_band": true
   },
   "excess_kurtosis": {
-   "measured": 7.5137,
+   "measured": 7.9713,
    "band": [
     1.6,
     41.0
@@ -19,7 +19,7 @@
    "in_band": true
   },
   "return_acf1": {
-   "measured": 0.0155,
+   "measured": 0.0191,
    "band": [
     -0.08,
     0.06
@@ -43,7 +43,7 @@
    "in_band": true
   },
   "abs_return_acf20": {
-   "measured": 0.0046,
+   "measured": 0.0071,
    "band": [
     -0.04,
     0.08
@@ -83,7 +83,7 @@
    "in_band": true
   },
   "corr_asymmetry": {
-   "measured": -0.0228,
+   "measured": -0.0016,
    "band": [
     -0.25,
     0.45

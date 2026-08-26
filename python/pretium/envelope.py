@@ -65,16 +65,16 @@ CERTIFIED_HORIZON_DAYS = 252
 #: hold on held-out seeds and a held-out 60-name universe.
 CERTIFIED: dict[str, float] = {
     "annualised_vol_pct": 31.1614,
-    "excess_kurtosis": 7.5137,
-    "return_acf1": 0.0155,
+    "excess_kurtosis": 7.9713,
+    "return_acf1": 0.0191,
     "abs_return_acf1": 0.0954,
     "abs_return_acf5": 0.0502,
-    "abs_return_acf20": 0.0046,
+    "abs_return_acf20": 0.0071,
     "cross_sectional_corr": 0.3106,
     "volume_abs_return_corr": 0.4824,
     "leverage_effect": -0.0327,
     "volume_change_acf1": -0.3111,
-    "corr_asymmetry": -0.0228,
+    "corr_asymmetry": -0.0016,
     "corr_asymmetry_lagged": 0.0045,
     "sector_excess_corr": 0.1374,
     "corr_persistence_acf1": 0.1595,
@@ -104,19 +104,19 @@ BANDS_504: dict[str, tuple[float, float]] = {
 #: The same panel at 504 days. Five of ten in band against `BANDS_504`.
 MEASURED_504: dict[str, float] = {
     "annualised_vol_pct": 32.4036,
-    "excess_kurtosis": 8.4044,
-    "return_acf1": 0.0208,
-    "abs_return_acf1": 0.171,
-    "abs_return_acf5": 0.0776,
-    "abs_return_acf20": 0.0063,
+    "excess_kurtosis": 8.4139,
+    "return_acf1": 0.0206,
+    "abs_return_acf1": 0.1746,
+    "abs_return_acf5": 0.0864,
+    "abs_return_acf20": 0.0066,
     "cross_sectional_corr": 0.3572,
-    "volume_abs_return_corr": 0.5163,
-    "leverage_effect": -0.0423,
+    "volume_abs_return_corr": 0.5171,
+    "leverage_effect": -0.0395,
     "volume_change_acf1": -0.3134,
-    "corr_asymmetry": -0.0055,
-    "corr_asymmetry_lagged": -0.0159,
+    "corr_asymmetry": 0.0279,
+    "corr_asymmetry_lagged": -0.0234,
     "sector_excess_corr": 0.1217,
-    "corr_persistence_acf1": 0.1927,
+    "corr_persistence_acf1": 0.2038,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
@@ -192,37 +192,24 @@ GAPS: tuple[Gap, ...] = (
         id="horizon",
         summary="the certified horizon is 252 days",
         detail=(
-            "Against bands re-derived at the matching window, the model holds "
-            "5 of the original 10 at 504 days, 7 of 14 with the conditional "
-            "correlation and persistence statistics added in 0.1.4. Clustering roughly doubles from 252 to 504 "
-            "and keeps climbing, where real markets move about 14% over the "
-            "same span. Volatility itself stabilises near 29.3%, so long runs "
-            "do not drift or blow up -- they stay plausible in LEVEL and "
-            "become unrealistic in DYNAMICS, which is easy to miss by looking "
-            "only at the price path. That count is measured on the shipped "
-            "preset. pt-v6, selectable and not certified, holds 10 of the "
-            "thirteen measured on it at 504 days and 11 at the certified "
-            "horizon, against pt-v3's 6 and 11 of the same thirteen.\n\n"
-            "pt-v6 buys that at a cost in SCENARIO response, which the band "
-            "counts do not show and which lands on exactly the long-dated "
-            "crisis work it is otherwise the right choice for. Measured over "
-            "thirty seeds with tools/calibration/scenario_response.py, the "
-            "steady-state volatility lever from VIX 5 to VIX 65 reads 3.07x "
-            "on pt-v3 and 2.68x on pt-v6, against real markets' 6.16x. So a "
-            "sustained crisis is about an eighth less violent under pt-v6 "
-            "than under the default, and a scenario study turning on crisis "
-            "MAGNITUDE should prefer pt-v3 even over multi-year windows, or "
-            "say that it accepted the weaker response.\n\n"
-            "Two things that reading invites and the measurements do not "
-            "support. The cost is NOT pt-v6's to answer for: the lever runs "
-            "3.07x at pt-v3, 2.67x at pt-v4, 2.69x at pt-v5 and 2.68x at "
-            "pt-v6, so it was spent when jumps arrived at pt-v4 and every "
-            "preset since has inherited it. And the harness's 'shock "
-            "response retained' percentage should not be quoted for this: it "
-            "divides two small excesses over 1.0, so shock ratios of 1.062 "
-            "and 1.038 become a headline gap of 27.6% against 16.7%. The "
-            "transient difference between the two presets is real and it is "
-            "0.024, not eleven points."
+            "Against bands re-derived at the matching window, the shipped "
+            "pt-v10 holds 13 of 14 at 504 days, missing only the "
+            "volume-change row whose two-year band is tighter than its "
+            "one-year one. That is the best two-year reading this project "
+            "has measured; pt-v3, the default before the 2026-08-26 era "
+            "boundary, held 7 of 14.\n\n"
+            "What remains is a SHAPE problem rather than a level one. "
+            "Volatility itself stabilises near 32%, so a long run does not "
+            "drift or blow up, and clustering at lags one and five stays "
+            "inside its bands. The decay curve is the defect, and gap 3 "
+            "carries it: exponential memory imitating hyperbolic memory "
+            "holds up over one year and comes apart over several.\n\n"
+            "The certification itself is the reason for the horizon, not the "
+            "band counts. CERTIFIED is measured at 252 days on thirty seeds; "
+            "the 504-day table is measured but not certified, and nothing "
+            "beyond 504 has been measured at all. A two-year study is "
+            "reading numbers this page publishes; a five-year study is "
+            "reading numbers nobody has checked."
         ),
         forbids="multi-year backtests, and anything keyed on volatility dynamics beyond one year",
         statistics=("abs_return_acf1", "abs_return_acf5", "return_acf1", "excess_kurtosis"),
@@ -671,9 +658,10 @@ def check(
         fire(g, (
             "the result depends on the SIZE of a scenario's response, which "
             "is not certified -- only its direction is. Measured: the "
-            "steady-state volatility lever from VIX 5 to VIX 65 reads 3.07x "
+            "steady-state volatility lever from VIX 5 to VIX 65 reads 4.75x "
             "on the shipped preset against real markets' 6.16x, so a crisis "
-            "here is roughly half as violent as a real one. The direction is "
+            "here is about three quarters as violent as a real one. The "
+            "direction is "
             "sound, with all four driver channels carrying the right sign and "
             "volatility clustering against the VIX level at +0.512 simulated "
             "against +0.489 for real AAPL, but the three DIRECTIONAL channels "

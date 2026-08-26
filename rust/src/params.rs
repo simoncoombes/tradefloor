@@ -1187,8 +1187,15 @@ impl ModelParams {
     /// pt-v9 with volume that remembers: the first preset holding ALL
     /// FOURTEEN realism statistics in band at the certified horizon.
     ///
-    /// Three coefficients move from pt-v9 (CALIBRATION-FOLLOWUPS.md §73,
-    /// §76). `vix_cycle_amplitude` 0.6 to 0.0 takes the business cycle out of
+    /// Four coefficients move from pt-v9 (CALIBRATION-FOLLOWUPS.md §73, §76,
+    /// §77). `market_vol_ceiling_multiple` 16 to 32 is the physical number
+    /// rather than a fitted one: the clamp caps the market factor's variance
+    /// at N times its calm level, and a real VIX of 82.7 against this model's
+    /// anchor of 15 is a variance ratio of 30. At 16 the market could not
+    /// reach the variance a real record VIX implies. It binds only in a
+    /// crisis, so calm volatility at a held VIX of 5, 15 and 25 is unchanged
+    /// to a tenth of a point, and the crisis lever rises from 4.30x to 4.75x
+    /// against a real 6.16x. `vix_cycle_amplitude` 0.6 to 0.0 takes the business cycle out of
     /// the VIX entirely: the five phase constants pulled the level to about
     /// 17.4 in a typical year against a real 18.3, and the market crossed its
     /// own crisis threshold on 2.7% of days against a real 12.5%. At zero the
@@ -1224,6 +1231,7 @@ impl ModelParams {
     pub const fn pt_v10() -> ModelParams {
         let mut p = ModelParams::pt_v9();
         p.vix_cycle_amplitude = 0.0;
+        p.market_vol_ceiling_multiple = 32.0;
         p.volume_innovation_sigma = 0.21;
         p.volume_persistence = 0.7;
         p
