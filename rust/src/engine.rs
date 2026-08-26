@@ -836,9 +836,32 @@ impl Engine {
     /// shipped preset reproduces bit for bit.
     fn apply_jumps(&mut self) {
         let p = &self.params;
+        // The regime's effect on the ARRIVAL RATE (§84). At coupling zero
+        // the branch is not taken and every preset is bit-identical; the
+        // scale is not applied as a multiply by one, because a guard is
+        // cheaper to read than a proof about IEEE-754. Only the threshold
+        // moves: the four draws below happen whatever the rate is, so the
+        // stream position never depends on a parameter.
+        let rate_scale = if p.jump_vix_coupling == 0.0 {
+            1.0
+        } else {
+            let ratio = self.economy.vix / p.market_vol_vix_anchor;
+            let c = p.jump_vix_coupling;
+            1.0 - c + c * ratio * ratio
+        };
+        let intensity_market = if p.jump_vix_coupling == 0.0 {
+            p.jump_intensity_market
+        } else {
+            p.jump_intensity_market * rate_scale
+        };
+        let intensity_idio = if p.jump_vix_coupling == 0.0 {
+            p.jump_intensity_idio
+        } else {
+            p.jump_intensity_idio * rate_scale
+        };
         let u_market = self.jump_rng.next_f64();
         let z_market = self.jump_rng.next_normal();
-        let market = if u_market < p.jump_intensity_market {
+        let market = if u_market < intensity_market {
             p.jump_mean_market + p.jump_sigma_market * z_market
         } else {
             0.0
@@ -846,7 +869,7 @@ impl Engine {
         for (index, company) in self.companies.iter_mut().enumerate() {
             let u = self.jump_rng.next_f64();
             let z = self.jump_rng.next_normal();
-            let idio = if u < p.jump_intensity_idio {
+            let idio = if u < intensity_idio {
                 p.jump_sigma_idio * z
             } else {
                 0.0

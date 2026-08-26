@@ -167,6 +167,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_realised_vol_weight": (0.0, 1.0),
     # A name's own variance following the VIX (§78).
     "garch_vix_coupling": (0.0, 1.0),
+    # A jump's arrival RATE following the VIX (§84). A share, so the unit
+    # interval is the whole domain: at 1.0 the rate is the shipped rate times
+    # (vix / 15)^2, which at a pinned VIX 65 is about eighteen times as many
+    # jump days and at VIX 5 about a ninth.
+    "jump_vix_coupling": (0.0, 1.0),
     # How much of the business cycle's VIX swing survives (§77). A scale on
     # the phase VIX around its mean, so the unit interval is the whole
     # domain and both ends are shipped positions rather than guesses: every

@@ -444,6 +444,27 @@ pub struct ModelParams {
     pub jump_intensity_idio: f64,
     /// Standard deviation of the idiosyncratic jump, in log-return units.
     pub jump_sigma_idio: f64,
+    /// How much a jump's ARRIVAL RATE follows the VIX. Zero is every preset
+    /// before this dial and is bit-identical (§84).
+    ///
+    /// Both intensities are per-day probabilities that ignore the regime,
+    /// so the number of jump days in a dead-calm market and in a panic is
+    /// the same. Decomposing the nine attribution components under a pinned
+    /// VIX measured what that costs: jumps carry 40.5% of the variance of a
+    /// market pinned at VIX 5 and 1.1% of one pinned at VIX 65, on 3003 and
+    /// 2998 jump day-cells respectively. Real markets are the other way
+    /// round, and jump clustering in crises is the documented fact this
+    /// misses. It is also the floor under the calm end of the crisis lever:
+    /// a market that cannot stop jumping cannot get quiet.
+    ///
+    /// At `c` both intensities are scaled by `1 - c + c * (vix /
+    /// market_vol_vix_anchor)^2`, the same map `garch_vix_coupling` and the
+    /// market factor's target use, so at the anchor the rate is exactly the
+    /// shipped rate at any coupling and the mechanisms read the regime
+    /// alike. `apply_jumps` draws two uniforms and two normals
+    /// unconditionally whatever the rate is, so this moves a THRESHOLD and
+    /// never a stream position.
+    pub jump_vix_coupling: f64,
     /// Cross-sectional spread in volatility persistence, in raw `beta`
     /// units. Zero is every preset before pt-v7 and is bit-identical.
     ///
@@ -868,6 +889,7 @@ impl ModelParams {
             jump_sigma_market: 0.0,
             jump_intensity_idio: 0.0,
             jump_sigma_idio: 0.0,
+            jump_vix_coupling: 0.0,
             garch_beta_dispersion: 0.0,
             jump_momentum_share: 1.0,
             volume_persistence: 0.0,
@@ -1360,6 +1382,7 @@ impl ModelParams {
             "jump_sigma_market" => self.jump_sigma_market,
             "jump_intensity_idio" => self.jump_intensity_idio,
             "jump_sigma_idio" => self.jump_sigma_idio,
+            "jump_vix_coupling" => self.jump_vix_coupling,
             "garch_beta_dispersion" => self.garch_beta_dispersion,
             "jump_momentum_share" => self.jump_momentum_share,
             "volume_persistence" => self.volume_persistence,
@@ -1468,6 +1491,7 @@ impl ModelParams {
             "garch_beta_dispersion" => out.garch_beta_dispersion = value,
             "jump_momentum_share" => out.jump_momentum_share = value,
             "jump_sigma_idio" => out.jump_sigma_idio = value,
+            "jump_vix_coupling" => out.jump_vix_coupling = value,
             "jump_sigma_market" => out.jump_sigma_market = value,
             "volume_innovation_sigma" => out.volume_innovation_sigma = value,
             "volume_persistence" => out.volume_persistence = value,
@@ -1619,6 +1643,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "jump_momentum_share",
         "jump_sigma_idio",
         "jump_sigma_market",
+        "jump_vix_coupling",
         "market_factor_sigma",
         "market_vol_alpha",
         "market_vol_beta",
