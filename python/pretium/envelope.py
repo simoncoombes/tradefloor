@@ -380,32 +380,53 @@ GAPS: tuple[Gap, ...] = (
     ),
     Gap(
         id="roster-concentration",
-        summary="certification was measured on a sector-balanced roster",
+        summary="a concentrated roster holds at one year and comes apart at two",
         detail=(
             "`Universe.random()` assigns sectors round-robin over the twelve "
             "in `sectors.SECTORS`, so a roster is as close to balanced as its "
             "size allows: the certified 40 names put four in each of four "
             "sectors and three in each of the other eight. No real index is "
             "balanced that way -- the S&P is roughly a third technology and "
-            "the Nasdaq more so. (This gap said 'exactly five names in each "
-            "of twelve sectors' until 2026-08-26, which is 60 names and "
-            "describes no roster the certification used.)\n\n"
-            "Varying ONLY sector composition, with every name drawn from one "
-            "pool: balanced holds 9 at L_real 0.0000; an S&P-like mix holds 8 "
-            "at 0.0176, losing abs_return_acf5; an all-technology roster "
-            "holds 7 and runs 32.8% volatility. Those three counts are out "
-            "of the TEN-statistic panel of the pt-v3 era and have not been "
-            "re-measured on pt-v10; they are kept because what they "
-            "establish is a property of roster composition rather than of a "
-            "preset. So part of the certification is an artifact of that "
-            "balance, and the more concentrated the roster, the less of it "
-            "transfers."
+            "the Nasdaq more so.\n\n"
+            "RE-MEASURED 2026-08-26 on pt-v12: thirty seeds, the fourteen-"
+            "statistic panel, both horizons. This gap previously carried "
+            "'balanced 9, S&P-like 8, all-technology 7', counts out of the "
+            "TEN-statistic panel of the pt-v3 era at six seeds, and said so. "
+            "Superseded:\n\n"
+            "                      252d     504d   out at 504\n"
+            "  balanced           14/14    14/14   --\n"
+            "  S&P-like           14/14    13/14   annualised_vol_pct\n"
+            "  technology-heavy   14/14    11/14   vol, corr_persistence, xs_corr\n"
+            "  all-technology     13/13    10/13   vol, corr_persistence, xs_corr\n"
+            "  defensive          14/14    14/14   --\n\n"
+            "The finding has changed shape. AT THE CERTIFIED HORIZON, "
+            "concentration costs nothing: every shape tested holds the whole "
+            "panel, so the envelope transfers to a roster shaped like a real "
+            "index. This gap used to say part of the certification was an "
+            "artifact of balance; on pt-v12 at 252 days that is no longer "
+            "measurable.\n\n"
+            "What concentration costs is the SECOND year, and the mechanism "
+            "is visible rather than mysterious. Cross-sectional correlation "
+            "rises monotonically with it -- 0.3797 balanced, 0.3813 S&P-like, "
+            "0.4112 technology-heavy, 0.5316 all-technology -- which is the "
+            "model behaving CORRECTLY, since names in one industry should "
+            "move together more. It rises past the 504-day band's top of "
+            "0.41 and annualised volatility follows it out. A band derived "
+            "from broad real-market windows is the wrong ruler for a "
+            "single-sector portfolio, so part of this is a statement about "
+            "the grading rather than about the model.\n\n"
+            "`sector_excess_corr` is UNDEFINED on an all-technology roster "
+            "rather than out of band: it asks how much a name moves with its "
+            "own industry beyond the market, and with one sector those are "
+            "the same thing. Hence 13 rather than 14 in that row. Measured by "
+            "`tools/calibration/roster_shapes.py`."
         ),
         forbids=(
-            "inheriting this envelope for a sector-concentrated roster -- "
-            "re-measure the panel on your own universe instead"
+            "inheriting this envelope for a sector-concentrated roster BEYOND "
+            "one year -- at the certified horizon it now transfers"
         ),
-        statistics=("abs_return_acf5", "return_acf1", "annualised_vol_pct"),
+        statistics=("cross_sectional_corr", "annualised_vol_pct",
+                    "corr_persistence_acf1"),
     ),
 )
 
