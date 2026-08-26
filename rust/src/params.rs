@@ -440,6 +440,29 @@ pub struct ModelParams {
     ///
     /// 0.0 disables it and volume is exactly what it was.
     pub volume_variance_gain: f64,
+    /// Per-NAME volume persistence and its innovation. Both zero on every
+    /// preset before this dial and bit-identical (§107).
+    ///
+    /// `volume_persistence` carries a COMMON multiplier: every name shares
+    /// it, so the whole market is busy or quiet together. That function's
+    /// own docstring has said since it was written that "real volume
+    /// persistence is partly idiosyncratic, and that half is not modelled".
+    ///
+    /// It is the half the last panel miss needs. `volume_change_acf1` at 504
+    /// days reads about -0.316 against a band of -0.29 to -0.21 on every
+    /// preset, and the model is too NEGATIVE, which is what independent
+    /// per-tick noise does to the change in a series. Reaching the band
+    /// through the common component needs a bigger innovation, and that
+    /// takes `volume_abs_return_corr` out with it (§21 to §23, §73): a
+    /// market-wide volume multiplier adds volume variance unrelated to any
+    /// name's own moves. A PER-NAME state raises each name's own volume
+    /// autocorrelation without touching the common component the
+    /// volume-and-volatility row depends on, which is the trade those
+    /// searches could not find a way around.
+    pub volume_idio_persistence: f64,
+    /// Innovation of the per-name volume state. See
+    /// [`ModelParams::volume_idio_persistence`].
+    pub volume_idio_sigma: f64,
 
     // ── Universe memory (market/tick.rs, engine.rs) ─────────────────────
     /// How slowly the universe's remembered stress decays, per day.
@@ -1021,6 +1044,8 @@ impl ModelParams {
             market_vol_slow_gain: 0.0,
             fair_value_book_floor: 0.0,
             market_vol_slow_weight: 0.0,
+            volume_idio_persistence: 0.0,
+            volume_idio_sigma: 0.0,
             volume_variance_gain: 0.0,
             universe_stress_decay: 0.0,
             universe_stress_weight: 0.0,
@@ -1608,6 +1633,8 @@ impl ModelParams {
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
             "market_vol_slow_weight" => self.market_vol_slow_weight,
+            "volume_idio_persistence" => self.volume_idio_persistence,
+            "volume_idio_sigma" => self.volume_idio_sigma,
             "volume_variance_gain" => self.volume_variance_gain,
             "universe_stress_decay" => self.universe_stress_decay,
             "universe_stress_weight" => self.universe_stress_weight,
@@ -1720,6 +1747,8 @@ impl ModelParams {
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
             "market_vol_slow_weight" => out.market_vol_slow_weight = value,
+            "volume_idio_persistence" => out.volume_idio_persistence = value,
+            "volume_idio_sigma" => out.volume_idio_sigma = value,
             "volume_variance_gain" => out.volume_variance_gain = value,
             "universe_stress_decay" => out.universe_stress_decay = value,
             "universe_stress_weight" => out.universe_stress_weight = value,
@@ -1927,6 +1956,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_return_gain_up",
         "vix_return_source",
         "vix_target_shock_cap",
+        "volume_idio_persistence",
+        "volume_idio_sigma",
         "volume_innovation_sigma",
         "volume_persistence",
         "volume_variance_gain",

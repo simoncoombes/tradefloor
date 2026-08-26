@@ -98,6 +98,8 @@ pub struct EngineRngState {
     pub jumps: RngState,
     /// The persistent-volume stream, carried for the same reason.
     pub volume: RngState,
+    /// The per-name volume stream, carried for the same reason.
+    pub volume_idio: RngState,
     /// The endogenous-news stream, carried for the same reason. Left out,
     /// a restored engine would draw a different news sequence from the one
     /// it was checkpointed on, which is invisible while news is inert and
@@ -185,6 +187,7 @@ pub struct Engine {
     external_rng: GameRng,
     jump_rng: GameRng,
     volume_rng: GameRng,
+    volume_idio_rng: GameRng,
     news_rng: GameRng,
     companies: Vec<TickCompany>,
     economy: EconomyState,
@@ -229,6 +232,8 @@ pub struct Engine {
     /// Shared log-scale volume multiplier state. 0.0 means a multiplier of
     /// exactly 1.0, which is every preset before pt-v4.
     volume_state: f64,
+    /// Per-NAME volume state, one per company (§107).
+    volume_idio: Vec<f64>,
     /// Cumulative draws per stream, including any the embedder took through
     /// [`Engine::draw_uniform`]. The single most useful numbers for
     /// diagnosing a divergence: if these differ between two runs, nothing
@@ -370,6 +375,7 @@ impl Engine {
             external_rng: GameRng::substream(seed, stream::EXTERNAL),
             jump_rng: GameRng::substream(seed, stream::JUMPS),
             volume_rng: GameRng::substream(seed, stream::VOLUME),
+            volume_idio_rng: GameRng::substream(seed, stream::VOLUME_IDIO),
             news_rng: GameRng::substream(seed, stream::NEWS),
             companies,
             economy,
@@ -384,6 +390,7 @@ impl Engine {
             market_vol: MarketVarianceState::new_with(&params),
             universe_stress: 0.0,
             volume_state: 0.0,
+            volume_idio: vec![0.0; companies_len],
             sector_keys,
             draws: StreamDraws::default(),
             params,
@@ -438,6 +445,7 @@ impl Engine {
             external: self.external_rng.snapshot(),
             jumps: self.jump_rng.snapshot(),
             volume: self.volume_rng.snapshot(),
+            volume_idio: self.volume_idio_rng.snapshot(),
             news: self.news_rng.snapshot(),
         }
     }
@@ -455,6 +463,7 @@ impl Engine {
         self.external_rng = GameRng::restore(state.external);
         self.jump_rng = GameRng::restore(state.jumps);
         self.volume_rng = GameRng::restore(state.volume);
+        self.volume_idio_rng = GameRng::restore(state.volume_idio);
         self.news_rng = GameRng::restore(state.news);
     }
 
@@ -543,6 +552,7 @@ impl Engine {
                 economy: &self.economy,
                 universe_stress: self.universe_stress,
                 volume_state: self.volume_state,
+                volume_idio: &self.volume_idio,
                 market_status: status,
                 intraday_t: intraday_fraction(request.time),
                 volatility_multiplier: request.volatility_multiplier,
@@ -808,6 +818,7 @@ impl Engine {
         self.update_universe_stress();
         self.apply_jumps();
         self.update_volume_state();
+        self.update_volume_idio();
     }
 
     /// Endogenous jumps, applied once per name at the day close.
@@ -955,6 +966,25 @@ impl Engine {
         }
         self.volume_state =
             p.volume_persistence * self.volume_state + p.volume_innovation_sigma * z;
+    }
+
+    /// The per-NAME volume state, one draw per company per day.
+    ///
+    /// On its own stream and drawn UNCONDITIONALLY, the same discipline
+    /// `apply_jumps` follows: the count must not depend on a parameter or
+    /// the schedule stops being comparable across presets. At zero sigma
+    /// every state stays exactly 0.0, so the multiplier stays exactly 1.0
+    /// and the tick's volume arithmetic is untouched.
+    fn update_volume_idio(&mut self) {
+        let p = &self.params;
+        let (rho, sigma) = (p.volume_idio_persistence, p.volume_idio_sigma);
+        for i in 0..self.volume_idio.len() {
+            let z = self.volume_idio_rng.next_normal();
+            if rho == 0.0 && sigma == 0.0 {
+                continue;
+            }
+            self.volume_idio[i] = rho * self.volume_idio[i] + sigma * z;
+        }
     }
 
     /// The daily macro step: economy, cycle roll, then the central bank.

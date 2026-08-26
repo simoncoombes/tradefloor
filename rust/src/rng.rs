@@ -213,6 +213,15 @@ pub mod stream {
     /// A separate one from both, so no two mechanisms' draw counts couple.
     pub const NEWS: u32 = 5;
 
+    /// Per-name volume persistence, drawn once per name per day.
+    ///
+    /// Separate from [`VOLUME`], which carries the COMMON component, for the
+    /// reason every split here exists: the common update draws once a day
+    /// and the per-name update draws once per name, so sharing a stream
+    /// would make the common sequence depend on the universe size and
+    /// shift every preset that sets only the common half.
+    pub const VOLUME_IDIO: u32 = 6;
+
     /// Derived streams live at `256 + id`. See the module docs for why the
     /// offset exists.
     pub const STREAM_SEQUENCE_BASE: u32 = 256;
