@@ -844,7 +844,7 @@ pub const PT_V9: ModelParams = ModelParams::pt_v9();
 /// pt-v9 with volume that remembers -- see [`ModelParams::pt_v10`].
 pub const PT_V10: ModelParams = ModelParams::pt_v10();
 
-/// pt-v10 with jumps that cluster into crises -- see
+/// pt-v10 with a crisis that behaves like one -- see
 /// [`ModelParams::pt_v11`].
 pub const PT_V11: ModelParams = ModelParams::pt_v11();
 
@@ -1357,85 +1357,66 @@ impl ModelParams {
         p
     }
 
-    /// pt-v10 with jumps that know what regime they are in: the first
-    /// preset whose crisis is as violent as a real one.
+    /// pt-v10 with a crisis that behaves like one: the first preset to hold
+    /// the crisis lever, crisis co-movement and crisis sector structure at
+    /// the same time.
     ///
-    /// Three coefficients move from pt-v10 (CALIBRATION-FOLLOWUPS.md §84 to
-    /// §90). `jump_vix_coupling` 0.0 to 0.7 makes a jump's ARRIVAL RATE
-    /// follow the VIX; the two base intensities are scaled by 0.6 to fund
-    /// it. Both halves are necessary and the second is derived rather than
-    /// searched.
-    ///
-    /// # What it fixes
-    ///
-    /// Every preset before this one drew jumps at a constant per-day rate,
-    /// so a dead-calm market and a panic jumped equally often. Decomposing
-    /// the nine attribution components under a pinned VIX measured what that
-    /// costs: jumps carry 40.5% of the variance of a market pinned at VIX 5
-    /// and 1.1% of one pinned at VIX 65, on 3003 and 2998 jump day-cells
-    /// respectively (§84). Real markets are the other way round. That
-    /// constant rate was the floor under the calm end of the crisis lever —
-    /// a market that cannot stop jumping cannot get quiet — and three
-    /// parameter hypotheses were refuted before the decomposition found it
-    /// (§82, §83).
-    ///
-    /// **The crisis volatility lever reads about 6.12x against a real
-    /// 6.16x.** It has been the oldest open number in this project: 2.95x
-    /// when the gap was written, 3.07x on pt-v3, 4.34x on pt-v8, 5.05x on
-    /// pt-v10. The lever rises from BOTH ends, which is what removing a
-    /// VIX-insensitive additive term predicts.
-    ///
-    /// # Why the intensities are scaled, and by exactly that much
-    ///
-    /// The rate scale `1 - c + c * (vix / anchor)^2` averages ABOVE one over
-    /// this model's own VIX distribution, so the coupling alone ADDS jump
-    /// variance rather than moving it between regimes. Measured on an
-    /// undriven 504-day run: VIX mean 20.24, `E[(vix / 15)^2]` = 2.035, so
-    /// the mean scale at `c` = 0.7 is 1.725 and the funding factor is its
-    /// reciprocal, 0.580 (§88). Unfunded, the coupling took the 504-day
-    /// panel from 13 of 14 to 11, losing `annualised_vol_pct` at 34.9
-    /// against a ceiling of 34.0 (§87). At 0.6, close to the derived 0.580,
-    /// two-year volatility returns to 32.7 — pt-v10's value to the decimal.
+    /// Three coefficients move from pt-v10 (CALIBRATION-FOLLOWUPS.md §92 to
+    /// §100). `crisis_blend_gain` 0.5 to 0.8 loads names onto the market
+    /// factor harder in a crisis; `sector_vix_coupling` 0.25 to 1.0 lets the
+    /// sector draw's variance follow the regime; `idio_sigma_scale` 0.6526
+    /// to 0.58 funds the extra variance the first two add, which is the same
+    /// bookkeeping the market factor's variance has always used.
     ///
     /// # Measured, thirty seeds
     ///
-    /// 252 days: **14 of 14** in band, no misses, on training seeds and on a
-    /// held-out universe alike. 504 days: 13 of 14, missing only
-    /// `volume_change_acf1`, which pt-v10 misses too. Sector excess is
-    /// unchanged at both horizons (+0.1359 and +0.1195 against pt-v10's
-    /// +0.1346 and +0.1201). §8 passes on every axis with no flips. **No
-    /// axis regresses against pt-v10** (§90).
+    /// | | pt-v11 | pt-v10 | real |
+    /// |---|---|---|---|
+    /// | panel at 252 | 14/14 | 14/14 | |
+    /// | panel at 504 | 13/14 | 13/14 | |
+    /// | crisis lever | **6.40** | 4.97 | 6.16 |
+    /// | crisis co-movement | **0.687** | 0.669 | 0.664 to 0.727 |
+    /// | crisis sector excess | **+0.091** | +0.040 | +0.103 |
+    ///
+    /// It regresses NOTHING against pt-v10: both panels equal, and all three
+    /// crisis numbers better. §8 passes on every axis with no flips, with
+    /// pt-v10 run as the control beside it. The single 504-day miss is the
+    /// volume row pt-v10 misses too.
+    ///
+    /// # Why this route and not jumps
+    ///
+    /// An earlier pt-v11 bought the lever with `jump_vix_coupling` and
+    /// reached 6.22, and it cost crisis co-movement: 0.604 against a real
+    /// floor of 0.664. Jumps are per-name, and crisis co-movement IS the
+    /// market factor's share of total variance, so buying a violent crisis
+    /// with idiosyncratic variance necessarily dilutes it. Four gate batches
+    /// confirmed the trade on every dial that was not the market factor.
+    ///
+    /// The market factor's own crisis channel had been unusable because its
+    /// gain was the literal 0.5 and its spike saturates a 0.98 cap in any
+    /// crisis, so the most a crisis could load a name onto the market was
+    /// 0.49 of beta (§97). Making that a dial removed the ceiling, and the
+    /// lever bought through it raises co-movement instead of lowering it.
+    /// `jump_vix_coupling` remains a shipped dial and §84 stands on its own
+    /// terms, but it is not how this preset reaches a real crisis.
     ///
     /// # What it costs
     ///
-    /// Crisis-state cross-sectional correlation, and this was under-reported
-    /// when the preset was registered (§92). At a held VIX 45 it reads 0.604
-    /// against pt-v10's 0.669, and real markets sit at 0.664 to 0.727, so
-    /// this preset takes that diagnostic OUT of the real range. It is not a
-    /// panel statistic, which is exactly why a panel-shaped reading missed
-    /// it. The cause is structural rather than a mis-set coefficient: jumps
-    /// are per-name, so buying the lever through them adds idiosyncratic
-    /// variance, and crisis co-movement is the market factor's SHARE of
-    /// total variance. Any route to the lever that is not the market factor
-    /// pays here. **A study whose thesis is how tightly names move together
-    /// in a crisis should use pt-v10, not this preset.**
+    /// The driven-window axis (§81, §100): replayed through the real 2020-21
+    /// macro path, daily return sd is 1.55x real AAPL's against pt-v10's
+    /// 1.47x. The model already carried excess noise around a correct
+    /// scenario gain and this adds about five percent more of it. Sector
+    /// excess also lands at +0.091 against a real +0.103, closer than any
+    /// preset before it and still short.
     ///
-    /// # What is not claimed
-    ///
-    /// The panel gates are UNDRIVEN. Through a real driven path the VIX runs
-    /// well above the anchor, so this preset fires more jumps there than
-    /// pt-v10 does, and §81's finding was that the model already carries
-    /// excess noise around a correct scenario gain. That cost is not yet
-    /// measured and this preset does not claim it is zero.
-    ///
-    /// NOT the default. pt-v10 holds that and the envelope certifies
-    /// pt-v10; 0.2.0 moved the default once already and moving it twice in
-    /// one release cycle would strand work published in between.
+    /// NOT the default. pt-v10 holds that and the envelope certifies pt-v10;
+    /// promoting this one is an era boundary and a separate decision from
+    /// registering it.
     pub const fn pt_v11() -> ModelParams {
         let mut p = ModelParams::pt_v10();
-        p.jump_vix_coupling = 0.7;
-        p.jump_intensity_market = 0.04317129366394317;
-        p.jump_intensity_idio = 0.013631923739110182;
+        p.crisis_blend_gain = 0.8;
+        p.sector_vix_coupling = 1.0;
+        p.idio_sigma_scale = 0.58;
         p
     }
 
