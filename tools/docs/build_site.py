@@ -1533,9 +1533,11 @@ def apply_scenarios_fixes(doc: str) -> str:
             "pinned through the scenario API. Since the 2026-08-26 era "
             "boundary VIX also moves a name's own variance, through "
             "<code style=\"font-size:12px\">garch_vix_coupling</code>; before "
-            "it, VIX sized only the shared factor. These figures sit above "
-            'the 31.5% on <a href="#/trust">Realism and Limits</a> because a '
-            "pinned VIX is not a normal market: the pin drives the factor "
+            "it, VIX sized only the shared factor. These figures straddle "
+            'the 31.5% on <a href="#/trust">Realism and Limits</a> rather '
+            "than sitting near it, a calm pin landing about there and a "
+            "crisis pin running three times higher, because a pinned VIX is "
+            "not a normal market: the pin drives the factor "
             "variance directly, and these runs use a smaller roster over 120 "
             "days rather than the certified 40 names over 252. Compare pins "
             "against each other, and take the certified number from an "
@@ -1709,8 +1711,10 @@ def apply_internals_fixes(doc: str) -> str:
             "pinned VIX is not a normal market: the pin drives the factor "
             "variance directly, and these runs use a smaller roster over 120 "
             "days rather than the certified 40 names over 252.",
-            "Those levels sit above the certified panel's 31.5% because a "
-            "pinned VIX is not a normal market: the pin drives the factor "
+            "Those levels straddle the certified panel's 31.5% rather than "
+            "sitting near it, a calm pin landing about there and a crisis "
+            "pin running three times higher, because a pinned VIX is not a "
+            "normal market: the pin drives the factor "
             "variance directly, and these runs use a smaller roster over 120 "
             "days rather than the certified 40 names over 252. The ratio "
             "between two of them is also not the crisis lever the realism "
