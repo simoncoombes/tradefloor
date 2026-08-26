@@ -111,7 +111,11 @@ costs.
 **Realism is a stated envelope, not a score.** `pt.facts.measure()` reports
 fourteen statistics against real-market bands. At 252 days the shipped `pt-v10`
 preset holds **all fourteen in band** on thirty calibration seeds, and all
-fourteen again on a 60-name universe it never saw. That is a market with the
+fourteen again on a 60-name universe it never saw. Read that as fourteen
+in-band verdicts rather than fourteen independent validations: five of the
+fourteen were live calibration targets, the bands were used both to tune
+against and to grade against, and "held out" means unseen simulation seeds and
+another roster from the same generator rather than withheld market data. That is a market with the
 right
 volatility, the right tails, the right co-movement, industries that co-move
 more than strangers, correlation that stays elevated after a panic, volume
