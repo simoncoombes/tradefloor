@@ -12,7 +12,7 @@ shutdown -h +60
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates15
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates16
 BRANCH=main
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
