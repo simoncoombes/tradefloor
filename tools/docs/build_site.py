@@ -362,6 +362,28 @@ ERA_FIXES = [
         "since; what they establish is a property of the roster rather than "
         "of a preset.",
     ),
+    # The worked methods paragraph is the citation a reader copies, so it
+    # models the current shape or it teaches the wrong one. It named 0.1.0,
+    # pt-v3 and a pre-era-boundary digest against a file that carries a
+    # preset and no digest.
+    (
+        "Strategies were evaluated on pretium 0.1.0 (commit "
+        '<code style="font-size:12px">&lt;sha&gt;</code>), model preset '
+        '<code style="font-size:12px">pt-v3</code>,',
+        "Strategies were evaluated on pretium 0.2.0 (commit "
+        '<code style="font-size:12px">&lt;sha&gt;</code>), model preset '
+        '<code style="font-size:12px">pt-v10</code>,',
+    ),
+    (
+        "Realism of the shipped preset at this horizon is as published in "
+        '<code style="font-size:12px">envelope.json</code> at digest '
+        '<code style="font-size:12px">992ef95d\u2026dc185e3</code>; absolute '
+        "returns are not claimed to forecast live results.",
+        "Realism of the shipped preset at this horizon is as published in "
+        '<code style="font-size:12px">envelope.json</code>, which names the '
+        "preset the figures describe; absolute returns are not claimed to "
+        "forecast live results.",
+    ),
     # The sector table's own description of the generator. Round-robin over
     # twelve sectors is five names each only at n = 60; the certified roster
     # is 40 and gets four in four sectors and three in the other eight.

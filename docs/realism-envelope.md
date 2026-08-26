@@ -435,6 +435,14 @@ in that dictionary is one the reporting path alone consumed. It does move
 the known-answer digest, because the digest hashes the reported preset.
 The measurements on this page are unaffected.
 
-The envelope is re-measured whenever the default preset changes. If the
-digest in `envelope.json` does not match the wheel you have installed,
-this page describes a different model than the one you are running.
+That digest is the pt-v3 era's, and it is kept as the record of what those
+two runs ran. The current era's determinism baseline is known-answer v10,
+`4e22d5a6...e860378`, which the release workflow checks inside every wheel
+before it uploads.
+
+The envelope is re-measured whenever the default preset changes.
+`envelope.json` carries the preset the figures describe rather than a
+digest, so the check to run is
+`pretium.model_preset()["name"] == json.load(open("envelope.json"))["preset"]`.
+If those differ, this page describes a different model than the one you are
+running.
