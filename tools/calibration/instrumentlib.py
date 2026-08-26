@@ -352,6 +352,10 @@ PARAM_SPECS: dict[str, dict] = {
                        "hard_range": (0.0, 1.5)},
     "sector_loading_beta_slope": {"kind": "abs", "step_unit": 0.05,
                                   "hard_range": (0.0, 1.0)},
+    # Volume following a NAME's own conditional variance (§112). Same shape
+    # as volume_variance_gain, which does this for the market factor.
+    "volume_idio_variance_gain": {"kind": "abs", "step_unit": 0.05,
+                                  "hard_range": (0.0, 2.0)},
     "volume_idio_persistence": {"kind": "abs", "step_unit": 0.05,
                                 "hard_range": (0.0, 0.99)},
     "volume_idio_sigma": {"kind": "abs", "step_unit": 0.02,

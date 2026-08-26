@@ -246,6 +246,7 @@ PERTURBATIONS = [
     ("news_peer_vix_coupling", 4.0, False),      # multiplies a peer weight that is zero on every preset, and a crisis spike the harness never reaches
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
+    ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick
     ("volume_idio_persistence", 0.8, False),     # a PAIR like the news dials: persistence alone carries an innovation of zero, so every per-name state stays exactly 0.0
     ("volume_idio_sigma", 0.25, True),           # the innovation half: non-zero sigma moves volume from the first day, and volume reaches price through the book      # the crisis blend only fires above the VIX gate, which the harness does not cross         # anchored: the harness runs near market_vol_vix_anchor, where the rate scale is exactly 1.0 at any coupling
 ]

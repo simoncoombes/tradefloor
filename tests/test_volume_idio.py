@@ -109,3 +109,30 @@ def test_both_dials_are_settable_and_fingerprinted() -> None:
         m = pt.ModelParams.from_preset("pt-v11", **{name: value})
         assert m.fingerprint.startswith("custom-")
         assert m.to_dict()[name] == value
+
+
+def test_the_variance_coupling_ships_inert_and_follows_the_name() -> None:
+    """The return-RELATED per-name volume, and why it exists.
+
+    §111 measured that per-name volume PERSISTENCE fixes the volume-change
+    row and takes `volume_abs_return_corr` down with it, exactly as the
+    common component does. The cause is not common-versus-per-name: any
+    volume variance unrelated to a name's own returns dilutes a statistic
+    measuring how well volume tracks the size of that name's move.
+
+    This couples volume to the name's own conditional variance instead, so
+    the variance it adds is return-related by construction.
+    """
+    for preset in ("pt-v3", "pt-v10", "pt-v11"):
+        m = pt.ModelParams.from_preset(preset, volume_idio_variance_gain=0.0)
+        assert m.fingerprint == preset
+        assert list(_run(m).prices()) == list(_run(preset).prices()), preset
+
+    on = pt.ModelParams.from_preset("pt-v11", volume_idio_variance_gain=1.0)
+    assert on.fingerprint.startswith("custom-")
+    assert "volume_idio_variance_gain" in pt.ModelParams.settable()
+
+    def vols(engine):
+        return pa.table(engine.bars(grain="day"))["volume"].to_pylist()
+
+    assert vols(_run(on)) != vols(_run("pt-v11"))

@@ -742,6 +742,36 @@ pub fn simulate_market_tick(
             }
             _ => volume_multiplier,
         };
+        // Volume that follows the NAME's own conditional variance (§112).
+        //
+        // §111 measured why the per-name state of §107 could not be used: it
+        // fixes `volume_change_acf1` and takes `volume_abs_return_corr` down
+        // with it, exactly as the COMMON component does. The cause is not
+        // common-versus-per-name, which is what §107 assumed. It is that
+        // volume variance unrelated to a name's own returns dilutes a
+        // statistic measuring how well volume tracks the size of that name's
+        // move, and per-name noise is as unrelated as market-wide noise.
+        //
+        // This is the return-RELATED version, and the per-name analogue of
+        // `volume_variance_gain`, which does the same thing with the MARKET
+        // factor's variance and nothing else. The reference is the sector's
+        // base daily variance, a static table lookup, so no plumbing and no
+        // new state.
+        let volume_multiplier = if inputs.params.volume_idio_variance_gain == 0.0 {
+            volume_multiplier
+        } else {
+            match crate::sectors::by_key(&companies[idx].sector)
+                .map(|s| s.base_daily_variance())
+            {
+                Some(base) if base > 0.0 => {
+                    let ratio = companies[idx].stock.garch_variance / base;
+                    let raw = 1.0
+                        + inputs.params.volume_idio_variance_gain * (ratio - 1.0);
+                    volume_multiplier * mathx::clamp(raw, 0.25, 4.0)
+                }
+                _ => volume_multiplier,
+            }
+        };
         let stock = &companies[idx].stock;
         // Zero-guard: a newly listed company before `resetDailyPrices` seeds
         // `open` would divide by zero and propagate NaN into the batch.
