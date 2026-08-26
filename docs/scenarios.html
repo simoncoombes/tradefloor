@@ -172,21 +172,21 @@ pt.evaluate(agents, seed=7, universe=universe, days=20, scenario=shock)</code></
         <div class="tablewrap"><table style="max-width:480px">
           <thead><tr><th>Agent</th><th style="text-align:right">Calm</th><th style="text-align:right">Hiked</th><th style="text-align:right">Delta</th></tr></thead>
           <tbody style="font-family:var(--font-mono);font-size:12.5px">
-            <tr><td>buy_and_hold</td><td style="text-align:right">−7.16%</td><td style="text-align:right">−10.75%</td><td style="text-align:right">−3.59</td></tr>
-            <tr><td>momentum</td><td style="text-align:right">−1.17%</td><td style="text-align:right">−3.52%</td><td style="text-align:right">−2.36</td></tr>
-            <tr><td>oracle</td><td style="text-align:right">+11.11%</td><td style="text-align:right">+8.70%</td><td style="text-align:right">−2.41</td></tr>
+            <tr><td>buy_and_hold</td><td style="text-align:right">−5.63%</td><td style="text-align:right">−8.76%</td><td style="text-align:right">−3.13</td></tr>
+            <tr><td>momentum</td><td style="text-align:right">−7.88%</td><td style="text-align:right">−9.74%</td><td style="text-align:right">−1.86</td></tr>
+            <tr><td>oracle</td><td style="text-align:right">+14.98%</td><td style="text-align:right">+12.99%</td><td style="text-align:right">−1.99</td></tr>
           </tbody>
         </table></div>
-        <p>Buy-and-hold is long only, holds through the repricing, and loses the most. Momentum and the Oracle trade around it and each give up about two and a half points. The sizes belong to the seed: across sim seeds 5 to 9 buy-and-hold gives up 3.4 to 4.7 points every time, while momentum's give-up spans −5.1 to +0.5. Run more than one seed before you quote a size.</p>
+        <p>Buy-and-hold is long only, holds through the repricing, and gives up the most. Momentum and the Oracle trade around it and each give up about two points. The sizes belong to the seed: across sim seeds 5 to 9 buy-and-hold gives up 3.0 to 5.0 points every time, while momentum's give-up spans −1.9 to +0.5. Run more than one seed before you quote a size.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">What a VIX Scenario Moves</h2>
         <p>VIX moves four things at once, which is why pinning it high feels like a crisis rather than turning up a dial:</p>
         <ul style="color:var(--mut);font-size:14px">
-          <li><strong style="color:var(--fg)">Volatility.</strong> The market factor's variance chases a target that scales with (VIX/15)². Realised annual volatility: 49% at VIX 5, 59% at 15, 107% at 45, 124% at 65.</li>
-          <li><strong style="color:var(--fg)">Spreads.</strong> Mean quoted spread goes from 11.5 bps at VIX 15 to 25.9 bps at VIX 65, so trading costs more exactly when you least want it to.</li>
-          <li><strong style="color:var(--fg)">Correlation.</strong> Above VIX 25.5 the cross-section blends toward the market factor: mean pairwise correlation reads +0.27 calm, +0.68 at VIX 45, +0.76 at 65. Diversification stops working, the way it does in a real crisis.</li>
+          <li><strong style="color:var(--fg)">Volatility.</strong> The market factor's variance chases a target that scales with (VIX/15)². Realised annual volatility: 31% at VIX 5, 37% at 15, 105% at 45, 126% at 65.</li>
+          <li><strong style="color:var(--fg)">Spreads.</strong> Mean quoted spread goes from 11.7 bps at VIX 15 to 21.5 bps at VIX 65, so trading costs more exactly when you least want it to.</li>
+          <li><strong style="color:var(--fg)">Correlation.</strong> Above VIX 25.5 the cross-section blends toward the market factor: mean pairwise correlation reads +0.20 calm, +0.62 at VIX 45, +0.68 at 65. Diversification stops working, the way it does in a real crisis.</li>
           <li><strong style="color:var(--fg)">Credit spreads,</strong> recomputed at central-bank meetings, so a VIX path also ends up repricing the yield that equities discount off.</li>
         </ul>
-        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Measured: Universe.random(20-25, seed=11) · 120 days · sim seed 3, pinned through the scenario API. What VIX never moves is a single name's own noise. These figures are much higher than the 24.1% on <a href="trust.html">Realism and Limits</a> because a pinned VIX is not a normal market: the pin drives the factor variance directly, and these runs use a smaller roster over 120 days rather than the certified 40 names over 252. Compare pins against each other, and take the certified number from an unpinned run.</p>
+        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Measured: Universe.random(20-25, seed=11) · 120 days · sim seed 3, pinned through the scenario API. Since the 2026-08-26 era boundary VIX also moves a name's own variance, through <code style="font-size:12px">garch_vix_coupling</code>; before it, VIX sized only the shared factor. These figures straddle the 31.5% on <a href="trust.html">Realism and Limits</a> rather than sitting near it, a calm pin landing about there and a crisis pin running three times higher, because a pinned VIX is not a normal market: the pin drives the factor variance directly, and these runs use a smaller roster over 120 days rather than the certified 40 names over 252. Compare pins against each other, and take the certified number from an unpinned run. The ratio between two pins is NOT the crisis lever the realism page and the release notes quote: that one runs VIX 5 to VIX 65 on the certified roster over 252 days at thirty seeds and reads 5.05x. Three numbers, three measurements.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">Example: A Liquidity Crisis</h2>
         <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
@@ -200,7 +200,7 @@ calm = pt.facts.measure(seed=3, universe=u, days=120,
                         scenario=pt.Scenario("calm").hold(vix=18.0))
 print(f"{calm['annualised_vol_pct']:.2f}% calm, "
       f"{shocked['annualised_vol_pct']:.2f}% crisis")
-# 61.76% calm, 82.16% crisis</code></pre>
+# 39.98% calm, 67.68% crisis</code></pre>
         </div>
         <p>The peak of 80 is anchored on the VIX's highest close of 2008: 80.86, on 20 November. The recipe docs anchor every number this way, and also say what each recipe does not claim: reproducing a volatility level is not reproducing a crisis. 2008 was a solvency crisis with a frozen money market behind it, and none of that is in this model.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">Comparing With and Without the Event</h2>
@@ -210,7 +210,7 @@ print(f"{calm['annualised_vol_pct']:.2f}% calm, "
           <div style="font:600 10.5px/1 var(--font-mono);letter-spacing:0.09em;color:var(--bad);margin:0 0 9px">TRAPS AND LIMITS</div>
           <p style="font-size:13.5px;color:var(--mut)">Pinning <code style="font-size:12px">federal_funds_rate</code> alone does nothing until the first central-bank meeting, around day 45, because equities discount off the corporate bond yield. A short policy-only study measures exactly 0.00% and looks fine. <code style="font-size:12px">rate_shock</code> moves the whole curve when you want an immediate repricing.</p>
           <p style="font-size:13.5px;color:var(--mut)">The shape constructors build a whole scenario. <code style="font-size:12px">Scenario().hold(...).vix_shock(...)</code> reads like chaining and would throw away your holds; the library refuses it by name.</p>
-          <p style="font-size:13.5px;color:var(--mut)">And gap 5 on the realism page: scenario response is directional, not sized. A crisis here is about half as violent as a real one. Use scenarios to detect breakage, never to size losses.</p>
+          <p style="font-size:13.5px;color:var(--mut)">And gap 5 on the realism page: scenario response is directional, not sized. A crisis here is about four fifths as violent as a real one, 5.05x against 6.16x on the certified roster. Use scenarios to detect breakage, never to size losses.</p>
         </div>
         <h2 style="font-size:21px;margin:46px 0 10px">A Whole Crisis Study</h2>
         <p>A whole crisis study. Build the event, look at the path before you spend anything on it, check the question is answerable, then measure what the crisis did to the market, to a strategy and to execution cost. Same seed throughout, so the only difference between the two worlds is the event.</p>
@@ -264,37 +264,38 @@ for s in range(1, 13):
     ...                              # one seed is one sample</code></pre>
         </div>
         <div style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">OUTPUT</span><span title="Medians and verdict text are quoted from the shipped envelope; the spread columns and strategy numbers were composed for the example." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--codemut);border:1px solid var(--codeline)">MIXED, SEE NOTE</span></div>
+          <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">OUTPUT</span><span title="Captured from the run named beside this block." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--tks);border:1px solid var(--tks)">MEASURED</span></div>
           <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);color:var(--codemut)">{'day': 0, 'vix': 18.0}
 {'day': 1, 'vix': 18.0}
 ...
-{'day': 20, 'vix': 18.0}
-{'day': 21, 'vix': 19.03}
-{'day': 22, 'vix': 20.07}
-{'day': 23, 'vix': 21.10}
-{'day': 24, 'vix': 22.13}
+{'day': 19, 'vix': 18.0}
+{'day': 20, 'vix': 80.0}
+{'day': 21, 'vix': 78.97}
+{'day': 22, 'vix': 77.93}
+{'day': 23, 'vix': 76.90}
+{'day': 24, 'vix': 75.87}
 
-inside the envelope
+inside the envelope for the statistics you named
   - horizon 120d is within the certified 252d, and no named statistic
     meets a measured gap
-  ? annualised_vol_pct is in band at the certified horizon (24.0972 in
+  ? annualised_vol_pct is in band at the certified horizon (31.4632 in
     (15.0, 36.0)) -- but that is a median across 30 seeds; check
     `intervals` for the spread before relying on one seed
-  ? cross_sectional_corr is in band at the certified horizon (0.2558 in
+  ? cross_sectional_corr is in band at the certified horizon (0.3063 in
     (0.08, 0.56)) -- but that is a median across 30 seeds; check
     `intervals` for the spread before relying on one seed
 
-(82.16, 61.76)      # annualised vol %, crisis against calm
-0.6781              # cross-sectional correlation under the crisis
+(67.68, 39.98)      # annualised vol %, crisis against calm
+0.6235              # cross-sectional correlation under the crisis
 
-calm    0.1142   -0.0871
-crisis  0.0316   -0.2043
+calm   -42.9347  11.9232
+crisis -56.6869  95.0928
 
 6.06 11.69          # shortfall bps, calm then VIX 45</code></pre>
         </div>
-        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">In that block the volatility pair and the two shortfall figures are measured runs, cited in the prose below. The scenario table rows and the two strategy lines are composed to show the shape of the output.</p>
-        <p>Volatility goes from 62% to 82%, and correlation climbs with it. The strategy's drawdown grows, and you can separate the causes: fair value repricing, wider spreads, and a cross-section that stopped diversifying. Execution cost nearly doubles on all twelve seeds, so that result belongs to the regime rather than to one path.</p>
-        <p>Do not quote the sizes as real. A crisis here is roughly half as violent as a real one (gap 5). Read the direction and the ordering; leave the magnitudes alone.</p>
+        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Every line in that block is a measurement on pretium 0.2.0 under pt-v10, from the code above it. The scenario rows are elided in the middle and rounded to two decimals; nothing else is edited. Note what the path actually does: <code style="font-size:12.5px">vix_shock</code> puts the peak on day <code style="font-size:12.5px">at</code> and decays it over the window, rather than ramping up to it.</p>
+        <p>Volatility goes from 40% to 68%, and correlation climbs with it, 0.49 to 0.62. The strategy's drawdown grows, and you can separate the causes: fair value repricing, wider spreads, and a cross-section that stopped diversifying. Execution cost nearly doubles on all twelve seeds, so that result belongs to the regime rather than to one path.</p>
+        <p>Do not quote the sizes as real. A crisis here is about four fifths as violent as a real one (gap 5), and the pinned pair above is a different measurement again. Read the direction and the ordering; leave the magnitudes alone.</p>
 </main>
 </div>
 <footer class="site"><div class="layout" style="display:block">

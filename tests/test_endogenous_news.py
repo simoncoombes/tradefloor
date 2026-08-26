@@ -31,28 +31,49 @@ def _news_column(model, days: int = 20, n: int = 25) -> list[float]:
 
 
 @pytest.mark.parametrize("preset", ["pt-v3", "pt-v10", "pt-v11"])
-def test_it_ships_inert(preset: str) -> None:
-    """At intensity zero the trajectory is the shipped one, bit for bit."""
+def test_restating_a_presets_own_news_is_inert(preset: str) -> None:
+    """Re-stating a preset's own news settings changes nothing, bit for bit.
+
+    Written against each preset's OWN values rather than zero, which is what
+    every preset carried until pt-v11 switched news on. A test that
+    hardcodes the old default stops testing inertness the day a preset
+    adopts the dial.
+    """
+    own = pt.ModelParams.from_preset(preset).to_dict()
     base = pt.Engine(seed=17, universe=pt.Universe.random(25, seed=9), model=preset)
     base.run_days(12)
     before = list(base.prices())
 
-    m = pt.ModelParams.from_preset(preset, endogenous_news_intensity=0.0)
+    m = pt.ModelParams.from_preset(
+        preset,
+        endogenous_news_intensity=own["endogenous_news_intensity"],
+        endogenous_news_sigma=own["endogenous_news_sigma"])
     after = pt.Engine(seed=17, universe=pt.Universe.random(25, seed=9), model=m)
     after.run_days(12)
     assert list(after.prices()) == before
     assert m.fingerprint == preset
 
 
-def test_company_news_is_zero_on_every_shipped_preset() -> None:
-    """The gap itself, asserted so it cannot be closed by accident.
+@pytest.mark.parametrize("preset", ["pt-v3", "pt-v10"])
+def test_it_is_still_off_on_every_preset_before_pt_v11(preset: str) -> None:
+    """The mechanism ships inert, and the presets that predate it stay so."""
+    m = pt.ModelParams.from_preset(preset, endogenous_news_intensity=0.0)
+    assert m.fingerprint == preset
+    assert m.to_dict()["endogenous_news_intensity"] == 0.0
 
-    Every shipped preset leaves this channel silent. If a preset ever
-    switches endogenous news on, this test must be updated deliberately
-    rather than discovered failing.
+
+def test_company_news_fires_on_pt_v11_and_on_nothing_before_it() -> None:
+    """The gap, and the preset that closed it.
+
+    This test used to assert the channel was silent on EVERY preset, with a
+    note that a preset switching news on must update it deliberately rather
+    than discover it failing. pt-v11 switched it on, so this is that
+    deliberate update: the channel is live there and silent everywhere
+    earlier, which is what keeps the older presets reproducing.
     """
-    for preset in ("pt-v3", "pt-v10", "pt-v11"):
+    for preset in ("pt-v3", "pt-v10"):
         assert all(v == 0.0 for v in _news_column(preset)), preset
+    assert any(v != 0.0 for v in _news_column("pt-v11"))
 
 
 def test_switching_it_on_makes_company_news_fire() -> None:

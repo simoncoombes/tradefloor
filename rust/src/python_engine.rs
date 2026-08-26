@@ -1619,7 +1619,8 @@ impl PyEngine {
         // nested structure so a pre-split snapshot (three numbers) is
         // unmistakable at a glance and on restore.
         let mut rng_out = Vec::with_capacity(15);
-        for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume, rng.news] {
+        for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume,
+                  rng.news, rng.volume_idio] {
             rng_out.push(f64::from_bits(s.state));
             rng_out.push(f64::from_bits(s.increment));
             rng_out.push(s.spare.unwrap_or(f64::NAN));
@@ -1814,10 +1815,11 @@ impl PyEngine {
         // does not carry -- see the bindings below. That is what lets a
         // checkpoint written before a mechanism existed replay exactly as it
         // did then, rather than against a zeroed generator wearing its seed.
-        if !matches!(rng.len(), 9 | 12 | 15 | 18) {
+        if !matches!(rng.len(), 9 | 12 | 15 | 18 | 21) {
             return Err(ValidationError::new_err(format!(
                 "rng must be 9 numbers (market, economy, external), 12 \
-                 (plus jumps), 15 (plus volume) or 18 (plus news), as \
+                 (plus jumps), 15 (plus volume), 18 (plus news) or 21 \
+                 (plus per-name volume), as \
                  (state, increment, spare) triples, got {}",
                 rng.len()
             )));
@@ -1845,6 +1847,7 @@ impl PyEngine {
         let jumps = if rng.len() >= 12 { stream(9) } else { current.jumps };
         let volume = if rng.len() >= 15 { stream(12) } else { current.volume };
         let news = if rng.len() >= 18 { stream(15) } else { current.news };
+        let volume_idio = if rng.len() >= 21 { stream(18) } else { current.volume_idio };
         self.inner.set_rng_state(crate::engine::EngineRngState {
             market: stream(0),
             economy: stream(3),
@@ -1852,6 +1855,7 @@ impl PyEngine {
             jumps,
             volume,
             news,
+            volume_idio,
         });
 
         // The per-day accumulators. Absent from a snapshot written before

@@ -346,6 +346,11 @@ PARAM_SPECS: dict[str, dict] = {
     # calm panel cannot see this dial at all.
     "news_peer_vix_coupling": {"kind": "abs", "step_unit": 0.25,
                                "hard_range": (0.0, 8.0)},
+    # Per-name volume persistence (§107). Same shape as the common pair.
+    "volume_idio_persistence": {"kind": "abs", "step_unit": 0.05,
+                                "hard_range": (0.0, 0.99)},
+    "volume_idio_sigma": {"kind": "abs", "step_unit": 0.02,
+                          "hard_range": (0.0, 0.6)},
     "garch_ceiling_multiple":   {"kind": "log",
                                  "hard_range": (1.0, 50.0)},
     "garch_floor_multiple":     {"kind": "log",

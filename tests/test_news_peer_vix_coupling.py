@@ -37,7 +37,8 @@ def _prices(vix: float, days: int = 12, **over):
 @pytest.mark.parametrize("preset", ["pt-v3", "pt-v10", "pt-v11"])
 def test_it_ships_inert(preset: str) -> None:
     """At zero the trajectory is the shipped one, bit for bit, in a crisis."""
-    m = pt.ModelParams.from_preset(preset, news_peer_vix_coupling=0.0)
+    own = pt.ModelParams.from_preset(preset).to_dict()["news_peer_vix_coupling"]
+    m = pt.ModelParams.from_preset(preset, news_peer_vix_coupling=own)
     assert m.fingerprint == preset
 
     def run(model):
@@ -71,9 +72,21 @@ def test_it_moves_a_crisis() -> None:
 
 
 def test_it_does_nothing_without_news_to_transfer() -> None:
-    """No announcer, no contagion, however hard the coupling is turned up."""
-    quiet = _prices(45.0)
-    assert _prices(45.0, news_peer_vix_coupling=4.0) == quiet
+    """No announcer, no contagion, however hard the coupling is turned up.
+
+    Measured on pt-v10, which carries no news. pt-v11 does, so it cannot
+    answer this question about itself.
+    """
+    def run(**over):
+        m = pt.ModelParams.from_preset("pt-v10", **over) if over else "pt-v10"
+        e = pt.Engine(seed=23, universe=pt.Universe.random(20, seed=11), model=m)
+        s = Scenario().hold(vix=45.0)
+        for d in range(12):
+            s.apply(e, d)
+            e.run_days(1, first_day=d)
+        return list(e.prices())
+
+    assert run(news_peer_vix_coupling=4.0) == run()
 
 
 def test_it_raises_crisis_sector_structure() -> None:

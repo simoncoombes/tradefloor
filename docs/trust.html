@@ -142,9 +142,9 @@ and copy buttons.</p>
         <p>"Measured" is used for figures from several different methods, and the difference matters, so every figure here carries a provenance line naming five things: the statistic, the preset, the seeds, the roster, and the horizon. Three methods recur.</p>
         <div class="tablewrap"><table>
           <tbody style="font-size:13.5px">
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;width:190px">certification panel</td><td>pt-v3, 30 seeds, 40 instruments, 252 days. The figures in the table below, and the only ones the word "certified" applies to.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">six-seed panel</td><td>pt-v3, sim seeds 1 to 6, <code style="font-size:12px">Universe.random(40, seed=111)</code>, 252 days. What <code style="font-size:12px">pt.facts</code> reports, and what the <a href="releases.html">release notes</a> quote. Same statistics, fewer seeds, so the values differ slightly from the panel above.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">single pinned run</td><td>One seed, a smaller roster, 120 days, a macro field held fixed. What the <a href="scenarios.html">scenario</a> figures come from. Good for comparing one pin against another, and not comparable to either panel.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;width:190px">certification panel</td><td>pt-v10, 30 seeds, 40 instruments, 252 days, every figure the MEDIAN across those seeds. The figures in the table below, and the only ones the word "certified" applies to. A median is not a typical run: read Seed-to-Seed Variation before quoting one.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">six-seed panel</td><td>pt-v10, sim seeds 1 to 6, <code style="font-size:12px">Universe.random(40, seed=111)</code>, 252 days. What <code style="font-size:12px">pt.facts</code> reports, and what the <a href="releases.html">release notes</a> quote. Same statistics, fewer seeds, so the values differ slightly from the panel above.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">single pinned run</td><td>One seed, a smaller roster, 120 days, a macro field held fixed. What the <a href="scenarios.html">scenario</a> figures come from. Good for comparing one pin against another, and not comparable to either panel. In particular, the calm-to-crisis volatility ratio a pair of pinned runs implies is NOT the crisis lever in gap 5: that one is measured on the certified 40-name roster over 252 days at thirty seeds, from VIX 5 to VIX 65. Three numbers on this site describe how violent a crisis is, and they are three different measurements.</td></tr>
           </tbody>
         </table></div>
         <p>Output blocks carry a badge. <span style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;color:var(--tks);border:1px solid var(--tks)">MEASURED</span> means the numbers came from the run named beside the block. <span style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;color:var(--mut);border:1px solid var(--line)">ILLUSTRATIVE</span> means the shapes and field names are real and the values were composed, so you can see what a call returns without inheriting a number nobody ran.</p>
@@ -168,17 +168,19 @@ print(verdict)</code></pre>
           <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">OUTPUT</span><span title="Captured from the run named beside this block." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--tks);border:1px solid var(--tks)">MEASURED</span></div>
           <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);color:var(--codemut)">OUTSIDE the envelope
   - horizon 504d exceeds the certified 252d. At 504 days the model holds
-    5 of 10 against horizon-matched bands: abs_return_acf1 0.289 against
-    (0.04, 0.22), abs_return_acf5 0.152 against (0.02, 0.10)
-  - excess_kurtosis reads 5.23 at 504 days against a horizon-matched band
-    of (7.1, 22.0) -- the tails are too thin where you are measuring
+    13 of 14 against horizon-matched bands, missing only
+    volume_change_acf1 at -0.3156 against (-0.29, -0.21). Beyond 504
+    days nothing has been measured at all
   - abs_return_acf20 depends on the decay shape, which is a mechanism gap:
     log-log slope -0.953 against real markets' -0.436, and the curve is
-    negative by lag 30 where real markets stay positive to lag 60</code></pre>
+    negative by lag 30 where real markets stay positive to lag 60
+  ? excess_kurtosis reads 8.26 at 504 days against (7.1, 22.0): inside
+    it, but about 0.3 seed-sd above the floor, so a tail study at this
+    horizon is reading the low edge of the band</code></pre>
         </div>
         <p>Each reason points at the measurement behind it, so you can check it yourself. Misspell a statistic and you get an error rather than an answer. If it quietly ignored names it did not recognise, you would walk away thinking you had the all-clear.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">What Is Certified</h2>
-        <p>At a 252-day horizon the shipped <code style="font-size:13px">pt-v10</code> preset puts all fourteen measured statistics in band, on thirty calibration seeds and on a held-out 60-name universe measured at the same resolution. It is the first preset in the project with no miss at this horizon.</p>
+        <p>At a 252-day horizon the shipped <code style="font-size:13px">pt-v10</code> preset puts all fourteen measured statistics in band, on thirty calibration seeds and on a held-out 60-name universe measured at the same resolution. It is the first preset in the project with no miss at this horizon. Every figure below is the median of those thirty seeds, and that median is what the word certified describes: it is not a promise about your one run, which the spread further down prices.</p>
         <div class="tablewrap"><table>
           <thead><tr><th>Statistic</th><th style="text-align:right">Measured</th><th style="text-align:right">Band</th><th>Verdict</th></tr></thead>
           <tbody style="font-family:var(--font-mono);font-size:12.5px">
@@ -203,15 +205,16 @@ print(verdict)</code></pre>
         <div class="tablewrap"><table style="max-width:560px">
           <thead><tr><th>Axis</th><th style="text-align:right">Result</th><th style="text-align:right">L_real</th></tr></thead>
           <tbody style="font-family:var(--font-mono);font-size:12.5px">
-            <tr><td>training seeds (101-130), 40 names</td><td style="text-align:right">9/10 in band</td><td style="text-align:right">0.0000</td></tr>
-            <tr><td>held-out seeds (1-6), 40 names</td><td style="text-align:right">9/10 in band</td><td style="text-align:right">0.0000</td></tr>
-            <tr><td>held-out universe (60 names, different draw)</td><td style="text-align:right">9/10 in band</td><td style="text-align:right">0.0000</td></tr>
+            <tr><td>training seeds (101-130), 40 names</td><td style="text-align:right">14/14 in band</td><td style="text-align:right">0.0000</td></tr>
+            <tr><td>held-out seeds (1-30), 40 names</td><td style="text-align:right">14/14 in band</td><td style="text-align:right">0.0000</td></tr>
+            <tr><td>held-out universe (60 names, seed 909)</td><td style="text-align:right">14/14 in band</td><td style="text-align:right">0.0000</td></tr>
           </tbody>
         </table></div>
-        <p style="margin:14px 0 0">Five of the fourteen statistics were live calibration targets, so an in-band verdict on those is partly the tuning meeting its target. The held-out rows are what make the claim more than that.</p>
+        <p style="margin:14px 0 0">Five of the fourteen statistics were live calibration targets, so an in-band verdict on those five is the tuning meeting its target rather than an independent success. The held-out rows test whether the fit generalises; they do not make those five independent.</p>
+        <p style="margin:14px 0 0">And read "held out" narrowly, because it is doing less work than the phrase suggests. It means simulation seeds the calibration never drew and a roster it never ran. It does not mean withheld market data: the bands come from real-market windows, and the same bands were used to tune against and to grade against, with no empirical train and test split behind them. The held-out universe is another <code style="font-size:12.5px">Universe.random()</code> draw from the same generator, so it varies the names and not the shape of the roster. Gap 6 varies the shape, and the count drops.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">Seed-to-Seed Variation</h2>
-        <p>Every number above is the middle of thirty runs, and your one run will not be the middle. Measured on the shipped preset, nine of the fourteen statistics have their 10th-to-90th percentile range across seeds crossing a band edge. <code style="font-size:13px">abs_return_acf1</code> reads a median of 0.141 against a ceiling of 0.22, with a p90 of 0.426 and an across-seed standard deviation of 0.170, larger than the median itself.</p>
-        <p>So "9/10 in band" describes the middle of thirty runs. Your one run can easily look worse. Read the spread before relying on one seed:</p>
+        <p>Every number above is the middle of thirty runs, and your one run will not be the middle. Measured on the shipped preset, nine of the fourteen statistics have their 10th-to-90th percentile range across seeds crossing a band edge. <code style="font-size:13px">abs_return_acf1</code> reads a median of 0.0994 against a ceiling of 0.22, with a p90 of 0.4063 and an across-seed standard deviation of 0.1467, larger than the median itself.</p>
+        <p>So "14/14 in band" describes the middle of thirty runs, and the word certified describes that median rather than your run. It does not promise a typical single seed is in band on all fourteen; the spread below says most are not. Read it before relying on one seed:</p>
         <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
             <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
@@ -281,29 +284,29 @@ print(envelope.report_intervals(rows))</code></pre>
           <summary>3 · Volatility memory has the wrong shape</summary>
           <div style="padding:14px 16px 4px;font-size:14px;color:var(--mut)">
             <p>Real markets' volatility autocorrelation decays like a power law. The model's decays exponentially, because it is built from exponentials: per-name GARCH plus an AR(1) factor variance. Over one year two exponentials fake a power law well enough that no panel statistic objects. The fake thins out as the window grows, and by lag 30 the model's memory changes sign. Where a real market still says yesterday's turbulence makes today's more likely a month later, this one says the mild opposite.</p>
-            <p>On log-log axes real markets fit a slope of −0.436 over lags 1-20. The model fits −0.953, about 2.2 times steeper. This is a mechanism gap: no parameter setting turns one slope into the other. It was tried, and a two-component variance mixture lands lag 20 while getting lag 60 wrong in both directions at once.</p>
+            <p>On log-log axes real markets fit a slope of −0.436 over lags 1-20. The model fits −0.953, about 2.2 times steeper. This is a mechanism gap: no setting of this model's parameters turns one slope into the other, because the process is built from exponentials and a sum of exponentials is not a power law. It was tried, and a two-component variance mixture lands lag 20 while getting lag 60 wrong in both directions at once. Read that as a limit of this model class rather than of the project: gap 1 carried the stronger claim, that its row was structurally unreachable, and a new mechanism reached it. A gap is closed by adding mechanism, not by tuning what is already here.</p>
             <p style="color:var(--fg)"><strong>Forbids:</strong> strategies whose edge depends on volatility memory beyond about lag 20. Vol targeting and risk parity on a one-month or longer estimate are outside the envelope.</p>
           </div>
         </details>
         <details style="border:1px solid var(--line);border-radius:9px;margin:0 0 10px;background:var(--panel)">
-          <summary>4 · The endogenous economy cannot reach its own crisis regimes</summary>
+          <summary>4 · The endogenous economy cannot reach its own MACRO crisis regimes</summary>
           <div style="padding:14px 16px 4px;font-size:14px;color:var(--mut)">
-            <p>Left to itself the macro state stays in a moderate band. Endogenous inflation peaks at 4.06% to 4.11% over five seeds and five years, against a clamp of 6.0% and a US CPI that reached 9.1% in June 2022. The cause is dispersion rather than persistence. This slot used to carry a thin-tails gap, retired at 0.2.0: two-year excess kurtosis moved from 5.23, under its band, to 8.26, inside it.</p>
-            <p style="color:var(--fg)"><strong>Forbids:</strong> studying an inflation regime or a policy crisis from the endogenous economy alone. Drive one with a scenario instead.</p>
+            <p>Two kinds of crisis, and the answer differs. A VOLATILITY crisis is endogenous since 0.2.0: the shipped preset's own VIX crosses its crisis threshold on 10.2% of days against a real 12.5%, where the previous default reached it on none, so a panic is something this market produces and not only something a scenario drives. A MACRO crisis is not. Left to itself the macro state stays in a moderate band: endogenous inflation peaks at 4.06% to 4.11% over five seeds and five years, against a clamp of 6.0% and a US CPI that reached 9.1% in June 2022, and the central bank's own crisis cadence hangs off an inflation rate the economy never gets to. The cause is dispersion rather than persistence. This slot used to carry a thin-tails gap, retired at 0.2.0: two-year excess kurtosis moved from 5.23, under its band, to 8.26, inside it.</p>
+            <p style="color:var(--fg)"><strong>Forbids:</strong> studying an inflation regime or a policy crisis from the endogenous economy alone. Drive one with a scenario instead. A volatility crisis does not need one.</p>
           </div>
         </details>
         <details style="border:1px solid var(--line);border-radius:9px;margin:0 0 10px;background:var(--panel)">
           <summary>5 · Scenario response is directional, not calibrated</summary>
           <div style="padding:14px 16px 4px;font-size:14px;color:var(--mut)">
-            <p>Two quantities, failing differently. The steady state is the ratio of realised annualised volatility at crisis VIX to realised annualised volatility at calm VIX, measured on the 40-name reference roster: about 3.1 times here against real markets' 6.16 (17.2% annualised below VIX 12 against 106.1% above VIX 45). Roughly half. That is not the same quantity as the 82% against 62% in a single pinned 120-day run elsewhere on this site, which is one seed on a smaller roster over a shorter window. The transient: the shipped preset retains 27.6% of the previous preset's shock response, because it raised factor-variance persistence to 0.989 to buy volatility clustering, and a 63-day half-life cannot track a twenty-day spike.</p>
+            <p>Two quantities, failing differently. The steady state is the ratio of realised annualised volatility at crisis VIX to realised annualised volatility at calm VIX, measured from VIX 5 to VIX 65 on the 40-name reference roster over 252 days at thirty seeds: 5.05 times here against real markets' 6.16 (17.2% annualised below VIX 12 against 106.1% above VIX 45). About four fifths, up from 3.07 times at the previous default. That is not the same quantity as the pair of pinned 120-day runs elsewhere on this site, which is one seed on a smaller roster over a shorter window and reads about 2.8 times from VIX 15 to VIX 45. Three numbers on this site describe how violent a crisis is; check which one you are reading before quoting it. The transient: the shipped preset retains 27.6% of the previous preset's shock response, because it raised factor-variance persistence to 0.989 to buy volatility clustering, and a 63-day half-life cannot track a twenty-day spike.</p>
             <p>This was attacked directly and the attack failed, which is why it is a gap and no longer a task. A two-timescale variance mixture restored the transient (1.062 to 1.203) and doubled the 504-day loss (0.9887 to 2.0164), and raising the slow component's weight made the horizon monotonically worse while the transient stayed flat. Within this model class, restoring the crisis transient costs long-horizon realism.</p>
-            <p style="color:var(--fg)"><strong>Forbids:</strong> sizing a scenario's impact rather than detecting it. Use scenarios to ask whether a strategy breaks. A crisis here is about half as violent as a real one and arrives more slowly, so surviving one is a weaker test than the label suggests.</p>
+            <p style="color:var(--fg)"><strong>Forbids:</strong> sizing a scenario's impact rather than detecting it. Use scenarios to ask whether a strategy breaks. A crisis here is about four fifths as violent as a real one and arrives more slowly, so surviving one is a weaker test than the label suggests.</p>
           </div>
         </details>
         <details style="border:1px solid var(--line);border-radius:9px;margin:0 0 10px;background:var(--panel)">
           <summary>6 · Certification used a sector-balanced roster</summary>
           <div style="padding:14px 16px 4px;font-size:14px;color:var(--mut)">
-            <p><code style="font-size:12.5px">Universe.random()</code> places exactly five names in each of twelve sectors. No real index is balanced that way. The S&amp;P is roughly a third technology, and the Nasdaq more so. Varying only sector composition:</p>
+            <p><code style="font-size:12.5px">Universe.random()</code> assigns sectors round-robin over the twelve in <code style="font-size:12.5px">sectors.SECTORS</code>, so a roster is as close to balanced as its size allows: the certified 40 names put four in each of four sectors and three in each of the other eight. No real index is balanced that way. The S&amp;P is roughly a third technology, and the Nasdaq more so. Varying only sector composition, and measured on pt-v3 against the TEN-statistic panel of the time rather than re-measured on pt-v10, because what this establishes is a property of the roster rather than of a preset:</p>
             <div class="tablewrap"><table style="max-width:560px;margin:0 0 14px">
               <thead><tr><th>Roster</th><th style="text-align:right">In band</th><th style="text-align:right">L_real</th><th style="text-align:right">Vol %</th></tr></thead>
               <tbody style="font-family:var(--font-mono);font-size:12px">
@@ -312,9 +315,12 @@ print(envelope.report_intervals(rows))</code></pre>
                 <tr><td>all technology</td><td style="text-align:right">7/10</td><td style="text-align:right">0.0043</td><td style="text-align:right">32.8</td></tr>
               </tbody>
             </table></div>
+            <p>This is also the limit of the held-out universe above. That roster is another draw from the same generator, so it varies the names and not the shape; this table varies the shape, and the count drops.</p>
             <p style="color:var(--fg)"><strong>Forbids:</strong> inheriting these numbers for a sector-concentrated roster. Re-measure the panel on your own universe: <code style="font-size:12.5px">facts.measure()</code> takes it directly, and <code style="font-size:12.5px">envelope.intervals()</code> reports the spread.</p>
           </div>
         </details>
+        <h2 style="font-size:21px;margin:46px 0 10px">What the Panel Does Not Cover</h2>
+        <p>All fourteen statistics are daily properties of prices, correlations and volume. Matching is a real limit order book with price-time priority rather than a slippage coefficient, and impact is emergent, which is a statement about the MECHANISM. It is not a validation claim: nothing on this page measures depth shape, cancellation intensity, queue dynamics, the intraday spread distribution, impact decay, resiliency or order-sign autocorrelation against real market data. So a strategy whose edge or cost lives inside the book is leaning on a part of this simulator the envelope does not reach, however comfortably its returns sit in band. Execution cost here is measured and self-consistent, and it is not certified realistic.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">Why There Is No Realism Score</h2>
         <p>A model is realistic in some ways and at some scales, not others. One number would hide the detail that decides whether your result means anything. There is also a practical problem: numbers get quoted and warnings do not. "87% realistic" travels. "Volatility clustering runs about twice real beyond one year" does not. So you get a yes or no with the reasons attached, and nothing here is called a realism score.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">What to Use It For</h2>
@@ -322,7 +328,7 @@ print(envelope.report_intervals(rows))</code></pre>
           <div style="border:1px solid var(--line);border-radius:10px;padding:18px 20px 8px">
             <div style="font:600 10.5px/1 var(--font-mono);letter-spacing:0.09em;color:var(--accent);margin:0 0 12px">USE PRETIUM FOR</div>
             <ul style="font-size:13.5px;color:var(--mut)">
-              <li>Strategy evaluation up to about one year, where the edge depends on statistics the panel certifies</li>
+              <li>Strategy evaluation up to about one year, where the edge depends on statistics the panel certifies, which are daily price-process, correlation and volume properties</li>
               <li>Relative comparison of strategies under identical conditions: same seed, differences come from the strategies</li>
               <li>Testing whether a strategy survives a regime change or a stress scenario at all</li>
               <li>Agent and RL environments that need a plausible, self-consistent market</li>
@@ -334,13 +340,15 @@ print(envelope.report_intervals(rows))</code></pre>
               <li>Multi-year backtests (gap 2)</li>
               <li>Sizing how badly a crisis hurts, as opposed to detecting that it does (gap 5)</li>
               <li>Inheriting these numbers on a sector-concentrated roster (gap 6)</li>
-              <li>Long-horizon volatility memory (gap 3), or VaR at multi-year horizons (gap 4)</li>
+              <li>Long-horizon volatility memory (gap 3), or VaR at multi-year horizons (gap 2)</li>
+              <li>Studying an inflation regime or a policy crisis the economy is left to reach on its own (gap 4)</li>
               <li>Strategies trading the change in volume (gap 1)</li>
               <li>Any claim that simulated performance forecasts live returns</li>
+              <li>Execution-sensitive conclusions that rest on the order book's own realism, which nothing here certifies</li>
             </ul>
           </div>
         </div>
-        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:24px 0 0">Machine-readable companion: envelope.json carries the per-statistic detail, the gap list and the provenance. Both measurement runs report known-answer digest 992ef95d…dc185e3. If the digest in envelope.json does not match your installed wheel, this page describes a different model than the one you are running.</p>
+        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:24px 0 0">Machine-readable companion: envelope.json carries the per-statistic detail, the gap list and the preset the figures describe. The cross-platform determinism baseline for this era is known-answer v10, digest 4e22d5a6…860378, which the release workflow checks inside every wheel before it uploads. If pretium.model_preset()["name"] is not the preset named in envelope.json, this page describes a different model than the one you are running.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">Checking a Study Before Running It</h2>
         <p>The whole sequence for a six-month momentum study: check the question, measure the panel on your own universe, read the seed spread, then run the study.</p>
         <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
@@ -373,34 +381,36 @@ scores = pt.evaluate({"mom": spec}, seed=7, universe=u, days=126)
 print(scores["mom"].return_pct, scores["mom"].impact_bps)</code></pre>
         </div>
         <div style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">OUTPUT</span><span title="Medians and verdict text are quoted from the shipped envelope; the spread columns and strategy numbers were composed for the example." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--codemut);border:1px solid var(--codeline)">MIXED, SEE NOTE</span></div>
+          <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">OUTPUT</span><span title="Captured from the run named beside this block." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--tks);border:1px solid var(--tks)">MEASURED</span></div>
           <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);color:var(--codemut)"># 1.
 True
-inside the envelope
+inside the envelope for the statistics you named
   - horizon 126d is within the certified 252d, and no named statistic
     meets a measured gap
-  ? return_acf1 is in band at the certified horizon (0.0375 in
+  ? return_acf1 is in band at the certified horizon (0.0195 in
     (-0.08, 0.06)) -- but that is a median across 30 seeds; check
     `intervals` for the spread before relying on one seed
-  ? abs_return_acf1 is in band at the certified horizon (0.1413 in
+  ? abs_return_acf1 is in band at the certified horizon (0.0994 in
     (0.02, 0.22)) -- but that is a median across 30 seeds; check
     `intervals` for the spread before relying on one seed
 
 # 2.
 statistic                   median       p10       p90       sd             band  verdict
 -----------------------------------------------------------------------------------------
-annualised_vol_pct         24.0972   19.8410   30.1174    3.9026    (15.0, 36.0)  in band
-excess_kurtosis             2.5305    1.7118    5.4402    1.4771     (1.6, 41.0)  in band
-return_acf1                 0.0375    0.0198    0.0631    0.0164   (-0.08, 0.06)  in band on the median; p10-p90 crosses an edge
-abs_return_acf1             0.1413    0.0492    0.4260    0.1701     (0.02, 0.22)  in band on the median; p10-p90 crosses an edge
+annualised_vol_pct         30.1974   26.5765   37.8424    7.1275     (15.0, 36.0)  in band on the median; p10-p90 crosses an edge
+excess_kurtosis             6.9315    4.5513   11.3102    2.9010      (1.6, 41.0)  in band
+return_acf1                 0.0057   -0.0299    0.1492    0.0704    (-0.08, 0.06)  in band on the median; p10-p90 crosses an edge
+abs_return_acf1             0.0713    0.0280    0.1793    0.0941     (0.02, 0.22)  in band (an extreme seed crosses)
+abs_return_acf5             0.0190   -0.0146    0.1264    0.0555     (0.02, 0.09)  OUT 0.0 sd
 ...
-volume_change_acf1         -0.4598   -0.4712   -0.4441    0.0098  (-0.32, -0.20)  OUT 13.7 sd
+volume_change_acf1         -0.3160   -0.3441   -0.2688    0.0282    (-0.32, -0.2)  in band on the median; p10-p90 crosses an edge
+corr_persistence_acf1    unmeasured
 
 # 3.
-4.87 48719.20</code></pre>
+-52.87 -11.89</code></pre>
         </div>
-        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">In that block the medians, bands, verdicts and the check reasons come from the shipped envelope. The p10, p90 and sd columns and the step 3 numbers are composed to show the shape of the report.</p>
-        <p>Step 1 says yes, with two warnings. Step 2 shows why they were worth printing: <code style="font-size:13px">abs_return_acf1</code> has a median of 0.141 inside its band and a p90 of 0.426, well above the ceiling of 0.22. A single seed can easily land out of band on a statistic that looks comfortable in the summary. That is what decides how many seeds step 3 needs.</p>
+        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Every figure in that block is a measurement: pretium 0.2.0, pt-v10, the code above it verbatim, sim seeds 1 to 30 over Universe.random(40, seed=111) at 126 days. Rows between abs_return_acf5 and volume_change_acf1 are elided for width.</p>
+        <p>Step 1 says yes for the two statistics it was asked about, which is the whole of what it says. Step 2 is why that scope matters: at this horizon <code style="font-size:13px">abs_return_acf5</code> sits on its floor and reads out, and <code style="font-size:13px">corr_persistence_acf1</code> cannot be measured at all in 126 days, because twelve 21-day windows are not enough to autocorrelate. Neither was named in step 1, so neither appears in its verdict. The named statistics carry their own spread besides: <code style="font-size:13px">return_acf1</code> has a median of 0.0057 inside its band and a p90 of 0.149, well above the ceiling of 0.06. A single seed can easily land out of band on a statistic that looks comfortable in the summary. That is what decides how many seeds step 3 needs.</p>
         <p style="margin:24px 0 0">If your question fits, one check is left: <a href="interrogate.html">would your edge survive a somewhat different market?</a></p>
 </main>
 </div>

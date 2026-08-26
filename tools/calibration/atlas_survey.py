@@ -181,6 +181,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # and the interesting region is well above zero because the spike it
     # multiplies is below one.
     "news_peer_vix_coupling": (0.0, 8.0),
+    # Per-name volume persistence (§107), mirroring the common pair's ranges.
+    "volume_idio_persistence": (0.0, 0.99),
+    "volume_idio_sigma": (0.0, 0.6),
     # How much of the business cycle's VIX swing survives (§77). A scale on
     # the phase VIX around its mean, so the unit interval is the whole
     # domain and both ends are shipped positions rather than guesses: every
