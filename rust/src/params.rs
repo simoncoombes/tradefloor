@@ -132,6 +132,28 @@ pub struct ModelParams {
     /// the market draw, so whatever this is set to, sector structure reads
     /// zero at VIX 45 (CRISIS-BLEND-SECTOR.md). Raising it is an era boundary.
     pub sector_factor_sigma: f64,
+    /// How hard a name loads onto its OWN sector's factor. 0.5 on every
+    /// preset before this dial and bit-identical (§108).
+    ///
+    /// It was the literal 0.5 for every member of every sector. A name's
+    /// exposure to the MARKET varies by its beta; its exposure to its own
+    /// industry did not vary at all, which is the last homogeneous loading
+    /// in the factor structure.
+    pub sector_loading: f64,
+    /// How much a name's sector loading follows its market beta. Zero on
+    /// every preset before this dial and bit-identical.
+    ///
+    /// At `s` the loading is `sector_loading * (1 + s * (beta - 1))`, so a
+    /// high-beta name loads harder on its industry and a defensive one
+    /// loads less. Tied to beta rather than to a fresh draw on purpose: it
+    /// reuses a per-name attribute the universe already carries, so it needs
+    /// no RNG stream and cannot move the draw schedule.
+    ///
+    /// This is cross-sectional DISPERSION in sector exposure, which the
+    /// model has never had. `sector_excess_corr` is a mean over pairs, so a
+    /// fixed loading makes every same-sector pair identically exposed; real
+    /// industries contain pure plays and conglomerates.
+    pub sector_loading_beta_slope: f64,
     /// Scale on the per-name idiosyncratic GARCH sigma — the funding side
     /// of the factor-variance reallocation. Bit-inert at 1.0.
     pub idio_sigma_scale: f64,
@@ -985,6 +1007,8 @@ impl ModelParams {
         ModelParams {
             market_factor_sigma: tick::MARKET_FACTOR_SIGMA,
             sector_factor_sigma: tick::SECTOR_FACTOR_SIGMA,
+            sector_loading: 0.5,
+            sector_loading_beta_slope: 0.0,
             idio_sigma_scale: factor_vol::IDIO_SIGMA_SCALE,
             order_flow_coefficient: factors::ORDER_FLOW_COEFFICIENT,
             informed_flow_fraction: factors::INFORMED_FLOW_FRACTION,
@@ -1558,6 +1582,8 @@ impl ModelParams {
         Some(match name {
             "market_factor_sigma" => self.market_factor_sigma,
             "sector_factor_sigma" => self.sector_factor_sigma,
+            "sector_loading" => self.sector_loading,
+            "sector_loading_beta_slope" => self.sector_loading_beta_slope,
             "idio_sigma_scale" => self.idio_sigma_scale,
             "order_flow_coefficient" => self.order_flow_coefficient,
             "inflation_ceiling" => self.inflation_ceiling,
@@ -1670,6 +1696,8 @@ impl ModelParams {
         match name {
             "market_factor_sigma" => out.market_factor_sigma = value,
             "sector_factor_sigma" => out.sector_factor_sigma = value,
+            "sector_loading" => out.sector_loading = value,
+            "sector_loading_beta_slope" => out.sector_loading_beta_slope = value,
             "idio_sigma_scale" => out.idio_sigma_scale = value,
             "order_flow_coefficient" => out.order_flow_coefficient = value,
             "inflation_ceiling" => out.inflation_ceiling = value,
@@ -1896,6 +1924,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "price_hard_cap",
         "regime_stress_points",
         "sector_factor_sigma",
+        "sector_loading",
+        "sector_loading_beta_slope",
         "sector_vix_coupling",
         "size_effect_exponent",
         "size_effect_smoothness",

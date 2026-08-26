@@ -348,7 +348,24 @@ pub fn calculate_live_factors(
             + params.crisis_blend_source * params.crisis_blend_gain
                 * shared.crisis_spike * shared.market_factor
     };
-    let sector_component = 0.5 * shared.sector(&company.sector);
+    // The sector loading (§108). It was the literal 0.5 for every member of
+    // every sector: a name's exposure to its own industry was the one
+    // systematic loading the model did not let vary, where its exposure to
+    // the MARKET varies by beta two lines above.
+    //
+    // At slope zero the branch is not taken and the loading is exactly
+    // `sector_loading`, so a preset that sets neither is bit-identical.
+    let sector_loading = if params.sector_loading_beta_slope == 0.0 {
+        params.sector_loading
+    } else {
+        // Tied to beta rather than to a new draw: a name that moves more
+        // with the market plausibly moves more with its industry too, and
+        // reusing an existing per-name attribute costs no RNG stream and
+        // cannot shift the draw schedule.
+        let b = beta;
+        params.sector_loading * (1.0 + params.sector_loading_beta_slope * (b - 1.0))
+    };
+    let sector_component = sector_loading * shared.sector(&company.sector);
 
     // `garchVariance` is in DAILY units; the tick needs per-tick sigma.
     // `IDIO_SIGMA_SCALE` is the funding side of the market-factor variance
