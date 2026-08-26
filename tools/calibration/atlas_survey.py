@@ -959,10 +959,18 @@ def cmd_collect(args) -> int:
         outputs["shock_ratio_median"] = gates["shock_ratio_median"]
         outputs["vol_lever"] = gates["vol_lever"]
         outputs["corr_blend"] = gates["corr_blend"]
-        # The crisis state's sector excess and kurtosis at VIX 45, which §62
-        # named as the one column the next survey needed. Rows streamed by
-        # an older driver lack them, so a resume without them is tolerated.
-        for key, name in (("sector_ex", "sector_ex_45"), ("kurt", "kurt_45")):
+        # The crisis state's sector excess, kurtosis and CO-MOVEMENT at VIX
+        # 45. §62 named the first as the column the next survey needed;
+        # co-movement was added after the crisis-survey run of §102, which
+        # could not answer the question it was launched for because
+        # cross-sectional correlation at VIX 45 was measured on every row
+        # and never surfaced. `corr_blend` is a RATIO of crisis correlation
+        # to calm, so a vector that raises calm correlation reads LOW on it
+        # while having the higher crisis LEVEL, which is what a preset is
+        # judged on. The level is what belongs here. Rows streamed by an
+        # older driver lack these, so a resume without them is tolerated.
+        for key, name in (("sector_ex", "sector_ex_45"), ("kurt", "kurt_45"),
+                          ("corr", "xs_45")):
             vals = [rows[f"{index}:held45:{s}"].get(key) for s in seeds]
             vals = [v for v in vals if v is not None]
             if vals:
