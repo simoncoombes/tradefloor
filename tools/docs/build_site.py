@@ -1285,6 +1285,17 @@ def apply_trust_fixes(doc: str) -> str:
             "depends on statistics the panel certifies, which are daily "
             "price-process, correlation and volume properties</li>",
         ),
+        # Gap 4 stopped being the thin-tails gap at 0.2.0, so the bullet
+        # pointing VaR at it pointed at the wrong gap. Multi-year VaR is
+        # gap 2's horizon; gap 4 is the macro regime.
+        (
+            "<li>Long-horizon volatility memory (gap 3), or VaR at "
+            "multi-year horizons (gap 4)</li>",
+            "<li>Long-horizon volatility memory (gap 3), or VaR at "
+            "multi-year horizons (gap 2)</li>\n              "
+            "<li>Studying an inflation regime or a policy crisis the "
+            "economy is left to reach on its own (gap 4)</li>",
+        ),
         (
             "<li>Any claim that simulated performance forecasts live "
             "returns</li>",
