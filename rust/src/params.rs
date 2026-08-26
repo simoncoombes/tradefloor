@@ -612,6 +612,24 @@ pub struct ModelParams {
     /// is source 1.0 with `vix_return_gain` near 2.0 and
     /// `vix_return_clamp` in percentage points rather than fractions.
     pub vix_return_source: f64,
+    /// How much of the VIX's level comes from the business cycle.
+    ///
+    /// The VIX target starts at a constant per cycle phase: 14 in expansion,
+    /// 18 at a peak, 25 in contraction, 22 in a trough, 16 in recovery. Those
+    /// five numbers move on a multi-YEAR clock, which is why the model's
+    /// volatility clustering is a function of the measurement window: lag-5
+    /// clustering reads 0.0136 over 252 days, below its 0.02 floor, and
+    /// 0.0828 over 504, because only the longer window contains a phase
+    /// change. Real markets read inside 0.02 to 0.09 at ONE year and 0.02 to
+    /// 0.10 at two: their clustering comes from episodes lasting weeks, not
+    /// from the cycle.
+    ///
+    /// At 1.0, shipped, the five constants are used as they are. At `a` each
+    /// is pulled toward their mean of 19.0: `19.0 + a * (phase - 19.0)`, so
+    /// 0.0 makes the cycle contribute nothing to the VIX and any episodes
+    /// have to come from the market. Combines with `vix_return_source`, which
+    /// is what supplies episodes in the first place (§70, §71).
+    pub vix_cycle_amplitude: f64,
     /// VIX points added to its target per unit of a DOWN day's index
     /// return, before the clamp and cap below.
     ///
@@ -829,6 +847,7 @@ impl ModelParams {
             spread_size_exponent: crate::microstructure::SPREAD_SIZE_EXPONENT,
             vix_mean_reversion: crate::economy::VIX_MEAN_REVERSION,
             vix_realised_vol_weight: 0.0,
+            vix_cycle_amplitude: 1.0,
             vix_return_source: 0.0,
             vix_return_gain: crate::economy::VIX_RETURN_GAIN,
             vix_return_gain_up: crate::economy::VIX_RETURN_GAIN_UP,
@@ -1201,6 +1220,7 @@ impl ModelParams {
             "spread_size_smoothness" => self.spread_size_smoothness,
             "spread_size_exponent" => self.spread_size_exponent,
             "vix_mean_reversion" => self.vix_mean_reversion,
+            "vix_cycle_amplitude" => self.vix_cycle_amplitude,
             "vix_realised_vol_weight" => self.vix_realised_vol_weight,
             "vix_return_clamp" => self.vix_return_clamp,
             "vix_return_gain" => self.vix_return_gain,
@@ -1306,6 +1326,7 @@ impl ModelParams {
             "spread_size_exponent" => out.spread_size_exponent = value,
             "spread_size_smoothness" => out.spread_size_smoothness = value,
             "vix_mean_reversion" => out.vix_mean_reversion = value,
+            "vix_cycle_amplitude" => out.vix_cycle_amplitude = value,
             "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
             "vix_return_gain" => out.vix_return_gain = value,
@@ -1477,6 +1498,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "spread_size_smoothness",
         "universe_stress_decay",
         "universe_stress_weight",
+        "vix_cycle_amplitude",
         "vix_mean_reversion",
         "vix_realised_vol_weight",
         "vix_return_clamp",

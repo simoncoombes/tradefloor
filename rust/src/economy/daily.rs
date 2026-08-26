@@ -85,6 +85,8 @@ pub struct DailyInputs<'a> {
     /// Which return the VIX reacts to (0.0 the last tick, 1.0 the day), and
     /// the day's cap-weighted open-to-close index return in percent. See §70.
     pub vix_return_source: f64,
+    /// How much of the VIX level comes from the cycle phase (1.0 shipped).
+    pub vix_cycle_amplitude: f64,
     pub market_day_return_pct: f64,
     pub vix_implied_from_market: f64,
     pub vix_return_gain_up: f64,
@@ -119,6 +121,7 @@ impl<'a> Default for DailyInputs<'a> {
             vix_return_gain: VIX_RETURN_GAIN,
             vix_realised_vol_weight: 0.0,
             vix_return_source: 0.0,
+            vix_cycle_amplitude: 1.0,
             market_day_return_pct: 0.0,
             vix_implied_from_market: 0.0,
             vix_return_gain_up: VIX_RETURN_GAIN_UP,
@@ -651,12 +654,21 @@ pub fn update_economy_daily(
     // Pure JS since "Cycle 71". `wasmCalculateVixTarget` is imported at
     // `economy.ts:16` and never called — an import-driven worklist would
     // invent work here.
-    let mut target_vix = match economy.cycle_phase {
+    let phase_vix = match economy.cycle_phase {
         CyclePhase::Expansion => 14.0,
         CyclePhase::Peak => 18.0,
         CyclePhase::Contraction => 25.0,
         CyclePhase::Trough => 22.0,
         CyclePhase::Recovery => 16.0,
+    };
+    // THE CLOCK THE CLUSTERING RUNS ON. Those five constants move on a
+    // multi-year cycle, so volatility regimes here are years long and a
+    // one-year window contains no regime change at all. At amplitude 1.0
+    // this is the shipped arithmetic exactly. See §71.
+    let mut target_vix = if inputs.vix_cycle_amplitude == 1.0 {
+        phase_vix
+    } else {
+        VIX_PHASE_MEAN + inputs.vix_cycle_amplitude * (phase_vix - VIX_PHASE_MEAN)
     };
     // The CURRENT day's return, not the previous one, so VIX reacts same-day
     // and the negative correlation is real.

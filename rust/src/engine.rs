@@ -957,6 +957,7 @@ impl Engine {
                 vix_return_gain: self.params.vix_return_gain,
                 vix_realised_vol_weight: self.params.vix_realised_vol_weight,
                 vix_return_source: self.params.vix_return_source,
+                vix_cycle_amplitude: self.params.vix_cycle_amplitude,
                 market_day_return_pct,
                 // The factor's sigma read back through the forward
                 // coupling's own anchor, so the loop is consistent: the

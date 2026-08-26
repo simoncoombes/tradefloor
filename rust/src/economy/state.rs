@@ -59,6 +59,9 @@ pub const VIX_MEAN_REVERSION: f64 = 0.12;
 /// 2,511 common days to 2026-08). Carried at runtime as
 /// `ModelParams::vix_return_gain`.
 pub const VIX_RETURN_GAIN: f64 = 25.0;
+/// Mean of the five cycle-phase VIX targets, the anchor `vix_cycle_amplitude`
+/// scales deviations around: (14 + 18 + 25 + 22 + 16) / 5.
+pub const VIX_PHASE_MEAN: f64 = 19.0;
 /// The same for an UP day, where the real response is about half the size.
 pub const VIX_RETURN_GAIN_UP: f64 = 10.0;
 /// The index return is clamped to this before it drives the VIX, so a -10%
