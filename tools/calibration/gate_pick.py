@@ -14,6 +14,7 @@ gate; the record quotes the block. §8 is separate (section8_check.py).
 from __future__ import annotations
 
 import argparse
+import json
 import statistics as st
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -45,6 +46,83 @@ def model(base: str, overrides: dict[str, float]):
     return pt.ModelParams.from_preset(base, **overrides)
 
 
+
+# ── The driven-window axis (§81, §100) ────────────────────────────────────
+#
+# The panel gates are UNDRIVEN, and §81 found a defect they cannot see: run
+# through the real 2020-21 macro path, the model's scenario response GAIN is
+# right within ten percent on all three driver channels, while its daily
+# return sd is 1.51x real AAPL's. The expected response to a scenario is
+# calibrated and the dispersion around it is too wide, so one run understates
+# how much of its own move was the scenario.
+#
+# Any preset that changes crisis variance can move that ratio, and nothing in
+# the panel would report it. So it is a gate axis rather than a script
+# somebody remembers to run.
+_COVID = Path(__file__).resolve().parent.parent.parent / "examples" / "data" / "covid-2020-2021.json"
+
+
+def _covid_inputs():
+    import datetime as dt
+    raw = json.loads(_COVID.read_text(encoding="utf-8"))
+    dates = [dt.date.fromisoformat(d) for d in raw["dates"]]
+    first_cut, second_cut = dt.date(2020, 3, 3), dt.date(2020, 3, 15)
+    policy = [0.01625 if d < first_cut else (0.01125 if d < second_cut else 0.00125)
+              for d in dates]
+    hyg0 = raw["hyg"][0]
+    credit = [0.0554 + (hyg0 - x) / hyg0 / 3.8 for x in raw["hyg"]]
+    spx = raw["spx"]
+    k, trend = 2 / 201, [spx[0]]
+    for v in spx[1:]:
+        trend.append(trend[-1] + k * (v - trend[-1]))
+    qe = [max(-0.35, min(0.35, spx[i] / trend[i] - 1)) for i in range(len(spx))]
+    return raw, policy, credit, qe
+
+
+def _sd(xs):
+    n = len(xs); mu = sum(xs) / n
+    return (sum((x - mu) ** 2 for x in xs) / n) ** 0.5
+
+
+def driven_window(m, seed: int) -> dict:
+    """Daily return sd and the VIX-channel gain, against real AAPL's own."""
+    import pyarrow as pa
+    import pyarrow.compute as pc
+    raw, policy, credit, qe = _covid_inputs()
+    n = len(raw["dates"])
+    path = [{"day": i, "vix": raw["vix"][i], "federal_funds_rate": policy[i],
+             "corporate_bond_yield": credit[i], "qe_pe_boost": qe[i]}
+            for i in range(n)]
+    scen = pt.Scenario.from_json(json.dumps(
+        {"schema": 1, "label": "covid", "days": n, "path": path}))
+    aapl = pt.Instrument("AAPL", "technology", initial_price=raw["aapl"][0],
+                         shares_outstanding=17.77e9, eps=2.97,
+                         book_value_per_share=5.09, revenue_growth=-0.02,
+                         avg_volume=140e6, beta=1.2, short_interest=124e6)
+    u = pt.Universe([aapl]); u.extend(pt.Universe.random(39, seed=2020))
+    e = pt.Engine(seed=seed, universe=u, model=m)
+    for i in range(n):
+        scen.apply(e, i)
+        e.run_days(1, first_day=i)
+    b = pa.table(e.bars(grain="day"))
+    close = pc.filter(b, pc.equal(b["instrument_id"], 0))["close"].to_pylist()
+
+    def rets(x):
+        return [x[i] / x[i - 1] - 1 for i in range(1, len(x))]
+
+    r_sim, r_real = rets(close), rets(raw["aapl"])
+    d_vix = [raw["vix"][i] - raw["vix"][i - 1] for i in range(1, n)]
+
+    def beta(y, x):
+        k = len(y); mx, my = sum(x) / k, sum(y) / k
+        sxx = sum((v - mx) ** 2 for v in x)
+        return sum((x[i] - mx) * (y[i] - my) for i in range(k)) / sxx
+
+    return {"ret_sd": _sd(r_sim), "real_ret_sd": _sd(r_real),
+            "noise_ratio": _sd(r_sim) / _sd(r_real),
+            "vix_beta": beta(r_sim, d_vix), "real_vix_beta": beta(r_real, d_vix)}
+
+
 def one(job):
     base, overrides, kind, seed = job
     m = model(base, overrides)
@@ -60,6 +138,8 @@ def one(job):
         held = {"vix5": 5.0, "vix45": 45.0, "vix65": 65.0}[kind]
         f = facts.measure(seed=seed, universe=pt.Universe.random(40, seed=111), days=252,
                           model=m, scenario=Scenario().hold(vix=held))
+    elif kind == "driven":
+        return kind, driven_window(m, seed)
     elif kind == "ho_seeds":
         f = facts.measure(seed=seed, universe=pt.Universe.random(40, seed=111), days=252, model=m)
     elif kind == "ho_universe":
@@ -71,6 +151,11 @@ def one(job):
 
 def summarise(kind: str, rows: list[dict]) -> str:
     med = {k: st.median([r[k] for r in rows if r.get(k) is not None]) for k in rows[0]}
+    if kind == "driven":
+        return (f"  driven 2020-21 ({len(rows)} seeds): return sd "
+                f"{med['ret_sd']:.4f} vs real AAPL {med['real_ret_sd']:.4f} "
+                f"= {med['noise_ratio']:.2f}x; VIX gain {med['vix_beta']:.5f} "
+                f"vs real {med['real_vix_beta']:.5f}")
     if kind in ("vix5", "vix65"):
         return (f"  held VIX {kind[3:]:<3s} ({len(rows)} seeds): vol "
                 f"{med['annualised_vol_pct']:.1f} xs {med['cross_sectional_corr']:.3f}")

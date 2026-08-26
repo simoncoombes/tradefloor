@@ -56,8 +56,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "python"))
 import gate_pick  # noqa: E402
 from pretium import envelope, facts  # noqa: E402
 
-KINDS = ("p252", "p504", "vix5", "vix45", "vix65", "ho_seeds",
-         "ho_universe")
+KINDS = ("p252", "p504", "vix5", "vix45", "vix65", "driven",
+         "ho_seeds", "ho_universe")
 
 
 def one(job):
@@ -92,6 +92,9 @@ def verdict(rows_by_kind: dict[str, list]) -> dict:
             continue
         med = {k: st.median([r[k] for r in rows if r.get(k) is not None])
                for k in rows[0]}
+        if kind == "driven":
+            out["driven"] = med
+            continue
         if kind in ("vix5", "vix45", "vix65"):
             out[kind] = {k: med[k] for k in (
                 "sector_excess_corr", "cross_sectional_corr",
@@ -130,6 +133,10 @@ def main() -> int:
         jobs += [(label, base, ov, "vix5", s) for s in train]
         jobs += [(label, base, ov, "vix45", s) for s in train]
         jobs += [(label, base, ov, "vix65", s) for s in train]
+        # Six seeds, not thirty: the driven window is one FIXED macro path,
+        # so seeds vary only the noise around it, and each run is 505
+        # sessions over forty names. Six is enough to median a ratio.
+        jobs += [(label, base, ov, "driven", s) for s in train[:6]]
         jobs += [(label, base, ov, "ho_seeds", s) for s in gate_pick.HELDOUT]
         jobs += [(label, base, ov, "ho_universe", s) for s in gate_pick.HELDOUT]
 
