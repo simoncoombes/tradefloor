@@ -167,6 +167,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_realised_vol_weight": (0.0, 1.0),
     # A name's own variance following the VIX (§78).
     "garch_vix_coupling": (0.0, 1.0),
+    # How much of the business cycle's VIX swing survives (§77). A scale on
+    # the phase VIX around its mean, so the unit interval is the whole
+    # domain and both ends are shipped positions rather than guesses: every
+    # preset through pt-v8 ran 1.0, pt-v9 ran 0.6, and pt-v10 ships 0.0,
+    # having moved the volatility regime onto what the market does itself.
+    "vix_cycle_amplitude": (0.0, 1.0),
     # Which return the VIX reads: a share between the last tick and the day.
     "vix_return_source": (0.0, 1.0),
     # Jumps. Intensity is per-day probability: 0.25 is roughly one jump a
@@ -234,6 +240,12 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     # measured 0.65 to 0.81 as the region where the trim is a trade rather
     # than a wreck, so the range is the one a retrim can use.
     "idio_sigma_scale": (0.5, 1.0),
+    # The market factor's variance clamp, in multiples of the target. pt-v10
+    # ships 32, whose [1/4x, 4x] convention box tops out at 128 against a
+    # hard range of [1.0, 50.0]: a third of a 3000-vector plan planned above
+    # the cap and was thrown away as infeasible before it measured anything.
+    # The box is the shipped value's lower quarter up to the cap itself.
+    "market_vol_ceiling_multiple": (8.0, 50.0),
     # The fear channel's two bounded quantities (§70, §71). Their
     # multiplicative default boxes run past the hard ranges the calibration
     # specs give them, which the stationarity gate then rejects one vector
@@ -393,10 +405,21 @@ def survey_axes() -> list[atlas.Axis]:
             "the zero-shipped set moved and ZERO_SHIPPED_RANGES did not: "
             f"unranged {sorted(unranged)}. Choose ranges on purpose; atlas "
             "refuses to guess them.")
-    if BASE_PRESET == "pt-v3" and zeros != set(ZERO_SHIPPED_RANGES):
+    # The stale direction is checked against the union of the presets a
+    # survey is actually based on, rather than against pt-v3 alone. pt-v3 was
+    # the only base when this guard was written; the 2026-08-26 era boundary
+    # moved the default to pt-v10, which ships `vix_cycle_amplitude` at zero
+    # where pt-v3 ships it at one. Pinning the check to one preset would
+    # either refuse a legitimate range or force a base-specific registry.
+    zero_on_any = set()
+    for preset in ("pt-v3", pretium.ModelParams.from_preset().fingerprint):
+        d = pretium.ModelParams.from_preset(preset).to_dict()
+        zero_on_any |= {n for n in settable if float(d[n]) == 0.0}
+    stale = set(ZERO_SHIPPED_RANGES) - zero_on_any
+    if stale:
         raise RuntimeError(
-            "stale ZERO_SHIPPED_RANGES entries for pt-v3: "
-            f"{sorted(set(ZERO_SHIPPED_RANGES) - zeros)}")
+            "stale ZERO_SHIPPED_RANGES entries, zero on neither pt-v3 nor "
+            f"the shipped default: {sorted(stale)}")
 
     raw = sorted(n for n in settable if n not in REPARAMETERISED)
     ranges: dict[str, tuple[float, float]] = {}
