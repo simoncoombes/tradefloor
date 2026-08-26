@@ -193,6 +193,10 @@ pub struct ModelParams {
     /// Standard deviation of an endogenous news event's price impact, in the
     /// units `NewsEvent::price_impact` carries.
     pub endogenous_news_sigma: f64,
+    /// Weight on SECTOR-WIDE news, an event tagged with a sector and
+    /// no company. Distinct from peer transfer, which is one named
+    /// company's news reaching another; this is news about the
+    /// industry itself.
     pub news_sector_weight: f64,
     /// Weight of market-wide news on every name (§5.4 promotion).
     pub news_market_weight: f64,
@@ -292,11 +296,31 @@ pub struct ModelParams {
     /// and nothing else, so it buys co-movement in the one currency that
     /// does not dilute it.
     pub crisis_blend_gain: f64,
+    /// Where the crisis correlation injection is taken FROM. At 0.0 it
+    /// comes out of the sector slot, which consumes the sector draw
+    /// exactly when sector structure matters most; at 1.0 it is added
+    /// to the market component instead, leaving the sector draw
+    /// whole. pt-v7 onward run 1.0.
     pub crisis_blend_source: f64,
 
     // ── Per-name GJR-GARCH (market/garch.rs) ────────────────────────────
+    /// The GJR-GARCH constant: the variance a name reverts toward
+    /// when neither yesterday's shock nor yesterday's variance pulls
+    /// it. Small by construction, because the long-run level is set
+    /// by the sector's base variance rather than by this term.
     pub garch_omega: f64,
+    /// Weight on yesterday's squared shock: how sharply a name's
+    /// variance reacts to its own last move. Higher alpha is a
+    /// twitchier name; the persistence that carries the reaction
+    /// forward is `garch_beta`.
     pub garch_alpha: f64,
+    /// Weight on yesterday's variance: how long a name's volatility
+    /// remembers. `alpha + beta + gamma/2` is the persistence, and it
+    /// must stay under one or the variance process has no stationary
+    /// level and a long run drifts without bound. The calibration
+    /// searches (persistence, alpha share) rather than these two
+    /// directly, because independent boxes around them put half
+    /// their mass across that line (atlas_survey TRANSFORMED_AXES).
     pub garch_beta: f64,
     /// GJR leverage-effect asymmetry. Zero recovers symmetric GARCH(1,1)
     /// bit for bit.
@@ -334,9 +358,27 @@ pub struct ModelParams {
     pub garch_floor_multiple: f64,
 
     // ── Market-factor variance process (market/factor_vol.rs) ───────────
+    /// The market factor's own GARCH reaction term: how sharply
+    /// market-wide variance responds to the last market-wide shock.
+    /// This is the process that gives every name a common volatility
+    /// regime; a name's own GJR-GARCH is idiosyncratic on top of it.
     pub market_vol_alpha: f64,
+    /// The market factor's variance persistence. `alpha + beta` is
+    /// this process's persistence and is subject to the same
+    /// stationarity limit as the per-name one, and to the same
+    /// reparameterisation in the survey.
     pub market_vol_beta: f64,
+    /// Cap on the market factor's variance, as a multiple of its calm
+    /// level. A CAP, not a lever: it does nothing until the variance
+    /// reaches it, so raising it above where it already binds changes
+    /// almost nothing. Measured from 32 to 50 it moves the crisis
+    /// lever by under 3% and crisis co-movement not at all (§93).
+    /// The physical anchor is that a real record VIX of 82.7 against
+    /// this model's anchor of 15 is a variance ratio of about 30.
     pub market_vol_ceiling_multiple: f64,
+    /// Floor on the market factor's variance, as a multiple of its
+    /// calm level. Stops a quiet stretch from compounding into a
+    /// market with no shared movement at all.
     pub market_vol_floor_multiple: f64,
     /// 0 = autonomous target, 1 = target fully proportional to VIX².
     pub market_vol_vix_coupling: f64,
@@ -372,6 +414,12 @@ pub struct ModelParams {
     /// earnings path has somewhere monotonic to run; adopting it is an era
     /// boundary and a recalibration, not a bug fix.
     pub fair_value_book_floor: f64,
+    /// Weight of the SLOW variance component in the market factor's
+    /// two-component mixture. The mixture exists because real
+    /// volatility memory decays hyperbolically and a single
+    /// exponential cannot imitate that past about a year; two
+    /// exponentials fake it better and still come apart, which is
+    /// gap 3.
     pub market_vol_slow_weight: f64,
     /// How strongly realised volume tracks the market factor's variance.
     ///
