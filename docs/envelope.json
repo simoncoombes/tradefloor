@@ -1,9 +1,9 @@
 {
-  "preset": "pt-v10",
+  "preset": "pt-v12",
   "certified_horizon_days": 252,
   "statistics": {
     "annualised_vol_pct": {
-      "measured": 31.4632,
+      "measured": 32.7604,
       "band": [
         15.0,
         36.0
@@ -11,7 +11,7 @@
       "in_band": true
     },
     "excess_kurtosis": {
-      "measured": 7.7618,
+      "measured": 6.7001,
       "band": [
         1.6,
         41.0
@@ -19,7 +19,7 @@
       "in_band": true
     },
     "return_acf1": {
-      "measured": 0.0195,
+      "measured": 0.0239,
       "band": [
         -0.08,
         0.06
@@ -27,7 +27,7 @@
       "in_band": true
     },
     "abs_return_acf1": {
-      "measured": 0.0994,
+      "measured": 0.1107,
       "band": [
         0.02,
         0.22
@@ -35,7 +35,7 @@
       "in_band": true
     },
     "abs_return_acf5": {
-      "measured": 0.0487,
+      "measured": 0.0428,
       "band": [
         0.02,
         0.09
@@ -43,7 +43,7 @@
       "in_band": true
     },
     "abs_return_acf20": {
-      "measured": 0.0043,
+      "measured": 0.004,
       "band": [
         -0.04,
         0.08
@@ -51,7 +51,7 @@
       "in_band": true
     },
     "cross_sectional_corr": {
-      "measured": 0.3063,
+      "measured": 0.3177,
       "band": [
         0.08,
         0.56
@@ -59,7 +59,7 @@
       "in_band": true
     },
     "volume_abs_return_corr": {
-      "measured": 0.4784,
+      "measured": 0.5599,
       "band": [
         0.46,
         0.66
@@ -67,7 +67,7 @@
       "in_band": true
     },
     "leverage_effect": {
-      "measured": -0.0336,
+      "measured": -0.0401,
       "band": [
         -0.16,
         0.0
@@ -75,7 +75,7 @@
       "in_band": true
     },
     "volume_change_acf1": {
-      "measured": -0.313,
+      "measured": -0.2656,
       "band": [
         -0.32,
         -0.2
@@ -83,7 +83,7 @@
       "in_band": true
     },
     "corr_asymmetry": {
-      "measured": -0.0034,
+      "measured": -0.0147,
       "band": [
         -0.25,
         0.45
@@ -91,7 +91,7 @@
       "in_band": true
     },
     "corr_asymmetry_lagged": {
-      "measured": 0.0054,
+      "measured": 0.0181,
       "band": [
         -0.2,
         0.55
@@ -99,7 +99,7 @@
       "in_band": true
     },
     "sector_excess_corr": {
-      "measured": 0.1346,
+      "measured": 0.2079,
       "band": [
         0.11,
         0.23
@@ -107,7 +107,7 @@
       "in_band": true
     },
     "corr_persistence_acf1": {
-      "measured": 0.1622,
+      "measured": 0.1525,
       "band": [
         -0.19,
         0.54
@@ -117,20 +117,9 @@
   },
   "gaps": [
     {
-      "id": "volume-change",
-      "summary": "volume-change autocorrelation leaves its band beyond one year",
-      "detail": "At 252 days the shipped preset reads -0.3130 against a band of -0.32 to -0.20, inside it but only 0.7 seed-sd clear of the floor. At 504 days it reads -0.3156 against a tighter band of -0.29 to -0.21, about 2.2 seed-sd out, and it is the only row of the fourteen that misses at that horizon.\n\nThis gap used to say the row was unreachable without spending a passing statistic, because every earlier way of reaching it cost volume_abs_return_corr its own band (CALIBRATION-FOLLOWUPS \u00a721 to \u00a723). That is no longer true and the claim is withdrawn: pt-v10 carries volume_persistence 0.70 with volume_innovation_sigma 0.21 and holds BOTH rows at 252 days, volume_change_acf1 at -0.3130 and volume_abs_return_corr at 0.4784. What remains is a horizon problem, not a trade-off: the two-year band is tighter than the one-year band and the model sits just outside it.",
-      "forbids": "strategies trading the day-to-day CHANGE in volume beyond one year",
-      "statistics": [
-        "volume_change_acf1"
-      ],
-      "beyond_days": 252,
-      "closed_by": []
-    },
-    {
       "id": "horizon",
       "summary": "the certified horizon is 252 days",
-      "detail": "Against bands re-derived at the matching window, the shipped pt-v10 holds 13 of 14 at 504 days, missing only the volume-change row whose two-year band is tighter than its one-year one. That is the best two-year reading this project has measured; pt-v3, the default before the 2026-08-26 era boundary, held 7 of 14.\n\nWhat remains is a SHAPE problem rather than a level one. Volatility itself stabilises near 32%, so a long run does not drift or blow up, and clustering at lags one and five stays inside its bands. The decay curve is the defect, and gap 3 carries it: exponential memory imitating hyperbolic memory holds up over one year and comes apart over several.\n\nThe certification itself is the reason for the horizon, not the band counts. CERTIFIED is measured at 252 days on thirty seeds; the 504-day table is measured but not certified, and nothing beyond 504 has been measured at all. A two-year study is reading numbers this page publishes; a five-year study is reading numbers nobody has checked.",
+      "detail": "Against bands re-derived at the matching window, the shipped pt-v12 holds ALL FOURTEEN at 504 days. That is the first time this project has measured it: pt-v3 held 7 there and pt-v10 held 13.\n\nSo why is the horizon still 252? Two reasons, and the band count is neither. First, headroom: annualised_vol_pct reads 33.89 against a band ending at 34.0, which is 0.11 of room on a statistic whose seed spread is many times that, so the fourteenth row is real but thin. Second and decisive, CERTIFIED is what this module certifies and it is measured at 252 days on thirty seeds. The 504-day table is measured, not certified.\n\nWhat remains is a SHAPE problem rather than a level one. Volatility itself stabilises near 32%, so a long run does not drift or blow up, and clustering at lags one and five stays inside its bands. The decay curve is the defect, and gap 3 carries it: exponential memory imitating hyperbolic memory holds up over one year and comes apart over several.\n\nThe certification itself is the reason for the horizon, not the band counts. CERTIFIED is measured at 252 days on thirty seeds; the 504-day table is measured but not certified, and nothing beyond 504 has been measured at all. A two-year study is reading numbers this page publishes; a five-year study is reading numbers nobody has checked.",
       "forbids": "multi-year backtests, and anything keyed on volatility dynamics beyond one year",
       "statistics": [
         "abs_return_acf1",
@@ -144,7 +133,7 @@
     {
       "id": "decay-shape",
       "summary": "volatility memory decays exponentially, not hyperbolically",
-      "detail": "Log-log slope over lags 1-20 is -0.953 against real markets' -0.436, about 2.2x steeper, and the curve turns NEGATIVE by lag 30 where real markets remain weakly positive to lag 60. This is a mechanism gap, not a calibration one: the process is built from exponentials, and over one year two of them fake a power law well enough that no panel statistic objects. A two-component mixture was tried and is not sufficient.",
+      "detail": "Log-log slope over lags 1-20 is -0.953 against real markets' -0.436, about 2.2x steeper, and the curve turns NEGATIVE by lag 30 where real markets remain weakly positive to lag 60. This is a mechanism gap, not a calibration one: the process is built from exponentials, and over one year two of them fake a power law well enough that no panel statistic objects. A two-component mixture was tried and is not sufficient.\n\nRead the scope of that claim precisely. It says no setting of THIS model's parameters turns one slope into the other, because a sum of exponentials is not a power law. It does not say the problem is beyond the project: the volume-change gap carried the stronger claim, that its row was structurally unreachable, and a new mechanism reached it. A mechanism gap is closed by adding mechanism, not by tuning what is here.",
       "forbids": "strategies whose edge depends on volatility memory beyond about lag 20 -- vol targeting and risk parity on a one-month or longer estimate",
       "statistics": [
         "abs_return_acf20"
@@ -155,7 +144,7 @@
     {
       "id": "scenario-magnitude",
       "summary": "scenario response is directional, not calibrated",
-      "detail": "The VIX shock response is materially weaker than the previous preset's. The direction of response is right; the magnitude is not certified.\n\n'Direction is right' is measured rather than asserted. Driving the real 2020-21 macro path through the model and correlating daily returns against each driver, over 504 sessions, against the same correlations computed on real AAPL over the same window:\n  return vs change in VIX             -0.423 (real -0.622)\n  return vs change in credit yield    -0.496 (real -0.592)\n  return vs change in valuation       +0.573 (real +0.803)\n  absolute return vs VIX level        +0.512 (real +0.489)\n\nAll four carry the sign theory fixes in advance, and the volatility-clustering channel is close to exact. The three DIRECTIONAL channels run at roughly seventy to eighty-five percent of the real response, which is this gap seen from another angle: a shock moves this market the right way and not far enough. An event study over the five sessions after each of six dated 2020-21 events agrees on sign five times out of six. The exception is the Fed's intermeeting cut of 3 March 2020, where an announcement-effect channel is absent rather than miscalibrated; see examples/09-a-pandemic-shaped-market.ipynb.\n\nSector structure is the same shortfall measured a second way. In calm markets it is in band on the shipped preset, 0.1346 at 252 days and 0.1201 at 504 against bands starting at 0.11, which is why the separate sector-structure gap was retired at 0.2.0. Under a held VIX 45 it reads +0.035 against a real +0.103 in the 2020 window, on thirty seeds at 252 days; pt-v7 measured on the same recipe reads +0.064. Industries exist in this market and they hold together in a crisis about a third as tightly as real ones.",
+      "detail": "The VIX shock response is materially weaker than the previous preset's. The direction of response is right; the magnitude is not certified.\n\n'Direction is right' is measured rather than asserted. Driving the real 2020-21 macro path through the model and correlating daily returns against each driver, over 504 sessions, against the same correlations computed on real AAPL over the same window:\n  return vs change in VIX             -0.423 (real -0.622)\n  return vs change in credit yield    -0.496 (real -0.592)\n  return vs change in valuation       +0.573 (real +0.803)\n  absolute return vs VIX level        +0.512 (real +0.489)\n\nAll four carry the sign theory fixes in advance, and the volatility-clustering channel is close to exact.\n\nThis gap used to read those three directional correlations as response SIZES, and said the model ran at seventy to eighty-five percent of the real response. That is withdrawn (\u00a781). A correlation is beta * sd(driver) / sd(return), which is signal share rather than gain, and measured as gains the three channels are right: OLS slope of daily return on each driver over the same 504 sessions gives -0.00461 against real AAPL's -0.00500 for the VIX, -8.106 against -7.445 for the credit yield, and +1.226 against +1.272 for valuation, all within ten percent, with real AAPL inside the model's six-seed range on every channel.\n\nThe denominator is the defect. Over those same runs the model's daily return sd is 0.0355 against real AAPL's 0.0236, 1.51x, and its residual sd is 1.76x. So the expected response to a scenario is calibrated and the dispersion around it is too wide: one run understates how much of its own move was the scenario. An event study over the five sessions after each of six dated 2020-21 events agrees on sign five times out of six. The exception is the Fed's intermeeting cut of 3 March 2020, where an announcement-effect channel is absent rather than miscalibrated; see examples/09-a-pandemic-shaped-market.ipynb.\n\nSector structure is the same shortfall measured a second way. In calm markets it is in band on the shipped preset, 0.1346 at 252 days and 0.1201 at 504 against bands starting at 0.11, which is why the separate sector-structure gap was retired at 0.2.0. Under a held VIX 45 it reads +0.035 against a real +0.103 in the 2020 window, on thirty seeds at 252 days; pt-v7 measured on the same recipe reads +0.064. Industries exist in this market and they hold together in a crisis about a third as tightly as real ones.",
       "forbids": "sizing a scenario's impact rather than detecting it",
       "statistics": [],
       "beyond_days": null,
@@ -173,7 +162,7 @@
     {
       "id": "roster-concentration",
       "summary": "certification was measured on a sector-balanced roster",
-      "detail": "`Universe.random()` places exactly five names in each of twelve sectors, and no real index is balanced that way -- the S&P is roughly a third technology and the Nasdaq more so. Varying ONLY sector composition, with every name drawn from one pool: balanced holds 9 of the original 10 at L_real 0.0000; an S&P-like mix holds 8 at 0.0176, losing abs_return_acf5; an all-technology roster holds 7/10 and runs 32.8% volatility. So part of the certification is an artifact of that balance, and the more concentrated the roster, the less of it transfers.",
+      "detail": "`Universe.random()` assigns sectors round-robin over the twelve in `sectors.SECTORS`, so a roster is as close to balanced as its size allows: the certified 40 names put four in each of four sectors and three in each of the other eight. No real index is balanced that way -- the S&P is roughly a third technology and the Nasdaq more so. (This gap said 'exactly five names in each of twelve sectors' until 2026-08-26, which is 60 names and describes no roster the certification used.)\n\nVarying ONLY sector composition, with every name drawn from one pool: balanced holds 9 at L_real 0.0000; an S&P-like mix holds 8 at 0.0176, losing abs_return_acf5; an all-technology roster holds 7 and runs 32.8% volatility. Those three counts are out of the TEN-statistic panel of the pt-v3 era and have not been re-measured on pt-v10; they are kept because what they establish is a property of roster composition rather than of a preset. So part of the certification is an artifact of that balance, and the more concentrated the roster, the less of it transfers.",
       "forbids": "inheriting this envelope for a sector-concentrated roster -- re-measure the panel on your own universe instead",
       "statistics": [
         "abs_return_acf5",

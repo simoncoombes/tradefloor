@@ -73,6 +73,9 @@ def test_the_earlier_presets_are_untouched() -> None:
 
 def test_it_is_not_the_default() -> None:
     from pretium import envelope
-    assert envelope.PRESET == "pt-v10"
+    # The PROPERTY, not the literal: what this test is named for is that
+    # pt-v8 is not the certified preset, and that survives an era boundary
+    # where a hard-coded successor's name does not.
+    assert envelope.PRESET != "pt-v8"
     e = pt.Engine(seed=1, universe=pt.Universe.random(3, seed=1))
-    assert e.model_fingerprint == "pt-v10"
+    assert e.model_fingerprint != "pt-v8"

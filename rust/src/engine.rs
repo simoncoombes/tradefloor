@@ -189,6 +189,11 @@ pub struct Engine {
     volume_rng: GameRng,
     volume_idio_rng: GameRng,
     news_rng: GameRng,
+    /// The day's endogenous news, generated once in `open_market` (§117).
+    /// A field rather than a local because a tick loop and a single
+    /// `run_session` are two spellings of the same day and both must read
+    /// the same events; when this was a local in `run_session` they did not.
+    session_news: Vec<crate::market::NewsEvent>,
     companies: Vec<TickCompany>,
     economy: EconomyState,
     central_bank: CentralBankState,
@@ -345,15 +350,16 @@ impl Engine {
     ///
     /// One definition, because the alternative is what this replaced: the
     /// default written as a bare `PT_V1` at two call sites, where moving an
-    /// era means finding both. Since 2026-08-22 this is [`PT_V3`], the
-    /// converged margined optimum — `L_real` 0.0000 on all three 252-day
-    /// axes and 0.0058 on the 504-day one. `pt-v1` and `pt-v2` stay
-    /// selectable and bit-reproducing, so anything recorded under either
-    /// replays exactly by naming it.
+    /// era means finding both. Since the second 2026-08-26 era boundary this
+    /// is [`PT_V12`], the first preset to hold all fourteen realism
+    /// statistics in band at BOTH 252 and 504 days, and on a held-out
+    /// universe (§114). Every earlier preset stays selectable and
+    /// bit-reproducing, so anything recorded under one replays exactly by
+    /// naming it.
     ///
-    /// [`PT_V3`]: crate::params::PT_V3
+    /// [`PT_V12`]: crate::params::PT_V12
     pub const fn default_model() -> crate::params::ModelParams {
-        crate::params::PT_V10
+        crate::params::PT_V12
     }
 
     /// [`Engine::new`] under an explicit model preset (the runtime seam,
@@ -390,6 +396,7 @@ impl Engine {
             market_vol: MarketVarianceState::new_with(&params),
             universe_stress: 0.0,
             volume_state: 0.0,
+            session_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             sector_keys,
             draws: StreamDraws::default(),
@@ -527,6 +534,46 @@ impl Engine {
     }
 
     fn tick_inner(
+        &mut self,
+        request: &TickRequest,
+        rng: &mut impl Rng,
+        settle_draws: SettleDrawPolicy,
+    ) -> TickOutcome {
+        // The day's endogenous news, chained onto whatever the caller
+        // supplied. Here rather than in `run_session` because this is the
+        // one function every path reaches: `run_session`'s loop, the public
+        // `tick`, `tick_with`, and `EngineBatch::tick`, which builds its own
+        // `TickRequest` with `news: &[]` (§117).
+        //
+        // Taken out of `self` and put back, the same move `tick` makes with
+        // the market generator and for the same reason: `tick_inner` holds
+        // `&mut self`, so it cannot also borrow a field. At zero intensity
+        // the vector is empty and the caller's slice is used untouched, so
+        // every preset before pt-v11 allocates nothing and is bit-identical.
+        let day_news = std::mem::take(&mut self.session_news);
+        let chained: Vec<NewsEvent> = if day_news.is_empty() {
+            Vec::new()
+        } else {
+            // The caller's events first, then ours: the news arm is ORDERED
+            // and exclusive, so order decides which branch an event takes.
+            let mut v = Vec::with_capacity(request.news.len() + day_news.len());
+            v.extend_from_slice(request.news);
+            v.extend(day_news.iter().cloned());
+            v
+        };
+        let request = &TickRequest {
+            news: if chained.is_empty() { request.news } else { &chained },
+            news_impact_queue: request.news_impact_queue,
+            order_volumes: request.order_volumes,
+            time: request.time,
+            volatility_multiplier: request.volatility_multiplier,
+        };
+        let outcome = self.tick_body(request, rng, settle_draws);
+        self.session_news = day_news;
+        outcome
+    }
+
+    fn tick_body(
         &mut self,
         request: &TickRequest,
         rng: &mut impl Rng,
@@ -775,6 +822,34 @@ impl Engine {
         // attribution above: an abandoned day must not leak its partial
         // innovation into the next close's update.
         self.market_vol.open_day();
+
+        // Endogenous news for the day (§101, moved here by §117). Two draws
+        // per company, ALWAYS, on the NEWS stream: the uniform decides
+        // occurrence and the normal decides impact, and at zero intensity
+        // `u < 0.0` is false for every u in [0, 1). Same draw discipline as
+        // `apply_jumps`, for the same reason. Skipped entirely at zero
+        // intensity so every preset before pt-v11 is bit-identical.
+        //
+        // `open_market` is the one point every spelling of a day passes
+        // through exactly once, which is what makes a tick loop and a
+        // session agree. It takes no other draws, so moving the generation
+        // here left the NEWS stream's own order untouched.
+        self.session_news.clear();
+        if self.params.endogenous_news_intensity != 0.0 {
+            let intensity = self.params.endogenous_news_intensity;
+            let sigma = self.params.endogenous_news_sigma;
+            for i in 0..self.companies.len() {
+                let u = self.news_rng.next_f64();
+                let z = self.news_rng.next_normal();
+                if u < intensity {
+                    self.session_news.push(crate::market::NewsEvent {
+                        company_id: Some(self.companies[i].id.clone()),
+                        sector: Some(self.companies[i].sector.clone()),
+                        price_impact: Some(sigma * z),
+                    });
+                }
+            }
+        }
 
         reset_daily_prices(&mut self.companies);
     }
@@ -1124,54 +1199,15 @@ impl Engine {
             self.open_market();
         }
 
-        // Endogenous news, generated once for the session and chained onto
-        // whatever the caller supplied (§101). Built here rather than at
-        // every call site so no caller has to know the mechanism exists, and
-        // skipped entirely at zero intensity so the borrowed slice is used
-        // untouched and every shipped preset is bit-identical.
-        //
-        // Two draws per company, ALWAYS, on the NEWS stream: the uniform
-        // decides occurrence and the normal decides impact, and at zero
-        // intensity `u < 0.0` is false for every u in [0, 1). Same draw
-        // discipline as `apply_jumps`, for the same reason.
-        let generated_news: Vec<crate::market::NewsEvent> =
-            if self.params.endogenous_news_intensity == 0.0 {
-                Vec::new()
-            } else {
-                let p = &self.params;
-                let mut out = Vec::new();
-                for company in self.companies.iter() {
-                    let u = self.news_rng.next_f64();
-                    let z = self.news_rng.next_normal();
-                    if u < p.endogenous_news_intensity {
-                        out.push(crate::market::NewsEvent {
-                            company_id: Some(company.id.clone()),
-                            sector: Some(company.sector.clone()),
-                            price_impact: Some(p.endogenous_news_sigma * z),
-                        });
-                    }
-                }
-                out
-            };
-        // A local rather than a field on `self`: the slice is borrowed
-        // across the tick loop, which takes `&mut self`. One allocation per
-        // session, against a 390-tick day, and none at all at zero intensity.
-        let combined_news: Vec<crate::market::NewsEvent> = if generated_news.is_empty() {
-            Vec::new()
-        } else {
-            // The caller's events first, then ours: the news arm is ORDERED
-            // and exclusive, so order decides which branch an event takes.
-            let mut v = Vec::with_capacity(request.news.len() + generated_news.len());
-            v.extend_from_slice(request.news);
-            v.extend(generated_news);
-            v
-        };
-        let session_news: &[crate::market::NewsEvent] = if combined_news.is_empty() {
-            request.news
-        } else {
-            &combined_news
-        };
-
+        // Endogenous news is generated at the DAY boundary (`open_market`)
+        // and chained onto the caller's events inside `tick_inner`, which is
+        // the ONE point every spelling of a minute passes through. It used to
+        // be generated and chained here, and that was wrong twice over
+        // (§117): a session is a CALL, so `EngineBatch::tick` re-rolled the
+        // day's news on every minute, and `Engine::tick` bypasses this
+        // function altogether with `news: &[]`, so a tick-driven caller saw
+        // no endogenous news at all. pt-v11 was the first preset to turn the
+        // mechanism on, so both were invisible until it did.
         let mut draws = 0usize;
         let (mut hour, mut minute) = (request.start.hour, request.start.minute);
         let mut halted_at = None;
@@ -1184,7 +1220,7 @@ impl Engine {
                     day_of_week: request.start.day_of_week,
                 },
                 volatility_multiplier: request.volatility_multiplier,
-                news: session_news,
+                news: request.news,
                 news_impact_queue: request.news_impact_queue,
                 order_volumes: request.order_volumes,
             });
@@ -2117,6 +2153,15 @@ mod tests {
     fn different_seeds_produce_different_markets() {
         // The companion assertion: reproducible-because-constant would pass
         // the test above and be worthless.
+        //
+        // Compares the WHOLE price vector over four seeds, not company A over
+        // two. Prices settle to the cent, so a single name colliding across a
+        // single pair of seeds is a coincidence rather than a collapse -- and
+        // one duly happened at the pt-v12 boundary, where company A landed on
+        // 101.54 for both seed 1 and seed 2 after sixty minutes while every
+        // other name differed. A test that reads one number cannot tell the
+        // two apart, which is the whole point of the property it is named
+        // for.
         let run = |seed| {
             let mut e = engine(seed);
             e.open_market();
@@ -2125,7 +2170,15 @@ mod tests {
             }
             e.prices()
         };
-        assert_ne!(run(1)[0].to_bits(), run(2)[0].to_bits());
+        let seeds: Vec<Vec<f64>> = (1u32..=4).map(run).collect();
+        for (i, a) in seeds.iter().enumerate() {
+            for b in seeds.iter().skip(i + 1) {
+                assert!(
+                    a.iter().zip(b).any(|(x, y)| x.to_bits() != y.to_bits()),
+                    "two seeds produced an identical market: {a:?} vs {b:?}"
+                );
+            }
+        }
     }
 
     #[test]

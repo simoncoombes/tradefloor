@@ -112,7 +112,11 @@ PERTURBATIONS = [
     # so the ratio is never exactly 1.0 and the sigma moves. A first draft
     # marked it False on the anchor argument and the probe disagreed.
     ("crisis_blend_source", 0.0, False),     # perturbed away from the default (1.0 since pt-v7); still needs VIX > the crisis threshold, which three sessions do not reach
-    ("sector_vix_coupling", 1.0, True),
+    # 0.25, not 1.0: the default carries 1.0 since pt-v11, so perturbing TO
+    # it is a no-op and the test read "not wired through". The value has to
+    # differ from whatever the default holds, which is what an era boundary
+    # keeps breaking.
+    ("sector_vix_coupling", 0.25, True),
     ("garch_omega", 1e-5, True),
     ("garch_alpha", 0.12, True),
     ("garch_beta", 0.7, True),
@@ -241,7 +245,10 @@ PERTURBATIONS = [
     ("crisis_vix_threshold", 18.0, False),     # needs VIX above the gate
     ("jump_vix_coupling", 1.0, False),
     ("crisis_blend_gain", 2.0, False),
-    ("endogenous_news_intensity", 0.25, False),  # a PAIR: events fire but carry impact sigma * z, and sigma ships at 0.0, so alone this generates zero-impact news
+    # Was inert with reason "sigma ships at 0.0, so alone this generates
+    # zero-impact news". True since pt-v11 put sigma at 0.03 and pt-v12 made
+    # it the default, so raising the rate now moves the market on its own.
+    ("endogenous_news_intensity", 0.25, True),
     ("endogenous_news_sigma", 0.05, False),      # the other half of the pair: no events exist to carry an impact until intensity is non-zero
     ("news_peer_vix_coupling", 4.0, False),      # multiplies a peer weight that is zero on every preset, and a crisis spike the harness never reaches
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick

@@ -26,7 +26,8 @@ from pretium import envelope as env
 #: that MUST surface that gap, so adding a gap means adding the route to it.
 ROUTES: dict[str, dict] = {
     "horizon": dict(horizon_days=504),
-    "volume-change": dict(horizon_days=504, statistics=("volume_change_acf1",)),
+    # "volume-change" retired 2026-08-26 (§114): pt-v12 holds the row inside
+    # both horizons, so there is no route to a gap that no longer exists.
     "decay-shape": dict(horizon_days=252, statistics=("abs_return_acf20",)),
     "scenario-magnitude": dict(horizon_days=252, scenario_magnitude=True),
     "roster-concentration": dict(horizon_days=252, sector_concentrated=True),

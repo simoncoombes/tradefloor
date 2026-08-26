@@ -87,38 +87,26 @@ def test_a_bigger_hike_hurts_more():
     assert large["median_pct"] < small["median_pct"]
 
 
-@pytest.mark.xfail(
-    reason=(
-        "KNOWN REGRESSION at the pt-v3 era boundary, left red on purpose. "
-        "On this fixture the shock/flat ratio at seeds 3, 5, 7 reads "
-        "x1.064, x1.062, x1.037 against pt-v1's x1.23, x1.25, x1.17.\n\n"
-        "CORRECTED 2026-08-23, and the correction matters. An earlier "
-        "version of this note said the era boundary had HALVED the VIX "
-        "volatility lever, x2.51 to x1.54. That came from an instrument "
-        "measuring its held-VIX half at one hardcoded seed. Re-measured at "
-        "thirty, the steady-state lever is x3.22 at pt-v1 against x3.07 at "
-        "pt-v3 -- 95.2% retained, essentially intact.\n\n"
-        "What is real is the TRANSIENT, which held at both sample sizes: "
-        "27.6% of pt-v1's shock response retained. That distinction is "
-        "physical. The market factor's variance reverts to a target "
-        "scaling with (VIX/15)^2, and pt-v3's 63-day half-life still "
-        "reaches the right level for a HELD VIX; what it cannot do is "
-        "track a twenty-day spike. So this test fails for a narrower and "
-        "better-understood reason than it was first given.\n\n"
-        "Both levers are far below real markets' x6.16 anyway (17.2% "
-        "annualised at VIX<12 against 106.1% at VIX 45+, measured on the "
-        "40-name reference roster), so 'restore pt-v1's lever' was never "
-        "the right target.\n\n"
-        "Not fixed by search: ONE variance timescale is doing two jobs. "
-        "Within-year clustering wants long memory and transient VIX "
-        "tracking wants short. The repair is the multi-timescale variance "
-        "process, where a fast component tracks VIX and a slow one carries "
-        "clustering. Tracked by tools/calibration/scenario_response.py, "
-        "which now defaults to thirty seeds precisely because three was "
-        "how this got mis-stated."
-    ),
-    strict=True,
-)
+# Was `@pytest.mark.xfail(strict=True)` from the pt-v3 era boundary until
+# 2026-08-26, when pt-v12 became the default and it started passing (§118).
+#
+# The regression it recorded was the TRANSIENT response to a VIX spike, not
+# the steady-state lever: pt-v1 read x1.23, x1.25, x1.17 on seeds 3, 5, 7 and
+# pt-v3 read x1.064, x1.062, x1.037, which is 27.6% of pt-v1's shock response
+# retained. Its note said the repair was "the multi-timescale variance
+# process, where a fast component tracks VIX and a slow one carries
+# clustering". That process was never built, and `market_vol_slow_persistence`
+# still ships at zero on every preset.
+#
+# What actually repaired it was the crisis work in pt-v11 -- the crisis blend
+# gain, sector VIX coupling and peer news transfer -- carried into pt-v12.
+# Re-measured on five seeds at the pt-v12 default: x1.192, x1.094, x1.124,
+# x1.094, x1.141, median x1.124, which is 54% of pt-v1's response against
+# pt-v3's 27.6%. Roughly doubled, still short, and no longer a known failure.
+#
+# The prescription in the old note is left standing as a hypothesis rather
+# than deleted: a second timescale may still be the rest of this. It is now
+# an open question, not a diagnosis, because something else fixed half of it.
 def test_a_vix_shock_raises_realised_volatility():
     """The claim the 2026-08 coupling made true, pinned from the tests.
 

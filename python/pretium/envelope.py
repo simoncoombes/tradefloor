@@ -53,7 +53,7 @@ from ._core import ValidationError
 from .facts import REAL_MARKETS, SEED_SD, SEED_SD_504, band_distance
 
 #: The preset these measurements describe.
-PRESET = "pt-v10"
+PRESET = "pt-v12"
 
 #: The measurement horizon the envelope certifies, in trading days.
 #: Not a soft preference: three statistics that are in band here leave it by
@@ -63,6 +63,11 @@ CERTIFIED_HORIZON_DAYS = 252
 #: Measured at the certified horizon: 30 seeds, 40 instruments, 252 days.
 #: ALL FOURTEEN in band, at a band-distance loss of 0.0000, and all fourteen
 #: again on a held-out 60-name universe measured at the same resolution.
+#:
+#: Since pt-v12 (2026-08-26) all fourteen are ALSO in band at 504 days, which
+#: is the first time this project has measured that: pt-v3 held seven there
+#: and pt-v10 held thirteen. See `MEASURED_504` and the `horizon` gap, which
+#: no longer carries a missing row.
 #:
 #: This comment read "nine of ten" until 2026-08-26. It described pt-v3, and
 #: survived two era boundaries and four statistics being added to the panel
@@ -81,20 +86,20 @@ CERTIFIED_HORIZON_DAYS = 252
 #: "roster-concentration" measures what changes when the roster's SHAPE
 #: changes, and it changes the count.
 CERTIFIED: dict[str, float] = {
-    "annualised_vol_pct": 31.4632,
-    "excess_kurtosis": 7.7618,
-    "return_acf1": 0.0195,
-    "abs_return_acf1": 0.0994,
-    "abs_return_acf5": 0.0487,
-    "abs_return_acf20": 0.0043,
-    "cross_sectional_corr": 0.3063,
-    "volume_abs_return_corr": 0.4784,
-    "leverage_effect": -0.0336,
-    "volume_change_acf1": -0.313,
-    "corr_asymmetry": -0.0034,
-    "corr_asymmetry_lagged": 0.0054,
-    "sector_excess_corr": 0.1346,
-    "corr_persistence_acf1": 0.1622,
+    "annualised_vol_pct": 32.7604,
+    "excess_kurtosis": 6.7001,
+    "return_acf1": 0.0239,
+    "abs_return_acf1": 0.1107,
+    "abs_return_acf5": 0.0428,
+    "abs_return_acf20": 0.004,
+    "cross_sectional_corr": 0.3177,
+    "volume_abs_return_corr": 0.5599,
+    "leverage_effect": -0.0401,
+    "volume_change_acf1": -0.2656,
+    "corr_asymmetry": -0.0147,
+    "corr_asymmetry_lagged": 0.0181,
+    "sector_excess_corr": 0.2079,
+    "corr_persistence_acf1": 0.1525,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -118,25 +123,32 @@ BANDS_504: dict[str, tuple[float, float]] = {
     "corr_persistence_acf1": (0.19, 0.49),
 }
 
-#: The same panel at 504 days. THIRTEEN of fourteen in band against
-#: `BANDS_504`, missing only `volume_change_acf1`. This comment read
-#: "five of ten" until 2026-08-26, which described pt-v3 against the
-#: ten-statistic panel of the time.
+#: The same panel at 504 days. ALL FOURTEEN in band against `BANDS_504`,
+#: which pt-v12 is the first preset to manage. This comment read "five of
+#: ten" until 2026-08-26 (pt-v3, against the ten-statistic panel of the
+#: time), then "thirteen of fourteen, missing only volume_change_acf1"
+#: (pt-v10 and pt-v11). `volume_move_cap` closed that row.
+#:
+#: Read the headroom, not just the count. `annualised_vol_pct` is 33.89
+#: against a band ending at 34.0, which is 0.11 of room on a statistic whose
+#: seed spread is far wider than that; the 504-day count is genuine but this
+#: row would flip on a change that barely moves the model. That is why the
+#: certified horizon stays 252: this table is MEASURED, not certified.
 MEASURED_504: dict[str, float] = {
-    "annualised_vol_pct": 32.6919,
-    "excess_kurtosis": 8.2631,
-    "return_acf1": 0.0213,
-    "abs_return_acf1": 0.1749,
-    "abs_return_acf5": 0.083,
-    "abs_return_acf20": 0.0088,
-    "cross_sectional_corr": 0.3533,
-    "volume_abs_return_corr": 0.5174,
-    "leverage_effect": -0.0375,
-    "volume_change_acf1": -0.3156,
-    "corr_asymmetry": 0.0133,
-    "corr_asymmetry_lagged": -0.0247,
-    "sector_excess_corr": 0.1201,
-    "corr_persistence_acf1": 0.1908,
+    "annualised_vol_pct": 33.8939,
+    "excess_kurtosis": 7.7528,
+    "return_acf1": 0.025,
+    "abs_return_acf1": 0.2084,
+    "abs_return_acf5": 0.0864,
+    "abs_return_acf20": 0.0052,
+    "cross_sectional_corr": 0.3797,
+    "volume_abs_return_corr": 0.6088,
+    "leverage_effect": -0.0543,
+    "volume_change_acf1": -0.2572,
+    "corr_asymmetry": -0.0049,
+    "corr_asymmetry_lagged": -0.0017,
+    "sector_excess_corr": 0.1761,
+    "corr_persistence_acf1": 0.2077,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
@@ -188,40 +200,38 @@ class Gap:
 
 
 GAPS: tuple[Gap, ...] = (
-    Gap(
-        id="volume-change",
-        summary="volume-change autocorrelation leaves its band beyond one year",
-        detail=(
-            "At 252 days the shipped preset reads -0.3130 against a band of "
-            "-0.32 to -0.20, inside it but only 0.7 seed-sd clear of the "
-            "floor. At 504 days it reads -0.3156 against a tighter band of "
-            "-0.29 to -0.21, about 2.2 seed-sd out, and it is the only row "
-            "of the fourteen that misses at that horizon.\n\n"
-            "This gap used to say the row was unreachable without spending a "
-            "passing statistic, because every earlier way of reaching it cost "
-            "volume_abs_return_corr its own band (CALIBRATION-FOLLOWUPS §21 "
-            "to §23). That is no longer true and the claim is withdrawn: "
-            "pt-v10 carries volume_persistence 0.70 with "
-            "volume_innovation_sigma 0.21 and holds BOTH rows at 252 days, "
-            "volume_change_acf1 at -0.3130 and volume_abs_return_corr at "
-            "0.4784. What remains is a horizon problem, not a trade-off: the "
-            "two-year band is tighter than the one-year band and the model "
-            "sits just outside it."
-        ),
-        forbids="strategies trading the day-to-day CHANGE in volume beyond one year",
-        statistics=("volume_change_acf1",),
-        beyond_days=CERTIFIED_HORIZON_DAYS,
-    ),
+    # RETIRED 2026-08-26: the "volume-change" gap. It read that
+    # volume_change_acf1 sat about 2.2 seed-sd outside its tighter 504-day
+    # band and was the only row of fourteen to miss at that horizon. pt-v12
+    # reads -0.2572 at 504 days against a band of -0.29 to -0.21 and -0.2656
+    # at 252, comfortably inside both, so the restriction it carried is
+    # lifted rather than reworded (§114).
+    #
+    # Worth remembering what this gap claimed before it was closed. Its first
+    # version said the row was UNREACHABLE without spending a passing
+    # statistic; that was withdrawn when pt-v10 held both rows at 252 days,
+    # and the gap was rewritten as "a horizon problem, not a trade-off". Then
+    # the horizon half closed too, and neither closure came from the volume
+    # mechanisms three calibration sections were spent on: it came from a
+    # literal 4.0 in tick.rs that saturated volume's response to a name's own
+    # move at a four percent day. Two confident structural claims about one
+    # statistic, both wrong, both refuted by measurement.
     Gap(
         id="horizon",
         summary="the certified horizon is 252 days",
         detail=(
             "Against bands re-derived at the matching window, the shipped "
-            "pt-v10 holds 13 of 14 at 504 days, missing only the "
-            "volume-change row whose two-year band is tighter than its "
-            "one-year one. That is the best two-year reading this project "
-            "has measured; pt-v3, the default before the 2026-08-26 era "
-            "boundary, held 7 of 14.\n\n"
+            "pt-v12 holds ALL FOURTEEN at 504 days. That is the first time "
+            "this project has measured it: pt-v3 held 7 there and pt-v10 "
+            "held 13.\n\n"
+            "So why is the horizon still 252? Two reasons, and the band "
+            "count is neither. First, headroom: annualised_vol_pct reads "
+            "33.89 against a band ending at 34.0, which is 0.11 of room on "
+            "a statistic whose seed spread is many times that, so the "
+            "fourteenth row is real but thin. Second and decisive, "
+            "CERTIFIED is what this module certifies and it is measured at "
+            "252 days on thirty seeds. The 504-day table is measured, not "
+            "certified.\n\n"
             "What remains is a SHAPE problem rather than a level one. "
             "Volatility itself stabilises near 32%, so a long run does not "
             "drift or blow up, and clustering at lags one and five stays "
@@ -616,12 +626,25 @@ def check(
 
     if horizon_days > CERTIFIED_HORIZON_DAYS:
         g = by_id["horizon"]
+        # The count is COMPUTED, not written down. This sentence read "13 of
+        # 14 ... missing only volume_change_acf1" and stayed that way after
+        # pt-v12 brought that row inside its 504-day band, so `check` was
+        # telling callers a statistic missed while quoting a number that is
+        # plainly inside the band printed beside it (§114).
+        out = [k for k, v in MEASURED_504.items()
+               if not (BANDS_504[k][0] <= v <= BANDS_504[k][1])]
+        held = (f"holds all {len(MEASURED_504)} against horizon-matched bands"
+                if not out else
+                f"holds {len(MEASURED_504) - len(out)} of {len(MEASURED_504)} "
+                f"against horizon-matched bands, missing "
+                + ", ".join(f"{k} at {MEASURED_504[k]:.4f} against "
+                            f"{BANDS_504[k]}" for k in out))
         fire(g, (
             f"horizon {horizon_days}d exceeds the certified "
-            f"{CERTIFIED_HORIZON_DAYS}d. At 504 days the model holds 13 of 14 "
-            f"against horizon-matched bands, missing only volume_change_acf1 "
-            f"at {MEASURED_504['volume_change_acf1']:.4f} against "
-            f"{BANDS_504['volume_change_acf1']}. Beyond 504 days nothing has "
+            f"{CERTIFIED_HORIZON_DAYS}d. At 504 days the model {held}. The "
+            f"thin one is annualised_vol_pct at "
+            f"{MEASURED_504['annualised_vol_pct']:.2f} against "
+            f"{BANDS_504['annualised_vol_pct']}. Beyond 504 days nothing has "
             f"been measured at all"
         ))
         if "excess_kurtosis" in wanted:
@@ -633,16 +656,12 @@ def check(
             )
 
     for name in wanted:
-        if name == "volume_change_acf1" and horizon_days > CERTIFIED_HORIZON_DAYS:
-            g = by_id["volume-change"]
-            fire(g, (
-                f"volume_change_acf1 reads "
-                f"{MEASURED_504[name]:.4f} at 504 days against "
-                f"{BANDS_504[name]}, about 2.2 seed-sd out, and it is the "
-                f"only row of the fourteen that misses at that horizon. At "
-                f"252 days it is in band at {CERTIFIED[name]:.4f}"
-            ))
-        elif name == "abs_return_acf20":
+        # `volume_change_acf1` fired a gap here at any horizon past 252 until
+        # pt-v12 brought it inside the 504-day band (-0.2572 against
+        # -0.29..-0.21). The arm is deleted rather than made conditional: a
+        # gap that no longer exists in GAPS cannot be looked up, and the
+        # lookup is what failed when the gap was retired (§114).
+        if name == "abs_return_acf20":
             g = by_id["decay-shape"]
             fire(g, (
                 f"abs_return_acf20 depends on the decay shape, which is a "

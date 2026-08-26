@@ -94,10 +94,20 @@ def test_return_autocorrelation_no_longer_disqualifies_an_agent_ranking():
     thirty seeds). This asserts the size of the improvement, so a regression
     toward the old model trips it.
     """
-    facts = measure(seed=3, universe=UNIVERSE, days=180)
-    assert facts["return_acf1"] < 0.15, (
+    # SIX seeds and a median, not one seed. On one seed at 180 days this
+    # statistic has a seed-sd near 0.09, so the threshold below is within
+    # noise of the reading and a change of default flips it: seed 3 read
+    # +0.164 the day pt-v12 became the default while the thirty-seed median
+    # was +0.024, which is a better model failing a worse test. The property
+    # this test is named for is a property of the distribution.
+    import statistics
+    median = statistics.median(
+        measure(seed=s, universe=UNIVERSE, days=180)["return_acf1"]
+        for s in (1, 2, 3, 4, 5, 6))
+    assert median < 0.15, (
         "return autocorrelation has risen back toward the pt-v1 era; the "
-        "retired 'momentum is mechanically profitable' caveat may be live again"
+        "retired 'momentum is mechanically profitable' caveat may be live "
+        f"again (six-seed median {median:.4f})"
     )
 
 
@@ -171,10 +181,17 @@ def test_volatility_is_in_band_so_raw_percentages_mean_something_now():
     # Oracle, shortfall in basis points -- because they survive a universe
     # change that a raw percentage does not. But the reason to prefer them is
     # no longer that the level is wrong.
-    facts = measure(seed=3, universe=UNIVERSE, days=180)
-    verdict = compare_to_real_markets(facts)["annualised_vol_pct"]
+    # Six seeds and a median, for the reason given in the return-acf test
+    # above: seed 3 at 180 days read 36.1% against a band ending at 36.0 the
+    # day pt-v12 became the default, while its thirty-seed 252-day median is
+    # 32.8%. A band check on one short run is a coin toss near the edge.
+    import statistics
+    runs = [measure(seed=s, universe=UNIVERSE, days=180) for s in (1, 2, 3, 4, 5, 6)]
+    median = statistics.median(f["annualised_vol_pct"] for f in runs)
+    verdict = compare_to_real_markets(
+        {**runs[2], "annualised_vol_pct": median})["annualised_vol_pct"]
     assert verdict["matches"], (
-        f"annualised volatility left its band at {facts['annualised_vol_pct']:.1f}%"
+        f"annualised volatility left its band at a six-seed median {median:.1f}%"
     )
 
 

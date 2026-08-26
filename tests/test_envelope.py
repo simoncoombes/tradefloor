@@ -77,20 +77,37 @@ def test_a_concentrated_roster_is_outside():
     assert any(g.id == "roster-concentration" for g in v.gaps)
 
 
-def test_the_volume_change_row_is_outside_beyond_one_year_only():
-    """It used to be outside at every horizon; at 0.2.0 that stopped being true.
+def test_the_volume_change_row_is_now_inside_at_both_horizons():
+    """Three eras of one statistic, and this test has pinned all of them.
 
-    pt-v10 holds volume_change_acf1 AND volume_abs_return_corr in band at 252
-    days, which every earlier preset had to trade against each other. What
-    remains is the 504-day band, which is tighter than the 252-day one.
+    It was outside at every horizon before 0.2.0. pt-v10 brought it inside at
+    252 days alongside `volume_abs_return_corr`, which every earlier preset
+    had to trade against it, and this test then pinned "inside at 252, out at
+    504". pt-v12 brought it inside at 504 too: -0.2656 and -0.2572 against
+    bands of -0.32..-0.20 and -0.29..-0.21.
+
+    So the `volume-change` gap is retired, and `check` must stop reporting it
+    at BOTH horizons. A retired gap that a `check` still returns would deny a
+    caller a certification the measurements support, which is the same class
+    of error as granting one they do not (§114 and the two gaps retired at
+    the previous boundary for the same reason).
     """
     inside = env.check(horizon_days=252, statistics=["volume_change_acf1"])
     assert inside.inside
-    assert not any(g.id == "volume-change" for g in inside.gaps)
 
-    out = env.check(horizon_days=504, statistics=["volume_change_acf1"])
-    assert not out.inside
-    assert any(g.id == "volume-change" for g in out.gaps)
+    # At 504 the `horizon` gap still fires -- the certified horizon is 252 and
+    # that is a statement about what was CERTIFIED, not about this row. What
+    # must no longer fire, at either horizon, is `volume-change`.
+    far = env.check(horizon_days=504, statistics=["volume_change_acf1"])
+    assert [g.id for g in far.gaps] == ["horizon"]
+
+    for verdict in (inside, far):
+        assert not any(g.id == "volume-change" for g in verdict.gaps)
+    assert not any(g.id == "volume-change" for g in env.GAPS)
+
+    # And the horizon gap's own reason must not claim a row misses while
+    # quoting a number inside the band it prints beside it.
+    assert "missing" not in " ".join(far.reasons), far.reasons
 
 
 def test_an_unknown_statistic_is_refused_not_ignored():
@@ -205,6 +222,13 @@ def test_certified_serialises_for_a_manifest():
 def test_score_reads_a_panel_against_its_own_horizon():
     """The wrong-ruler error, made hard to commit.
 
+    A SYNTHETIC panel, not `CERTIFIED`. This test used the shipped preset's
+    own `volume_change_acf1` as the demonstration, which worked only while
+    that statistic happened to sit between the two bands; pt-v12 moved it
+    inside both and the test started asserting something false about a
+    better model. What is under test is `score`'s choice of ruler, which has
+    nothing to do with which preset ships, so the example is now a literal.
+
     `excess_kurtosis` at 5.23 is comfortably inside the 252-day band of
     1.6-41 and OUT of the horizon-matched 504-day band of 7.1-22. Scoring a
     504-day panel against the 252-day bands has been done repeatedly in this
@@ -212,15 +236,16 @@ def test_score_reads_a_panel_against_its_own_horizon():
     with the other by accident.
     """
     panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    panel["excess_kurtosis"] = 5.23
     near = env.score(panel, horizon_days=252)
     far = env.score(panel, horizon_days=504)
     assert near["ruler"] == "REAL_MARKETS"
     assert far["ruler"] == "REAL_MARKETS_504"
-    assert near["statistics"]["volume_change_acf1"]["in_band"]
-    assert not far["statistics"]["volume_change_acf1"]["in_band"], (
-        "-0.314 is inside the 252-day band and outside the tighter 504-day "
-        "one; a "
-        "score that missed that is measuring with the wrong ruler"
+    assert near["statistics"]["excess_kurtosis"]["in_band"]
+    assert not far["statistics"]["excess_kurtosis"]["in_band"], (
+        "5.23 is inside the 252-day kurtosis band and outside the tighter "
+        "504-day one; a score that missed that is measuring with the wrong "
+        "ruler"
     )
 
 
