@@ -254,6 +254,70 @@ ERA_FIXES = [
         'notebooks.</p>\n'
         '        <h2 style="font-size:21px;margin:46px 0 10px">Build Targets</h2>',
     ),
+    # The count leaked into five more places than the heading. A page that
+    # says nine components beside a schema row promising seven is a reader's
+    # bug report, and the two extra columns are the ones that make the
+    # decomposition reconstruct a jump day or a halted day at all.
+    (
+        "What moved a price, broken into seven contributions that sum to the "
+        "move.",
+        "What moved a price, broken into nine contributions that sum to the "
+        "move.",
+    ),
+    (
+        "The answer key. Three levels plus the seven factor contributions.",
+        "The answer key. Three levels plus the nine factor contributions.",
+    ),
+    (
+        "One row per instrument per tick: fundamental value, anchor price, "
+        "mispricing, and seven factor contributions that sum to the move.",
+        "One row per instrument per tick: fundamental value, anchor price, "
+        "mispricing, and nine factor contributions that sum to the move.",
+    ),
+    (
+        '        return "momentum"        # one of the seven factor names',
+        '        return "momentum"        # one of the nine factor names',
+    ),
+    # The snapshot's RNG block grew with the engine's stream count and this
+    # row did not. A reader counting the numbers in a real snapshot found
+    # eighteen under a sentence promising nine.
+    (
+        "Nine numbers: state, increment and Box-Muller spare for each of the "
+        "three streams. A pre-split snapshot carrying three is refused on "
+        "restore with its era named, because it froze a single-stream market "
+        "this version cannot continue bit-exactly.",
+        "Three numbers per generator stream: state, increment and Box-Muller "
+        "spare. The count grows as the engine gains streams, and restore "
+        "reads the era off the LENGTH rather than a version field: nine for "
+        "the original market, economy and external split, then twelve, "
+        "fifteen and eighteen as jumps, volume and news arrived. A shorter "
+        "snapshot restores the streams it carries and leaves the rest where "
+        "the fresh engine put them, so a checkpoint written before a "
+        "mechanism existed replays as it did then. A pre-split snapshot "
+        "carrying three is refused with its era named, because it froze a "
+        "single-stream market this version cannot continue bit-exactly.",
+    ),
+    # The exactness of a resumed run was stated without its one exception,
+    # which was live from pt-v4 to 0.2.0. Measured: under 0.1.4 a pt-v4
+    # snapshot restored and re-run does NOT reproduce the uninterrupted run,
+    # while pt-v1 and pt-v3 do; under 0.2.0 all three do.
+    (
+        'So: <code style="font-size:13px">branch</code> when the experiment '
+        'happens now, <code style="font-size:13px">Checkpoint</code> when '
+        "someone else needs to start where you started.</p>",
+        'So: <code style="font-size:13px">branch</code> when the experiment '
+        'happens now, <code style="font-size:13px">Checkpoint</code> when '
+        "someone else needs to start where you started.</p>\n        "
+        '<p style="color:var(--mut);font-size:14px">One historical exception '
+        "to the exactness, because it was live for five releases. Snapshots "
+        "did not carry the engine's log-volume state until 0.2.0, so a "
+        "restored engine could trade different volume and print different "
+        "prices. That state is inert on pt-v1 to pt-v3 and live from pt-v4, "
+        "and the divergence is reproducible: on 0.1.4 a pt-v4 snapshot "
+        "restored and re-run does not match the uninterrupted run, where "
+        "pt-v1 and pt-v3 do. Resume anything checkpointed under 0.1.x on a "
+        "jump-carrying preset with that in mind.",
+    ),
     ("The Seven Components", "The Nine Components"),
     ("seven components", "nine components"),
     ("seven factors", "nine factors"),
@@ -297,10 +361,17 @@ RELEASE_STATUS_FIXES = [
         "move before 1.0. Nothing has been tagged, and there is no DOI yet.",
         "Published on PyPI as <code style=\"font-size:12.5px\">pretium</code> "
         "and on crates.io as the <code style=\"font-size:12.5px\">pretium</code> "
-        "crate. Everything documented works and is tested. The API may move "
-        "before 1.0. Each release is tagged and its wheels are built by the "
-        "release workflow, which runs one fixed simulation inside every wheel "
-        "and compares digests before anything is uploaded. There is no DOI yet.",
+        "crate. The API is exercised by the test suite and the example "
+        "notebooks are executed rather than written and hoped over, so the "
+        "code on this site runs. Published FIGURES are a separate discipline "
+        "and a weaker guarantee: they are re-measured by "
+        "<code style=\"font-size:12.5px\">tools/remeasure</code>, which "
+        "reports every number the stated method no longer produces, and a "
+        "figure it flags is a documentation defect until someone corrects it. "
+        "The API may move before 1.0. Each release is tagged and its wheels "
+        "are built by the release workflow, which runs one fixed simulation "
+        "inside every wheel and compares digests before anything is "
+        "uploaded. There is no DOI yet.",
     ),
 ]
 
@@ -1608,7 +1679,17 @@ def apply_factors_fixes(doc: str) -> str:
             "seven columns are off by 0.128 and nine by 5.0e-17. Where a "
             "residual does remain, the mispricing clamp bound; the circuit "
             "breaker has had its own column since 2026-08-26 and is no longer "
-            "part of it.",
+            "part of it.</p>\n        <p>Which is also a caveat on the older "
+            "promise, and it is stated here rather than left for someone to "
+            "rediscover. Before 2026-08-26 the identity held on every day "
+            "neither mechanism fired and did not hold on the days they did: "
+            "any day a jump landed, on any preset from "
+            "<code style=\"font-size:12.5px\">pt-v4</code> onward, and any day "
+            "the session circuit breaker bound, on any preset at all. So a "
+            "ground-truth decomposition published from a 0.1.x release is "
+            "exact except on those days, and the columns were never wrong, "
+            "only incomplete. Both are columns now and the identity holds "
+            "through a crisis.",
         ),
     ]
     for old, new in swaps:
