@@ -593,6 +593,25 @@ pub struct ModelParams {
     /// second calibration constant. The VIX clamp of 10 to 80 and the
     /// factor's ceiling multiple bound the feedback.
     pub vix_realised_vol_weight: f64,
+    /// Which return the VIX reacts to: the last TICK's (0.0, shipped) or the
+    /// day's (1.0), blended in between.
+    ///
+    /// The VIX's return channel reads `market_return_pct`, which the engine
+    /// builds from `previous_tick_price`: the cap-weighted move over the
+    /// final minute of the session, not the session. MEASURED (§70): an
+    /// index day of -7.87% moves the VIX +0.15 points, half the worst days
+    /// move it DOWN, and with the gain raised to 5000 and the clamp opened
+    /// the day's index return still correlates -0.065 with the next day's
+    /// VIX change. Raising the gain amplifies the closing minute, which is
+    /// noise, which is why every gain sweep in §68 and §69 did nothing.
+    ///
+    /// At 1.0 the channel reads the day's cap-weighted open-to-close return
+    /// instead, in the same percent units, which includes the jumps that
+    /// `apply_jumps` adds after the tick loop. Real markets move the VIX
+    /// about 2 points per percent the index falls, so a calibrated setting
+    /// is source 1.0 with `vix_return_gain` near 2.0 and
+    /// `vix_return_clamp` in percentage points rather than fractions.
+    pub vix_return_source: f64,
     /// VIX points added to its target per unit of a DOWN day's index
     /// return, before the clamp and cap below.
     ///
@@ -810,6 +829,7 @@ impl ModelParams {
             spread_size_exponent: crate::microstructure::SPREAD_SIZE_EXPONENT,
             vix_mean_reversion: crate::economy::VIX_MEAN_REVERSION,
             vix_realised_vol_weight: 0.0,
+            vix_return_source: 0.0,
             vix_return_gain: crate::economy::VIX_RETURN_GAIN,
             vix_return_gain_up: crate::economy::VIX_RETURN_GAIN_UP,
             vix_return_clamp: crate::economy::VIX_RETURN_CLAMP,
@@ -1185,6 +1205,7 @@ impl ModelParams {
             "vix_return_clamp" => self.vix_return_clamp,
             "vix_return_gain" => self.vix_return_gain,
             "vix_return_gain_up" => self.vix_return_gain_up,
+            "vix_return_source" => self.vix_return_source,
             "vix_target_shock_cap" => self.vix_target_shock_cap,
             "crisis_vix_threshold" => self.crisis_vix_threshold,
             "news_peer_weight" => self.news_peer_weight,
@@ -1289,6 +1310,7 @@ impl ModelParams {
             "vix_return_clamp" => out.vix_return_clamp = value,
             "vix_return_gain" => out.vix_return_gain = value,
             "vix_return_gain_up" => out.vix_return_gain_up = value,
+            "vix_return_source" => out.vix_return_source = value,
             "vix_target_shock_cap" => out.vix_target_shock_cap = value,
             "crisis_vix_threshold" => out.crisis_vix_threshold = value,
             "news_peer_weight" => out.news_peer_weight = value,
@@ -1460,6 +1482,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_return_clamp",
         "vix_return_gain",
         "vix_return_gain_up",
+        "vix_return_source",
         "vix_target_shock_cap",
         "volume_innovation_sigma",
         "volume_persistence",

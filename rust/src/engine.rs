@@ -930,12 +930,34 @@ impl Engine {
     ) -> DayAdvanceOutcome {
         let phase_before = self.economy.cycle_phase;
 
+        // The DAY's cap-weighted return, in the same percent units as
+        // `market_return_pct`. Read only when `vix_return_source` is
+        // non-zero, so the shipped path is untouched. `previous_close` is
+        // set at the OPEN (market/daily.rs), so this is open to close, and
+        // `apply_jumps` has already run, so the jumps are in `price`.
+        let market_day_return_pct = if self.params.vix_return_source == 0.0 {
+            0.0
+        } else {
+            let (mut acc, mut mcap) = (0.0, 0.0);
+            for c in self.companies.iter() {
+                if !c.is_public || c.is_bankrupt || c.stock.previous_close <= 0.0 {
+                    continue;
+                }
+                let d = (c.stock.price - c.stock.previous_close) / c.stock.previous_close * 100.0;
+                acc += d * c.stock.market_cap;
+                mcap += c.stock.market_cap;
+            }
+            if mcap > 0.0 { acc / mcap } else { 0.0 }
+        };
+
         self.economy = update_economy_daily(
             &self.economy,
             &DailyInputs {
                 vix_mean_reversion: self.params.vix_mean_reversion,
                 vix_return_gain: self.params.vix_return_gain,
                 vix_realised_vol_weight: self.params.vix_realised_vol_weight,
+                vix_return_source: self.params.vix_return_source,
+                market_day_return_pct,
                 // The factor's sigma read back through the forward
                 // coupling's own anchor, so the loop is consistent: the
                 // forward map sends VIX to variance through

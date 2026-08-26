@@ -82,6 +82,10 @@ pub struct DailyInputs<'a> {
     /// from the market factor's current sigma through the forward coupling's
     /// own anchor; at weight 0.0 neither is read. See §68.
     pub vix_realised_vol_weight: f64,
+    /// Which return the VIX reacts to (0.0 the last tick, 1.0 the day), and
+    /// the day's cap-weighted open-to-close index return in percent. See §70.
+    pub vix_return_source: f64,
+    pub market_day_return_pct: f64,
     pub vix_implied_from_market: f64,
     pub vix_return_gain_up: f64,
     pub vix_return_clamp: f64,
@@ -114,6 +118,8 @@ impl<'a> Default for DailyInputs<'a> {
             vix_mean_reversion: VIX_MEAN_REVERSION,
             vix_return_gain: VIX_RETURN_GAIN,
             vix_realised_vol_weight: 0.0,
+            vix_return_source: 0.0,
+            market_day_return_pct: 0.0,
             vix_implied_from_market: 0.0,
             vix_return_gain_up: VIX_RETURN_GAIN_UP,
             vix_return_clamp: VIX_RETURN_CLAMP,
@@ -655,8 +661,19 @@ pub fn update_economy_daily(
     // The CURRENT day's return, not the previous one, so VIX reacts same-day
     // and the negative correlation is real.
     let clamp_vix = inputs.vix_return_clamp;
-    let current_mkt_ret_vix =
-        mathx::max(-clamp_vix, mathx::min(clamp_vix, inputs.market_return_pct));
+    // WHICH RETURN THE VIX IS AFRAID OF. `market_return_pct` is the final
+    // tick's cap-weighted move, so the fear channel has been reading the
+    // closing minute rather than the session: a -7.87% day moved the VIX
+    // +0.15 points and the correlation between the day's return and the
+    // next day's VIX change is -0.065 even with the gain at 5000 (§70). At
+    // source 0.0 this branch is not taken and every preset reproduces.
+    let driving_return = if inputs.vix_return_source == 0.0 {
+        inputs.market_return_pct
+    } else {
+        let s = inputs.vix_return_source;
+        (1.0 - s) * inputs.market_return_pct + s * inputs.market_day_return_pct
+    };
+    let current_mkt_ret_vix = mathx::max(-clamp_vix, mathx::min(clamp_vix, driving_return));
     let return_spike = if current_mkt_ret_vix < 0.0 {
         -current_mkt_ret_vix * inputs.vix_return_gain
     } else {

@@ -159,6 +159,8 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_realised_vol_weight": {"kind": "abs", "step_unit": 0.05,
                                 "hard_range": (0.0, 1.0)},
     "vix_return_gain": {"kind": "log", "hard_range": (1.0, 250.0)},
+    "vix_return_source": {"kind": "abs", "step_unit": 0.1,
+                          "hard_range": (0.0, 1.0)},
     "vix_return_gain_up": {"kind": "log", "hard_range": (1.0, 250.0)},
     "vix_return_clamp": {"kind": "abs", "step_unit": 0.01,
                          "hard_range": (0.005, 0.25)},
