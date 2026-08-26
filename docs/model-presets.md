@@ -25,7 +25,7 @@ mean nothing.
 
 ## Which preset to use
 
-Eleven presets ship. Five are recommendations; the rest exist so that
+Ten presets ship. Four are recommendations; the rest exist so that
 results already published on them keep reproducing bit for bit, and a
 new preset never moves an old one.
 
@@ -36,22 +36,15 @@ new preset never moves an old one.
 | `pt-v7` | studies whose thesis is a sector, or a crisis: the first preset with industries that survive a crisis, twelve of thirteen realism statistics in band at both horizons | recommended, opt in by name |
 | `pt-v8` | crisis studies and anything that measures how correlation moves through time: the factor's variance has a memory, the crisis lever is 4.34x, thirteen of fourteen in band at 504 days | recommended, opt in by name |
 | `pt-v9` | anything measuring volatility regimes, clustering or crises the market makes itself: thirteen of fourteen statistics in band at both horizons, and the first preset whose VIX responds to the day's move rather than to the closing minute | recommended, opt in by name |
-| `pt-v11` | crisis studies where the SIZE of the crisis matters: the first preset whose crisis is as violent as a real one, with a volatility lever of about 6.12x against a real 6.16x where the default reads 5.05x. Fourteen of fourteen at 252 days and thirteen at 504, no panel statistic regressed. It pays in crisis-state co-movement: cross-sectional correlation at a held VIX 45 reads 0.604 against the default's 0.669 and a real 0.664 to 0.727, so a sector or co-movement thesis wants the default instead | recommended, opt in by name |
 | `pt-v1`, `pt-v2`, `pt-v4`, `pt-v5`, `pt-v6` | reproducing a run that names them | reproduction only |
 
-Three of the opt-in recommendations are the steps between `pt-v3` and
+The three opt-in recommendations are the steps between `pt-v3` and
 `pt-v10`, kept selectable because each one is the best preset for a
 narrower question and because a run that named one must keep reproducing.
 `pt-v7` is the one to reach for when the thesis is a sector, `pt-v8` when
 it is how correlation moves through time, `pt-v9` when it is the volatility
 regime itself. If the question is none of those, the default already
 carries their gains.
-
-`pt-v11` is the exception: it is AHEAD of the default rather than behind it.
-It is the first preset whose crisis is as violent as a real one, because it
-is the first in which a jump's arrival rate knows what regime the market is
-in. It is not the default only because 0.2.0 moved the default once already
-and moving it twice in one cycle would strand work published in between.
 
 The default moved from `pt-v3` to `pt-v10` on 2026-08-26. Re-certifying
 moves every published number at once, which is why it happens rarely and
