@@ -225,6 +225,32 @@ pub struct ModelParams {
     /// window reads +0.10; and a longer window reads lower sector excess than
     /// a shorter one on every base, because it contains more crisis days.
     /// Written when the sector draw carried nothing worth keeping.
+    /// How hard a crisis loads every name onto the market factor, as a
+    /// multiplier on the crisis spike. 0.5 is every preset before this dial
+    /// and is bit-identical (§96, §97).
+    ///
+    /// The crisis blend adds `crisis_blend_source * gain * crisis_spike *
+    /// market_factor` to a name's market component, and `gain` was the
+    /// literal 0.5. The spike itself is capped at `crisis_blend_cap`, 0.98,
+    /// so the extra market loading a crisis could ever produce was
+    /// 0.5 x 0.98 = 0.49 of beta, fixed in the source and reachable by no
+    /// parameter.
+    ///
+    /// That ceiling is why crisis co-movement could not be raised. Measured
+    /// at thirty seeds, every route to a real-sized crisis lever adds
+    /// variance that is NOT the market factor (jumps are per-name, the
+    /// sector draw is per-sector), and crisis-state cross-sectional
+    /// correlation is precisely the market factor's SHARE of total variance.
+    /// So the lever and co-movement traded against each other, and the one
+    /// channel that should have raised both was already pinned: the spike
+    /// saturates its cap for any crisis, because `effective_stress` is the
+    /// raw point excess over the 25.5 threshold and is about 19.5 at a held
+    /// VIX 45.
+    ///
+    /// Raising this gain is the headroom. It multiplies the market factor
+    /// and nothing else, so it buys co-movement in the one currency that
+    /// does not dilute it.
+    pub crisis_blend_gain: f64,
     pub crisis_blend_source: f64,
 
     // ── Per-name GJR-GARCH (market/garch.rs) ────────────────────────────
@@ -882,6 +908,7 @@ impl ModelParams {
             crash_amplifier_slope: factors::CRASH_AMPLIFIER_SLOPE,
             crisis_blend_ramp: tick::CRISIS_BLEND_RAMP,
             crisis_blend_cap: tick::CRISIS_BLEND_CAP,
+            crisis_blend_gain: 0.5,
             crisis_blend_source: 0.0,
             sector_vix_coupling: 0.0,
             garch_omega: garch::OMEGA,
@@ -1470,6 +1497,7 @@ impl ModelParams {
             "crash_amplifier_slope" => self.crash_amplifier_slope,
             "crisis_blend_ramp" => self.crisis_blend_ramp,
             "crisis_blend_cap" => self.crisis_blend_cap,
+            "crisis_blend_gain" => self.crisis_blend_gain,
             "crisis_blend_source" => self.crisis_blend_source,
             "sector_vix_coupling" => self.sector_vix_coupling,
             "garch_omega" => self.garch_omega,
@@ -1578,6 +1606,7 @@ impl ModelParams {
             "crash_amplifier_slope" => out.crash_amplifier_slope = value,
             "crisis_blend_ramp" => out.crisis_blend_ramp = value,
             "crisis_blend_cap" => out.crisis_blend_cap = value,
+            "crisis_blend_gain" => out.crisis_blend_gain = value,
             "crisis_blend_source" => out.crisis_blend_source = value,
             "sector_vix_coupling" => out.sector_vix_coupling = value,
             "garch_omega" => out.garch_omega = value,
@@ -1734,6 +1763,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "crash_amplifier_slope",
         "crash_amplifier_threshold",
         "crisis_blend_cap",
+        "crisis_blend_gain",
         "crisis_blend_ramp",
         "crisis_blend_source",
         "crisis_vix_threshold",

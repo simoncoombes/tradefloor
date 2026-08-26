@@ -328,7 +328,8 @@ pub fn calculate_live_factors(
         beta * shared.market_factor
     } else {
         beta * shared.market_factor
-            + params.crisis_blend_source * 0.5 * shared.crisis_spike * shared.market_factor
+            + params.crisis_blend_source * params.crisis_blend_gain
+                * shared.crisis_spike * shared.market_factor
     };
     let sector_component = 0.5 * shared.sector(&company.sector);
 

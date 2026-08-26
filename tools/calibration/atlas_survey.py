@@ -240,6 +240,10 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     # out at 0.008, and §59 measured the band reached at 0.012 and overshot
     # at 0.020, so the box is the range that can see the answer.
     "sector_factor_sigma": (0.0, 0.02),
+    # The crisis market-factor gain (§97). Shipped 0.5, and the [1/4x, 4x]
+    # convention box would top out at 2.0 anyway; stated explicitly because
+    # the interesting region is ABOVE the shipped value, not around it.
+    "crisis_blend_gain": (0.25, 2.0),
     # The idiosyncratic scale. Its [1/4x, 4x] box around 0.81 spans 0.2 to
     # 3.3, most of which is annualised volatility far outside any band; §60
     # measured 0.65 to 0.81 as the region where the trim is a trade rather
