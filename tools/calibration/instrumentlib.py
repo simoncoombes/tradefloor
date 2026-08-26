@@ -164,8 +164,11 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_cycle_amplitude": {"kind": "abs", "step_unit": 0.1,
                             "hard_range": (0.0, 2.0)},
     "vix_return_gain_up": {"kind": "log", "hard_range": (1.0, 250.0)},
-    "vix_return_clamp": {"kind": "abs", "step_unit": 0.01,
-                         "hard_range": (0.005, 0.25)},
+    # The clamp's units follow `vix_return_source`: a FRACTION when the
+    # channel reads the closing tick (shipped 0.03) and PERCENTAGE POINTS
+    # when it reads the day (pt-v9 uses 15.0). One box has to hold both, so
+    # it is log-scaled and spans three orders of magnitude.
+    "vix_return_clamp": {"kind": "log", "hard_range": (0.005, 30.0)},
     "vix_target_shock_cap": {"kind": "log", "hard_range": (1.0, 70.0)},
     "inflation_reversion": {"kind": "abs", "step_unit": 0.05},
     "inflation_ceiling": {"kind": "log"},

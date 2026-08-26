@@ -232,6 +232,19 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     # measured 0.65 to 0.81 as the region where the trim is a trade rather
     # than a wreck, so the range is the one a retrim can use.
     "idio_sigma_scale": (0.5, 1.0),
+    # The fear channel's two bounded quantities (§70, §71). Their
+    # multiplicative default boxes run past the hard ranges the calibration
+    # specs give them, which the stationarity gate then rejects one vector
+    # at a time; naming the box here makes every sampled point feasible.
+    #
+    # The clamp is in PERCENT on both paths, which is the unit bug §70 found:
+    # pt-v3's 0.03 clamps the fear channel at three basis points where the
+    # arithmetic reads as though it were three percent, and pt-v9's 15.0 is
+    # fifteen points. One box has to contain both, so it is log-scaled across
+    # four decades, and the low half of it maps the market with no fear
+    # channel at all rather than being wasted.
+    "vix_return_clamp": (0.005, 30.0),
+    "vix_target_shock_cap": (10.0, 70.0),
     # The market factor's GARCH memory (§64), in the survey's own transformed
     # axes (persistence is alpha + beta, alpha_frac is alpha's share, so
     # every point maps to a stationary process). Shipped 0.989 and 0.473

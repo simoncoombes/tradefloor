@@ -12,20 +12,22 @@ shutdown -h +240
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey5
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey6
 BRANCH=main
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
 SAMPLES=3000
-# The §66 surface: the crisis state on the pt-v8 base. pt-v8 gave back a
-# third of the crisis-state sector excess pt-v7 bought (+0.053 against
-# +0.079, real +0.10) and carries a lever of 4.34x against 6.16x. The axes
-# are the ones that act in a crisis: sector sigma and its VIX coupling, the
-# blend cap and ramp, the factor's persistence and ceiling, and the idio
-# scale to pay. Seven axes, 3000 LHS points, 144000 tasks, about 70 minutes
-# on 94 workers; sector_ex_45 and vol_lever are the columns to read.
-BASE=pt-v8
-ONLY=sector_factor_sigma,sector_vix_coupling,crisis_blend_cap,crisis_blend_ramp,market_vol_persistence,market_vol_ceiling_multiple,idio_sigma_scale
+# The §72 surface: the fear channel on the pt-v9 base. pt-v9 was calibrated
+# by hand from a real slope estimate and a four-point sweep at six seeds, in
+# a space with seven dimensions, and it pays for its one-year gain with the
+# crisis blend (3.16x to 2.29x). The axes are the channel itself (gain,
+# clamp, target cap), what it reacts to (jump_sigma_market), what sets the
+# regime clock (vix_cycle_amplitude), the crisis blend cap that the channel
+# costs, and the idio scale to pay. Seven axes, 3000 LHS points, 144000
+# tasks, about 70 minutes on 94 workers. Columns to read: the fourteen-stat
+# panel at BOTH horizons, corr_blend, vol_lever and sector_ex_45.
+BASE=pt-v9
+ONLY=vix_return_gain,vix_return_clamp,vix_target_shock_cap,vix_cycle_amplitude,jump_sigma_market,crisis_blend_cap,idio_sigma_scale
 
 dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 
