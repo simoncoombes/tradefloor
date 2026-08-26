@@ -172,6 +172,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # (vix / 15)^2, which at a pinned VIX 65 is about eighteen times as many
     # jump days and at VIX 5 about a ninth.
     "jump_vix_coupling": (0.0, 1.0),
+    # Endogenous news (§101). Both ship at zero, so both need explicit
+    # ranges. Intensity to 0.25 is about one event a week per name; sigma to
+    # 0.10 spans a 10% surprise, which is a large earnings move.
+    "endogenous_news_intensity": (0.0, 0.25),
+    "endogenous_news_sigma": (0.0, 0.10),
     # How much of the business cycle's VIX swing survives (§77). A scale on
     # the phase VIX around its mean, so the unit interval is the whole
     # domain and both ends are shipped positions rather than guesses: every

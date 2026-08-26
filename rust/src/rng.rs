@@ -205,6 +205,14 @@ pub mod stream {
     /// everybody would forget.
     pub const VOLUME: u32 = 4;
 
+    /// Endogenous company news, drawn once per name per day at the open.
+    ///
+    /// Its own stream for the same reason [`JUMPS`] and [`VOLUME`] have
+    /// theirs: a draw-consuming mechanism on a shared stream shifts every
+    /// later draw and moves every preset's trajectory the moment it lands.
+    /// A separate one from both, so no two mechanisms' draw counts couple.
+    pub const NEWS: u32 = 5;
+
     /// Derived streams live at `256 + id`. See the module docs for why the
     /// offset exists.
     pub const STREAM_SEQUENCE_BASE: u32 = 256;

@@ -169,6 +169,30 @@ pub struct ModelParams {
     /// CPIAUCSL). At -1.0 every preset reproduces bit for bit.
     pub inflation_floor: f64,
     /// Weight of sector-scoped news on a member name (§5.4 promotion).
+    /// Daily probability that a company generates its OWN news, and the
+    /// standard deviation of that news's price impact. Both zero on every
+    /// preset before this dial, bit-identically (§101).
+    ///
+    /// The news machinery has always existed and has never fired. News is
+    /// caller-supplied: `SessionRequest.news` is a slice the engine never
+    /// filled, and the only populated path is `pretium.replay`, which feeds
+    /// a recorded log's news back in. So `company_news` contributed exactly
+    /// zero in every simulation the panel measures, 0 nonzero day-cells out
+    /// of 30240 at every pinned VIX (§85), and `news_sector_weight`,
+    /// `news_market_weight` and the two peer weights could not move any
+    /// certified statistic.
+    ///
+    /// That left the jump process as this market's only idiosyncratic
+    /// shock, which this file already calls the earnings-surprise channel.
+    /// A jump lands on one name and reaches no other. Real earnings
+    /// surprises transfer: one cloud company's miss moves its peers.
+    /// Switching this on gives sector co-movement an ENDOGENOUS contagion
+    /// route, where today it is entirely exogenous, a per-tick sector draw
+    /// plus market beta and nothing that travels between members.
+    pub endogenous_news_intensity: f64,
+    /// Standard deviation of an endogenous news event's price impact, in the
+    /// units `NewsEvent::price_impact` carries.
+    pub endogenous_news_sigma: f64,
     pub news_sector_weight: f64,
     /// Weight of market-wide news on every name (§5.4 promotion).
     pub news_market_weight: f64,
@@ -902,6 +926,8 @@ impl ModelParams {
             inflation_reversion: crate::economy::INFLATION_MEAN_REVERSION,
             inflation_ceiling: crate::economy::INFLATION_CEILING,
             inflation_floor: crate::economy::INFLATION_FLOOR,
+            endogenous_news_intensity: 0.0,
+            endogenous_news_sigma: 0.0,
             news_sector_weight: factors::NEWS_SECTOR_WEIGHT,
             news_market_weight: factors::NEWS_MARKET_WEIGHT,
             crash_amplifier_threshold: factors::CRASH_AMPLIFIER_THRESHOLD,
@@ -1472,6 +1498,8 @@ impl ModelParams {
             "inflation_floor" => self.inflation_floor,
             "inflation_reversion" => self.inflation_reversion,
             "informed_flow_fraction" => self.informed_flow_fraction,
+            "endogenous_news_intensity" => self.endogenous_news_intensity,
+            "endogenous_news_sigma" => self.endogenous_news_sigma,
             "news_sector_weight" => self.news_sector_weight,
             "news_market_weight" => self.news_market_weight,
             "crash_amplifier_threshold" => self.crash_amplifier_threshold,
@@ -1581,6 +1609,8 @@ impl ModelParams {
             "inflation_floor" => out.inflation_floor = value,
             "inflation_reversion" => out.inflation_reversion = value,
             "informed_flow_fraction" => out.informed_flow_fraction = value,
+            "endogenous_news_intensity" => out.endogenous_news_intensity = value,
+            "endogenous_news_sigma" => out.endogenous_news_sigma = value,
             "news_sector_weight" => out.news_sector_weight = value,
             "news_market_weight" => out.news_market_weight = value,
             "crash_amplifier_threshold" => out.crash_amplifier_threshold = value,
@@ -1751,6 +1781,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "crowd_lean_cap",
         "crowd_momentum_gain",
         "crowd_valuation_gain",
+        "endogenous_news_intensity",
+        "endogenous_news_sigma",
         "fair_value_book_floor",
         "garch_alpha",
         "garch_beta",

@@ -1619,7 +1619,7 @@ impl PyEngine {
         // nested structure so a pre-split snapshot (three numbers) is
         // unmistakable at a glance and on restore.
         let mut rng_out = Vec::with_capacity(15);
-        for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume] {
+        for s in [rng.market, rng.economy, rng.external, rng.jumps, rng.volume, rng.news] {
             rng_out.push(f64::from_bits(s.state));
             rng_out.push(f64::from_bits(s.increment));
             rng_out.push(s.spare.unwrap_or(f64::NAN));
@@ -1807,14 +1807,18 @@ impl PyEngine {
                  version that wrote it, or re-simulate from the seed.",
             ));
         }
-        // Nine is a snapshot from before the jump stream; twelve carries it.
-        // Both restore, and the nine-number case keeps this engine's own
-        // seed-derived jump position -- see the `jumps` binding below.
-        if rng.len() != 9 && rng.len() != 12 && rng.len() != 15 {
+        // Three words per stream, and the count has grown three times:
+        // 9 predates the jump stream, 12 carries it, 15 adds volume, 18 adds
+        // endogenous news. Every length still restores, and a short snapshot
+        // keeps this engine's own seed-derived position for the streams it
+        // does not carry -- see the bindings below. That is what lets a
+        // checkpoint written before a mechanism existed replay exactly as it
+        // did then, rather than against a zeroed generator wearing its seed.
+        if !matches!(rng.len(), 9 | 12 | 15 | 18) {
             return Err(ValidationError::new_err(format!(
                 "rng must be 9 numbers (market, economy, external), 12 \
-                 (plus jumps) or 15 (plus volume), as (state, increment, \
-                 spare) triples, got {}",
+                 (plus jumps), 15 (plus volume) or 18 (plus news), as \
+                 (state, increment, spare) triples, got {}",
                 rng.len()
             )));
         }
@@ -1840,12 +1844,14 @@ impl PyEngine {
         let current = self.inner.rng_state();
         let jumps = if rng.len() >= 12 { stream(9) } else { current.jumps };
         let volume = if rng.len() >= 15 { stream(12) } else { current.volume };
+        let news = if rng.len() >= 18 { stream(15) } else { current.news };
         self.inner.set_rng_state(crate::engine::EngineRngState {
             market: stream(0),
             economy: stream(3),
             external: stream(6),
             jumps,
             volume,
+            news,
         });
 
         // The per-day accumulators. Absent from a snapshot written before
