@@ -12,7 +12,7 @@ shutdown -h +60
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates18
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates19
 BRANCH=main
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
@@ -105,13 +105,12 @@ setsid nohup /home/ec2-user/stream.sh "$BUCKET" >/var/log/pretium-stream.log 2>&
 
 cat > /home/ec2-user/candidates.json <<'CANDS'
 [
-  {"label": "v11-control", "base": "pt-v11", "overrides": {}},
-  {"label": "cap8", "base": "pt-v11", "overrides": {"volume_move_cap": 8.0}},
-  {"label": "cap12", "base": "pt-v11", "overrides": {"volume_move_cap": 12.0}},
-  {"label": "cap20", "base": "pt-v11", "overrides": {"volume_move_cap": 20.0}},
-  {"label": "cap12 noise.10", "base": "pt-v11", "overrides": {"volume_move_cap": 12.0, "volume_move_noise": 0.1}},
-  {"label": "cap12 vg0.5", "base": "pt-v11", "overrides": {"volume_move_cap": 12.0, "volume_idio_variance_gain": 0.5}},
-  {"label": "cap12 noise.10 vg0.5", "base": "pt-v11", "overrides": {"volume_move_cap": 12.0, "volume_move_noise": 0.1, "volume_idio_variance_gain": 0.5}}
+  {"label": "v12-control", "base": "pt-v12", "overrides": {}},
+  {"label": "pers0.90", "base": "pt-v12", "overrides": {"garch_beta": 0.7489001070794509, "garch_omega": 1.2226057932292347e-06}},
+  {"label": "pers0.93", "base": "pt-v12", "overrides": {"garch_beta": 0.7789001070794509, "garch_omega": 8.558240552604639e-07}},
+  {"label": "pers0.95", "base": "pt-v12", "overrides": {"garch_beta": 0.7989001070794508, "garch_omega": 6.113028966146181e-07}},
+  {"label": "pers0.96", "base": "pt-v12", "overrides": {"garch_beta": 0.8089001070794508, "garch_omega": 4.890423172916945e-07}},
+  {"label": "pers0.95 no-omega", "base": "pt-v12", "overrides": {"garch_beta": 0.7989001070794508}}
 ]
 CANDS
 chown ec2-user:ec2-user /home/ec2-user/candidates.json
