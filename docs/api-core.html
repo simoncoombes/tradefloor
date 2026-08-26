@@ -141,7 +141,7 @@ and copy buttons.</p>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">Engine(seed, universe, macro_state=None, model=None)</td><td>A market. <code style="font-size:12px">model</code> is a preset name or a ModelParams; the default is pt-v10.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">run_days(n)</td><td>Advance n trading days. The macro chain steps at every close.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">bars(grain="day")</td><td>OHLCV as Arrow. Four granularities.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">truth()</td><td>One row per instrument per tick: fundamental value, anchor price, mispricing, and seven factor contributions that sum to the move.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">truth()</td><td>One row per instrument per tick: fundamental value, anchor price, mispricing, and nine factor contributions that sum to the move.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">pin_macro(**fields)</td><td>Override the endogenous chain for a field from today onward.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">draw_uniform() · draw_normal()</td><td>Host randomness from the external stream. Never touches the market's sequence.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">draws_by_stream()</td><td>Per-stream draw counts: market, economy, external.</td></tr>

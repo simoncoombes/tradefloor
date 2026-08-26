@@ -147,6 +147,7 @@ and copy buttons.</p>
           </tbody>
         </table></div>
         <p>So: <code style="font-size:13px">branch</code> when the experiment happens now, <code style="font-size:13px">Checkpoint</code> when someone else needs to start where you started.</p>
+        <p style="color:var(--mut);font-size:14px">One historical exception to the exactness, because it was live for five releases. Snapshots did not carry the engine's log-volume state until 0.2.0, so a restored engine could trade different volume and print different prices. That state is inert on pt-v1 to pt-v3 and live from pt-v4, and the divergence is reproducible: on 0.1.4 a pt-v4 snapshot restored and re-run does not match the uninterrupted run, where pt-v1 and pt-v3 do. Resume anything checkpointed under 0.1.x on a jump-carrying preset with that in mind.
         <h2 style="font-size:21px;margin:46px 0 10px">Forking a Live Engine</h2>
         <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
@@ -238,7 +239,7 @@ True</code></pre>
         <h2 style="font-size:21px;margin:46px 0 10px">What Travels, and What Does Not</h2>
         <div class="tablewrap"><table>
           <tbody style="font-size:13.5px">
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">RNG position</td><td>Nine numbers: state, increment and Box-Muller spare for each of the three streams. A pre-split snapshot carrying three is refused on restore with its era named, because it froze a single-stream market this version cannot continue bit-exactly.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">RNG position</td><td>Three numbers per generator stream: state, increment and Box-Muller spare. The count grows as the engine gains streams, and restore reads the era off the LENGTH rather than a version field: nine for the original market, economy and external split, then twelve, fifteen and eighteen as jumps, volume and news arrived. A shorter snapshot restores the streams it carries and leaves the rest where the fresh engine put them, so a checkpoint written before a mechanism existed replays as it did then. A pre-split snapshot carrying three is refused with its era named, because it froze a single-stream market this version cannot continue bit-exactly.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">model</td><td>The parent's coefficients. A custom-model checkpoint resumes under the custom model or refuses.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">universe · seed · macro · order log</td><td>Everything a resume needs, which is why they are arguments rather than assumptions.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">schema</td><td>A checkpoint written by a newer version is refused rather than read partially.</td></tr>
