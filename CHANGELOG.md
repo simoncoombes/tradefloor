@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+### The default is pt-v10: an era boundary
+
+Every seeded trajectory changed. A run recorded before this release does not
+reproduce after it unless it names its preset, and every earlier preset from
+`pt-v1` through `pt-v9` stays selectable and reproduces bit for bit forever.
+The known-answer baseline is regenerated at v10 and the cross-platform gate
+runs against it.
+
+`pt.Engine(seed=..., universe=...)` now runs pt-v10, which holds **all
+fourteen realism statistics in band at the certified 252-day horizon**, on
+the calibration seeds and on a 60-name universe it never saw. pt-v3 held
+twelve. The envelope certifies pt-v10; `envelope.CERTIFIED` and the 504-day
+table are re-derived on it, and `envelope.check()` no longer names a
+statistic as out of band at 252 days, because none is.
+
+Two defects the flip exposed, both invisible while the default carried
+neither mechanism:
+
+- **The truth table did not carry jumps.** `apply_jumps` moves `mispricing_s`
+  after the tick loop, so the seven attribution components did not
+  reconstruct a day on which a jump fired, on any preset from pt-v4 onward.
+  `truth()` gains a `jump` column, `Engine.FACTORS` is eight, and the column
+  lands on the row where the move is observed. The identity now holds to
+  1e-16 on the default.
+- **Snapshots did not carry the volume state.** The common log-volume AR(1)
+  was omitted from `state_snapshot()`, which was harmless while it was
+  effectively off and became a divergence the day pt-v10 turned it on: a
+  restored engine traded different volume and printed different prices.
+
+Two behavioural changes worth knowing, both consequences of a market that
+responds to its own moves: a VIX pin now acts on the first day rather than
+the second, because the sector draw's sigma reads the VIX inside the tick;
+and flow large enough to move the index now costs about as much through
+everyone else's volatility as through its own book, which
+`examples/07-research-workflow.py` measures and states.
+
+Calibration record §68 to §75.
+
 ### pt-v10: every statistic in band
 
 The engine carries a common log-volume state, an AR(1) that has shipped

@@ -31,7 +31,7 @@ outstanding, with roughly one name in eleven above the 20% squeeze threshold.
 
 **Coefficients ship as a preset.** They are named and versioned rather than
 passed as constructor keywords, so two published results can be compared.
-`pt-v3` is the current default.
+`pt-v10` is the current default.
 `model_preset()` returns it, and the returned values are folded into the
 known-answer digest and parity-tested against the reference implementation.
 

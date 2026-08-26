@@ -8,16 +8,16 @@ rack: experiment
 
 The model's coefficients ship as a named, versioned preset. A preset names
 the complete set, frozen and documented: the variance processes, the factor
-structure, the mispricing dynamics and the guards. **`"pt-v3"` is the
+structure, the mispricing dynamics and the guards. **`"pt-v10"` is the
 current default**; most users never touch it. `"pt-v1"` and `"pt-v2"` remain
 selectable and bit-reproducing forever.
 
 ```python
-eng = pt.Engine(seed=42, universe=u, model="pt-v3")   # the default, spelled out
+eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the default, spelled out
 eng = pt.Engine(seed=42, universe=u, model="pt-v1")   # an earlier era, still exact
 ```
 
-The reason is comparability. `(package version, model="pt-v3", universe
+The reason is comparability. `(package version, model="pt-v10", universe
 fingerprint, seed)` is a complete, minimal, citable specification of a
 market. If every user ran a bespoke coefficient set, no two published
 results would be comparable, and "tested on the pretium simulator" would
@@ -31,7 +31,8 @@ new preset never moves an old one.
 
 | preset | use it for | status |
 |---|---|---|
-| `pt-v3` | anything: the default, and the one the realism envelope certifies | recommended |
+| `pt-v10` | anything: the default, the one the realism envelope certifies, and the only preset with all fourteen statistics in band at 252 days | recommended |
+| `pt-v3` | reproducing work published before the 2026-08-26 era boundary, when it was the default | reproduction only |
 | `pt-v7` | studies whose thesis is a sector, or a crisis: the first preset with industries that survive a crisis, twelve of thirteen realism statistics in band at both horizons | recommended, opt in by name |
 | `pt-v8` | crisis studies and anything that measures how correlation moves through time: the factor's variance has a memory, the crisis lever is 4.34x, thirteen of fourteen in band at 504 days | recommended, opt in by name |
 | `pt-v9` | anything measuring volatility regimes, clustering or crises the market makes itself: thirteen of fourteen statistics in band at both horizons, and the first preset whose VIX responds to the day's move rather than to the closing minute | recommended, opt in by name |
@@ -129,8 +130,8 @@ distinct fingerprints, and draw counts match across vectors per seed.
 A calibrated preset arrives as a new named entry in the shipped table,
 produced by the calibration tooling with its provenance committed; every
 earlier preset stays selectable and bit-reproducing forever. That has now
-happened twice. `"pt-v2"` and `"pt-v3"` were both produced this way, and
-`"pt-v3"` is the current default. The library consumes presets; it does not
+happened several times. `"pt-v2"`, `"pt-v3"` and everything through
+`"pt-v10"` were produced this way, and `"pt-v10"` is the current default. The library consumes presets; it does not
 ship an optimiser.
 
 What the shipped default is certified to reproduce, and where it is not, is

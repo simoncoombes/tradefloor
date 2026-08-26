@@ -96,23 +96,20 @@ informative, because it broke against a live order book under honest impact
 costs.
 
 **Realism is a stated envelope, not a score.** `pt.facts.measure()` reports
-fourteen statistics against real-market bands. At 252 days the shipped `pt-v3`
-preset holds twelve of the fourteen in band, and holds the same statistics on
-axes the calibration never saw: fresh seeds, and a fresh 60-name universe. It
-misses two, both stated as gaps: volume shocks do not persist, and names in the
-same sector do not co-move more than names in different ones.
+fourteen statistics against real-market bands. At 252 days the shipped `pt-v10`
+preset holds **all fourteen in band**, and holds all fourteen again on a
+60-name universe the calibration never saw. That is a market with the right
+volatility, the right tails, the right co-movement, industries that co-move
+more than strangers, correlation that stays elevated after a panic, volume
+that behaves, and volatility episodes it produces itself.
 
-`pt-v7` closes the sector one and `pt-v8` closes it and gives the market
-factor's variance a memory, so correlation that rose last month is still
-elevated this month and a crisis is 70% as violent as a real one against the
-default's 50%. Both are selectable by name and neither is the default. No
-preset closes the volume one: the autocorrelation of volume changes misses by
-13.7 seed standard deviations on every preset, and it is excluded from the
-calibration objective deliberately, because an optimiser pointed at an
-unreachable target does not fail cleanly, it distorts every other parameter
-chasing it. In practice a volume forecast here is never wrong twice running, so
-an execution algorithm faces an easier scheduling problem than the one it was
-written for. Every earlier preset keeps reproducing bit for bit.
+pt-v10 became the default on 2026-08-26, an era boundary: every seeded
+trajectory changed. Runs recorded before it are not comparable to runs after
+it unless they name their preset, and every earlier preset from `pt-v1`
+onward stays selectable and reproduces bit for bit forever.
+
+At 504 days pt-v10 holds twelve of fourteen, and the two it misses there are
+stated as gaps.
 
 **Eight gaps are measured and named rather than assumed.** The certified
 horizon is 252 days and the model doesn't hold beyond it. Volatility memory

@@ -30,40 +30,34 @@ parameters move them, or which move YOUR result, see [Atlas](atlas.md).
 
 ## The claim, in one sentence
 
-**At a 252-day measurement horizon, the shipped `pt-v3` preset matches
-twelve of the fourteen realism statistics pretium measures. The two it
-misses are named below, and one of them, sector co-movement, is closed by
-the selectable `pt-v7` and `pt-v8`.**
+**At a 252-day measurement horizon, the shipped `pt-v10` preset matches
+ALL FOURTEEN realism statistics pretium measures, on the calibration seeds
+and on a held-out 60-name universe alike.** At 504 days it holds twelve, and
+the gaps below say which and why.
 
 ## What is certified
 
-Shipped default `pt-v3`, 30 seeds, 40 instruments, 252 trading days.
+Shipped default `pt-v10`, 30 seeds, 40 instruments, 252 trading days.
 Bands are `pretium.facts.REAL_MARKETS`, derived from real-market windows
 of the same length by the method in the calibration docs.
 
 | statistic | measured | band | verdict |
 |---|---|---|---|
-| `annualised_vol_pct` | 24.10 | 15.0 to 36.0 | in band |
-| `excess_kurtosis` | 2.53 | 1.6 to 41.0 | in band |
-| `return_acf1` | +0.0375 | −0.08 to 0.06 | in band |
-| `abs_return_acf1` | +0.1413 | 0.02 to 0.22 | in band |
-| `abs_return_acf5` | +0.0496 | 0.02 to 0.09 | in band |
-| `abs_return_acf20` | +0.0082 | −0.04 to 0.08 | in band |
-| `cross_sectional_corr` | +0.2558 | 0.08 to 0.56 | in band |
-| `volume_abs_return_corr` | +0.5339 | 0.46 to 0.66 | in band |
-| `leverage_effect` | −0.0349 | −0.16 to 0.00 | in band |
-| `volume_change_acf1` | −0.4598 | −0.32 to −0.20 | **out, 13.7 sd** |
-| `corr_asymmetry` | +0.0036 | −0.25 to 0.45 | in band |
-| `corr_asymmetry_lagged` | −0.0330 | −0.20 to 0.55 | in band |
-| `sector_excess_corr` | +0.0037 | 0.11 to 0.23 | **out, 15 sd** |
-| `corr_persistence_acf1` | +0.0413 | −0.19 to 0.54 | in band |
-
-Band-distance loss `L_real` = **0.0000**. The last four rows were added on
-2026-08-25; see gap 7 for why the panel grew and what the new miss means.
-`corr_persistence_acf1` also carries a 504-day band of 0.19 to 0.49, which is
-the one that can judge it: twelve 21-day windows in a year cannot, and the
-252-day band above is wide because the real windows themselves are. At 504
-days `pt-v3` reads +0.225, inside that band and on its floor.
+| `annualised_vol_pct` | +28.8814 | 15.0 to 36.0 | in band |
+| `excess_kurtosis` | +8.8342 | 1.6 to 41.0 | in band |
+| `return_acf1` | +0.0157 | -0.08 to 0.06 | in band |
+| `abs_return_acf1` | +0.0698 | 0.02 to 0.22 | in band |
+| `abs_return_acf5` | +0.0307 | 0.02 to 0.09 | in band |
+| `abs_return_acf20` | +0.0049 | -0.04 to 0.08 | in band |
+| `cross_sectional_corr` | +0.2537 | 0.08 to 0.56 | in band |
+| `volume_abs_return_corr` | +0.4824 | 0.46 to 0.66 | in band |
+| `leverage_effect` | -0.0276 | -0.16 to 0.0 | in band |
+| `volume_change_acf1` | -0.3140 | -0.32 to -0.2 | in band |
+| `corr_asymmetry` | -0.0071 | -0.25 to 0.45 | in band |
+| `corr_asymmetry_lagged` | -0.0159 | -0.2 to 0.55 | in band |
+| `sector_excess_corr` | +0.1457 | 0.11 to 0.23 | in band |
+| `corr_persistence_acf1` | +0.1813 | -0.19 to 0.54 | in band |
+Band-distance loss `L_real` = **0.0000**, and every statistic is inside its band: pt-v10 is the first preset with no miss at this horizon. The volume-change row was called structurally unreachable until 2026-08-26; gap 1 below says what changed. `corr_persistence_acf1` also carries a 504-day band of 0.19 to 0.49, which is the one that can judge it: twelve 21-day windows in a year cannot.
 
 ## The claim survives the axes it was not fitted to
 
@@ -88,24 +82,26 @@ search never touched. This is the part of the claim worth trusting.
 
 ## The gaps, measured
 
-### Gap 1: volume change is unreachable without spending a passing statistic
+### Gap 1: volume change, reachable since the era boundary and not before
 
-`volume_change_acf1` reads −0.46 against a real band of −0.32 to −0.20:
-**13.7 seed-standard-deviations out**. A held volume level plus independent
-per-tick noise sits near −0.5 at any coefficients of the shipped mechanism.
-It is not unreachable outright. The common volume state that ships live in
-pt-v4 reaches the band at persistence 0.7 with innovation sigma 0.25, or at
-`volume_variance_gain` 1.0 to 2.0, and both pay for it with
-`volume_abs_return_corr` leaving its own band. So the row is a trade, not a
-wall, and the trade has not been taken. It is excluded from the calibration
-objective deliberately. An optimiser pointed at an unreachable target does
-not fail cleanly, it distorts every other parameter chasing it and then
-"succeeds" by overfitting. It is reported in every result the library
-produces, as a standing falsification verdict rather than a footnote.
+`volume_change_acf1` is the autocorrelation of day-to-day volume changes.
+Every preset through pt-v9 read about -0.42 against a real band of -0.32 to
+-0.20, and this page called it unreachable without spending a passing
+statistic, because the engine's common log-volume state reaches the band and
+takes `volume_abs_return_corr` out with it: a market-wide volume multiplier
+adds volume variance unrelated to any name's own moves.
 
-**Consequence: do not trust strategies that trade the day-to-day *change*
-in volume.** The volume *level*'s relationship to volatility is in band
-and is fine to use.
+That trade was real, and it was priced on the pt-v3 era base. On the pt-v10
+base both bands are reachable together, in a window about 0.03 wide in the
+innovation sigma. The default now reads **-0.3140** on the statistic and
+**0.4824** on the correlation, both inside. Calibration record §73.
+
+**What remains.** At 504 days the band tightens to -0.29 to -0.21 and the
+default reads -0.3159, outside it. Longer volume memory moves the figure the
+wrong way, and reaching the two-year band needs a bigger innovation, which
+takes the correlation through its one-year floor. **So a strategy trading
+the change in volume is on solid ground at one year and outside the envelope
+at two.**
 
 ### Gap 2: the certified horizon is 252 days, and the model does not hold beyond it
 
