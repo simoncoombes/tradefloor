@@ -56,27 +56,38 @@ def main() -> int:
                     help="default: whatever ships")
     ap.add_argument("--seeds", type=int, default=30)
     ap.add_argument("--workers", type=int, default=6)
+    ap.add_argument("--mem-gb", type=float, default=150.0,
+                    help="memory budget for the pool; workers per horizon are "
+                         "sized from it, because a long panel is large")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
     preset = args.preset or pt.ModelParams.from_preset().fingerprint
     seeds = list(range(101, 101 + args.seeds))
-    jobs = [(preset, d, s) for d in HORIZONS for s in seeds]
     print(f"{preset}: {len(HORIZONS)} horizons x {len(seeds)} seeds "
-          f"= {len(jobs)} panels, {args.workers} workers", flush=True)
-    # A 2520-day panel is ten times a 252-day one, so the long horizons are
-    # nearly all of the work. Submit longest first: the tail of a pool is
-    # whatever is still running, and a 2520 starting last idles 93 cores.
-    jobs.sort(key=lambda j: -j[1])
+          f"= {len(HORIZONS) * len(seeds)} panels", flush=True)
 
+    # ONE POOL PER HORIZON, sized by MEMORY rather than by cores. This is the
+    # opposite of `gate_batch`'s flat pool and the reason is measured: the
+    # first launch of this tool put all five horizons in one 94-worker pool
+    # and died with BrokenProcessPool inside a minute. A 504-day 40-name
+    # panel is about 1.6 GB resident, so a 2520-day one is about 8 GB, and 94
+    # of those is forty times the box.
+    #
+    # A flat pool is right when every task costs the same. These differ by
+    # 10x, so the cheap horizons would finish instantly and the expensive
+    # ones would OOM the box they were sharing.
+    panel_gb = lambda days: 1.6 * days / 504.0
     acc: dict[int, list] = {d: [] for d in HORIZONS}
-    done = 0
-    with ProcessPoolExecutor(args.workers) as ex:
-        for days, seed, row in ex.map(one, jobs):
-            acc[days].append(row)
-            done += 1
-            if done % 25 == 0:
-                print(f"  ... {done}/{len(jobs)}", flush=True)
+    for days in sorted(HORIZONS, reverse=True):
+        workers = max(1, min(args.workers, int(args.mem_gb / panel_gb(days))))
+        print(f"\n  {days}d: ~{panel_gb(days):.1f} GB per panel, "
+              f"{workers} workers", flush=True)
+        jobs = [(preset, days, s) for s in seeds]
+        with ProcessPoolExecutor(workers) as ex:
+            for d, seed, row in ex.map(one, jobs):
+                acc[d].append(row)
+        print(f"  {days}d: {len(acc[days])}/{len(seeds)} done", flush=True)
 
     med = {d: {k: st.median([r[k] for r in acc[d]]) for k in facts.REAL_MARKETS}
            for d in HORIZONS}
