@@ -18,8 +18,7 @@ Six parameters now describe that channel, all shipped at the literals they
 replace and bit-identical there: `vix_return_source`, `vix_return_gain`,
 `vix_return_gain_up`, `vix_return_clamp`, `vix_target_shock_cap` and
 `vix_cycle_amplitude`, plus `vix_realised_vol_weight` for the feedback from
-the market's own volatility. `pt-v9` sets them, along with a real index crash
-frequency and a second halving of the momentum term, and is the first preset
+the market's own volatility. `pt-v9` sets them, along with a second halving of the momentum term, and is the first preset
 to hold **thirteen of fourteen statistics in band at 252 days and at 504**,
 on training seeds, a held-out universe and the §8 overfitting control alike.
 Its endogenous VIX reaches the crisis threshold on 6.7% of days. It is not

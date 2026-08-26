@@ -1,6 +1,6 @@
 """pt-v9: pt-v8 with a market that frightens itself.
 
-Eight coefficients move from pt-v8 and nothing else does (calibration record
+Seven coefficients move from pt-v8 and nothing else does (calibration record
 §68 to §71). What these tests pin is the identity contract and the property
 the preset exists for: the VIX reads the day rather than the closing minute.
 """
@@ -10,7 +10,6 @@ from __future__ import annotations
 import pretium as pt
 
 MOVED = {
-    "jump_sigma_market": 0.02,
     "momentum_theta": 0.018551562499999993,
     "vix_cycle_amplitude": 0.6,
     "vix_return_clamp": 15.0,
@@ -21,7 +20,7 @@ MOVED = {
 }
 
 
-def test_it_is_pt_v8_with_eight_coefficients_moved() -> None:
+def test_it_is_pt_v8_with_seven_coefficients_moved() -> None:
     v8 = pt.ModelParams.from_preset("pt-v8").to_dict()
     v9 = pt.ModelParams.from_preset("pt-v9").to_dict()
     for name, value in MOVED.items():
@@ -46,6 +45,10 @@ def test_the_fear_channel_reads_the_day() -> None:
     # Symmetric by measurement: the asymmetric gain turned every down day into
     # a level rather than an episode (§71).
     assert v9["vix_return_gain"] == v9["vix_return_gain_up"]
+    # The market jump stays at pt-v8's size. Raising it was measured to
+    # overshoot the index crash frequency and cost a third of the crisis
+    # blend, and was removed before release (§72).
+    assert v9["jump_sigma_market"] == pt.ModelParams.from_preset("pt-v8").to_dict()["jump_sigma_market"]
 
 
 def test_it_is_a_different_market() -> None:

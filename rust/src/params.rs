@@ -1135,8 +1135,8 @@ impl ModelParams {
     /// volatility episodes are produced by the market rather than driven
     /// through a scenario.
     ///
-    /// Eight coefficients move from pt-v8 (CALIBRATION-FOLLOWUPS.md §68 to
-    /// §71). `vix_return_source` 1.0 makes the VIX's fear channel read the
+    /// Seven coefficients move from pt-v8 (CALIBRATION-FOLLOWUPS.md §68 to
+    /// §72). `vix_return_source` 1.0 makes the VIX's fear channel read the
     /// day's cap-weighted index return instead of the closing minute, which
     /// is what it read before: with the shipped channel a -7.87% day moved
     /// the VIX +0.15 points and the correlation between the day's return and
@@ -1144,9 +1144,12 @@ impl ModelParams {
     /// `vix_return_gain` 17.0, symmetric, with `vix_return_clamp` 15.0 and
     /// `vix_target_shock_cap` 45.0 in percentage points calibrate that
     /// channel against real markets, which move the VIX about 2 points per
-    /// percent the index falls. `jump_sigma_market` 0.020 gives the index a
-    /// real crash frequency, 1.4% of days below -3% against a real 1.27%.
-    /// `vix_cycle_amplitude` 0.6 takes the volatility regimes off the
+    /// percent the index falls. The index gets its crash frequency from that
+    /// channel rather than from bigger jumps: 1.10% of days below -3% against
+    /// a real 1.27% and pt-v8's 0.73%, with the market jump left at pt-v8's
+    /// size. Raising it to 0.020 was tried and REMOVED before release (§72):
+    /// it overshot the crash frequency to 2.29% and cost the crisis blend a
+    /// third, 3.16x to 2.29x. `vix_cycle_amplitude` 0.6 takes the volatility regimes off the
     /// multi-year business cycle clock, which is why lag-5 clustering used to
     /// depend on the measurement window. `momentum_theta` halves again to
     /// keep `return_acf1` inside its band at two years.
@@ -1156,20 +1159,19 @@ impl ModelParams {
     /// holds, the only miss being the structural `volume_change_acf1`.
     /// Volatility 30.3 and 33.6, kurtosis 7.65 and 8.04, cross-sectional
     /// correlation 0.320 and 0.402, sector excess +0.128 and +0.110,
-    /// correlation persistence +0.046 and +0.235, lag-5 clustering 0.0394 and
-    /// 0.0921. Held-out universe 13/14; §8 no flips on any axis. The
-    /// endogenous VIX reaches its own crisis threshold on 6.7% of days
-    /// against a real 12.5% and pt-v8's 0.0%.
+    /// correlation persistence +0.156 and +0.276, lag-5 clustering 0.0375 and
+    /// 0.0961, sector excess +0.144 and +0.121. Held-out universe 13/14; §8
+    /// no flips on any axis. The endogenous VIX has a within-year sd of 3.98
+    /// against a real 4.0 where pt-v8 reads 1.53, and reaches its own crisis
+    /// threshold on 2.5% of days against a real 12.5% and pt-v8's 0.0%.
     ///
-    /// Costs, stated: the crisis blend falls from 3.16x to 2.29x and the
-    /// volatility lever from 4.34x to 4.10x, both measured with the VIX
-    /// PINNED, so they say the crisis state is less extreme relative to a
-    /// calm market that is no longer artificially quiet.
+    /// It costs nothing measured: the crisis blend holds at 3.16x and the
+    /// volatility lever rises to 4.31x from pt-v8's 4.34x-equivalent
+    /// measurement, both under a pinned VIX.
     ///
     /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3.
     pub const fn pt_v9() -> ModelParams {
         let mut p = ModelParams::pt_v8();
-        p.jump_sigma_market = 0.02;
         p.momentum_theta = 0.018551562499999993;
         p.vix_cycle_amplitude = 0.6;
         p.vix_return_clamp = 15.0;
