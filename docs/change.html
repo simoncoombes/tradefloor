@@ -197,6 +197,11 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v1")  # an earlier era, still exa
                 <td style="vertical-align:top">Selectable, not the default. pt-v8 with a market that frightens itself: the VIX's fear channel reads the day's index return rather than the closing minute (<code style="font-size:12px">vix_return_source</code> 1.0), calibrated at about 2 VIX points per percent the index falls, with the volatility regimes taken off the multi-year business cycle clock (<code style="font-size:12px">vix_cycle_amplitude</code> 0.6) and <code style="font-size:12px">momentum_theta</code> halved again.</td>
                 <td>The first preset holding thirteen of fourteen statistics in band at 252 days AND at 504, the only miss being the structural volume-change row. The endogenous VIX reaches its own crisis threshold on 6.7% of days against a real 12.5% and pt-v8's 0.0%, so a crisis is something this market produces rather than something a scenario drives. Costs: the crisis blend falls from 3.16x to 2.29x under a pinned VIX. Calibration record §68 to §71.</td>
               </tr>
+              <tr>
+                <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v10</td>
+                <td style="vertical-align:top">Selectable, not the default. pt-v9 with the engine's common log-volume state switched on: <code style="font-size:12px">volume_persistence</code> 0.70 and <code style="font-size:12px">volume_innovation_sigma</code> 0.21.</td>
+                <td>The first preset holding ALL FOURTEEN realism statistics in band at the certified 252-day horizon, on training seeds and on a held-out 60-name universe alike, including the volume-change statistic every earlier preset misses. At 504 days it holds twelve. It costs nothing measured: the crisis lever, the correlation blend and the shock ratio are all within noise of pt-v9's. Calibration record §73.</td>
+              </tr>
           </tbody>
         </table></div>
         <h2 style="font-size:21px;margin:46px 0 10px">Custom Models and Fingerprints</h2>

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### pt-v10: every statistic in band
+
+The engine carries a common log-volume state, an AR(1) that has shipped
+switched off since pt-v1. Turning it on used to spend a passing statistic:
+`volume_change_acf1` reaches its band and `volume_abs_return_corr` leaves
+its floor, because a market-wide volume multiplier adds volume variance
+unrelated to any name's own moves. That trade was priced on the pt-v3 era
+base, and the envelope has called the statistic unreachable ever since.
+
+On the pt-v9 base both bands are reachable together, and the window is
+narrow: at innovation sigma 0.20 the change autocorrelation is still 0.005
+past its edge, and at 0.23 the correlation has left its floor. `pt-v10` sets
+persistence 0.70 and innovation sigma 0.21 and holds **all fourteen
+statistics in band at 252 days** on thirty training seeds, and fourteen of
+fourteen again on a held-out 60-name universe. At 504 days it holds twelve.
+§8 passes on every axis. Nothing measured pays for it: the crisis lever, the
+correlation blend and the shock ratio are all within noise of pt-v9's.
+Calibration record §73.
+
 ### pt-v9: a market that frightens itself
 
 The VIX's fear channel was reading the wrong number. `market_return_pct`,

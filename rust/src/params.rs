@@ -748,6 +748,8 @@ pub const PT_V7: ModelParams = ModelParams::pt_v7();
 pub const PT_V8: ModelParams = ModelParams::pt_v8();
 /// pt-v8 with a market that frightens itself -- see [`ModelParams::pt_v9`].
 pub const PT_V9: ModelParams = ModelParams::pt_v9();
+/// pt-v9 with volume that remembers -- see [`ModelParams::pt_v10`].
+pub const PT_V10: ModelParams = ModelParams::pt_v10();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -1182,6 +1184,42 @@ impl ModelParams {
         p
     }
 
+    /// pt-v9 with volume that remembers: the first preset holding ALL
+    /// FOURTEEN realism statistics in band at the certified horizon.
+    ///
+    /// Two coefficients move from pt-v9 (CALIBRATION-FOLLOWUPS.md §73). The
+    /// engine carries a common log-volume state, an AR(1) that has shipped
+    /// switched off since pt-v1; `volume_persistence` 0.70 and
+    /// `volume_innovation_sigma` 0.21 turn it on. `volume_change_acf1` is the
+    /// statistic every earlier preset misses, and the envelope has called it
+    /// unreachable without spending `volume_abs_return_corr`, because a
+    /// market-wide volume multiplier adds volume variance unrelated to any
+    /// name's own moves. That trade was priced on the pt-v3 era base. On this
+    /// one both bands are reachable together, and the window is narrow: at
+    /// innovation sigma 0.20 the change autocorrelation is still 0.005 past
+    /// its edge and at 0.23 the correlation has left its floor.
+    ///
+    /// MEASURED, thirty training seeds: **fourteen of fourteen in band at 252
+    /// days**, `volume_change_acf1` -0.3140 against a band of -0.32 to -0.20
+    /// and `volume_abs_return_corr` 0.4824 against 0.46 to 0.66, with
+    /// volatility 28.9, kurtosis 8.83, cross-sectional correlation 0.254,
+    /// sector excess +0.146 and correlation persistence +0.181. A HELD-OUT
+    /// 60-name universe also reads fourteen of fourteen. At 504 days it holds
+    /// twelve: the volume statistic leaves again, and lag-5 clustering sits
+    /// 0.03 seed sd past its ceiling. §8 passes on every axis with no flips.
+    ///
+    /// It costs nothing measured: the crisis lever reads 4.30x against
+    /// pt-v9's 4.31x, the correlation blend 3.13x against 3.16x and the shock
+    /// ratio 1.078 against 1.084, all inside noise.
+    ///
+    /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3.
+    pub const fn pt_v10() -> ModelParams {
+        let mut p = ModelParams::pt_v9();
+        p.volume_innovation_sigma = 0.21;
+        p.volume_persistence = 0.7;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -1205,13 +1243,14 @@ impl ModelParams {
             "pt-v7" => Some(PT_V7),
             "pt-v8" => Some(PT_V8),
             "pt-v9" => Some(PT_V9),
+            "pt-v10" => Some(PT_V10),
             _ => None,
         }
     }
 
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
-        &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9"]
+        &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -1659,7 +1698,8 @@ mod tests {
         assert_eq!(ModelParams::preset("pt-v8").unwrap().fingerprint(), "pt-v8");
         assert_eq!(PT_V9.fingerprint(), "pt-v9");
         assert_eq!(ModelParams::preset("pt-v9").unwrap().fingerprint(), "pt-v9");
-        assert!(ModelParams::preset("pt-v10").is_none());
+        assert_eq!(PT_V10.fingerprint(), "pt-v10");
+        assert!(ModelParams::preset("pt-v11").is_none());
 
         // Adding a preset must not disturb an existing one. The fingerprint
         // is taken over the PARAMETERS, not the table, so this holds by
