@@ -219,19 +219,23 @@ excess_kurtosis             3.1147    1.8402    6.7715    1.9033    (1.6, 41.0) 
 return_acf1                 0.0412    0.0203    0.0688    0.0171   (-0.08, 0.06)  in band; p10-p90 crosses an edge
 abs_return_acf1             0.1688    0.0715    0.4102    0.1544    (0.02, 0.22)  in band; p10-p90 crosses an edge
 ...
-volume_change_acf1         -0.4571   -0.4688   -0.4402    0.0104  (-0.32, -0.20)  OUT 13.6 sd
+volume_change_acf1         -0.3095   -0.3402   -0.2711    0.0268  (-0.32, -0.20)  in band; p10-p90 crosses an edge
 
 # 4. the verdict for a concentrated roster
 OUTSIDE the envelope
   - the roster is sector-concentrated, and certification was measured on
-    a perfectly balanced one. An S&amp;P-like mix holds 8/10 (abs_return_acf5
-    leaves band); an all-technology roster holds 7/10 at 32.8% volatility.
-    Re-measure on your own universe
+    a sector-balanced one. Measured on pt-v3 against the ten-statistic
+    panel of the time, and not re-measured since: an S&amp;P-like mix holds
+    8 of 10 (abs_return_acf5 leaves band); an all-technology roster holds
+    7 of 10 at 32.8% volatility. Re-measure on your own universe
+  ? cross_sectional_corr is in band at the certified horizon (0.3063 in
+    (0.08, 0.56)) -- but that is a median across 30 seeds; check
+    `intervals` for the spread before relying on one seed
 
 # 5. the study
 0.1874 0.9231</code></pre>
         </div>
-        <p>Step 4 refuses, which is the right answer here. Use the panel from step 3 as the realism record for this roster. The published numbers describe a different roster. The sector counts in step 2 are usually why yours differ: 14 financials against a balanced roster's 5 changes what the market does.</p>
+        <p>Step 4 refuses, which is the right answer here. Use the panel from step 3 as the realism record for this roster. The published numbers describe a different roster. The sector counts in step 2 are usually why yours differ: 14 financials against a round-robin roster's 3 or 4 per sector changes what the market does.</p>
         <p>Store the snapshot file and the universe fingerprint alongside your results. Re-running the same EDGAR query later gives different numbers, and a re-ordered roster gives a different market.</p>
 </main>
 </div>
