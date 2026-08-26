@@ -217,9 +217,10 @@ def test_a_snapshot_covers_every_column():
     # pre-jump format and still restores, keeping this engine's own
     # seed-derived jump position.
     # Three words per stream, and the stream count grows: MARKET,
-    # ECONOMY, EXTERNAL, JUMPS, VOLUME, NEWS. Written as a count so
+    # ECONOMY, EXTERNAL, JUMPS, VOLUME, NEWS, VOLUME_IDIO. Written as a
+    # count so
     # adding a stream updates one number with a reason beside it.
-    assert len(snapshot["rng"]) == 3 * 6
+    assert len(snapshot["rng"]) == 3 * 7
 
 
 def test_absence_survives_a_snapshot_round_trip():

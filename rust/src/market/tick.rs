@@ -314,6 +314,9 @@ pub struct TickInputs<'a> {
     /// Shared log-scale volume multiplier state, from the engine's daily
     /// AR(1). 0.0 means a multiplier of exactly 1.0.
     pub volume_state: f64,
+    /// Per-NAME volume state, indexed by company (§107). Empty means the
+    /// mechanism is off, which every preset before it is.
+    pub volume_idio: &'a [f64],
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
@@ -730,6 +733,15 @@ pub fn simulate_market_tick(
     let mut volumes = vec![0.0; active_count];
     for i in 0..active_count {
         let idx = active_indices[i];
+        // The per-NAME persistent component (§107). Guarded on the slice
+        // being empty AND on the state being zero, so a preset that does not
+        // set it multiplies by nothing at all rather than by `exp(0.0)`.
+        let volume_multiplier = match inputs.volume_idio.get(idx) {
+            Some(&s) if s != 0.0 => {
+                volume_multiplier * mathx::clamp(mathx::exp(s), 0.25, 4.0)
+            }
+            _ => volume_multiplier,
+        };
         let stock = &companies[idx].stock;
         // Zero-guard: a newly listed company before `resetDailyPrices` seeds
         // `open` would divide by zero and propagate NaN into the batch.

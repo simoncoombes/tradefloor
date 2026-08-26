@@ -132,6 +132,28 @@ pub struct ModelParams {
     /// the market draw, so whatever this is set to, sector structure reads
     /// zero at VIX 45 (CRISIS-BLEND-SECTOR.md). Raising it is an era boundary.
     pub sector_factor_sigma: f64,
+    /// How hard a name loads onto its OWN sector's factor. 0.5 on every
+    /// preset before this dial and bit-identical (§108).
+    ///
+    /// It was the literal 0.5 for every member of every sector. A name's
+    /// exposure to the MARKET varies by its beta; its exposure to its own
+    /// industry did not vary at all, which is the last homogeneous loading
+    /// in the factor structure.
+    pub sector_loading: f64,
+    /// How much a name's sector loading follows its market beta. Zero on
+    /// every preset before this dial and bit-identical.
+    ///
+    /// At `s` the loading is `sector_loading * (1 + s * (beta - 1))`, so a
+    /// high-beta name loads harder on its industry and a defensive one
+    /// loads less. Tied to beta rather than to a fresh draw on purpose: it
+    /// reuses a per-name attribute the universe already carries, so it needs
+    /// no RNG stream and cannot move the draw schedule.
+    ///
+    /// This is cross-sectional DISPERSION in sector exposure, which the
+    /// model has never had. `sector_excess_corr` is a mean over pairs, so a
+    /// fixed loading makes every same-sector pair identically exposed; real
+    /// industries contain pure plays and conglomerates.
+    pub sector_loading_beta_slope: f64,
     /// Scale on the per-name idiosyncratic GARCH sigma — the funding side
     /// of the factor-variance reallocation. Bit-inert at 1.0.
     pub idio_sigma_scale: f64,
@@ -440,6 +462,29 @@ pub struct ModelParams {
     ///
     /// 0.0 disables it and volume is exactly what it was.
     pub volume_variance_gain: f64,
+    /// Per-NAME volume persistence and its innovation. Both zero on every
+    /// preset before this dial and bit-identical (§107).
+    ///
+    /// `volume_persistence` carries a COMMON multiplier: every name shares
+    /// it, so the whole market is busy or quiet together. That function's
+    /// own docstring has said since it was written that "real volume
+    /// persistence is partly idiosyncratic, and that half is not modelled".
+    ///
+    /// It is the half the last panel miss needs. `volume_change_acf1` at 504
+    /// days reads about -0.316 against a band of -0.29 to -0.21 on every
+    /// preset, and the model is too NEGATIVE, which is what independent
+    /// per-tick noise does to the change in a series. Reaching the band
+    /// through the common component needs a bigger innovation, and that
+    /// takes `volume_abs_return_corr` out with it (§21 to §23, §73): a
+    /// market-wide volume multiplier adds volume variance unrelated to any
+    /// name's own moves. A PER-NAME state raises each name's own volume
+    /// autocorrelation without touching the common component the
+    /// volume-and-volatility row depends on, which is the trade those
+    /// searches could not find a way around.
+    pub volume_idio_persistence: f64,
+    /// Innovation of the per-name volume state. See
+    /// [`ModelParams::volume_idio_persistence`].
+    pub volume_idio_sigma: f64,
 
     // ── Universe memory (market/tick.rs, engine.rs) ─────────────────────
     /// How slowly the universe's remembered stress decays, per day.
@@ -985,6 +1030,8 @@ impl ModelParams {
         ModelParams {
             market_factor_sigma: tick::MARKET_FACTOR_SIGMA,
             sector_factor_sigma: tick::SECTOR_FACTOR_SIGMA,
+            sector_loading: 0.5,
+            sector_loading_beta_slope: 0.0,
             idio_sigma_scale: factor_vol::IDIO_SIGMA_SCALE,
             order_flow_coefficient: factors::ORDER_FLOW_COEFFICIENT,
             informed_flow_fraction: factors::INFORMED_FLOW_FRACTION,
@@ -1021,6 +1068,8 @@ impl ModelParams {
             market_vol_slow_gain: 0.0,
             fair_value_book_floor: 0.0,
             market_vol_slow_weight: 0.0,
+            volume_idio_persistence: 0.0,
+            volume_idio_sigma: 0.0,
             volume_variance_gain: 0.0,
             universe_stress_decay: 0.0,
             universe_stress_weight: 0.0,
@@ -1466,9 +1515,9 @@ impl ModelParams {
     /// |---|---|---|---|
     /// | panel at 252 | 14/14 | 14/14 | |
     /// | panel at 504 | 13/14 | 13/14 | |
-    /// | crisis lever | **6.40** | 4.97 | 6.16 |
-    /// | crisis co-movement | **0.687** | 0.669 | 0.664 to 0.727 |
-    /// | crisis sector excess | **+0.091** | +0.040 | +0.103 |
+    /// | crisis lever | **6.01** | 4.97 | 6.16 |
+    /// | crisis co-movement | **0.697** | 0.669 | 0.664 to 0.727 |
+    /// | crisis sector excess | **+0.110** | +0.040 | +0.103 |
     ///
     /// It regresses NOTHING against pt-v10: both panels equal, and all three
     /// crisis numbers better. §8 passes on every axis with no flips, with
@@ -1506,9 +1555,25 @@ impl ModelParams {
     /// registering it.
     pub const fn pt_v11() -> ModelParams {
         let mut p = ModelParams::pt_v10();
+        // The crisis, through the market factor (§97 to §99).
         p.crisis_blend_gain = 0.8;
         p.sector_vix_coupling = 1.0;
-        p.idio_sigma_scale = 0.58;
+        // Company news that transfers to sector peers, harder in a crisis
+        // (§101 to §106). The peer weight is small and the coupling large,
+        // so a calm market barely sees transfer and a crisis does.
+        p.endogenous_news_intensity = 0.05;
+        p.endogenous_news_sigma = 0.03;
+        p.news_peer_weight = 0.05;
+        p.news_peer_weight_down = 0.05;
+        p.news_peer_vix_coupling = 8.0;
+        // News is the earnings-surprise channel the idio jump stood in for,
+        // so the jump gives way rather than stacking; the rest is funded
+        // from the idio scale, as the market factor's variance always has
+        // been. Cutting the jump further than this costs the tails: at 0.6
+        // of pt-v10's rate, 504-day kurtosis fell to 7.04 against a floor
+        // of 7.1 (§106).
+        p.jump_intensity_idio = 0.018175898318813576;
+        p.idio_sigma_scale = 0.53;
         p
     }
 
@@ -1558,6 +1623,8 @@ impl ModelParams {
         Some(match name {
             "market_factor_sigma" => self.market_factor_sigma,
             "sector_factor_sigma" => self.sector_factor_sigma,
+            "sector_loading" => self.sector_loading,
+            "sector_loading_beta_slope" => self.sector_loading_beta_slope,
             "idio_sigma_scale" => self.idio_sigma_scale,
             "order_flow_coefficient" => self.order_flow_coefficient,
             "inflation_ceiling" => self.inflation_ceiling,
@@ -1592,6 +1659,8 @@ impl ModelParams {
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
             "market_vol_slow_weight" => self.market_vol_slow_weight,
+            "volume_idio_persistence" => self.volume_idio_persistence,
+            "volume_idio_sigma" => self.volume_idio_sigma,
             "volume_variance_gain" => self.volume_variance_gain,
             "universe_stress_decay" => self.universe_stress_decay,
             "universe_stress_weight" => self.universe_stress_weight,
@@ -1670,6 +1739,8 @@ impl ModelParams {
         match name {
             "market_factor_sigma" => out.market_factor_sigma = value,
             "sector_factor_sigma" => out.sector_factor_sigma = value,
+            "sector_loading" => out.sector_loading = value,
+            "sector_loading_beta_slope" => out.sector_loading_beta_slope = value,
             "idio_sigma_scale" => out.idio_sigma_scale = value,
             "order_flow_coefficient" => out.order_flow_coefficient = value,
             "inflation_ceiling" => out.inflation_ceiling = value,
@@ -1704,6 +1775,8 @@ impl ModelParams {
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
             "market_vol_slow_weight" => out.market_vol_slow_weight = value,
+            "volume_idio_persistence" => out.volume_idio_persistence = value,
+            "volume_idio_sigma" => out.volume_idio_sigma = value,
             "volume_variance_gain" => out.volume_variance_gain = value,
             "universe_stress_decay" => out.universe_stress_decay = value,
             "universe_stress_weight" => out.universe_stress_weight = value,
@@ -1896,6 +1969,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "price_hard_cap",
         "regime_stress_points",
         "sector_factor_sigma",
+        "sector_loading",
+        "sector_loading_beta_slope",
         "sector_vix_coupling",
         "size_effect_exponent",
         "size_effect_smoothness",
@@ -1911,6 +1986,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_return_gain_up",
         "vix_return_source",
         "vix_target_shock_cap",
+        "volume_idio_persistence",
+        "volume_idio_sigma",
         "volume_innovation_sigma",
         "volume_persistence",
         "volume_variance_gain",
