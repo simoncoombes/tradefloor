@@ -1,131 +1,90 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
-### The default is pt-v10: an era boundary
+**The market this library simulates is a different, and much better, market.**
+Every seeded run changes: a result recorded under 0.1.x does not reproduce
+under 0.2.0 unless it names the preset it used. That is the point of the
+version bump, and every earlier preset from `pt-v1` to `pt-v9` stays
+selectable and reproduces bit for bit forever, so nothing you have already
+published is stranded.
 
-Every seeded trajectory changed. A run recorded before this release does not
-reproduce after it unless it names its preset, and every earlier preset from
-`pt-v1` through `pt-v9` stays selectable and reproduces bit for bit forever.
-The known-answer baseline is regenerated at v10 and the cross-platform gate
-runs against it.
+### What you get by default now
 
-`pt.Engine(seed=..., universe=...)` now runs pt-v10, which holds **all
-fourteen realism statistics in band at the certified 252-day horizon** and
-thirteen of fourteen at 504 days, missing only the volume-change row there.
-pt-v3 held twelve and seven.
+`pt.Engine(seed=..., universe=...)` runs `pt-v10`, the first preset that
+matches real markets on **every statistic pretium measures** at the
+certified one-year horizon, and on thirteen of fourteen at two years. The
+previous default managed twelve and seven.
 
-pt-v10 also takes the business cycle out of the VIX (`vix_cycle_amplitude`
-0.0). The five cycle-phase constants pulled the level to about 17.4 in a
-typical year against a real 18.3, and the market crossed its own crisis
-threshold on 2.7% of days against a real 12.5%. Without them the level reads
-19.6, the within-year spread 4.54 against a real 4.0, and the threshold is
-crossed on **10.2% of days**: volatility regimes come from the market rather
-than from the calendar.
+In plain terms, this market now has:
 
-It also raises `market_vol_ceiling_multiple` from 16 to 32, which is a
-physical number rather than a fitted one: the clamp caps the market factor's
-variance at N times its calm level, and a real VIX of 82.7 against this
-model's anchor of 15 is a variance ratio of 30. At 16 the market could not
-reach the variance a record VIX implies. It binds only in a crisis, so calm
-volatility at a held VIX of 5, 15 and 25 is unchanged to a tenth of a point,
-and the crisis volatility lever rises from 4.30x to **4.75x** against a real
-6.16x. A crisis in this market is about three quarters as violent as a real
-one, where it used to be half. The envelope certifies pt-v10; `envelope.CERTIFIED` and the 504-day
-table are re-derived on it, and `envelope.check()` no longer names a
-statistic as out of band at 252 days, because none is.
+- **Volatility episodes it creates itself.** It reaches its own crisis
+  threshold on 10.2% of days against a real 12.5%, where the old default
+  reached it on none. A crisis is something the market can produce, not only
+  something a scenario drives.
+- **Crises worth the name.** The volatility lever from calm to panic reads
+  5.05x against a real 6.16x, up from 3.07x. A crisis here is about four
+  fifths as violent as a real one, where it used to be half.
+- **Industries.** Names in the same sector co-move more than names in
+  different ones, in calm markets and in a crisis alike.
+- **Correlation with a memory.** Correlation that rose last month is still
+  elevated this month, as it is in real markets.
+- **Volume that behaves.** The volume-change statistic, which the envelope
+  called unreachable for a year, is in band.
 
-Two defects the flip exposed, both invisible while the default carried
-neither mechanism:
+### What changed under the hood
 
-- **The truth table did not carry jumps.** `apply_jumps` moves `mispricing_s`
-  after the tick loop, so the seven attribution components did not
-  reconstruct a day on which a jump fired, on any preset from pt-v4 onward.
-  `truth()` gains a `jump` column, `Engine.FACTORS` is eight, and the column
-  lands on the row where the move is observed. The identity now holds to
-  1e-16 on the default.
-- **Snapshots did not carry the volume state.** The common log-volume AR(1)
-  was omitted from `state_snapshot()`, which was harmless while it was
-  effectively off and became a divergence the day pt-v10 turned it on: a
-  restored engine traded different volume and printed different prices.
+Ten new parameters, every one shipped at the value the engine already used,
+so each arrived as a measurement rather than a guess. The ones that ended up
+in the default: the VIX's fear channel now reads the day's index return
+instead of the closing minute; volatility regimes come from the market
+rather than from the business cycle; a name's own variance follows the VIX
+as the market factor's always did; the factor's variance clamp sits at the
+level a record VIX actually implies; and the engine's log-volume state is
+switched on.
 
-Two behavioural changes worth knowing, both consequences of a market that
-responds to its own moves: a VIX pin now acts on the first day rather than
-the second, because the sector draw's sigma reads the VIX inside the tick;
-and flow large enough to move the index now costs about as much through
-everyone else's volatility as through its own book, which
-`examples/07-research-workflow.py` measures and states.
+The full derivation, including what each change cost, is in the calibration
+record (sections 68 to 79) in the design repository.
 
-Calibration record §68 to §75.
+### Two ground-truth defects fixed
 
-### pt-v10: every statistic in band
+The truth table promises that the named components of a price move sum to
+the move. They did not, in two cases, and both were invisible while the old
+default carried neither mechanism:
 
-The engine carries a common log-volume state, an AR(1) that has shipped
-switched off since pt-v1. Turning it on used to spend a passing statistic:
-`volume_change_acf1` reaches its band and `volume_abs_return_corr` leaves
-its floor, because a market-wide volume multiplier adds volume variance
-unrelated to any name's own moves. That trade was priced on the pt-v3 era
-base, and the envelope has called the statistic unreachable ever since.
+- **Jumps.** A daily jump moves the mispricing state after the tick loop, so
+  the seven components never reconstructed a day one fired, on any preset
+  since `pt-v4`. `truth()` gains a `jump` column.
+- **Halted days.** When a price leaves the session circuit-breaker band the
+  engine re-derives the state from the clamped price, and booked that to
+  nobody: over one crisis window the columns summed to -0.204 against a
+  change of -0.190. `truth()` gains a `circuit_breaker` column.
 
-On the pt-v9 base both bands are reachable together, and the window is
-narrow: at innovation sigma 0.20 the change autocorrelation is still 0.005
-past its edge, and at 0.23 the correlation has left its floor. `pt-v10` sets
-persistence 0.70 and innovation sigma 0.21 and holds **all fourteen
-statistics in band at 252 days** on thirty training seeds, and fourteen of
-fourteen again on a held-out 60-name universe. At 504 days it holds twelve.
-§8 passes on every axis. Nothing measured pays for it: the crisis lever, the
-correlation blend and the shock ratio are all within noise of pt-v9's.
-Calibration record §73.
+`Engine.FACTORS` is nine now, and the identity holds through a crisis to
+1e-16. Snapshots also carry the log-volume state, which they did not: a
+restored engine used to trade different volume and print different prices.
 
-### pt-v9: a market that frightens itself
+### Two behaviour changes worth knowing
 
-The VIX's fear channel was reading the wrong number. `market_return_pct`,
-the return it reacts to, is built from `previous_tick_price`: the
-cap-weighted move over the final MINUTE of the session, in percent, then
-clamped downstream to a fraction. Measured, on the shipped presets: an index
-day of -7.87% moves the VIX +0.15 points, half the worst days of a year move
-it down, and with the gain raised to 5000 and the clamp opened the day's
-return still correlates -0.065 with the next day's VIX change. The market
-could not frighten itself, which is why its endogenous VIX never once crossed
-its own crisis threshold in a year against a real 12.5% of days.
+Both follow from a market that responds to its own moves. A VIX pin now acts
+on the first day rather than the second, because the sector draw's volatility
+reads the VIX inside the tick. And order flow large enough to move the index
+now costs about as much through everyone else's volatility as through its own
+book, which `examples/07-research-workflow.py` measures.
 
-Six parameters now describe that channel, all shipped at the literals they
-replace and bit-identical there: `vix_return_source`, `vix_return_gain`,
-`vix_return_gain_up`, `vix_return_clamp`, `vix_target_shock_cap` and
-`vix_cycle_amplitude`, plus `vix_realised_vol_weight` for the feedback from
-the market's own volatility. `pt-v9` sets them, along with a second halving of the momentum term, and is the first preset
-to hold **thirteen of fourteen statistics in band at 252 days and at 504**,
-on training seeds, a held-out universe and the §8 overfitting control alike.
-Its endogenous VIX reaches the crisis threshold on 6.7% of days. It is not
-the default. Calibration record §68 to §71.
+### New: a first notebook
 
-### Fixed: a checkpoint could resume a different market
+`examples/00-a-year-in-one-market.ipynb` is the entry point the examples were
+missing. One company, one trading year, two crises of different kinds, a
+chart, and the components that explain the move. About twenty seconds to run.
 
-`Checkpoint.of` decided whether to record the model by comparing the
-engine's fingerprint against `ModelParams.from_preset()`, whose no-arg form
-returned pt-v1 while `Engine` defaults to pt-v3. A pt-v1 run therefore
-checkpointed with no model and resumed as pt-v3, replaying a market it had
-not frozen. Runs under every other preset were unaffected, because their
-fingerprints differed from pt-v1 and the model was carried.
+### Also in this release
 
-The cause is fixed rather than the symptom: `ModelParams.from_preset()` with
-no name now returns the engine's default preset, the same one `Engine(...)`
-runs and `model_preset()` already reported. Passing a name explicitly is
-unchanged, so `from_preset("pt-v1")` still returns pt-v1. Callers relying on
-the no-arg form to mean pt-v1 will now get pt-v3, and the fingerprint says
-so. `tests/test_checkpoint_model.py` round-trips every shipped preset and
-pins the two defaults together.
-
-`inflation_floor` (-1.0) is a dial, the third and last of the inflation
-clamps. Measured over twelve seeds and three years: dropping it to -3.0 moves
-the mean by 0.01 and the sd by 0.02, so it is not a lever. The reversion is.
-
-What a wider inflation regime costs the equity panel, measured on pt-v8 at
-thirty seeds with `inflation_reversion` 0.20 and `inflation_ceiling` 10: the
-252-day panel gains lag-5 clustering and reads 13 of 14, the 504-day panel
-loses the return autocorrelation and that same statistic and reads 11 of 14,
-and the crisis state does not move. No preset takes the dials. Calibration
-record §65.
+`inflation_reversion`, `inflation_ceiling` and `inflation_floor` make the
+monthly inflation update's constants settable, measured against real CPI but
+taken by no preset: a real inflation range costs the two-year panel. The
+calibration tooling gained a one-command thirty-seed gate (`gate_pick.py`)
+and surveys that record what they used to be blind to.
 
 ## 0.1.4
 

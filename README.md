@@ -20,6 +20,19 @@ happened if I'd traded differently, and what actually caused this price move.
 pip install pretium
 ```
 
+Wheels are prebuilt for Linux, macOS and Windows on CPython 3.11+, and the
+core package has no dependencies.
+
+The engine is also published as a Rust crate, so you can use it without
+Python at all:
+
+```
+cargo add pretium
+```
+
+Both are built from the same source at the same version, and run the same
+market: <https://crates.io/crates/pretium>.
+
 The API may still move before 1.0. What will not move is a published
 result: anything that changes the simulated trajectory arrives as a new
 model preset rather than an edit to an existing one, so a run you cited last
