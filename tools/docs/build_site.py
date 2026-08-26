@@ -318,6 +318,112 @@ ERA_FIXES = [
         "pt-v1 and pt-v3 do. Resume anything checkpointed under 0.1.x on a "
         "jump-carrying preset with that in mind.",
     ),
+    # The EDGAR page's worked example. The block is badged ILLUSTRATIVE, so
+    # its composed panel is not a measurement claim, but it was composed
+    # against pt-v3 and showed a volume row 13.6 sd out that pt-v10 holds in
+    # band, and its step-4 verdict is a real function's output that has since
+    # changed. A composed number may be arbitrary; it may not contradict the
+    # model the page describes.
+    (
+        "abs_return_acf1             0.1688    0.0715    0.4102    0.1544 "
+        "   (0.02, 0.22)  in band; p10-p90 crosses an edge\n...\n"
+        "volume_change_acf1         -0.4571   -0.4688   -0.4402    0.0104 "
+        " (-0.32, -0.20)  OUT 13.6 sd",
+        "abs_return_acf1             0.1688    0.0715    0.4102    0.1544 "
+        "   (0.02, 0.22)  in band; p10-p90 crosses an edge\n...\n"
+        "volume_change_acf1         -0.3095   -0.3402   -0.2711    0.0268 "
+        " (-0.32, -0.20)  in band; p10-p90 crosses an edge",
+    ),
+    (
+        "# 4. the verdict for a concentrated roster\nOUTSIDE the envelope\n"
+        "  - the roster is sector-concentrated, and certification was "
+        "measured on\n    a perfectly balanced one. An S&amp;P-like mix "
+        "holds 8/10 (abs_return_acf5\n    leaves band); an all-technology "
+        "roster holds 7/10 at 32.8% volatility.\n    Re-measure on your own "
+        "universe",
+        "# 4. the verdict for a concentrated roster\nOUTSIDE the envelope\n"
+        "  - the roster is sector-concentrated, and certification was "
+        "measured on\n    a sector-balanced one. Measured on pt-v3 against "
+        "the ten-statistic\n    panel of the time, and not re-measured "
+        "since: an S&amp;P-like mix holds\n    8 of 10 (abs_return_acf5 "
+        "leaves band); an all-technology roster holds\n    7 of 10 at 32.8% "
+        "volatility. Re-measure on your own universe\n  ? "
+        "cross_sectional_corr is in band at the certified horizon (0.3063 "
+        "in\n    (0.08, 0.56)) -- but that is a median across 30 seeds; "
+        "check\n    `intervals` for the spread before relying on one seed",
+    ),
+    (
+        "The sector counts in step 2 are usually why yours differ: 14 "
+        "financials against a balanced roster's 5 changes what the market "
+        "does.",
+        "The sector counts in step 2 are usually why yours differ: 14 "
+        "financials against a round-robin roster's 3 or 4 per sector changes "
+        "what the market does.",
+    ),
+    # The sector table's own description of the generator. Round-robin over
+    # twelve sectors is five names each only at n = 60; the certified roster
+    # is 40 and gets four in four sectors and three in the other eight.
+    (
+        '<code style="font-size:12px">Universe.random</code> places exactly '
+        "five names in each, and you pass the key rather than the display "
+        "name,",
+        '<code style="font-size:12px">Universe.random</code> assigns these '
+        "round-robin, so a roster is as close to balanced as its size "
+        "allows: 60 names give five each, and the certified 40 give four to "
+        "four sectors and three to the other eight. You pass the key rather "
+        "than the display name,",
+    ),
+    # The digest a reader was told to check. It is the pre-era-boundary
+    # baseline, and the file named beside it carries the preset rather than a
+    # digest, so the check as written could not be run.
+    (
+        "Both published measurement runs report known-answer digest "
+        '<code style="font-size:13px">992ef95d…dc185e3</code>; if that does '
+        "not match your installed wheel, the published page describes a "
+        "different model than the one you are running.",
+        "The determinism baseline for the current era is known-answer v10, "
+        'digest <code style="font-size:13px">4e22d5a6…e860378</code>, which '
+        "the release workflow checks inside every wheel before it uploads; "
+        "the pre-2026-08-26 era carried a different one, so a digest is an "
+        "era marker rather than a version number. For the check that matters "
+        "to a citation, compare "
+        '<code style="font-size:13px">pretium.model_preset()["name"]</code> '
+        "against the preset named in envelope.json: if they differ, the "
+        "published page describes a different model than the one you are "
+        "running.",
+    ),
+    # The API preset reference stops at pt-v4 and recommends a superseded
+    # default for multi-year work, which the realism page forbids outright.
+    (
+        "market_factor_sigma. Built for horizons past a year."
+        "</sc-raw-td></sc-raw-tr>",
+        "market_factor_sigma. Built to investigate horizons past a "
+        "year, which is not the same as being certified for them: nothing "
+        "in this project is certified past 252 days.</sc-raw-td></sc-raw-tr>",
+    ),
+    (
+        '<h2 style="font-size:19px;margin:42px 0 8px">Choosing Between '
+        "pt-v3 and pt-v4</h2>\n        <p>A real choice with a measured "
+        "basis, and the two horizons disagree.</p>",
+        '<h2 style="font-size:19px;margin:42px 0 8px">Choosing Between '
+        "pt-v3 and pt-v4</h2>\n        <p>A historical choice, kept because "
+        "work published against either preset still reproduces. Neither is "
+        "the default: <code style=\"font-size:13px\">pt-v10</code> has been "
+        "since 2026-08-26, and it holds all fourteen statistics at 252 days "
+        "and thirteen at 504, so it dominates both rows below. The full "
+        "table of the ten shipped presets is on "
+        '<a href="#/change">Presets and Custom Models</a>.</p>\n        '
+        "<p>The two counts below are out of the ten-statistic panel of the "
+        "pt-v3 era, and the two horizons disagree.</p>",
+    ),
+    (
+        "<strong>pt-v3 for anything at or under a year, pt-v4 for "
+        "multi-year questions.</strong>",
+        "<strong>Between these two, and only these two: pt-v3 at or under a "
+        "year, pt-v4 for INVESTIGATING longer horizons.</strong> Neither "
+        "licenses a multi-year backtest, which the realism page forbids on "
+        "every preset, and pt-v10 beats both at both horizons.",
+    ),
     ("The Seven Components", "The Nine Components"),
     ("seven components", "nine components"),
     ("seven factors", "nine factors"),

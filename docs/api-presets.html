@@ -152,11 +152,12 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v4")   # for multi-year questions
             <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">pt-v1</td><td>The original reference model, ported from the engine this library grew out of. Herding runs strong (momentum_theta 0.25), which is what made momentum so profitable in early eras. Kept selectable and bit-reproducing forever, so old results stay checkable.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">pt-v2</td><td>The first calibrated preset, produced by the calibration tooling against the re-derived realism bands. Selectable, never the default. Its certificate and report are committed in the repository.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">pt-v3</td><td>The default until the 2026-08-26 era boundary, produced the same way, and the preset the realism numbers described then: nine of the ten statistics measured at the time were in band at 252 days. Herding is turned well down (momentum_theta 0.0742).</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">pt-v4</td><td>Selectable, and deliberately not the default. pt-v3 plus nine parameters that ship inert on pt-v3: five endogenous jump coefficients, three volume-process parameters, and market_factor_sigma. Built for horizons past a year.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">pt-v4</td><td>Selectable, and deliberately not the default. pt-v3 plus nine parameters that ship inert on pt-v3: five endogenous jump coefficients, three volume-process parameters, and market_factor_sigma. Built to investigate horizons past a year, which is not the same as being certified for them: nothing in this project is certified past 252 days.</td></tr>
           </tbody>
         </table></div>
         <h2 style="font-size:19px;margin:42px 0 8px">Choosing Between pt-v3 and pt-v4</h2>
-        <p>A real choice with a measured basis, and the two horizons disagree.</p>
+        <p>A historical choice, kept because work published against either preset still reproduces. Neither is the default: <code style="font-size:13px">pt-v10</code> has been since 2026-08-26, and it holds all fourteen statistics at 252 days and thirteen at 504, so it dominates both rows below. The full table of the ten shipped presets is on <a href="change.html">Presets and Custom Models</a>.</p>
+        <p>The two counts below are out of the ten-statistic panel of the pt-v3 era, and the two horizons disagree.</p>
         <div class="tablewrap"><table style="max-width:520px">
           <thead><tr><th>Horizon</th><th style="text-align:right">pt-v3</th><th style="text-align:right">pt-v4</th></tr></thead>
           <tbody style="font-family:var(--font-mono);font-size:12.5px">
@@ -164,7 +165,7 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v4")   # for multi-year questions
             <tr><td>504 days</td><td style="text-align:right">5/10</td><td style="text-align:right">7/10</td></tr>
           </tbody>
         </table></div>
-        <p style="margin:14px 0 0"><strong>pt-v3 for anything at or under a year, pt-v4 for multi-year questions.</strong></p>
+        <p style="margin:14px 0 0"><strong>Between these two, and only these two: pt-v3 at or under a year, pt-v4 for INVESTIGATING longer horizons.</strong> Neither licenses a multi-year backtest, which the realism page forbids on every preset, and pt-v10 beats both at both horizons.</p>
         <p>What pt-v4 buys is the thin-tails gap, which nothing before it had moved: excess kurtosis at 504 days goes from 5.23 to 9.19, inside the horizon-matched band of 7.1 to 22. It halves the dual-horizon objective, 0.9887 to 0.4863 on training seeds and 1.3990 to 0.7493 on thirty seeds the search never saw.</p>
         <p>What it costs is <code style="font-size:13px">return_acf1</code> at the certified horizon: 0.0739 on training seeds, 0.0838 on held-out seeds, and 0.0801 on a held-out 60-name universe, against a band ceiling of 0.06. Three independent axes agreeing makes that a regression rather than seed noise.</p>
         <p>That is why it is not the default. Promoting it would turn the envelope's nine-of-ten into eight-of-ten, and the statistic it gives up is the one behind "momentum works here for the wrong reason", which is the defect pt-v3 exists to have fixed.</p>
