@@ -132,16 +132,30 @@ ERA_FIXES = [
         "band over a year, and six known gaps with what each one rules out.",
     ),
     (
-        "Five of the ten statistics were live calibration targets",
-        "Five of the fourteen statistics were live calibration targets",
-    ),
-    (
         "Measured on the shipped preset, eight of the ten statistics have "
         "their 10th-to-90th percentile range across seeds crossing a band "
         "edge.",
         "Measured on the shipped preset, nine of the fourteen statistics "
         "have their 10th-to-90th percentile range across seeds crossing a "
         "band edge.",
+    ),
+    (
+        '<code style="font-size:13px">abs_return_acf1</code> reads a median '
+        "of 0.141 against a ceiling of 0.22, with a p90 of 0.426 and an "
+        "across-seed standard deviation of 0.170, larger than the median "
+        "itself.",
+        '<code style="font-size:13px">abs_return_acf1</code> reads a median '
+        "of 0.0994 against a ceiling of 0.22, with a p90 of 0.4063 and an "
+        "across-seed standard deviation of 0.1467, larger than the median "
+        "itself.",
+    ),
+    (
+        'So "9/10 in band" describes the middle of thirty runs. Your one run '
+        "can easily look worse. Read the spread before relying on one seed:",
+        'So "14/14 in band" describes the middle of thirty runs, and the word '
+        "certified describes that median rather than your run. It does not "
+        "promise a typical single seed is in band on all fourteen; the spread "
+        "below says most are not. Read it before relying on one seed:",
     ),
     (
         "eight of the ten statistics have their middle-eighty-percent range "
@@ -167,9 +181,51 @@ ERA_FIXES = [
         "ten statistics measured at the time were in band at 252 days. "
         "Herding is turned well down (momentum_theta 0.0742).",
     ),
+    # The presets page's own count of itself. "Three presets ship" was true
+    # when the bundle was authored and the table beneath it now runs to ten,
+    # so the sentence contradicted the rows immediately under it.
     (
-        '<code style="font-size:13px">pt-v3</code> is the current default;',
-        '<code style="font-size:13px">pt-v10</code> is the current default;',
+        '<code style="font-size:13px">pt-v3</code> is the current default; '
+        '<code style="font-size:13px">pt-v1</code> and '
+        '<code style="font-size:13px">pt-v2</code> stay selectable and '
+        "bit-reproducing forever.",
+        '<code style="font-size:13px">pt-v10</code> is the current default, '
+        'and every earlier preset from <code style="font-size:13px">pt-v1'
+        '</code> to <code style="font-size:13px">pt-v9</code> stays '
+        "selectable and reproduces bit for bit. What that guarantee covers is "
+        "the PRESET: naming one pins the coefficient set and the market it "
+        "produces on a given package version, and a run is only fully "
+        "specified by (package version, model, universe fingerprint, seed). "
+        'See <a href="#/install">Install and Versioning</a> for what a '
+        "package-version change can and cannot move.",
+    ),
+    (
+        "Three presets ship. All three stay selectable and bit-reproducing "
+        "forever.",
+        "Ten presets ship. pt-v10 is the default; the other nine are "
+        "selectable by name and none of them has ever been un-shipped.",
+    ),
+    (
+        "Built for long horizons. It halves the dual-horizon objective",
+        "Built to INVESTIGATE long-horizon realism, which is not the same as "
+        "being certified for long-horizon strategy studies: nothing in this "
+        "project is certified past 252 days. It halves the dual-horizon "
+        "objective",
+    ),
+    # The volume row is in band at one year since 0.2.0, so the calibration
+    # example can no longer call it unreachable. Gap 1 on the realism page
+    # withdrew that claim and this sentence had not caught up.
+    (
+        "The structurally unreachable statistic rides along in every result "
+        "as a standing falsification verdict, and stays out of the loss, "
+        "because an optimiser pointed at an unreachable target distorts every "
+        "other parameter chasing it.",
+        "The statistics outside the objective ride along in every result as a "
+        "standing falsification verdict, and stay out of the loss, because an "
+        "optimiser is only allowed to chase what the project decided it may "
+        "chase. That is a policy about the search, not a claim that the rows "
+        "are unreachable: the volume-change row was called unreachable until "
+        "0.2.0, and pt-v10 holds it at one year.",
     ),
     (
         'eng = pt.Engine(seed=42, universe=u, model="pt-v3")  # the default, spelled out',
@@ -197,6 +253,178 @@ ERA_FIXES = [
         'Python package adds the harness, the evaluation layer and the '
         'notebooks.</p>\n'
         '        <h2 style="font-size:21px;margin:46px 0 10px">Build Targets</h2>',
+    ),
+    # The count leaked into five more places than the heading. A page that
+    # says nine components beside a schema row promising seven is a reader's
+    # bug report, and the two extra columns are the ones that make the
+    # decomposition reconstruct a jump day or a halted day at all.
+    (
+        "What moved a price, broken into seven contributions that sum to the "
+        "move.",
+        "What moved a price, broken into nine contributions that sum to the "
+        "move.",
+    ),
+    (
+        "The answer key. Three levels plus the seven factor contributions.",
+        "The answer key. Three levels plus the nine factor contributions.",
+    ),
+    (
+        "One row per instrument per tick: fundamental value, anchor price, "
+        "mispricing, and seven factor contributions that sum to the move.",
+        "One row per instrument per tick: fundamental value, anchor price, "
+        "mispricing, and nine factor contributions that sum to the move.",
+    ),
+    (
+        '        return "momentum"        # one of the seven factor names',
+        '        return "momentum"        # one of the nine factor names',
+    ),
+    # The snapshot's RNG block grew with the engine's stream count and this
+    # row did not. A reader counting the numbers in a real snapshot found
+    # eighteen under a sentence promising nine.
+    (
+        "Nine numbers: state, increment and Box-Muller spare for each of the "
+        "three streams. A pre-split snapshot carrying three is refused on "
+        "restore with its era named, because it froze a single-stream market "
+        "this version cannot continue bit-exactly.",
+        "Three numbers per generator stream: state, increment and Box-Muller "
+        "spare. The count grows as the engine gains streams, and restore "
+        "reads the era off the LENGTH rather than a version field: nine for "
+        "the original market, economy and external split, then twelve, "
+        "fifteen and eighteen as jumps, volume and news arrived. A shorter "
+        "snapshot restores the streams it carries and leaves the rest where "
+        "the fresh engine put them, so a checkpoint written before a "
+        "mechanism existed replays as it did then. A pre-split snapshot "
+        "carrying three is refused with its era named, because it froze a "
+        "single-stream market this version cannot continue bit-exactly.",
+    ),
+    # The exactness of a resumed run was stated without its one exception,
+    # which was live from pt-v4 to 0.2.0. Measured: under 0.1.4 a pt-v4
+    # snapshot restored and re-run does NOT reproduce the uninterrupted run,
+    # while pt-v1 and pt-v3 do; under 0.2.0 all three do.
+    (
+        'So: <code style="font-size:13px">branch</code> when the experiment '
+        'happens now, <code style="font-size:13px">Checkpoint</code> when '
+        "someone else needs to start where you started.</p>",
+        'So: <code style="font-size:13px">branch</code> when the experiment '
+        'happens now, <code style="font-size:13px">Checkpoint</code> when '
+        "someone else needs to start where you started.</p>\n        "
+        '<p style="color:var(--mut);font-size:14px">One historical exception '
+        "to the exactness, because it was live for five releases. Snapshots "
+        "did not carry the engine's log-volume state until 0.2.0, so a "
+        "restored engine could trade different volume and print different "
+        "prices. That state is inert on pt-v1 to pt-v3 and live from pt-v4, "
+        "and the divergence is reproducible: on 0.1.4 a pt-v4 snapshot "
+        "restored and re-run does not match the uninterrupted run, where "
+        "pt-v1 and pt-v3 do. Resume anything checkpointed under 0.1.x on a "
+        "jump-carrying preset with that in mind.",
+    ),
+    # The EDGAR page's worked example. The block is badged ILLUSTRATIVE, so
+    # its composed panel is not a measurement claim, but it was composed
+    # against pt-v3 and showed a volume row 13.6 sd out that pt-v10 holds in
+    # band, and its step-4 verdict is a real function's output that has since
+    # changed. A composed number may be arbitrary; it may not contradict the
+    # model the page describes.
+    (
+        "abs_return_acf1             0.1688    0.0715    0.4102    0.1544 "
+        "   (0.02, 0.22)  in band; p10-p90 crosses an edge\n...\n"
+        "volume_change_acf1         -0.4571   -0.4688   -0.4402    0.0104 "
+        " (-0.32, -0.20)  OUT 13.6 sd",
+        "abs_return_acf1             0.1688    0.0715    0.4102    0.1544 "
+        "   (0.02, 0.22)  in band; p10-p90 crosses an edge\n...\n"
+        "volume_change_acf1         -0.3095   -0.3402   -0.2711    0.0268 "
+        " (-0.32, -0.20)  in band; p10-p90 crosses an edge",
+    ),
+    (
+        "# 4. the verdict for a concentrated roster\nOUTSIDE the envelope\n"
+        "  - the roster is sector-concentrated, and certification was "
+        "measured on\n    a perfectly balanced one. An S&amp;P-like mix "
+        "holds 8/10 (abs_return_acf5\n    leaves band); an all-technology "
+        "roster holds 7/10 at 32.8% volatility.\n    Re-measure on your own "
+        "universe",
+        "# 4. the verdict for a concentrated roster\nOUTSIDE the envelope\n"
+        "  - the roster is sector-concentrated, and certification was "
+        "measured on\n    a perfectly balanced one. An S&amp;P-like mix "
+        "holds 8/10 (abs_return_acf5\n    leaves band); an all-technology "
+        "roster holds 7/10 at 32.8% volatility.\n    Re-measure on your own "
+        "universe\n  ? cross_sectional_corr is in band at the certified "
+        "horizon (0.3063 in\n    (0.08, 0.56)) -- but that is a median "
+        "across 30 seeds; check\n    `intervals` for the spread before "
+        "relying on one seed",
+    ),
+    (
+        "The sector counts in step 2 are usually why yours differ: 14 "
+        "financials against a balanced roster's 5 changes what the market "
+        "does.",
+        "The sector counts in step 2 are usually why yours differ: 14 "
+        "financials against a round-robin roster's 3 or 4 per sector changes "
+        "what the market does. Step 4's two counts are out of the "
+        "ten-statistic panel of the pt-v3 era and have not been re-measured "
+        "since; what they establish is a property of the roster rather than "
+        "of a preset.",
+    ),
+    # The sector table's own description of the generator. Round-robin over
+    # twelve sectors is five names each only at n = 60; the certified roster
+    # is 40 and gets four in four sectors and three in the other eight.
+    (
+        '<code style="font-size:12px">Universe.random</code> places exactly '
+        "five names in each, and you pass the key rather than the display "
+        "name,",
+        '<code style="font-size:12px">Universe.random</code> assigns these '
+        "round-robin, so a roster is as close to balanced as its size "
+        "allows: 60 names give five each, and the certified 40 give four to "
+        "four sectors and three to the other eight. You pass the key rather "
+        "than the display name,",
+    ),
+    # The digest a reader was told to check. It is the pre-era-boundary
+    # baseline, and the file named beside it carries the preset rather than a
+    # digest, so the check as written could not be run.
+    (
+        "Both published measurement runs report known-answer digest "
+        '<code style="font-size:13px">992ef95d…dc185e3</code>; if that does '
+        "not match your installed wheel, the published page describes a "
+        "different model than the one you are running.",
+        "The determinism baseline for the current era is known-answer v10, "
+        'digest <code style="font-size:13px">4e22d5a6…e860378</code>, which '
+        "the release workflow checks inside every wheel before it uploads; "
+        "the pre-2026-08-26 era carried a different one, so a digest is an "
+        "era marker rather than a version number. For the check that matters "
+        "to a citation, compare "
+        '<code style="font-size:13px">pretium.model_preset()["name"]</code> '
+        "against the preset named in envelope.json: if they differ, the "
+        "published page describes a different model than the one you are "
+        "running.",
+    ),
+    # The API preset reference stops at pt-v4 and recommends a superseded
+    # default for multi-year work, which the realism page forbids outright.
+    (
+        "market_factor_sigma. Built for horizons past a year."
+        "</sc-raw-td></sc-raw-tr>",
+        "market_factor_sigma. Built to investigate horizons past a "
+        "year, which is not the same as being certified for them: nothing "
+        "in this project is certified past 252 days.</sc-raw-td></sc-raw-tr>",
+    ),
+    (
+        '<h2 style="font-size:19px;margin:42px 0 8px">Choosing Between '
+        "pt-v3 and pt-v4</h2>\n        <p>A real choice with a measured "
+        "basis, and the two horizons disagree.</p>",
+        '<h2 style="font-size:19px;margin:42px 0 8px">Choosing Between '
+        "pt-v3 and pt-v4</h2>\n        <p>A historical choice, kept because "
+        "work published against either preset still reproduces. Neither is "
+        "the default: <code style=\"font-size:13px\">pt-v10</code> has been "
+        "since 2026-08-26, and it holds all fourteen statistics at 252 days "
+        "and thirteen at 504, so it dominates both rows below. The full "
+        "table of the ten shipped presets is on "
+        '<a href="#/change">Presets and Custom Models</a>.</p>\n        '
+        "<p>The two counts below are out of the ten-statistic panel of the "
+        "pt-v3 era, and the two horizons disagree.</p>",
+    ),
+    (
+        "<strong>pt-v3 for anything at or under a year, pt-v4 for "
+        "multi-year questions.</strong>",
+        "<strong>Between these two, and only these two: pt-v3 at or under a "
+        "year, pt-v4 for INVESTIGATING longer horizons.</strong> Neither "
+        "licenses a multi-year backtest, which the realism page forbids on "
+        "every preset, and pt-v10 beats both at both horizons.",
     ),
     ("The Seven Components", "The Nine Components"),
     ("seven components", "nine components"),
@@ -241,10 +469,17 @@ RELEASE_STATUS_FIXES = [
         "move before 1.0. Nothing has been tagged, and there is no DOI yet.",
         "Published on PyPI as <code style=\"font-size:12.5px\">pretium</code> "
         "and on crates.io as the <code style=\"font-size:12.5px\">pretium</code> "
-        "crate. Everything documented works and is tested. The API may move "
-        "before 1.0. Each release is tagged and its wheels are built by the "
-        "release workflow, which runs one fixed simulation inside every wheel "
-        "and compares digests before anything is uploaded. There is no DOI yet.",
+        "crate. The API is exercised by the test suite and the example "
+        "notebooks are executed rather than written and hoped over, so the "
+        "code on this site runs. Published FIGURES are a separate discipline "
+        "and a weaker guarantee: they are re-measured by "
+        "<code style=\"font-size:12.5px\">tools/remeasure</code>, which "
+        "reports every number the stated method no longer produces, and a "
+        "figure it flags is a documentation defect until someone corrects it. "
+        "The API may move before 1.0. Each release is tagged and its wheels "
+        "are built by the release workflow, which runs one fixed simulation "
+        "inside every wheel and compares digests before anything is "
+        "uploaded. There is no DOI yet.",
     ),
 ]
 
@@ -412,6 +647,8 @@ def read_bundle() -> str:
             )
         doc = doc.replace(old, new)
     doc = apply_trust_fixes(doc)
+    doc = apply_scenarios_fixes(doc)
+    doc = apply_internals_fixes(doc)
     doc = apply_factors_fixes(doc)
     # Two spots track the package version; the rest are history. See VERSION.
     doc = doc.replace(">v0.1.0<", f">v{VERSION}<")
@@ -693,6 +930,31 @@ def horizon_rows() -> str:
     return "\n            ".join(rows)
 
 
+#: The held-out axes, re-measured on pt-v10 for 0.2.0 at the same thirty-seed
+#: resolution as the certification itself (`docs/realism-envelope.md`, "The
+#: claim survives the axes it was not fitted to"). The bundle carries the
+#: pt-v3-era 9/10 version of this table.
+#:
+#: Not generated from `pretium.envelope` like the two tables above it,
+#: because the module carries the certified panel and not the held-out runs.
+#: A generated table cannot drift; this one can, so it names its provenance.
+HELD_OUT_ROWS = (
+    '<sc-raw-tbody style="font-family:var(--font-mono);font-size:12.5px">\n'
+    "            <sc-raw-tr><sc-raw-td>training seeds (101-130), 40 names"
+    '</sc-raw-td><sc-raw-td style="text-align:right">14/14 in band'
+    '</sc-raw-td><sc-raw-td style="text-align:right">0.0000</sc-raw-td>'
+    "</sc-raw-tr>\n"
+    "            <sc-raw-tr><sc-raw-td>held-out seeds (1-30), 40 names"
+    '</sc-raw-td><sc-raw-td style="text-align:right">14/14 in band'
+    '</sc-raw-td><sc-raw-td style="text-align:right">0.0000</sc-raw-td>'
+    "</sc-raw-tr>\n"
+    "            <sc-raw-tr><sc-raw-td>held-out universe (60 names, seed 909)"
+    '</sc-raw-td><sc-raw-td style="text-align:right">14/14 in band'
+    '</sc-raw-td><sc-raw-td style="text-align:right">0.0000</sc-raw-td>'
+    "</sc-raw-tr>\n          </sc-raw-tbody>"
+)
+
+
 def apply_trust_fixes(doc: str) -> str:
     """Bring the realism page's measured content up to the shipped envelope.
 
@@ -713,6 +975,39 @@ def apply_trust_fixes(doc: str) -> str:
         doc = doc[:s] + replacement + doc[e:]
 
     swaps = [
+        # Provenance. The three method rows at the top of the page name the
+        # preset each figure came from, and two of them still said pt-v3
+        # while the table below them was regenerated for pt-v10. A
+        # provenance line that names the wrong preset is worse than none.
+        (
+            "certification panel</sc-raw-td><sc-raw-td>pt-v3, 30 seeds, 40 "
+            "instruments, 252 days. The figures in the table below, and the "
+            'only ones the word "certified" applies to.</sc-raw-td>',
+            "certification panel</sc-raw-td><sc-raw-td>pt-v10, 30 seeds, 40 "
+            "instruments, 252 days, every figure the MEDIAN across those "
+            "seeds. The figures in the table below, and the only ones the "
+            'word "certified" applies to. A median is not a typical run: '
+            "read Seed-to-Seed Variation before quoting one.</sc-raw-td>",
+        ),
+        (
+            "six-seed panel</sc-raw-td><sc-raw-td>pt-v3, sim seeds 1 to 6,",
+            "six-seed panel</sc-raw-td><sc-raw-td>pt-v10, sim seeds 1 to 6,",
+        ),
+        (
+            "One seed, a smaller roster, 120 days, a macro field held fixed. "
+            'What the <a href="#/scenarios">scenario</a> figures come from. '
+            "Good for comparing one pin against another, and not comparable "
+            "to either panel.",
+            "One seed, a smaller roster, 120 days, a macro field held fixed. "
+            'What the <a href="#/scenarios">scenario</a> figures come from. '
+            "Good for comparing one pin against another, and not comparable "
+            "to either panel. In particular, the calm-to-crisis volatility "
+            "ratio a pair of pinned runs implies is NOT the crisis lever in "
+            "gap 5: that one is measured on the certified 40-name roster "
+            "over 252 days at thirty seeds, from VIX 5 to VIX 65. Three "
+            "numbers on this site describe how violent a crisis is, and they "
+            "are three different measurements.",
+        ),
         (
             "<p>At a 252-day horizon the shipped <code style=\"font-size:13px\">"
             "pt-v3</code> preset puts nine of the ten measured statistics in "
@@ -722,7 +1017,10 @@ def apply_trust_fixes(doc: str) -> str:
             "pt-v10</code> preset puts all fourteen measured statistics in "
             "band, on thirty calibration seeds and on a held-out 60-name "
             "universe measured at the same resolution. It is the first preset "
-            "in the project with no miss at this horizon.</p>",
+            "in the project with no miss at this horizon. Every figure below "
+            "is the median of those thirty seeds, and that median is what the "
+            "word certified describes: it is not a promise about your one "
+            "run, which the spread further down prices.</p>",
         ),
         (
             "Measured: preset pt-v3 · 30 seeds · 40 instruments · 252 trading "
@@ -777,7 +1075,8 @@ def apply_trust_fixes(doc: str) -> str:
     swaps.extend([
         (
             "4 · Tails are too thin over multi-year windows",
-            "4 · The endogenous economy cannot reach its own crisis regimes",
+            "4 · The endogenous economy cannot reach its own MACRO crisis "
+            "regimes",
         ),
         (
             "<p>Over 504-day windows real markets show excess kurtosis of 7.1 "
@@ -785,13 +1084,20 @@ def apply_trust_fixes(doc: str) -> str:
             "wide enough that this reads as comfortably in band on every "
             "252-day certificate, which is why it went unnoticed: nothing was "
             "measuring kurtosis where it fails.</p>",
-            "<p>Left to itself the macro state stays in a moderate band. "
-            "Endogenous inflation peaks at 4.06% to 4.11% over five seeds and "
-            "five years, against a clamp of 6.0% and a US CPI that reached "
-            "9.1% in June 2022. The cause is dispersion rather than "
-            "persistence. This slot used to carry a thin-tails gap, retired "
-            "at 0.2.0: two-year excess kurtosis moved from 5.23, under its "
-            "band, to 8.26, inside it.</p>",
+            "<p>Two kinds of crisis, and the answer differs. A VOLATILITY "
+            "crisis is endogenous since 0.2.0: the shipped preset's own VIX "
+            "crosses its crisis threshold on 10.2% of days against a real "
+            "12.5%, where the previous default reached it on none, so a "
+            "panic is something this market produces and not only something "
+            "a scenario drives. A MACRO crisis is not. Left to itself the "
+            "macro state stays in a moderate band: endogenous inflation "
+            "peaks at 4.06% to 4.11% over five seeds and five years, against "
+            "a clamp of 6.0% and a US CPI that reached 9.1% in June 2022, "
+            "and the central bank's own crisis cadence hangs off an "
+            "inflation rate the economy never gets to. The cause is "
+            "dispersion rather than persistence. This slot used to carry a "
+            "thin-tails gap, retired at 0.2.0: two-year excess kurtosis "
+            "moved from 5.23, under its band, to 8.26, inside it.</p>",
         ),
         (
             "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> tail-risk or "
@@ -799,7 +1105,315 @@ def apply_trust_fixes(doc: str) -> str:
             "horizon, kurtosis is in band.</p>",
             "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> studying an "
             "inflation regime or a policy crisis from the endogenous economy "
-            "alone. Drive one with a scenario instead.</p>",
+            "alone. Drive one with a scenario instead. A volatility crisis "
+            "does not need one.</p>",
+        ),
+        (
+            '<p style="margin:14px 0 0">Five of the ten statistics were live '
+            "calibration targets, so an in-band verdict on those is partly "
+            "the tuning meeting its target. The held-out rows are what make "
+            "the claim more than that.</p>",
+            '<p style="margin:14px 0 0">Five of the fourteen statistics were '
+            "live calibration targets, so an in-band verdict on those five is "
+            "the tuning meeting its target rather than an independent "
+            "success. The held-out rows test whether the fit generalises; "
+            "they do not make those five independent.</p>\n        "
+            '<p style="margin:14px 0 0">And read "held out" narrowly, because '
+            "it is doing less work than the phrase suggests. It means "
+            "simulation seeds the calibration never drew and a roster it "
+            "never ran. It does not mean withheld market data: the bands come "
+            "from real-market windows, and the same bands were used to tune "
+            "against and to grade against, with no empirical train and test "
+            "split behind them. The held-out universe is another "
+            "<code style=\"font-size:12.5px\">Universe.random()</code> draw "
+            "from the same generator, so it varies the names and not the "
+            "shape of the roster. Gap 6 varies the shape, and the count "
+            "drops.</p>",
+        ),
+        # The two worked examples' output blocks. Both were captured before
+        # the era boundary and both carry a badge saying they were measured,
+        # which makes a stale block worse than an unlabelled one. Their text
+        # is what the installed 0.2.0 package prints.
+        (
+            "OUTSIDE the envelope\n  - horizon 504d exceeds the certified "
+            "252d. At 504 days the model holds\n    5 of 10 against "
+            "horizon-matched bands: abs_return_acf1 0.289 against\n    "
+            "(0.04, 0.22), abs_return_acf5 0.152 against (0.02, 0.10)\n  - "
+            "excess_kurtosis reads 5.23 at 504 days against a horizon-matched "
+            "band\n    of (7.1, 22.0) -- the tails are too thin where you are "
+            "measuring\n  - abs_return_acf20 depends on the decay shape, "
+            "which is a mechanism gap:\n    log-log slope -0.953 against real "
+            "markets' -0.436, and the curve is\n    negative by lag 30 where "
+            "real markets stay positive to lag 60",
+            "OUTSIDE the envelope\n  - horizon 504d exceeds the certified "
+            "252d. At 504 days the model holds\n    13 of 14 against "
+            "horizon-matched bands, missing only\n    volume_change_acf1 at "
+            "-0.3156 against (-0.29, -0.21). Beyond 504\n    days nothing "
+            "has been measured at all\n  - abs_return_acf20 depends on the "
+            "decay shape, which is a mechanism gap:\n    log-log slope -0.953 "
+            "against real markets' -0.436, and the curve is\n    negative by "
+            "lag 30 where real markets stay positive to lag 60\n  ? "
+            "excess_kurtosis reads 8.26 at 504 days against (7.1, 22.0): "
+            "inside\n    it, but about 0.3 seed-sd above the floor, so a tail "
+            "study at this\n    horizon is reading the low edge of the band",
+        ),
+        # The six-month worked example. Every figure in it is now a real
+        # measurement, so the block's badge stops saying MIXED: the spread
+        # columns and the strategy line were the composed part, and both were
+        # re-run. Measured on pretium 0.2.0, pt-v10, the page's own code:
+        # Universe.random(40, seed=111), sim seeds 1 to 30, 126 days.
+        (
+            '<span title="Medians and verdict text are quoted from the '
+            "shipped envelope; the spread columns and strategy numbers were "
+            'composed for the example." style="font:500 9.5px/1 '
+            "var(--font-mono);letter-spacing:0.07em;border-radius:5px;"
+            "padding:3px 6px;margin-left:8px;color:var(--codemut);border:1px "
+            'solid var(--codeline)">MIXED, SEE NOTE</span></div>\n          '
+            '<pre style="padding:13px 16px;overflow-x:auto"><code '
+            'data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);'
+            'color:var(--codemut)"># 1.',
+            '<span title="Captured from the run named beside this block." '
+            'style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;'
+            "border-radius:5px;padding:3px 6px;margin-left:8px;color:"
+            'var(--tks);border:1px solid var(--tks)">MEASURED</span></div>\n'
+            '          <pre style="padding:13px 16px;overflow-x:auto"><code '
+            'data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);'
+            'color:var(--codemut)"># 1.',
+        ),
+        (
+            "# 1.\nTrue\ninside the envelope\n  - horizon 126d is within the "
+            "certified 252d, and no named statistic\n    meets a measured "
+            "gap\n  ? return_acf1 is in band at the certified horizon (0.0375 "
+            "in\n    (-0.08, 0.06)) -- but that is a median across 30 seeds; "
+            "check\n    `intervals` for the spread before relying on one "
+            "seed\n  ? abs_return_acf1 is in band at the certified horizon "
+            "(0.1413 in\n    (0.02, 0.22)) -- but that is a median across 30 "
+            "seeds; check\n    `intervals` for the spread before relying on "
+            "one seed",
+            "# 1.\nTrue\ninside the envelope\n"
+            "  - horizon 126d is within the certified 252d, and no named "
+            "statistic\n    meets a measured gap\n  ? return_acf1 is in band "
+            "at the certified horizon (0.0195 in\n    (-0.08, 0.06)) -- but "
+            "that is a median across 30 seeds; check\n    `intervals` for the "
+            "spread before relying on one seed\n  ? abs_return_acf1 is in "
+            "band at the certified horizon (0.0994 in\n    (0.02, 0.22)) -- "
+            "but that is a median across 30 seeds; check\n    `intervals` for "
+            "the spread before relying on one seed",
+        ),
+        (
+            "annualised_vol_pct         24.0972   19.8410   30.1174    3.9026"
+            "    (15.0, 36.0)  in band\nexcess_kurtosis             2.5305    "
+            "1.7118    5.4402    1.4771     (1.6, 41.0)  in band\n"
+            "return_acf1                 0.0375    0.0198    0.0631    0.0164"
+            "   (-0.08, 0.06)  in band on the median; p10-p90 crosses an edge"
+            "\nabs_return_acf1             0.1413    0.0492    0.4260    "
+            "0.1701     (0.02, 0.22)  in band on the median; p10-p90 crosses "
+            "an edge\n...\nvolume_change_acf1         -0.4598   -0.4712   "
+            "-0.4441    0.0098  (-0.32, -0.20)  OUT 13.7 sd\n\n# 3.\n"
+            "4.87 48719.20",
+            "annualised_vol_pct         30.1974   26.5765   37.8424    7.1275"
+            "     (15.0, 36.0)  in band on the median; p10-p90 crosses an edge"
+            "\nexcess_kurtosis             6.9315    4.5513   11.3102    "
+            "2.9010      (1.6, 41.0)  in band\n"
+            "return_acf1                 0.0057   -0.0299    0.1492    0.0704"
+            "    (-0.08, 0.06)  in band on the median; p10-p90 crosses an edge"
+            "\nabs_return_acf1             0.0713    0.0280    0.1793    "
+            "0.0941     (0.02, 0.22)  in band (an extreme seed crosses)\n"
+            "abs_return_acf5             0.0190   -0.0146    0.1264    0.0555"
+            "     (0.02, 0.09)  OUT 0.0 sd\n...\n"
+            "volume_change_acf1         -0.3160   -0.3441   -0.2688    0.0282"
+            "    (-0.32, -0.2)  in band on the median; p10-p90 crosses an edge"
+            "\ncorr_persistence_acf1    unmeasured\n\n# 3.\n-52.87 -11.89",
+        ),
+        (
+            "In that block the medians, bands, verdicts and the check reasons "
+            "come from the shipped envelope. The p10, p90 and sd columns and "
+            "the step 3 numbers are composed to show the shape of the report.",
+            "Every figure in that block is a measurement: pretium 0.2.0, "
+            "pt-v10, the code above it verbatim, sim seeds 1 to 30 over "
+            "Universe.random(40, seed=111) at 126 days. Rows between "
+            "abs_return_acf5 and volume_change_acf1 are elided for width.",
+        ),
+        (
+            "Step 1 says yes, with two warnings. Step 2 shows why they were "
+            "worth printing: <code style=\"font-size:13px\">abs_return_acf1"
+            "</code> has a median of 0.141 inside its band and a p90 of 0.426, "
+            "well above the ceiling of 0.22. A single seed can easily land out "
+            "of band on a statistic that looks comfortable in the summary. "
+            "That is what decides how many seeds step 3 needs.",
+            "Step 1 says yes for the two statistics it was asked about, which "
+            "is the whole of what it says. Step 2 is why that scope matters: "
+            "at this horizon "
+            "<code style=\"font-size:13px\">abs_return_acf5</code> sits on its "
+            "floor and reads out, and "
+            "<code style=\"font-size:13px\">corr_persistence_acf1</code> "
+            "cannot be measured at all in 126 days, because twelve 21-day "
+            "windows are not enough to autocorrelate. Neither was named in "
+            "step 1, so neither appears in its verdict. The named statistics "
+            "carry their own spread besides: "
+            "<code style=\"font-size:13px\">return_acf1</code> has a median of "
+            "0.0057 inside its band and a p90 of 0.149, well above the "
+            "ceiling of 0.06. A single seed can easily land out of band on a "
+            "statistic that looks comfortable in the summary. That is what "
+            "decides how many seeds step 3 needs.",
+        ),
+        # The machine-readable companion carries the preset, not a digest, so
+        # the check the page told a reader to run could not be run. The digest
+        # it quoted was the pt-v3-era baseline besides.
+        (
+            "Machine-readable companion: envelope.json carries the "
+            "per-statistic detail, the gap list and the provenance. Both "
+            "measurement runs report known-answer digest 992ef95d…dc185e3. If "
+            "the digest in envelope.json does not match your installed wheel, "
+            "this page describes a different model than the one you are "
+            "running.",
+            "Machine-readable companion: envelope.json carries the "
+            "per-statistic detail, the gap list and the preset the figures "
+            "describe. The cross-platform determinism baseline for this era "
+            "is known-answer v10, digest 4e22d5a6…860378, which the release "
+            "workflow checks inside every wheel before it uploads. If "
+            "pretium.model_preset()[\"name\"] is not the preset named in "
+            "envelope.json, this page describes a different model than the "
+            "one you are running.",
+        ),
+        # What the panel does and does not certify. The book is a real
+        # mechanism rather than a slippage coefficient, and none of that is
+        # an empirical microstructure claim: the fourteen statistics are
+        # daily price-process and volume properties.
+        (
+            "<li>Strategy evaluation up to about one year, where the edge "
+            "depends on statistics the panel certifies</li>",
+            "<li>Strategy evaluation up to about one year, where the edge "
+            "depends on statistics the panel certifies, which are daily "
+            "price-process, correlation and volume properties</li>",
+        ),
+        # Gap 4 stopped being the thin-tails gap at 0.2.0, so the bullet
+        # pointing VaR at it pointed at the wrong gap. Multi-year VaR is
+        # gap 2's horizon; gap 4 is the macro regime.
+        (
+            "<li>Long-horizon volatility memory (gap 3), or VaR at "
+            "multi-year horizons (gap 4)</li>",
+            "<li>Long-horizon volatility memory (gap 3), or VaR at "
+            "multi-year horizons (gap 2)</li>\n              "
+            "<li>Studying an inflation regime or a policy crisis the "
+            "economy is left to reach on its own (gap 4)</li>",
+        ),
+        (
+            "<li>Any claim that simulated performance forecasts live "
+            "returns</li>",
+            "<li>Any claim that simulated performance forecasts live "
+            "returns</li>\n              "
+            "<li>Execution-sensitive conclusions that rest on the order "
+            "book's own realism, which nothing here certifies</li>",
+        ),
+        (
+            "<h2 style=\"font-size:21px;margin:46px 0 10px\">Why There Is No "
+            "Realism Score</h2>",
+            "<h2 style=\"font-size:21px;margin:46px 0 10px\">What the Panel "
+            "Does Not Cover</h2>\n        "
+            "<p>All fourteen statistics are daily properties of prices, "
+            "correlations and volume. Matching is a real limit order book "
+            "with price-time priority rather than a slippage coefficient, and "
+            "impact is emergent, which is a statement about the MECHANISM. It "
+            "is not a validation claim: nothing on this page measures depth "
+            "shape, cancellation intensity, queue dynamics, the intraday "
+            "spread distribution, impact decay, resiliency or order-sign "
+            "autocorrelation against real market data. So a strategy whose "
+            "edge or cost lives inside the book is leaning on a part of this "
+            "simulator the envelope does not reach, however comfortably its "
+            "returns sit in band. Execution cost here is measured and "
+            "self-consistent, and it is not certified realistic.</p>\n        "
+            "<h2 style=\"font-size:21px;margin:46px 0 10px\">Why There Is No "
+            "Realism Score</h2>",
+        ),
+        # Gap 5. The lever moved from 3.07x to 5.05x at the era boundary and
+        # this paragraph did not, so the page said "roughly half" while the
+        # release notes said four fifths of the same quantity.
+        (
+            "measured on the 40-name reference roster: about 3.1 times here "
+            "against real markets' 6.16 (17.2% annualised below VIX 12 "
+            "against 106.1% above VIX 45). Roughly half. That is not the "
+            "same quantity as the 82% against 62% in a single pinned 120-day "
+            "run elsewhere on this site, which is one seed on a smaller "
+            "roster over a shorter window.",
+            "measured from VIX 5 to VIX 65 on the 40-name reference roster "
+            "over 252 days at thirty seeds: 5.05 times here against real "
+            "markets' 6.16 (17.2% annualised below VIX 12 against 106.1% "
+            "above VIX 45). About four fifths, up from 3.07 times at the "
+            "previous default. That is not the same quantity as the pair of "
+            "pinned 120-day runs elsewhere on this site, which is one seed "
+            "on a smaller roster over a shorter window and reads about 2.8 "
+            "times from VIX 15 to VIX 45. Three numbers on this site "
+            "describe how violent a crisis is; check which one you are "
+            "reading before quoting it.",
+        ),
+        (
+            "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> sizing a "
+            "scenario's impact rather than detecting it. Use scenarios to ask "
+            "whether a strategy breaks. A crisis here is about half as "
+            "violent as a real one and arrives more slowly, so surviving one "
+            "is a weaker test than the label suggests.</p>",
+            "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> sizing a "
+            "scenario's impact rather than detecting it. Use scenarios to ask "
+            "whether a strategy breaks. A crisis here is about four fifths as "
+            "violent as a real one and arrives more slowly, so surviving one "
+            "is a weaker test than the label suggests.</p>",
+        ),
+        # Gap 3. "No parameter setting turns one slope into the other" is a
+        # statement about this model class. Gap 1 made the stronger claim and
+        # had to withdraw it, so the weaker one says out loud which it is.
+        (
+            "The model fits −0.953, about 2.2 times steeper. This is a "
+            "mechanism gap: no parameter setting turns one slope into the "
+            "other. It was tried, and a two-component variance mixture lands "
+            "lag 20 while getting lag 60 wrong in both directions at once.",
+            "The model fits −0.953, about 2.2 times steeper. This is a "
+            "mechanism gap: no setting of this model's parameters turns one "
+            "slope into the other, because the process is built from "
+            "exponentials and a sum of exponentials is not a power law. It "
+            "was tried, and a two-component variance mixture lands lag 20 "
+            "while getting lag 60 wrong in both directions at once. Read "
+            "that as a limit of this model class rather than of the project: "
+            "gap 1 carried the stronger claim, that its row was structurally "
+            "unreachable, and a new mechanism reached it. A gap is closed by "
+            "adding mechanism, not by tuning what is already here.",
+        ),
+        # Gap 6. Round-robin over twelve sectors is not five names each, and
+        # the three counts below it are a pt-v3-era ten-statistic panel.
+        (
+            "<p><code style=\"font-size:12.5px\">Universe.random()</code> places "
+            "exactly five names in each of twelve sectors. No real index is "
+            "balanced that way. The S&amp;P is roughly a third technology, "
+            "and the Nasdaq more so. Varying only sector composition:</p>",
+            "<p><code style=\"font-size:12.5px\">Universe.random()</code> assigns "
+            "sectors round-robin over the twelve in "
+            "<code style=\"font-size:12.5px\">sectors.SECTORS</code>, so a "
+            "roster is as close to balanced as its size allows: the certified "
+            "40 names put four in each of four sectors and three in each of "
+            "the other eight. No real index is balanced that way. The "
+            "S&amp;P is roughly a third technology, and the Nasdaq more so. "
+            "Varying only sector composition, and measured on pt-v3 against "
+            "the TEN-statistic panel of the time rather than re-measured on "
+            "pt-v10, because what this establishes is a property of the "
+            "roster rather than of a preset:</p>",
+        ),
+        (
+            "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> inheriting "
+            "these numbers for a sector-concentrated roster. Re-measure the "
+            "panel on your own universe: <code style=\"font-size:12.5px\">"
+            "facts.measure()</code> takes it directly, and "
+            "<code style=\"font-size:12.5px\">envelope.intervals()</code> "
+            "reports the spread.</p>",
+            "<p>This is also the limit of the held-out universe above. That "
+            "roster is another draw from the same generator, so it varies the "
+            "names and not the shape; this table varies the shape, and the "
+            "count drops.</p>\n            "
+            "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> inheriting "
+            "these numbers for a sector-concentrated roster. Re-measure the "
+            "panel on your own universe: <code style=\"font-size:12.5px\">"
+            "facts.measure()</code> takes it directly, and "
+            "<code style=\"font-size:12.5px\">envelope.intervals()</code> "
+            "reports the spread.</p>",
         ),
     ])
 
@@ -815,6 +1429,325 @@ def apply_trust_fixes(doc: str) -> str:
         "</sc-raw-tbody>",
         '<sc-raw-tbody style="font-family:var(--font-mono);font-size:12px">\n'
         f"                {horizon_rows()}\n              </sc-raw-tbody>")
+    # The held-out table. The certified table above it was regenerated for
+    # pt-v10 and this one was not, so the page claimed fourteen of fourteen
+    # in one paragraph and nine of ten three lines later. Both counts were
+    # real; they were two generations of the panel printed side by side.
+    cut("A model graded on the same thirty seeds", "<sc-raw-tbody",
+        "</sc-raw-tbody>", HELD_OUT_ROWS)
+    return doc
+
+
+def apply_scenarios_fixes(doc: str) -> str:
+    """Re-measure the scenarios page on the shipped preset.
+
+    Every figure on this page came from a run, and every one of those runs
+    predates the 2026-08-26 era boundary that changed what a VIX pin does.
+    The page also carried a third crisis-intensity number, so a reader met
+    a pinned 59%-to-107% ratio here, a 3.1x steady-state lever on the
+    realism page and a 5.05x lever in the release notes, with nothing saying
+    they are three different measurements.
+
+    Re-measured on the installed 0.2.0 package by the recipes the page
+    states: volatility and the crisis pair over `Universe.random(20,
+    seed=11)`, spreads and correlation over `Universe.random(25, seed=11)`,
+    120 days, sim seed 3, pinned through the scenario API; the rate-shock
+    table over `Universe.random(20, seed=4)`, `reference_agents(seed=3)`,
+    sim seed 7, 20 days. Each replacement asserts.
+    """
+    swaps = [
+        # The rate-shock table.
+        (
+            "<sc-raw-tr><sc-raw-td>buy_and_hold</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">\u22127.16%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u221210.75%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22123.59</sc-raw-td>'
+            "</sc-raw-tr>\n            "
+            "<sc-raw-tr><sc-raw-td>momentum</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">\u22121.17%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22123.52%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22122.36</sc-raw-td>'
+            "</sc-raw-tr>\n            "
+            "<sc-raw-tr><sc-raw-td>oracle</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">+11.11%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">+8.70%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22122.41</sc-raw-td>'
+            "</sc-raw-tr>",
+            "<sc-raw-tr><sc-raw-td>buy_and_hold</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">\u22125.63%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22128.76%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22123.13</sc-raw-td>'
+            "</sc-raw-tr>\n            "
+            "<sc-raw-tr><sc-raw-td>momentum</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">\u22127.88%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22129.74%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22121.86</sc-raw-td>'
+            "</sc-raw-tr>\n            "
+            "<sc-raw-tr><sc-raw-td>oracle</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">+14.98%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">+12.99%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22121.99</sc-raw-td>'
+            "</sc-raw-tr>",
+        ),
+        (
+            "Buy-and-hold is long only, holds through the repricing, and "
+            "loses the most. Momentum and the Oracle trade around it and "
+            "each give up about two and a half points. The sizes belong to "
+            "the seed: across sim seeds 5 to 9 buy-and-hold gives up 3.4 to "
+            "4.7 points every time, while momentum's give-up spans "
+            "\u22125.1 to +0.5. Run more than one seed before you quote a "
+            "size.",
+            "Buy-and-hold is long only, holds through the repricing, and "
+            "gives up the most. Momentum and the Oracle trade around it and "
+            "each give up about two points. The sizes belong to the seed: "
+            "across sim seeds 5 to 9 buy-and-hold gives up 3.0 to 5.0 points "
+            "every time, while momentum's give-up spans \u22121.9 to +0.5. "
+            "Run more than one seed before you quote a size.",
+        ),
+        # What a VIX pin actually does now.
+        (
+            "Realised annual volatility: 49% at VIX 5, 59% at 15, 107% at "
+            "45, 124% at 65.",
+            "Realised annual volatility: 31% at VIX 5, 37% at 15, 105% at "
+            "45, 126% at 65.",
+        ),
+        (
+            "Mean quoted spread goes from 11.5 bps at VIX 15 to 25.9 bps at "
+            "VIX 65,",
+            "Mean quoted spread goes from 11.7 bps at VIX 15 to 21.5 bps at "
+            "VIX 65,",
+        ),
+        (
+            "mean pairwise correlation reads +0.27 calm, +0.68 at VIX 45, "
+            "+0.76 at 65.",
+            "mean pairwise correlation reads +0.20 calm, +0.62 at VIX 45, "
+            "+0.68 at 65.",
+        ),
+        (
+            "pinned through the scenario API. What VIX never moves is a "
+            "single name's own noise. These figures are much higher than the "
+            '24.1% on <a href="#/trust">Realism and Limits</a> because a '
+            "pinned VIX is not a normal market: the pin drives the factor "
+            "variance directly, and these runs use a smaller roster over 120 "
+            "days rather than the certified 40 names over 252. Compare pins "
+            "against each other, and take the certified number from an "
+            "unpinned run.",
+            "pinned through the scenario API. Since the 2026-08-26 era "
+            "boundary VIX also moves a name's own variance, through "
+            "<code style=\"font-size:12px\">garch_vix_coupling</code>; before "
+            "it, VIX sized only the shared factor. These figures straddle "
+            'the 31.5% on <a href="#/trust">Realism and Limits</a> rather '
+            "than sitting near it, a calm pin landing about there and a "
+            "crisis pin running three times higher, because a pinned VIX is "
+            "not a normal market: the pin drives the factor "
+            "variance directly, and these runs use a smaller roster over 120 "
+            "days rather than the certified 40 names over 252. Compare pins "
+            "against each other, and take the certified number from an "
+            "unpinned run. The ratio between two pins is NOT the crisis "
+            "lever the realism page and the release notes quote: that one "
+            "runs VIX 5 to VIX 65 on the certified roster over 252 days at "
+            "thirty seeds and reads 5.05x. Three numbers, three "
+            "measurements.",
+        ),
+        # The liquidity-crisis pair, in the comment the example prints.
+        (
+            "# 61.76% calm, 82.16% crisis",
+            "# 39.98% calm, 67.68% crisis",
+        ),
+        # The whole-crisis-study block. Every line in it is now a real run,
+        # including the two the note called composed, so the badge moves.
+        (
+            '<span title="Medians and verdict text are quoted from the '
+            "shipped envelope; the spread columns and strategy numbers were "
+            'composed for the example." style="font:500 9.5px/1 '
+            "var(--font-mono);letter-spacing:0.07em;border-radius:5px;"
+            "padding:3px 6px;margin-left:8px;color:var(--codemut);border:1px "
+            'solid var(--codeline)">MIXED, SEE NOTE</span></div>\n'
+            '          <pre style="padding:13px 16px;overflow-x:auto"><code '
+            'data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);'
+            "color:var(--codemut)\">{'day': 0, 'vix': 18.0}",
+            '<span title="Captured from the run named beside this block." '
+            'style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;'
+            "border-radius:5px;padding:3px 6px;margin-left:8px;color:"
+            'var(--tks);border:1px solid var(--tks)">MEASURED</span></div>\n'
+            '          <pre style="padding:13px 16px;overflow-x:auto"><code '
+            'data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);'
+            "color:var(--codemut)\">{'day': 0, 'vix': 18.0}",
+        ),
+        (
+            "{'day': 1, 'vix': 18.0}\n...\n{'day': 20, 'vix': 18.0}\n"
+            "{'day': 21, 'vix': 19.03}\n{'day': 22, 'vix': 20.07}\n"
+            "{'day': 23, 'vix': 21.10}\n{'day': 24, 'vix': 22.13}\n\n"
+            "inside the envelope\n  - horizon 120d is within the certified "
+            "252d, and no named statistic\n    meets a measured gap\n  ? "
+            "annualised_vol_pct is in band at the certified horizon (24.0972 "
+            "in\n    (15.0, 36.0)) -- but that is a median across 30 seeds; "
+            "check\n    `intervals` for the spread before relying on one "
+            "seed\n  ? cross_sectional_corr is in band at the certified "
+            "horizon (0.2558 in\n    (0.08, 0.56)) -- but that is a median "
+            "across 30 seeds; check\n    `intervals` for the spread before "
+            "relying on one seed\n\n(82.16, 61.76)      # annualised vol %, "
+            "crisis against calm\n0.6781              # cross-sectional "
+            "correlation under the crisis\n\ncalm    0.1142   -0.0871\n"
+            "crisis  0.0316   -0.2043\n\n6.06 11.69          # shortfall "
+            "bps, calm then VIX 45",
+            "{'day': 1, 'vix': 18.0}\n...\n{'day': 19, 'vix': 18.0}\n"
+            "{'day': 20, 'vix': 80.0}\n{'day': 21, 'vix': 78.97}\n"
+            "{'day': 22, 'vix': 77.93}\n{'day': 23, 'vix': 76.90}\n"
+            "{'day': 24, 'vix': 75.87}\n\n"
+            "inside the envelope\n  - horizon "
+            "120d is within the certified 252d, and no named statistic\n    "
+            "meets a measured gap\n  ? annualised_vol_pct is in band at the "
+            "certified horizon (31.4632 in\n    (15.0, 36.0)) -- but that is "
+            "a median across 30 seeds; check\n    `intervals` for the spread "
+            "before relying on one seed\n  ? cross_sectional_corr is in band "
+            "at the certified horizon (0.3063 in\n    (0.08, 0.56)) -- but "
+            "that is a median across 30 seeds; check\n    `intervals` for the "
+            "spread before relying on one seed\n\n(67.68, 39.98)      # "
+            "annualised vol %, crisis against calm\n0.6235              # "
+            "cross-sectional correlation under the crisis\n\n"
+            "calm   -42.9347  11.9232\ncrisis -56.6869  95.0928\n\n"
+            "6.06 11.69          # shortfall bps, calm then VIX 45",
+        ),
+        (
+            "In that block the volatility pair and the two shortfall figures "
+            "are measured runs, cited in the prose below. The scenario table "
+            "rows and the two strategy lines are composed to show the shape "
+            "of the output.",
+            "Every line in that block is a measurement on pretium 0.2.0 "
+            "under pt-v10, from the code above it. The scenario rows are "
+            "elided in the middle and rounded to two decimals; nothing else "
+            "is edited. Note what the path actually does: "
+            "<code style=\"font-size:12.5px\">vix_shock</code> puts the peak "
+            "on day <code style=\"font-size:12.5px\">at</code> and decays it "
+            "over the window, rather than ramping up to it.",
+        ),
+        (
+            "Volatility goes from 62% to 82%, and correlation climbs with "
+            "it.",
+            "Volatility goes from 40% to 68%, and correlation climbs with "
+            "it, 0.49 to 0.62.",
+        ),
+        # The two "half as violent" lines, both quoting the pt-v3-era lever.
+        (
+            "And gap 5 on the realism page: scenario response is "
+            "directional, not sized. A crisis here is about half as violent "
+            "as a real one. Use scenarios to detect breakage, never to size "
+            "losses.",
+            "And gap 5 on the realism page: scenario response is "
+            "directional, not sized. A crisis here is about four fifths as "
+            "violent as a real one, 5.05x against 6.16x on the certified "
+            "roster. Use scenarios to detect breakage, never to size losses.",
+        ),
+        (
+            "Do not quote the sizes as real. A crisis here is roughly half "
+            "as violent as a real one (gap 5). Read the direction and the "
+            "ordering; leave the magnitudes alone.",
+            "Do not quote the sizes as real. A crisis here is about four "
+            "fifths as violent as a real one (gap 5), and the pinned pair "
+            "above is a different measurement again. Read the direction and "
+            "the ordering; leave the magnitudes alone.",
+        ),
+    ]
+    for old, new in swaps:
+        if old not in doc:
+            sys.exit("the design bundle reworded a scenarios-page passage "
+                     f"that apply_scenarios_fixes corrects: {old[:70]!r}")
+        doc = doc.replace(old, new, 1)
+    return doc
+
+
+def apply_internals_fixes(doc: str) -> str:
+    """Cross the "Under the Hood" page over the 0.2.0 era boundary.
+
+    The page describes how the CURRENT default behaves, and it was written
+    against pt-v3: it named pt-v3 as the shipped model, quoted that preset's
+    momentum coefficient, and carried a pinned-VIX response measured before
+    the era boundary rewired four of the mechanisms it describes. A page that
+    explains the engine while quoting a superseded preset's numbers is a
+    plausible and wrong explanation of what a reader is running.
+
+    The replacement figures are measured on the installed 0.2.0 package by
+    the recipe the page already states: annualised volatility over
+    `Universe.random(20, seed=11)`, correlation over
+    `Universe.random(25, seed=11)`, 120 days, sim seed 3, VIX pinned through
+    the scenario API. Each replacement asserts.
+    """
+    swaps = [
+        (
+            "the shipped <code style=\"font-size:13px\">pt-v3</code> turns the "
+            "term down to 0.0742 and measures +0.0375, inside the band.",
+            "the shipped <code style=\"font-size:13px\">pt-v10</code> turns the "
+            "term down to 0.0186 and measures +0.0195, inside the band.",
+        ),
+        (
+            "On top sits a shared market factor with its own conditional "
+            "variance, coupled to VIX. The factor's variance reverts to a "
+            "target scaling with (VIX/15)\u00b2, so a pinned VIX moves "
+            "realised volatility: 49% annualised at VIX 5, 59% at 15, 107% "
+            "at 45, 124% at 65. Above VIX 25.5 the cross-section blends "
+            "toward the factor, and mean pairwise correlation reads +0.27 "
+            "calm, +0.68 at VIX 45, +0.76 at 65. Diversification fails under "
+            "stress the way real crises make it fail.",
+            "On top sits a shared market factor with its own conditional "
+            "variance, coupled to VIX. The factor's variance reverts to a "
+            "target scaling with (VIX/15)\u00b2, so a pinned VIX moves "
+            "realised volatility: 31% annualised at VIX 5, 37% at 15, 105% "
+            "at 45, 126% at 65. Above VIX 25.5 the cross-section blends "
+            "toward the factor, and mean pairwise correlation reads +0.20 "
+            "calm, +0.62 at VIX 45, +0.68 at 65. Diversification fails under "
+            "stress the way real crises make it fail. Since the 2026-08-26 "
+            "era boundary the coupling is not the factor's alone: a name's "
+            "own GJR-GARCH variance follows the VIX too "
+            "(<code style=\"font-size:13px\">garch_vix_coupling</code> 0.3), a "
+            "quarter of sector variance follows it "
+            "(<code style=\"font-size:13px\">sector_vix_coupling</code> 0.25), "
+            "the VIX's own fear channel reads the day's index return rather "
+            "than the closing minute, the volatility regimes come off the "
+            "market instead of the business cycle, and the factor's variance "
+            "clamp sits at 32x its baseline rather than 8x. Descriptions of "
+            "these mechanics written for pt-v3 do not carry over.",
+        ),
+        (
+            "Those levels are far above the 24.1% certified panel because a "
+            "pinned VIX is not a normal market: the pin drives the factor "
+            "variance directly, and these runs use a smaller roster over 120 "
+            "days rather than the certified 40 names over 252.",
+            "Those levels straddle the certified panel's 31.5% rather than "
+            "sitting near it, a calm pin landing about there and a crisis "
+            "pin running three times higher, because a pinned VIX is not a "
+            "normal market: the pin drives the factor "
+            "variance directly, and these runs use a smaller roster over 120 "
+            "days rather than the certified 40 names over 252. The ratio "
+            "between two of them is also not the crisis lever the realism "
+            "page quotes, which is measured on the certified roster.",
+        ),
+        # The book is a mechanism claim. It is not an empirical
+        # microstructure claim, and the page was inviting the second reading.
+        (
+            "Matching runs against a limit order book with price-time "
+            "priority. You get queue position, partial fills, and a quoted "
+            "spread that widens under stress. Impact is emergent: a large "
+            "order pays worse prices because it consumed levels, and there is "
+            "no slippage coefficient anywhere in the code.",
+            "Matching runs against a limit order book with price-time "
+            "priority. You get queue position, partial fills, and a quoted "
+            "spread that widens under stress. Impact is emergent: a large "
+            "order pays worse prices because it consumed levels, and there is "
+            "no slippage coefficient anywhere in the code. Read that as a "
+            "statement about the mechanism, not about calibration: the "
+            "realism envelope measures daily price, correlation and volume "
+            "statistics, and nothing in it grades depth shape, cancellation "
+            "intensity, queue dynamics, the intraday spread distribution, "
+            "impact decay, resiliency or order-sign autocorrelation against "
+            "real market data. The book is real and it is not certified.",
+        ),
+    ]
+    for old, new in swaps:
+        if old not in doc:
+            sys.exit("the design bundle reworded an internals-page passage "
+                     f"that apply_internals_fixes corrects: {old[:70]!r}")
+        doc = doc.replace(old, new, 1)
     return doc
 
 
@@ -869,7 +1802,17 @@ def apply_factors_fixes(doc: str) -> str:
             "seven columns are off by 0.128 and nine by 5.0e-17. Where a "
             "residual does remain, the mispricing clamp bound; the circuit "
             "breaker has had its own column since 2026-08-26 and is no longer "
-            "part of it.",
+            "part of it.</p>\n        <p>Which is also a caveat on the older "
+            "promise, and it is stated here rather than left for someone to "
+            "rediscover. Before 2026-08-26 the identity held on every day "
+            "neither mechanism fired and did not hold on the days they did: "
+            "any day a jump landed, on any preset from "
+            "<code style=\"font-size:12.5px\">pt-v4</code> onward, and any day "
+            "the session circuit breaker bound, on any preset at all. So a "
+            "ground-truth decomposition published from a 0.1.x release is "
+            "exact except on those days, and the columns were never wrong, "
+            "only incomplete. Both are columns now and the identity holds "
+            "through a crisis.",
         ),
     ]
     for old, new in swaps:

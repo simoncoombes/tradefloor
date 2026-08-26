@@ -71,11 +71,18 @@ Both ship at the values every earlier preset already ran on, bit for bit.
 ## 0.2.0
 
 **The market this library simulates is a different, and much better, market.**
-Every seeded run changes: a result recorded under 0.1.x does not reproduce
-under 0.2.0 unless it names the preset it used. That is the point of the
-version bump, and every earlier preset from `pt-v1` to `pt-v9` stays
-selectable and reproduces bit for bit forever, so nothing you have already
-published is stranded.
+Every run that leaned on the DEFAULT preset changes, which is what the version
+bump is for: the default moved from `pt-v3` to `pt-v10`, so a result recorded
+under 0.1.x reproduces under 0.2.0 only if it names the preset it used. A run
+that named `pt-v1` through `pt-v9` is untouched and reproduces bit for bit, so
+nothing you have already published is stranded. Checked across this boundary
+rather than asserted: `pt-v1`, `pt-v2` and `pt-v3` produce identical market
+digests under 0.1.4 and under 0.2.0.
+
+What that guarantee covers is the PRESET, and a fully specified run is still
+(package version, model, universe fingerprint, seed). Naming a preset pins the
+coefficient set and the market it produces; the package version is what pins
+the implementation those coefficients run through.
 
 ### What you get by default now
 
@@ -83,6 +90,13 @@ published is stranded.
 matches real markets on **every statistic pretium measures** at the
 certified one-year horizon, and on thirteen of fourteen at two years. The
 previous default managed twelve and seven.
+
+Read "matches" as fourteen in-band verdicts rather than fourteen independent
+successes: five of the fourteen were live calibration targets, so an in-band
+verdict on those is the tuning meeting its target. The held-out axes below
+test whether the fit generalises across draws; they are simulation seeds and
+another roster from the same generator, not withheld market data, and the
+bands were used both to tune against and to grade against.
 
 That one-year result holds on thirty training seeds, on thirty seeds the
 calibration never used, and on a 60-name universe it never saw: fourteen of
@@ -136,8 +150,22 @@ default carried neither mechanism:
   change of -0.190. `truth()` gains a `circuit_breaker` column.
 
 `Engine.FACTORS` is nine now, and the identity holds through a crisis to
-1e-16. Snapshots also carry the log-volume state, which they did not: a
-restored engine used to trade different volume and print different prices.
+1e-16.
+
+Both defects are also a caveat on what older releases promised. A
+ground-truth decomposition published from a 0.1.x release is exact except on
+the days those two mechanisms fired: any day a jump landed, from `pt-v4`
+onward, and any day the session circuit breaker bound, on any preset. The
+columns were never wrong, only incomplete, and the days they were incomplete
+on are named.
+
+Snapshots also carry the log-volume state, which they did not: a restored
+engine used to trade different volume and print different prices. That state
+is inert on `pt-v1` through `pt-v3` and live from `pt-v4`, so checkpoint and
+fork reproduction under 0.1.x was exact for the first three presets and not
+for the rest. Measured: on 0.1.4 a `pt-v4` snapshot restored and re-run does
+not match the uninterrupted run, where `pt-v1` and `pt-v3` do; on 0.2.0 all
+three do.
 
 ### Two behaviour changes worth knowing
 
