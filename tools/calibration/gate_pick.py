@@ -52,9 +52,14 @@ def one(job):
         f = facts.measure(seed=seed, universe=pt.Universe.random(40, seed=111), days=252, model=m)
     elif kind == "p504":
         f = facts.measure(seed=seed, universe=pt.Universe.random(40, seed=111), days=504, model=m)
-    elif kind == "vix45":
+    elif kind in ("vix5", "vix45", "vix65"):
+        # The two ENDS as well as the middle: the crisis volatility lever is
+        # vol(VIX 65) / vol(VIX 5), and it is the headline number for any
+        # crisis preset. A gate that reported only the middle sent every
+        # candidate to a separate laptop run to find its lever (§93).
+        held = {"vix5": 5.0, "vix45": 45.0, "vix65": 65.0}[kind]
         f = facts.measure(seed=seed, universe=pt.Universe.random(40, seed=111), days=252,
-                          model=m, scenario=Scenario().hold(vix=45.0))
+                          model=m, scenario=Scenario().hold(vix=held))
     elif kind == "ho_seeds":
         f = facts.measure(seed=seed, universe=pt.Universe.random(40, seed=111), days=252, model=m)
     elif kind == "ho_universe":
@@ -66,6 +71,9 @@ def one(job):
 
 def summarise(kind: str, rows: list[dict]) -> str:
     med = {k: st.median([r[k] for r in rows if r.get(k) is not None]) for k in rows[0]}
+    if kind in ("vix5", "vix65"):
+        return (f"  held VIX {kind[3:]:<3s} ({len(rows)} seeds): vol "
+                f"{med['annualised_vol_pct']:.1f} xs {med['cross_sectional_corr']:.3f}")
     if kind == "vix45":
         return (f"  held VIX 45 ({len(rows)} seeds): sector_ex {med['sector_excess_corr']:+.4f} "
                 f"xs {med['cross_sectional_corr']:.3f} kurt {med['excess_kurtosis']:.2f} "
