@@ -157,10 +157,12 @@ reading order and executed as part of the test suite:
 | [`04-how-realistic-is-this`](https://github.com/simoncoombes/pretium/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the gaps |
 | [`05-training-an-agent`](https://github.com/simoncoombes/pretium/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
 | [`06-execution-and-impact`](https://github.com/simoncoombes/pretium/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
+| [`07-research-workflow.py`](https://github.com/simoncoombes/pretium/blob/main/examples/07-research-workflow.py) | A whole study in one file: sweep, evaluation, TCA and replay |
+| [`08-claude-agent.py`](https://github.com/simoncoombes/pretium/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
 | [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/pretium/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields actually transmit |
 
-Or a whole study in one file. Sweep, evaluation, TCA and replay in about five
-seconds:
+The two scripts run from the command line rather than a notebook. The whole
+study takes about five seconds:
 
 ```
 python examples/07-research-workflow.py
