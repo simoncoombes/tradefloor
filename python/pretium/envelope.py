@@ -250,7 +250,14 @@ GAPS: tuple[Gap, ...] = (
             f"one: the process is built from exponentials, and over one year "
             f"two of them fake a power law well enough that no panel "
             f"statistic objects. A two-component mixture was tried and is "
-            f"not sufficient."
+            f"not sufficient.\n\n"
+            f"Read the scope of that claim precisely. It says no setting of "
+            f"THIS model's parameters turns one slope into the other, "
+            f"because a sum of exponentials is not a power law. It does not "
+            f"say the problem is beyond the project: the volume-change gap "
+            f"carried the stronger claim, that its row was structurally "
+            f"unreachable, and a new mechanism reached it. A mechanism gap "
+            f"is closed by adding mechanism, not by tuning what is here."
         ),
         forbids=(
             f"strategies whose edge depends on volatility memory beyond "
