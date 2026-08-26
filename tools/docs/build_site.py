@@ -468,6 +468,7 @@ def read_bundle() -> str:
             )
         doc = doc.replace(old, new)
     doc = apply_trust_fixes(doc)
+    doc = apply_scenarios_fixes(doc)
     doc = apply_internals_fixes(doc)
     doc = apply_factors_fixes(doc)
     # Two spots track the package version; the rest are history. See VERSION.
@@ -1244,6 +1245,223 @@ def apply_trust_fixes(doc: str) -> str:
     # real; they were two generations of the panel printed side by side.
     cut("A model graded on the same thirty seeds", "<sc-raw-tbody",
         "</sc-raw-tbody>", HELD_OUT_ROWS)
+    return doc
+
+
+def apply_scenarios_fixes(doc: str) -> str:
+    """Re-measure the scenarios page on the shipped preset.
+
+    Every figure on this page came from a run, and every one of those runs
+    predates the 2026-08-26 era boundary that changed what a VIX pin does.
+    The page also carried a third crisis-intensity number, so a reader met
+    a pinned 59%-to-107% ratio here, a 3.1x steady-state lever on the
+    realism page and a 5.05x lever in the release notes, with nothing saying
+    they are three different measurements.
+
+    Re-measured on the installed 0.2.0 package by the recipes the page
+    states: volatility and the crisis pair over `Universe.random(20,
+    seed=11)`, spreads and correlation over `Universe.random(25, seed=11)`,
+    120 days, sim seed 3, pinned through the scenario API; the rate-shock
+    table over `Universe.random(20, seed=4)`, `reference_agents(seed=3)`,
+    sim seed 7, 20 days. Each replacement asserts.
+    """
+    swaps = [
+        # The rate-shock table.
+        (
+            "<sc-raw-tr><sc-raw-td>buy_and_hold</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">\u22127.16%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u221210.75%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22123.59</sc-raw-td>'
+            "</sc-raw-tr>\n            "
+            "<sc-raw-tr><sc-raw-td>momentum</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">\u22121.17%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22123.52%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22122.36</sc-raw-td>'
+            "</sc-raw-tr>\n            "
+            "<sc-raw-tr><sc-raw-td>oracle</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">+11.11%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">+8.70%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22122.41</sc-raw-td>'
+            "</sc-raw-tr>",
+            "<sc-raw-tr><sc-raw-td>buy_and_hold</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">\u22125.63%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22128.76%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22123.13</sc-raw-td>'
+            "</sc-raw-tr>\n            "
+            "<sc-raw-tr><sc-raw-td>momentum</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">\u22127.88%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22129.74%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22121.86</sc-raw-td>'
+            "</sc-raw-tr>\n            "
+            "<sc-raw-tr><sc-raw-td>oracle</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">+14.98%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">+12.99%</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">\u22121.99</sc-raw-td>'
+            "</sc-raw-tr>",
+        ),
+        (
+            "Buy-and-hold is long only, holds through the repricing, and "
+            "loses the most. Momentum and the Oracle trade around it and "
+            "each give up about two and a half points. The sizes belong to "
+            "the seed: across sim seeds 5 to 9 buy-and-hold gives up 3.4 to "
+            "4.7 points every time, while momentum's give-up spans "
+            "\u22125.1 to +0.5. Run more than one seed before you quote a "
+            "size.",
+            "Buy-and-hold is long only, holds through the repricing, and "
+            "gives up the most. Momentum and the Oracle trade around it and "
+            "each give up about two points. The sizes belong to the seed: "
+            "across sim seeds 5 to 9 buy-and-hold gives up 3.0 to 5.0 points "
+            "every time, while momentum's give-up spans \u22121.9 to +0.5. "
+            "Run more than one seed before you quote a size.",
+        ),
+        # What a VIX pin actually does now.
+        (
+            "Realised annual volatility: 49% at VIX 5, 59% at 15, 107% at "
+            "45, 124% at 65.",
+            "Realised annual volatility: 31% at VIX 5, 37% at 15, 105% at "
+            "45, 126% at 65.",
+        ),
+        (
+            "Mean quoted spread goes from 11.5 bps at VIX 15 to 25.9 bps at "
+            "VIX 65,",
+            "Mean quoted spread goes from 11.7 bps at VIX 15 to 21.5 bps at "
+            "VIX 65,",
+        ),
+        (
+            "mean pairwise correlation reads +0.27 calm, +0.68 at VIX 45, "
+            "+0.76 at 65.",
+            "mean pairwise correlation reads +0.20 calm, +0.62 at VIX 45, "
+            "+0.68 at 65.",
+        ),
+        (
+            "pinned through the scenario API. What VIX never moves is a "
+            "single name's own noise. These figures are much higher than the "
+            '24.1% on <a href="#/trust">Realism and Limits</a> because a '
+            "pinned VIX is not a normal market: the pin drives the factor "
+            "variance directly, and these runs use a smaller roster over 120 "
+            "days rather than the certified 40 names over 252. Compare pins "
+            "against each other, and take the certified number from an "
+            "unpinned run.",
+            "pinned through the scenario API. Since the 2026-08-26 era "
+            "boundary VIX also moves a name's own variance, through "
+            "<code style=\"font-size:12px\">garch_vix_coupling</code>; before "
+            "it, VIX sized only the shared factor. These figures sit above "
+            'the 31.5% on <a href="#/trust">Realism and Limits</a> because a '
+            "pinned VIX is not a normal market: the pin drives the factor "
+            "variance directly, and these runs use a smaller roster over 120 "
+            "days rather than the certified 40 names over 252. Compare pins "
+            "against each other, and take the certified number from an "
+            "unpinned run. The ratio between two pins is NOT the crisis "
+            "lever the realism page and the release notes quote: that one "
+            "runs VIX 5 to VIX 65 on the certified roster over 252 days at "
+            "thirty seeds and reads 5.05x. Three numbers, three "
+            "measurements.",
+        ),
+        # The liquidity-crisis pair, in the comment the example prints.
+        (
+            "# 61.76% calm, 82.16% crisis",
+            "# 39.98% calm, 67.68% crisis",
+        ),
+        # The whole-crisis-study block. Every line in it is now a real run,
+        # including the two the note called composed, so the badge moves.
+        (
+            '<span title="Medians and verdict text are quoted from the '
+            "shipped envelope; the spread columns and strategy numbers were "
+            'composed for the example." style="font:500 9.5px/1 '
+            "var(--font-mono);letter-spacing:0.07em;border-radius:5px;"
+            "padding:3px 6px;margin-left:8px;color:var(--codemut);border:1px "
+            'solid var(--codeline)">MIXED, SEE NOTE</span></div>\n'
+            '          <pre style="padding:13px 16px;overflow-x:auto"><code '
+            'data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);'
+            "color:var(--codemut)\">{'day': 0, 'vix': 18.0}",
+            '<span title="Captured from the run named beside this block." '
+            'style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;'
+            "border-radius:5px;padding:3px 6px;margin-left:8px;color:"
+            'var(--tks);border:1px solid var(--tks)">MEASURED</span></div>\n'
+            '          <pre style="padding:13px 16px;overflow-x:auto"><code '
+            'data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);'
+            "color:var(--codemut)\">{'day': 0, 'vix': 18.0}",
+        ),
+        (
+            "{'day': 1, 'vix': 18.0}\n...\n{'day': 20, 'vix': 18.0}\n"
+            "{'day': 21, 'vix': 19.03}\n{'day': 22, 'vix': 20.07}\n"
+            "{'day': 23, 'vix': 21.10}\n{'day': 24, 'vix': 22.13}\n\n"
+            "inside the envelope\n  - horizon 120d is within the certified "
+            "252d, and no named statistic\n    meets a measured gap\n  ? "
+            "annualised_vol_pct is in band at the certified horizon (24.0972 "
+            "in\n    (15.0, 36.0)) -- but that is a median across 30 seeds; "
+            "check\n    `intervals` for the spread before relying on one "
+            "seed\n  ? cross_sectional_corr is in band at the certified "
+            "horizon (0.2558 in\n    (0.08, 0.56)) -- but that is a median "
+            "across 30 seeds; check\n    `intervals` for the spread before "
+            "relying on one seed\n\n(82.16, 61.76)      # annualised vol %, "
+            "crisis against calm\n0.6781              # cross-sectional "
+            "correlation under the crisis\n\ncalm    0.1142   -0.0871\n"
+            "crisis  0.0316   -0.2043\n\n6.06 11.69          # shortfall "
+            "bps, calm then VIX 45",
+            "{'day': 1, 'vix': 18.0}\n...\n{'day': 19, 'vix': 18.0}\n"
+            "{'day': 20, 'vix': 80.0}\n{'day': 21, 'vix': 78.97}\n"
+            "{'day': 22, 'vix': 77.93}\n{'day': 23, 'vix': 76.90}\n"
+            "{'day': 24, 'vix': 75.87}\n\n"
+            "inside the envelope for the statistics you named\n  - horizon "
+            "120d is within the certified 252d, and no named statistic\n    "
+            "meets a measured gap\n  ? annualised_vol_pct is in band at the "
+            "certified horizon (31.4632 in\n    (15.0, 36.0)) -- but that is "
+            "a median across 30 seeds; check\n    `intervals` for the spread "
+            "before relying on one seed\n  ? cross_sectional_corr is in band "
+            "at the certified horizon (0.3063 in\n    (0.08, 0.56)) -- but "
+            "that is a median across 30 seeds; check\n    `intervals` for the "
+            "spread before relying on one seed\n\n(67.68, 39.98)      # "
+            "annualised vol %, crisis against calm\n0.6235              # "
+            "cross-sectional correlation under the crisis\n\n"
+            "calm   -42.9347  11.9232\ncrisis -56.6869  95.0928\n\n"
+            "6.06 11.69          # shortfall bps, calm then VIX 45",
+        ),
+        (
+            "In that block the volatility pair and the two shortfall figures "
+            "are measured runs, cited in the prose below. The scenario table "
+            "rows and the two strategy lines are composed to show the shape "
+            "of the output.",
+            "Every line in that block is a measurement on pretium 0.2.0 "
+            "under pt-v10, from the code above it. The scenario rows are "
+            "elided in the middle and rounded to two decimals; nothing else "
+            "is edited. Note what the path actually does: "
+            "<code style=\"font-size:12.5px\">vix_shock</code> puts the peak "
+            "on day <code style=\"font-size:12.5px\">at</code> and decays it "
+            "over the window, rather than ramping up to it.",
+        ),
+        (
+            "Volatility goes from 62% to 82%, and correlation climbs with "
+            "it.",
+            "Volatility goes from 40% to 68%, and correlation climbs with "
+            "it, 0.49 to 0.62.",
+        ),
+        # The two "half as violent" lines, both quoting the pt-v3-era lever.
+        (
+            "And gap 5 on the realism page: scenario response is "
+            "directional, not sized. A crisis here is about half as violent "
+            "as a real one. Use scenarios to detect breakage, never to size "
+            "losses.",
+            "And gap 5 on the realism page: scenario response is "
+            "directional, not sized. A crisis here is about four fifths as "
+            "violent as a real one, 5.05x against 6.16x on the certified "
+            "roster. Use scenarios to detect breakage, never to size losses.",
+        ),
+        (
+            "Do not quote the sizes as real. A crisis here is roughly half "
+            "as violent as a real one (gap 5). Read the direction and the "
+            "ordering; leave the magnitudes alone.",
+            "Do not quote the sizes as real. A crisis here is about four "
+            "fifths as violent as a real one (gap 5), and the pinned pair "
+            "above is a different measurement again. Read the direction and "
+            "the ordering; leave the magnitudes alone.",
+        ),
+    ]
+    for old, new in swaps:
+        if old not in doc:
+            sys.exit("the design bundle reworded a scenarios-page passage "
+                     f"that apply_scenarios_fixes corrects: {old[:70]!r}")
+        doc = doc.replace(old, new, 1)
     return doc
 
 
