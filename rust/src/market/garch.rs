@@ -14,9 +14,19 @@
 //! of the same size — the leverage effect, which real equities have and a
 //! symmetric GARCH structurally cannot (the return enters squared, so its
 //! sign is destroyed; design finding 8, CALIBRATION.md §3.5). The effective
-//! persistence is `ALPHA + BETA + GAMMA/2` (the asymmetry term is live on
-//! roughly half of days) — close to 1, so shocks decay slowly, which is
-//! what produces multi-week crises rather than one bad afternoon.
+//! persistence is `ALPHA + BETA + GAMMA/2`, the asymmetry term being live on
+//! roughly half of days.
+//!
+//! **The constants below are not what any shipped preset runs.** This module
+//! reads 0.99, a 69-day half-life. Every preset from pt-v6 onward carries a
+//! recalibrated `garch_beta` and `garch_gamma` and lands at 0.8364, which is
+//! a half-life of 3.9 DAYS. That was measured on 2026-08-26 (§115) and it is
+//! the whole of the `decay-shape` gap: the latent variance autocorrelation
+//! is already negative by lag 20, and neither the sector clamps nor
+//! measurement noise account for it. This paragraph exists because the text
+//! above it said the persistence was "held at the reference's 0.99" for
+//! three eras after it stopped being true, and the test that would have
+//! caught it asserts on these constants rather than on a preset.
 //!
 //! GJR (Glosten–Jagannathan–Runkle) rather than EGARCH, deliberately:
 //! EGARCH's log-variance form needs `exp`/`log` per name per day, which
@@ -216,10 +226,52 @@ pub fn update_garch_variance_for(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::params::ModelParams;
 
     /// A representative sector daily sigma of 1.5%, so base variance is
     /// 0.000225 — `sectorBaseDailyVariance`'s default.
     const BASE: f64 = 0.015 * 0.015;
+
+    /// Every SHIPPED preset stays below the stationarity ceiling.
+    ///
+    /// The test below this one asserts on the module constants, which no
+    /// preset uses; it therefore passed for three eras while the shipped
+    /// persistence sat at 0.8364 against a documented 0.99 (§115). This one
+    /// asserts on what actually runs. It pins the LOW side loosely on
+    /// purpose: 0.8364 is a 3.9-day half-life and probably too short, but
+    /// that is a calibration question with a gate attached, not something a
+    /// unit test should decide. What it must not do is drift unnoticed
+    /// again, so the reading is written into the failure message.
+    ///
+    /// The history the sweep turned up, half-life in trading days:
+    /// pt-v1 0.9900 (69d), pt-v2 0.9551 (15d), pt-v3 through pt-v12 0.8364
+    /// (3.9d). The memory was lost in the pt-v2 to pt-v3 calibration and has
+    /// been frozen across ten presets since.
+    #[test]
+    fn every_shipped_preset_has_a_stationary_variance_process() {
+        for name in ModelParams::preset_names() {
+            let p = ModelParams::preset(name).unwrap();
+            let persistence = p.garch_alpha + p.garch_beta + p.garch_gamma / 2.0;
+            let half_life = (0.5f64).ln() / persistence.ln();
+            // 1.0, not GARCH_PERSISTENCE_CEILING. That constant is the
+            // bound a calibration SEARCH is held inside, not the point the
+            // process diverges: pt-v1 ships at 0.99 and is perfectly
+            // stationary. Asserting the search bound here failed pt-v1 on
+            // the first run of this test.
+            assert!(
+                persistence < 1.0,
+                "{name}: persistence {persistence} at or above 1.0 — variance \
+                 grows without bound"
+            );
+            assert!(
+                (0.75..1.0).contains(&persistence),
+                "{name}: persistence {persistence}, shock half-life \
+                 {half_life:.1} days. Below 0.75 there is no volatility \
+                 clustering left to speak of. If this moved on purpose, \
+                 update the module note and §115."
+            );
+        }
+    }
 
     #[test]
     fn persistence_is_high_enough_for_crises_to_last() {
