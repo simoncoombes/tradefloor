@@ -347,6 +347,11 @@ PARAM_SPECS: dict[str, dict] = {
     "news_peer_vix_coupling": {"kind": "abs", "step_unit": 0.25,
                                "hard_range": (0.0, 8.0)},
     # Per-name volume persistence (§107). Same shape as the common pair.
+    # The sector loading and its beta slope (§108).
+    "sector_loading": {"kind": "abs", "step_unit": 0.05,
+                       "hard_range": (0.0, 1.5)},
+    "sector_loading_beta_slope": {"kind": "abs", "step_unit": 0.05,
+                                  "hard_range": (0.0, 1.0)},
     "volume_idio_persistence": {"kind": "abs", "step_unit": 0.05,
                                 "hard_range": (0.0, 0.99)},
     "volume_idio_sigma": {"kind": "abs", "step_unit": 0.02,
