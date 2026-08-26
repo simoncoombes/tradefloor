@@ -25,7 +25,7 @@ mean nothing.
 
 ## Which preset to use
 
-Eight presets ship. Three are recommendations; the rest exist so that
+Nine presets ship. Four are recommendations; the rest exist so that
 results already published on them keep reproducing bit for bit, and a
 new preset never moves an old one.
 
@@ -34,6 +34,7 @@ new preset never moves an old one.
 | `pt-v3` | anything: the default, and the one the realism envelope certifies | recommended |
 | `pt-v7` | studies whose thesis is a sector, or a crisis: the first preset with industries that survive a crisis, twelve of thirteen realism statistics in band at both horizons | recommended, opt in by name |
 | `pt-v8` | crisis studies and anything that measures how correlation moves through time: the factor's variance has a memory, the crisis lever is 4.34x, thirteen of fourteen in band at 504 days | recommended, opt in by name |
+| `pt-v9` | anything measuring volatility regimes, clustering or crises the market makes itself: thirteen of fourteen statistics in band at both horizons, and the first preset whose VIX responds to the day's move rather than to the closing minute | recommended, opt in by name |
 | `pt-v1`, `pt-v2`, `pt-v4`, `pt-v5`, `pt-v6` | reproducing a run that names them | reproduction only |
 
 `pt-v7` is not the default because the envelope certifies one preset by

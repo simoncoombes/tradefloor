@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### pt-v9: a market that frightens itself
+
+The VIX's fear channel was reading the wrong number. `market_return_pct`,
+the return it reacts to, is built from `previous_tick_price`: the
+cap-weighted move over the final MINUTE of the session, in percent, then
+clamped downstream to a fraction. Measured, on the shipped presets: an index
+day of -7.87% moves the VIX +0.15 points, half the worst days of a year move
+it down, and with the gain raised to 5000 and the clamp opened the day's
+return still correlates -0.065 with the next day's VIX change. The market
+could not frighten itself, which is why its endogenous VIX never once crossed
+its own crisis threshold in a year against a real 12.5% of days.
+
+Six parameters now describe that channel, all shipped at the literals they
+replace and bit-identical there: `vix_return_source`, `vix_return_gain`,
+`vix_return_gain_up`, `vix_return_clamp`, `vix_target_shock_cap` and
+`vix_cycle_amplitude`, plus `vix_realised_vol_weight` for the feedback from
+the market's own volatility. `pt-v9` sets them, along with a real index crash
+frequency and a second halving of the momentum term, and is the first preset
+to hold **thirteen of fourteen statistics in band at 252 days and at 504**,
+on training seeds, a held-out universe and the §8 overfitting control alike.
+Its endogenous VIX reaches the crisis threshold on 6.7% of days. It is not
+the default. Calibration record §68 to §71.
+
 ### Fixed: a checkpoint could resume a different market
 
 `Checkpoint.of` decided whether to record the model by comparing the

@@ -746,6 +746,8 @@ pub const PT_V6: ModelParams = ModelParams::pt_v6();
 pub const PT_V7: ModelParams = ModelParams::pt_v7();
 /// pt-v7 with the market factor's variance given a memory -- see [`ModelParams::pt_v8`].
 pub const PT_V8: ModelParams = ModelParams::pt_v8();
+/// pt-v8 with a market that frightens itself -- see [`ModelParams::pt_v9`].
+pub const PT_V9: ModelParams = ModelParams::pt_v9();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -1129,6 +1131,55 @@ impl ModelParams {
         p
     }
 
+    /// pt-v8 with a market that frightens itself: the first preset whose
+    /// volatility episodes are produced by the market rather than driven
+    /// through a scenario.
+    ///
+    /// Eight coefficients move from pt-v8 (CALIBRATION-FOLLOWUPS.md §68 to
+    /// §71). `vix_return_source` 1.0 makes the VIX's fear channel read the
+    /// day's cap-weighted index return instead of the closing minute, which
+    /// is what it read before: with the shipped channel a -7.87% day moved
+    /// the VIX +0.15 points and the correlation between the day's return and
+    /// the next day's VIX change was -0.065 even with the gain at 5000.
+    /// `vix_return_gain` 17.0, symmetric, with `vix_return_clamp` 15.0 and
+    /// `vix_target_shock_cap` 45.0 in percentage points calibrate that
+    /// channel against real markets, which move the VIX about 2 points per
+    /// percent the index falls. `jump_sigma_market` 0.020 gives the index a
+    /// real crash frequency, 1.4% of days below -3% against a real 1.27%.
+    /// `vix_cycle_amplitude` 0.6 takes the volatility regimes off the
+    /// multi-year business cycle clock, which is why lag-5 clustering used to
+    /// depend on the measurement window. `momentum_theta` halves again to
+    /// keep `return_acf1` inside its band at two years.
+    ///
+    /// MEASURED, thirty training seeds, fourteen statistics: **thirteen of
+    /// fourteen in band at 252 days AND at 504**, which no earlier preset
+    /// holds, the only miss being the structural `volume_change_acf1`.
+    /// Volatility 30.3 and 33.6, kurtosis 7.65 and 8.04, cross-sectional
+    /// correlation 0.320 and 0.402, sector excess +0.128 and +0.110,
+    /// correlation persistence +0.046 and +0.235, lag-5 clustering 0.0394 and
+    /// 0.0921. Held-out universe 13/14; §8 no flips on any axis. The
+    /// endogenous VIX reaches its own crisis threshold on 6.7% of days
+    /// against a real 12.5% and pt-v8's 0.0%.
+    ///
+    /// Costs, stated: the crisis blend falls from 3.16x to 2.29x and the
+    /// volatility lever from 4.34x to 4.10x, both measured with the VIX
+    /// PINNED, so they say the crisis state is less extreme relative to a
+    /// calm market that is no longer artificially quiet.
+    ///
+    /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3.
+    pub const fn pt_v9() -> ModelParams {
+        let mut p = ModelParams::pt_v8();
+        p.jump_sigma_market = 0.02;
+        p.momentum_theta = 0.018551562499999993;
+        p.vix_cycle_amplitude = 0.6;
+        p.vix_return_clamp = 15.0;
+        p.vix_return_gain = 17.0;
+        p.vix_return_gain_up = 17.0;
+        p.vix_return_source = 1.0;
+        p.vix_target_shock_cap = 45.0;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -1151,13 +1202,14 @@ impl ModelParams {
             "pt-v6" => Some(PT_V6),
             "pt-v7" => Some(PT_V7),
             "pt-v8" => Some(PT_V8),
+            "pt-v9" => Some(PT_V9),
             _ => None,
         }
     }
 
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
-        &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8"]
+        &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -1603,7 +1655,9 @@ mod tests {
         // as a shipped one.
         assert_eq!(PT_V8.fingerprint(), "pt-v8");
         assert_eq!(ModelParams::preset("pt-v8").unwrap().fingerprint(), "pt-v8");
-        assert!(ModelParams::preset("pt-v9").is_none());
+        assert_eq!(PT_V9.fingerprint(), "pt-v9");
+        assert_eq!(ModelParams::preset("pt-v9").unwrap().fingerprint(), "pt-v9");
+        assert!(ModelParams::preset("pt-v10").is_none());
 
         // Adding a preset must not disturb an existing one. The fingerprint
         // is taken over the PARAMETERS, not the table, so this holds by
