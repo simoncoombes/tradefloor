@@ -99,8 +99,15 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # random -6,881, buy_and_hold -8,121. The bottom pair swapped back, and
     # momentum and mean-reversion are now within 2% of each other, which is
     # the margin this comment keeps warning about.
-    assert ranked == ["oracle", "momentum", "mean_reversion",
-                      "random", "buy_and_hold"]
+    #
+    # Re-measured again at the pt-v12 boundary (§114), where unpinning the
+    # volume response to the size of a move re-dealt every trajectory:
+    # oracle +7.455%, mean_reversion +1.777%, momentum +0.801%,
+    # buy_and_hold -0.396%, random -0.923%. Momentum and mean-reversion
+    # swapped for the fourth time, which is the margin this comment has been
+    # warning about since it was written; the oracle has never moved.
+    assert ranked == ["oracle", "mean_reversion", "momentum",
+                      "buy_and_hold", "random"]
 
 
 def test_random_trading_is_close_to_flat_over_a_short_run(scores):

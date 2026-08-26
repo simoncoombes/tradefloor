@@ -40,9 +40,9 @@ COMPONENTS = [
 LEVELS = ["mispricing_s", "fundamental_value", "anchor_price"]
 
 
-def run(n=6, seed=5, days=2):
+def run(n=6, seed=5, days=2, model=None):
     universe = pretium.Universe.random(n, seed=2)
-    engine = pretium.Engine(seed=seed, universe=universe)
+    engine = pretium.Engine(seed=seed, universe=universe, model=model)
     engine.run_days(days, record=True)
     return engine, pa.table(engine.truth()).to_pydict(), n
 
@@ -107,10 +107,18 @@ def test_news_and_flow_land_on_the_traded_name_and_nowhere_else():
 
 
 def test_a_quiet_run_leaves_the_shock_columns_at_zero():
-    # Zero because nothing happened, not because the column is dead — the test
+    # Zero because nothing happened, not because the column is dead -- the test
     # above proves the same columns light up when something does. Both halves
     # are needed: either alone is consistent with a broken column.
-    _, table, _ = run()
+    #
+    # "Quiet" has to be asked for explicitly since pt-v12 became the default.
+    # Earlier defaults generated no news of their own, so an engine with no
+    # news argument WAS a quiet market; pt-v11 added endogenous news and
+    # pt-v12 ships it on, so a default run now has company_news in it by
+    # design. Turning the mechanism off is what this test means by quiet.
+    quiet_model = pretium.ModelParams.from_preset(
+        endogenous_news_intensity=0.0, endogenous_news_sigma=0.0)
+    _, table, _ = run(model=quiet_model)
     assert all(x == 0.0 for x in table["company_news"])
     assert all(x == 0.0 for x in table["order_flow_impact"])
     assert any(x != 0.0 for x in table["random_noise"])
