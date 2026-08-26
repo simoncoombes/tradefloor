@@ -44,6 +44,21 @@ still hold together slightly less than the +0.10 real ones do.
 It controls how hard a crisis loads every name onto the market factor, and it
 is what `pt-v11` turns up.
 
+`endogenous_news_intensity` and `endogenous_news_sigma` give this market
+news of its own. The news machinery has existed since the beginning and had
+never once fired: news could only arrive from a replayed log, so in an
+ordinary simulation the news column was always zero and four news settings
+could not affect anything. The jump process was the only company-specific
+shock, and a jump lands on one company and reaches no other.
+
+Real earnings surprises spread. Switch these on with `news_peer_weight` and
+one company's surprise moves its sector's other members, which is a route
+for industries to move together that this market has never had. Measured at
+thirty seeds, that lands crisis-time industry co-movement on +0.107 against
+a real +0.103, where the default reads +0.040. Both ship off, and no preset
+uses them yet: news is company-specific movement before it is contagion, and
+switching it on as-is costs more elsewhere than it buys.
+
 `jump_vix_coupling` makes a price jump's arrival RATE follow the VIX. Every
 preset before it jumped just as often in a dead-calm market as in a panic,
 which is backwards: measured under a pinned VIX, jumps carried 40% of a calm
