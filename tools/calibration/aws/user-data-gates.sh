@@ -12,7 +12,7 @@ shutdown -h +60
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates5
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates6
 BRANCH=main
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
@@ -105,12 +105,12 @@ setsid nohup /home/ec2-user/stream.sh "$BUCKET" >/var/log/pretium-stream.log 2>&
 
 cat > /home/ec2-user/candidates.json <<'CANDS'
 [
-  {"label": "base(g0.5)", "base": "pt-v11", "overrides": {"garch_vix_coupling": 0.0, "sector_vix_coupling": 0.8, "crisis_blend_gain": 0.5}},
-  {"label": "gain0.8", "base": "pt-v11", "overrides": {"garch_vix_coupling": 0.0, "sector_vix_coupling": 0.8, "crisis_blend_gain": 0.8}},
-  {"label": "gain1.1", "base": "pt-v11", "overrides": {"garch_vix_coupling": 0.0, "sector_vix_coupling": 0.8, "crisis_blend_gain": 1.1}},
-  {"label": "gain1.4", "base": "pt-v11", "overrides": {"garch_vix_coupling": 0.0, "sector_vix_coupling": 0.8, "crisis_blend_gain": 1.4}},
-  {"label": "gain1.8", "base": "pt-v11", "overrides": {"garch_vix_coupling": 0.0, "sector_vix_coupling": 0.8, "crisis_blend_gain": 1.8}},
-  {"label": "v11+gain1.4", "base": "pt-v11", "overrides": {"crisis_blend_gain": 1.4}}
+  {"label": "v10+sec.8+g0.6", "base": "pt-v10", "overrides": {"sector_vix_coupling": 0.8, "crisis_blend_gain": 0.6}},
+  {"label": "v10+sec.8+g0.7", "base": "pt-v10", "overrides": {"sector_vix_coupling": 0.8, "crisis_blend_gain": 0.7}},
+  {"label": "v10+sec.8+g0.8", "base": "pt-v10", "overrides": {"sector_vix_coupling": 0.8, "crisis_blend_gain": 0.8}},
+  {"label": "v10+sec.8+g0.9", "base": "pt-v10", "overrides": {"sector_vix_coupling": 0.8, "crisis_blend_gain": 0.9}},
+  {"label": "v10+g0.8", "base": "pt-v10", "overrides": {"crisis_blend_gain": 0.8}},
+  {"label": "v11+g0+sec.8+g0.6", "base": "pt-v11", "overrides": {"garch_vix_coupling": 0.0, "sector_vix_coupling": 0.8, "crisis_blend_gain": 0.6}}
 ]
 CANDS
 chown ec2-user:ec2-user /home/ec2-user/candidates.json
