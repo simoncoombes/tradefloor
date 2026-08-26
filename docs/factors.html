@@ -137,7 +137,7 @@ and copy buttons.</p>
         <h1 style="font-size:30px">The Nine Components</h1>
         <p style="font-size:16px;color:var(--mut);margin:14px 0 0">Every tick's change in mispricing is broken into nine components that sum to it. These are the names the <code style="font-size:14px">truth</code> table uses, the values <code style="font-size:14px">explain_price_move</code> returns, and the closed set an agent's <code style="font-size:14px">explain</code> must answer from. The crate calls them <code style="font-size:14px">S_COMPONENT_KEYS</code>; the runtime list is <code style="font-size:14px">Engine.FACTORS</code>.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">The Set</h2>
-        <p style="color:var(--mut);font-size:14px">In order. The first three are the model’s own dynamics; the last four are shocks.</p>
+        <p style="color:var(--mut);font-size:14px">In order. The first three are the model’s own dynamics, the next four are shocks, and the last two are discrete events the engine books after the tick chain.</p>
         <div class="tablewrap"><table>
           <thead><tr><th>Name</th><th>What it is</th></tr></thead>
           <tbody style="font-size:13.5px">
@@ -148,10 +148,12 @@ and copy buttons.</p>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">order_flow_impact</td><td>The permanent, information-bearing part of order imbalance. Your own orders land here. The temporary part is not in this column, because it shows up in the price the book settled rather than in the model's target.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">short_squeeze_effect</td><td>Forced flow: short squeezes and stop cascades. Fires on high short interest into a rising price, and on cascades in either direction.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">random_noise</td><td>The idiosyncratic draw, scaled by the name's beta, its sector's volatility, its size, and the GARCH variance state.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">circuit_breaker</td><td>The session circuit breaker’s own correction. When the model price leaves the allowed band the tick re-derives the state from the clamped price, and until 2026-08-26 that rewrite was booked to nobody, so on any day the breaker bound the columns did not reconstruct the move.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">jump</td><td>The daily jump, applied after the tick loop rather than inside it, and recorded on the tick where it is first observed. Every preset from pt-v4 carries jumps, and without this column those days never reconstructed.</td></tr>
           </tbody>
         </table></div>
         <h2 style="font-size:21px;margin:46px 0 10px">They Sum, and That Is the Point</h2>
-        <p>Difference <code style="font-size:13px">mispricing_s</code> across two ticks, add the seven columns, and the residual should be around 1e-16. That is what makes this a dataset rather than a commentary: you can check a label against the outcome instead of trusting it.</p>
+        <p>Difference <code style="font-size:13px">mispricing_s</code> across two ticks, add the nine columns, and the residual should be around 1e-16. That is what makes this a dataset rather than a commentary: you can check a label against the outcome instead of trusting it.</p>
         <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
             <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
@@ -161,18 +163,19 @@ and copy buttons.</p>
 import polars as pl
 
 engine = pt.Engine(seed=42, universe=pt.Universe.random(20, seed=11))
-engine.run_days(5)
+engine.run_days(120)   # long enough for a jump to fire
 truth = pl.from_arrow(engine.truth())
 
 FACTORS = ["reversion", "momentum", "crowd_lean", "company_news",
-           "order_flow_impact", "short_squeeze_effect", "random_noise"]
+           "order_flow_impact", "short_squeeze_effect", "random_noise",
+           "circuit_breaker", "jump"]                 # Engine.FACTORS
 
 one = truth.filter(pl.col("instrument_id") == 0).sort("day", "tick")
 delta = one["mispricing_s"].diff()
 summed = one.select(sum(pl.col(c) for c in FACTORS)).to_series()
 print((delta[1:] - summed[1:]).abs().max())      # ~1e-16</code></pre>
         </div>
-        <p>Where the residual is not zero, the mispricing clamp or a circuit breaker bound. That is worth seeing, and it would be invisible in a summary.</p>
+        <p>Run it over five days instead of 120 and the seven-column version of this check also passes, because five days is too short for a jump to fire. On this seed over 120 days, with 8 jump ticks, seven columns are off by 0.128 and nine by 5.0e-17. Where a residual does remain, the mispricing clamp bound; the circuit breaker has had its own column since 2026-08-26 and is no longer part of it.</p>
         <p><code style="font-size:13px">Engine.FACTORS</code> is the same list at runtime, so an agent can validate its own answer against it rather than hardcoding strings.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">Scope</h2>
         <p>It is not a decomposition of the <em>price</em>. It decomposes the mispricing, which is the gap between price and fair value. Everything that moves fair value itself, such as a rate change repricing the discount, is in <code style="font-size:13px">fundamental_value</code> instead.</p>

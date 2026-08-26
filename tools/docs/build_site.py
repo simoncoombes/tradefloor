@@ -412,6 +412,7 @@ def read_bundle() -> str:
             )
         doc = doc.replace(old, new)
     doc = apply_trust_fixes(doc)
+    doc = apply_factors_fixes(doc)
     # Two spots track the package version; the rest are history. See VERSION.
     doc = doc.replace(">v0.1.0<", f">v{VERSION}<")
     doc = doc.replace("version = {0.1.0}", "version = {%s}" % VERSION)
@@ -815,6 +816,93 @@ def apply_trust_fixes(doc: str) -> str:
         '<sc-raw-tbody style="font-family:var(--font-mono);font-size:12px">\n'
         f"                {horizon_rows()}\n              </sc-raw-tbody>")
     return doc
+
+
+def apply_factors_fixes(doc: str) -> str:
+    """Give the components page the two columns the engine gained.
+
+    The page was authored with seven components and still listed seven after
+    the title was corrected to nine, which is worse than either: a reader
+    counting the table found seven under a heading that said nine. Both
+    additions are real columns of `truth()` and members of `Engine.FACTORS`.
+
+    Its worked example was the sharper problem. It summed seven columns over
+    a FIVE-day run and asserted a residual around 1e-16, which held only
+    because five days is too short for a jump to fire. Measured on the same
+    seed over 120 days, with 8 jump ticks, the seven-column sum is off by
+    0.128 while the nine-column sum reads 5.0e-17. A check that passes by
+    being too short to exercise the thing it checks is worse than no check.
+    """
+    swaps = [
+        (
+            "In order. The first three are the model\u2019s own dynamics; the "
+            "last four are shocks.",
+            "In order. The first three are the model\u2019s own dynamics, the "
+            "next four are shocks, and the last two are discrete events the "
+            "engine books after the tick chain.",
+        ),
+        (
+            "Difference <code style=\"font-size:13px\">mispricing_s</code> "
+            "across two ticks, add the seven columns, and the residual should "
+            "be around 1e-16.",
+            "Difference <code style=\"font-size:13px\">mispricing_s</code> "
+            "across two ticks, add the nine columns, and the residual should "
+            "be around 1e-16.",
+        ),
+        (
+            "engine.run_days(5)\ntruth = pl.from_arrow(engine.truth())\n\n"
+            'FACTORS = ["reversion", "momentum", "crowd_lean", "company_news",\n'
+            '           "order_flow_impact", "short_squeeze_effect", "random_noise"]',
+            "engine.run_days(120)   # long enough for a jump to fire\n"
+            "truth = pl.from_arrow(engine.truth())\n\n"
+            'FACTORS = ["reversion", "momentum", "crowd_lean", "company_news",\n'
+            '           "order_flow_impact", "short_squeeze_effect", "random_noise",\n'
+            '           "circuit_breaker", "jump"]                 # Engine.FACTORS',
+        ),
+        (
+            "Where the residual is not zero, the mispricing clamp or a circuit "
+            "breaker bound. That is worth seeing, and it would be invisible in "
+            "a summary.",
+            "Run it over five days instead of 120 and the seven-column version "
+            "of this check also passes, because five days is too short for a "
+            "jump to fire. On this seed over 120 days, with 8 jump ticks, "
+            "seven columns are off by 0.128 and nine by 5.0e-17. Where a "
+            "residual does remain, the mispricing clamp bound; the circuit "
+            "breaker has had its own column since 2026-08-26 and is no longer "
+            "part of it.",
+        ),
+    ]
+    for old, new in swaps:
+        if old not in doc:
+            sys.exit("the design bundle reworded a components-page passage "
+                     f"that apply_factors_fixes corrects: {old[:70]!r}")
+        doc = doc.replace(old, new, 1)
+
+    rows = (
+        '<sc-raw-tr><sc-raw-td style="font-family:var(--font-mono);'
+        'font-size:12.5px">circuit_breaker</sc-raw-td><sc-raw-td>The session '
+        'circuit breaker\u2019s own correction. When the model price leaves '
+        'the allowed band the tick re-derives the state from the clamped '
+        'price, and until 2026-08-26 that rewrite was booked to nobody, so on '
+        'any day the breaker bound the columns did not reconstruct the move.'
+        '</sc-raw-td></sc-raw-tr>\n            '
+        '<sc-raw-tr><sc-raw-td style="font-family:var(--font-mono);'
+        'font-size:12.5px">jump</sc-raw-td><sc-raw-td>The daily jump, applied '
+        'after the tick loop rather than inside it, and recorded on the tick '
+        'where it is first observed. Every preset from pt-v4 carries jumps, '
+        'and without this column those days never reconstructed.'
+        '</sc-raw-td></sc-raw-tr>'
+    )
+    # Anchored on a short unique phrase and the row end that follows it,
+    # rather than on the whole row: the bundle uses typographic apostrophes
+    # and matching them through two layers of escaping is how this function
+    # failed the first time it was written.
+    probe = "The idiosyncratic draw, scaled by the name"
+    if probe not in doc:
+        sys.exit("the components table's random_noise row was reworded; "
+                 "apply_factors_fixes cannot append the two new rows")
+    cut = doc.index("</sc-raw-tr>", doc.index(probe)) + len("</sc-raw-tr>")
+    return doc[:cut] + "\n            " + rows + doc[cut:]
 
 def nav_html(pages: list[dict], current: str) -> str:
     items = []
