@@ -56,7 +56,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "python"))
 import gate_pick  # noqa: E402
 from pretium import envelope, facts  # noqa: E402
 
-KINDS = ("p252", "p504", "vix45", "ho_seeds", "ho_universe")
+KINDS = ("p252", "p504", "vix5", "vix45", "vix65", "ho_seeds",
+         "ho_universe")
 
 
 def one(job):
@@ -91,8 +92,8 @@ def verdict(rows_by_kind: dict[str, list]) -> dict:
             continue
         med = {k: st.median([r[k] for r in rows if r.get(k) is not None])
                for k in rows[0]}
-        if kind == "vix45":
-            out["vix45"] = {k: med[k] for k in (
+        if kind in ("vix5", "vix45", "vix65"):
+            out[kind] = {k: med[k] for k in (
                 "sector_excess_corr", "cross_sectional_corr",
                 "excess_kurtosis", "annualised_vol_pct")}
             continue
@@ -126,7 +127,9 @@ def main() -> int:
               flush=True)
         jobs += [(label, base, ov, "p252", s) for s in train]
         jobs += [(label, base, ov, "p504", s) for s in train]
+        jobs += [(label, base, ov, "vix5", s) for s in train]
         jobs += [(label, base, ov, "vix45", s) for s in train]
+        jobs += [(label, base, ov, "vix65", s) for s in train]
         jobs += [(label, base, ov, "ho_seeds", s) for s in gate_pick.HELDOUT]
         jobs += [(label, base, ov, "ho_universe", s) for s in gate_pick.HELDOUT]
 
@@ -149,10 +152,17 @@ def main() -> int:
         for kind in KINDS:
             if acc[label].get(kind):
                 print(gate_pick.summarise(kind, acc[label][kind]), flush=True)
+        v = verdict(acc[label])
+        if "vix5" in v and "vix65" in v:
+            lever = (v["vix65"]["annualised_vol_pct"]
+                     / v["vix5"]["annualised_vol_pct"])
+            v["vol_lever"] = lever
+            print(f"  crisis lever  vol(VIX 65)/vol(VIX 5) = {lever:.3f}"
+                  f"   (real 6.16)", flush=True)
         results[label] = {
             "base": c["base"], "overrides": c["overrides"],
             "fingerprint": gate_pick.model(c["base"], c["overrides"]).fingerprint,
-            **verdict(acc[label]),
+            **v,
         }
 
     if args.out:

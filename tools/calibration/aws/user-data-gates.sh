@@ -12,7 +12,7 @@ shutdown -h +60
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates1
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates3
 BRANCH=main
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
@@ -105,13 +105,14 @@ setsid nohup /home/ec2-user/stream.sh "$BUCKET" >/var/log/pretium-stream.log 2>&
 
 cat > /home/ec2-user/candidates.json <<'CANDS'
 [
-  {"label": "pt-v10-control",   "base": "pt-v10", "overrides": {}},
-  {"label": "pt-v11",           "base": "pt-v11", "overrides": {}},
-  {"label": "v10+sector0.8",    "base": "pt-v10", "overrides": {"sector_vix_coupling": 0.8}},
-  {"label": "v11+sector0.5",    "base": "pt-v11", "overrides": {"sector_vix_coupling": 0.5}},
-  {"label": "v10+garch0.0",     "base": "pt-v10", "overrides": {"garch_vix_coupling": 0.0}},
-  {"label": "v10+garch1.0",     "base": "pt-v10", "overrides": {"garch_vix_coupling": 1.0}},
-  {"label": "v11+garch0.0",     "base": "pt-v11", "overrides": {"garch_vix_coupling": 0.0}}
+  {"label": "pt-v10-control", "base": "pt-v10", "overrides": {}},
+  {"label": "pt-v11",         "base": "pt-v11", "overrides": {}},
+  {"label": "v11+garch0",     "base": "pt-v11", "overrides": {"garch_vix_coupling": 0.0}},
+  {"label": "v11+garch0+sec0.8", "base": "pt-v11",
+   "overrides": {"garch_vix_coupling": 0.0, "sector_vix_coupling": 0.8}},
+  {"label": "v11+garch0.15+sec0.8", "base": "pt-v11",
+   "overrides": {"garch_vix_coupling": 0.15, "sector_vix_coupling": 0.8}},
+  {"label": "v10+sector0.8",  "base": "pt-v10", "overrides": {"sector_vix_coupling": 0.8}}
 ]
 CANDS
 chown ec2-user:ec2-user /home/ec2-user/candidates.json
@@ -192,7 +193,11 @@ set -e
 
 # The certificate's existence on disk is the test, not the script reaching
 # its last line.
-if [ -f /home/ec2-user/out/atlas-survey.json ]; then
+# The marker names THIS run's artefact. It named the survey's on the first
+# gate batch, so a run that produced every gate correctly and exited 0 wrote
+# "FAILED ... no certificate" and the results were only in run.log. A marker
+# that describes the wrong artefact is as bad as one that describes nothing.
+if [ -f /home/ec2-user/out/gates.json ]; then
   echo "CERTIFIED exit=$STATUS" > /tmp/DONE
 else
   echo "FAILED exit=$STATUS no certificate" > /tmp/DONE
@@ -205,7 +210,6 @@ for f in tasks.jsonl meta.json; do
 done
 aws s3 cp /var/log/pretium-run.log "$BUCKET/run.log" || true
 aws s3 cp /tmp/DONE "$BUCKET/DONE" || true
-aws s3 cp /home/ec2-user/out/atlas-survey.json "$BUCKET/" || true
-aws s3 cp /home/ec2-user/out/atlas-report.txt "$BUCKET/" || true
+aws s3 cp /home/ec2-user/out/gates.json "$BUCKET/" || true
 
 shutdown -h now
