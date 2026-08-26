@@ -42,8 +42,16 @@ import sys
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+# The source tree is APPENDED, never inserted ahead of site-packages.
+# Inserting it shadows an installed pretium wheel with a source copy that
+# has no compiled `_core`, which is invisible locally (the dev venv is an
+# editable install pointing at these same files, extension included) and
+# fatal on a fresh box, where the wheel is a real install. That is exactly
+# how the first AWS gate batch died: "cannot import name '_core' from
+# partially initialized module 'pretium'". atlas_survey.py never had the
+# bug because it only ever added its own directory.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "python"))
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "python"))
 
 import gate_pick  # noqa: E402
 from pretium import envelope, facts  # noqa: E402
