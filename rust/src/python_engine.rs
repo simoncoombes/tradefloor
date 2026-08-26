@@ -451,7 +451,7 @@ impl PyEngine {
         self.day_buffer
             .anchor
             .extend_from_slice(&self.buffer.anchor[..n]);
-        for k in 0..7 {
+        for k in 0..8 {
             self.day_buffer.components[k]
                 .extend_from_slice(&self.buffer.components[k][..n]);
         }
@@ -460,11 +460,11 @@ impl PyEngine {
         // first tick of the next day: `s` there already includes it. Zeroed
         // here and filled from the pending value on that first row, so the
         // columns sum to the change in `s` tick by tick (§74).
-        let before = self.day_buffer.components[7].len();
-        self.day_buffer.components[7].resize(self.day_buffer.components[0].len(), 0.0);
+        let before = self.day_buffer.components[8].len();
+        self.day_buffer.components[8].resize(self.day_buffer.components[0].len(), 0.0);
         if !self.pending_jump.is_empty() {
             for (i, v) in self.pending_jump.iter().enumerate() {
-                if let Some(slot) = self.day_buffer.components[7].get_mut(before + i) {
+                if let Some(slot) = self.day_buffer.components[8].get_mut(before + i) {
                     *slot += v;
                 }
             }
@@ -479,7 +479,7 @@ impl PyEngine {
     /// carry it. The engine accumulates it in attribution slot 7; this puts it
     /// on the tape where a reader reconstructing the day will find it.
     fn record_day_jump(&mut self) {
-        let jumps: Vec<f64> = self.inner.attribution().iter().map(|row| row[7]).collect();
+        let jumps: Vec<f64> = self.inner.attribution().iter().map(|row| row[8]).collect();
         if jumps.iter().any(|v| *v != 0.0) {
             self.pending_jump = jumps;
         }
@@ -642,7 +642,7 @@ struct DayBuffer {
     mispricing: Vec<f64>,
     fundamental: Vec<f64>,
     anchor: Vec<f64>,
-    components: [Vec<f64>; 8],
+    components: [Vec<f64>; 9],
 }
 
 impl DayBuffer {
@@ -1638,13 +1638,13 @@ impl PyEngine {
         // re-opens the day and re-anchors `previous_close`.
         // Two widths now: the engine's attribution carries the daily jump in
         // an eighth slot, the tick's own decomposition does not (§74).
-        let flat8 = |rows: &[[f64; 8]]| -> Vec<f64> {
+        let flat9 = |rows: &[[f64; 9]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
-        let flat = |rows: &[[f64; 7]]| -> Vec<f64> {
+        let flat = |rows: &[[f64; 8]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
-        out.set_item("attribution", f64_bytes(py, &flat8(self.inner.attribution())))?;
+        out.set_item("attribution", f64_bytes(py, &flat9(self.inner.attribution())))?;
         out.set_item(
             "tick_components",
             f64_bytes(py, &flat(self.inner.tick_components())),
@@ -2177,7 +2177,7 @@ impl PyEngine {
                 // writes. On this un-recorded path the day has not closed, so
                 // there is no jump yet and the column is zeros (§74).
                 &std::array::from_fn(|k| {
-                    if k < 7 {
+                    if k < 8 {
                         self.written(&self.buffer.components[k]).to_vec()
                     } else {
                         vec![0.0; self.written(&self.buffer.components[0]).len()]
@@ -2537,7 +2537,7 @@ impl PyNewsImpact {
 /// An alias rather than a second list. Declared twice, the two orderings would
 /// eventually disagree and every column would still look plausible -- the
 /// `truth` schema is generated from the same constant for the same reason.
-pub const FACTOR_NAMES: [&str; 8] = [
+pub const FACTOR_NAMES: [&str; 9] = [
     crate::market::factors::S_COMPONENT_KEYS[0],
     crate::market::factors::S_COMPONENT_KEYS[1],
     crate::market::factors::S_COMPONENT_KEYS[2],
@@ -2545,6 +2545,7 @@ pub const FACTOR_NAMES: [&str; 8] = [
     crate::market::factors::S_COMPONENT_KEYS[4],
     crate::market::factors::S_COMPONENT_KEYS[5],
     crate::market::factors::S_COMPONENT_KEYS[6],
+    crate::market::factors::S_COMPONENT_KEYS[7],
     crate::market::factors::JUMP_COMPONENT_KEY,
 ];
 

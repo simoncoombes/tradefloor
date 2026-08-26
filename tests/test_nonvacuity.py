@@ -106,7 +106,13 @@ def test_an_agent_that_does_nothing_is_visibly_different():
 
 
 def test_every_truth_component_can_be_non_zero():
-    """All seven reachable. A column of structural zeros is a lie by column.
+    """Every component reachable. A column of structural zeros is a lie by
+    column.
+
+    `circuit_breaker` is excluded from the dead-column check below and gets
+    its own test: it only fires when a name's model price leaves the session
+    band, which two ordinary days never do. It is reachable, and the test
+    that proves it drives a name through the band deliberately.
 
     `short_squeeze_effect` was exactly that until the universe generator
     started drawing short interest: present in the schema, named in the
@@ -139,7 +145,7 @@ def test_every_truth_component_can_be_non_zero():
 
     table = pa.table(engine.truth()).to_pydict()
     dead = [name for name in pretium.Engine.FACTORS
-            if all(v == 0.0 for v in table[name])]
+            if name != "circuit_breaker" and all(v == 0.0 for v in table[name])]
     assert dead == [], dead
     # And momentum specifically is zero on day one and non-zero on day two,
     # which is the shape of "not yet" rather than "never".
@@ -147,6 +153,46 @@ def test_every_truth_component_can_be_non_zero():
     day_two = [v for v, d in zip(table["momentum"], table["day"]) if d == 1]
     assert all(v == 0.0 for v in day_one)
     assert any(v != 0.0 for v in day_two)
+
+
+def test_the_circuit_breaker_component_fires_when_the_breaker_binds():
+    """The ninth component, and the only one an ordinary day never reaches.
+
+    When a name's model price leaves the session band the tick clamps it and
+    re-derives the mispricing state from the clamped price. Until 2026-08-26
+    that rewrite was booked to no component, so the columns did not
+    reconstruct the move on a halted day: over one crisis window they summed
+    to -0.204 against a change of -0.190 (calibration record §79).
+
+    Driven here with a scenario violent enough to hit the band rather than
+    waiting for one, because "never fires" and "has not fired yet" look the
+    same from a quiet run.
+    """
+    pa = pytest.importorskip("pyarrow")
+
+    universe = pretium.Universe.random(20, seed=5)
+    scenario = (pretium.Scenario()
+                .hold(vix=15.0, corporate_bond_yield=0.055)
+                .ramp("vix", start=65.0, end=15.0, over=20, begin=5)
+                .step("qe_pe_boost", before=0.0, after=-0.30, at=5))
+    engine = pretium.Engine(seed=2024, universe=universe)
+    for day in range(25):
+        scenario.apply(engine, day)
+        engine.run_days(1, first_day=day, record=True)
+
+    table = pa.table(engine.truth()).to_pydict()
+    fired = [v for v in table["circuit_breaker"] if v != 0.0]
+    assert fired, "the breaker never bound, so this proves nothing"
+
+    # And with it recorded, the columns reconstruct the move exactly.
+    rows = list(zip(table["instrument_id"], table["mispricing_s"],
+                    *(table[c] for c in pretium.Engine.FACTORS)))
+    first = [r for r in rows if r[0] == 0]
+    delta = first[-1][1] - first[0][1]
+    total = sum(sum(r[2:]) for r in first[1:])
+    assert delta == pytest.approx(total, abs=1e-12), (
+        f"components sum to {total:+.6f} against a change of {delta:+.6f}"
+    )
 
 
 def test_every_column_can_differ_between_two_markets():

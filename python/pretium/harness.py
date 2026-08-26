@@ -70,9 +70,10 @@ FACTOR_NAMES: tuple[
     Literal["reversion"], Literal["momentum"], Literal["crowd_lean"],
     Literal["company_news"], Literal["order_flow_impact"],
     Literal["short_squeeze_effect"], Literal["random_noise"],
-    Literal["jump"],
+    Literal["circuit_breaker"], Literal["jump"],
 ] = ("reversion", "momentum", "crowd_lean", "company_news",
-     "order_flow_impact", "short_squeeze_effect", "random_noise", "jump")
+     "order_flow_impact", "short_squeeze_effect", "random_noise",
+     "circuit_breaker", "jump")
 
 
 def _f64(buf: bytes) -> list[float]:

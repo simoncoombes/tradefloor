@@ -193,7 +193,7 @@ pub struct Engine {
     /// jump, which `apply_jumps` writes to `s` outside the tick loop. It was
     /// missing until 2026-08-26, so on any preset carrying jumps the truth
     /// table's components did not reconstruct the move (§74).
-    attribution: Vec<[f64; 8]>,
+    attribution: Vec<[f64; 9]>,
     /// This tick's ground truth, per company slot.
     ///
     /// `attribution` above sums across the day, which is what a scorer wants
@@ -206,7 +206,7 @@ pub struct Engine {
     /// apart: `fundamental` is the valuation, `anchor` is
     /// `fundamental * exp(s)` -- the price the model wanted before the book
     /// touched it -- and the printed price is what the book actually settled.
-    tick_components: Vec<[f64; 7]>,
+    tick_components: Vec<[f64; 8]>,
     tick_fundamental: Vec<f64>,
     tick_anchor: Vec<f64>,
     /// The market factor's conditional-variance state
@@ -367,8 +367,8 @@ impl Engine {
             companies,
             economy,
             central_bank,
-            attribution: vec![[0.0; 8]; companies_len],
-            tick_components: vec![[0.0; 7]; companies_len],
+            attribution: vec![[0.0; 9]; companies_len],
+            tick_components: vec![[0.0; 8]; companies_len],
             // NaN, not zero: a company that has never ticked has no valuation,
             // and zero is a real one that would silently read as "worthless"
             // rather than as "not yet computed".
@@ -573,7 +573,7 @@ impl Engine {
         // is true, and keeps the columns summing to a Δs of zero. Carrying the
         // previous tick's values forward would invent activity.
         for slot in self.tick_components.iter_mut() {
-            *slot = [0.0; 7];
+            *slot = [0.0; 8];
         }
         for (n, slot) in outcome.active_indices.iter().enumerate() {
             if let (Some(acc), Some(computed)) = (
@@ -637,14 +637,14 @@ impl Engine {
     /// lie this port has already had to correct once. So the four live
     /// components are reported, and the squeeze is kept separate because it is
     /// genuinely a distinct mechanism.
-    pub fn attribution(&self) -> &[[f64; 8]] {
+    pub fn attribution(&self) -> &[[f64; 9]] {
         &self.attribution
     }
 
     /// This tick's `s` decomposition per company slot, in
     /// [`crate::market::factors::S_COMPONENT_KEYS`] order. Zero for a company
     /// that did not tick.
-    pub fn tick_components(&self) -> &[[f64; 7]] {
+    pub fn tick_components(&self) -> &[[f64; 8]] {
         &self.tick_components
     }
 
@@ -679,8 +679,8 @@ impl Engine {
     ) -> Result<(), String> {
         let n = self.companies.len();
         for (name, len, want) in [
-            ("attribution", attribution.len(), n * 8),
-            ("tick_components", components.len(), n * 7),
+            ("attribution", attribution.len(), n * 9),
+            ("tick_components", components.len(), n * 8),
             ("tick_fundamental", fundamental.len(), n),
             ("tick_anchor", anchor.len(), n),
         ] {
@@ -689,12 +689,12 @@ impl Engine {
             }
         }
         self.attribution = attribution
-            .chunks_exact(8)
-            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]])
+            .chunks_exact(9)
+            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8]])
             .collect();
         self.tick_components = components
-            .chunks_exact(7)
-            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6]])
+            .chunks_exact(8)
+            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]])
             .collect();
         self.tick_fundamental = fundamental.to_vec();
         self.tick_anchor = anchor.to_vec();
@@ -745,9 +745,9 @@ impl Engine {
         // caller can still read yesterday's decomposition after the close has
         // run, which is when they would actually want it.
         self.attribution.clear();
-        self.attribution.resize(self.companies.len(), [0.0; 8]);
+        self.attribution.resize(self.companies.len(), [0.0; 9]);
         self.tick_components.clear();
-        self.tick_components.resize(self.companies.len(), [0.0; 7]);
+        self.tick_components.resize(self.companies.len(), [0.0; 8]);
         self.tick_fundamental.clear();
         self.tick_fundamental.resize(self.companies.len(), f64::NAN);
         self.tick_anchor.clear();
@@ -863,7 +863,7 @@ impl Engine {
                     // so the columns reconstruct the move even when the cap
                     // binds -- which is exactly when a jump is interesting.
                     if let Some(acc) = self.attribution.get_mut(index) {
-                        acc[7] += after - s;
+                        acc[8] += after - s;
                     }
                     company.stock.mispricing_s = Some(after);
                     // Move the momentum reference with the jump, by the
@@ -1326,8 +1326,8 @@ impl Engine {
     /// ordering must establish it before the first tick.
     pub fn add_company(&mut self, company: TickCompany) -> usize {
         self.companies.push(company);
-        self.attribution.push([0.0; 8]);
-        self.tick_components.push([0.0; 7]);
+        self.attribution.push([0.0; 9]);
+        self.tick_components.push([0.0; 8]);
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);
         self.companies.len() - 1
@@ -1854,7 +1854,7 @@ pub struct SessionBuffer {
     /// `S_COMPONENT_KEYS` order. Seven flat buffers rather than one of
     /// `[f64; 7]`, because each becomes an Arrow column and a column wants a
     /// contiguous run of its own values.
-    pub components: [Vec<f64>; 7],
+    pub components: [Vec<f64>; 8],
 }
 
 impl SessionBuffer {
@@ -1882,7 +1882,7 @@ impl SessionBuffer {
         &mut self,
         tick: usize,
         companies: &[TickCompany],
-        components: &[[f64; 7]],
+        components: &[[f64; 8]],
         fundamental: &[f64],
         anchor: &[f64],
     ) {
@@ -1895,7 +1895,7 @@ impl SessionBuffer {
             self.mispricing_s[base + i] = c.stock.mispricing_s.unwrap_or(f64::NAN);
             self.fundamental[base + i] = fundamental.get(i).copied().unwrap_or(f64::NAN);
             self.anchor[base + i] = anchor.get(i).copied().unwrap_or(f64::NAN);
-            let row = components.get(i).copied().unwrap_or([0.0; 7]);
+            let row = components.get(i).copied().unwrap_or([0.0; 8]);
             for (k, column) in self.components.iter_mut().enumerate() {
                 column[base + i] = row[k];
             }

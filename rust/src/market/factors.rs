@@ -48,7 +48,7 @@ use crate::mathx;
 /// preset that carries jumps (§74).
 pub const JUMP_COMPONENT_KEY: &str = "jump";
 
-pub const S_COMPONENT_KEYS: [&str; 7] = [
+pub const S_COMPONENT_KEYS: [&str; 8] = [
     "reversion",
     "momentum",
     "crowd_lean",
@@ -56,6 +56,13 @@ pub const S_COMPONENT_KEYS: [&str; 7] = [
     "order_flow_impact",
     "short_squeeze_effect",
     "random_noise",
+    // The session circuit breaker's own correction. When the model price
+    // leaves the band the tick re-derives `s` from the clamped price, and
+    // until 2026-08-26 that rewrite was booked to nobody: on any day the
+    // breaker bound, the columns did not reconstruct the move. Measured on
+    // one crisis window before the fix, the seven summed to -0.204 against a
+    // change of -0.190 (§79).
+    "circuit_breaker",
 ];
 
 /// Total impact coefficient for order flow, before the informed fraction.

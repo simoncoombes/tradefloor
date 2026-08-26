@@ -347,7 +347,7 @@ pub struct TickOutcome {
     /// the crowd, actually DID to the mispricing on this tick. They sum to
     /// `Δs` -- so a consumer can verify the label against the outcome rather
     /// than trusting it.
-    pub s_components: Vec<[f64; 7]>,
+    pub s_components: Vec<[f64; 8]>,
     /// Volume printed per active company.
     pub volumes: Vec<f64>,
     /// The live factor decomposition per active company, in `active_indices`
@@ -620,7 +620,7 @@ pub fn simulate_market_tick(
 
     let mut new_prices = vec![0.0; active_count];
     let mut fundamentals = vec![f64::NAN; active_count];
-    let mut s_components = vec![[0.0f64; 7]; active_count];
+    let mut s_components = vec![[0.0f64; 8]; active_count];
     let mut crowd_leans = vec![0.0; active_count];
 
     for i in 0..active_count {
@@ -660,6 +660,8 @@ pub fn simulate_market_tick(
                 raw.order_flow_impact * scale,
                 raw.short_squeeze_effect * scale,
                 all_noises[i] * intraday_vol_mult,
+                // The breaker's slot, filled below if it binds.
+                0.0,
             ]
         } else {
             // Closed: no reversion, no crowd, and the squeeze term is not
@@ -673,6 +675,7 @@ pub fn simulate_market_tick(
                 raw.order_flow_impact * scale,
                 0.0,
                 all_noises[i],
+                0.0,
             ]
         };
 
@@ -704,7 +707,11 @@ pub fn simulate_market_tick(
         let min_price = mathx::max(previous_closes[i] * p.breaker_down, 0.01);
         if new_price > max_price || new_price < min_price {
             new_price = mathx::max(min_price, mathx::min(max_price, new_price));
+            let before = s_val;
             s_val = clamp_s(p, mathx::log(new_price / fv));
+            // What the breaker took off the tick, booked to the breaker. The
+            // columns reconstruct the move on a halted day now (§79).
+            s_components[i][7] += s_val - before;
         }
 
         companies[idx].stock.mispricing_s = Some(s_val);

@@ -171,7 +171,7 @@ pub fn truth_batch(
     mispricing: &[f64],
     fundamental: &[f64],
     anchor: &[f64],
-    components: &[Vec<f64>; 8],
+    components: &[Vec<f64>; 9],
 ) -> Result<RecordBatch, String> {
     let rows = ticks * instruments;
     if mispricing.len() < rows || fundamental.len() < rows || anchor.len() < rows {
@@ -482,7 +482,7 @@ pub struct RecordedDay {
     pub mispricing: Vec<f64>,
     pub fundamental: Vec<f64>,
     pub anchor: Vec<f64>,
-    pub components: [Vec<f64>; 8],
+    pub components: [Vec<f64>; 9],
 }
 
 /// `bars` at a coarser grain: real OHLCV.

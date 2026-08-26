@@ -496,9 +496,12 @@ def test_attribution_reports_every_component_that_moves_a_price():
         "reversion", "momentum", "crowd_lean",
         "company_news", "order_flow_impact", "short_squeeze_effect",
         "random_noise",
-        # The eighth arrived 2026-08-26: `apply_jumps` moves `s` after the
-        # tick loop, so the seven above did not reconstruct a jump day on any
-        # preset carrying jumps, which is every preset from pt-v4 (§74).
+        # The eighth and ninth arrived 2026-08-26. `apply_jumps` moves `s`
+        # after the tick loop, and the session breaker rewrites it from the
+        # clamped price; the seven above reconstructed neither a jump day nor
+        # a halted one on any preset that has jumps, which is every preset
+        # from pt-v4 (§74, §79).
+        "circuit_breaker",
         "jump",
     ]
 
