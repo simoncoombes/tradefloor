@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased
+
+### `pt-v11`: crises as violent as real ones
+
+A new selectable preset. The default is unchanged, and every earlier preset
+still reproduces bit for bit.
+
+Until now every preset drew price jumps at a **constant** daily rate, so a
+dead-calm market and a panic jumped equally often. Measuring where a calm
+market's volatility actually comes from found it: jumps carry 40.5% of the
+variance of a market pinned at VIX 5 and 1.1% of one pinned at VIX 65, on
+3003 and 2998 jump days. Real markets are the other way round, and that
+constant rate was the floor under how quiet this market could ever get.
+
+`pt-v11` couples the jump **arrival rate** to the VIX and scales the base
+rates down to pay for it. The result is the number this project has chased
+longest: **the crisis volatility lever reads about 6.12x against a real
+6.16x**, where the default reads 5.05x and the first measurement of it read
+2.95x. It holds all fourteen realism statistics in band at one year, on
+training seeds and on a held-out universe, and thirteen of fourteen at two
+years, with no statistic regressed against the default.
+
+```python
+eng = pt.Engine(seed=42, universe=u, model="pt-v11")
+```
+
+Not the default, deliberately: 0.2.0 moved the default once already, and
+moving it twice in one cycle would strand work published in between. What it
+does not yet claim is a cost outside the panel: driven through a real macro
+path this preset fires more jumps than the default, and that has not been
+measured.
+
+### New parameter
+
+`jump_vix_coupling` makes a jump's arrival rate follow the VIX. It ships at
+0.0 on every preset before `pt-v11`, bit-identically, and is not
+variance-neutral: raising it adds jump variance unless the base intensities
+are scaled down, and the factor that does so is derivable from the VIX
+distribution rather than searched. Its docstring carries the arithmetic.
+
 ## 0.2.0
 
 **The market this library simulates is a different, and much better, market.**

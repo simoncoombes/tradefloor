@@ -649,7 +649,7 @@ def test_unknown_read_only_and_derived_names_are_refused():
     with pytest.raises(pretium.ValidationError, match="finite"):
         pretium.ModelParams.from_preset("pt-v1", garch_alpha=float("nan"))
     with pytest.raises(pretium.ValidationError, match="unknown model preset"):
-        pretium.ModelParams.from_preset("pt-v11")
+        pretium.ModelParams.from_preset("pt-v999")
     with pytest.raises(pretium.ValidationError, match="model must be"):
         pretium.Engine(seed=1, universe=UNIVERSE, model=0.12)
 
@@ -689,7 +689,7 @@ def test_model_preset_keeps_its_kat_frozen_shape_and_gains_name():
         "mispricing_phi", "momentum_theta", "name",
     ]
     with pytest.raises(pretium.ValidationError, match="unknown model preset"):
-        pretium.model_preset("pt-v11")
+        pretium.model_preset("pt-v999")
 
 
 # -- property 4: the fingerprint travels ------------------------------------

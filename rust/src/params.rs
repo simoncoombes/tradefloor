@@ -818,6 +818,10 @@ pub const PT_V9: ModelParams = ModelParams::pt_v9();
 /// pt-v9 with volume that remembers -- see [`ModelParams::pt_v10`].
 pub const PT_V10: ModelParams = ModelParams::pt_v10();
 
+/// pt-v10 with jumps that cluster into crises -- see
+/// [`ModelParams::pt_v11`].
+pub const PT_V11: ModelParams = ModelParams::pt_v11();
+
 /// The name of the preset an engine runs when none is named.
 ///
 /// This exists because the name and the coefficients drifted apart once
@@ -1010,8 +1014,8 @@ impl ModelParams {
     /// against five.
     ///
     /// Choose it when the question is a multi-year one. The envelope
-    /// certifies pt-v3 at 252 days and that claim is not weakened by this
-    /// preset existing beside it.
+    /// certifies pt-v10 at 252 days since the 2026-08-26 era boundary, and
+    /// that claim is not weakened by this preset existing beside it.
     pub const fn pt_v4() -> ModelParams {
         let mut p = ModelParams::pt_v3();
         p.jump_intensity_market = 0.086555921159823;
@@ -1059,8 +1063,9 @@ impl ModelParams {
     /// correlation blend identical (§39). It passes §8 on every axis, both
     /// the loss thresholds and the flip test (§45).
     ///
-    /// NOT the default. The envelope certifies pt-v3 at 252 days, and
-    /// certification is a separate act from passing the controls.
+    /// NOT the default. The envelope certifies pt-v10 at 252 days since
+    /// the 2026-08-26 era boundary, and certification is a separate act
+    /// from passing the controls.
     ///
     /// `volume_change_acf1` remains out of band here as everywhere, for the
     /// structural reason recorded when it was excluded from the objective.
@@ -1102,8 +1107,9 @@ impl ModelParams {
     /// reliable edge over hold: pt-v3 is 8-16, pt-v5 is 13-11, this is
     /// 10-14, none significant (§51). There is no edge to remove.
     ///
-    /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3;
-    /// passing the controls is not certification.
+    /// NOT the default. pt-v10 holds that since the 2026-08-26 era
+    /// boundary and the envelope certifies pt-v10; passing the controls is
+    /// not certification.
     pub const fn pt_v6() -> ModelParams {
         let mut p = ModelParams::pt_v5();
         // Exactly half of pt-v3's 0.07420624999999997, asserted in tests
@@ -1150,7 +1156,8 @@ impl ModelParams {
     /// Gates, in the record: the response instrument against pt-v6, held-out
     /// seeds and universe, §8 against pt-v6's passing control.
     ///
-    /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3.
+    /// NOT the default. pt-v10 holds that since the 2026-08-26 era
+    /// boundary, and the envelope certifies pt-v10.
     pub const fn pt_v7() -> ModelParams {
         let mut p = ModelParams::pt_v6();
         p.sector_factor_sigma = 0.012;
@@ -1189,7 +1196,8 @@ impl ModelParams {
     /// flips. Cost stated: crisis-state sector excess +0.053 against pt-v7's
     /// +0.079 (real +0.10).
     ///
-    /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3.
+    /// NOT the default. pt-v10 holds that since the 2026-08-26 era
+    /// boundary, and the envelope certifies pt-v10.
     pub const fn pt_v8() -> ModelParams {
         let mut p = ModelParams::pt_v7();
         p.market_factor_sigma = 0.008829098749522557;
@@ -1240,7 +1248,8 @@ impl ModelParams {
     /// volatility lever rises to 4.31x from pt-v8's 4.34x-equivalent
     /// measurement, both under a pinned VIX.
     ///
-    /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3.
+    /// NOT the default. pt-v10 holds that since the 2026-08-26 era
+    /// boundary, and the envelope certifies pt-v10.
     pub const fn pt_v9() -> ModelParams {
         let mut p = ModelParams::pt_v8();
         p.momentum_theta = 0.018551562499999993;
@@ -1306,7 +1315,11 @@ impl ModelParams {
     /// pt-v9's 4.31x, the correlation blend 3.13x against 3.16x and the shock
     /// ratio 1.078 against 1.084, all inside noise.
     ///
-    /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3.
+    /// THE DEFAULT since the 2026-08-26 era boundary, and what the envelope
+    /// certifies: all fourteen realism statistics in band at 252 days on
+    /// thirty training seeds and on a held-out universe, thirteen of
+    /// fourteen at 504 days. This line read "NOT the default" until the
+    /// boundary moved and was corrected after 0.2.0 shipped with it stale.
     pub const fn pt_v10() -> ModelParams {
         let mut p = ModelParams::pt_v9();
         p.vix_cycle_amplitude = 0.0;
@@ -1314,6 +1327,74 @@ impl ModelParams {
         p.garch_vix_coupling = 0.3;
         p.volume_innovation_sigma = 0.21;
         p.volume_persistence = 0.7;
+        p
+    }
+
+    /// pt-v10 with jumps that know what regime they are in: the first
+    /// preset whose crisis is as violent as a real one.
+    ///
+    /// Three coefficients move from pt-v10 (CALIBRATION-FOLLOWUPS.md §84 to
+    /// §90). `jump_vix_coupling` 0.0 to 0.7 makes a jump's ARRIVAL RATE
+    /// follow the VIX; the two base intensities are scaled by 0.6 to fund
+    /// it. Both halves are necessary and the second is derived rather than
+    /// searched.
+    ///
+    /// # What it fixes
+    ///
+    /// Every preset before this one drew jumps at a constant per-day rate,
+    /// so a dead-calm market and a panic jumped equally often. Decomposing
+    /// the nine attribution components under a pinned VIX measured what that
+    /// costs: jumps carry 40.5% of the variance of a market pinned at VIX 5
+    /// and 1.1% of one pinned at VIX 65, on 3003 and 2998 jump day-cells
+    /// respectively (§84). Real markets are the other way round. That
+    /// constant rate was the floor under the calm end of the crisis lever —
+    /// a market that cannot stop jumping cannot get quiet — and three
+    /// parameter hypotheses were refuted before the decomposition found it
+    /// (§82, §83).
+    ///
+    /// **The crisis volatility lever reads about 6.12x against a real
+    /// 6.16x.** It has been the oldest open number in this project: 2.95x
+    /// when the gap was written, 3.07x on pt-v3, 4.34x on pt-v8, 5.05x on
+    /// pt-v10. The lever rises from BOTH ends, which is what removing a
+    /// VIX-insensitive additive term predicts.
+    ///
+    /// # Why the intensities are scaled, and by exactly that much
+    ///
+    /// The rate scale `1 - c + c * (vix / anchor)^2` averages ABOVE one over
+    /// this model's own VIX distribution, so the coupling alone ADDS jump
+    /// variance rather than moving it between regimes. Measured on an
+    /// undriven 504-day run: VIX mean 20.24, `E[(vix / 15)^2]` = 2.035, so
+    /// the mean scale at `c` = 0.7 is 1.725 and the funding factor is its
+    /// reciprocal, 0.580 (§88). Unfunded, the coupling took the 504-day
+    /// panel from 13 of 14 to 11, losing `annualised_vol_pct` at 34.9
+    /// against a ceiling of 34.0 (§87). At 0.6, close to the derived 0.580,
+    /// two-year volatility returns to 32.7 — pt-v10's value to the decimal.
+    ///
+    /// # Measured, thirty seeds
+    ///
+    /// 252 days: **14 of 14** in band, no misses, on training seeds and on a
+    /// held-out universe alike. 504 days: 13 of 14, missing only
+    /// `volume_change_acf1`, which pt-v10 misses too. Sector excess is
+    /// unchanged at both horizons (+0.1359 and +0.1195 against pt-v10's
+    /// +0.1346 and +0.1201). §8 passes on every axis with no flips. **No
+    /// axis regresses against pt-v10** (§90).
+    ///
+    /// # What is not claimed
+    ///
+    /// The panel gates are UNDRIVEN. Through a real driven path the VIX runs
+    /// well above the anchor, so this preset fires more jumps there than
+    /// pt-v10 does, and §81's finding was that the model already carries
+    /// excess noise around a correct scenario gain. That cost is not yet
+    /// measured and this preset does not claim it is zero.
+    ///
+    /// NOT the default. pt-v10 holds that and the envelope certifies
+    /// pt-v10; 0.2.0 moved the default once already and moving it twice in
+    /// one release cycle would strand work published in between.
+    pub const fn pt_v11() -> ModelParams {
+        let mut p = ModelParams::pt_v10();
+        p.jump_vix_coupling = 0.7;
+        p.jump_intensity_market = 0.04317129366394317;
+        p.jump_intensity_idio = 0.013631923739110182;
         p
     }
 
@@ -1325,8 +1406,8 @@ impl ModelParams {
     ///
     /// Note what this function does NOT decide: which preset an engine
     /// gets when the caller names none. That is `engine.rs`'s and
-    /// `python_engine.rs`'s default, and as of the `pt-v3` era boundary it
-    /// is [`PT_V3`]. `pt-v1` and `pt-v2` remain selectable and
+    /// `python_engine.rs`'s default, and as of the 2026-08-26 era boundary
+    /// it is [`PT_V10`]. `pt-v1` and `pt-v2` remain selectable and
     /// bit-reproducing forever, so a result recorded under either replays
     /// exactly by naming it.
     pub fn preset(name: &str) -> Option<ModelParams> {
@@ -1341,13 +1422,15 @@ impl ModelParams {
             "pt-v8" => Some(PT_V8),
             "pt-v9" => Some(PT_V9),
             "pt-v10" => Some(PT_V10),
+            "pt-v11" => Some(PT_V11),
             _ => None,
         }
     }
 
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
-        &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10"]
+        &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
+          "pt-v11"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -1802,7 +1885,15 @@ mod tests {
         assert_eq!(PT_V9.fingerprint(), "pt-v9");
         assert_eq!(ModelParams::preset("pt-v9").unwrap().fingerprint(), "pt-v9");
         assert_eq!(PT_V10.fingerprint(), "pt-v10");
-        assert!(ModelParams::preset("pt-v11").is_none());
+        assert_eq!(ModelParams::preset("pt-v10").unwrap().fingerprint(), "pt-v10");
+        assert_eq!(PT_V11.fingerprint(), "pt-v11");
+        assert_eq!(ModelParams::preset("pt-v11").unwrap().fingerprint(), "pt-v11");
+        // The sentinel is a name no preset will ever take, not the NEXT one.
+        // It used to be the next unreleased name, which meant this guard
+        // sprang the day that preset shipped rather than the day something
+        // went wrong: pt-v11 tripped it on registration, twice (here and in
+        // tests/test_model_params.py).
+        assert!(ModelParams::preset("pt-v999").is_none());
 
         // Adding a preset must not disturb an existing one. The fingerprint
         // is taken over the PARAMETERS, not the table, so this holds by
