@@ -1063,7 +1063,7 @@ pub const PT_V12: ModelParams = ModelParams::pt_v12();
 /// bottom of this file asserts it resolves to the engine's default
 /// bit-for-bit. A future era that moves the default and forgets this
 /// constant fails the suite instead of mislabelling every manifest.
-pub const DEFAULT_PRESET_NAME: &str = "pt-v10";
+pub const DEFAULT_PRESET_NAME: &str = "pt-v12";
 
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
 /// certificate recorded.
@@ -1622,9 +1622,10 @@ impl ModelParams {
     /// excess also lands at +0.091 against a real +0.103, closer than any
     /// preset before it and still short.
     ///
-    /// NOT the default. pt-v10 holds that and the envelope certifies pt-v10;
-    /// promoting this one is an era boundary and a separate decision from
-    /// registering it.
+    /// NOT the default. [`PT_V12`] holds that, and is this preset plus one
+    /// number: `volume_move_cap`. Selecting pt-v11 by name gives the crisis
+    /// work without the volume-cap fix, which is the comparison §114 is
+    /// written against.
     pub const fn pt_v11() -> ModelParams {
         let mut p = ModelParams::pt_v10();
         // The crisis, through the market factor (§97 to §99).
@@ -1689,7 +1690,10 @@ impl ModelParams {
     /// against a real 1.00. That axis was already the worst thing about this
     /// model and this makes it 0.6% worse.
     ///
-    /// NOT the default. pt-v10 holds that and the envelope certifies pt-v10.
+    /// **The default since the second 2026-08-26 era boundary**, and what
+    /// the envelope certifies. [`PT_V10`] and [`PT_V3`] stay selectable and
+    /// bit-reproducing, so anything recorded under either replays exactly by
+    /// naming it.
     pub const fn pt_v12() -> ModelParams {
         let mut p = ModelParams::pt_v11();
         p.volume_move_cap = 12.0;
@@ -1704,8 +1708,8 @@ impl ModelParams {
     ///
     /// Note what this function does NOT decide: which preset an engine
     /// gets when the caller names none. That is `engine.rs`'s and
-    /// `python_engine.rs`'s default, and as of the 2026-08-26 era boundary
-    /// it is [`PT_V10`]. `pt-v1` and `pt-v2` remain selectable and
+    /// `python_engine.rs`'s default, and as of the second 2026-08-26 era
+    /// boundary it is [`PT_V12`]. `pt-v1` and `pt-v2` remain selectable and
     /// bit-reproducing forever, so a result recorded under either replays
     /// exactly by naming it.
     pub fn preset(name: &str) -> Option<ModelParams> {
@@ -2279,12 +2283,12 @@ mod tests {
         // without a model got pt-v3 from 2026-08-22 and pt-v10 from
         // 2026-08-26; if this flips, every published figure silently
         // describes a different market.
-        assert_eq!(crate::params::PT_V10.fingerprint(), "pt-v10");
+        assert_eq!(crate::params::PT_V12.fingerprint(), "pt-v12");
         assert_eq!(
             crate::engine::Engine::default_model().fingerprint(),
-            "pt-v10"
+            "pt-v12"
         );
-        assert_eq!(DEFAULT_PRESET_NAME, "pt-v10");
+        assert_eq!(DEFAULT_PRESET_NAME, "pt-v12");
         // The earlier default still exists and still answers to its name.
         assert_eq!(crate::params::PT_V3.fingerprint(), "pt-v3");
     }
