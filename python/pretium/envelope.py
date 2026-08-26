@@ -170,23 +170,27 @@ class Gap:
 GAPS: tuple[Gap, ...] = (
     Gap(
         id="volume-change",
-        summary="volume-change autocorrelation is unreachable without spending a passing statistic",
+        summary="volume-change autocorrelation leaves its band beyond one year",
         detail=(
-            "-0.4598 against a band of -0.32 to -0.20, 13.7 seed-sd out. A "
-            "held volume level plus independent per-tick noise sits near -0.5 "
-            "at any coefficients of the SHIPPED mechanism. It is not "
-            "unreachable outright: the common volume state that ships live "
-            "in pt-v4 reaches the band at volume_persistence 0.7 with "
-            "innovation sigma 0.25, or at volume_variance_gain 1.0 to 2.0, "
-            "and both pay for it with volume_abs_return_corr leaving its own "
-            "band (CALIBRATION-FOLLOWUPS §21 to §23). The row is excluded "
-            "from the calibration objective deliberately: an optimiser "
-            "pointed at a target it can only reach by spending a live one "
-            "does not fail cleanly, it distorts every other parameter "
-            "chasing it."
+            "At 252 days the shipped preset reads -0.3130 against a band of "
+            "-0.32 to -0.20, inside it but only 0.7 seed-sd clear of the "
+            "floor. At 504 days it reads -0.3156 against a tighter band of "
+            "-0.29 to -0.21, about 2.2 seed-sd out, and it is the only row "
+            "of the fourteen that misses at that horizon.\n\n"
+            "This gap used to say the row was unreachable without spending a "
+            "passing statistic, because every earlier way of reaching it cost "
+            "volume_abs_return_corr its own band (CALIBRATION-FOLLOWUPS §21 "
+            "to §23). That is no longer true and the claim is withdrawn: "
+            "pt-v10 carries volume_persistence 0.70 with "
+            "volume_innovation_sigma 0.21 and holds BOTH rows at 252 days, "
+            "volume_change_acf1 at -0.3130 and volume_abs_return_corr at "
+            "0.4784. What remains is a horizon problem, not a trade-off: the "
+            "two-year band is tighter than the one-year band and the model "
+            "sits just outside it."
         ),
-        forbids="strategies trading the day-to-day CHANGE in volume",
+        forbids="strategies trading the day-to-day CHANGE in volume beyond one year",
         statistics=("volume_change_acf1",),
+        beyond_days=CERTIFIED_HORIZON_DAYS,
     ),
     Gap(
         id="horizon",
@@ -236,21 +240,6 @@ GAPS: tuple[Gap, ...] = (
         statistics=("abs_return_acf20",),
     ),
     Gap(
-        id="thin-tails",
-        summary="tails are too thin over multi-year windows",
-        detail=(
-            "Excess kurtosis reads 5.23 at 504 days against a horizon-matched "
-            "band of 7.1 to 22. The 252-day band's floor of 1.6 is wide "
-            "enough that this reads as comfortably in band on every 252-day "
-            "certificate, which is why it went unnoticed: nothing was "
-            "measuring kurtosis where it fails."
-        ),
-        forbids="tail-risk or VaR calibration at multi-year horizons",
-        statistics=("excess_kurtosis",),
-        beyond_days=CERTIFIED_HORIZON_DAYS,
-        closed_by=("pt-v4", "pt-v5", "pt-v6"),
-    ),
-    Gap(
         id="scenario-magnitude",
         summary="scenario response is directional, not calibrated",
         detail=(
@@ -276,6 +265,16 @@ GAPS: tuple[Gap, ...] = (
             "The exception is the Fed's intermeeting cut of 3 March 2020, "
             "where an announcement-effect channel is absent rather than "
             "miscalibrated; see examples/09-a-pandemic-shaped-market.ipynb."
+            "\n\n"
+            "Sector structure is the same shortfall measured a second "
+            "way. In calm markets it is in band on the shipped preset, "
+            "0.1346 at 252 days and 0.1201 at 504 against bands starting "
+            "at 0.11, which is why the separate sector-structure gap was "
+            "retired at 0.2.0. Under a held VIX 45 it reads +0.035 "
+            "against a real +0.103 in the 2020 window, on thirty seeds "
+            "at 252 days; pt-v7 measured on the same recipe reads "
+            "+0.064. Industries exist in this market and they hold "
+            "together in a crisis about a third as tightly as real ones."
         ),
         forbids="sizing a scenario's impact rather than detecting it",
     ),
@@ -330,48 +329,6 @@ GAPS: tuple[Gap, ...] = (
         statistics=(),
     ),
     Gap(
-        id="sector-structure",
-        summary="names in the same sector do not co-move more than names in different ones",
-        detail=(
-            "sector_excess_corr, mean same-sector pairwise correlation minus "
-            "mean cross-sector, reads 0.0037 on the shipped preset against a "
-            "real band of 0.11 to 0.23: about 15 seed-sd out at 252 days, and "
-            "0.0051 against 0.11 to 0.22 at 504 days, about 20 out. Every one "
-            "of ten real windows, the 2020 crisis included, sits between 0.10 "
-            "and 0.20, so this is the tightest band on the panel after "
-            "volume_change_acf1 and the model is nowhere near it. The same "
-            "reading holds on held-out seeds (0.012) and a held-out 60-name "
-            "universe (0.017).\n\n"
-            "The cause is a single scalar. The sector factor is one normal per "
-            "sector at sigma 0.002 with a fixed loading of 0.5 for every "
-            "member (market/tick.rs, market/factors.rs), which carries about a "
-            "quarter of one percent of a name's daily variance, so residual "
-            "correlation after the market factor is diagonal in practice. The "
-            "parameter is settable as sector_factor_sigma and was reported as "
-            "a null direction by the pt-v1 search, which is exactly what a "
-            "lever invisible to the objective looks like; it was never "
-            "measured against a statistic that could see it until now. "
-            "Sector labels do move prices elsewhere: the same company under "
-            "twelve labels spreads two-year returns across ninety points "
-            "through the valuation anchors. What is missing is co-movement.\n\n"
-            "The dial has been measured (CALIBRATION-FOLLOWUPS §59 to §61). "
-            "At 0.012 the statistic lands inside its band at one year on "
-            "training seeds, held-out seeds and a held-out universe, and on "
-            "the pt-v6 base clears the §8 overfitting control. It pays twice, "
-            "on every base, for one reason: the sector draw is the only "
-            "variance term that does not scale with VIX, so it dilutes the "
-            "crisis lever by a tenth in calm markets and is consumed by the "
-            "crisis blend in stressed ones, where sector excess reads zero "
-            "at a held VIX 45 against a real +0.10. Two parameters that "
-            "remove both causes, sector_vix_coupling and crisis_blend_source, "
-            "ship inert at 0.0 in 0.1.4; no preset uses them until the "
-            "thirty-seed measurement is in."
-        ),
-        forbids="sector rotation, sector-neutral construction, industry diversification, and any long/short pair whose thesis is the sector",
-        statistics=("sector_excess_corr",),
-        closed_by=("pt-v7", "pt-v8"),
-    ),
-    Gap(
         id="roster-concentration",
         summary="certification was measured on a sector-balanced roster",
         detail=(
@@ -379,7 +336,7 @@ GAPS: tuple[Gap, ...] = (
             "sectors, and no real index is balanced that way -- the S&P is "
             "roughly a third technology and the Nasdaq more so. Varying ONLY "
             "sector composition, with every name drawn from one pool: "
-            "balanced holds 9 of the original 10 at L_real 0.0000; an S&P-like mix holds 8 "
+            "balanced holds 9 of the ten-statistic panel of the time at L_real 0.0000; an S&P-like mix holds 8 "
             "at 0.0176, losing abs_return_acf5; an all-technology roster "
             "holds 7/10 and runs 32.8% volatility. So part of the "
             "certification is an artifact of that balance, and the more "
@@ -592,39 +549,28 @@ def check(
         fire(g, (
             f"horizon {horizon_days}d exceeds the certified "
             f"{CERTIFIED_HORIZON_DAYS}d. At 504 days the model holds 13 of 14 "
-            f"against horizon-matched bands: abs_return_acf1 "
-            f"{MEASURED_504['abs_return_acf1']:.3f} against "
-            f"{BANDS_504['abs_return_acf1']}, abs_return_acf5 "
-            f"{MEASURED_504['abs_return_acf5']:.3f} against "
-            f"{BANDS_504['abs_return_acf5']}"
+            f"against horizon-matched bands, missing only volume_change_acf1 "
+            f"at {MEASURED_504['volume_change_acf1']:.4f} against "
+            f"{BANDS_504['volume_change_acf1']}. Beyond 504 days nothing has "
+            f"been measured at all"
         ))
         if "excess_kurtosis" in wanted:
-            k = by_id["thin-tails"]
-            fire(k, (
+            warnings.append(
                 f"excess_kurtosis reads {MEASURED_504['excess_kurtosis']:.2f} "
-                f"at 504 days against a horizon-matched band of "
-                f"{BANDS_504['excess_kurtosis']} -- the tails are too thin "
-                f"where you are measuring"
-            ))
+                f"at 504 days against {BANDS_504['excess_kurtosis']}: inside "
+                f"it, but about 0.3 seed-sd above the floor, so a tail study "
+                f"at this horizon is reading the low edge of the band"
+            )
 
     for name in wanted:
-        if name == "volume_change_acf1":
+        if name == "volume_change_acf1" and horizon_days > CERTIFIED_HORIZON_DAYS:
             g = by_id["volume-change"]
             fire(g, (
-                f"volume_change_acf1 is unreachable without spending a "
-                f"passing statistic: {CERTIFIED[name]:.4f} against "
-                f"{REAL_MARKETS[name]}, 13.7 seed-sd out. The volume state "
-                f"can reach it and pays with volume_abs_return_corr, so it "
-                f"is excluded from the objective"
-            ))
-        elif name == "sector_excess_corr":
-            g = by_id["sector-structure"]
-            fire(g, (
-                f"sector_excess_corr reads {CERTIFIED[name]:.4f} against "
-                f"{REAL_MARKETS[name]}, about 15 seed-sd out: the model has "
-                "no sector co-movement, only a market factor and a sector "
-                "sigma of 0.002 that carries a quarter of one percent of "
-                "variance"
+                f"volume_change_acf1 reads "
+                f"{MEASURED_504[name]:.4f} at 504 days against "
+                f"{BANDS_504[name]}, about 2.2 seed-sd out, and it is the "
+                f"only row of the fourteen that misses at that horizon. At "
+                f"252 days it is in band at {CERTIFIED[name]:.4f}"
             ))
         elif name == "abs_return_acf20":
             g = by_id["decay-shape"]
@@ -774,7 +720,8 @@ def regressions(panel: Mapping[str, float], *,
     whole panel by hand.
 
     That is not hypothetical. `pt-v4` halves the dual-horizon loss and is
-    the first vector ever to close the thin-tails gap -- and it surrenders
+    the first vector ever to close the thin-tails gap, retired at 0.2.0 when
+    the shipped preset closed it too -- and it surrenders
     `return_acf1` at the certified horizon, on training seeds, held-out
     seeds and a held-out universe alike. It was called a win twice before
     anyone counted (CALIBRATION-FOLLOWUPS §33).
@@ -808,10 +755,13 @@ def regressions(panel: Mapping[str, float], *,
     theirs = score(panel, horizon_days=horizon_days)["statistics"]
     lost = []
     for name, row in theirs.items():
-        if row["structural"]:
-            # Out of band by design and excluded from the objective; a
-            # candidate cannot be blamed for it or credited with it.
-            continue
+        # Being outside the calibration objective is not a licence to lose
+        # the row. Until 0.2.0 every `structural` statistic was skipped here,
+        # on the reasoning that the shipped preset did not hold them either;
+        # pt-v10 holds all fourteen at the certified horizon, so that
+        # reasoning expired and the skip with it. The condition below is the
+        # one that always did the work: a row the shipped preset does not
+        # hold in band cannot be lost by a candidate.
         low, high = REAL_MARKETS[name]
         if band_distance(CERTIFIED[name], low, high) == 0 and not row["in_band"]:
             lost.append(name)

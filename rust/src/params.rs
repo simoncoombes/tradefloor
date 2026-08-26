@@ -1798,15 +1798,19 @@ mod tests {
     }
 
     #[test]
-    fn the_default_preset_is_pt_v3() {
+    fn the_default_preset_is_pt_v10() {
         // The era boundary, asserted rather than assumed. An engine built
-        // without a model gets pt-v3 from 2026-08-22; if this flips back,
-        // every published figure silently describes a different market.
-        assert_eq!(crate::params::PT_V3.fingerprint(), "pt-v3");
+        // without a model got pt-v3 from 2026-08-22 and pt-v10 from
+        // 2026-08-26; if this flips, every published figure silently
+        // describes a different market.
+        assert_eq!(crate::params::PT_V10.fingerprint(), "pt-v10");
         assert_eq!(
             crate::engine::Engine::default_model().fingerprint(),
-            "pt-v3"
+            "pt-v10"
         );
+        assert_eq!(DEFAULT_PRESET_NAME, "pt-v10");
+        // The earlier default still exists and still answers to its name.
+        assert_eq!(crate::params::PT_V3.fingerprint(), "pt-v3");
     }
 
     #[test]

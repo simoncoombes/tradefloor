@@ -75,14 +75,14 @@ pub fn bars_schema() -> SchemaRef {
 /// `mispricing_s` isolates the valuation gap. Three quantities that are easy
 /// to conflate, kept apart on purpose.
 ///
-/// **The decomposition.** Seven columns, in `S_COMPONENT_KEYS` order, giving
+/// **The decomposition.** Eight columns, in `S_COMPONENT_KEYS` order, giving
 /// every contribution to this tick's change in `s`. `reversion`, `momentum`
 /// and `crowd_lean` are the model's own dynamics; `company_news`,
 /// `order_flow_impact`, `short_squeeze_effect` and `random_noise` are the
 /// shocks. They sum to `Δs`.
 ///
 /// That they SUM is what makes this a dataset rather than a commentary. A
-/// consumer can difference `mispricing_s` across ticks, add the seven columns,
+/// consumer can difference `mispricing_s` across ticks, add the nine columns,
 /// and check the label against the outcome instead of trusting it. Where the
 /// residual is not zero, the `s` clamp or a circuit breaker bound -- which is
 /// itself worth seeing, and would be invisible in a summary.
@@ -113,7 +113,7 @@ pub fn truth_schema() -> SchemaRef {
         fields.push(Field::new(key, DataType::Float64, false));
     }
     // The daily jump, which `apply_jumps` writes to `s` after the tick loop.
-    // Without it the seven columns do not reconstruct the move on any preset
+    // Without it the other eight columns do not reconstruct the move on any preset
     // that carries jumps, which is every preset from pt-v4 (§74).
     fields.push(Field::new(
         crate::market::factors::JUMP_COMPONENT_KEY,

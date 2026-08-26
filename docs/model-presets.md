@@ -25,26 +25,31 @@ mean nothing.
 
 ## Which preset to use
 
-Ten presets ship. Five are recommendations; the rest exist so that
+Ten presets ship. Four are recommendations; the rest exist so that
 results already published on them keep reproducing bit for bit, and a
 new preset never moves an old one.
 
 | preset | use it for | status |
 |---|---|---|
-| `pt-v10` | anything: the default, the one the realism envelope certifies, and the only preset with all fourteen statistics in band at 252 days | recommended |
+| `pt-v10` | anything: the default, the one the realism envelope certifies, and the only preset with all fourteen statistics in band at 252 days, on thirty training seeds and on a held-out universe | recommended |
 | `pt-v3` | reproducing work published before the 2026-08-26 era boundary, when it was the default | reproduction only |
 | `pt-v7` | studies whose thesis is a sector, or a crisis: the first preset with industries that survive a crisis, twelve of thirteen realism statistics in band at both horizons | recommended, opt in by name |
 | `pt-v8` | crisis studies and anything that measures how correlation moves through time: the factor's variance has a memory, the crisis lever is 4.34x, thirteen of fourteen in band at 504 days | recommended, opt in by name |
 | `pt-v9` | anything measuring volatility regimes, clustering or crises the market makes itself: thirteen of fourteen statistics in band at both horizons, and the first preset whose VIX responds to the day's move rather than to the closing minute | recommended, opt in by name |
-| `pt-v10` | the most realistic market this project measures: all fourteen statistics in band at 252 days, on training seeds and a held-out universe | recommended, opt in by name |
 | `pt-v1`, `pt-v2`, `pt-v4`, `pt-v5`, `pt-v6` | reproducing a run that names them | reproduction only |
 
-`pt-v7` is not the default because the envelope certifies one preset by
-policy, and re-certifying moves every published number at once. On a
-single real name replayed through a real crisis (the pandemic notebook in
-`examples/`) `pt-v3` and `pt-v6` fit the path a touch better than `pt-v7`;
-`pt-v7` earns its keep in the cross-section, which a one-name path does not
-measure. The per-preset record of what moved and what it measured is in the
+The three opt-in recommendations are the steps between `pt-v3` and
+`pt-v10`, kept selectable because each one is the best preset for a
+narrower question and because a run that named one must keep reproducing.
+`pt-v7` is the one to reach for when the thesis is a sector, `pt-v8` when
+it is how correlation moves through time, `pt-v9` when it is the volatility
+regime itself. If the question is none of those, the default already
+carries their gains.
+
+The default moved from `pt-v3` to `pt-v10` on 2026-08-26. Re-certifying
+moves every published number at once, which is why it happens rarely and
+why the old default stays selectable by name. The per-preset record of
+what moved and what it measured is in the
 [changelog](https://github.com/simoncoombes/pretium/blob/main/CHANGELOG.md)
 and the calibration record it cites.
 

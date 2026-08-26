@@ -30,10 +30,10 @@ parameters move them, or which move YOUR result, see [Atlas](atlas.md).
 
 ## The claim, in one sentence
 
-**At a 252-day measurement horizon, the shipped `pt-v10` preset matches
-ALL FOURTEEN realism statistics pretium measures, on the calibration seeds
-and on a held-out 60-name universe alike.** At 504 days it holds twelve, and
-the gaps below say which and why.
+**At a 252-day measurement horizon, the shipped `pt-v10` preset matches ALL
+FOURTEEN realism statistics pretium measures, on thirty calibration seeds
+and on a held-out 60-name universe measured at the same resolution.** At 504
+days it holds thirteen, and the gaps below say which and why.
 
 ## What is certified
 
@@ -65,22 +65,37 @@ A model fitted to thirty seeds and reported on those same thirty seeds has
 demonstrated nothing. The certified claim is re-measured on two axes the
 calibration never saw:
 
-| axis | result | `L_real` |
+| axis | seeds | result |
 |---|---|---|
-| training seeds (101-130), 40 names | 12/14 in band | 0.0000 |
-| **held-out seeds** (1-6), 40 names | 11/13 in band | 0.0000 |
-| **held-out universe** (60 names, different draw) | 11/13 in band | 0.0000 |
+| training seeds (101-130), 40 names | 30 | **14/14** in band |
+| **held-out seeds** (1-30), 40 names | 30 | **14/14** in band |
+| **held-out universe** (60 names, seed 909), held-out seeds | 30 | **14/14** in band |
 
-The fourteenth statistic, correlation persistence, joined on 2026-08-25
-(calibration record §64) with a 252-day band wide enough to admit every
-preset and a 504-day band that is the ruler; it is in band on the training
-seeds at both horizons and has not been measured on the held-out axes, so
-those two rows count the thirteen.
+All three re-measured on pt-v10 for this release, at the same thirty-seed
+resolution as the certification itself. Nothing the calibration fitted to is
+load-bearing: the same fourteen statistics land in band on seeds it never
+used and on a universe it never saw.
 
-The same eleven statistics, the same zero loss, on instruments and seeds the
-search never touched. This is the part of the claim worth trusting.
+**Read the resolution before the count.** The project's gate tool screens
+held-out axes on six seeds, and at six seeds both held-out rows read 13/14,
+dropping `corr_persistence_acf1`. That is a property of six seeds rather
+than of the model: the statistic's across-seed standard deviation is 0.28,
+and its estimate moves from -0.220 at six seeds to +0.183 at thirty, against
+a band floor of -0.19. An earlier draft of this page reported the six-seed
+count as though it were the certified one. On the same held-out universe and
+the same thirty seeds, `pt-v3` holds twelve of fourteen.
 
 ## The gaps, measured
+
+Six, down from eight at 0.1.4. Two closed at the era boundary and are
+recorded here rather than deleted quietly. **Tails are too thin over
+multi-year windows** closed because excess kurtosis at 504 days moved from
+5.23, below its band, to 8.26, inside it; it sits about 0.3 seed-sd above
+the floor, so Gap 2 carries the caution that remains. **The model has no
+sector structure** closed because `sector_excess_corr` moved from 0.0037 to
+0.1346 at 252 days and 0.1201 at 504, inside both bands, on training seeds
+and on a held-out universe. What that gap said about crises did not close,
+and is now measured under Gap 4.
 
 ### Gap 1: volume change, reachable since the era boundary and not before
 
@@ -93,11 +108,11 @@ adds volume variance unrelated to any name's own moves.
 
 That trade was real, and it was priced on the pt-v3 era base. On the pt-v10
 base both bands are reachable together, in a window about 0.03 wide in the
-innovation sigma. The default now reads **-0.3140** on the statistic and
-**0.4824** on the correlation, both inside. Calibration record §73.
+innovation sigma. The default now reads **-0.3130** on the statistic and
+**0.4784** on the correlation, both inside. Calibration record §73.
 
 **What remains.** At 504 days the band tightens to -0.29 to -0.21 and the
-default reads -0.3159, outside it. Longer volume memory moves the figure the
+default reads -0.3156, outside it. Longer volume memory moves the figure the
 wrong way, and reaching the two-year band needs a bigger innovation, which
 takes the correlation through its one-year floor. **So a strategy trading
 the change in volume is on solid ground at one year and outside the envelope
@@ -112,16 +127,27 @@ which would be the wrong ruler, the shipped model holds **13 of 14**, missing on
 
 | statistic | 252d | 504d | 504-matched band | verdict at 504d |
 |---|---|---|---|---|
-| `abs_return_acf1` | 0.141 | 0.289 | 0.04 to 0.22 | out |
-| `abs_return_acf5` | 0.050 | 0.152 | 0.02 to 0.10 | out |
-| `return_acf1` | 0.037 | 0.057 | −0.03 to 0.04 | out |
-| `excess_kurtosis` | 2.53 | 5.23 | **7.1 to 22** | out |
-| `annualised_vol_pct` | 24.1 | 29.3 | 16 to 34 | in |
+| `annualised_vol_pct` | 31.46 | 32.69 | 16 to 34 | in |
+| `excess_kurtosis` | 7.76 | 8.26 | 7.1 to 22 | in |
+| `return_acf1` | 0.0195 | 0.0213 | -0.03 to 0.04 | in |
+| `abs_return_acf1` | 0.0994 | 0.1749 | 0.04 to 0.22 | in |
+| `abs_return_acf5` | 0.0487 | 0.0830 | 0.02 to 0.1 | in |
+| `abs_return_acf20` | 0.0043 | 0.0088 | -0.02 to 0.07 | in |
+| `cross_sectional_corr` | 0.3063 | 0.3533 | 0.23 to 0.41 | in |
+| `volume_abs_return_corr` | 0.4784 | 0.5174 | 0.48 to 0.65 | in |
+| `leverage_effect` | -0.0336 | -0.0375 | -0.13 to 0.02 | in |
+| `volume_change_acf1` | -0.3130 | -0.3156 | -0.29 to -0.21 | **out** |
+| `corr_asymmetry` | -0.0034 | 0.0133 | -0.04 to 0.13 | in |
+| `corr_asymmetry_lagged` | 0.0054 | -0.0247 | -0.1 to 0.47 | in |
+| `sector_excess_corr` | 0.1346 | 0.1201 | 0.11 to 0.22 | in |
+| `corr_persistence_acf1` | 0.1622 | 0.1908 | 0.19 to 0.49 | in |
 
-**Consequence: pretium is not certified for multi-year backtests.** A
-strategy evaluated over two years or more is being evaluated in a market
-whose volatility clustering is roughly twice real, and whose tails are too
-thin (see Gap 4).
+**Consequence: pretium is not certified for multi-year backtests.** Not
+because the two-year panel is bad, since one row of fourteen misses it, but
+because certification is a measurement and this one was taken at 252 days.
+Two figures deserve a reader's caution at the longer horizon: excess
+kurtosis sits inside its band at 8.26 but only about 0.3 seed-sd above the
+floor of 7.1, and beyond 504 days nothing has been measured at all.
 
 ### Gap 3: volatility memory has the wrong *shape* rather than the wrong length
 
@@ -164,19 +190,7 @@ memory beyond about two weeks.** Vol-targeting and risk-parity overlays
 that use a one-month or longer volatility estimate are outside the
 envelope.
 
-### Gap 4: tails are too thin at long horizons
-
-Over 504-day windows real markets show excess kurtosis of **7.1 to 22**.
-The model shows **5.2**. The 252-day band's floor of 1.6 is wide enough
-that this reads "comfortably in band" on every 252-day certificate the
-project produces, which is why it went unnoticed: nothing was measuring
-kurtosis where it fails.
-
-**Consequence: do not calibrate tail risk or VaR against pretium at
-multi-year horizons.** At the certified 252-day horizon, kurtosis is in
-band.
-
-### Gap 5: scenario response is directional rather than calibrated
+### Gap 4: scenario response is directional rather than calibrated
 
 Two separate quantities, and they fail differently.
 
@@ -229,80 +243,21 @@ So within this model class, **restoring the crisis transient costs
 long-horizon realism, and the mechanism built to buy it back cannot.** That
 is a structural limit, not a calibration that has not been run yet.
 
+**Sector structure is the same shortfall measured a second way.** In calm
+markets it is in band, 0.1346 at 252 days and 0.1201 at 504 against bands
+starting at 0.11. Under a held VIX 45 it reads **+0.035** against a real
+**+0.103** in the 2020 window, thirty seeds at 252 days; `pt-v7` on the same
+recipe reads +0.064. Industries exist in this market and they hold together
+in a crisis about a third as tightly as real ones, which is why the crisis
+half of the retired sector gap is carried here.
+
 **Consequence: use scenarios to ask *whether* a strategy breaks, not *how
 much*.** A crisis here is about four fifths as violent as a real one and arrives
 more slowly, so a strategy that survives one has not been tested as hard as
-the label suggests.
+the label suggests. A sector thesis tested through a crisis is being tested
+in a market whose industries loosen when a real one's would tighten.
 
-### Gap 6: certification was measured on a sector-balanced roster
-
-`Universe.random()` places exactly five names in each of twelve sectors. No
-real index is balanced that way. The S&P is roughly a third technology and
-the Nasdaq more so. Varying **only** sector composition, with every name
-drawn from one pool:
-
-| roster | in band | `L_real` | vol% |
-|---|---|---|---|
-| balanced (the certified one) | 9 of the original 10 | 0.0000 | 27.9 |
-| S&P-like mix | 8/10 | 0.0176 | 27.4 |
-| all technology | 7/10 | 0.0043 | 32.8 |
-
-So part of the certification is an artifact of that balance, and the more
-concentrated the roster, the less of it transfers.
-
-**Consequence: do not inherit this envelope for a sector-concentrated
-roster.** Re-measure the panel on your own universe. `facts.measure()`
-takes it directly, and `envelope.intervals()` will report the spread.
-
-### Gap 7: the model has no sector structure
-
-`sector_excess_corr`, mean same-sector pairwise correlation minus mean
-cross-sector, reads **0.0037** on the shipped preset against a real band of
-**+0.11 to +0.23**: about 15 seed-standard-deviations out at 252 days, and
-about 20 out at 504. Every one of ten real windows, the 2020 crisis included,
-sits between +0.10 and +0.20, which makes this the tightest band on the panel
-after `volume_change_acf1`. The reading holds on held-out seeds (0.012) and on
-a held-out 60-name universe (0.017).
-
-The cause is one scalar. The sector factor is a single normal per sector at
-sigma 0.002 with a loading of 0.5 for every member, and carries about a quarter
-of one percent of a name's daily variance, so residual correlation after the
-market factor is diagonal in practice. The parameter, `sector_factor_sigma`, is
-settable, and the pt-v1 search reported it as a null direction: which is what a
-lever looks like when nothing in the objective can see it. Sector labels are
-not inert elsewhere, since the same company under twelve labels spreads its
-two-year return across ninety points through the valuation anchors. What is
-missing is co-movement.
-
-**Consequence: sector rotation, sector-neutral construction, industry
-diversification, and any long/short pair whose thesis is the sector are all
-being tested in a market that does not have industries.** This gap was found
-by adding a statistic the panel did not have, and the two other statistics
-added beside it, downside correlation asymmetry same-day and lagged, both sit
-inside their bands.
-
-**Two selectable presets close it.** The dial alone pays twice, on every
-base, for one reason: the sector draw is the only variance term that does not
-scale with VIX, so it dilutes the crisis volatility lever in calm markets and
-is consumed by the crisis blend in stressed ones, where sector excess reads
-zero at a held VIX 45. `sector_vix_coupling` and `crisis_blend_source` remove
-both causes and ship inert; `pt-v7` and `pt-v8` use them.
-
-| preset | sector excess, 252 / 504 days | at a held VIX 45 |
-|---|---|---|
-| real | 0.11 to 0.23 / 0.11 to 0.22 | +0.103 in the 2020 window |
-| `pt-v3` (default) | +0.004 / +0.005 | +0.000 |
-| `pt-v7` | +0.128 / +0.118 | +0.079 |
-| `pt-v8` | +0.146 / +0.129 | +0.053 |
-
-Thirty training seeds, `Universe.random(40, seed=111)`. Both presets hold
-thirteen of fourteen statistics at 504 days where the default holds seven.
-Neither is the default, because the envelope certifies one preset and
-re-certifying moves every published number at once; naming them here is a
-statement about those presets, not a certification. Calibration record §58 to
-§67.
-
-### Gap 8: the endogenous economy cannot reach its own crisis regimes
+### Gap 5: the endogenous economy cannot reach its own crisis regimes
 
 Left to itself the macro state stays in a moderate band. Endogenous inflation
 peaks at 4.06% to 4.11% over five seeds and five years against a clamp of
@@ -334,16 +289,40 @@ the ceiling at 10 the endogenous series matches the real 2015 to 2025 mean and
 dispersion, and the long-horizon equity panel pays two statistics for it, so
 no preset takes them. Calibration record §65.
 
+### Gap 6: certification was measured on a sector-balanced roster
+
+`Universe.random()` places exactly five names in each of twelve sectors. No
+real index is balanced that way. The S&P is roughly a third technology and
+the Nasdaq more so. Varying **only** sector composition, with every name
+drawn from one pool:
+
+| roster | in band | `L_real` | vol% |
+|---|---|---|---|
+| balanced (the certified one) | 9 of 10 | 0.0000 | 27.9 |
+| S&P-like mix | 8 of 10 | 0.0176 | 27.4 |
+| all technology | 7 of 10 | 0.0043 | 32.8 |
+
+**Measured on `pt-v3` against the ten-statistic panel of the time, and not
+re-measured on `pt-v10`.** It is kept because what it establishes is a
+property of roster composition rather than of a preset: the more
+concentrated the roster, the less of the certification transfers, and part
+of the certification is an artifact of that balance. The magnitudes should
+be read as an earlier era's.
+
+**Consequence: do not inherit this envelope for a sector-concentrated
+roster.** Re-measure the panel on your own universe. `facts.measure()`
+takes it directly, and `envelope.intervals()` will report the spread.
+
 ## The numbers above are medians, and one run is not the median
 
 Every figure on this page is a median across thirty seeds. That is not what
 a single run shows you.
 
-Measured on the shipped preset, **seven of the original ten statistics have their
-10th-to-90th-percentile range across seeds crossing a band edge**.
-`abs_return_acf1` reads a median of 0.141 against a ceiling of 0.22, with a
-p90 of 0.426 and an across-seed standard deviation of 0.170, larger than
-the median itself.
+Measured on the shipped preset over thirty seeds, **nine of the fourteen
+statistics have their 10th-to-90th-percentile range across seeds crossing a
+band edge**. `abs_return_acf1` reads a median of 0.0994 against a ceiling of
+0.22, with a p90 of 0.4063 and an across-seed standard deviation of 0.1467,
+larger than the median itself.
 
 A statistic can be comfortably in band on the median and out of band on a
 large minority of individual seeds. `pretium.envelope.intervals()` reports
@@ -369,19 +348,16 @@ the difference between a certified claim and a misread one.
 
 **Do not use pretium for:**
 
-- Multi-year backtests (Gap 2).
-- Sizing how badly a crisis hurts, as opposed to detecting that it does
-  (Gap 5). A crisis here is about four fifths as violent as a real one.
+- Multi-year backtests (Gap 2). Nothing beyond 504 days has been measured.
+- Sizing a scenario's impact rather than detecting it (Gap 4). A crisis here
+  is about four fifths as violent as a real one, and sector structure holds
+  together in one about a third as tightly.
 - Inheriting these numbers for a sector-concentrated roster (Gap 6).
 - Strategies keyed on long-horizon volatility memory (Gap 3).
-- Tail-risk or VaR calibration at multi-year horizons (Gap 4).
-- Strategies trading the change in volume (Gap 1).
-- Sector rotation, sector-neutral construction, industry diversification or
-  any long/short pair whose thesis is the sector, on the default preset
-  (Gap 7). `pt-v7` and `pt-v8` close it.
+- Strategies trading the change in volume beyond one year (Gap 1). At one
+  year the row is in band, and this list said otherwise before 0.2.0.
 - Studying an inflation regime or a policy crisis from the endogenous
-  economy alone (Gap 8).
-- Sizing a scenario's impact rather than detecting it (Gap 5).
+  economy alone (Gap 5).
 - Any claim that absolute simulated performance forecasts live results.
   That is not a gap in this model; it is true of every market simulator,
   and no amount of realism work will change it.

@@ -59,7 +59,7 @@ sentence has to carry its own.
 A survey costs whatever `measure` costs, times the sample count. It is
 meant to be run once at a screening resolution and reused via `save`/`load`
 for every later question, not re-run per question. A screening resolution
-is exactly that: on the shipped preset, eight of the original ten panel statistics
+is exactly that: on the shipped preset, nine of the fourteen panel statistics
 have their across-seed p10-p90 range crossing a band edge, so any point
 this map recommends still needs a full-seed (thirty, not six) confirmation
 before it is believed. `unidentified` and the shapes in `explain` rank and

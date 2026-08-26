@@ -9,7 +9,7 @@ Start at 00 if you have not used pretium before.
 | [`00-a-year-in-one-market.ipynb`](00-a-year-in-one-market.ipynb) | The shortest useful thing: one year, one company, two crises, and why the price moved |
 | [`01-first-simulation.ipynb`](01-first-simulation.ipynb) | Universe, engine, order book, determinism, provenance |
 | [`02-evaluating-a-strategy.ipynb`](02-evaluating-a-strategy.ipynb) | Strategy specs, baselines, capture ratio, ranking across seeds |
-| [`03-why-did-the-price-move.ipynb`](03-why-did-the-price-move.ipynb) | The seven factor contributions that sum to every move |
+| [`03-why-did-the-price-move.ipynb`](03-why-did-the-price-move.ipynb) | The nine factor contributions that sum to every move |
 | [`04-how-realistic-is-this.ipynb`](04-how-realistic-is-this.ipynb) | The realism panel, the gaps, choosing a preset |
 | [`05-training-an-agent.ipynb`](05-training-an-agent.ipynb) | The Gymnasium environment, episodes, what size costs |
 | [`06-execution-and-impact.ipynb`](06-execution-and-impact.ipynb) | TCA, the counterfactual run, partial fills |
@@ -40,7 +40,7 @@ automatically.
 
 `tests/test_examples.py` checks them. The scripts are syntax-checked on every
 test run, which catches a rename that missed a reference. The rest is opt-in,
-because executing seven notebooks takes about a minute:
+because executing eight notebooks takes about a minute:
 
 ```
 PRETIUM_SLOW_TESTS=1 pytest tests/test_examples.py

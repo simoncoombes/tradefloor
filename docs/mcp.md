@@ -90,7 +90,7 @@ Two pages, two directions, and they are easy to confuse:
 | `evaluate_strategies` | How do these strategies do on one identical market |
 | `rank_strategies` | Which is really better, across seeds, with a paired sign test |
 | `run_stress_scenario` | What a shock does, always against the same market unshocked |
-| `explain_price_move` | Why did this price move, via the seven factors that sum to it |
+| `explain_price_move` | Why did this price move, via the nine factors that sum to it |
 | `start_job` | Run something too slow to answer inline, including a full certified year |
 | `check_job` | Is it done, and what did it find |
 

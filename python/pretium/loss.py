@@ -128,7 +128,12 @@ CONSTRAINTS = (
 )
 
 #: Reported in every result, excluded from the loss: the panel statistics
-#: found structurally unreachable. Derived as the complement so that
+#: no lever has been shown to move cleanly, so an optimiser pointed at them
+#: distorts everything else chasing them. Membership is about the OBJECTIVE,
+#: not about reachability. Two members were called structurally unreachable
+#: until 0.2.0 and are not: the shipped preset holds volume_change_acf1 and
+#: sector_excess_corr in band at the certified horizon. Derived as the
+#: complement so that
 #: promoting a statistic is genuinely a one-tuple edit, and so a statistic
 #: added to `facts.REAL_MARKETS` is excluded-but-reported by default rather
 #: than silently optimised against.

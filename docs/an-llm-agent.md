@@ -70,11 +70,11 @@ parsed out of free text.
 ```python
 class Decision(BaseModel):
     weights: dict[str, float]   # -1.0 to 1.0 per ticker
-    driver: Factor              # one of the engine's seven factors
+    driver: Factor              # one of the engine's nine factors
     reasoning: str
 ```
 
-`driver` is a `Literal` of the seven components the engine decomposes each
+`driver` is a `Literal` of the nine components the engine decomposes each
 move into, so the answer is drawn from a closed set and can be checked. The
 call uses `messages.parse`, which validates the response against the schema:
 

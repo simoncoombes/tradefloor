@@ -166,6 +166,7 @@ fn replay_case(case: &Json) -> (TickCompany, String) {
             // Passed in rather than looked up, following the crate's
             // convention: the sector table lives in the TypeScript.
             sector_base_daily_variance: bits(i["sectorBaseDailyVariance"].as_str().unwrap()),
+            vix: 15.0,
             avg_volume: AvgVolumePolicy::ReferenceEma,
         },
     );
@@ -295,6 +296,7 @@ fn walk_chain(chain: &Json, base: f64, mut visit: impl FnMut(usize, &TickCompany
             &CloseInputs {
                 daily_innovation: None,
                 sector_base_daily_variance: base,
+                vix: 15.0,
                 avg_volume: AvgVolumePolicy::ReferenceEma,
             },
         );

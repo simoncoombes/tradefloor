@@ -16,7 +16,7 @@ rack: measure
 
 Keep the three price levels apart. Conflating them ruins the join.
 
-The seven factors sum to the change in `mispricing_s`, with a measured residual
+The nine factors sum to the change in `mispricing_s`, with a measured residual
 around 1e-16. Difference `mispricing_s` across ticks, add the columns, and you
 can verify the label instead of trusting it.
 

@@ -16,6 +16,10 @@ matches real markets on **every statistic pretium measures** at the
 certified one-year horizon, and on thirteen of fourteen at two years. The
 previous default managed twelve and seven.
 
+That one-year result holds on thirty training seeds, on thirty seeds the
+calibration never used, and on a 60-name universe it never saw: fourteen of
+fourteen on all three, re-measured for this release.
+
 In plain terms, this market now has:
 
 - **Volatility episodes it creates itself.** It reaches its own crisis
@@ -26,11 +30,14 @@ In plain terms, this market now has:
   5.05x against a real 6.16x, up from 3.07x. A crisis here is about four
   fifths as violent as a real one, where it used to be half.
 - **Industries.** Names in the same sector co-move more than names in
-  different ones, in calm markets and in a crisis alike.
+  different ones: 0.135 against a real band starting at 0.11, where the old
+  default read 0.004. In a crisis they hold together about a third as
+  tightly as real ones, which is the part that has not closed.
 - **Correlation with a memory.** Correlation that rose last month is still
   elevated this month, as it is in real markets.
 - **Volume that behaves.** The volume-change statistic, which the envelope
-  called unreachable for a year, is in band.
+  called unreachable for a year, is in band at one year. At two years it is
+  the one row of fourteen that still misses.
 
 ### What changed under the hood
 
@@ -77,6 +84,26 @@ book, which `examples/07-research-workflow.py` measures.
 `examples/00-a-year-in-one-market.ipynb` is the entry point the examples were
 missing. One company, one trading year, two crises of different kinds, a
 chart, and the components that explain the move. About twenty seconds to run.
+
+### The envelope has two fewer gaps, and one stricter check
+
+The gap list is measured, so it moves when the model does. Two gaps closed
+at this release and are recorded rather than quietly dropped: **tails are
+too thin over multi-year windows**, because two-year excess kurtosis moved
+from 5.23, under its band, to 8.26, inside it; and **the model has no sector
+structure**, because same-sector co-movement moved from 0.004 to 0.135. What
+the sector gap said about crises did not close and is now carried by the
+scenario gap, with the number attached: +0.035 under a held VIX 45 against a
+real +0.103.
+
+`envelope.check` no longer refuses questions the model can answer. Asking it
+about sector co-movement, or about volume-change autocorrelation at one
+year, used to return a refusal quoting a figure that was in band.
+
+`envelope.regressions` got stricter in the other direction. It used to skip
+the five statistics outside the calibration objective, on the reasoning that
+the shipped preset did not hold them either. pt-v10 holds all fourteen, so a
+candidate that drops one is now named for it.
 
 ### Also in this release
 

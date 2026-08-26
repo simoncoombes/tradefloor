@@ -1555,7 +1555,7 @@ impl PyEngine {
     /// Accumulated per DAY and reset at `open_market`, so a read after
     /// `close_market` still returns the day just finished.
     ///
-    /// # Seven components, and the same seven the `truth` table carries
+    /// # Nine components, and the same nine the `truth` table carries
     ///
     /// Four shocks -- `company_news`, `order_flow_impact`,
     /// `short_squeeze_effect`, `random_noise` -- and the three pieces of the

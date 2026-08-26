@@ -20,10 +20,10 @@ its own on purpose: two realism pages quoting different numbers is how a
 project ends up contradicting itself, and this one did exactly that for a
 while, describing a model two presets old.
 
-The short version: at a 252-day horizon the shipped preset matches **nine
-of the ten** statistics pretium measures, holds that on seeds and
-instruments the calibration never saw, and fails the tenth structurally.
-Beyond 252 days it is not certified, and the envelope says why.
+The short version: at a 252-day horizon the shipped preset matches **all
+fourteen** statistics pretium measures and holds that on a universe the
+calibration never saw. At 504 days it holds thirteen. Beyond 252 days it is
+not certified, and the envelope says why.
 
 ## What each gap took to close
 
@@ -60,16 +60,19 @@ measuring somewhere the panel does not look. That is the pattern worth
 carrying forward: every remaining gap was found by changing the measurement,
 not by tuning harder.
 
-- **Volume dynamics need a model, not a constant.** A held volume level plus
-  independent per-tick noise sits near −0.5 at any coefficients. Persistent
-  volume shocks are a mechanism this engine does not have, and until it does,
-  this row is structural and excluded from the calibration objective
-  deliberately.
+- **Volume dynamics beyond one year.** A held volume level plus independent
+  per-tick noise sits near −0.5 at any coefficients, which is why this row
+  was called structural for a year. The mechanism arrived rather than the
+  coefficient: a persistent log-volume state, switched on in the shipped
+  preset, puts the row inside its one-year band without costing the
+  volume-and-volatility row its own. The two-year band is tighter, and the
+  model sits just outside it there.
 - **The certified horizon is 252 days.** The statistics are horizon-dependent
   and the model is roughly five times more horizon-sensitive than the market
   it imitates. Measured against bands re-derived at the matching window, the
-  wrong ruler being the easy mistake here, it holds seven of fourteen at 504
-  days, where the selectable `pt-v7` and `pt-v8` hold thirteen.
+  wrong ruler being the easy mistake here, it holds thirteen of fourteen at
+  504 days. Nothing beyond 504 days has been measured at all, which is the
+  part of this gap that no preset closes.
 - **Volatility memory has the wrong shape.** Real markets' decays
   hyperbolically; this model's decays exponentially, because it is built from
   exponentials. Over one year two exponentials fake a power law well enough
@@ -78,11 +81,12 @@ not by tuning harder.
   market is still weakly positive. No parameter setting turns one slope into
   the other. This is a mechanism gap, and a two-component variance mixture,
   the obvious fix, was tried and is not sufficient.
-- **Tails are too thin at long horizons.** Over two-year windows real markets
-  are far more kurtotic than this model. The 252-day band is wide enough that
-  this reads as comfortably in band on every certificate the project
-  produces, which is why it went unnoticed for so long: nothing was measuring
-  kurtosis where it fails.
+- **Tails at long horizons, closed and worth recording.** Over two-year
+  windows real markets are far more kurtotic than this model used to be, and
+  the 252-day band was wide enough to hide it. That gap closed at 0.2.0:
+  two-year excess kurtosis now lands inside its band, though near the floor.
+  It is listed here rather than deleted because the way it was found, by
+  measuring somewhere the panel does not look, is the transferable part.
 
 ## What this market is good for
 

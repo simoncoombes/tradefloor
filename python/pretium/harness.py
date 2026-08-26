@@ -54,7 +54,7 @@ if TYPE_CHECKING:
     from .spec import StrategySpec
 
 
-# The seven components, as literals a checker can match against
+# The nine components, as literals a checker can match against
 # Engine.attribution's accepted values. Engine.FACTORS returns the same names
 # at runtime, but as plain strings.
 #

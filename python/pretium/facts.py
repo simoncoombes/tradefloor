@@ -17,16 +17,11 @@ band is the same defect as an unreproducible figure, one level up.
 
 ## The headline
 
-**Against re-derived bands at 504 days, seven of the fourteen statistics are
-in band on the default preset, and thirteen on the selectable pt-v7 and
-pt-v8. Of the original ten, the
-dependence structure mostly holds, and what fails is scale, trend, and
-where the clustering sits.** Volatility runs high, returns trend where
-real ones do not, volatility clustering is concentrated into short lags
-more strongly than a real year shows, and volume-change dynamics remain
-structural. Kurtosis, lag-20 clustering, cross-sectional correlation,
-volume against volatility, and the leverage effect are inside their
-bands.
+**At 252 days the default preset holds all fourteen statistics in band. At
+504 days, against bands re-derived at that window, it holds thirteen.** The
+one that misses is `volume_change_acf1`, whose two-year band is tighter than
+its one-year band. This headline read seven of fourteen at 504 days until
+the 2026-08-26 era boundary moved the default from pt-v3 to pt-v10.
 
 Two eras of caveats attach. First, the 2026-08 model changes (the GJR
 asymmetry term, conditional volatility on the shared market factor, that

@@ -226,10 +226,10 @@ eighty percent crosses, so a user running one seed is *likely*, not merely
 able, to measure out of band on a statistic whose median sits comfortably
 inside.
 
-Measured on the shipped preset, **7 of the original 10 statistics straddle by that
-test**. `abs_return_acf1` has a median of 0.141 against a ceiling of 0.22,
-a p90 of 0.426, and an across-seed standard deviation of 0.170, larger
-than the median itself.
+Measured on the shipped preset over thirty seeds, **9 of the 14 statistics
+straddle by that test**. `abs_return_acf1` has a median of 0.0994 against a
+ceiling of 0.22, a p90 of 0.4063, and an across-seed standard deviation of
+0.1467, larger than the median itself.
 
 ### Why there is no confidence score
 

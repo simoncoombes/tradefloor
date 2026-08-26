@@ -1,7 +1,11 @@
 """Sector structure must survive a crisis, and the two parameters that let it.
 
-Gap 7 (`sector-structure`) is that names in the same sector do not co-move
-more than names in different ones. The dial that fixes it in calm markets,
+The `sector-structure` gap was that names in the same sector do not co-move
+more than names in different ones. It closed at 0.2.0: the default reads
+0.1346 at 252 days against a band starting at 0.11. The crisis half did not
+close, and the envelope carries it under the scenario-magnitude gap, which
+is what these parameters exist to move. The dial that fixes it in calm
+markets,
 `sector_factor_sigma`, was measured at thirty seeds and found to pay twice
 (CALIBRATION-FOLLOWUPS.md §59, §60): the crisis volatility lever falls by a
 tenth because the sector draw is the one variance term that does not scale

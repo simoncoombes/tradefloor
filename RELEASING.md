@@ -34,12 +34,20 @@ the GitHub release notes from this section, matching `## X.Y.Z` or
 Prose, not a bulleted catalogue. No em dashes or en dashes anywhere: a test
 does not enforce this, a reader notices it.
 
-### 3. Run the suite, including the slow half
+### 3. Run the suite, including the slow half AND the Rust one
 
 ```
 python -m pytest tests/ -q
 PRETIUM_SLOW_TESTS=1 python -m pytest tests/test_examples.py -q
+cd rust && cargo test --offline
 ```
+
+The third line is not optional and was learned the hard way at 0.2.0. The
+Python suite does not run the crate's own unit tests, so `cargo test` sat
+red for a whole afternoon of engine work: a unit test still asserted the old
+default preset, and the parity tests would not compile against a struct that
+had gained a field. Neither is visible from pytest, and the first one only
+surfaced from the packaged-crate check in the crate section below.
 
 The second executes all six notebooks and the research workflow end to end.
 It is skipped by default because it takes half a minute, which is exactly

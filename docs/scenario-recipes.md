@@ -298,7 +298,7 @@ and credit scenarios, which move fair value directionally, with
 
 Every "in this model" figure on this page was measured on engine commit
 `9b485a0`, pretium 0.1.0, under model preset `pt-v1`, which was the default
-at the time and is not any more. The shipped default is now `pt-v3`, so
+at the time and is not any more. The shipped default is now `pt-v10`, so
 these figures describe an earlier era. Every one of them is an inventory row
 in the re-measurement harness under the group `recipes`:
 

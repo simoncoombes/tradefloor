@@ -110,8 +110,9 @@ costs.
 
 **Realism is a stated envelope, not a score.** `pt.facts.measure()` reports
 fourteen statistics against real-market bands. At 252 days the shipped `pt-v10`
-preset holds **all fourteen in band**, and holds all fourteen again on a
-60-name universe the calibration never saw. That is a market with the right
+preset holds **all fourteen in band** on thirty calibration seeds, and all
+fourteen again on a 60-name universe it never saw. That is a market with the
+right
 volatility, the right tails, the right co-movement, industries that co-move
 more than strangers, correlation that stays elevated after a panic, volume
 that behaves, and volatility episodes it produces itself.
@@ -121,17 +122,19 @@ trajectory changed. Runs recorded before it are not comparable to runs after
 it unless they name their preset, and every earlier preset from `pt-v1`
 onward stays selectable and reproduces bit for bit forever.
 
-At 504 days pt-v10 holds twelve of fourteen, and the two it misses there are
-stated as gaps.
+At 504 days pt-v10 holds thirteen of fourteen. The one it misses there,
+volume-change autocorrelation, is stated as a gap.
 
-**Eight gaps are measured and named rather than assumed.** The certified
-horizon is 252 days and the model doesn't hold beyond it. Volatility memory
-decays exponentially where real markets decay hyperbolically. Tails are too
-thin over multi-year windows. Scenario response is directionally right but
-not calibrated in magnitude, at seventy to eighty five percent of the real
-size. The endogenous economy cannot reach its own crisis regimes, so an
-inflation regime has to be driven through a scenario. And certification was
-measured on a sector-balanced roster, which no real index is.
+**Six gaps are measured and named rather than assumed.** The certified
+horizon is 252 days, and nothing beyond 504 days has been measured at all.
+Volatility memory decays exponentially where real markets decay
+hyperbolically. Volume-change autocorrelation leaves its band at two years.
+Scenario response is directionally right but not calibrated in magnitude, at
+seventy to eighty five percent of the real size, and industries hold
+together in a crisis about a third as tightly as real ones. The endogenous
+economy cannot reach its own crisis regimes, so an inflation regime has to
+be driven through a scenario. And certification was measured on a
+sector-balanced roster, which no real index is.
 [The realism envelope](https://simoncoombes.github.io/pretium/trust.html)
 states each gap and what it forbids. `pt.envelope.check()` refuses to certify
 a question that falls outside one.
@@ -147,9 +150,10 @@ reading order and executed as part of the test suite:
 
 | | what it covers |
 |---|---|
+| [`00-a-year-in-one-market`](https://github.com/simoncoombes/pretium/blob/main/examples/00-a-year-in-one-market.ipynb) | Start here: one company, one year, two crises, one chart |
 | [`01-first-simulation`](https://github.com/simoncoombes/pretium/blob/main/examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
 | [`02-evaluating-a-strategy`](https://github.com/simoncoombes/pretium/blob/main/examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
-| [`03-why-did-the-price-move`](https://github.com/simoncoombes/pretium/blob/main/examples/03-why-did-the-price-move.ipynb) | The seven factors that sum to every move |
+| [`03-why-did-the-price-move`](https://github.com/simoncoombes/pretium/blob/main/examples/03-why-did-the-price-move.ipynb) | The nine factors that sum to every move |
 | [`04-how-realistic-is-this`](https://github.com/simoncoombes/pretium/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the gaps |
 | [`05-training-an-agent`](https://github.com/simoncoombes/pretium/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
 | [`06-execution-and-impact`](https://github.com/simoncoombes/pretium/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |

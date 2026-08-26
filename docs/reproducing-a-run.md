@@ -32,7 +32,7 @@ against the wrong starting conditions is a thing you have to do on purpose.
 
 ```python
 pt.version()                      # '0.2.0'
-pt.model_preset()["name"]         # 'pt-v3', the shipped default
+pt.model_preset()["name"]         # 'pt-v10', the shipped default
 ```
 
 Coefficients ship as a named preset rather than as constructor keywords, so

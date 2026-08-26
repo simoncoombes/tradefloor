@@ -1,5 +1,7 @@
 """The realism envelope as data: intervals, and the membership check."""
 
+from unittest import mock
+
 import pytest
 
 import pretium
@@ -75,10 +77,20 @@ def test_a_concentrated_roster_is_outside():
     assert any(g.id == "roster-concentration" for g in v.gaps)
 
 
-def test_the_structural_statistic_is_always_outside():
-    v = env.check(horizon_days=10, statistics=["volume_change_acf1"])
-    assert not v.inside
-    assert any(g.id == "volume-change" for g in v.gaps)
+def test_the_volume_change_row_is_outside_beyond_one_year_only():
+    """It used to be outside at every horizon; at 0.2.0 that stopped being true.
+
+    pt-v10 holds volume_change_acf1 AND volume_abs_return_corr in band at 252
+    days, which every earlier preset had to trade against each other. What
+    remains is the 504-day band, which is tighter than the 252-day one.
+    """
+    inside = env.check(horizon_days=252, statistics=["volume_change_acf1"])
+    assert inside.inside
+    assert not any(g.id == "volume-change" for g in inside.gaps)
+
+    out = env.check(horizon_days=504, statistics=["volume_change_acf1"])
+    assert not out.inside
+    assert any(g.id == "volume-change" for g in out.gaps)
 
 
 def test_an_unknown_statistic_is_refused_not_ignored():
@@ -197,7 +209,8 @@ def test_a_panel_that_loses_a_statistic_is_named():
     """pt-v4's actual failure, pinned.
 
     It halves the dual-horizon objective and is the first vector to close
-    the thin-tails gap -- and it surrenders `return_acf1` at the certified
+    the thin-tails gap, which was retired at 0.2.0 when the shipped preset
+    closed it too -- and it surrenders `return_acf1` at the certified
     horizon. It was called a win twice before anyone counted the panel
     (CALIBRATION-FOLLOWUPS §33), which is why this is a function now.
     """
@@ -207,13 +220,33 @@ def test_a_panel_that_loses_a_statistic_is_named():
     assert env.regressions(panel) == ["return_acf1"]
 
 
-def test_a_structural_statistic_is_never_counted_as_a_regression():
-    """`volume_change_acf1` is out of band by design and excluded from the
-    objective. A candidate can neither be blamed for it nor credited with
-    it, and counting it would make every candidate look like a regression."""
+def test_a_structural_statistic_the_shipped_preset_holds_is_a_regression():
+    """The inverse of what this test asserted before 0.2.0, and why.
+
+    `volume_change_acf1` sits outside the calibration objective, and while
+    the shipped preset was itself out of band on it, losing it cost a
+    candidate nothing that was ever held. pt-v10 holds all fourteen at the
+    certified horizon. A candidate that drops one is now giving up something
+    that ships, whether or not the objective was pointed at it.
+    """
     panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
     panel["volume_change_acf1"] = -99.0
-    assert env.regressions(panel) == []
+    assert env.regressions(panel) == ["volume_change_acf1"]
+
+
+def test_a_row_the_shipped_preset_does_not_hold_cannot_be_lost():
+    """The condition that always did the work, asserted directly.
+
+    Nothing can be blamed on a candidate for a row the baseline misses too,
+    which is what keeps this function from calling every candidate a
+    regression the moment a statistic leaves the shipped panel.
+    """
+    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    low, _ = REAL_MARKETS["return_acf1"]
+    baseline_miss = dict(env.CERTIFIED, return_acf1=low - 1.0)
+    with mock.patch.object(env, "CERTIFIED", baseline_miss):
+        panel["return_acf1"] = low - 2.0
+        assert env.regressions(panel) == []
 
 
 def test_regressions_refuses_a_horizon_it_has_no_baseline_for():
