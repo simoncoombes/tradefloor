@@ -115,7 +115,25 @@ import pretium
 # target now carries the day's VIX, and the KAT macro starts in
 # contraction at VIX 19.5, so every session past the first close
 # moves. The direct GameRng section below does not.
-KAT_VERSION = 10
+# v11: the pt-v12 era boundary (§114). Two changes, one of them a
+# trajectory change and one deliberately not.
+#
+# The trajectory change is the default preset: pt-v10 to pt-v12, which is
+# pt-v11's crisis work plus `volume_move_cap` 4.0 -> 12.0. The cap was a
+# literal in `tick.rs` from the first version and saturated a name's volume
+# response at a four percent day, so every crisis session traded exactly as
+# much as a bad Tuesday. Unpinning it makes pt-v12 the first preset to hold
+# all fourteen realism statistics in band at BOTH 252 and 504 days, and on a
+# held-out universe. Zero new draws: the cap is arithmetic on a value the
+# tick already had.
+#
+# The change that is NOT a trajectory change, recorded because it looks like
+# one: endogenous news moved from `run_session` to `open_market`, and its
+# chaining to `tick_inner` (§117). That fixed a tick-driven day rolling the
+# day's news 390 times, and `Engine::tick` seeing no endogenous news at all.
+# Every path that measures this model runs one session per day, so the
+# trajectory fingerprint did not move -- `b1bbc17be7bf6aee` before and after.
+KAT_VERSION = 11
 
 SEED = 20260820
 DAYS = 250

@@ -2153,6 +2153,15 @@ mod tests {
     fn different_seeds_produce_different_markets() {
         // The companion assertion: reproducible-because-constant would pass
         // the test above and be worthless.
+        //
+        // Compares the WHOLE price vector over four seeds, not company A over
+        // two. Prices settle to the cent, so a single name colliding across a
+        // single pair of seeds is a coincidence rather than a collapse -- and
+        // one duly happened at the pt-v12 boundary, where company A landed on
+        // 101.54 for both seed 1 and seed 2 after sixty minutes while every
+        // other name differed. A test that reads one number cannot tell the
+        // two apart, which is the whole point of the property it is named
+        // for.
         let run = |seed| {
             let mut e = engine(seed);
             e.open_market();
@@ -2161,7 +2170,15 @@ mod tests {
             }
             e.prices()
         };
-        assert_ne!(run(1)[0].to_bits(), run(2)[0].to_bits());
+        let seeds: Vec<Vec<f64>> = (1u32..=4).map(run).collect();
+        for (i, a) in seeds.iter().enumerate() {
+            for b in seeds.iter().skip(i + 1) {
+                assert!(
+                    a.iter().zip(b).any(|(x, y)| x.to_bits() != y.to_bits()),
+                    "two seeds produced an identical market: {a:?} vs {b:?}"
+                );
+            }
+        }
     }
 
     #[test]
