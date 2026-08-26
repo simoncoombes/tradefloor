@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>The Seven Components · pretium docs</title>
-<meta name="description" content="Every tick&#x27;s change in mispricing is broken into seven components that sum to it. These are the names the truth table uses, the values explain_price_move...">
+<title>The Nine Components · pretium docs</title>
+<meta name="description" content="Every tick&#x27;s change in mispricing is broken into nine components that sum to it. These are the names the truth table uses, the values explain_price_move...">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/factors.html">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="pretium docs">
-<meta property="og:title" content="The Seven Components">
-<meta property="og:description" content="Every tick&#x27;s change in mispricing is broken into seven components that sum to it. These are the names the truth table uses, the values explain_price_move...">
+<meta property="og:title" content="The Nine Components">
+<meta property="og:description" content="Every tick&#x27;s change in mispricing is broken into nine components that sum to it. These are the names the truth table uses, the values explain_price_move...">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/factors.html">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="The Seven Components">
-<meta name="twitter:description" content="Every tick&#x27;s change in mispricing is broken into seven components that sum to it. These are the names the truth table uses, the values explain_price_move...">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The Seven Components","description":"Every tick's change in mispricing is broken into seven components that sum to it. These are the names the truth table uses, the values explain_price_move...","url":"https://simoncoombes.github.io/pretium/factors.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<meta name="twitter:title" content="The Nine Components">
+<meta name="twitter:description" content="Every tick&#x27;s change in mispricing is broken into nine components that sum to it. These are the names the truth table uses, the values explain_price_move...">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The Nine Components","description":"Every tick's change in mispricing is broken into nine components that sum to it. These are the names the truth table uses, the values explain_price_move...","url":"https://simoncoombes.github.io/pretium/factors.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -128,14 +128,14 @@ gtag('config', 'G-1LBM3239ZF');
 <a href="https://github.com/simoncoombes/pretium">GitHub</a>
 </div></header>
 <div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><span aria-current="page">The seven components</span></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
+<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><span aria-current="page">The nine components</span></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
 <main>
 <p class="appnote">This is the plain version of the page. The
 <a href="./#/factors">full documentation app</a> adds search, dark mode
 and copy buttons.</p>
 <div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">REFERENCE</div>
-        <h1 style="font-size:30px">The Seven Components</h1>
-        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">Every tick's change in mispricing is broken into seven components that sum to it. These are the names the <code style="font-size:14px">truth</code> table uses, the values <code style="font-size:14px">explain_price_move</code> returns, and the closed set an agent's <code style="font-size:14px">explain</code> must answer from. The crate calls them <code style="font-size:14px">S_COMPONENT_KEYS</code>; the runtime list is <code style="font-size:14px">Engine.FACTORS</code>.</p>
+        <h1 style="font-size:30px">The Nine Components</h1>
+        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">Every tick's change in mispricing is broken into nine components that sum to it. These are the names the <code style="font-size:14px">truth</code> table uses, the values <code style="font-size:14px">explain_price_move</code> returns, and the closed set an agent's <code style="font-size:14px">explain</code> must answer from. The crate calls them <code style="font-size:14px">S_COMPONENT_KEYS</code>; the runtime list is <code style="font-size:14px">Engine.FACTORS</code>.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">The Set</h2>
         <p style="color:var(--mut);font-size:14px">In order. The first three are the model’s own dynamics; the last four are shocks.</p>
         <div class="tablewrap"><table>

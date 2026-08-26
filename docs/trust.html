@@ -4,17 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Realism and Limits · pretium docs</title>
-<meta name="description" content="pretium publishes what it gets right and what it gets wrong: ten statistics measured against real markets, how long those results hold for, the roster...">
+<meta name="description" content="pretium publishes what it gets right and what it gets wrong: fourteen statistics measured against real markets, how long those results hold for, the...">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/trust.html">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="pretium docs">
 <meta property="og:title" content="Realism and Limits">
-<meta property="og:description" content="pretium publishes what it gets right and what it gets wrong: ten statistics measured against real markets, how long those results hold for, the roster...">
+<meta property="og:description" content="pretium publishes what it gets right and what it gets wrong: fourteen statistics measured against real markets, how long those results hold for, the...">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/trust.html">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Realism and Limits">
-<meta name="twitter:description" content="pretium publishes what it gets right and what it gets wrong: ten statistics measured against real markets, how long those results hold for, the roster...">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Realism and Limits","description":"pretium publishes what it gets right and what it gets wrong: ten statistics measured against real markets, how long those results hold for, the roster...","url":"https://simoncoombes.github.io/pretium/trust.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<meta name="twitter:description" content="pretium publishes what it gets right and what it gets wrong: fourteen statistics measured against real markets, how long those results hold for, the...">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Realism and Limits","description":"pretium publishes what it gets right and what it gets wrong: fourteen statistics measured against real markets, how long those results hold for, the...","url":"https://simoncoombes.github.io/pretium/trust.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -128,14 +128,14 @@ gtag('config', 'G-1LBM3239ZF');
 <a href="https://github.com/simoncoombes/pretium">GitHub</a>
 </div></header>
 <div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><span aria-current="page">Realism and limits</span></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The seven components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
+<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><span aria-current="page">Realism and limits</span></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
 <main>
 <p class="appnote">This is the plain version of the page. The
 <a href="./#/trust">full documentation app</a> adds search, dark mode
 and copy buttons.</p>
 <div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">GUIDE</div>
         <h1 style="font-size:30px">Realism and Limits</h1>
-        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">pretium publishes what it gets right and what it gets wrong: ten statistics measured against real markets, how long those results hold for, the roster they were measured on, and six known gaps. Each gap ends with a plain rule about what not to use the simulator for.</p>
+        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">pretium publishes what it gets right and what it gets wrong: fourteen statistics measured against real markets, how long those results hold for, the roster they were measured on, and six known gaps. Each gap ends with a plain rule about what not to use the simulator for.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">Read This Before You Conclude Anything</h2>
         <p>Any simulator will hand you a number for a question it cannot answer. This page tells you which questions it can, with the measurements behind each claim. Reading it first costs you five minutes. Finding out afterwards that your two-year backtest ran a year past the tested horizon costs you the study.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">How to Read the Numbers on This Site</h2>
@@ -178,23 +178,27 @@ print(verdict)</code></pre>
         </div>
         <p>Each reason points at the measurement behind it, so you can check it yourself. Misspell a statistic and you get an error rather than an answer. If it quietly ignored names it did not recognise, you would walk away thinking you had the all-clear.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">What Is Certified</h2>
-        <p>At a 252-day horizon the shipped <code style="font-size:13px">pt-v3</code> preset puts nine of the ten measured statistics in band. The tenth fails structurally and is named, in every result the library produces.</p>
+        <p>At a 252-day horizon the shipped <code style="font-size:13px">pt-v10</code> preset puts all fourteen measured statistics in band, on thirty calibration seeds and on a held-out 60-name universe measured at the same resolution. It is the first preset in the project with no miss at this horizon.</p>
         <div class="tablewrap"><table>
           <thead><tr><th>Statistic</th><th style="text-align:right">Measured</th><th style="text-align:right">Band</th><th>Verdict</th></tr></thead>
           <tbody style="font-family:var(--font-mono);font-size:12.5px">
-            <tr><td>annualised_vol_pct</td><td style="text-align:right">24.10</td><td style="text-align:right">15.0 - 36.0</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>excess_kurtosis</td><td style="text-align:right">2.53</td><td style="text-align:right">1.6 - 41.0</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>return_acf1</td><td style="text-align:right">+0.0375</td><td style="text-align:right">−0.08 - 0.06</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>abs_return_acf1</td><td style="text-align:right">+0.1413</td><td style="text-align:right">0.02 - 0.22</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>abs_return_acf5</td><td style="text-align:right">+0.0496</td><td style="text-align:right">0.02 - 0.09</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>abs_return_acf20</td><td style="text-align:right">+0.0082</td><td style="text-align:right">−0.04 - 0.08</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>cross_sectional_corr</td><td style="text-align:right">+0.2558</td><td style="text-align:right">0.08 - 0.56</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>volume_abs_return_corr</td><td style="text-align:right">+0.5339</td><td style="text-align:right">0.46 - 0.66</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>leverage_effect</td><td style="text-align:right">−0.0349</td><td style="text-align:right">−0.16 - 0.00</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>volume_change_acf1</td><td style="text-align:right">−0.4598</td><td style="text-align:right">−0.32 - −0.20</td><td style="color:var(--bad);font-weight:600">out, 13.7 sd</td></tr>
+            <tr><td>annualised_vol_pct</td><td style="text-align:right">31.46</td><td style="text-align:right">15 - 36</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>excess_kurtosis</td><td style="text-align:right">7.76</td><td style="text-align:right">1.6 - 41</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>return_acf1</td><td style="text-align:right">+0.0195</td><td style="text-align:right">−0.08 - 0.06</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>abs_return_acf1</td><td style="text-align:right">+0.0994</td><td style="text-align:right">0.02 - 0.22</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>abs_return_acf5</td><td style="text-align:right">+0.0487</td><td style="text-align:right">0.02 - 0.09</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>abs_return_acf20</td><td style="text-align:right">+0.0043</td><td style="text-align:right">−0.04 - 0.08</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>cross_sectional_corr</td><td style="text-align:right">+0.3063</td><td style="text-align:right">0.08 - 0.56</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>volume_abs_return_corr</td><td style="text-align:right">+0.4784</td><td style="text-align:right">0.46 - 0.66</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>leverage_effect</td><td style="text-align:right">−0.0336</td><td style="text-align:right">−0.16 - 0</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>volume_change_acf1</td><td style="text-align:right">−0.3130</td><td style="text-align:right">−0.32 - −0.2</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>corr_asymmetry</td><td style="text-align:right">−0.0034</td><td style="text-align:right">−0.25 - 0.45</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>corr_asymmetry_lagged</td><td style="text-align:right">+0.0054</td><td style="text-align:right">−0.2 - 0.55</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>sector_excess_corr</td><td style="text-align:right">+0.1346</td><td style="text-align:right">0.11 - 0.23</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>corr_persistence_acf1</td><td style="text-align:right">+0.1622</td><td style="text-align:right">−0.19 - 0.54</td><td style="color:var(--mut)">in band</td></tr>
           </tbody>
         </table></div>
-        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Measured: preset pt-v3 · 30 seeds · 40 instruments · 252 trading days · band-distance loss L_real = 0.0000. Bands are pretium.facts.REAL_MARKETS, derived from real-market windows of the same length.</p>
+        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Measured: preset pt-v10 · 30 seeds · 40 instruments · 252 trading days · band-distance loss L_real = 0.0000. Bands are pretium.facts.REAL_MARKETS, derived from real-market windows of the same length.</p>
         <p>A model graded on the same thirty seeds it was tuned on proves nothing. So the same panel was re-measured on seeds and universes the tuning never saw:</p>
         <div class="tablewrap"><table style="max-width:560px">
           <thead><tr><th>Axis</th><th style="text-align:right">Result</th><th style="text-align:right">L_real</th></tr></thead>
@@ -204,9 +208,9 @@ print(verdict)</code></pre>
             <tr><td>held-out universe (60 names, different draw)</td><td style="text-align:right">9/10 in band</td><td style="text-align:right">0.0000</td></tr>
           </tbody>
         </table></div>
-        <p style="margin:14px 0 0">Five of the ten statistics were live calibration targets, so an in-band verdict on those is partly the tuning meeting its target. The held-out rows are what make the claim more than that.</p>
+        <p style="margin:14px 0 0">Five of the fourteen statistics were live calibration targets, so an in-band verdict on those is partly the tuning meeting its target. The held-out rows are what make the claim more than that.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">Seed-to-Seed Variation</h2>
-        <p>Every number above is the middle of thirty runs, and your one run will not be the middle. Measured on the shipped preset, eight of the ten statistics have their 10th-to-90th percentile range across seeds crossing a band edge. <code style="font-size:13px">abs_return_acf1</code> reads a median of 0.141 against a ceiling of 0.22, with a p90 of 0.426 and an across-seed standard deviation of 0.170, larger than the median itself.</p>
+        <p>Every number above is the middle of thirty runs, and your one run will not be the middle. Measured on the shipped preset, nine of the fourteen statistics have their 10th-to-90th percentile range across seeds crossing a band edge. <code style="font-size:13px">abs_return_acf1</code> reads a median of 0.141 against a ceiling of 0.22, with a p90 of 0.426 and an across-seed standard deviation of 0.170, larger than the median itself.</p>
         <p>So "9/10 in band" describes the middle of thirty runs. Your one run can easily look worse. Read the spread before relying on one seed:</p>
         <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
@@ -222,7 +226,7 @@ print(envelope.report_intervals(rows))</code></pre>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin:20px 0 0">
           <div style="border:1px solid var(--line);border-radius:10px;padding:18px 20px 8px;background:var(--panel)">
             <h3 style="font-size:15px;margin:0 0 8px">One Seed Is One Sample</h3>
-            <p style="font-size:13.5px;color:var(--mut);margin:0">A verdict from a single run measures the seed as much as the thing you are testing. Every number on this page is the middle of thirty runs, and eight of the ten statistics have their middle-eighty-percent range crossing a band edge. Use <code style="font-size:12px">pt.rank</code> across seeds for comparisons, and <code style="font-size:12px">envelope.intervals</code> for statistics.</p>
+            <p style="font-size:13.5px;color:var(--mut);margin:0">A verdict from a single run measures the seed as much as the thing you are testing. Every number on this page is the middle of thirty runs, and nine of the fourteen statistics have their middle-eighty-percent range crossing a band edge. Use <code style="font-size:12px">pt.rank</code> across seeds for comparisons, and <code style="font-size:12px">envelope.intervals</code> for statistics.</p>
           </div>
           <div style="border:1px solid var(--line);border-radius:10px;padding:18px 20px 8px;background:var(--panel)">
             <h3 style="font-size:15px;margin:0 0 8px">Simulated Returns Are Not a Forecast</h3>
@@ -241,24 +245,33 @@ print(envelope.report_intervals(rows))</code></pre>
         <h2 style="font-size:21px;margin:46px 0 10px">Known Gaps</h2>
         <p>Each of these was measured, and each one says what it rules out. Note that the horizon gaps only bite past a year.</p>
         <details style="border:1px solid var(--line);border-radius:9px;margin:0 0 10px;background:var(--panel)">
-          <summary>1 · The tenth statistic is structurally unreachable</summary>
+          <summary>1 · Volume-change autocorrelation leaves its band past a year</summary>
           <div style="padding:14px 16px 4px;font-size:14px;color:var(--mut)">
-            <p><code style="font-size:12.5px">volume_change_acf1</code> reads −0.46 against a real band of −0.32 to −0.20: 13.7 seed-standard-deviations out. A held volume level plus independent per-tick noise sits near −0.5 at any coefficients, which means no parameter setting can reach it. It is excluded from the calibration objective deliberately, because an optimiser pointed at an unreachable target distorts every other parameter chasing it. It stays in every report as a standing falsification verdict.</p>
+            <p><code style="font-size:12.5px">volume_change_acf1</code> reads −0.3130 at 252 days against a real band of −0.32 to −0.20, inside it but only 0.7 seed-sd clear of the floor, and −0.3156 at 504 days against a tighter −0.29 to −0.21, about 2.2 seed-sd out. This page called the row structurally unreachable until 0.2.0, because every way of reaching it cost <code style="font-size:12.5px">volume_abs_return_corr</code> its own band. That is withdrawn: pt-v10 holds both at one year. It stays outside the calibration objective, which is a statement about what an optimiser may chase, not about reachability.</p>
             <p style="color:var(--fg)"><strong>Forbids:</strong> strategies trading the day-to-day change in volume. The volume level's relationship to volatility is in band and fine to use. A volume forecast here is never wrong twice running, so an execution algorithm tested against this market faces an easier problem than the one it was written for.</p>
           </div>
         </details>
         <details style="border:1px solid var(--line);border-radius:9px;margin:0 0 10px;background:var(--panel)">
           <summary>2 · The certified horizon is 252 days</summary>
           <div style="padding:14px 16px 4px;font-size:14px;color:var(--mut)">
-            <p>Measured against bands re-derived at the matching 504-day window, the model holds 5 of 10. Volatility clustering roughly doubles from 252 to 504 days where real markets move about 14%. The price level stays plausible, so long runs look fine and are not. The dynamics leave the envelope while the chart still looks like a market.</p>
+            <p>Measured against bands re-derived at the matching 504-day window, the model holds 13 of 14, missing only the volume-change row. That is the best two-year reading this project has measured, and it is still not a certification: CERTIFIED is measured at 252 days, the 504-day table is measured but not certified, and beyond 504 days nothing has been measured at all. Excess kurtosis deserves a reader's caution at this horizon, inside its band at 8.26 but only about 0.3 seed-sd above a floor of 7.1.</p>
             <div class="tablewrap"><table style="max-width:620px;margin:0 0 14px">
               <thead><tr><th>Statistic</th><th style="text-align:right">252d</th><th style="text-align:right">504d</th><th style="text-align:right">504-matched band</th><th>At 504d</th></tr></thead>
               <tbody style="font-family:var(--font-mono);font-size:12px">
-                <tr><td>abs_return_acf1</td><td style="text-align:right">0.141</td><td style="text-align:right">0.289</td><td style="text-align:right">0.04 - 0.22</td><td style="color:var(--bad)">out</td></tr>
-                <tr><td>abs_return_acf5</td><td style="text-align:right">0.050</td><td style="text-align:right">0.152</td><td style="text-align:right">0.02 - 0.10</td><td style="color:var(--bad)">out</td></tr>
-                <tr><td>return_acf1</td><td style="text-align:right">0.037</td><td style="text-align:right">0.057</td><td style="text-align:right">−0.03 - 0.04</td><td style="color:var(--bad)">out</td></tr>
-                <tr><td>excess_kurtosis</td><td style="text-align:right">2.53</td><td style="text-align:right">5.23</td><td style="text-align:right">7.1 - 22</td><td style="color:var(--bad)">out</td></tr>
-                <tr><td>annualised_vol_pct</td><td style="text-align:right">24.1</td><td style="text-align:right">29.3</td><td style="text-align:right">16 - 34</td><td>in</td></tr>
+                <tr><td>annualised_vol_pct</td><td style="text-align:right">31.46</td><td style="text-align:right">32.69</td><td style="text-align:right">16 - 34</td><td>in</td></tr>
+            <tr><td>excess_kurtosis</td><td style="text-align:right">7.76</td><td style="text-align:right">8.26</td><td style="text-align:right">7.1 - 22</td><td>in</td></tr>
+            <tr><td>return_acf1</td><td style="text-align:right">+0.0195</td><td style="text-align:right">+0.0213</td><td style="text-align:right">−0.03 - 0.04</td><td>in</td></tr>
+            <tr><td>abs_return_acf1</td><td style="text-align:right">+0.0994</td><td style="text-align:right">+0.1749</td><td style="text-align:right">0.04 - 0.22</td><td>in</td></tr>
+            <tr><td>abs_return_acf5</td><td style="text-align:right">+0.0487</td><td style="text-align:right">+0.0830</td><td style="text-align:right">0.02 - 0.1</td><td>in</td></tr>
+            <tr><td>abs_return_acf20</td><td style="text-align:right">+0.0043</td><td style="text-align:right">+0.0088</td><td style="text-align:right">−0.02 - 0.07</td><td>in</td></tr>
+            <tr><td>cross_sectional_corr</td><td style="text-align:right">+0.3063</td><td style="text-align:right">+0.3533</td><td style="text-align:right">0.23 - 0.41</td><td>in</td></tr>
+            <tr><td>volume_abs_return_corr</td><td style="text-align:right">+0.4784</td><td style="text-align:right">+0.5174</td><td style="text-align:right">0.48 - 0.65</td><td>in</td></tr>
+            <tr><td>leverage_effect</td><td style="text-align:right">−0.0336</td><td style="text-align:right">−0.0375</td><td style="text-align:right">−0.13 - 0.02</td><td>in</td></tr>
+            <tr><td>volume_change_acf1</td><td style="text-align:right">−0.3130</td><td style="text-align:right">−0.3156</td><td style="text-align:right">−0.29 - −0.21</td><td>out</td></tr>
+            <tr><td>corr_asymmetry</td><td style="text-align:right">−0.0034</td><td style="text-align:right">+0.0133</td><td style="text-align:right">−0.04 - 0.13</td><td>in</td></tr>
+            <tr><td>corr_asymmetry_lagged</td><td style="text-align:right">+0.0054</td><td style="text-align:right">−0.0247</td><td style="text-align:right">−0.1 - 0.47</td><td>in</td></tr>
+            <tr><td>sector_excess_corr</td><td style="text-align:right">+0.1346</td><td style="text-align:right">+0.1201</td><td style="text-align:right">0.11 - 0.22</td><td>in</td></tr>
+            <tr><td>corr_persistence_acf1</td><td style="text-align:right">+0.1622</td><td style="text-align:right">+0.1908</td><td style="text-align:right">0.19 - 0.49</td><td>in</td></tr>
               </tbody>
             </table></div>
             <p style="color:var(--fg)"><strong>Forbids:</strong> multi-year backtests, and anything keyed on volatility dynamics beyond one year.</p>
@@ -273,10 +286,10 @@ print(envelope.report_intervals(rows))</code></pre>
           </div>
         </details>
         <details style="border:1px solid var(--line);border-radius:9px;margin:0 0 10px;background:var(--panel)">
-          <summary>4 · Tails are too thin over multi-year windows</summary>
+          <summary>4 · The endogenous economy cannot reach its own crisis regimes</summary>
           <div style="padding:14px 16px 4px;font-size:14px;color:var(--mut)">
-            <p>Over 504-day windows real markets show excess kurtosis of 7.1 to 22. The model shows 5.2. The 252-day band's floor of 1.6 is wide enough that this reads as comfortably in band on every 252-day certificate, which is why it went unnoticed: nothing was measuring kurtosis where it fails.</p>
-            <p style="color:var(--fg)"><strong>Forbids:</strong> tail-risk or VaR calibration at multi-year horizons. At the certified 252-day horizon, kurtosis is in band.</p>
+            <p>Left to itself the macro state stays in a moderate band. Endogenous inflation peaks at 4.06% to 4.11% over five seeds and five years, against a clamp of 6.0% and a US CPI that reached 9.1% in June 2022. The cause is dispersion rather than persistence. This slot used to carry a thin-tails gap, retired at 0.2.0: two-year excess kurtosis moved from 5.23, under its band, to 8.26, inside it.</p>
+            <p style="color:var(--fg)"><strong>Forbids:</strong> studying an inflation regime or a policy crisis from the endogenous economy alone. Drive one with a scenario instead.</p>
           </div>
         </details>
         <details style="border:1px solid var(--line);border-radius:9px;margin:0 0 10px;background:var(--panel)">

@@ -98,6 +98,94 @@ PROSE_FIXES = [
     ("MIXED — SEE NOTE", "MIXED, SEE NOTE"),
 ]
 
+#: The bundle was authored in the pt-v3 era, when the panel had ten
+#: statistics and the tick decomposition had seven components. Both grew:
+#: fourteen statistics since 2026-08-25, nine components since the jump and
+#: circuit-breaker columns were added, and the default preset moved to
+#: pt-v10 on 2026-08-26. The published site is generated from this bundle
+#: rather than from the markdown in docs/, so a stale claim here is the
+#: claim users actually read.
+#:
+#: These assert. A bundle revision that rewords any of them fails the build
+#: rather than quietly restoring a number that is no longer true.
+ERA_FIXES = [
+    (
+        "It measures ten statistics against real markets and gets nine of "
+        "them right over a year. The ten results are published, along with "
+        "six things it gets wrong and what each one rules out.",
+        "It measures fourteen statistics against real markets and gets all "
+        "fourteen right over a year. The fourteen results are published, "
+        "along with six things it gets wrong and what each one rules out.",
+    ),
+    (
+        "pretium publishes what it gets right and what it gets wrong: ten "
+        "statistics measured against real markets, how long those results "
+        "hold for",
+        "pretium publishes what it gets right and what it gets wrong: "
+        "fourteen statistics measured against real markets, how long those "
+        "results hold for",
+    ),
+    (
+        "Ten statistics measured against real markets, nine of them in band "
+        "over a year, and six known gaps with what each one rules out.",
+        "Fourteen statistics measured against real markets, all fourteen in "
+        "band over a year, and six known gaps with what each one rules out.",
+    ),
+    (
+        "Five of the ten statistics were live calibration targets",
+        "Five of the fourteen statistics were live calibration targets",
+    ),
+    (
+        "Measured on the shipped preset, eight of the ten statistics have "
+        "their 10th-to-90th percentile range across seeds crossing a band "
+        "edge.",
+        "Measured on the shipped preset, nine of the fourteen statistics "
+        "have their 10th-to-90th percentile range across seeds crossing a "
+        "band edge.",
+    ),
+    (
+        "eight of the ten statistics have their middle-eighty-percent range "
+        "crossing a band edge",
+        "nine of the fourteen statistics have their middle-eighty-percent "
+        "range crossing a band edge",
+    ),
+    (
+        'is a preset name or a ModelParams; the default is pt-v3.',
+        'is a preset name or a ModelParams; the default is pt-v10.',
+    ),
+    (
+        "The current default, and the one the realism numbers describe.",
+        "The default until the 2026-08-26 era boundary, kept selectable so "
+        "work published against it keeps reproducing.",
+    ),
+    (
+        "The current default, produced the same way. This is the preset the "
+        "realism numbers describe: nine of ten statistics in band at 252 "
+        "days. Herding is turned well down (momentum_theta 0.0742).",
+        "The default until the 2026-08-26 era boundary, produced the same "
+        "way, and the preset the realism numbers described then: nine of the "
+        "ten statistics measured at the time were in band at 252 days. "
+        "Herding is turned well down (momentum_theta 0.0742).",
+    ),
+    (
+        '<code style="font-size:13px">pt-v3</code> is the current default;',
+        '<code style="font-size:13px">pt-v10</code> is the current default;',
+    ),
+    (
+        'eng = pt.Engine(seed=42, universe=u, model="pt-v3")  # the default, spelled out',
+        'eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the default, spelled out',
+    ),
+    (
+        'eng = pt.Engine(seed=42, universe=u)                  # pt-v3, the default\n'
+        'eng = pt.Engine(seed=42, universe=u, model="pt-v3")   # the same, spelled out',
+        'eng = pt.Engine(seed=42, universe=u)                  # pt-v10, the default\n'
+        'eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the same, spelled out',
+    ),
+    ("The Seven Components", "The Nine Components"),
+    ("seven components", "nine components"),
+    ("seven factors", "nine factors"),
+]
+
 #: The bundle was authored before anything shipped, so its Release Notes page
 #: still says 0.1.0 is unreleased and nothing has been tagged. Every word of
 #: that is now false, and a documentation page asserting a package is
@@ -299,6 +387,14 @@ def read_bundle() -> str:
 
     for old, new in PROSE_FIXES:
         doc = doc.replace(old, new)
+    for old, new in ERA_FIXES:
+        if old not in doc:
+            sys.exit(
+                "the design bundle no longer contains a phrase ERA_FIXES "
+                f"corrects, so the correction would be silently skipped: {old[:60]!r}"
+            )
+        doc = doc.replace(old, new)
+    doc = apply_trust_fixes(doc)
     # Two spots track the package version; the rest are history. See VERSION.
     doc = doc.replace(">v0.1.0<", f">v{VERSION}<")
     doc = doc.replace("version = {0.1.0}", "version = {%s}" % VERSION)
@@ -511,6 +607,197 @@ def json_ld(page: dict, desc: str) -> str:
         + "</script>"
     )
 
+
+
+def _fmt(v: float) -> str:
+    # The bundle's own convention: a real minus sign, not a hyphen.
+    s = f"{v:.2f}" if abs(v) >= 1 else f"{v:+.4f}"
+    return s.replace("-", "\u2212")
+
+
+def _band(lo: float, hi: float) -> str:
+    def n(x):
+        s = f"{x:.4f}".rstrip("0").rstrip(".")
+        return (s if s not in ("-0", "") else "0").replace("-", "\u2212")
+    return f"{n(lo)} - {n(hi)}"
+
+
+def certified_rows() -> str:
+    """The certification table's body, generated from the shipped envelope.
+
+    The bundle carries a pt-v3-era table: ten statistics, `volume_change_acf1`
+    at -0.4598 and out by 13.7 sd. Every figure moved at the 2026-08-26 era
+    boundary, and this is the page a reader consults to decide whether to
+    trust a result. Generating it from `pretium.envelope` means the published
+    table cannot drift from the module again.
+    """
+    from pretium import envelope as env, facts
+
+    rows = []
+    for name, value in env.CERTIFIED.items():
+        if name not in facts.REAL_MARKETS:
+            continue
+        lo, hi = facts.REAL_MARKETS[name]
+        ok = lo <= value <= hi
+        verdict = "in band" if ok else "out"
+        colour = "var(--mut)" if ok else "var(--warn, #b45309)"
+        rows.append(
+            f"<sc-raw-tr><sc-raw-td>{name}</sc-raw-td>"
+            f'<sc-raw-td style="text-align:right">{_fmt(value)}</sc-raw-td>'
+            f'<sc-raw-td style="text-align:right">{_band(lo, hi)}</sc-raw-td>'
+            f'<sc-raw-td style="color:{colour}">{verdict}</sc-raw-td></sc-raw-tr>'
+        )
+    body = "\n            ".join(rows)
+    return (
+        '<sc-raw-tbody style="font-family:var(--font-mono);font-size:12.5px">\n'
+        f"            {body}\n          </sc-raw-tbody>"
+    )
+
+
+def horizon_rows() -> str:
+    """The 504-day comparison table, likewise generated."""
+    from pretium import envelope as env, facts
+
+    rows = []
+    for name in facts.REAL_MARKETS:
+        v252, v504 = env.CERTIFIED.get(name), env.MEASURED_504.get(name)
+        if v252 is None or v504 is None:
+            continue
+        lo, hi = facts.REAL_MARKETS_504[name]
+        ok = lo <= v504 <= hi
+        rows.append(
+            f"<sc-raw-tr><sc-raw-td>{name}</sc-raw-td>"
+            f'<sc-raw-td style="text-align:right">{_fmt(v252)}</sc-raw-td>'
+            f'<sc-raw-td style="text-align:right">{_fmt(v504)}</sc-raw-td>'
+            f'<sc-raw-td style="text-align:right">{_band(lo, hi)}</sc-raw-td>'
+            f'<sc-raw-td>{"in" if ok else "out"}</sc-raw-td></sc-raw-tr>'
+        )
+    return "\n            ".join(rows)
+
+
+def apply_trust_fixes(doc: str) -> str:
+    """Bring the realism page's measured content up to the shipped envelope.
+
+    The bundle's "What Is Certified" table, its 504-day comparison and its
+    first two gaps are all pt-v3 era. This is the page the site points a
+    reader to before they trust a result, so a stale number here is the worst
+    stale number in the project. Each replacement asserts.
+    """
+    def cut(marker: str, start_tag: str, end_tag: str, replacement: str) -> None:
+        nonlocal doc
+        if marker not in doc:
+            sys.exit(f"the design bundle no longer contains {marker[:60]!r}; "
+                     "apply_trust_fixes needs updating rather than silently "
+                     "shipping a pt-v3-era realism page")
+        i = doc.index(marker)
+        s = doc.index(start_tag, i)
+        e = doc.index(end_tag, s) + len(end_tag)
+        doc = doc[:s] + replacement + doc[e:]
+
+    swaps = [
+        (
+            "<p>At a 252-day horizon the shipped <code style=\"font-size:13px\">"
+            "pt-v3</code> preset puts nine of the ten measured statistics in "
+            "band. The tenth fails structurally and is named, in every result "
+            "the library produces.</p>",
+            "<p>At a 252-day horizon the shipped <code style=\"font-size:13px\">"
+            "pt-v10</code> preset puts all fourteen measured statistics in "
+            "band, on thirty calibration seeds and on a held-out 60-name "
+            "universe measured at the same resolution. It is the first preset "
+            "in the project with no miss at this horizon.</p>",
+        ),
+        (
+            "Measured: preset pt-v3 · 30 seeds · 40 instruments · 252 trading "
+            "days · band-distance loss L_real = 0.0000.",
+            "Measured: preset pt-v10 · 30 seeds · 40 instruments · 252 trading "
+            "days · band-distance loss L_real = 0.0000.",
+        ),
+        (
+            "1 · The tenth statistic is structurally unreachable",
+            "1 · Volume-change autocorrelation leaves its band past a year",
+        ),
+        (
+            "<p><code style=\"font-size:12.5px\">volume_change_acf1</code> reads "
+            "−0.46 against a real band of −0.32 to −0.20: 13.7 "
+            "seed-standard-deviations out. A held volume level plus "
+            "independent per-tick noise sits near −0.5 at any coefficients, "
+            "which means no parameter setting can reach it. It is excluded "
+            "from the calibration objective deliberately, because an optimiser "
+            "pointed at an unreachable target distorts every other parameter "
+            "chasing it. It stays in every report as a standing falsification "
+            "verdict.</p>",
+            "<p><code style=\"font-size:12.5px\">volume_change_acf1</code> reads "
+            "−0.3130 at 252 days against a real band of −0.32 to −0.20, inside "
+            "it but only 0.7 seed-sd clear of the floor, and −0.3156 at 504 "
+            "days against a tighter −0.29 to −0.21, about 2.2 seed-sd out. "
+            "This page called the row structurally unreachable until 0.2.0, "
+            "because every way of reaching it cost "
+            "<code style=\"font-size:12.5px\">volume_abs_return_corr</code> its "
+            "own band. That is withdrawn: pt-v10 holds both at one year. It "
+            "stays outside the calibration objective, which is a statement "
+            "about what an optimiser may chase, not about reachability.</p>",
+        ),
+        (
+            "Measured against bands re-derived at the matching 504-day window, "
+            "the model holds 5 of 10.",
+            "Measured against bands re-derived at the matching 504-day window, "
+            "the model holds 13 of 14, missing only the volume-change row.",
+        ),
+        (
+            "Volatility clustering roughly doubles from 252 to 504 days where "
+            "real markets move about 14%. The price level stays plausible, so "
+            "long runs look fine and are not. The dynamics leave the envelope "
+            "while the chart still looks like a market.",
+            "That is the best two-year reading this project has measured, and "
+            "it is still not a certification: CERTIFIED is measured at 252 "
+            "days, the 504-day table is measured but not certified, and "
+            "beyond 504 days nothing has been measured at all. Excess "
+            "kurtosis deserves a reader's caution at this horizon, inside its "
+            "band at 8.26 but only about 0.3 seed-sd above a floor of 7.1.",
+        ),
+    ]
+    swaps.extend([
+        (
+            "4 · Tails are too thin over multi-year windows",
+            "4 · The endogenous economy cannot reach its own crisis regimes",
+        ),
+        (
+            "<p>Over 504-day windows real markets show excess kurtosis of 7.1 "
+            "to 22. The model shows 5.2. The 252-day band's floor of 1.6 is "
+            "wide enough that this reads as comfortably in band on every "
+            "252-day certificate, which is why it went unnoticed: nothing was "
+            "measuring kurtosis where it fails.</p>",
+            "<p>Left to itself the macro state stays in a moderate band. "
+            "Endogenous inflation peaks at 4.06% to 4.11% over five seeds and "
+            "five years, against a clamp of 6.0% and a US CPI that reached "
+            "9.1% in June 2022. The cause is dispersion rather than "
+            "persistence. This slot used to carry a thin-tails gap, retired "
+            "at 0.2.0: two-year excess kurtosis moved from 5.23, under its "
+            "band, to 8.26, inside it.</p>",
+        ),
+        (
+            "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> tail-risk or "
+            "VaR calibration at multi-year horizons. At the certified 252-day "
+            "horizon, kurtosis is in band.</p>",
+            "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> studying an "
+            "inflation regime or a policy crisis from the endogenous economy "
+            "alone. Drive one with a scenario instead.</p>",
+        ),
+    ])
+
+    for old, new in swaps:
+        if old not in doc:
+            sys.exit("the design bundle reworded a realism-page passage that "
+                     f"apply_trust_fixes corrects: {old[:70]!r}")
+        doc = doc.replace(old, new, 1)
+
+    cut("At a 252-day horizon the shipped", "<sc-raw-tbody", "</sc-raw-tbody>",
+        certified_rows())
+    cut("2 · The certified horizon is 252 days", "<sc-raw-tbody",
+        "</sc-raw-tbody>",
+        '<sc-raw-tbody style="font-family:var(--font-mono);font-size:12px">\n'
+        f"                {horizon_rows()}\n              </sc-raw-tbody>")
+    return doc
 
 def nav_html(pages: list[dict], current: str) -> str:
     items = []
