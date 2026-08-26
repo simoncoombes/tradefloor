@@ -1466,9 +1466,9 @@ impl ModelParams {
     /// |---|---|---|---|
     /// | panel at 252 | 14/14 | 14/14 | |
     /// | panel at 504 | 13/14 | 13/14 | |
-    /// | crisis lever | **6.40** | 4.97 | 6.16 |
-    /// | crisis co-movement | **0.687** | 0.669 | 0.664 to 0.727 |
-    /// | crisis sector excess | **+0.091** | +0.040 | +0.103 |
+    /// | crisis lever | **6.01** | 4.97 | 6.16 |
+    /// | crisis co-movement | **0.697** | 0.669 | 0.664 to 0.727 |
+    /// | crisis sector excess | **+0.110** | +0.040 | +0.103 |
     ///
     /// It regresses NOTHING against pt-v10: both panels equal, and all three
     /// crisis numbers better. §8 passes on every axis with no flips, with
@@ -1506,9 +1506,25 @@ impl ModelParams {
     /// registering it.
     pub const fn pt_v11() -> ModelParams {
         let mut p = ModelParams::pt_v10();
+        // The crisis, through the market factor (§97 to §99).
         p.crisis_blend_gain = 0.8;
         p.sector_vix_coupling = 1.0;
-        p.idio_sigma_scale = 0.58;
+        // Company news that transfers to sector peers, harder in a crisis
+        // (§101 to §106). The peer weight is small and the coupling large,
+        // so a calm market barely sees transfer and a crisis does.
+        p.endogenous_news_intensity = 0.05;
+        p.endogenous_news_sigma = 0.03;
+        p.news_peer_weight = 0.05;
+        p.news_peer_weight_down = 0.05;
+        p.news_peer_vix_coupling = 8.0;
+        // News is the earnings-surprise channel the idio jump stood in for,
+        // so the jump gives way rather than stacking; the rest is funded
+        // from the idio scale, as the market factor's variance always has
+        // been. Cutting the jump further than this costs the tails: at 0.6
+        // of pt-v10's rate, 504-day kurtosis fell to 7.04 against a floor
+        // of 7.1 (§106).
+        p.jump_intensity_idio = 0.018175898318813576;
+        p.idio_sigma_scale = 0.53;
         p
     }
 

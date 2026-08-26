@@ -14,9 +14,9 @@ tightly enough while it happened. Industries came apart when real ones hold.
 
 | in a crisis | pt-v11 | the default | real markets |
 |---|---|---|---|
-| how much more volatile | **6.4x** | 5.0x | 6.2x |
-| how tightly names move together | **0.69** | 0.67 | 0.66 to 0.73 |
-| how much industries hold together | **+0.09** | +0.04 | +0.10 |
+| how much more volatile | **6.0x** | 5.0x | 6.2x |
+| how tightly names move together | **0.70** | 0.67 | 0.66 to 0.73 |
+| how much industries hold together | **+0.11** | +0.04 | +0.10 |
 
 It matches the default on every one of the fourteen realism statistics at
 one year and thirteen of fourteen at two, so none of that is paid for
@@ -33,10 +33,17 @@ make crises more violent had to do it through company-specific movement
 instead, which by construction made names move together LESS. Turning that
 fixed number into a setting removed the ceiling.
 
+**And industries that infect each other.** Real earnings surprises spread:
+one cloud company's miss moves the others. This market had no route for
+that at all, so industries only moved together because they shared a
+market-wide factor. `pt-v11` gives companies their own news and lets it
+reach their sector's peers, harder in a crisis than in a quiet week. That
+is what takes industry co-movement from +0.04 to +0.11 against a real
++0.10, and it costs nothing on the realism panel at either horizon.
+
 **What it costs.** Driven through the real 2020-21 market, this preset's
-day-to-day movement is about 5% noisier than the default's, which was
-already noisier than the real stock it imitates. And industries at +0.09
-still hold together slightly less than the +0.10 real ones do.
+day-to-day movement is about 6% noisier than the default's, which was
+already noisier than the real stock it imitates.
 
 ### New settings
 
