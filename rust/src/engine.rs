@@ -935,6 +935,17 @@ impl Engine {
             &DailyInputs {
                 vix_mean_reversion: self.params.vix_mean_reversion,
                 vix_return_gain: self.params.vix_return_gain,
+                vix_realised_vol_weight: self.params.vix_realised_vol_weight,
+                // The factor's sigma read back through the forward
+                // coupling's own anchor, so the loop is consistent: the
+                // forward map sends VIX to variance through
+                // `(vix / anchor)^2`, and this is its inverse.
+                vix_implied_from_market: if self.params.vix_realised_vol_weight == 0.0 {
+                    0.0
+                } else {
+                    self.params.market_vol_vix_anchor * self.market_vol.sigma_daily()
+                        / self.params.market_factor_sigma
+                },
                 vix_return_gain_up: self.params.vix_return_gain_up,
                 vix_return_clamp: self.params.vix_return_clamp,
                 vix_target_shock_cap: self.params.vix_target_shock_cap,

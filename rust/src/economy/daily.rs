@@ -77,6 +77,12 @@ pub struct DailyInputs<'a> {
     /// `vix_mean_reversion` is: a literal here decides how violent a crisis
     /// can be, which is a calibration question. See §68.
     pub vix_return_gain: f64,
+    /// How much of the VIX target is the market's own volatility, and what
+    /// that volatility implies in VIX points. The engine computes the second
+    /// from the market factor's current sigma through the forward coupling's
+    /// own anchor; at weight 0.0 neither is read. See §68.
+    pub vix_realised_vol_weight: f64,
+    pub vix_implied_from_market: f64,
     pub vix_return_gain_up: f64,
     pub vix_return_clamp: f64,
     pub vix_target_shock_cap: f64,
@@ -107,6 +113,8 @@ impl<'a> Default for DailyInputs<'a> {
             game_day: 0,
             vix_mean_reversion: VIX_MEAN_REVERSION,
             vix_return_gain: VIX_RETURN_GAIN,
+            vix_realised_vol_weight: 0.0,
+            vix_implied_from_market: 0.0,
             vix_return_gain_up: VIX_RETURN_GAIN_UP,
             vix_return_clamp: VIX_RETURN_CLAMP,
             vix_target_shock_cap: VIX_TARGET_SHOCK_CAP,
@@ -667,6 +675,18 @@ pub fn update_economy_daily(
     let day_of_month_vix = day_of_year as f64 - ((earnings_month_vix - 1.0) * 30.44).floor();
     if day_of_month_vix <= 15.0 {
         target_vix += 0.5;
+    }
+
+    // THE FEEDBACK LOOP, WHICH RAN ONE WAY. The VIX sets the market
+    // factor's variance target and the market's own volatility never came
+    // back, so the VIX was a function of the business cycle and not of the
+    // market: it tracked trailing realised volatility at +0.28 against a
+    // real +0.82, and never once crossed its own crisis threshold in a year
+    // (§68). At weight zero this branch is not taken and every preset
+    // reproduces bit for bit.
+    if inputs.vix_realised_vol_weight != 0.0 {
+        let w = inputs.vix_realised_vol_weight;
+        target_vix = (1.0 - w) * target_vix + w * inputs.vix_implied_from_market;
     }
 
     new_state.vix = clamp(

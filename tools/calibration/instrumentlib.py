@@ -156,6 +156,8 @@ PARAM_SPECS: dict[str, dict] = {
     # above the panel's other values, and a raw deviation penalty on them
     # would be about the regulariser rather than the model (trap 4 in the
     # calibration notes).
+    "vix_realised_vol_weight": {"kind": "abs", "step_unit": 0.05,
+                                "hard_range": (0.0, 1.0)},
     "vix_return_gain": {"kind": "log", "hard_range": (1.0, 250.0)},
     "vix_return_gain_up": {"kind": "log", "hard_range": (1.0, 250.0)},
     "vix_return_clamp": {"kind": "abs", "step_unit": 0.01,

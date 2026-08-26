@@ -160,6 +160,11 @@ DEFAULT_PLAN_SEED = atlas.DEFAULT_SEED
 #: `tests/test_model_params.py` (values proven to move the market),
 #: `instrumentlib.PARAM_SPECS` hard ranges, and the mechanism's own units.
 ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
+    # The VIX's feedback weight (§68): a share, so its box is the unit
+    # interval. At 1.0 the loop gain is exactly one by construction, since
+    # the implied VIX is the forward coupling's own inverse, so the top of
+    # the box is a boundary worth sampling rather than an arbitrary cap.
+    "vix_realised_vol_weight": (0.0, 1.0),
     # Jumps. Intensity is per-day probability: 0.25 is roughly one jump a
     # week, already a violent market; the perturbation table's 1.0 proves
     # wiring, not plausibility. Market jump mean is signed and surveyed

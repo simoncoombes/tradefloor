@@ -573,6 +573,38 @@ pub struct ModelParams {
     /// threshold on 0.0% of days against a real 12.5%, so a one-year run
     /// contains no volatility episode and lag-5 clustering sits on its band
     /// floor. Calibration record §68.
+    /// How much of the VIX's target is the market's own volatility.
+    ///
+    /// Shipped 0.0, and bit-identical there by branch. At zero the VIX is a
+    /// function of the business cycle phase, a one-day return spike that
+    /// decays with a 5.4-day half-life, and noise: the market's own realised
+    /// volatility is not an input to it. MEASURED consequence (§68): real
+    /// implied volatility tracks trailing 21-day realised volatility at
+    /// +0.818 (FRED VIXCLS against SP500, 2,491 days), the model at +0.275
+    /// on pt-v3 and +0.337 on pt-v8, and the endogenous VIX crosses its own
+    /// crisis threshold on 0.0% of days in a year against a real 12.5%.
+    /// This market cannot frighten itself.
+    ///
+    /// At `w` the target becomes `(1 - w) * target + w * implied`, where
+    /// `implied` is the market factor's current sigma read back through the
+    /// same anchor the forward coupling uses: `market_vol_vix_anchor *
+    /// sigma_today / market_factor_sigma`. Using the forward map's own
+    /// inverse means the loop is consistent at equilibrium and introduces no
+    /// second calibration constant. The VIX clamp of 10 to 80 and the
+    /// factor's ceiling multiple bound the feedback.
+    pub vix_realised_vol_weight: f64,
+    /// VIX points added to its target per unit of a DOWN day's index
+    /// return, before the clamp and cap below.
+    ///
+    /// Shipped 25.0, a literal in the VIX update. MEASURED against real
+    /// markets (FRED VIXCLS and SP500, 2,511 common days to 2026-08): a
+    /// session at -3% or worse moves the VIX a median of +6.03 points, and
+    /// -2% to -1% moves it +1.95. The shipped gain with the shipped clamp
+    /// adds at most 0.75 points to the TARGET, of which the day traverses
+    /// `vix_mean_reversion`, about 0.09 points. Raising it to the real slope
+    /// is NOT the lever, measured: it moves the within-year VIX sd from 1.54
+    /// to 1.79 against a real 4.0 and leaves lag-5 clustering where it was
+    /// (§68). What was missing is the feedback above, not the gain.
     pub vix_return_gain: f64,
     /// The same for an UP day. Shipped 10.0; the real response to a +2% day
     /// is about half the size of the response to -2%, which the shipped
@@ -777,6 +809,7 @@ impl ModelParams {
             spread_size_smoothness: 0.0,
             spread_size_exponent: crate::microstructure::SPREAD_SIZE_EXPONENT,
             vix_mean_reversion: crate::economy::VIX_MEAN_REVERSION,
+            vix_realised_vol_weight: 0.0,
             vix_return_gain: crate::economy::VIX_RETURN_GAIN,
             vix_return_gain_up: crate::economy::VIX_RETURN_GAIN_UP,
             vix_return_clamp: crate::economy::VIX_RETURN_CLAMP,
@@ -1148,6 +1181,7 @@ impl ModelParams {
             "spread_size_smoothness" => self.spread_size_smoothness,
             "spread_size_exponent" => self.spread_size_exponent,
             "vix_mean_reversion" => self.vix_mean_reversion,
+            "vix_realised_vol_weight" => self.vix_realised_vol_weight,
             "vix_return_clamp" => self.vix_return_clamp,
             "vix_return_gain" => self.vix_return_gain,
             "vix_return_gain_up" => self.vix_return_gain_up,
@@ -1251,6 +1285,7 @@ impl ModelParams {
             "spread_size_exponent" => out.spread_size_exponent = value,
             "spread_size_smoothness" => out.spread_size_smoothness = value,
             "vix_mean_reversion" => out.vix_mean_reversion = value,
+            "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
             "vix_return_gain" => out.vix_return_gain = value,
             "vix_return_gain_up" => out.vix_return_gain_up = value,
@@ -1421,6 +1456,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "universe_stress_decay",
         "universe_stress_weight",
         "vix_mean_reversion",
+        "vix_realised_vol_weight",
         "vix_return_clamp",
         "vix_return_gain",
         "vix_return_gain_up",
