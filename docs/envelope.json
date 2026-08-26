@@ -3,7 +3,7 @@
  "certified_horizon_days": 252,
  "statistics": {
   "annualised_vol_pct": {
-   "measured": 28.8814,
+   "measured": 31.1614,
    "band": [
     15.0,
     36.0
@@ -11,7 +11,7 @@
    "in_band": true
   },
   "excess_kurtosis": {
-   "measured": 8.8342,
+   "measured": 7.5137,
    "band": [
     1.6,
     41.0
@@ -19,7 +19,7 @@
    "in_band": true
   },
   "return_acf1": {
-   "measured": 0.0157,
+   "measured": 0.0155,
    "band": [
     -0.08,
     0.06
@@ -27,7 +27,7 @@
    "in_band": true
   },
   "abs_return_acf1": {
-   "measured": 0.0698,
+   "measured": 0.0954,
    "band": [
     0.02,
     0.22
@@ -35,7 +35,7 @@
    "in_band": true
   },
   "abs_return_acf5": {
-   "measured": 0.0307,
+   "measured": 0.0502,
    "band": [
     0.02,
     0.09
@@ -43,7 +43,7 @@
    "in_band": true
   },
   "abs_return_acf20": {
-   "measured": 0.0049,
+   "measured": 0.0046,
    "band": [
     -0.04,
     0.08
@@ -51,7 +51,7 @@
    "in_band": true
   },
   "cross_sectional_corr": {
-   "measured": 0.2537,
+   "measured": 0.3106,
    "band": [
     0.08,
     0.56
@@ -67,7 +67,7 @@
    "in_band": true
   },
   "leverage_effect": {
-   "measured": -0.0276,
+   "measured": -0.0327,
    "band": [
     -0.16,
     0.0
@@ -75,7 +75,7 @@
    "in_band": true
   },
   "volume_change_acf1": {
-   "measured": -0.314,
+   "measured": -0.3111,
    "band": [
     -0.32,
     -0.2
@@ -83,7 +83,7 @@
    "in_band": true
   },
   "corr_asymmetry": {
-   "measured": -0.0071,
+   "measured": -0.0228,
    "band": [
     -0.25,
     0.45
@@ -91,7 +91,7 @@
    "in_band": true
   },
   "corr_asymmetry_lagged": {
-   "measured": -0.0159,
+   "measured": 0.0045,
    "band": [
     -0.2,
     0.55
@@ -99,7 +99,7 @@
    "in_band": true
   },
   "sector_excess_corr": {
-   "measured": 0.1457,
+   "measured": 0.1374,
    "band": [
     0.11,
     0.23
@@ -107,7 +107,7 @@
    "in_band": true
   },
   "corr_persistence_acf1": {
-   "measured": 0.1813,
+   "measured": 0.1595,
    "band": [
     -0.19,
     0.54

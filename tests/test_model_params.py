@@ -228,7 +228,7 @@ PERTURBATIONS = [
     # `test_the_crisis_threshold_acts_above_itself`.
     ("vix_mean_reversion", 0.30, True),
     ("vix_realised_vol_weight", 0.5, True),
-    ("vix_cycle_amplitude", 0.0, True),
+    ("vix_cycle_amplitude", 1.0, True),     # perturbed AWAY from the default, which is 0.0 since the 2026-08-26 boundary
     ("vix_return_source", 0.0, True),        # perturbed AWAY from the default, which is 1.0 since pt-v10
     ("vix_return_gain", 150.0, True),         # the channel reads the day since pt-v10, and the harness's days fall
     ("vix_return_gain_up", 60.0, False),     # needs an UP day; under this default the channel reads the DAY and the harness's three sessions fall

@@ -11,9 +11,17 @@ The known-answer baseline is regenerated at v10 and the cross-platform gate
 runs against it.
 
 `pt.Engine(seed=..., universe=...)` now runs pt-v10, which holds **all
-fourteen realism statistics in band at the certified 252-day horizon**, on
-the calibration seeds and on a 60-name universe it never saw. pt-v3 held
-twelve. The envelope certifies pt-v10; `envelope.CERTIFIED` and the 504-day
+fourteen realism statistics in band at the certified 252-day horizon** and
+thirteen of fourteen at 504 days, missing only the volume-change row there.
+pt-v3 held twelve and seven.
+
+pt-v10 also takes the business cycle out of the VIX (`vix_cycle_amplitude`
+0.0). The five cycle-phase constants pulled the level to about 17.4 in a
+typical year against a real 18.3, and the market crossed its own crisis
+threshold on 2.7% of days against a real 12.5%. Without them the level reads
+19.6, the within-year spread 4.54 against a real 4.0, and the threshold is
+crossed on **10.2% of days**: volatility regimes come from the market rather
+than from the calendar. The envelope certifies pt-v10; `envelope.CERTIFIED` and the 504-day
 table are re-derived on it, and `envelope.check()` no longer names a
 statistic as out of band at 252 days, because none is.
 

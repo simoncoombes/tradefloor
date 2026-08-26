@@ -2,7 +2,7 @@
 
 The first preset holding all fourteen realism statistics in band at the
 certified 252-day horizon, on training seeds and on a held-out universe
-(calibration record §73). Two coefficients move from pt-v9.
+(calibration record §73). Three coefficients move from pt-v9.
 """
 
 from __future__ import annotations
@@ -10,12 +10,13 @@ from __future__ import annotations
 import pretium as pt
 
 MOVED = {
+    "vix_cycle_amplitude": 0.0,
     "volume_innovation_sigma": 0.21,
     "volume_persistence": 0.7,
 }
 
 
-def test_it_is_pt_v9_with_two_coefficients_moved() -> None:
+def test_it_is_pt_v9_with_three_coefficients_moved() -> None:
     v9 = pt.ModelParams.from_preset("pt-v9").to_dict()
     v10 = pt.ModelParams.from_preset("pt-v10").to_dict()
     for name, value in MOVED.items():

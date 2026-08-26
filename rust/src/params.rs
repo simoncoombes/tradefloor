@@ -1187,7 +1187,15 @@ impl ModelParams {
     /// pt-v9 with volume that remembers: the first preset holding ALL
     /// FOURTEEN realism statistics in band at the certified horizon.
     ///
-    /// Two coefficients move from pt-v9 (CALIBRATION-FOLLOWUPS.md §73). The
+    /// Three coefficients move from pt-v9 (CALIBRATION-FOLLOWUPS.md §73,
+    /// §76). `vix_cycle_amplitude` 0.6 to 0.0 takes the business cycle out of
+    /// the VIX entirely: the five phase constants pulled the level to about
+    /// 17.4 in a typical year against a real 18.3, and the market crossed its
+    /// own crisis threshold on 2.7% of days against a real 12.5%. At zero the
+    /// level reads 19.6, the within-year sd 4.54 against a real 4.0, and the
+    /// threshold is crossed on 10.2% of days. Volatility regimes now come
+    /// from the market rather than from the calendar, which is what §71
+    /// measured them to need. The
     /// engine carries a common log-volume state, an AR(1) that has shipped
     /// switched off since pt-v1; `volume_persistence` 0.70 and
     /// `volume_innovation_sigma` 0.21 turn it on. `volume_change_acf1` is the
@@ -1215,6 +1223,7 @@ impl ModelParams {
     /// NOT the default. pt-v3 keeps that and the envelope certifies pt-v3.
     pub const fn pt_v10() -> ModelParams {
         let mut p = ModelParams::pt_v9();
+        p.vix_cycle_amplitude = 0.0;
         p.volume_innovation_sigma = 0.21;
         p.volume_persistence = 0.7;
         p

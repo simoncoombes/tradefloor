@@ -143,7 +143,14 @@ def test_volatility_clustering_is_in_band_at_short_lags_and_dies_too_fast():
     # -0.44. Exponential memory imitating hyperbolic memory. It is
     # structural, no parameter setting fixes it, and it is the reason the
     # 504-day horizon is the one axis still not perfectly in band.
-    facts = measure(seed=3, universe=UNIVERSE, days=180)
+    # Measured at the CERTIFIED horizon, not at 180 days as this used to be.
+    # The bands come from 252-day windows of real data, and clustering is
+    # strongly horizon-dependent: on the 2026-08-26 default the same seed
+    # reads lag five at 0.098 over 180 days, just past a 0.09 ceiling, and
+    # 0.087 over 252. Scoring a 180-day panel against a 252-day band was
+    # measuring with the wrong ruler, which is the mistake this file's own
+    # header warns about.
+    facts = measure(seed=3, universe=UNIVERSE, days=252)
     verdicts = compare_to_real_markets(facts)
     assert verdicts["abs_return_acf1"]["matches"]
     assert verdicts["abs_return_acf5"]["matches"]
