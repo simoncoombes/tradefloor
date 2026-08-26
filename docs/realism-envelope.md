@@ -216,9 +216,25 @@ same correlations computed on real AAPL over the same window:
 | absolute return vs VIX level | +0.512 | +0.489 | positive |
 
 All four carry the right sign, and the volatility-clustering channel is close
-to exact. The three directional channels run at roughly seventy to eighty-five
-percent of the real response, which is this gap from another angle: a shock
-moves this market the right way and not far enough. An event study over the
+to exact.
+
+**The response size was misread, and is corrected here.** This page used to
+read those three directional correlations as response sizes and say the model
+ran at seventy to eighty-five percent of real. A correlation is
+`beta * sd(driver) / sd(return)`, which is signal share rather than gain.
+Measured as gains, by OLS slope of daily return on each driver's daily change
+over the same 504 sessions, the three channels are right: **-0.00461**
+against real AAPL's -0.00500 for the VIX, **-8.106** against -7.445 for the
+credit yield, and **+1.226** against +1.272 for valuation. All within ten
+percent, with real AAPL inside the model's six-seed range every time.
+
+The denominator is the defect. Over the same runs the model's daily return sd
+is **0.0355** against real AAPL's **0.0236**, and its residual sd is 1.76x
+real. The expected response to a scenario is calibrated; the dispersion
+around it is too wide, so one run understates how much of its own move was
+the scenario. Calibration record §81.
+
+An event study over the
 five sessions after each of six dated events agrees on sign five times out of
 six; the exception is the Fed's intermeeting cut of 3 March 2020, where an
 announcement-effect channel is missing rather than miscalibrated. Worked

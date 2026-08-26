@@ -129,8 +129,8 @@ volume-change autocorrelation, is stated as a gap.
 horizon is 252 days, and nothing beyond 504 days has been measured at all.
 Volatility memory decays exponentially where real markets decay
 hyperbolically. Volume-change autocorrelation leaves its band at two years.
-Scenario response is directionally right but not calibrated in magnitude, at
-seventy to eighty five percent of the real size, and industries hold
+Scenario response has the right size, measured as a regression gain, but too
+much noise around it for one run to size a scenario from, and industries hold
 together in a crisis about a third as tightly as real ones. The endogenous
 economy cannot reach its own crisis regimes, so an inflation regime has to
 be driven through a scenario. And certification was measured on a
