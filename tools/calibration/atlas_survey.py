@@ -177,6 +177,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # 0.10 spans a 10% surprise, which is a large earnings move.
     "endogenous_news_intensity": (0.0, 0.25),
     "endogenous_news_sigma": (0.0, 0.10),
+    # Crisis contagion (§105). Ships at zero so it needs an explicit range,
+    # and the interesting region is well above zero because the spike it
+    # multiplies is below one.
+    "news_peer_vix_coupling": (0.0, 8.0),
     # How much of the business cycle's VIX swing survives (§77). A scale on
     # the phase VIX around its mean, so the unit interval is the whole
     # domain and both ends are shipped positions rather than guesses: every

@@ -226,6 +226,23 @@ pub struct ModelParams {
     ///
     /// Applies when the event's price impact is negative. 0.0 is inert.
     pub news_peer_weight_down: f64,
+    /// How much harder news transfers to a PEER in a crisis. Zero on every
+    /// preset before this dial and bit-identical (§104, §105).
+    ///
+    /// The peer weights are constants, so contagion ran as hard in a quiet
+    /// July as in March 2020. Measured, that is what made endogenous news
+    /// unusable: calm-market sector excess is already in band at +0.166
+    /// against a 0.11-to-0.22 ceiling, and constant transfer pushed it to
+    /// +0.256 at both horizons in exchange for the crisis figure that was
+    /// wanted. A mechanism that cannot tell a crisis from a Tuesday cannot
+    /// be aimed at one.
+    ///
+    /// At `c` the peer weight becomes `base * (1 + c * crisis_spike)`. The
+    /// spike is ZERO below `crisis_vix_threshold`, so a calm market is
+    /// untouched at ANY coupling and only the crisis moves. Real
+    /// information contagion works this way: when one bank misses, the
+    /// market re-reads every other bank, and it does that harder in a panic.
+    pub news_peer_vix_coupling: f64,
     /// Market-shock magnitude, in baseline sigmas, above which the crash
     /// amplifier fires (§5.4 promotion).
     pub crash_amplifier_threshold: f64,
@@ -986,6 +1003,7 @@ impl ModelParams {
             crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
+            news_peer_vix_coupling: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -1556,6 +1574,7 @@ impl ModelParams {
             "crisis_vix_threshold" => self.crisis_vix_threshold,
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
+            "news_peer_vix_coupling" => self.news_peer_vix_coupling,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -1667,6 +1686,7 @@ impl ModelParams {
             "crisis_vix_threshold" => out.crisis_vix_threshold = value,
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
+            "news_peer_vix_coupling" => out.news_peer_vix_coupling = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -1819,6 +1839,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "mispricing_half_life_days",
         "momentum_theta",
         "news_market_weight",
+        "news_peer_vix_coupling",
         "news_peer_weight",
         "news_peer_weight_down",
         "news_sector_weight",

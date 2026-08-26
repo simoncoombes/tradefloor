@@ -242,7 +242,8 @@ PERTURBATIONS = [
     ("jump_vix_coupling", 1.0, False),
     ("crisis_blend_gain", 2.0, False),
     ("endogenous_news_intensity", 0.25, False),  # a PAIR: events fire but carry impact sigma * z, and sigma ships at 0.0, so alone this generates zero-impact news
-    ("endogenous_news_sigma", 0.05, False),      # the other half of the pair: no events exist to carry an impact until intensity is non-zero      # the crisis blend only fires above the VIX gate, which the harness does not cross         # anchored: the harness runs near market_vol_vix_anchor, where the rate scale is exactly 1.0 at any coupling
+    ("endogenous_news_sigma", 0.05, False),      # the other half of the pair: no events exist to carry an impact until intensity is non-zero
+    ("news_peer_vix_coupling", 4.0, False),      # multiplies a peer weight that is zero on every preset, and a crisis spike the harness never reaches      # the crisis blend only fires above the VIX gate, which the harness does not cross         # anchored: the harness runs near market_vol_vix_anchor, where the rate scale is exactly 1.0 at any coupling
 ]
 
 
