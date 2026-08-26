@@ -802,6 +802,11 @@ def cmd_run(args) -> int:
     n_infeasible = 0
     with open(rows_path, "a", encoding="utf-8") as sink:
         for index, vector in enumerate(vectors[:limit]):
+            # Shard on the GLOBAL index so every shard agrees about which
+            # vector is which, and a concatenation of their tasks.jsonl
+            # files is exactly the whole run.
+            if index % args.shard_n != args.shard_i:
+                continue
             if feasibility[index]:
                 n_infeasible += 1
                 marker_id = f"{index}:infeasible"
@@ -816,7 +821,9 @@ def cmd_run(args) -> int:
                         if t["id"] not in done]
 
         total = len(pending)
-        print(f"plan {fingerprint}: {limit} vectors, {n_infeasible} "
+        shard = (f"shard {args.shard_i}/{args.shard_n} of "
+                 if args.shard_n > 1 else "")
+        print(f"plan {fingerprint}: {shard}{limit} vectors, {n_infeasible} "
               f"infeasible (recorded), {len(done)} tasks already done, "
               f"{total} to run on {args.workers} workers", flush=True)
         if not pending:
@@ -1065,6 +1072,14 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=None,
                         help="run only the first N vectors -- a smoke run "
                              "before committing a big box to the rest")
+    parser.add_argument("--shard", default=None, metavar="I/N",
+                        help="run only vectors where index %% N == I, so one "
+                             "plan can span N boxes. The plan, its "
+                             "fingerprint and the global vector indices are "
+                             "identical on every shard, which is what lets "
+                             "the tasks.jsonl files be concatenated and "
+                             "collected as one run. Spot quota, not money, "
+                             "is what caps N.")
     parser.add_argument("--retry-errors", action="store_true",
                         help="re-run tasks whose recorded failure was "
                              "infrastructure (OOM, dead worker) rather "
@@ -1073,6 +1088,16 @@ def main() -> int:
                              "space, so leaving them final biases the "
                              "marginals against a region.")
     args = parser.parse_args()
+    args.shard_i, args.shard_n = 0, 1
+    if args.shard:
+        try:
+            i, n = (int(x) for x in args.shard.split("/", 1))
+        except ValueError:
+            raise SystemExit(f"--shard wants I/N, got {args.shard!r}")
+        if not (n >= 1 and 0 <= i < n):
+            raise SystemExit(
+                f"--shard {args.shard}: need N >= 1 and 0 <= I < N")
+        args.shard_i, args.shard_n = i, n
     BASE_PRESET = args.base
     ONLY = tuple(x.strip() for x in args.only.split(",") if x.strip()) if args.only else None
     if args.command != "plan" and not args.out:
