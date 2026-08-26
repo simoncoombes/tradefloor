@@ -239,7 +239,8 @@ PERTURBATIONS = [
     ("inflation_floor", -3.0, False),         # binds only when inflation reaches -1%
     ("inflation_reversion", 0.15, False),      # monthly; reaches prices via the bond yield at the first meeting (day 45)
     ("crisis_vix_threshold", 18.0, False),     # needs VIX above the gate
-    ("jump_vix_coupling", 1.0, False),         # anchored: the harness runs near market_vol_vix_anchor, where the rate scale is exactly 1.0 at any coupling
+    ("jump_vix_coupling", 1.0, False),
+    ("crisis_blend_gain", 2.0, False),      # the crisis blend only fires above the VIX gate, which the harness does not cross         # anchored: the harness runs near market_vol_vix_anchor, where the rate scale is exactly 1.0 at any coupling
 ]
 
 

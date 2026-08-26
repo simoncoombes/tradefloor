@@ -329,6 +329,11 @@ PARAM_SPECS: dict[str, dict] = {
     # other couplings, so the hard range is the unit interval.
     "jump_vix_coupling": {"kind": "abs", "step_unit": 0.05,
                           "hard_range": (0.0, 1.0)},
+    # How hard a crisis loads names onto the market factor (§97). 0.5 was
+    # the literal; the range reaches 2.0 because the whole point is headroom
+    # above the old ceiling of 0.5 x 0.98.
+    "crisis_blend_gain": {"kind": "abs", "step_unit": 0.05,
+                          "hard_range": (0.0, 2.0)},
     "garch_ceiling_multiple":   {"kind": "log",
                                  "hard_range": (1.0, 50.0)},
     "garch_floor_multiple":     {"kind": "log",
