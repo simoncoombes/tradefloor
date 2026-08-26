@@ -12,7 +12,7 @@ shutdown -h +60
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates12
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates13
 BRANCH=main
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
@@ -106,11 +106,11 @@ setsid nohup /home/ec2-user/stream.sh "$BUCKET" >/var/log/pretium-stream.log 2>&
 cat > /home/ec2-user/candidates.json <<'CANDS'
 [
   {"label": "v11-control", "base": "pt-v11", "overrides": {}},
-  {"label": "unfunded", "base": "pt-v11", "overrides": {"endogenous_news_intensity": 0.05, "endogenous_news_sigma": 0.03, "news_peer_weight": 0.05, "news_peer_weight_down": 0.05, "news_peer_vix_coupling": 8.0}},
-  {"label": "idio.55", "base": "pt-v11", "overrides": {"endogenous_news_intensity": 0.05, "endogenous_news_sigma": 0.03, "news_peer_weight": 0.05, "news_peer_weight_down": 0.05, "news_peer_vix_coupling": 8.0, "idio_sigma_scale": 0.55}},
-  {"label": "idio.52", "base": "pt-v11", "overrides": {"endogenous_news_intensity": 0.05, "endogenous_news_sigma": 0.03, "news_peer_weight": 0.05, "news_peer_weight_down": 0.05, "news_peer_vix_coupling": 8.0, "idio_sigma_scale": 0.52}},
-  {"label": "jump x.6", "base": "pt-v11", "overrides": {"endogenous_news_intensity": 0.05, "endogenous_news_sigma": 0.03, "news_peer_weight": 0.05, "news_peer_weight_down": 0.05, "news_peer_vix_coupling": 8.0, "jump_intensity_idio": 0.013631923739110182}},
-  {"label": "jump x.6 idio.55", "base": "pt-v11", "overrides": {"endogenous_news_intensity": 0.05, "endogenous_news_sigma": 0.03, "news_peer_weight": 0.05, "news_peer_weight_down": 0.05, "news_peer_vix_coupling": 8.0, "jump_intensity_idio": 0.013631923739110182, "idio_sigma_scale": 0.55}}
+  {"label": "j.8 i.55", "base": "pt-v11", "overrides": {"endogenous_news_intensity": 0.05, "endogenous_news_sigma": 0.03, "news_peer_weight": 0.05, "news_peer_weight_down": 0.05, "news_peer_vix_coupling": 8.0, "jump_intensity_idio": 0.01817589831881358, "idio_sigma_scale": 0.55}},
+  {"label": "j.8 i.53", "base": "pt-v11", "overrides": {"endogenous_news_intensity": 0.05, "endogenous_news_sigma": 0.03, "news_peer_weight": 0.05, "news_peer_weight_down": 0.05, "news_peer_vix_coupling": 8.0, "jump_intensity_idio": 0.01817589831881358, "idio_sigma_scale": 0.53}},
+  {"label": "j.9 i.55", "base": "pt-v11", "overrides": {"endogenous_news_intensity": 0.05, "endogenous_news_sigma": 0.03, "news_peer_weight": 0.05, "news_peer_weight_down": 0.05, "news_peer_vix_coupling": 8.0, "jump_intensity_idio": 0.020447885608665273, "idio_sigma_scale": 0.55}},
+  {"label": "j.7 i.56", "base": "pt-v11", "overrides": {"endogenous_news_intensity": 0.05, "endogenous_news_sigma": 0.03, "news_peer_weight": 0.05, "news_peer_weight_down": 0.05, "news_peer_vix_coupling": 8.0, "jump_intensity_idio": 0.015903911028961878, "idio_sigma_scale": 0.56}},
+  {"label": "j1.0 i.54", "base": "pt-v11", "overrides": {"endogenous_news_intensity": 0.05, "endogenous_news_sigma": 0.03, "news_peer_weight": 0.05, "news_peer_weight_down": 0.05, "news_peer_vix_coupling": 8.0, "idio_sigma_scale": 0.54}}
 ]
 CANDS
 chown ec2-user:ec2-user /home/ec2-user/candidates.json
