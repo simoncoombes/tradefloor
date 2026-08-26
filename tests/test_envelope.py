@@ -157,6 +157,39 @@ def test_the_published_artifact_matches_the_module():
     )
 
 
+def test_the_certified_comment_matches_the_certified_numbers():
+    """A comment that contradicts the data below it is worse than no comment.
+
+    The note above `CERTIFIED` read "nine of ten in band" until 2026-08-26.
+    It described pt-v3, and it survived two era boundaries and four
+    statistics joining the panel, because nothing tests a comment. A reader
+    checking whether to trust this library reads that line.
+
+    So the count is asserted against what `score` actually returns. If a
+    future preset changes it, this fails and the comment gets updated on
+    purpose rather than left to rot.
+    """
+    import re
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent / "python" / "pretium"
+           / "envelope.py").read_text(encoding="utf-8")
+    note = src[:src.index("CERTIFIED: dict[str, float] = {")]
+    note = note[note.rindex("#: Measured at the certified horizon"):]
+
+    panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
+    scored = env.score(panel, horizon_days=env.CERTIFIED_HORIZON_DAYS)
+    words = {14: "ALL FOURTEEN", 13: "thirteen of fourteen",
+             12: "twelve of fourteen"}
+    expected = words.get(scored["in_band"])
+    assert expected is not None, (
+        f"{scored['in_band']} of {scored['of']} in band and this test has no "
+        "wording for it; add one rather than deleting the assertion")
+    assert expected in note, (
+        f"the note above CERTIFIED does not say {expected!r}, but the panel "
+        f"holds {scored['in_band']} of {scored['of']}:\n{note}")
+
+
 def test_certified_serialises_for_a_manifest():
     d = env.certified()
     assert d["preset"] == env.PRESET
