@@ -482,6 +482,24 @@ pub struct ModelParams {
     /// volume-and-volatility row depends on, which is the trade those
     /// searches could not find a way around.
     pub volume_idio_persistence: f64,
+    /// Volume that follows the NAME's own conditional variance. Zero on
+    /// every preset before this dial and bit-identical (§112).
+    ///
+    /// `volume_variance_gain` couples volume to the MARKET factor's
+    /// variance and nothing else, so a name whose OWN volatility is
+    /// elevated trades no more than a quiet one in the same market.
+    ///
+    /// This exists because §111 refuted §107. Adding per-name volume
+    /// PERSISTENCE fixes `volume_change_acf1` and takes
+    /// `volume_abs_return_corr` down with it, exactly as the common
+    /// component does, and the reason is not that the old state was common.
+    /// `volume_abs_return_corr` measures how well volume tracks the size of
+    /// a name's own move, so any volume variance UNRELATED to that name's
+    /// returns dilutes it, and per-name noise is as unrelated as
+    /// market-wide noise. This is the return-related version: at `g` the
+    /// multiplier is `1 + g * (garch_variance / sector base - 1)`, clamped,
+    /// so a name trades more precisely when its own volatility is high.
+    pub volume_idio_variance_gain: f64,
     /// Innovation of the per-name volume state. See
     /// [`ModelParams::volume_idio_persistence`].
     pub volume_idio_sigma: f64,
@@ -1068,6 +1086,7 @@ impl ModelParams {
             market_vol_slow_gain: 0.0,
             fair_value_book_floor: 0.0,
             market_vol_slow_weight: 0.0,
+            volume_idio_variance_gain: 0.0,
             volume_idio_persistence: 0.0,
             volume_idio_sigma: 0.0,
             volume_variance_gain: 0.0,
@@ -1659,6 +1678,7 @@ impl ModelParams {
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
             "market_vol_slow_weight" => self.market_vol_slow_weight,
+            "volume_idio_variance_gain" => self.volume_idio_variance_gain,
             "volume_idio_persistence" => self.volume_idio_persistence,
             "volume_idio_sigma" => self.volume_idio_sigma,
             "volume_variance_gain" => self.volume_variance_gain,
@@ -1775,6 +1795,7 @@ impl ModelParams {
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
             "market_vol_slow_weight" => out.market_vol_slow_weight = value,
+            "volume_idio_variance_gain" => out.volume_idio_variance_gain = value,
             "volume_idio_persistence" => out.volume_idio_persistence = value,
             "volume_idio_sigma" => out.volume_idio_sigma = value,
             "volume_variance_gain" => out.volume_variance_gain = value,
@@ -1988,6 +2009,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_target_shock_cap",
         "volume_idio_persistence",
         "volume_idio_sigma",
+        "volume_idio_variance_gain",
         "volume_innovation_sigma",
         "volume_persistence",
         "volume_variance_gain",

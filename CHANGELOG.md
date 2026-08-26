@@ -66,6 +66,21 @@ a real +0.103, where the default reads +0.040. Both ship off, and no preset
 uses them yet: news is company-specific movement before it is contagion, and
 switching it on as-is costs more elsewhere than it buys.
 
+`volume_idio_persistence` and `volume_idio_sigma` give each company its own
+trading-volume rhythm. Until now a single number made the whole market busy
+or quiet together, and that function's own note said the other half, the part
+that belongs to each company, was not modelled. It is the half the one
+remaining realism miss needs: day-to-day volume changes reverse too sharply
+over two years, and the only previous route to fixing that broke the
+relationship between volume and volatility instead.
+
+`sector_loading` and `sector_loading_beta_slope` let a company's exposure to
+its OWN industry vary. It was a fixed number, the same for every member of
+every sector, while exposure to the market has always varied by beta. With
+the slope above zero a jumpy company moves more with its industry and a
+defensive one moves less, which is how real industries are: they contain
+pure plays and conglomerates.
+
 `jump_vix_coupling` makes a price jump's arrival RATE follow the VIX. Every
 preset before it jumped just as often in a dead-calm market as in a panic,
 which is backwards: measured under a pinned VIX, jumps carried 40% of a calm

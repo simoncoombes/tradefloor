@@ -12,7 +12,7 @@ shutdown -h +60
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates16
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates17
 BRANCH=main
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
@@ -106,11 +106,11 @@ setsid nohup /home/ec2-user/stream.sh "$BUCKET" >/var/log/pretium-stream.log 2>&
 cat > /home/ec2-user/candidates.json <<'CANDS'
 [
   {"label": "v11-control", "base": "pt-v11", "overrides": {}},
-  {"label": "rho.7 s.15", "base": "pt-v11", "overrides": {"volume_idio_persistence": 0.7, "volume_idio_sigma": 0.15}},
-  {"label": "rho.8 s.25", "base": "pt-v11", "overrides": {"volume_idio_persistence": 0.8, "volume_idio_sigma": 0.25}},
-  {"label": "rho.9 s.20", "base": "pt-v11", "overrides": {"volume_idio_persistence": 0.9, "volume_idio_sigma": 0.2}},
-  {"label": "rho.85 s.35", "base": "pt-v11", "overrides": {"volume_idio_persistence": 0.85, "volume_idio_sigma": 0.35}},
-  {"label": "rho.95 s.15", "base": "pt-v11", "overrides": {"volume_idio_persistence": 0.95, "volume_idio_sigma": 0.15}}
+  {"label": "vg0.5", "base": "pt-v11", "overrides": {"volume_idio_variance_gain": 0.5}},
+  {"label": "vg1.0", "base": "pt-v11", "overrides": {"volume_idio_variance_gain": 1.0}},
+  {"label": "vg1.5", "base": "pt-v11", "overrides": {"volume_idio_variance_gain": 1.5}},
+  {"label": "vg1.0 rho.7 s.10", "base": "pt-v11", "overrides": {"volume_idio_variance_gain": 1.0, "volume_idio_persistence": 0.7, "volume_idio_sigma": 0.1}},
+  {"label": "vg1.5 rho.7 s.15", "base": "pt-v11", "overrides": {"volume_idio_variance_gain": 1.5, "volume_idio_persistence": 0.7, "volume_idio_sigma": 0.15}}
 ]
 CANDS
 chown ec2-user:ec2-user /home/ec2-user/candidates.json

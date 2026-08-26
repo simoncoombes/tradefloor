@@ -187,6 +187,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # one already makes a beta-2 name load twice as hard on its industry as
     # a beta-1 one, which is past any cross-section anybody has measured.
     "sector_loading_beta_slope": (0.0, 1.0),
+    # Volume following a name's own variance (§112). Ships at zero.
+    "volume_idio_variance_gain": (0.0, 2.0),
     "volume_idio_persistence": (0.0, 0.99),
     "volume_idio_sigma": (0.0, 0.6),
     # How much of the business cycle's VIX swing survives (§77). A scale on
