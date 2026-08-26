@@ -181,6 +181,23 @@ ERA_FIXES = [
         'eng = pt.Engine(seed=42, universe=u)                  # pt-v10, the default\n'
         'eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the same, spelled out',
     ),
+    (
+        '<h2 style="font-size:21px;margin:46px 0 10px">Build Targets</h2>',
+        '<h2 style="font-size:21px;margin:46px 0 10px">Using it from Rust</h2>\n'
+        '        <p style="color:var(--mut);font-size:14px">The engine is a '
+        'Rust crate and is published on crates.io as '
+        '<code style="font-size:12.5px">pretium</code>, the same code the '
+        'Python wheels are built from.</p>\n'
+        '        <pre style="padding:13px 16px;overflow-x:auto"><code '
+        'data-lang="sh" style="font:400 13px/1.7 var(--font-mono);'
+        'color:var(--codefg)">cargo add pretium</code></pre>\n'
+        '        <p style="color:var(--mut);font-size:14px">Docs at '
+        '<a href="https://docs.rs/pretium">docs.rs/pretium</a>. The crate '
+        'carries the engine, the presets and the determinism guarantees; the '
+        'Python package adds the harness, the evaluation layer and the '
+        'notebooks.</p>\n'
+        '        <h2 style="font-size:21px;margin:46px 0 10px">Build Targets</h2>',
+    ),
     ("The Seven Components", "The Nine Components"),
     ("seven components", "nine components"),
     ("seven factors", "nine factors"),

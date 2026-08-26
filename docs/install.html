@@ -157,6 +157,10 @@ pip install "pretium[mcp]"       # + the MCP server</code></pre>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">Dependencies</td><td>None for the core package. Arrow output works through the buffer protocol, so polars, pandas, pyarrow and duckdb read it without pretium depending on any of them.</td></tr>
           </tbody>
         </table></div>
+        <h2 style="font-size:21px;margin:46px 0 10px">Using it from Rust</h2>
+        <p style="color:var(--mut);font-size:14px">The engine is a Rust crate and is published on crates.io as <code style="font-size:12.5px">pretium</code>, the same code the Python wheels are built from.</p>
+        <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="sh" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">cargo add pretium</code></pre>
+        <p style="color:var(--mut);font-size:14px">Docs at <a href="https://docs.rs/pretium">docs.rs/pretium</a>. The crate carries the engine, the presets and the determinism guarantees; the Python package adds the harness, the evaluation layer and the notebooks.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">Build Targets</h2>
         <p style="color:var(--mut);font-size:14px">The release builds and compares five Python wheel targets. Anything else needs a source build and is outside the determinism claim.</p>
         <div class="tablewrap"><table>
