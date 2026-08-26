@@ -172,6 +172,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # (vix / 15)^2, which at a pinned VIX 65 is about eighteen times as many
     # jump days and at VIX 5 about a ninth.
     "jump_vix_coupling": (0.0, 1.0),
+    # Endogenous news (§101). Both ship at zero, so both need explicit
+    # ranges. Intensity to 0.25 is about one event a week per name; sigma to
+    # 0.10 spans a 10% surprise, which is a large earnings move.
+    "endogenous_news_intensity": (0.0, 0.25),
+    "endogenous_news_sigma": (0.0, 0.10),
     # How much of the business cycle's VIX swing survives (§77). A scale on
     # the phase VIX around its mean, so the unit interval is the whole
     # domain and both ends are shipped positions rather than guesses: every
@@ -954,10 +959,18 @@ def cmd_collect(args) -> int:
         outputs["shock_ratio_median"] = gates["shock_ratio_median"]
         outputs["vol_lever"] = gates["vol_lever"]
         outputs["corr_blend"] = gates["corr_blend"]
-        # The crisis state's sector excess and kurtosis at VIX 45, which §62
-        # named as the one column the next survey needed. Rows streamed by
-        # an older driver lack them, so a resume without them is tolerated.
-        for key, name in (("sector_ex", "sector_ex_45"), ("kurt", "kurt_45")):
+        # The crisis state's sector excess, kurtosis and CO-MOVEMENT at VIX
+        # 45. §62 named the first as the column the next survey needed;
+        # co-movement was added after the crisis-survey run of §102, which
+        # could not answer the question it was launched for because
+        # cross-sectional correlation at VIX 45 was measured on every row
+        # and never surfaced. `corr_blend` is a RATIO of crisis correlation
+        # to calm, so a vector that raises calm correlation reads LOW on it
+        # while having the higher crisis LEVEL, which is what a preset is
+        # judged on. The level is what belongs here. Rows streamed by an
+        # older driver lack these, so a resume without them is tolerated.
+        for key, name in (("sector_ex", "sector_ex_45"), ("kurt", "kurt_45"),
+                          ("corr", "xs_45")):
             vals = [rows[f"{index}:held45:{s}"].get(key) for s in seeds]
             vals = [v for v in vals if v is not None]
             if vals:

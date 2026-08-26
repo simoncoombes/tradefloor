@@ -334,6 +334,12 @@ PARAM_SPECS: dict[str, dict] = {
     # above the old ceiling of 0.5 x 0.98.
     "crisis_blend_gain": {"kind": "abs", "step_unit": 0.05,
                           "hard_range": (0.0, 2.0)},
+    # Endogenous company news (§101). Intensity is a per-day probability, so
+    # 0.25 is roughly one event a week per name, already a chatty market.
+    "endogenous_news_intensity": {"kind": "abs", "step_unit": 0.01,
+                                  "hard_range": (0.0, 0.25)},
+    "endogenous_news_sigma": {"kind": "abs", "step_unit": 0.005,
+                              "hard_range": (0.0, 0.10)},
     "garch_ceiling_multiple":   {"kind": "log",
                                  "hard_range": (1.0, 50.0)},
     "garch_floor_multiple":     {"kind": "log",

@@ -98,6 +98,11 @@ pub struct EngineRngState {
     pub jumps: RngState,
     /// The persistent-volume stream, carried for the same reason.
     pub volume: RngState,
+    /// The endogenous-news stream, carried for the same reason. Left out,
+    /// a restored engine would draw a different news sequence from the one
+    /// it was checkpointed on, which is invisible while news is inert and
+    /// silently wrong the day a preset switches it on.
+    pub news: RngState,
 }
 
 /// Cumulative draws per stream. Diagnostic, per D-R1: the single most
@@ -180,6 +185,7 @@ pub struct Engine {
     external_rng: GameRng,
     jump_rng: GameRng,
     volume_rng: GameRng,
+    news_rng: GameRng,
     companies: Vec<TickCompany>,
     economy: EconomyState,
     central_bank: CentralBankState,
@@ -364,6 +370,7 @@ impl Engine {
             external_rng: GameRng::substream(seed, stream::EXTERNAL),
             jump_rng: GameRng::substream(seed, stream::JUMPS),
             volume_rng: GameRng::substream(seed, stream::VOLUME),
+            news_rng: GameRng::substream(seed, stream::NEWS),
             companies,
             economy,
             central_bank,
@@ -431,6 +438,7 @@ impl Engine {
             external: self.external_rng.snapshot(),
             jumps: self.jump_rng.snapshot(),
             volume: self.volume_rng.snapshot(),
+            news: self.news_rng.snapshot(),
         }
     }
 
@@ -447,6 +455,7 @@ impl Engine {
         self.external_rng = GameRng::restore(state.external);
         self.jump_rng = GameRng::restore(state.jumps);
         self.volume_rng = GameRng::restore(state.volume);
+        self.news_rng = GameRng::restore(state.news);
     }
 
     /// Cumulative draws across all three streams. The per-stream split is
@@ -1085,6 +1094,54 @@ impl Engine {
             self.open_market();
         }
 
+        // Endogenous news, generated once for the session and chained onto
+        // whatever the caller supplied (§101). Built here rather than at
+        // every call site so no caller has to know the mechanism exists, and
+        // skipped entirely at zero intensity so the borrowed slice is used
+        // untouched and every shipped preset is bit-identical.
+        //
+        // Two draws per company, ALWAYS, on the NEWS stream: the uniform
+        // decides occurrence and the normal decides impact, and at zero
+        // intensity `u < 0.0` is false for every u in [0, 1). Same draw
+        // discipline as `apply_jumps`, for the same reason.
+        let generated_news: Vec<crate::market::NewsEvent> =
+            if self.params.endogenous_news_intensity == 0.0 {
+                Vec::new()
+            } else {
+                let p = &self.params;
+                let mut out = Vec::new();
+                for company in self.companies.iter() {
+                    let u = self.news_rng.next_f64();
+                    let z = self.news_rng.next_normal();
+                    if u < p.endogenous_news_intensity {
+                        out.push(crate::market::NewsEvent {
+                            company_id: Some(company.id.clone()),
+                            sector: Some(company.sector.clone()),
+                            price_impact: Some(p.endogenous_news_sigma * z),
+                        });
+                    }
+                }
+                out
+            };
+        // A local rather than a field on `self`: the slice is borrowed
+        // across the tick loop, which takes `&mut self`. One allocation per
+        // session, against a 390-tick day, and none at all at zero intensity.
+        let combined_news: Vec<crate::market::NewsEvent> = if generated_news.is_empty() {
+            Vec::new()
+        } else {
+            // The caller's events first, then ours: the news arm is ORDERED
+            // and exclusive, so order decides which branch an event takes.
+            let mut v = Vec::with_capacity(request.news.len() + generated_news.len());
+            v.extend_from_slice(request.news);
+            v.extend(generated_news);
+            v
+        };
+        let session_news: &[crate::market::NewsEvent] = if combined_news.is_empty() {
+            request.news
+        } else {
+            &combined_news
+        };
+
         let mut draws = 0usize;
         let (mut hour, mut minute) = (request.start.hour, request.start.minute);
         let mut halted_at = None;
@@ -1097,7 +1154,7 @@ impl Engine {
                     day_of_week: request.start.day_of_week,
                 },
                 volatility_multiplier: request.volatility_multiplier,
-                news: request.news,
+                news: session_news,
                 news_impact_queue: request.news_impact_queue,
                 order_volumes: request.order_volumes,
             });

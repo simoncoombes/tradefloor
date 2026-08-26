@@ -160,7 +160,7 @@ def test_the_per_stream_counts_sum_to_the_total():
     assert by_stream["external"] == 1
 
 
-def test_a_snapshot_carries_all_four_streams():
+def test_a_snapshot_carries_every_stream():
     # An odd number of normals per stream, so each has a Box-Muller spare in
     # flight -- the piece of position a lazy snapshot drops first.
     e = pretium.Engine(seed=3, universe=UNIVERSE)
@@ -174,7 +174,7 @@ def test_a_snapshot_carries_all_four_streams():
     # fires, so a snapshot that omitted it would restore to a different jump
     # sequence while looking correct -- harmless while jumps are inert, and
     # silently wrong the day they are not.
-    assert len(snapshot["rng"]) == 15
+    assert len(snapshot["rng"]) == 3 * 6
 
     restored = pretium.Engine(seed=3, universe=UNIVERSE)
     restored.restore_state(snapshot)

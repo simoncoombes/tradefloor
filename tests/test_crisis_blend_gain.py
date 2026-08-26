@@ -37,15 +37,28 @@ def _prices(preset: str, vix: float = 45.0, days: int = 10, **over) -> list[floa
 
 
 @pytest.mark.parametrize("preset", ["pt-v3", "pt-v10", "pt-v11"])
-def test_it_ships_inert(preset: str) -> None:
-    """At 0.5 the trajectory is the shipped one, bit for bit, in a crisis.
+def test_setting_it_to_its_own_value_is_inert(preset: str) -> None:
+    """Re-stating a preset's own gain changes nothing, bit for bit, in a crisis.
 
     Checked under a held VIX 45: the crisis blend does nothing below the
     threshold, so a calm check would pass for the wrong reason.
+
+    Written against each preset's OWN value rather than the literal 0.5,
+    which is what every preset carried until pt-v11 moved it to 0.8. A test
+    that hardcodes the old default silently stops testing inertness the day
+    a preset adopts the dial.
     """
+    own = pt.ModelParams.from_preset(preset).to_dict()["crisis_blend_gain"]
     base = _prices(preset)
-    assert _prices(preset, crisis_blend_gain=0.5) == base
-    assert pt.ModelParams.from_preset(preset, crisis_blend_gain=0.5).fingerprint == preset
+    assert _prices(preset, crisis_blend_gain=own) == base
+    assert pt.ModelParams.from_preset(preset, crisis_blend_gain=own).fingerprint == preset
+
+
+def test_the_old_literal_is_still_what_the_earlier_presets_carry() -> None:
+    """0.5 was the hard-coded value, and pt-v3 and pt-v10 must still be it."""
+    for preset in ("pt-v3", "pt-v10"):
+        assert pt.ModelParams.from_preset(preset).to_dict()["crisis_blend_gain"] == 0.5
+    assert pt.ModelParams.from_preset("pt-v11").to_dict()["crisis_blend_gain"] == 0.8
 
 
 def test_it_does_nothing_below_the_crisis_gate() -> None:

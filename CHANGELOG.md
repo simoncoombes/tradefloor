@@ -2,53 +2,56 @@
 
 ## Unreleased
 
-### `pt-v11`: crises as violent as real ones
+### `pt-v11`: a crisis that behaves like one
 
 A new selectable preset. The default is unchanged, and every earlier preset
 still reproduces bit for bit.
 
-Until now every preset drew price jumps at a **constant** daily rate, so a
-dead-calm market and a panic jumped equally often. Measuring where a calm
-market's volatility actually comes from found it: jumps carry 40.5% of the
-variance of a market pinned at VIX 5 and 1.1% of one pinned at VIX 65, on
-3003 and 2998 jump days. Real markets are the other way round, and that
-constant rate was the floor under how quiet this market could ever get.
+Three things go wrong in a crisis in this model, and until now fixing one
+broke another. A crisis was not violent enough. Names did not move together
+tightly enough while it happened. Industries came apart when real ones hold.
+`pt-v11` is the first preset to get all three right at once:
 
-`pt-v11` couples the jump **arrival rate** to the VIX and scales the base
-rates down to pay for it. The result is the number this project has chased
-longest: **the crisis volatility lever reads about 6.12x against a real
-6.16x**, where the default reads 5.05x and the first measurement of it read
-2.95x. It holds all fourteen realism statistics in band at one year, on
-training seeds and on a held-out universe, and thirteen of fourteen at two
-years, with no statistic regressed against the default.
+| in a crisis | pt-v11 | the default | real markets |
+|---|---|---|---|
+| how much more volatile | **6.4x** | 5.0x | 6.2x |
+| how tightly names move together | **0.69** | 0.67 | 0.66 to 0.73 |
+| how much industries hold together | **+0.09** | +0.04 | +0.10 |
+
+It matches the default on every one of the fourteen realism statistics at
+one year and thirteen of fourteen at two, so none of that is paid for
+somewhere else.
 
 ```python
 eng = pt.Engine(seed=42, universe=u, model="pt-v11")
 ```
 
-Not the default, deliberately: 0.2.0 moved the default once already, and
-moving it twice in one cycle would strand work published in between.
+**What was actually wrong.** How hard a crisis pulls every stock onto the
+market's own movement was a fixed number written into the engine, and it was
+already at its maximum during any crisis worth the name. So every attempt to
+make crises more violent had to do it through company-specific movement
+instead, which by construction made names move together LESS. Turning that
+fixed number into a setting removed the ceiling.
 
-**What it costs.** In a crisis, names move together slightly less: measured
-at a held VIX 45, cross-sectional correlation reads 0.604 against the
-default's 0.669, where real markets sit between 0.664 and 0.727. That is
-outside the real range and it is the honest price of this preset. The reason
-is structural: jumps happen to individual companies, so buying a more
-violent crisis through them adds company-specific movement, and crisis
-co-movement is how much of the market's movement is shared. **If your
-question is how tightly names move together in a crash, use the default.**
+**What it costs.** Driven through the real 2020-21 market, this preset's
+day-to-day movement is about 5% noisier than the default's, which was
+already noisier than the real stock it imitates. And industries at +0.09
+still hold together slightly less than the +0.10 real ones do.
 
-One further cost is not yet measured at all: driven through a real macro
-path this preset fires more jumps than the default does, and what that costs
-has not been quantified.
+### New settings
 
-### New parameter
+`crisis_blend_gain` is the setting that used to be a fixed 0.5 in the source.
+It controls how hard a crisis loads every name onto the market factor, and it
+is what `pt-v11` turns up.
 
-`jump_vix_coupling` makes a jump's arrival rate follow the VIX. It ships at
-0.0 on every preset before `pt-v11`, bit-identically, and is not
-variance-neutral: raising it adds jump variance unless the base intensities
-are scaled down, and the factor that does so is derivable from the VIX
-distribution rather than searched. Its docstring carries the arithmetic.
+`jump_vix_coupling` makes a price jump's arrival RATE follow the VIX. Every
+preset before it jumped just as often in a dead-calm market as in a panic,
+which is backwards: measured under a pinned VIX, jumps carried 40% of a calm
+market's movement and 1% of a panic's. It ships off, and `pt-v11` does not
+use it, because buying a violent crisis through company-specific jumps is
+what pulls names apart.
+
+Both ship at the values every earlier preset already ran on, bit for bit.
 
 ## 0.2.0
 
