@@ -455,6 +455,34 @@ impl PyEngine {
             self.day_buffer.components[k]
                 .extend_from_slice(&self.buffer.components[k][..n]);
         }
+        // The eighth series is the daily jump. It happens at the close, so
+        // no tick carries it, and the row where its effect is OBSERVED is the
+        // first tick of the next day: `s` there already includes it. Zeroed
+        // here and filled from the pending value on that first row, so the
+        // columns sum to the change in `s` tick by tick (§74).
+        let before = self.day_buffer.components[7].len();
+        self.day_buffer.components[7].resize(self.day_buffer.components[0].len(), 0.0);
+        if !self.pending_jump.is_empty() {
+            for (i, v) in self.pending_jump.iter().enumerate() {
+                if let Some(slot) = self.day_buffer.components[7].get_mut(before + i) {
+                    *slot += v;
+                }
+            }
+            self.pending_jump.clear();
+        }
+    }
+
+    /// Write the day's jump into the eighth component series, on the last
+    /// recorded row of each instrument.
+    ///
+    /// `apply_jumps` moves `mispricing_s` after the tick loop, so no tick can
+    /// carry it. The engine accumulates it in attribution slot 7; this puts it
+    /// on the tape where a reader reconstructing the day will find it.
+    fn record_day_jump(&mut self) {
+        let jumps: Vec<f64> = self.inner.attribution().iter().map(|row| row[7]).collect();
+        if jumps.iter().any(|v| *v != 0.0) {
+            self.pending_jump = jumps;
+        }
     }
 
     /// The daily macro step, run at every day boundary -- the explicit
@@ -614,7 +642,7 @@ struct DayBuffer {
     mispricing: Vec<f64>,
     fundamental: Vec<f64>,
     anchor: Vec<f64>,
-    components: [Vec<f64>; 7],
+    components: [Vec<f64>; 8],
 }
 
 impl DayBuffer {
@@ -636,6 +664,9 @@ impl DayBuffer {
 pub struct PyEngine {
     inner: Engine,
     buffer: SessionBuffer,
+    /// The jump the last close applied to `s`, waiting for the row where its
+    /// effect is observed: the FIRST tick of the next day (§74).
+    pending_jump: Vec<f64>,
     tickers: Vec<String>,
     /// Recorded per-day batches.
     ///
@@ -734,6 +765,7 @@ impl PyEngine {
                 params,
             ),
             buffer: SessionBuffer::new(),
+            pending_jump: Vec::new(),
             day_buffer: DayBuffer::default(),
             market_open: false,
             day_count: 0,
@@ -1174,6 +1206,7 @@ impl PyEngine {
         // which is bookkeeping rather than a modelling decision.
         self.day_count += 1;
         self.inner.close_day(i64::from(self.day_count));
+        self.record_day_jump();
     }
 
     /// One column across every instrument, as little-endian f64 bytes.
@@ -1603,10 +1636,15 @@ impl PyEngine {
         // diverge in PRICE -- `attribution` is the day's GARCH innovation at
         // the close, and `market_open` decides whether the next session
         // re-opens the day and re-anchors `previous_close`.
+        // Two widths now: the engine's attribution carries the daily jump in
+        // an eighth slot, the tick's own decomposition does not (§74).
+        let flat8 = |rows: &[[f64; 8]]| -> Vec<f64> {
+            rows.iter().flat_map(|r| r.iter().copied()).collect()
+        };
         let flat = |rows: &[[f64; 7]]| -> Vec<f64> {
             rows.iter().flat_map(|r| r.iter().copied()).collect()
         };
-        out.set_item("attribution", f64_bytes(py, &flat(self.inner.attribution())))?;
+        out.set_item("attribution", f64_bytes(py, &flat8(self.inner.attribution())))?;
         out.set_item(
             "tick_components",
             f64_bytes(py, &flat(self.inner.tick_components())),
@@ -2127,7 +2165,17 @@ impl PyEngine {
                 self.written(&self.buffer.mispricing_s),
                 self.written(&self.buffer.fundamental),
                 self.written(&self.buffer.anchor),
-                &std::array::from_fn(|k| self.written(&self.buffer.components[k]).to_vec()),
+                // Eight series from a seven-wide session buffer: the tick's
+                // own components, then the jump, which the tick loop never
+                // writes. On this un-recorded path the day has not closed, so
+                // there is no jump yet and the column is zeros (§74).
+                &std::array::from_fn(|k| {
+                    if k < 7 {
+                        self.written(&self.buffer.components[k]).to_vec()
+                    } else {
+                        vec![0.0; self.written(&self.buffer.components[0]).len()]
+                    }
+                }),
             )
             .map_err(crate::python_arrow::arrow_err)?]
         } else {
@@ -2482,7 +2530,16 @@ impl PyNewsImpact {
 /// An alias rather than a second list. Declared twice, the two orderings would
 /// eventually disagree and every column would still look plausible -- the
 /// `truth` schema is generated from the same constant for the same reason.
-pub const FACTOR_NAMES: [&str; 7] = crate::market::factors::S_COMPONENT_KEYS;
+pub const FACTOR_NAMES: [&str; 8] = [
+    crate::market::factors::S_COMPONENT_KEYS[0],
+    crate::market::factors::S_COMPONENT_KEYS[1],
+    crate::market::factors::S_COMPONENT_KEYS[2],
+    crate::market::factors::S_COMPONENT_KEYS[3],
+    crate::market::factors::S_COMPONENT_KEYS[4],
+    crate::market::factors::S_COMPONENT_KEYS[5],
+    crate::market::factors::S_COMPONENT_KEYS[6],
+    crate::market::factors::JUMP_COMPONENT_KEY,
+];
 
 /// Every field `column()` accepts, in one place.
 ///

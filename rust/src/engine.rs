@@ -189,7 +189,11 @@ pub struct Engine {
     /// Four entries per company -- company_news, order_flow_impact,
     /// short_squeeze_effect, random_noise -- summed tick by tick and reset at
     /// `open_market`.
-    attribution: Vec<[f64; 7]>,
+    /// Eight slots: the tick's seven `S_COMPONENT_KEYS` plus the daily
+    /// jump, which `apply_jumps` writes to `s` outside the tick loop. It was
+    /// missing until 2026-08-26, so on any preset carrying jumps the truth
+    /// table's components did not reconstruct the move (§74).
+    attribution: Vec<[f64; 8]>,
     /// This tick's ground truth, per company slot.
     ///
     /// `attribution` above sums across the day, which is what a scorer wants
@@ -322,7 +326,7 @@ impl Engine {
     ///
     /// [`PT_V3`]: crate::params::PT_V3
     pub const fn default_model() -> crate::params::ModelParams {
-        crate::params::PT_V3
+        crate::params::PT_V10
     }
 
     /// [`Engine::new`] under an explicit model preset (the runtime seam,
@@ -347,7 +351,7 @@ impl Engine {
             companies,
             economy,
             central_bank,
-            attribution: vec![[0.0; 7]; companies_len],
+            attribution: vec![[0.0; 8]; companies_len],
             tick_components: vec![[0.0; 7]; companies_len],
             // NaN, not zero: a company that has never ticked has no valuation,
             // and zero is a real one that would silently read as "worthless"
@@ -617,7 +621,7 @@ impl Engine {
     /// lie this port has already had to correct once. So the four live
     /// components are reported, and the squeeze is kept separate because it is
     /// genuinely a distinct mechanism.
-    pub fn attribution(&self) -> &[[f64; 7]] {
+    pub fn attribution(&self) -> &[[f64; 8]] {
         &self.attribution
     }
 
@@ -659,7 +663,7 @@ impl Engine {
     ) -> Result<(), String> {
         let n = self.companies.len();
         for (name, len, want) in [
-            ("attribution", attribution.len(), n * 7),
+            ("attribution", attribution.len(), n * 8),
             ("tick_components", components.len(), n * 7),
             ("tick_fundamental", fundamental.len(), n),
             ("tick_anchor", anchor.len(), n),
@@ -669,8 +673,8 @@ impl Engine {
             }
         }
         self.attribution = attribution
-            .chunks_exact(7)
-            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6]])
+            .chunks_exact(8)
+            .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]])
             .collect();
         self.tick_components = components
             .chunks_exact(7)
@@ -725,7 +729,7 @@ impl Engine {
         // caller can still read yesterday's decomposition after the close has
         // run, which is when they would actually want it.
         self.attribution.clear();
-        self.attribution.resize(self.companies.len(), [0.0; 7]);
+        self.attribution.resize(self.companies.len(), [0.0; 8]);
         self.tick_components.clear();
         self.tick_components.resize(self.companies.len(), [0.0; 7]);
         self.tick_fundamental.clear();
@@ -822,7 +826,7 @@ impl Engine {
         } else {
             0.0
         };
-        for company in self.companies.iter_mut() {
+        for (index, company) in self.companies.iter_mut().enumerate() {
             let u = self.jump_rng.next_f64();
             let z = self.jump_rng.next_normal();
             let idio = if u < p.jump_intensity_idio {
@@ -837,6 +841,13 @@ impl Engine {
             if total != 0.0 {
                 if let Some(s) = company.stock.mispricing_s {
                     let after = crate::market::tick::clamp_s(&self.params, s + total);
+                    // The jump's contribution to `s`, recorded in the eighth
+                    // attribution slot. The CLAMPED difference, not `total`,
+                    // so the columns reconstruct the move even when the cap
+                    // binds -- which is exactly when a jump is interesting.
+                    if let Some(acc) = self.attribution.get_mut(index) {
+                        acc[7] += after - s;
+                    }
                     company.stock.mispricing_s = Some(after);
                     // Move the momentum reference with the jump, by the
                     // share herding must not see.
@@ -1298,7 +1309,7 @@ impl Engine {
     /// ordering must establish it before the first tick.
     pub fn add_company(&mut self, company: TickCompany) -> usize {
         self.companies.push(company);
-        self.attribution.push([0.0; 7]);
+        self.attribution.push([0.0; 8]);
         self.tick_components.push([0.0; 7]);
         self.tick_fundamental.push(f64::NAN);
         self.tick_anchor.push(f64::NAN);

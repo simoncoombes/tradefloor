@@ -112,6 +112,14 @@ pub fn truth_schema() -> SchemaRef {
     for key in crate::market::factors::S_COMPONENT_KEYS {
         fields.push(Field::new(key, DataType::Float64, false));
     }
+    // The daily jump, which `apply_jumps` writes to `s` after the tick loop.
+    // Without it the seven columns do not reconstruct the move on any preset
+    // that carries jumps, which is every preset from pt-v4 (§74).
+    fields.push(Field::new(
+        crate::market::factors::JUMP_COMPONENT_KEY,
+        DataType::Float64,
+        false,
+    ));
     Arc::new(Schema::new(fields))
 }
 
@@ -163,7 +171,7 @@ pub fn truth_batch(
     mispricing: &[f64],
     fundamental: &[f64],
     anchor: &[f64],
-    components: &[Vec<f64>; 7],
+    components: &[Vec<f64>; 8],
 ) -> Result<RecordBatch, String> {
     let rows = ticks * instruments;
     if mispricing.len() < rows || fundamental.len() < rows || anchor.len() < rows {
@@ -474,7 +482,7 @@ pub struct RecordedDay {
     pub mispricing: Vec<f64>,
     pub fundamental: Vec<f64>,
     pub anchor: Vec<f64>,
-    pub components: [Vec<f64>; 7],
+    pub components: [Vec<f64>; 8],
 }
 
 /// `bars` at a coarser grain: real OHLCV.

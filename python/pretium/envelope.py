@@ -53,7 +53,7 @@ from ._core import ValidationError
 from .facts import REAL_MARKETS, SEED_SD, SEED_SD_504, band_distance
 
 #: The preset these measurements describe.
-PRESET = "pt-v3"
+PRESET = "pt-v10"
 
 #: The measurement horizon the envelope certifies, in trading days.
 #: Not a soft preference: three statistics that are in band here leave it by
@@ -64,21 +64,20 @@ CERTIFIED_HORIZON_DAYS = 252
 #: Nine of ten in band, at a band-distance loss of 0.0000, and the same nine
 #: hold on held-out seeds and a held-out 60-name universe.
 CERTIFIED: dict[str, float] = {
-    "annualised_vol_pct": 24.0972,
-    "excess_kurtosis": 2.5305,
-    "return_acf1": 0.0375,
-    "abs_return_acf1": 0.1413,
-    "abs_return_acf5": 0.0496,
-    "abs_return_acf20": 0.0082,
-    "cross_sectional_corr": 0.2558,
-    "volume_abs_return_corr": 0.5339,
-    "leverage_effect": -0.0349,
-    "volume_change_acf1": -0.4598,
-    # 2026-08-25, same protocol, 30 seeds: two in band, one 15 seed-sd out.
-    "corr_asymmetry": 0.0036,
-    "corr_asymmetry_lagged": -0.0330,
-    "sector_excess_corr": 0.0037,
-    "corr_persistence_acf1": 0.0413,
+    "annualised_vol_pct": 28.8814,
+    "excess_kurtosis": 8.8342,
+    "return_acf1": 0.0157,
+    "abs_return_acf1": 0.0698,
+    "abs_return_acf5": 0.0307,
+    "abs_return_acf20": 0.0049,
+    "cross_sectional_corr": 0.2537,
+    "volume_abs_return_corr": 0.4824,
+    "leverage_effect": -0.0276,
+    "volume_change_acf1": -0.314,
+    "corr_asymmetry": -0.0071,
+    "corr_asymmetry_lagged": -0.0159,
+    "sector_excess_corr": 0.1457,
+    "corr_persistence_acf1": 0.1813,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -104,22 +103,20 @@ BANDS_504: dict[str, tuple[float, float]] = {
 
 #: The same panel at 504 days. Five of ten in band against `BANDS_504`.
 MEASURED_504: dict[str, float] = {
-    "annualised_vol_pct": 29.2893,
-    "excess_kurtosis": 5.2274,
-    "return_acf1": 0.0571,
-    "abs_return_acf1": 0.2887,
-    "abs_return_acf5": 0.1524,
-    "abs_return_acf20": 0.0127,
-    "cross_sectional_corr": 0.4057,
-    "volume_abs_return_corr": 0.6301,
-    "leverage_effect": -0.0461,
-    "volume_change_acf1": -0.4327,
-    # 2026-08-25. corr_asymmetry sits 0.0024 below its floor, 0.02 seed-sd:
-    # on the edge, and counted out because the rule is the rule.
-    "corr_asymmetry": -0.0424,
-    "corr_asymmetry_lagged": -0.0763,
-    "sector_excess_corr": 0.0051,
-    "corr_persistence_acf1": 0.2249,
+    "annualised_vol_pct": 32.7826,
+    "excess_kurtosis": 8.427,
+    "return_acf1": 0.0275,
+    "abs_return_acf1": 0.1605,
+    "abs_return_acf5": 0.1025,
+    "abs_return_acf20": 0.0084,
+    "cross_sectional_corr": 0.3505,
+    "volume_abs_return_corr": 0.5281,
+    "leverage_effect": -0.0435,
+    "volume_change_acf1": -0.3159,
+    "corr_asymmetry": 0.0127,
+    "corr_asymmetry_lagged": -0.0109,
+    "sector_excess_corr": 0.1204,
+    "corr_persistence_acf1": 0.2678,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.

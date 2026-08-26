@@ -765,7 +765,7 @@ pub const PT_V10: ModelParams = ModelParams::pt_v10();
 /// bottom of this file asserts it resolves to the engine's default
 /// bit-for-bit. A future era that moves the default and forgets this
 /// constant fails the suite instead of mislabelling every manifest.
-pub const DEFAULT_PRESET_NAME: &str = "pt-v3";
+pub const DEFAULT_PRESET_NAME: &str = "pt-v10";
 
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
 /// certificate recorded.

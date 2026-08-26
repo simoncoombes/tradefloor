@@ -42,6 +42,12 @@ use crate::mathx;
 /// factors. Together they account for `Δs` exactly, except where the `s` clamp
 /// or a circuit breaker binds -- and a consumer can see that, because the
 /// residual against `Δs` stops being zero.
+/// The daily jump's slot in the ENGINE's attribution, after the seven tick
+/// components. `apply_jumps` moves `mispricing_s` outside the tick loop, so
+/// a decomposition of the seven alone does not reconstruct the day on any
+/// preset that carries jumps (§74).
+pub const JUMP_COMPONENT_KEY: &str = "jump";
+
 pub const S_COMPONENT_KEYS: [&str; 7] = [
     "reversion",
     "momentum",

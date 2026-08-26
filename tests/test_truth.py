@@ -33,6 +33,7 @@ COMPONENTS = [
     "order_flow_impact",
     "short_squeeze_effect",
     "random_noise",
+    "jump",
 ]
 
 LEVELS = ["mispricing_s", "fundamental_value", "anchor_price"]
@@ -340,7 +341,7 @@ def test_attribution_equals_the_tape_for_every_factor():
             f"{tape:+.6e}"
         )
         checked += 1
-    assert checked == 7, f"only {checked} factors compared"
+    assert checked == 8, f"only {checked} factors compared"
     # And at least one of them must be non-zero, or this compared zeros.
     assert any(_f64(engine.attribution(f))[0] != 0.0
                for f in pretium.Engine.FACTORS if f in truth.column_names)

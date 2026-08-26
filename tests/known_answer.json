@@ -1,11 +1,11 @@
 {
-  "bytes": 16920,
-  "days": 250,
-  "katVersion": 9,
-  "kind": "pretium.known-answer",
-  "metadataSha256": "6162d60c81a0d206649e8287b2d7d785471e9595bd932330b3771b1bb58a42da",
-  "note": "Cross-platform determinism gate. THREE digests, and the split is the point. simulationSha256 covers the trajectory and is the real gate: every wheel target must produce it, and a mismatch WITHOUT a katVersion bump means a platform disagreed. metadataSha256 covers what model_preset() REPORTS, which runs nothing -- it can be re-based when a reporting bug is fixed, without anyone claiming the market changed. sha256 is both concatenated, kept for continuity. v9 was regenerated at the pt-v3 era boundary, when the default preset moved from pt-v1 to pt-v3 and every trajectory moved with it. On 2026-08-23 the metadata half alone re-based: model_preset()'s default argument had been frozen at the literal \"pt-v1\" while engines ran pt-v3, so the library reported the wrong preset name and one wrong coefficient (momentum_theta) for every run. katVersion did NOT bump, because simulation_buffer() never calls model_preset() and the simulation digest is unchanged -- which is exactly the distinction the single combined hash could not express.",
-  "seed": 20260820,
-  "sha256": "6f469d711fc70373baf07d610f1faec92b8e4708553a26040e458b3287a972ec",
-  "simulationSha256": "5bd011be292f823ce1c360d1a12bf46de3362deee058a37283c74ab47069d0c1"
+ "bytes": 16920,
+ "days": 250,
+ "katVersion": 10,
+ "kind": "pretium.known-answer",
+ "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
+ "note": "Cross-platform determinism baseline. Regenerated 2026-08-26 for the era boundary that made pt-v10 the default preset: every seeded trajectory changed, deliberately. Runs from before this baseline are not comparable to runs after it unless they name their preset.",
+ "seed": 20260820,
+ "sha256": "6f9d38925737270e541a1ee2b296cf050e9c70ac97fe801ceb78a8ca15b3dafb",
+ "simulationSha256": "1e1f78143c29dfcc3f0bb403a8752bc312e799ac24ceeeeb063c0f76ef950f3c"
 }

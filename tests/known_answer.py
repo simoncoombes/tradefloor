@@ -115,7 +115,7 @@ import pretium
 # target now carries the day's VIX, and the KAT macro starts in
 # contraction at VIX 19.5, so every session past the first close
 # moves. The direct GameRng section below does not.
-KAT_VERSION = 9
+KAT_VERSION = 10
 
 SEED = 20260820
 DAYS = 250
