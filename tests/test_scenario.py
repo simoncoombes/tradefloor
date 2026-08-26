@@ -649,25 +649,29 @@ def test_vol_shock_still_works_and_says_it_is_deprecated():
     assert old.to_json(40) == new.to_json(40)
 
 
-def test_a_low_vix_calms_the_market_from_the_second_day_on_the_same_draws():
-    """The inertness claim, inverted by the coupling -- and pinned again.
+def test_a_low_vix_calms_the_market_from_the_first_day_on_the_same_draws():
+    """The inertness claim, inverted twice -- and pinned again.
 
     This test used to assert VIX 5 and VIX 15 produce bit-identical prices,
     because below 15 the spread multiplier floored at 1.0 and the correlation
     blend had not started -- there was no channel left. The 2026-08 coupling
     added one: every close feeds the day's VIX into the market factor's
-    variance target, so a sub-15 pin is now a CALMING lever rather than a
-    no-op. The divergence starts exactly at the second day -- day one trades
-    at the fresh baseline state and only the first close reads the pin --
-    and the draw schedule does not move at all, because the target reads
-    macro state rather than drawing anything: same market noise, different
-    variance, different prices.
+    variance target, so a sub-15 pin became a CALMING lever, and the
+    divergence started at the second day because only the close read it.
+
+    It starts on the FIRST day now. `sector_vix_coupling` arrived with pt-v7
+    and is 0.25 on the default preset since the 2026-08-26 era boundary: the
+    sector draw's sigma reads `economy.vix` INSIDE the tick, so a pin acts
+    while day one is still trading. The draw schedule still does not move at
+    all, because both channels read macro state rather than drawing anything:
+    same market noise, different variance, different prices.
     """
     day_one_calm = run_scenario(Scenario().hold(vix=15.0), seed=3,
                                 universe=UNIVERSE, days=1)
     day_one_low = run_scenario(Scenario().hold(vix=5.0), seed=3,
                                universe=UNIVERSE, days=1)
-    assert day_one_calm.prices() == day_one_low.prices()
+    assert day_one_calm.prices() != day_one_low.prices()
+    assert day_one_calm.draws_consumed == day_one_low.draws_consumed
 
     calm = run_scenario(Scenario().hold(vix=15.0), seed=3,
                         universe=UNIVERSE, days=4)

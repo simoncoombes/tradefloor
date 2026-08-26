@@ -73,7 +73,7 @@ def test_impact_is_isolated_to_the_names_actually_traded():
     shifted market and this whole measurement would become an estimate.
     """
     cf = pretium.flow_impact(
-        seed=5, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
+        seed=1, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
     )
     assert cf.untouched_moved() == []
     # And the traded name DID move. Without this the assertion above passes
@@ -81,11 +81,13 @@ def test_impact_is_isolated_to_the_names_actually_traded():
     # say -- because then nothing moved and nothing is untouched-and-moved.
     # "No leak" and "no effect at all" look the same from one direction only.
     #
-    # Seed 5, not the 42 this used to pin: since the factor-variance change,
-    # a seed whose measurement day rails the session breaker reads exactly
-    # zero impact WITH the flow fully applied (the rail erases the
-    # counterfactual at the close; see IMPACT_SEEDS above), and 42 became
-    # such a seed. The guard needs a rail-free seed to mean what it says.
+    # Seed 1, after 42 and then 5. The reason is the same each time and is
+    # the point of the comment: a seed whose measurement day rails the
+    # session breaker reads exactly zero impact WITH the flow fully applied,
+    # because the rail erases the counterfactual at the close (see
+    # IMPACT_SEEDS above). The 2026-08-26 era boundary to pt-v10 made seed 5
+    # one of those, since that market is more volatile and rails more often.
+    # Seed 1 reads +5.0 bps on the traded name and nothing on the rest.
     assert cf.impact_bps[cf.tickers.index(TRADED)] != 0.0
 
 

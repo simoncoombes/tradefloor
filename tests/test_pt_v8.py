@@ -73,6 +73,6 @@ def test_the_earlier_presets_are_untouched() -> None:
 
 def test_it_is_not_the_default() -> None:
     from pretium import envelope
-    assert envelope.PRESET == "pt-v3"
+    assert envelope.PRESET == "pt-v10"
     e = pt.Engine(seed=1, universe=pt.Universe.random(3, seed=1))
-    assert e.model_fingerprint == "pt-v3"
+    assert e.model_fingerprint == "pt-v10"

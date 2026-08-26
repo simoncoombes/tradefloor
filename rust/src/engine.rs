@@ -309,6 +309,22 @@ impl Engine {
         self.universe_stress
     }
 
+    /// The common log-volume state, for checkpoints and forks.
+    ///
+    /// An AR(1) the whole roster multiplies its volume by. It was missing
+    /// from the snapshot until 2026-08-26, which was invisible while the
+    /// mechanism shipped switched off and became a divergence the day pt-v10
+    /// turned it on: a restored engine traded different volume, which walks
+    /// the book differently and prints different prices (§74).
+    pub fn volume_state(&self) -> f64 {
+        self.volume_state
+    }
+
+    /// Put the volume state back. See [`Engine::volume_state`].
+    pub fn set_volume_state(&mut self, state: f64) {
+        self.volume_state = state;
+    }
+
     /// Put the remembered stress back. See [`Engine::universe_stress`].
     pub fn set_universe_stress(&mut self, stress: f64) {
         self.universe_stress = stress;

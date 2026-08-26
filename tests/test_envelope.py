@@ -21,17 +21,17 @@ def test_the_certified_panel_covers_every_measured_statistic():
     assert sorted(env.MEASURED_504) == sorted(REAL_MARKETS)
 
 
-def test_twelve_of_fourteen_are_in_band_at_the_certified_horizon():
-    """Nine of ten until 2026-08-25, when three conditional correlation
-    statistics joined the panel. Two of them are in band; the third,
-    sector_excess_corr, is 15 seed-sd out and is gap 7. The count is pinned
-    so that a change to it is a decision, not a drift."""
+def test_all_fourteen_are_in_band_at_the_certified_horizon():
+    """Nine of ten until 2026-08-25, when the panel grew to fourteen, then
+    twelve of fourteen on pt-v3. Since the 2026-08-26 era boundary the
+    default is pt-v10 and every statistic is in band, including the
+    volume-change row no earlier preset held. Pinned so that a change to it
+    is a decision, not a drift."""
     in_band = [k for k, v in env.CERTIFIED.items()
                if band_distance(v, *REAL_MARKETS[k]) == 0]
-    assert len(in_band) == 12
-    assert "corr_persistence_acf1" in in_band  # a band that admits everything at 252 days, and says so
-    assert "volume_change_acf1" not in in_band
-    assert "sector_excess_corr" not in in_band
+    assert len(in_band) == 14, sorted(set(env.CERTIFIED) - set(in_band))
+    assert "volume_change_acf1" in in_band
+    assert "sector_excess_corr" in in_band
 
 
 def test_every_gap_says_what_it_forbids():
@@ -171,9 +171,10 @@ def test_score_reads_a_panel_against_its_own_horizon():
     far = env.score(panel, horizon_days=504)
     assert near["ruler"] == "REAL_MARKETS"
     assert far["ruler"] == "REAL_MARKETS_504"
-    assert near["statistics"]["excess_kurtosis"]["in_band"]
-    assert not far["statistics"]["excess_kurtosis"]["in_band"], (
-        "5.23 is inside the 252-day band and outside the 504-day one; a "
+    assert near["statistics"]["volume_change_acf1"]["in_band"]
+    assert not far["statistics"]["volume_change_acf1"]["in_band"], (
+        "-0.314 is inside the 252-day band and outside the tighter 504-day "
+        "one; a "
         "score that missed that is measuring with the wrong ruler"
     )
 

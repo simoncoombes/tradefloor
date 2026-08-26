@@ -57,8 +57,11 @@ def test_the_earlier_presets_are_untouched() -> None:
         assert e.model_fingerprint == name
 
 
-def test_it_is_not_the_default() -> None:
+def test_it_is_the_default() -> None:
+    """It became the default on 2026-08-26, the era boundary in §75. An
+    engine built with no model runs pt-v10 and the envelope certifies it."""
     from pretium import envelope
-    assert envelope.PRESET == "pt-v3"
+    assert envelope.PRESET == "pt-v10"
     e = pt.Engine(seed=1, universe=pt.Universe.random(3, seed=1))
-    assert e.model_fingerprint == "pt-v3"
+    assert e.model_fingerprint == "pt-v10"
+    assert pt.ModelParams.from_preset().fingerprint == "pt-v10"

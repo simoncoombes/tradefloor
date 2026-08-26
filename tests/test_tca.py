@@ -229,7 +229,12 @@ def test_a_round_trip_leaves_less_lasting_impact_than_holding():
         ticker = UNIVERSE[0].ticker
         if abs(traded.impact_bps(ticker)) < abs(held.impact_bps(ticker)):
             smaller += 1
-    assert smaller >= len(SEEDS) - 1, (
+    # Two, not one, since the 2026-08-26 era boundary. pt-v10's market is
+    # more volatile than pt-v3's, so the nonlinear residual the comment above
+    # describes exceeds the recovered impact on more seeds: six of eight
+    # rather than seven of eight. The property is a tendency, and the
+    # tolerance is what says so.
+    assert smaller >= len(SEEDS) - 2, (
         f"a round trip out-impacted holding on {len(SEEDS) - smaller} of "
         f"{len(SEEDS)} seeds; unwinding has stopped recovering impact"
     )

@@ -93,8 +93,14 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # pair: random now pays the widest noise floor (-6,125 against
     # buy_and_hold's -116, with mean_reversion third at +273). The oracle
     # and momentum have never swapped.
+    #
+    # Re-measured again at the 2026-08-26 era boundary that made pt-v10 the
+    # default: oracle +72,530, momentum +17,219, mean_reversion +16,886,
+    # random -6,881, buy_and_hold -8,121. The bottom pair swapped back, and
+    # momentum and mean-reversion are now within 2% of each other, which is
+    # the margin this comment keeps warning about.
     assert ranked == ["oracle", "momentum", "mean_reversion",
-                      "buy_and_hold", "random"]
+                      "random", "buy_and_hold"]
 
 
 def test_random_trading_is_close_to_flat_over_a_short_run(scores):

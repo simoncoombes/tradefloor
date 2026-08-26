@@ -72,7 +72,7 @@ def test_it_is_not_the_default() -> None:
     The envelope certifies pt-v3 at 252 days. pt-v6 clears §8 and scenario
     response, and that is a different claim from being certified.
     """
-    assert pt.model_preset()["name"] == "pt-v3"
+    assert pt.model_preset()["name"] == "pt-v10"
 
 
 def test_the_ar2_stays_stationary() -> None:

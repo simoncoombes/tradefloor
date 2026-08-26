@@ -1666,6 +1666,10 @@ impl PyEngine {
             vec![market_variance, market_day_factor, market_fast_variance,
                  market_slow_variance],
         )?;
+        // The common log-volume state. Same reason as the variance above, and
+        // the same failure: omitted, a fork re-opens at volume 1.0 mid-regime
+        // and diverges through the book (§74).
+        out.set_item("volume_state", self.inner.volume_state())?;
 
         // The macro chain's state. The chain advances at every close now, so
         // a fork that did not carry these would snap back to the initial
@@ -1876,6 +1880,9 @@ impl PyEngine {
             // on its next session, and re-anchors `previous_close` mid-day --
             // so it prices differently from the parent it forked from.
             self.market_open = flag.extract()?;
+        }
+        if let Some(raw) = snapshot.get_item("volume_state")? {
+            self.inner.set_volume_state(raw.extract::<f64>()?);
         }
         if let Some(raw) = snapshot.get_item("market_variance")? {
             let vals: Vec<f64> = raw.extract()?;

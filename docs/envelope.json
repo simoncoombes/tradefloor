@@ -1,9 +1,9 @@
 {
- "preset": "pt-v3",
+ "preset": "pt-v10",
  "certified_horizon_days": 252,
  "statistics": {
   "annualised_vol_pct": {
-   "measured": 24.0972,
+   "measured": 28.8814,
    "band": [
     15.0,
     36.0
@@ -11,7 +11,7 @@
    "in_band": true
   },
   "excess_kurtosis": {
-   "measured": 2.5305,
+   "measured": 8.8342,
    "band": [
     1.6,
     41.0
@@ -19,7 +19,7 @@
    "in_band": true
   },
   "return_acf1": {
-   "measured": 0.0375,
+   "measured": 0.0157,
    "band": [
     -0.08,
     0.06
@@ -27,7 +27,7 @@
    "in_band": true
   },
   "abs_return_acf1": {
-   "measured": 0.1413,
+   "measured": 0.0698,
    "band": [
     0.02,
     0.22
@@ -35,7 +35,7 @@
    "in_band": true
   },
   "abs_return_acf5": {
-   "measured": 0.0496,
+   "measured": 0.0307,
    "band": [
     0.02,
     0.09
@@ -43,7 +43,7 @@
    "in_band": true
   },
   "abs_return_acf20": {
-   "measured": 0.0082,
+   "measured": 0.0049,
    "band": [
     -0.04,
     0.08
@@ -51,7 +51,7 @@
    "in_band": true
   },
   "cross_sectional_corr": {
-   "measured": 0.2558,
+   "measured": 0.2537,
    "band": [
     0.08,
     0.56
@@ -59,7 +59,7 @@
    "in_band": true
   },
   "volume_abs_return_corr": {
-   "measured": 0.5339,
+   "measured": 0.4824,
    "band": [
     0.46,
     0.66
@@ -67,7 +67,7 @@
    "in_band": true
   },
   "leverage_effect": {
-   "measured": -0.0349,
+   "measured": -0.0276,
    "band": [
     -0.16,
     0.0
@@ -75,15 +75,15 @@
    "in_band": true
   },
   "volume_change_acf1": {
-   "measured": -0.4598,
+   "measured": -0.314,
    "band": [
     -0.32,
     -0.2
    ],
-   "in_band": false
+   "in_band": true
   },
   "corr_asymmetry": {
-   "measured": 0.0036,
+   "measured": -0.0071,
    "band": [
     -0.25,
     0.45
@@ -91,7 +91,7 @@
    "in_band": true
   },
   "corr_asymmetry_lagged": {
-   "measured": -0.033,
+   "measured": -0.0159,
    "band": [
     -0.2,
     0.55
@@ -99,15 +99,15 @@
    "in_band": true
   },
   "sector_excess_corr": {
-   "measured": 0.0037,
+   "measured": 0.1457,
    "band": [
     0.11,
     0.23
    ],
-   "in_band": false
+   "in_band": true
   },
   "corr_persistence_acf1": {
-   "measured": 0.0413,
+   "measured": 0.1813,
    "band": [
     -0.19,
     0.54

@@ -502,11 +502,14 @@ def test_listing_jobs_needs_no_id():
     assert r["ok"] and isinstance(r["jobs"], list)
 
 
-def test_describe_simulator_reports_the_gap_that_is_out_of_band():
+def test_describe_simulator_reports_nothing_out_of_band():
+    """Two statistics were out until the 2026-08-26 era boundary made pt-v10
+    the default. It holds all fourteen at the certified horizon, so an agent
+    reading this surface is told there is nothing out rather than being told
+    a stale pair."""
     d = mcp.describe_simulator()
-    assert set(d["certified"]["statistics_out_of_band"]) == {
-        "volume_change_acf1", "sector_excess_corr"}
-    assert len(d["certified"]["statistics_in_band"]) == 12
+    assert set(d["certified"]["statistics_out_of_band"]) == set()
+    assert len(d["certified"]["statistics_in_band"]) == 14
     assert d["structural_limitations"]
     assert "atlas" in d["not_exposed_here"]
 

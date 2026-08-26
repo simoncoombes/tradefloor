@@ -63,12 +63,16 @@ if TYPE_CHECKING:
 # prices. An "explanation" that could only ever name a shock would be unable
 # to say "nothing happened; it drifted back toward fair value", which is the
 # correct answer most of the time.
+# The eighth, `jump`, arrived on 2026-08-26: `apply_jumps` moves `s` after
+# the tick loop, so the seven above did not reconstruct a day on which one
+# fired, on any preset carrying jumps (§74).
 FACTOR_NAMES: tuple[
     Literal["reversion"], Literal["momentum"], Literal["crowd_lean"],
     Literal["company_news"], Literal["order_flow_impact"],
     Literal["short_squeeze_effect"], Literal["random_noise"],
+    Literal["jump"],
 ] = ("reversion", "momentum", "crowd_lean", "company_news",
-     "order_flow_impact", "short_squeeze_effect", "random_noise")
+     "order_flow_impact", "short_squeeze_effect", "random_noise", "jump")
 
 
 def _f64(buf: bytes) -> list[float]:
