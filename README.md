@@ -129,7 +129,7 @@ and aggregate flow rather than agents that adapt to you.
 
 ## Worked examples
 
-Seven notebooks and two scripts in [`examples/`](https://github.com/simoncoombes/pretium/tree/main/examples), numbered in
+Eight notebooks and two scripts in [`examples/`](https://github.com/simoncoombes/pretium/tree/main/examples), numbered in
 reading order and executed as part of the test suite:
 
 | | what it covers |

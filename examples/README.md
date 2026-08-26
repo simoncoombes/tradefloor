@@ -1,10 +1,12 @@
 # Examples
 
-Seven notebooks and two scripts, numbered in reading order. The committed
+Eight notebooks and two scripts, numbered in reading order. The committed
 notebooks carry their output, so you can read them without running anything.
+Start at 00 if you have not used pretium before.
 
 | | what it covers |
 |---|---|
+| [`00-a-year-in-one-market.ipynb`](00-a-year-in-one-market.ipynb) | The shortest useful thing: one year, one company, two crises, and why the price moved |
 | [`01-first-simulation.ipynb`](01-first-simulation.ipynb) | Universe, engine, order book, determinism, provenance |
 | [`02-evaluating-a-strategy.ipynb`](02-evaluating-a-strategy.ipynb) | Strategy specs, baselines, capture ratio, ranking across seeds |
 | [`03-why-did-the-price-move.ipynb`](03-why-did-the-price-move.ipynb) | The seven factor contributions that sum to every move |
@@ -25,7 +27,7 @@ pip install pretium jupyter
 jupyter lab
 ```
 
-Notebooks 03 and 09 also need `matplotlib` for their charts, and 05 needs
+Notebooks 00, 03 and 09 also need `matplotlib` for their charts, and 05 needs
 `pretium[rl]` for the Gymnasium environment. The core library has no
 dependencies.
 
