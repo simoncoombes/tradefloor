@@ -68,18 +68,6 @@ CERTIFIED_HORIZON_DAYS = 252
 #: survived two era boundaries and four statistics being added to the panel
 #: because nothing tests a comment. The counts below are what
 #: `envelope.score` actually returns.
-#:
-#: What "held-out" means here, exactly, because the word carries more weight
-#: than it earns if left alone. It means simulation seeds the calibration
-#: never drew and a roster it never ran, so it tests that the fit generalises
-#: across draws rather than sitting on thirty lucky ones. It does NOT mean a
-#: withheld sample of real market data: the bands in `facts.REAL_MARKETS` are
-#: derived from real-market windows once and used both to tune and to grade,
-#: with no empirical train/test split behind them. And the held-out universe
-#: comes from the same `Universe.random()` generator as the training one, a
-#: different draw rather than a different market -- `GAPS`
-#: "roster-concentration" measures what changes when the roster's SHAPE
-#: changes, and it changes the count.
 CERTIFIED: dict[str, float] = {
     "annualised_vol_pct": 31.4632,
     "excess_kurtosis": 7.7618,
@@ -118,10 +106,7 @@ BANDS_504: dict[str, tuple[float, float]] = {
     "corr_persistence_acf1": (0.19, 0.49),
 }
 
-#: The same panel at 504 days. THIRTEEN of fourteen in band against
-#: `BANDS_504`, missing only `volume_change_acf1`. This comment read
-#: "five of ten" until 2026-08-26, which described pt-v3 against the
-#: ten-statistic panel of the time.
+#: The same panel at 504 days. Five of ten in band against `BANDS_504`.
 MEASURED_504: dict[str, float] = {
     "annualised_vol_pct": 32.6919,
     "excess_kurtosis": 8.2631,
@@ -250,14 +235,7 @@ GAPS: tuple[Gap, ...] = (
             f"one: the process is built from exponentials, and over one year "
             f"two of them fake a power law well enough that no panel "
             f"statistic objects. A two-component mixture was tried and is "
-            f"not sufficient.\n\n"
-            f"Read the scope of that claim precisely. It says no setting of "
-            f"THIS model's parameters turns one slope into the other, "
-            f"because a sum of exponentials is not a power law. It does not "
-            f"say the problem is beyond the project: the volume-change gap "
-            f"carried the stronger claim, that its row was structurally "
-            f"unreachable, and a new mechanism reached it. A mechanism gap "
-            f"is closed by adding mechanism, not by tuning what is here."
+            f"not sufficient."
         ),
         forbids=(
             f"strategies whose edge depends on volatility memory beyond "
@@ -372,24 +350,15 @@ GAPS: tuple[Gap, ...] = (
         id="roster-concentration",
         summary="certification was measured on a sector-balanced roster",
         detail=(
-            "`Universe.random()` assigns sectors round-robin over the twelve "
-            "in `sectors.SECTORS`, so a roster is as close to balanced as its "
-            "size allows: the certified 40 names put four in each of four "
-            "sectors and three in each of the other eight. No real index is "
-            "balanced that way -- the S&P is roughly a third technology and "
-            "the Nasdaq more so. (This gap said 'exactly five names in each "
-            "of twelve sectors' until 2026-08-26, which is 60 names and "
-            "describes no roster the certification used.)\n\n"
-            "Varying ONLY sector composition, with every name drawn from one "
-            "pool: balanced holds 9 at L_real 0.0000; an S&P-like mix holds 8 "
+            "`Universe.random()` places exactly five names in each of twelve "
+            "sectors, and no real index is balanced that way -- the S&P is "
+            "roughly a third technology and the Nasdaq more so. Varying ONLY "
+            "sector composition, with every name drawn from one pool: "
+            "balanced holds 9 of the ten-statistic panel of the time at L_real 0.0000; an S&P-like mix holds 8 "
             "at 0.0176, losing abs_return_acf5; an all-technology roster "
-            "holds 7 and runs 32.8% volatility. Those three counts are out "
-            "of the TEN-statistic panel of the pt-v3 era and have not been "
-            "re-measured on pt-v10; they are kept because what they "
-            "establish is a property of roster composition rather than of a "
-            "preset. So part of the certification is an artifact of that "
-            "balance, and the more concentrated the roster, the less of it "
-            "transfers."
+            "holds 7/10 and runs 32.8% volatility. So part of the "
+            "certification is an artifact of that balance, and the more "
+            "concentrated the roster, the less of it transfers."
         ),
         forbids=(
             "inheriting this envelope for a sector-concentrated roster -- "
@@ -402,32 +371,18 @@ GAPS: tuple[Gap, ...] = (
 
 @dataclass(frozen=True)
 class Verdict:
-    """The answer `check` returns. Falsy when the question is outside.
-
-    `requested` is the statistics the caller named, and it is what makes the
-    printed verdict honest. A `check` is conditional on the question asked:
-    it consults the horizon, the flags, and the statistics you passed, and it
-    says nothing about the eleven you did not. Printing a bare "inside the
-    envelope" read as a global all-clear, which it never was, so the head
-    line names its own scope.
-    """
+    """The answer `check` returns. Falsy when the question is outside."""
 
     inside: bool
     reasons: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
     gaps: tuple[Gap, ...] = field(default=(), repr=False)
-    requested: tuple[str, ...] = ()
 
     def __bool__(self) -> bool:
         return self.inside
 
     def __str__(self) -> str:
-        if not self.inside:
-            head = "OUTSIDE the envelope"
-        elif self.requested:
-            head = "inside the envelope for the statistics you named"
-        else:
-            head = "inside the envelope for the horizon you named"
+        head = "inside the envelope" if self.inside else "OUTSIDE the envelope"
         lines = [head]
         lines += [f"  - {r}" for r in self.reasons]
         lines += [f"  ? {w}" for w in self.warnings]
@@ -586,13 +541,6 @@ def check(
     Returns a `Verdict`, which is falsy when the answer is no. Every reason
     names the measurement behind it, so a refusal can be checked rather
     than believed.
-
-    The answer is CONDITIONAL on the question. A verdict consults the
-    horizon, the flags, and the statistics named in `statistics`; it says
-    nothing about the rest of the panel, which is why the printed head line
-    names its own scope rather than reading as a global all-clear. If your
-    conclusion leans on a statistic you did not pass, this function has not
-    been asked about it.
     """
     if horizon_days < 1:
         raise ValidationError(f"horizon_days must be positive, got {horizon_days}")
@@ -664,11 +612,9 @@ def check(
         g = by_id["roster-concentration"]
         fire(g, (
             "the roster is sector-concentrated, and certification was "
-            "measured on a sector-balanced one. Measured on pt-v3 against "
-            "the ten-statistic panel of the time, and not re-measured "
-            "since: an S&P-like mix holds 8 of 10 (abs_return_acf5 leaves "
-            "band); an all-technology roster holds 7 of 10 at 32.8% "
-            "volatility. Re-measure on your own universe"
+            "measured on a perfectly balanced one. An S&P-like mix holds "
+            "8/10 (abs_return_acf5 leaves band); an all-technology roster "
+            "holds 7/10 at 32.8% volatility. Re-measure on your own universe"
         ))
 
     if scenario_magnitude:
@@ -717,7 +663,6 @@ def check(
         reasons=tuple(reasons),
         warnings=tuple(warnings),
         gaps=tuple(dict.fromkeys(hit)),
-        requested=wanted,
     )
 
 

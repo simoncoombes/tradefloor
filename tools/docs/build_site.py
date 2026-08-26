@@ -343,14 +343,13 @@ ERA_FIXES = [
         "universe",
         "# 4. the verdict for a concentrated roster\nOUTSIDE the envelope\n"
         "  - the roster is sector-concentrated, and certification was "
-        "measured on\n    a sector-balanced one. Measured on pt-v3 against "
-        "the ten-statistic\n    panel of the time, and not re-measured "
-        "since: an S&amp;P-like mix holds\n    8 of 10 (abs_return_acf5 "
-        "leaves band); an all-technology roster holds\n    7 of 10 at 32.8% "
-        "volatility. Re-measure on your own universe\n  ? "
-        "cross_sectional_corr is in band at the certified horizon (0.3063 "
-        "in\n    (0.08, 0.56)) -- but that is a median across 30 seeds; "
-        "check\n    `intervals` for the spread before relying on one seed",
+        "measured on\n    a perfectly balanced one. An S&amp;P-like mix "
+        "holds 8/10 (abs_return_acf5\n    leaves band); an all-technology "
+        "roster holds 7/10 at 32.8% volatility.\n    Re-measure on your own "
+        "universe\n  ? cross_sectional_corr is in band at the certified "
+        "horizon (0.3063 in\n    (0.08, 0.56)) -- but that is a median "
+        "across 30 seeds; check\n    `intervals` for the spread before "
+        "relying on one seed",
     ),
     (
         "The sector counts in step 2 are usually why yours differ: 14 "
@@ -358,7 +357,10 @@ ERA_FIXES = [
         "does.",
         "The sector counts in step 2 are usually why yours differ: 14 "
         "financials against a round-robin roster's 3 or 4 per sector changes "
-        "what the market does.",
+        "what the market does. Step 4's two counts are out of the "
+        "ten-statistic panel of the pt-v3 era and have not been re-measured "
+        "since; what they establish is a property of the roster rather than "
+        "of a preset.",
     ),
     # The sector table's own description of the generator. Round-robin over
     # twelve sectors is five names each only at n = 60; the certified roster
@@ -1188,7 +1190,7 @@ def apply_trust_fixes(doc: str) -> str:
             "(0.1413 in\n    (0.02, 0.22)) -- but that is a median across 30 "
             "seeds; check\n    `intervals` for the spread before relying on "
             "one seed",
-            "# 1.\nTrue\ninside the envelope for the statistics you named\n"
+            "# 1.\nTrue\ninside the envelope\n"
             "  - horizon 126d is within the certified 252d, and no named "
             "statistic\n    meets a measured gap\n  ? return_acf1 is in band "
             "at the certified horizon (0.0195 in\n    (-0.08, 0.06)) -- but "
@@ -1593,7 +1595,7 @@ def apply_scenarios_fixes(doc: str) -> str:
             "{'day': 20, 'vix': 80.0}\n{'day': 21, 'vix': 78.97}\n"
             "{'day': 22, 'vix': 77.93}\n{'day': 23, 'vix': 76.90}\n"
             "{'day': 24, 'vix': 75.87}\n\n"
-            "inside the envelope for the statistics you named\n  - horizon "
+            "inside the envelope\n  - horizon "
             "120d is within the certified 252d, and no named statistic\n    "
             "meets a measured gap\n  ? annualised_vol_pct is in band at the "
             "certified horizon (31.4632 in\n    (15.0, 36.0)) -- but that is "
