@@ -247,6 +247,14 @@ PERTURBATIONS = [
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick
+    # 0.5, not 12.0: RAISING the cap is inert in this short window because
+    # no name here moves more than the shipped 4 percent from its open,
+    # which is the measurement that makes the cap a CRISIS dial. Lowering
+    # it binds on any day past half a percent, so it tests the wiring.
+    ("volume_move_cap", 0.5, True),              # saturates volume on any day past half a percent
+    ("volume_move_floor", 0.9, True),            # every name trades more on every day
+    ("volume_move_noise", 0.05, True),           # narrows the return-unrelated part of volume
+    ("volume_move_response", 0.9, True),         # steepens volume against the size of the day's move
     ("volume_idio_persistence", 0.8, False),     # a PAIR like the news dials: persistence alone carries an innovation of zero, so every per-name state stays exactly 0.0
     ("volume_idio_sigma", 0.25, True),           # the innovation half: non-zero sigma moves volume from the first day, and volume reaches price through the book      # the crisis blend only fires above the VIX gate, which the harness does not cross         # anchored: the harness runs near market_vol_vix_anchor, where the rate scale is exactly 1.0 at any coupling
 ]

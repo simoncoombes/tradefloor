@@ -124,6 +124,7 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
                 // preserves the behaviour these tests pin.
                 universe_stress: 0.0,
                 volume_state: 0.0,
+                volume_idio: &[],
                 economy: &economy,
                 market_status: MarketStatus::Open,
                 // Held mid-session so the intraday volume curve is flat and

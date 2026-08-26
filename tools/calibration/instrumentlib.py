@@ -360,6 +360,20 @@ PARAM_SPECS: dict[str, dict] = {
                                 "hard_range": (0.0, 0.99)},
     "volume_idio_sigma": {"kind": "abs", "step_unit": 0.02,
                           "hard_range": (0.0, 0.6)},
+    # The volume-move expression (§113); ships at the old literals.
+    # LOG, not abs: the cap ships at 4.0 with a box out to 30, and a raw
+    # difference of 26 squared dominates a regulariser whose median squared
+    # box deviation is order 0.01. It is a positive scale (a percentage move),
+    # so the log ratio is also the honest classification, not a workaround.
+    # test_no_parameter_dominates_the_deviation_penalty caught this.
+    "volume_move_cap": {"kind": "log", "step_unit": None,
+                        "hard_range": (1.0, 30.0)},
+    "volume_move_floor": {"kind": "abs", "step_unit": 0.05,
+                          "hard_range": (0.0, 2.0)},
+    "volume_move_noise": {"kind": "abs", "step_unit": 0.02,
+                          "hard_range": (0.0, 1.0)},
+    "volume_move_response": {"kind": "abs", "step_unit": 0.05,
+                             "hard_range": (0.0, 2.0)},
     "garch_ceiling_multiple":   {"kind": "log",
                                  "hard_range": (1.0, 50.0)},
     "garch_floor_multiple":     {"kind": "log",
