@@ -1379,6 +1379,20 @@ impl ModelParams {
     /// +0.1346 and +0.1201). §8 passes on every axis with no flips. **No
     /// axis regresses against pt-v10** (§90).
     ///
+    /// # What it costs
+    ///
+    /// Crisis-state cross-sectional correlation, and this was under-reported
+    /// when the preset was registered (§92). At a held VIX 45 it reads 0.604
+    /// against pt-v10's 0.669, and real markets sit at 0.664 to 0.727, so
+    /// this preset takes that diagnostic OUT of the real range. It is not a
+    /// panel statistic, which is exactly why a panel-shaped reading missed
+    /// it. The cause is structural rather than a mis-set coefficient: jumps
+    /// are per-name, so buying the lever through them adds idiosyncratic
+    /// variance, and crisis co-movement is the market factor's SHARE of
+    /// total variance. Any route to the lever that is not the market factor
+    /// pays here. **A study whose thesis is how tightly names move together
+    /// in a crisis should use pt-v10, not this preset.**
+    ///
     /// # What is not claimed
     ///
     /// The panel gates are UNDRIVEN. Through a real driven path the VIX runs

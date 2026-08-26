@@ -27,10 +27,20 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v11")
 ```
 
 Not the default, deliberately: 0.2.0 moved the default once already, and
-moving it twice in one cycle would strand work published in between. What it
-does not yet claim is a cost outside the panel: driven through a real macro
-path this preset fires more jumps than the default, and that has not been
-measured.
+moving it twice in one cycle would strand work published in between.
+
+**What it costs.** In a crisis, names move together slightly less: measured
+at a held VIX 45, cross-sectional correlation reads 0.604 against the
+default's 0.669, where real markets sit between 0.664 and 0.727. That is
+outside the real range and it is the honest price of this preset. The reason
+is structural: jumps happen to individual companies, so buying a more
+violent crisis through them adds company-specific movement, and crisis
+co-movement is how much of the market's movement is shared. **If your
+question is how tightly names move together in a crash, use the default.**
+
+One further cost is not yet measured at all: driven through a real macro
+path this preset fires more jumps than the default does, and what that costs
+has not been quantified.
 
 ### New parameter
 
