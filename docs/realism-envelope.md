@@ -195,8 +195,13 @@ envelope.
 Two separate quantities, and they fail differently.
 
 **The steady-state lever**, how much more violent a sustained crisis is
-than a calm market, reads about **×3.1** against real markets' **×6.16**.
-Roughly half. This is a ratio of annualised **volatility** at high VIX to
+than a calm market, reads **×5.05** against real markets' **×6.16**, about
+four fifths, up from ×3.07 at the previous default. It is measured from a
+held VIX 5 to a held VIX 65 on the certified 40-name roster over 252 days at
+thirty seeds, which is not the quantity a pair of pinned 120-day runs on a
+20-name roster gives (that reads about ×2.8 from VIX 15 to VIX 45). Three
+numbers on this site describe how violent a crisis is; check which one you
+are reading. This is a ratio of annualised **volatility** at high VIX to
 volatility at low VIX; it is not a correlation lever, and a mechanism that
 only reallocates variance between the market factor and the idiosyncratic
 term cannot move it by construction. Crisis correlation is a separate
@@ -273,7 +278,12 @@ more slowly, so a strategy that survives one has not been tested as hard as
 the label suggests. A sector thesis tested through a crisis is being tested
 in a market whose industries loosen when a real one's would tighten.
 
-### Gap 5: the endogenous economy cannot reach its own crisis regimes
+### Gap 5: the endogenous economy cannot reach its own *macro* crisis regimes
+
+Distinguish two kinds of crisis. A **volatility** crisis is endogenous since
+0.2.0: the shipped preset's own VIX crosses its crisis threshold on 10.2% of
+days against a real 12.5%, where the previous default reached it on none. A
+**macro** crisis is not, and that is this gap.
 
 Left to itself the macro state stays in a moderate band. Endogenous inflation
 peaks at 4.06% to 4.11% over five seeds and five years against a clamp of
@@ -307,10 +317,14 @@ no preset takes them. Calibration record §65.
 
 ### Gap 6: certification was measured on a sector-balanced roster
 
-`Universe.random()` places exactly five names in each of twelve sectors. No
-real index is balanced that way. The S&P is roughly a third technology and
-the Nasdaq more so. Varying **only** sector composition, with every name
-drawn from one pool:
+`Universe.random()` assigns sectors round-robin over the twelve in
+`sectors.SECTORS`, so a roster is as close to balanced as its size allows:
+the certified 40 names put four in each of four sectors and three in each of
+the other eight. No real index is balanced that way. The S&P is roughly a
+third technology and the Nasdaq more so. (This gap said "exactly five names
+in each of twelve sectors" until 2026-08-26, which is 60 names and describes
+no roster the certification used.) Varying **only** sector composition, with
+every name drawn from one pool:
 
 | roster | in band | `L_real` | vol% |
 |---|---|---|---|

@@ -21,9 +21,9 @@ scenario. Same market, same agents, only the macro path differs:
 
 | agent | calm | hiked | delta |
 |---|---|---|---|
-| buy_and_hold | -7.16% | -10.75% | -3.59 |
-| momentum | -1.17% | -3.52% | -2.36 |
-| oracle | +11.11% | +8.70% | -2.41 |
+| buy_and_hold | -5.63% | -8.76% | -3.13 |
+| momentum | -7.88% | -9.74% | -1.86 |
+| oracle | +14.98% | +12.99% | -1.99 |
 
 Nobody escapes the walk here. Buy-and-hold is long-only, holds through the
 repricing, and loses the most. Momentum and the Oracle can trade around it
@@ -31,15 +31,16 @@ and each give up about two and a half points. The Oracle stays far ahead in
 both worlds because it trades mispricing, and the shock moves fair value
 along with price - but holding positions through a repricing still costs it,
 so its edge survives the shock where its level does not. The sizes are the
-seed's, as ever: across sim seeds 5 to 9 buy-and-hold gives up 3.4 to 4.7
-points and never escapes, while momentum's give-up spans -5.1 to +0.5 - on
+seed's, as ever: across sim seeds 5 to 9 buy-and-hold gives up 3.0 to 5.0
+points and never escapes, while momentum's give-up spans -1.9 to +0.5 - on
 one seed in five it trades around the shock entirely.
 
 **One trap.** Pinning `federal_funds_rate` alone does nothing until the first
 central-bank meeting - a policy-rate `ramp` from 2.5% to 5% over thirty days
 (`Universe.random(20, seed=4)`, sim seed 5) moves every price by exactly
 0.00% over 40 days, and a median -4.29% once a 60-day run crosses the
-meeting at day 45, where the corporate yield is recomputed off the 10Y.
+meeting at day 45, where the corporate yield is recomputed off the 10Y
+(-4.11% on the shipped preset).
 Equities discount off the corporate bond yield, so a short policy-only study
 sees nothing, silently. `rate_shock` moves the whole curve for an immediate
 repricing; `ramp` isolates a single lever when that is what you want.
@@ -112,25 +113,27 @@ scenario API:
 
 | VIX | annualised realised vol |
 |---|---|
-| 5 | 49.48% |
-| 15 (the anchor) | 58.76% |
-| 45 | 107.07% |
-| 65 | 124.31% |
+| 5 | 31.39% |
+| 15 (the anchor) | 37.01% |
+| 45 | 104.94% |
+| 65 | 125.75% |
 
-A thirteenfold move in VIX moves realised volatility by a factor of 2.5, and
-a sub-15 pin now calms the market rather than doing nothing. VIX 5, 10 and 15
-produce identical prices only for the first day, since the first close is
-where a pin first enters the variance target, and diverge from the second:
-re-measured on the same universe at sim seed 3, day one's closes are
-bit-identical across all three pins and day two's differ for every pair. (An
+A thirteenfold move in VIX moves realised volatility by a factor of 4.0, and
+a sub-15 pin calms the market rather than doing nothing. Since the 0.2.0 era
+boundary a pin acts on the FIRST day rather than the second, because the
+sector draw's volatility reads the VIX inside the tick: VIX 5, 10 and 15 now
+give different day-one closes, where before they were bit-identical on day
+one and diverged from day two. (An
 earlier version of this page claimed bit-identity over 60 days; even before
 the coupling that had quietly become false at day 45, where the first
 central-bank meeting reprices the corporate yield off a VIX-bearing spread.)
 
-The response to a held pin saturates. The factor's variance is clamped at 8x
-its baseline for reasons independent of the coupling (the clamp carries the
-process's fourth moment), so above VIX ~42 a harder pin buys almost no
-additional factor variance: quadratic inside the plausible band, flat beyond.
+The response to a held pin saturates. The factor's variance is clamped at
+`market_vol_ceiling_multiple` times its baseline for reasons independent of
+the coupling (the clamp carries the process's fourth moment). That was 8x
+through pt-v3 and is 32x on the shipped pt-v10, set at the level a record VIX
+actually implies, so the saturation sits far higher than it used to:
+quadratic across the plausible band rather than flat above VIX ~42.
 A researcher pinning VIX 65 for a year gets a market realising roughly twice
 its calm volatility with crisis-level correlation. That is 2008 sustained,
 not a numerical blow-up.
@@ -142,13 +145,13 @@ Four channels:
    the crisis-correlation channel.
 2. **Quoted bid-ask**, through a multiplier `1 + max(0, (vix - 15) / 30)`.
    Mean quoted spread across `Universe.random(25, seed=11)` after five days,
-   sim seed 3: 11.52 bps at VIX 15, 13.92 at 25, 18.87 at 45, 25.89 at 65.
+   sim seed 3: 11.68 bps at VIX 15, 13.42 at 25, 17.16 at 45, 21.52 at 65.
 3. **Cross-sectional correlation above VIX 25.5** (the crisis threshold since
    the 2026-08 re-site; the old `vix > 40` trigger sat above the endogenous
    ceiling and could never fire), where sector factors blend toward the
    market factor. Together with channel 1, mean pairwise correlation of daily
    log returns over the same 25-name universe's 300 pairs, 120 days, sim
-   seed 3: +0.269 at VIX 15, +0.678 at 45, +0.759 at 65.
+   seed 3: +0.196 at VIX 15, +0.622 at 45, +0.680 at 65.
    Diversification genuinely stops working at crisis VIX. See
    [How realistic is this market](how-realistic-is-this-market.html).
 4. **Credit spreads** in the daily economy step, recomputed at central-bank
@@ -157,9 +160,11 @@ Four channels:
    [Core concepts](core-concepts.html).
 
 So a VIX path stresses execution and strategy at once: spreads widen,
-volatility rises, and the cross-section starts moving together. What it does
-not move is any single name's idiosyncratic variance. VIX sizes the shared
-factor's share, not each name's own noise.
+volatility rises, and the cross-section starts moving together. Since the
+0.2.0 era boundary it also moves a name's OWN variance, through
+`garch_vix_coupling` 0.3 on the shipped preset: this page used to say VIX
+sized the shared factor's share and never each name's own noise, and that
+was true up to pt-v9 and is not true now.
 
 ## Scenarios reach every entry point
 

@@ -66,7 +66,7 @@ disagreement fails the release. A WebAssembly build produces the same digest
 as the native one.
 
 **Ground truth you can read.** The simulator computed every price, so it can
-tell you why. One row per instrument per tick, with seven factor
+tell you why. One row per instrument per tick, with nine factor
 contributions that sum to the move and a residual around 1e-16. No historical
 dataset carries those labels. You can see that a stock fell, never that 60%
 of the fall was order-flow pressure.
@@ -117,10 +117,14 @@ volatility, the right tails, the right co-movement, industries that co-move
 more than strangers, correlation that stays elevated after a panic, volume
 that behaves, and volatility episodes it produces itself.
 
-pt-v10 became the default on 2026-08-26, an era boundary: every seeded
-trajectory changed. Runs recorded before it are not comparable to runs after
-it unless they name their preset, and every earlier preset from `pt-v1`
-onward stays selectable and reproduces bit for bit forever.
+pt-v10 became the default on 2026-08-26, an era boundary: every trajectory
+that came from the default changed. Runs recorded before it are not
+comparable to runs after it unless they name their preset, and every earlier
+preset from `pt-v1` onward stays selectable and reproduces bit for bit.
+Checked rather than asserted: `pt-v1`, `pt-v2` and `pt-v3` give identical
+market digests under 0.1.4 and 0.2.0. A fully specified run is still
+(package version, model, universe fingerprint, seed), since the preset pins
+the coefficients and the package version pins the implementation.
 
 At 504 days pt-v10 holds thirteen of fourteen. The one it misses there,
 volume-change autocorrelation, is stated as a gap.
@@ -132,8 +136,10 @@ hyperbolically. Volume-change autocorrelation leaves its band at two years.
 Scenario response has the right size, measured as a regression gain, but too
 much noise around it for one run to size a scenario from, and industries hold
 together in a crisis about a third as tightly as real ones. The endogenous
-economy cannot reach its own crisis regimes, so an inflation regime has to
-be driven through a scenario. And certification was measured on a
+MACRO economy cannot reach its own crisis regimes, so an inflation regime or
+a policy crisis has to be driven through a scenario; a volatility crisis does
+not, since the default reaches its own crisis threshold on 10.2% of days
+against a real 12.5%. And certification was measured on a
 sector-balanced roster, which no real index is.
 [The realism envelope](https://simoncoombes.github.io/pretium/trust.html)
 states each gap and what it forbids. `pt.envelope.check()` refuses to certify
