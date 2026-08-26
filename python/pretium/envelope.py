@@ -61,8 +61,13 @@ PRESET = "pt-v10"
 CERTIFIED_HORIZON_DAYS = 252
 
 #: Measured at the certified horizon: 30 seeds, 40 instruments, 252 days.
-#: Nine of ten in band, at a band-distance loss of 0.0000, and the same nine
-#: hold on held-out seeds and a held-out 60-name universe.
+#: ALL FOURTEEN in band, at a band-distance loss of 0.0000, and all fourteen
+#: again on a held-out 60-name universe measured at the same resolution.
+#:
+#: This comment read "nine of ten" until 2026-08-26. It described pt-v3, and
+#: survived two era boundaries and four statistics being added to the panel
+#: because nothing tests a comment. The counts below are what
+#: `envelope.score` actually returns.
 CERTIFIED: dict[str, float] = {
     "annualised_vol_pct": 31.4632,
     "excess_kurtosis": 7.7618,
