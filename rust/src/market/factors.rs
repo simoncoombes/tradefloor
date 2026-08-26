@@ -282,10 +282,27 @@ pub fn calculate_live_factors(
             // Asymmetric by construction, because the effect is: bad news
             // transfers more strongly than good. The weight is read by the
             // SIGN OF THE ANNOUNCER'S IMPACT, not of anything local.
-            let weight = if impact < 0.0 {
+            let base = if impact < 0.0 {
                 params.news_peer_weight_down
             } else {
                 params.news_peer_weight
+            };
+            // Contagion that knows what regime it is in (§104, §105). A
+            // CONSTANT peer weight transfers as hard in a quiet July as in
+            // March 2020, and measuring that is what killed the first
+            // attempt to use news: calm-market sector excess is already in
+            // band at +0.166 against a 0.11-to-0.22 ceiling, and constant
+            // transfer pushed it to +0.256 at both horizons while raising
+            // the crisis figure that was actually wanted.
+            //
+            // `crisis_spike` is ZERO below `crisis_vix_threshold`, so at any
+            // coupling a calm market is untouched and only the crisis moves.
+            // At coupling zero the branch is not taken at all, so every
+            // preset is bit-identical.
+            let weight = if params.news_peer_vix_coupling == 0.0 {
+                base
+            } else {
+                base * (1.0 + params.news_peer_vix_coupling * shared.crisis_spike)
             };
             // Guarded rather than multiplied through: at zero weight this
             // adds nothing at all, so the accumulator is untouched and the

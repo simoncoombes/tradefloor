@@ -340,6 +340,12 @@ PARAM_SPECS: dict[str, dict] = {
                                   "hard_range": (0.0, 0.25)},
     "endogenous_news_sigma": {"kind": "abs", "step_unit": 0.005,
                               "hard_range": (0.0, 0.10)},
+    # How much harder news transfers to a peer in a crisis (§105). A
+    # multiplier on the spike, and the spike is capped at ~0.98, so a
+    # coupling of 8 is about a ninefold crisis weight. Wide on purpose: the
+    # calm panel cannot see this dial at all.
+    "news_peer_vix_coupling": {"kind": "abs", "step_unit": 0.25,
+                               "hard_range": (0.0, 8.0)},
     "garch_ceiling_multiple":   {"kind": "log",
                                  "hard_range": (1.0, 50.0)},
     "garch_floor_multiple":     {"kind": "log",
