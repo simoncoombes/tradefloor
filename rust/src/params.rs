@@ -504,6 +504,53 @@ pub struct ModelParams {
     /// [`ModelParams::volume_idio_persistence`].
     pub volume_idio_sigma: f64,
 
+    /// Base volume a name trades on a day it does not move at all.
+    ///
+    /// Volume per tick is `base * (floor + response * min(move, cap) +
+    /// noise * u)`, where `move` is the day's move from the open in units
+    /// of one percent and `u` is a uniform draw. These four numbers were
+    /// literals `0.6`, `0.6`, `4.0` and `0.2` in the tick engine from the
+    /// first version until 0.3.0, and they ship at exactly those values,
+    /// so every preset before pt-v12 prints the volume it always did.
+    ///
+    /// They became dials because §113 measured what the cap costs. See
+    /// [`ModelParams::volume_move_cap`], which is the interesting one.
+    pub volume_move_floor: f64,
+    /// How much more a name trades per one percent it has moved today.
+    ///
+    /// The contemporaneous channel `volume_abs_return_corr` measures: that
+    /// statistic asks how well a name's volume tracks the size of its own
+    /// move, and this is the only term in the volume expression that ties
+    /// the two together on the SAME day. `volume_variance_gain` and
+    /// [`ModelParams::volume_idio_variance_gain`] both couple volume to a
+    /// conditional variance, which is a forecast made from yesterday's
+    /// information, and §113 measured that a forecast tracks today's
+    /// realised move far more loosely than today's move does.
+    pub volume_move_response: f64,
+    /// Where the volume response to a move SATURATES, in units of one
+    /// percent.
+    ///
+    /// At the shipped 4.0 a name that falls twelve percent trades exactly
+    /// as much as one that falls four. Real markets do not do that: volume
+    /// on a limit-down day is a multiple of a bad-Tuesday day, and the
+    /// relationship keeps rising well past four percent. The cap is the
+    /// reason `volume_abs_return_corr` sits where it does and the reason it
+    /// is so easily diluted, because every crisis day is pinned to one
+    /// value and contributes no covariance at all.
+    ///
+    /// Raising it also raises volume in crises, which is a returns change
+    /// and not only a volume one: volume feeds the book depth that prices
+    /// settle through, so a volume dial is a price dial (§113).
+    pub volume_move_cap: f64,
+    /// Amplitude of the return-UNRELATED noise in a name's daily volume.
+    ///
+    /// Multiplies a uniform draw, so it widens volume without any relation
+    /// to what the name did, which is exactly the dilution §111 identified.
+    /// Lowering it should raise `volume_abs_return_corr` and cost realism
+    /// in whatever a real market's unexplained volume variation represents,
+    /// so it is a dial rather than a thing to minimise.
+    pub volume_move_noise: f64,
+
     // ── Universe memory (market/tick.rs, engine.rs) ─────────────────────
     /// How slowly the universe's remembered stress decays, per day.
     ///
@@ -1089,6 +1136,10 @@ impl ModelParams {
             volume_idio_variance_gain: 0.0,
             volume_idio_persistence: 0.0,
             volume_idio_sigma: 0.0,
+            volume_move_floor: 0.6,
+            volume_move_response: 0.6,
+            volume_move_cap: 4.0,
+            volume_move_noise: 0.2,
             volume_variance_gain: 0.0,
             universe_stress_decay: 0.0,
             universe_stress_weight: 0.0,
@@ -1681,6 +1732,10 @@ impl ModelParams {
             "volume_idio_variance_gain" => self.volume_idio_variance_gain,
             "volume_idio_persistence" => self.volume_idio_persistence,
             "volume_idio_sigma" => self.volume_idio_sigma,
+            "volume_move_floor" => self.volume_move_floor,
+            "volume_move_response" => self.volume_move_response,
+            "volume_move_cap" => self.volume_move_cap,
+            "volume_move_noise" => self.volume_move_noise,
             "volume_variance_gain" => self.volume_variance_gain,
             "universe_stress_decay" => self.universe_stress_decay,
             "universe_stress_weight" => self.universe_stress_weight,
@@ -1798,6 +1853,10 @@ impl ModelParams {
             "volume_idio_variance_gain" => out.volume_idio_variance_gain = value,
             "volume_idio_persistence" => out.volume_idio_persistence = value,
             "volume_idio_sigma" => out.volume_idio_sigma = value,
+            "volume_move_floor" => out.volume_move_floor = value,
+            "volume_move_response" => out.volume_move_response = value,
+            "volume_move_cap" => out.volume_move_cap = value,
+            "volume_move_noise" => out.volume_move_noise = value,
             "volume_variance_gain" => out.volume_variance_gain = value,
             "universe_stress_decay" => out.universe_stress_decay = value,
             "universe_stress_weight" => out.universe_stress_weight = value,
@@ -2011,6 +2070,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "volume_idio_sigma",
         "volume_idio_variance_gain",
         "volume_innovation_sigma",
+        "volume_move_cap",
+        "volume_move_floor",
+        "volume_move_noise",
+        "volume_move_response",
         "volume_persistence",
         "volume_variance_gain",
     ]

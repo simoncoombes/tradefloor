@@ -313,6 +313,15 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     # couples 504-day kurtosis to 252-day return autocorrelation. At 0.0 the
     # jump moves the momentum reference with it, so herding never sees it.
     "jump_momentum_share": (0.0, 1.0),
+    # The volume-move expression (§113). These ship NON-zero, at the four
+    # literals they replaced, so the survey needs ranges that bracket the
+    # shipped point rather than start at it. The cap is the wide one on
+    # purpose: 4.0 is a saturation nobody chose and 20.0 is a twenty percent
+    # day, past which no real session goes without a halt.
+    "volume_move_cap": (2.0, 20.0),
+    "volume_move_floor": (0.0, 1.5),
+    "volume_move_noise": (0.0, 0.6),
+    "volume_move_response": (0.2, 1.5),
 }
 
 

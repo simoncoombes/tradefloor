@@ -783,7 +783,15 @@ pub fn simulate_market_tick(
         let base_volume = stock.avg_volume / 390.0;
         let price_magnitude = daily_change / 0.01;
         // The stashed uniform from phase 1, consumed here.
-        let volume_scale = 0.6 + 0.6 * mathx::min(price_magnitude, 4.0) + all_randoms[i] * 0.2;
+        // Four literals until 0.3.0, shipped at their old values so this is
+        // bit-identical wherever a preset leaves them alone. `volume_move_cap`
+        // is the one that mattered: at 4.0 every move past four percent
+        // trades the same, so no crisis day contributes any covariance to
+        // `volume_abs_return_corr`. See ModelParams::volume_move_cap.
+        let p = inputs.params;
+        let volume_scale = p.volume_move_floor
+            + p.volume_move_response * mathx::min(price_magnitude, p.volume_move_cap)
+            + all_randoms[i] * p.volume_move_noise;
         volumes[i] = (base_volume
             * volume_multiplier
             * volume_scale

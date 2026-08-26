@@ -269,6 +269,7 @@ fn check_scenario(file: &str) {
                 // preserves the behaviour these tests pin.
                 universe_stress: 0.0,
                 volume_state: 0.0,
+                volume_idio: &[],
                 economy: &economy,
                 market_status: status,
                 intraday_t: intraday_fraction(time),
