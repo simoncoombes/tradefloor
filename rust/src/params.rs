@@ -464,6 +464,26 @@ pub struct ModelParams {
     /// alike. `apply_jumps` draws two uniforms and two normals
     /// unconditionally whatever the rate is, so this moves a THRESHOLD and
     /// never a stream position.
+    ///
+    /// # It is not variance-neutral, and must be funded
+    ///
+    /// The scale averages ABOVE one over this model's own VIX distribution,
+    /// so raising the coupling adds jump variance rather than only moving it
+    /// between regimes. Measured on an undriven 504-day run (§88): VIX mean
+    /// 20.24, `E[(vix / 15)^2]` = 2.035, so the mean scale is
+    /// `1 - c + 2.035c` — 1.725 at `c` = 0.7, meaning jumps fire 72% more
+    /// often on average.
+    ///
+    /// Left unfunded that shows up as total volatility. At `c` = 0.7 on the
+    /// pt-v10 base it takes the 252-day panel to 14 of 14 and the 504-day
+    /// panel from 13 of 14 to 11, losing `annualised_vol_pct` at 34.9
+    /// against a ceiling of 34.0 and `sector_excess_corr` at 0.1058 against
+    /// a floor of 0.11 (§87).
+    ///
+    /// Fund it by scaling `jump_intensity_market` and `jump_intensity_idio`
+    /// by the reciprocal of the mean scale, which is derivable rather than
+    /// searched: 0.580 at `c` = 0.7, 0.491 at `c` = 1.0. That is the same
+    /// bookkeeping `idio_sigma_scale` does for the market factor's variance.
     pub jump_vix_coupling: f64,
     /// Cross-sectional spread in volatility persistence, in raw `beta`
     /// units. Zero is every preset before pt-v7 and is bit-identical.
