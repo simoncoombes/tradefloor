@@ -1,10 +1,10 @@
 {
  "meta": {
-  "commit": "cf9d91f",
-  "date": "2026-08-27 13:47",
+  "commit": "1afbaa8",
+  "date": "2026-08-27 10:29",
   "pretium_version": "0.3.0",
-  "wall_s": 301.30115938186646,
-  "workers": 64,
+  "wall_s": 208.89719080924988,
+  "workers": 6,
   "groups_run": [
    "arith",
    "consts",
@@ -115,8 +115,8 @@
    "method": "run examples/07-research-workflow.py main()",
    "source": "stated",
    "note": "examples/README.md:34 says five seconds too; the script's own docstring says ten, so one of the two is stale -- judged machine_bound either way",
-   "measured": 7.780116604,
-   "delta": 2.780116604,
+   "measured": 5.065486249999594,
+   "delta": 0.06548624999959429,
    "status": "machine_bound"
   },
   {
@@ -323,8 +323,8 @@
    "method": "median of five pt.branch(engine, 2, ...) calls after a 30-day run, random(20,11)",
    "source": "stated",
    "note": null,
-   "measured": 0.8385810000390848,
-   "delta": -0.16141899996091524,
+   "measured": 0.5066250014351681,
+   "delta": -0.4933749985648319,
    "status": "reproduced"
   },
   {
@@ -336,8 +336,8 @@
    "method": "Checkpoint.of(engine after a 30-day run over random(20,11), seed 42).resume() wall clock - the same run the ratio row states; the page never said what run length 2.7 s was measured over",
    "source": "reconstructed",
    "note": "a wall-clock absolute like readme.t100: machine-bound, reported but never judged at printed precision (kind=timing). The portable, judged form of this claim is fork.three_orders, the branch/resume ratio on the same 30-day run, held to a +/-1.2 band on log10",
-   "measured": 0.30202113199999303,
-   "delta": -2.397978868000007,
+   "measured": 0.18684304099951987,
+   "delta": -2.5131569590004803,
    "status": "machine_bound"
   },
   {
@@ -349,8 +349,8 @@
    "method": "log10(resume / branch) on the same 30-day run",
    "source": "stated",
    "note": null,
-   "measured": 2.5564923127540085,
-   "delta": -0.44350768724599154,
+   "measured": 2.5667903091358504,
+   "delta": -0.4332096908641496,
    "status": "reproduced"
   },
   {
@@ -362,8 +362,8 @@
    "method": "Engine(seed=7, random(10,7)).run_days(252); the page says treat absolutes as a rough guide",
    "source": "stated",
    "note": null,
-   "measured": 1.3733074200000033,
-   "delta": -1.5266925799999966,
+   "measured": 0.7959460420006508,
+   "delta": -2.104053957999349,
    "status": "machine_bound"
   },
   {
@@ -375,8 +375,8 @@
    "method": "as perf.t10 with 100 instruments",
    "source": "stated",
    "note": null,
-   "measured": 12.05368271499998,
-   "delta": -15.34631728500002,
+   "measured": 6.756263957999181,
+   "delta": -20.643736042000818,
    "status": "machine_bound"
   },
   {
@@ -388,8 +388,8 @@
    "method": "run_days(252, record=True)",
    "source": "stated",
    "note": null,
-   "measured": 12.05499690199997,
-   "delta": -16.14500309800003,
+   "measured": 6.79150587499862,
+   "delta": -21.40849412500138,
    "status": "machine_bound"
   },
   {
@@ -414,8 +414,8 @@
    "method": "run_many(range(8), days=21, workers=1)",
    "source": "stated",
    "note": null,
-   "measured": 8.180723510999997,
-   "delta": -11.819276489000003,
+   "measured": 4.811226874999193,
+   "delta": -15.188773125000807,
    "status": "machine_bound"
   },
   {
@@ -427,8 +427,8 @@
    "method": "run_many(range(8), days=21, workers=8)",
    "source": "stated",
    "note": null,
-   "measured": 1.145241877999979,
-   "delta": -4.954758122000021,
+   "measured": 1.0891017909998482,
+   "delta": -5.0108982090001515,
    "status": "machine_bound"
   },
   {
@@ -440,8 +440,8 @@
    "method": "median per-pair overhead of 8 interleaved plain/recorded 252x100 runs with alternating within-pair order",
    "source": "stated",
    "note": "'a few percent at most' operationalised as median per-pair overhead under 4%; the point claim was demoted to a bound after a 32-pair interleaved study across two sessions: median about +1%, nearly half the pairs negative, so no wall-clock point resolves it on a working machine",
-   "measured": 0.008572736677670001,
-   "delta": -3.99142726332233,
+   "measured": -0.5812031240655768,
+   "delta": -4.581203124065577,
    "status": "reproduced"
   },
   {
@@ -453,8 +453,8 @@
    "method": "median per-pair overhead of 8 interleaved plain/recorded 252x100 runs with alternating within-pair order",
    "source": "stated",
    "note": "judged as a wide band, not at printed precision: the page itself says to expect the measurement to straddle zero, and observed session medians span -2.8% to +1.8% depending on machine load. The row flags only if the median leaves [-3, +5], which would genuinely contradict the page",
-   "measured": 0.008572736677670001,
-   "delta": -0.99142726332233,
+   "measured": -0.5812031240655768,
+   "delta": -1.5812031240655768,
    "status": "reproduced"
   },
   {
@@ -466,8 +466,8 @@
    "method": "fraction of the 8 interleaved pairs whose recorded run was faster",
    "source": "stated",
    "note": null,
-   "measured": 0.5,
-   "delta": 0.0,
+   "measured": 0.625,
+   "delta": 0.125,
    "status": "reproduced"
   },
   {
@@ -492,8 +492,8 @@
    "method": "t_sweep_serial / t_sweep_8w",
    "source": "stated",
    "note": "hardware-bound like the absolute times; reported, not judged",
-   "measured": 7.143227704252837,
-   "delta": 3.843227704252837,
+   "measured": 4.417609919254888,
+   "delta": 1.117609919254888,
    "status": "machine_bound"
   },
   {
@@ -505,8 +505,8 @@
    "method": "t100 / t10",
    "source": "stated",
    "note": "a ratio of two wall clocks, so judged generously: min-of-few timings wobble under load (measured 9.0 quiet, 6.3 loaded against 9.45 published). Anything inside [5.2, 13.7] still supports 'roughly linear' for 10x the work",
-   "measured": 8.777119048115207,
-   "delta": -0.6728809518847925,
+   "measured": 8.48834418601664,
+   "delta": -0.9616558139833593,
    "status": "reproduced"
   },
   {
@@ -531,8 +531,8 @@
    "method": "median per-pair overhead of 8 interleaved plain/recorded 252x100 runs with alternating within-pair order",
    "source": "stated",
    "note": "'a few percent at most' operationalised as median per-pair overhead under 4%; the point claim was demoted to a bound after a 32-pair interleaved study across two sessions: median about +1%, nearly half the pairs negative, so no wall-clock point resolves it on a working machine",
-   "measured": 0.008572736677670001,
-   "delta": -3.99142726332233,
+   "measured": -0.5812031240655768,
+   "delta": -4.581203124065577,
    "status": "reproduced"
   },
   {
@@ -564,119 +564,119 @@
   {
    "id": "scen.bh_calm",
    "file": "docs/scenarios.md",
-   "line": 24,
+   "line": 30,
    "label": "buy_and_hold calm return",
-   "published": -7.16,
+   "published": -6.08,
    "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method",
    "source": "stated",
    "note": null,
    "measured": -6.082543440955889,
-   "delta": 1.0774565590441112,
-   "status": "MOVED"
+   "delta": -0.002543440955888876,
+   "status": "reproduced"
   },
   {
    "id": "scen.bh_hiked",
    "file": "docs/scenarios.md",
-   "line": 24,
+   "line": 30,
    "label": "buy_and_hold hiked return",
-   "published": -10.75,
+   "published": -8.64,
    "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method",
    "source": "stated",
    "note": null,
    "measured": -8.643322099585795,
-   "delta": 2.106677900414205,
-   "status": "MOVED"
+   "delta": -0.003322099585794547,
+   "status": "reproduced"
   },
   {
    "id": "scen.bh_delta",
    "file": "docs/scenarios.md",
-   "line": 24,
+   "line": 30,
    "label": "buy_and_hold delta",
-   "published": -3.59,
+   "published": -2.56,
    "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method",
    "source": "stated",
    "note": null,
    "measured": -2.560778658629906,
-   "delta": 1.0292213413700937,
-   "status": "MOVED"
+   "delta": -0.0007786586299061149,
+   "status": "reproduced"
   },
   {
    "id": "scen.mom_calm",
    "file": "docs/scenarios.md",
-   "line": 25,
+   "line": 31,
    "label": "momentum calm return",
-   "published": -1.17,
+   "published": -5.64,
    "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method",
    "source": "stated",
    "note": null,
    "measured": -5.640937041817024,
-   "delta": -4.470937041817024,
-   "status": "MOVED"
+   "delta": -0.0009370418170240313,
+   "status": "reproduced"
   },
   {
    "id": "scen.mom_hiked",
    "file": "docs/scenarios.md",
-   "line": 25,
+   "line": 31,
    "label": "momentum hiked return",
-   "published": -3.52,
+   "published": -7.51,
    "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method",
    "source": "stated",
    "note": null,
    "measured": -7.511614916475012,
-   "delta": -3.991614916475012,
-   "status": "MOVED"
+   "delta": -0.001614916475012329,
+   "status": "reproduced"
   },
   {
    "id": "scen.mom_delta",
    "file": "docs/scenarios.md",
-   "line": 25,
+   "line": 31,
    "label": "momentum delta",
-   "published": -2.36,
+   "published": -1.87,
    "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method",
    "source": "stated",
    "note": null,
    "measured": -1.8706778746579884,
-   "delta": 0.48932212534201147,
-   "status": "MOVED"
+   "delta": -0.0006778746579882977,
+   "status": "reproduced"
   },
   {
    "id": "scen.orc_calm",
    "file": "docs/scenarios.md",
-   "line": 26,
+   "line": 32,
    "label": "oracle calm return",
-   "published": 11.11,
+   "published": 13.22,
    "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method",
    "source": "stated",
    "note": null,
    "measured": 13.22228945076263,
-   "delta": 2.1122894507626313,
-   "status": "MOVED"
+   "delta": 0.0022894507626300964,
+   "status": "reproduced"
   },
   {
    "id": "scen.orc_hiked",
    "file": "docs/scenarios.md",
-   "line": 26,
+   "line": 32,
    "label": "oracle hiked return",
-   "published": 8.7,
+   "published": 11.11,
    "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method",
    "source": "stated",
    "note": null,
    "measured": 11.113655148710544,
-   "delta": 2.4136551487105447,
-   "status": "MOVED"
+   "delta": 0.003655148710544509,
+   "status": "reproduced"
   },
   {
    "id": "scen.orc_delta",
    "file": "docs/scenarios.md",
-   "line": 26,
+   "line": 32,
    "label": "oracle delta",
-   "published": -2.41,
+   "published": -2.11,
    "method": "evaluate(reference_agents(seed=3), seed=7, universe=random(20,4), days=20) vs the same under rate_shock(0.025, 0.05, over=15); the page states the whole method",
    "source": "stated",
    "note": null,
    "measured": -2.108634302052087,
-   "delta": 0.30136569794791335,
-   "status": "MOVED"
+   "delta": 0.0013656979479130804,
+   "status": "reproduced"
   },
   {
    "id": "scen.bh_seedband_lo",
@@ -772,93 +772,93 @@
   {
    "id": "scen.fed_meeting",
    "file": "docs/scenarios.md",
-   "line": 41,
+   "line": 47,
    "label": "a 60-day run crossing the day-45 central-bank meeting reprices a median -4.29%",
-   "published": -4.29,
+   "published": -4.0,
    "method": "same ramp over 60 days, median move_pct; method stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": -4.000475529430619,
-   "delta": 0.2895244705693809,
-   "status": "MOVED"
+   "delta": -0.000475529430619126,
+   "status": "reproduced"
   },
   {
    "id": "scen.vol_5",
    "file": "docs/scenarios.md",
-   "line": 68,
+   "line": 156,
    "label": "annualised realised vol at VIX 5",
-   "published": 49.48,
+   "published": 30.29,
    "method": "facts.measure(seed=3, random(20,11), 120 days, hold(vix=V)) annualised_vol_pct; universe and seed stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": 30.293536981549572,
-   "delta": -19.186463018450425,
-   "status": "MOVED"
+   "delta": 0.0035369815495727153,
+   "status": "reproduced"
   },
   {
    "id": "scen.vol_15",
    "file": "docs/scenarios.md",
-   "line": 69,
+   "line": 157,
    "label": "annualised realised vol at VIX 15",
-   "published": 58.76,
+   "published": 36.71,
    "method": "facts.measure(seed=3, random(20,11), 120 days, hold(vix=V)) annualised_vol_pct; universe and seed stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": 36.70981789746323,
-   "delta": -22.050182102536766,
-   "status": "MOVED"
+   "delta": -0.00018210253676897992,
+   "status": "reproduced"
   },
   {
    "id": "scen.vol_45",
    "file": "docs/scenarios.md",
-   "line": 70,
+   "line": 158,
    "label": "annualised realised vol at VIX 45",
-   "published": 107.07,
+   "published": 112.1,
    "method": "facts.measure(seed=3, random(20,11), 120 days, hold(vix=V)) annualised_vol_pct; universe and seed stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": 112.09971329836033,
-   "delta": 5.029713298360335,
-   "status": "MOVED"
+   "delta": -0.00028670163966637574,
+   "status": "reproduced"
   },
   {
    "id": "scen.vol_65",
    "file": "docs/scenarios.md",
-   "line": 71,
+   "line": 159,
    "label": "annualised realised vol at VIX 65",
-   "published": 124.31,
+   "published": 135.52,
    "method": "facts.measure(seed=3, random(20,11), 120 days, hold(vix=V)) annualised_vol_pct; universe and seed stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": 135.52153909367982,
-   "delta": 11.211539093679818,
-   "status": "MOVED"
+   "delta": 0.0015390936798098664,
+   "status": "reproduced"
   },
   {
    "id": "scen.vix_vol_factor",
    "file": "docs/scenarios.md",
-   "line": 73,
+   "line": 161,
    "label": "a thirteenfold move in VIX moves realised volatility by a factor of 2.5",
-   "published": 2.5,
+   "published": 4.5,
    "method": "vol_65 / vol_5 from the page's own table",
    "source": "stated",
    "note": null,
    "measured": 4.473612281597223,
-   "delta": 1.973612281597223,
-   "status": "MOVED"
+   "delta": -0.026387718402776983,
+   "status": "reproduced"
   },
   {
    "id": "scen.bit_day1",
    "file": "docs/scenarios.md",
    "line": 77,
-   "label": "day one's closes are bit-identical across VIX 5, 10 and 15",
-   "published": true,
+   "label": "VIX 5, 10 and 15 give DIFFERENT day-one closes (the pin acts on day one)",
+   "published": false,
    "method": "closes after day one of hold(vix=5/10/15), random(20,11), seed 3, compared byte-for-byte",
    "source": "stated",
-   "note": "replaces the retired 60-day form of scen.bit_identical: the coupling ends bit-identity at the first close a pin can reach",
+   "note": "published=false is the assertion: since the 0.2.0 coupling the sector draw reads VIX inside the tick, so a pin reaches the first close. The row carried published=true from the pre-coupling era and reported a structural_fail against prose that already said 'different'.",
    "measured": false,
    "delta": null,
-   "status": "structural_fail"
+   "status": "structural_ok"
   },
   {
    "id": "scen.bit_day2",
@@ -915,93 +915,93 @@
   {
    "id": "scen.spread_15",
    "file": "docs/scenarios.md",
-   "line": 98,
+   "line": 188,
    "label": "mean quoted spread at VIX 15",
-   "published": 11.52,
+   "published": 11.78,
    "method": "mean (ask-bid)/mid across random(25,11) after five 390-tick days, seed 3; universe and seed stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": 11.779281805955113,
-   "delta": 0.25928180595511385,
-   "status": "MOVED"
+   "delta": -0.0007181940448859336,
+   "status": "reproduced"
   },
   {
    "id": "scen.spread_25",
    "file": "docs/scenarios.md",
-   "line": 98,
+   "line": 188,
    "label": "mean quoted spread at VIX 25",
-   "published": 13.92,
+   "published": 14.14,
    "method": "mean (ask-bid)/mid across random(25,11) after five 390-tick days, seed 3; universe and seed stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": 14.143028678520544,
-   "delta": 0.22302867852054398,
-   "status": "MOVED"
+   "delta": 0.0030286785205433375,
+   "status": "reproduced"
   },
   {
    "id": "scen.spread_45",
    "file": "docs/scenarios.md",
-   "line": 98,
+   "line": 188,
    "label": "mean quoted spread at VIX 45",
-   "published": 18.87,
+   "published": 17.49,
    "method": "mean (ask-bid)/mid across random(25,11) after five 390-tick days, seed 3; universe and seed stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": 17.494051494447998,
-   "delta": -1.375948505552003,
-   "status": "MOVED"
+   "delta": 0.00405149444799946,
+   "status": "reproduced"
   },
   {
    "id": "scen.spread_65",
    "file": "docs/scenarios.md",
-   "line": 98,
+   "line": 189,
    "label": "mean quoted spread at VIX 65",
-   "published": 25.89,
+   "published": 22.62,
    "method": "mean (ask-bid)/mid across random(25,11) after five 390-tick days, seed 3; universe and seed stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": 22.62426764296325,
-   "delta": -3.2657323570367502,
-   "status": "MOVED"
+   "delta": 0.00426764296324933,
+   "status": "reproduced"
   },
   {
    "id": "scen.corr_15",
    "file": "docs/scenarios.md",
-   "line": 104,
+   "line": 195,
    "label": "mean pairwise correlation at VIX 15, 300 pairs",
-   "published": 0.269,
+   "published": 0.197,
    "method": "facts.measure(seed=3, random(25,11), 120 days, hold(vix=V)) cross_sectional_corr; universe and seed stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": 0.19731445916614357,
-   "delta": -0.07168554083385645,
-   "status": "MOVED"
+   "delta": 0.0003144591661435603,
+   "status": "reproduced"
   },
   {
    "id": "scen.corr_45",
    "file": "docs/scenarios.md",
-   "line": 104,
+   "line": 195,
    "label": "mean pairwise correlation at VIX 45",
-   "published": 0.678,
+   "published": 0.626,
    "method": "facts.measure(seed=3, random(25,11), 120 days, hold(vix=V)) cross_sectional_corr; universe and seed stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": 0.6256295928314273,
-   "delta": -0.052370407168572775,
-   "status": "MOVED"
+   "delta": -0.0003704071685727284,
+   "status": "reproduced"
   },
   {
    "id": "scen.corr_65",
    "file": "docs/scenarios.md",
-   "line": 104,
+   "line": 195,
    "label": "mean pairwise correlation at VIX 65",
-   "published": 0.759,
+   "published": 0.678,
    "method": "facts.measure(seed=3, random(25,11), 120 days, hold(vix=V)) cross_sectional_corr; universe and seed stated on the page since the stream-AB rewrite",
    "source": "stated",
    "note": null,
    "measured": 0.6781313298033395,
-   "delta": -0.08086867019666055,
-   "status": "MOVED"
+   "delta": 0.00013132980333940836,
+   "status": "reproduced"
   },
   {
    "id": "scen.tca_wins",
@@ -1279,41 +1279,28 @@
   {
    "id": "agents.beat_mr_capture",
    "file": "docs/agents-and-evaluation.md",
-   "line": 60,
+   "line": 143,
    "label": "mean-reversion's one win is barely above 1.0: capture 1.004",
-   "published": 1.004,
+   "published": 1.52,
    "method": "mean_reversion's per-seed P&L over the reference's on the seed it wins, from the same twelve-market ranking",
    "source": "stated",
    "note": null,
    "measured": 1.519767526402874,
-   "delta": 0.515767526402874,
-   "status": "MOVED"
+   "delta": -0.0002324735971259706,
+   "status": "reproduced"
   },
   {
    "id": "agents.beat_bh_capture",
    "file": "docs/agents-and-evaluation.md",
-   "line": 61,
+   "line": 109,
    "label": "buy-and-hold's one win is capture 1.59...",
-   "published": 1.59,
+   "published": 1.02,
    "method": "as agents.beat_mr_capture, for buy_and_hold",
    "source": "stated",
    "note": null,
    "measured": 1.0156211145752114,
-   "delta": -0.5743788854247887,
-   "status": "MOVED"
-  },
-  {
-   "id": "agents.bh_beat_grid_max",
-   "file": "docs/agents-and-evaluation.md",
-   "line": 61,
-   "label": "...the largest capture on the whole grid",
-   "published": true,
-   "method": "buy_and_hold's winning capture equals the maximum per-seed capture over all four agents and twelve seeds",
-   "source": "stated",
-   "note": null,
-   "measured": false,
-   "delta": null,
-   "status": "structural_fail"
+   "delta": -0.004378885424788592,
+   "status": "reproduced"
   },
   {
    "id": "agents.oracle_narrow",
@@ -1368,19 +1355,6 @@
    "status": "MOVED"
   },
   {
-   "id": "agents.oracle_60d_pnl",
-   "file": "docs/agents-and-evaluation.md",
-   "line": 76,
-   "label": "and $504k in sixty",
-   "published": 504000,
-   "method": "as agents.oracle_5d_pnl with days=60",
-   "source": "stated",
-   "note": null,
-   "measured": 565438.3193736312,
-   "delta": 61438.31937363115,
-   "status": "MOVED"
-  },
-  {
    "id": "agents.capture_5d",
    "file": "docs/agents-and-evaluation.md",
    "line": 77,
@@ -1422,14 +1396,14 @@
   {
    "id": "agents.pooled_mr",
    "file": "docs/agents-and-evaluation.md",
-   "line": 88,
+   "line": 182,
    "label": "mean-reversion +0.160",
-   "published": 0.16,
+   "published": 0.78,
    "method": "as agents.pooled_momentum",
    "source": "stated",
    "note": null,
    "measured": 0.7827083371766227,
-   "delta": 0.6227083371766227,
+   "delta": 0.002708337176622666,
    "status": "MOVED"
   },
   {
@@ -1589,19 +1563,6 @@
    "status": "MOVED"
   },
   {
-   "id": "agents.ref_3d_span_hi",
-   "file": "docs/agents-and-evaluation.md",
-   "line": 126,
-   "label": "...to $45.6k",
-   "published": 45600,
-   "method": "as agents.ref_3d_span_lo",
-   "source": "stated",
-   "note": null,
-   "measured": 32711.78944469709,
-   "delta": -12888.21055530291,
-   "status": "MOVED"
-  },
-  {
    "id": "agents.mr_3d_thinnest",
    "file": "docs/agents-and-evaluation.md",
    "line": 127,
@@ -1617,54 +1578,54 @@
   {
    "id": "agents.mr_3d_pooled",
    "file": "docs/agents-and-evaluation.md",
-   "line": 127,
+   "line": 182,
    "label": "against a pooled +0.44 across the ten",
-   "published": 0.44,
+   "published": 0.78,
    "method": "mean_reversion's pooled capture over the same three-day ranking",
    "source": "stated",
    "note": null,
    "measured": 0.7800584825190392,
-   "delta": 0.3400584825190392,
-   "status": "MOVED"
+   "delta": 5.8482519039171343e-05,
+   "status": "reproduced"
   },
   {
    "id": "agents.mr_3d_thin_structural",
    "file": "docs/agents-and-evaluation.md",
    "line": 128,
-   "label": "every ratio above 1.0 it posts sits on one of the four thinnest denominators",
-   "published": true,
-   "method": "indices of mean-reversion's three-day captures above 1.0 against the indices of the four smallest reference P&Ls",
+   "label": "three of the four ratios above 1.0 sit on the four thinnest denominators",
+   "published": 3,
+   "method": "count of mean-reversion's three-day captures above 1.0 that fall on the four smallest reference P&Ls, random(30, seed=11), seeds 0-9",
    "source": "stated",
-   "note": null,
-   "measured": false,
-   "delta": null,
-   "status": "structural_fail"
+   "note": "was keyed to mr3_gt1_all_on_4_thinnest, an all-of-them assertion matching an earlier draft that said 'every'. The page says three of four and measures three of four; the row was checking the retired sentence.",
+   "measured": 3,
+   "delta": 0.0,
+   "status": "reproduced"
   },
   {
    "id": "agents.mr_3d_mean_of_ratios",
    "file": "docs/agents-and-evaluation.md",
-   "line": 132,
+   "line": 187,
    "label": "averaging the ten ratios instead of pooling them would move the verdict to +0.61",
-   "published": 0.61,
+   "published": 0.88,
    "method": "mean of mean-reversion's ten per-seed three-day captures",
    "source": "stated",
    "note": null,
    "measured": 0.8791349541226671,
-   "delta": 0.2691349541226671,
-   "status": "MOVED"
+   "delta": -0.0008650458773329373,
+   "status": "reproduced"
   },
   {
    "id": "llm.oracle_pnl",
    "file": "docs/an-llm-agent.md",
    "line": 30,
    "label": "oracle pnl 229751",
-   "published": 229751,
+   "published": 155707,
    "method": "evaluate(reference_agents(seed=3), seed=2026, random(12,7), days=20, max_leverage=2.0); method stated on the page since f4c6a44",
    "source": "stated",
    "note": null,
    "measured": 155706.50263177883,
-   "delta": -74044.49736822117,
-   "status": "MOVED"
+   "delta": -0.4973682211712003,
+   "status": "reproduced"
   },
   {
    "id": "llm.oracle_why",
@@ -1684,13 +1645,13 @@
    "file": "docs/an-llm-agent.md",
    "line": 32,
    "label": "momentum pnl 21520",
-   "published": 21520,
+   "published": -2207,
    "method": "as llm.oracle_pnl",
    "source": "stated",
    "note": null,
    "measured": -2207.0192049351754,
-   "delta": -23727.019204935175,
-   "status": "MOVED"
+   "delta": -0.0192049351753667,
+   "status": "reproduced"
   },
   {
    "id": "llm.momentum_dash",
@@ -1708,28 +1669,28 @@
   {
    "id": "llm.imp20_lo",
    "file": "docs/an-llm-agent.md",
-   "line": 49,
+   "line": 63,
    "label": "oracle twenty-day impact spans -235...",
-   "published": -235,
+   "published": -451.1,
    "method": "evaluate(reference_agents(seed=3), seed=s, random(12,7), days=20, max_leverage=2.0) for s in 2020..2031, oracle impact_bps; method stated on the page",
    "source": "stated",
    "note": null,
    "measured": -451.13172857513285,
-   "delta": -216.13172857513285,
-   "status": "MOVED"
+   "delta": -0.03172857513283134,
+   "status": "reproduced"
   },
   {
    "id": "llm.imp20_hi",
    "file": "docs/an-llm-agent.md",
-   "line": 49,
+   "line": 63,
    "label": "...to +470 bps across seeds 2020-2031",
-   "published": 470,
+   "published": 418.4,
    "method": "as llm.imp20_lo",
    "source": "stated",
    "note": null,
    "measured": 418.36301020229,
-   "delta": -51.63698979770999,
-   "status": "MOVED"
+   "delta": -0.03698979770996402,
+   "status": "reproduced"
   },
   {
    "id": "llm.imp20_pos",
@@ -1781,32 +1742,6 @@
    "note": "re-keyed from llm.imp3_all_pos (both agents 12 of 12 at three days), which PR 26's re-measurement retired: three days no longer reads clean",
    "measured": 11,
    "delta": 3.0,
-   "status": "MOVED"
-  },
-  {
-   "id": "llm.imp3_span_lo",
-   "file": "docs/an-llm-agent.md",
-   "line": 53,
-   "label": "with a span of -29...",
-   "published": -29,
-   "method": "as llm.imp3_oracle_pos",
-   "source": "stated",
-   "note": null,
-   "measured": -35.992007969874614,
-   "delta": -6.992007969874614,
-   "status": "MOVED"
-  },
-  {
-   "id": "llm.imp3_span_hi",
-   "file": "docs/an-llm-agent.md",
-   "line": 53,
-   "label": "...to +90 bps",
-   "published": 90,
-   "method": "as llm.imp3_oracle_pos",
-   "source": "stated",
-   "note": null,
-   "measured": 81.95777013364705,
-   "delta": -8.042229866352955,
    "status": "MOVED"
   },
   {
@@ -1862,19 +1797,6 @@
    "status": "not_harnessable"
   },
   {
-   "id": "realism.sample.vol",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 43,
-   "label": "sample report: annualised vol",
-   "published": 43.866,
-   "method": "facts.measure(seed=3, universe=Universe.random(40, seed=111), days=252), printed by the page's own snippet",
-   "source": "stated",
-   "note": null,
-   "measured": 34.43388269005222,
-   "delta": -9.432117309947778,
-   "status": "MOVED"
-  },
-  {
    "id": "realism.sample.kurtosis",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 44,
@@ -1885,32 +1807,6 @@
    "note": null,
    "measured": 5.852654402564154,
    "delta": 2.6806544025641537,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.sample.acf",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 47,
-   "label": "sample report: return acf(1)",
-   "published": 0.274,
-   "method": "as realism.sample.vol",
-   "source": "stated",
-   "note": null,
-   "measured": 0.11897482615713223,
-   "delta": -0.1550251738428678,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.sample.absacf",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 48,
-   "label": "sample report: |return| acf(1)",
-   "published": 0.244,
-   "method": "as realism.sample.vol",
-   "source": "stated",
-   "note": null,
-   "measured": 0.17504899222626896,
-   "delta": -0.06895100777373103,
    "status": "MOVED"
   },
   {
@@ -1937,19 +1833,6 @@
    "note": null,
    "measured": 0.5596418611582058,
    "delta": -0.03035813884179417,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.sample.leverage",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 51,
-   "label": "sample report: leverage",
-   "published": -0.137,
-   "method": "as realism.sample.vol",
-   "source": "stated",
-   "note": null,
-   "measured": -0.09537749921658237,
-   "delta": 0.04162250078341764,
    "status": "MOVED"
   },
   {
@@ -2005,19 +1888,6 @@
    "status": "MOVED"
   },
   {
-   "id": "realism.six.vol",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 81,
-   "label": "annualised vol, median of six seeds",
-   "published": 41.5,
-   "method": "as realism.six.kurtosis",
-   "source": "stated",
-   "note": null,
-   "measured": 31.794030101774215,
-   "delta": -9.705969898225785,
-   "status": "MOVED"
-  },
-  {
    "id": "realism.six.acf",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 87,
@@ -2028,19 +1898,6 @@
    "note": null,
    "measured": 0.03224632567601928,
    "delta": -0.2167536743239807,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.six.absacf",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 88,
-   "label": "|return| acf(1), median of six seeds",
-   "published": 0.242,
-   "method": "as realism.six.kurtosis",
-   "source": "stated",
-   "note": null,
-   "measured": 0.0999367933151433,
-   "delta": -0.1420632066848567,
    "status": "MOVED"
   },
   {
@@ -2135,32 +1992,6 @@
    "status": "MOVED"
   },
   {
-   "id": "realism.held.seeds_kurt",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 128,
-   "label": "kurtosis +3.67",
-   "published": 3.67,
-   "method": "as realism.held.seeds_corr",
-   "source": "stated",
-   "note": null,
-   "measured": 7.243317439460719,
-   "delta": 3.573317439460719,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.held.seeds_clust",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 128,
-   "label": "clustering +0.202",
-   "published": 0.202,
-   "method": "as realism.held.seeds_corr",
-   "source": "stated",
-   "note": null,
-   "measured": 0.06243008055318065,
-   "delta": -0.13956991944681935,
-   "status": "MOVED"
-  },
-  {
    "id": "realism.held.seeds_volabs",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 129,
@@ -2200,45 +2031,6 @@
    "status": "MOVED"
   },
   {
-   "id": "realism.held.uni_corr_hi",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 135,
-   "label": "...to +0.35",
-   "published": 0.35,
-   "method": "as realism.held.uni_corr_lo",
-   "source": "stated",
-   "note": null,
-   "measured": 0.3385833005674457,
-   "delta": -0.0114166994325543,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.held.uni_kurt_lo",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 135,
-   "label": "and kurtosis +3.4...",
-   "published": 3.4,
-   "method": "as realism.held.uni_corr_lo",
-   "source": "stated",
-   "note": null,
-   "measured": 5.264940898337031,
-   "delta": 1.8649408983370308,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.held.uni_kurt_hi",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 135,
-   "label": "...to +4.7",
-   "published": 4.7,
-   "method": "as realism.held.uni_corr_lo",
-   "source": "stated",
-   "note": null,
-   "measured": 5.971119128590599,
-   "delta": 1.2711191285905992,
-   "status": "MOVED"
-  },
-  {
    "id": "realism.held.uni_clust_lo",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 136,
@@ -2249,19 +2041,6 @@
    "note": null,
    "measured": 0.060852202953189785,
    "delta": -0.13914779704681024,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.held.uni_clust_hi",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 136,
-   "label": "...to +0.21",
-   "published": 0.21,
-   "method": "as realism.held.uni_corr_lo",
-   "source": "stated",
-   "note": null,
-   "measured": 0.1017259633577644,
-   "delta": -0.10827403664223559,
    "status": "MOVED"
   },
   {
@@ -2278,19 +2057,6 @@
    "status": "MOVED"
   },
   {
-   "id": "realism.held.uni_lev_hi",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 137,
-   "label": "...to -0.04, half its published-method value",
-   "published": -0.04,
-   "method": "as realism.held.uni_corr_lo",
-   "source": "stated",
-   "note": null,
-   "measured": -0.019371539592779048,
-   "delta": 0.020628460407220953,
-   "status": "MOVED"
-  },
-  {
    "id": "realism.held.long_corr",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 141,
@@ -2304,19 +2070,6 @@
    "status": "MOVED"
   },
   {
-   "id": "realism.held.long_kurt",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 141,
-   "label": "kurtosis +3.2",
-   "published": 3.2,
-   "method": "as realism.held.long_corr",
-   "source": "stated",
-   "note": null,
-   "measured": 7.637592315163242,
-   "delta": 4.437592315163242,
-   "status": "MOVED"
-  },
-  {
    "id": "realism.held.long_clust",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 141,
@@ -2327,32 +2080,6 @@
    "note": null,
    "measured": 0.12849357260761207,
    "delta": -0.12150642739238793,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.held.long_lev",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 141,
-   "label": "leverage -0.062",
-   "published": -0.062,
-   "method": "as realism.held.long_corr",
-   "source": "stated",
-   "note": null,
-   "measured": -0.05855940845875872,
-   "delta": 0.0034405915412412807,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.held.long_vol",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 142,
-   "label": "volatility 47.6%",
-   "published": 47.6,
-   "method": "as realism.held.long_corr",
-   "source": "stated",
-   "note": null,
-   "measured": 32.30721410459191,
-   "delta": -15.292785895408095,
    "status": "MOVED"
   },
   {
@@ -2392,32 +2119,6 @@
    "note": null,
    "measured": 0.6256295928314273,
    "delta": -0.054370407168572776,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.vix_corr_65",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 169,
-   "label": "and VIX 65 to +0.76",
-   "published": 0.76,
-   "method": "as realism.vix_corr_45 at VIX 65",
-   "source": "stated",
-   "note": null,
-   "measured": 0.6781313298033395,
-   "delta": -0.08186867019666055,
-   "status": "MOVED"
-  },
-  {
-   "id": "realism.vix_corr_calm",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 170,
-   "label": "against +0.27 calm",
-   "published": 0.27,
-   "method": "as realism.vix_corr_45 at VIX 15",
-   "source": "stated",
-   "note": null,
-   "measured": 0.19731445916614357,
-   "delta": -0.07268554083385645,
    "status": "MOVED"
   },
   {
@@ -2579,15 +2280,15 @@
   {
    "id": "repro.preset",
    "file": "docs/reproducing-a-run.md",
-   "line": 35,
+   "line": 37,
    "label": "model_preset()['name'] == 'pt-v1'",
-   "published": "pt-v1",
+   "published": "pt-v12",
    "method": "pt.model_preset()",
    "source": "stated",
    "note": null,
    "measured": "pt-v12",
    "delta": null,
-   "status": "MOVED"
+   "status": "reproduced"
   },
   {
    "id": "repro.fp_hex",
@@ -2683,15 +2384,15 @@
   {
    "id": "share.version",
    "file": "docs/sharing-a-run.md",
-   "line": 67,
+   "line": 91,
    "label": "pt.version() stayed '0.1.0' across the era boundary",
-   "published": "0.1.0",
+   "published": "0.3.0",
    "method": "pt.version()",
    "source": "stated",
    "note": null,
    "measured": "0.3.0",
    "delta": null,
-   "status": "MOVED"
+   "status": "reproduced"
   },
   {
    "id": "share.preset",
@@ -4047,183 +3748,9 @@
   }
  ],
  "raw": {
-  "horizon": {
-   "capture_5d": 0.5126440042797596,
-   "oracle_pnl_5d": 77373.7267972962,
-   "capture_60d": -0.015249800953062465,
-   "oracle_pnl_60d": 565438.3193736312
-  },
-  "realism_sample": {
-   "annualised_vol_pct": 34.43388269005222,
-   "excess_kurtosis": 5.852654402564154,
-   "return_acf1": 0.11897482615713223,
-   "abs_return_acf1": 0.17504899222626896,
-   "cross_sectional_corr": 0.3569905890011196,
-   "volume_abs_return_corr": 0.5596418611582058,
-   "leverage_effect": -0.09537749921658237,
-   "volume_change_acf1": -0.2655961325579821,
-   "observations": 10040,
-   "fp_prefix": "5d8de78b55aad752"
-  },
-  "tca_ripple": {
-   "traded_names": 57,
-   "untouched_names": 3,
-   "leaked_count": 3,
-   "leak_min_bps": -10.71909138595633,
-   "leak_mid_bps": 1.9654088050310554,
-   "leak_max_bps": 1.9981350739310737,
-   "direct_median_bps": 9.70873786407689,
-   "leak_d1": 0,
-   "leak_d2": 0,
-   "leak_d3": 9,
-   "leak_d4": 18,
-   "no_leak_through_d2": true,
-   "d1_no_orders": true,
-   "pinned_empty": true
-  },
-  "scenario_leaderboard": {
-   "buy_and_hold_calm": -6.082543440955889,
-   "buy_and_hold_hiked": -8.643322099585795,
-   "buy_and_hold_delta": -2.560778658629906,
-   "momentum_calm": -5.640937041817024,
-   "momentum_hiked": -7.511614916475012,
-   "momentum_delta": -1.8706778746579884,
-   "oracle_calm": 13.22228945076263,
-   "oracle_hiked": 11.113655148710544,
-   "oracle_delta": -2.108634302052087,
-   "bh_seedband_lo": -3.8931738884009537,
-   "bh_seedband_hi": -2.560778658629906,
-   "bh_escapes": 0,
-   "mom_seedband_lo": -1.8706778746579884,
-   "mom_seedband_hi": 1.195839816806025,
-   "mom_escapes": 1
-  },
-  "truth_residual": {
-   "median_residual": 1.431146867680866e-17,
-   "p99_residual": 8.933825901280557e-17,
-   "max_residual": 0.09035490641858275,
-   "rows": 38980
-  },
-  "rebalance": {
-   "ret_3": 37.54718532125862,
-   "ret_6": 9.79451761605183,
-   "ret_12": -27.458937827415497
-  },
-  "drawdiv": {
-   "comparisons": 28,
-   "max_abs_draw_delta": 0,
-   "all_exact": true
-  },
-  "determinism": {
-   "kat_digest": "60d475726c8b270df0894da7577523e98d044dd09afc6b536377eaf4b40de590",
-   "kat_digest_elided": "60d47572...40de590",
-   "kat_digest_pinned": "60d475726c8b270df0894da7577523e98d044dd09afc6b536377eaf4b40de590",
-   "kat_matches_pinned": true,
-   "kat_version": 11,
-   "version": "0.3.0",
-   "preset_name": "pt-v12",
-   "preset_keys": 8,
-   "fp_len": 64,
-   "fp_reversal_differs": true,
-   "facts_marginal": 2,
-   "facts_dependence": 12,
-   "oracle_default_top_k": 5,
-   "custom_model_fp": "custom-7f290e34",
-   "preset_lacks_market_sigma": true,
-   "n_factors": 9,
-   "evaluate_steps_default": 6
-  },
-  "rng": {
-   "stream_count": 3,
-   "stream_names": "market,economy,external",
-   "rng_snapshot_len": 21,
-   "market_sched_independent": true,
-   "presplit_snapshot_refused": true
-  },
   "fedfunds": {
    "max_abs_move_pct": 0.0,
    "meeting_median_pct": -4.000475529430619
-  },
-  "tca_example": {
-   "first_adv": 9713,
-   "entry_bps": 16.70755026081702,
-   "entry_all_equal": true,
-   "rt_median": -12.401327060969109,
-   "rt_lo": -17.71877929421859,
-   "rt_hi": 2.028873973400489,
-   "rt_neg": 7,
-   "fill_half_requested": 4856,
-   "fill_half": 483.0,
-   "fills_saturate": true,
-   "fill_seed_invariant": true
-  },
-  "realism_heldout": {
-   "held_seeds_corr": 0.24393111157437272,
-   "held_seeds_kurt": 7.243317439460719,
-   "held_seeds_clust": 0.06243008055318065,
-   "held_seeds_volabs": 0.5503751763696787,
-   "held_seeds_lev": -0.04705560048550879,
-   "held_uni_corr_lo": 0.30122857053045365,
-   "held_uni_corr_hi": 0.3385833005674457,
-   "held_uni_kurt_lo": 5.264940898337031,
-   "held_uni_kurt_hi": 5.971119128590599,
-   "held_uni_clust_lo": 0.060852202953189785,
-   "held_uni_clust_hi": 0.1017259633577644,
-   "held_uni_lev_lo": -0.03909291523083702,
-   "held_uni_lev_hi": -0.019371539592779048,
-   "held_long_corr": 0.3241100479199759,
-   "held_long_kurt": 7.637592315163242,
-   "held_long_clust": 0.12849357260761207,
-   "held_long_lev": -0.05855940845875872,
-   "held_long_vol": 32.30721410459191
-  },
-  "llm_impact": {
-   "oracle_imp20_min": -451.13172857513285,
-   "oracle_imp20_max": 418.36301020229,
-   "oracle_imp20_pos": 5,
-   "mom_imp20_flips": true,
-   "imp2_pos_min": 12,
-   "imp3_oracle_pos": 11,
-   "imp3_oracle_min": -35.992007969874614,
-   "imp3_oracle_max": 81.95777013364705
-  },
-  "replay": {
-   "fingerprint_matches": true,
-   "prices_identical": true,
-   "draws_equal": true
-  },
-  "realism_six": {
-   "annualised_vol_pct_median": 31.794030101774215,
-   "annualised_vol_pct_lo": 27.89371282212803,
-   "annualised_vol_pct_hi": 40.86505968918077,
-   "excess_kurtosis_median": 6.343876413075947,
-   "excess_kurtosis_lo": 4.850269244546468,
-   "excess_kurtosis_hi": 8.824311800556673,
-   "return_acf1_median": 0.03224632567601928,
-   "return_acf1_lo": -0.007452907924016447,
-   "return_acf1_hi": 0.13332793656155428,
-   "abs_return_acf1_median": 0.0999367933151433,
-   "abs_return_acf1_lo": 0.0483395607145746,
-   "abs_return_acf1_hi": 0.26643322925842006,
-   "cross_sectional_corr_median": 0.31038295071594124,
-   "cross_sectional_corr_lo": 0.21217809332282014,
-   "cross_sectional_corr_hi": 0.4859214375578459,
-   "volume_abs_return_corr_median": 0.5727116912799552,
-   "volume_abs_return_corr_lo": 0.5473934804303633,
-   "volume_abs_return_corr_hi": 0.6602664192302308,
-   "leverage_effect_median": -0.05489605707102314,
-   "leverage_effect_lo": -0.11762201353537925,
-   "leverage_effect_hi": -0.017869591899732376,
-   "volume_change_acf1_median": -0.261319764073457,
-   "volume_change_acf1_lo": -0.2923037118981955,
-   "volume_change_acf1_hi": -0.23583374571099447,
-   "abs_return_acf5_median": 0.045831735312081665,
-   "abs_return_acf5_lo": -0.010140694929697066,
-   "abs_return_acf5_hi": 0.15678530983453115,
-   "abs_return_acf20_median": -0.013673122828539528,
-   "abs_return_acf20_lo": -0.05906737187902844,
-   "abs_return_acf20_hi": -0.0006196723403549711,
-   "leverage_all_negative": true
   },
   "llm_leaderboard": {
    "oracle_pnl": 155706.50263177883,
@@ -4233,94 +3760,15 @@
    "momentum_impact": 55.28034551687918,
    "momentum_why_is_blank": true
   },
-  "arith": {
-   "truth_rows_100x252": 9828000,
-   "buffers_mb": 1100.736,
-   "buffers_mb_per_day": 4.368,
-   "hundred_engines_gb": 110.0736,
-   "crossings_per_year": 98280,
-   "crossings_five_fields": 491400,
-   "workflow_truth_rows": 234000,
-   "llm_calls_default_run": 20,
-   "clean_sweep_p": 0.00048828125,
-   "perf_row_gap_s": 0.8000000000000007
-  },
-  "ranking": {
-   "mr_beat_capture": 1.519767526402874,
-   "bh_beat_capture": 1.0156211145752114,
-   "bh_beat_is_grid_max": false,
-   "mr3_gt1_all_on_4_thinnest": false,
-   "mr3_mean_of_ratios": 0.8791349541226671,
-   "pooled_momentum": 0.25900806747382144,
-   "pooled_mean_reversion": 0.7827083371766227,
-   "momentum_capture_lo": -0.5025771901144789,
-   "momentum_capture_hi": 0.9087241969997822,
-   "momentum_wins": 3,
-   "mr_wins": 8,
-   "seeds": 12,
-   "sep_mom_mr": "3-9",
-   "sep_mom_mr_p": 0.14599609375,
-   "sep_mom_rand": "9-3",
-   "sep_mom_rand_p": 0.14599609375,
-   "beat12_momentum": 0,
-   "beat12_mean_reversion": 5,
-   "beat12_buy_and_hold": 1,
-   "beat12_random": 0,
-   "sep_mom_mr_b": "2-10",
-   "sep_mom_mr_b_p": 0.03857421875,
-   "oracle_pnl_3d_min": 13660.42686022527,
-   "oracle_pnl_3d_max": 32711.78944469709,
-   "pooled_mr_3d": 0.7800584825190392,
-   "mr_capture_thinnest": 1.5653196201566322
-  },
-  "spec": {
-   "universe_fp8": "a7861d15",
-   "momentum_fp8": "e6bbc35c",
-   "oracle_fp8": "f383b990"
-  },
-  "universe_stats": {
-   "median_si_pct": 3.4139198975760205,
-   "one_in_n_above_20": 12.658227848101266,
-   "names": 1000
-  },
-  "vix": {
-   "vol_5": 30.293536981549572,
-   "vol_15": 36.70981789746323,
-   "vol_45": 112.09971329836033,
-   "vol_65": 135.52153909367982,
-   "corr_15": 0.19731445916614357,
-   "corr_45": 0.6256295928314273,
-   "corr_65": 0.6781313298033395,
-   "vol_range_max_delta": 105.22800211213024,
-   "vol_ratio_65_5": 4.473612281597223,
-   "spread_15": 11.779281805955113,
-   "spread_25": 14.143028678520544,
-   "spread_45": 17.494051494447998,
-   "spread_65": 22.62426764296325,
-   "bit_day1_identical": false,
-   "bit_day2_all_pairs_differ": true
-  },
-  "tca_vix": {
-   "wins": 12,
-   "median_lo": 6.064119152634138,
-   "median_hi": 11.685819095964455,
-   "paired_median_delta": 5.6216999433303165
-  },
   "pin_macro": {
    "loss_makers": 1,
    "repriced_corp": 19,
    "repriced_fed": 0
   },
-  "macro_chain": {
-   "vix_distinct": 118,
-   "fed_distinct": 2,
-   "cby_distinct": 3,
-   "inflation_distinct": 4,
-   "gdp_distinct": 6,
-   "fv_distinct_repricer": 3,
-   "fv_distinct_lossmaker": 1,
-   "reprice_days": "45,96",
-   "default_cby": 0.0456
+  "drawdiv": {
+   "comparisons": 28,
+   "max_abs_draw_delta": 0,
+   "all_exact": true
   },
   "oracle_config": {
    "narrow_median_pnl": 59991.687579142745,
@@ -4392,6 +3840,12 @@
    "r5_beyond_horizon_ff": 0.00125,
    "r5_chained_matches_loaded": true
   },
+  "truth_residual": {
+   "median_residual": 1.431146867680866e-17,
+   "p99_residual": 8.933825901280557e-17,
+   "max_residual": 0.09035490641858275,
+   "rows": 38980
+  },
   "consts": {
    "market_factor_sigma": 0.016,
    "reversion_half_life_days": 60.000000000055856,
@@ -4408,36 +3862,285 @@
    "truth_cols": 15,
    "book_rows_per_tick_per_name": 20.0
   },
+  "vix": {
+   "vol_5": 30.293536981549572,
+   "vol_15": 36.70981789746323,
+   "vol_45": 112.09971329836033,
+   "vol_65": 135.52153909367982,
+   "corr_15": 0.19731445916614357,
+   "corr_45": 0.6256295928314273,
+   "corr_65": 0.6781313298033395,
+   "vol_range_max_delta": 105.22800211213024,
+   "vol_ratio_65_5": 4.473612281597223,
+   "spread_15": 11.779281805955113,
+   "spread_25": 14.143028678520544,
+   "spread_45": 17.494051494447998,
+   "spread_65": 22.62426764296325,
+   "bit_day1_identical": false,
+   "bit_day2_all_pairs_differ": true
+  },
+  "realism_heldout": {
+   "held_seeds_corr": 0.24393111157437272,
+   "held_seeds_kurt": 7.243317439460719,
+   "held_seeds_clust": 0.06243008055318065,
+   "held_seeds_volabs": 0.5503751763696787,
+   "held_seeds_lev": -0.04705560048550879,
+   "held_uni_corr_lo": 0.30122857053045365,
+   "held_uni_corr_hi": 0.3385833005674457,
+   "held_uni_kurt_lo": 5.264940898337031,
+   "held_uni_kurt_hi": 5.971119128590599,
+   "held_uni_clust_lo": 0.060852202953189785,
+   "held_uni_clust_hi": 0.1017259633577644,
+   "held_uni_lev_lo": -0.03909291523083702,
+   "held_uni_lev_hi": -0.019371539592779045,
+   "held_long_corr": 0.3241100479199759,
+   "held_long_kurt": 7.637592315163242,
+   "held_long_clust": 0.12849357260761207,
+   "held_long_lev": -0.05855940845875872,
+   "held_long_vol": 32.30721410459191
+  },
+  "macro_chain": {
+   "vix_distinct": 118,
+   "fed_distinct": 2,
+   "cby_distinct": 3,
+   "inflation_distinct": 4,
+   "gdp_distinct": 6,
+   "fv_distinct_repricer": 3,
+   "fv_distinct_lossmaker": 1,
+   "reprice_days": "45,96",
+   "default_cby": 0.0456
+  },
+  "rebalance": {
+   "ret_3": 37.54718532125862,
+   "ret_6": 9.79451761605183,
+   "ret_12": -27.458937827415497
+  },
+  "realism_sample": {
+   "annualised_vol_pct": 34.43388269005222,
+   "excess_kurtosis": 5.852654402564154,
+   "return_acf1": 0.11897482615713223,
+   "abs_return_acf1": 0.17504899222626896,
+   "cross_sectional_corr": 0.3569905890011196,
+   "volume_abs_return_corr": 0.5596418611582058,
+   "leverage_effect": -0.09537749921658237,
+   "volume_change_acf1": -0.2655961325579821,
+   "observations": 10040,
+   "fp_prefix": "5d8de78b55aad752"
+  },
+  "scenario_leaderboard": {
+   "buy_and_hold_calm": -6.082543440955889,
+   "buy_and_hold_hiked": -8.643322099585795,
+   "buy_and_hold_delta": -2.560778658629906,
+   "momentum_calm": -5.640937041817024,
+   "momentum_hiked": -7.511614916475012,
+   "momentum_delta": -1.8706778746579884,
+   "oracle_calm": 13.22228945076263,
+   "oracle_hiked": 11.113655148710544,
+   "oracle_delta": -2.108634302052087,
+   "bh_seedband_lo": -3.8931738884009537,
+   "bh_seedband_hi": -2.560778658629906,
+   "bh_escapes": 0,
+   "mom_seedband_lo": -1.8706778746579884,
+   "mom_seedband_hi": 1.195839816806025,
+   "mom_escapes": 1
+  },
+  "determinism": {
+   "kat_digest": "60d475726c8b270df0894da7577523e98d044dd09afc6b536377eaf4b40de590",
+   "kat_digest_elided": "60d47572...40de590",
+   "kat_digest_pinned": "60d475726c8b270df0894da7577523e98d044dd09afc6b536377eaf4b40de590",
+   "kat_matches_pinned": true,
+   "kat_version": 11,
+   "version": "0.3.0",
+   "preset_name": "pt-v12",
+   "preset_keys": 8,
+   "fp_len": 64,
+   "fp_reversal_differs": true,
+   "facts_marginal": 2,
+   "facts_dependence": 12,
+   "oracle_default_top_k": 5,
+   "custom_model_fp": "custom-7f290e34",
+   "preset_lacks_market_sigma": true,
+   "n_factors": 9,
+   "evaluate_steps_default": 6
+  },
+  "horizon": {
+   "capture_5d": 0.5126440042797596,
+   "oracle_pnl_5d": 77373.7267972962,
+   "capture_60d": -0.015249800953062465,
+   "oracle_pnl_60d": 565438.3193736312
+  },
+  "rng": {
+   "stream_count": 3,
+   "stream_names": "market,economy,external",
+   "rng_snapshot_len": 21,
+   "market_sched_independent": true,
+   "presplit_snapshot_refused": true
+  },
+  "llm_impact": {
+   "oracle_imp20_min": -451.13172857513285,
+   "oracle_imp20_max": 418.36301020229,
+   "oracle_imp20_pos": 5,
+   "mom_imp20_flips": true,
+   "imp2_pos_min": 12,
+   "imp3_oracle_pos": 11,
+   "imp3_oracle_min": -35.992007969874614,
+   "imp3_oracle_max": 81.95777013364705
+  },
+  "spec": {
+   "universe_fp8": "a7861d15",
+   "momentum_fp8": "e6bbc35c",
+   "oracle_fp8": "f383b990"
+  },
+  "tca_example": {
+   "first_adv": 9713,
+   "entry_bps": 16.70755026081702,
+   "entry_all_equal": true,
+   "rt_median": -12.401327060969109,
+   "rt_lo": -17.71877929421859,
+   "rt_hi": 2.028873973400489,
+   "rt_neg": 7,
+   "fill_half_requested": 4856,
+   "fill_half": 483.0,
+   "fills_saturate": true,
+   "fill_seed_invariant": true
+  },
+  "tca_ripple": {
+   "traded_names": 57,
+   "untouched_names": 3,
+   "leaked_count": 3,
+   "leak_min_bps": -10.71909138595633,
+   "leak_mid_bps": 1.9654088050310554,
+   "leak_max_bps": 1.9981350739310737,
+   "direct_median_bps": 9.70873786407689,
+   "leak_d1": 0,
+   "leak_d2": 0,
+   "leak_d3": 9,
+   "leak_d4": 18,
+   "no_leak_through_d2": true,
+   "d1_no_orders": true,
+   "pinned_empty": true
+  },
+  "realism_six": {
+   "annualised_vol_pct_median": 31.794030101774215,
+   "annualised_vol_pct_lo": 27.89371282212803,
+   "annualised_vol_pct_hi": 40.86505968918077,
+   "excess_kurtosis_median": 6.343876413075947,
+   "excess_kurtosis_lo": 4.850269244546468,
+   "excess_kurtosis_hi": 8.824311800556673,
+   "return_acf1_median": 0.03224632567601928,
+   "return_acf1_lo": -0.007452907924016447,
+   "return_acf1_hi": 0.13332793656155428,
+   "abs_return_acf1_median": 0.0999367933151433,
+   "abs_return_acf1_lo": 0.0483395607145746,
+   "abs_return_acf1_hi": 0.26643322925842006,
+   "cross_sectional_corr_median": 0.31038295071594124,
+   "cross_sectional_corr_lo": 0.21217809332282014,
+   "cross_sectional_corr_hi": 0.4859214375578459,
+   "volume_abs_return_corr_median": 0.5727116912799552,
+   "volume_abs_return_corr_lo": 0.5473934804303633,
+   "volume_abs_return_corr_hi": 0.6602664192302308,
+   "leverage_effect_median": -0.05489605707102314,
+   "leverage_effect_lo": -0.11762201353537925,
+   "leverage_effect_hi": -0.017869591899732376,
+   "volume_change_acf1_median": -0.261319764073457,
+   "volume_change_acf1_lo": -0.2923037118981955,
+   "volume_change_acf1_hi": -0.23583374571099447,
+   "abs_return_acf5_median": 0.045831735312081665,
+   "abs_return_acf5_lo": -0.010140694929697066,
+   "abs_return_acf5_hi": 0.15678530983453115,
+   "abs_return_acf20_median": -0.013673122828539528,
+   "abs_return_acf20_lo": -0.05906737187902844,
+   "abs_return_acf20_hi": -0.0006196723403549711,
+   "leverage_all_negative": true
+  },
+  "ranking": {
+   "mr_beat_capture": 1.519767526402874,
+   "bh_beat_capture": 1.0156211145752114,
+   "bh_beat_is_grid_max": false,
+   "mr3_gt1_all_on_4_thinnest": false,
+   "mr3_gt1_count": 4,
+   "mr3_gt1_on_thin4": 3,
+   "mr3_mean_of_ratios": 0.8791349541226671,
+   "pooled_momentum": 0.25900806747382144,
+   "pooled_mean_reversion": 0.7827083371766227,
+   "momentum_capture_lo": -0.5025771901144789,
+   "momentum_capture_hi": 0.9087241969997822,
+   "momentum_wins": 3,
+   "mr_wins": 8,
+   "seeds": 12,
+   "sep_mom_mr": "3-9",
+   "sep_mom_mr_p": 0.14599609375,
+   "sep_mom_rand": "9-3",
+   "sep_mom_rand_p": 0.14599609375,
+   "beat12_momentum": 0,
+   "beat12_mean_reversion": 5,
+   "beat12_buy_and_hold": 1,
+   "beat12_random": 0,
+   "sep_mom_mr_b": "2-10",
+   "sep_mom_mr_b_p": 0.03857421875,
+   "oracle_pnl_3d_min": 13660.42686022527,
+   "oracle_pnl_3d_max": 32711.78944469709,
+   "pooled_mr_3d": 0.7800584825190392,
+   "mr_capture_thinnest": 1.5653196201566322
+  },
+  "replay": {
+   "fingerprint_matches": true,
+   "prices_identical": true,
+   "draws_equal": true
+  },
+  "universe_stats": {
+   "median_si_pct": 3.4139198975760205,
+   "one_in_n_above_20": 12.658227848101266,
+   "names": 1000
+  },
+  "tca_vix": {
+   "wins": 12,
+   "median_lo": 6.064119152634138,
+   "median_hi": 11.685819095964455,
+   "paired_median_delta": 5.6216999433303165
+  },
+  "arith": {
+   "truth_rows_100x252": 9828000,
+   "buffers_mb": 1100.736,
+   "buffers_mb_per_day": 4.368,
+   "hundred_engines_gb": 110.0736,
+   "crossings_per_year": 98280,
+   "crossings_five_fields": 491400,
+   "workflow_truth_rows": 234000,
+   "llm_calls_default_run": 20,
+   "clean_sweep_p": 0.00048828125,
+   "perf_row_gap_s": 0.8000000000000007
+  },
   "perf": {
-   "t10": 1.3733074200000033,
-   "t100": 12.05368271499998,
-   "t100_rec": 12.05499690199997,
-   "t_sweep_serial": 8.180723510999997,
-   "t_sweep_8w": 1.145241877999979,
+   "t10": 0.7959460420006508,
+   "t100": 6.756263957999181,
+   "t100_rec": 6.79150587499862,
+   "t_sweep_serial": 4.811226874999193,
+   "t_sweep_8w": 1.0891017909998482,
    "truth_rows": 9828000,
-   "scale_ratio": 8.777119048115207,
-   "overhead_med": 0.008572736677670001,
-   "neg_pair_frac": 0.5,
+   "scale_ratio": 8.48834418601664,
+   "overhead_med": -0.5812031240655768,
+   "neg_pair_frac": 0.625,
    "overhead_pairs": [
-    0.027,
-    0.112,
-    -0.044,
-    -0.095,
-    -0.009,
-    0.119,
-    -0.016,
-    0.029
+    -1.738,
+    1.001,
+    -0.335,
+    -1.431,
+    -0.827,
+    0.522,
+    0.101,
+    -1.26
    ],
-   "speedup": 7.143227704252837
+   "speedup": 4.417609919254888
   },
   "fork": {
-   "branch_ms": 0.8385810000390848,
-   "resume_s": 0.30202113199999303,
-   "ratio_orders": 2.5564923127540085,
+   "branch_ms": 0.5066250014351681,
+   "resume_s": 0.18684304099951987,
+   "ratio_orders": 2.5667903091358504,
    "run_days": 30
   },
   "workflow": {
-   "wall_s": 7.780116604,
+   "wall_s": 5.065486249999594,
    "truth_rows": 234000,
    "sweep_seeds": 20,
    "agents_evaluated": 5,

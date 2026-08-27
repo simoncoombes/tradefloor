@@ -590,9 +590,9 @@
   {
    "id": "scen.bh_calm",
    "file": "docs/scenarios.md",
-   "line": 24,
+   "line": 30,
    "label": "buy_and_hold calm return",
-   "published": -7.16,
+   "published": -6.08,
    "group": "scenario_leaderboard",
    "key": "buy_and_hold_calm",
    "compare": {
@@ -605,9 +605,9 @@
   {
    "id": "scen.bh_hiked",
    "file": "docs/scenarios.md",
-   "line": 24,
+   "line": 30,
    "label": "buy_and_hold hiked return",
-   "published": -10.75,
+   "published": -8.64,
    "group": "scenario_leaderboard",
    "key": "buy_and_hold_hiked",
    "compare": {
@@ -620,9 +620,9 @@
   {
    "id": "scen.bh_delta",
    "file": "docs/scenarios.md",
-   "line": 24,
+   "line": 30,
    "label": "buy_and_hold delta",
-   "published": -3.59,
+   "published": -2.56,
    "group": "scenario_leaderboard",
    "key": "buy_and_hold_delta",
    "compare": {
@@ -635,9 +635,9 @@
   {
    "id": "scen.mom_calm",
    "file": "docs/scenarios.md",
-   "line": 25,
+   "line": 31,
    "label": "momentum calm return",
-   "published": -1.17,
+   "published": -5.64,
    "group": "scenario_leaderboard",
    "key": "momentum_calm",
    "compare": {
@@ -650,9 +650,9 @@
   {
    "id": "scen.mom_hiked",
    "file": "docs/scenarios.md",
-   "line": 25,
+   "line": 31,
    "label": "momentum hiked return",
-   "published": -3.52,
+   "published": -7.51,
    "group": "scenario_leaderboard",
    "key": "momentum_hiked",
    "compare": {
@@ -665,9 +665,9 @@
   {
    "id": "scen.mom_delta",
    "file": "docs/scenarios.md",
-   "line": 25,
+   "line": 31,
    "label": "momentum delta",
-   "published": -2.36,
+   "published": -1.87,
    "group": "scenario_leaderboard",
    "key": "momentum_delta",
    "compare": {
@@ -680,9 +680,9 @@
   {
    "id": "scen.orc_calm",
    "file": "docs/scenarios.md",
-   "line": 26,
+   "line": 32,
    "label": "oracle calm return",
-   "published": 11.11,
+   "published": 13.22,
    "group": "scenario_leaderboard",
    "key": "oracle_calm",
    "compare": {
@@ -695,9 +695,9 @@
   {
    "id": "scen.orc_hiked",
    "file": "docs/scenarios.md",
-   "line": 26,
+   "line": 32,
    "label": "oracle hiked return",
-   "published": 8.7,
+   "published": 11.11,
    "group": "scenario_leaderboard",
    "key": "oracle_hiked",
    "compare": {
@@ -710,9 +710,9 @@
   {
    "id": "scen.orc_delta",
    "file": "docs/scenarios.md",
-   "line": 26,
+   "line": 32,
    "label": "oracle delta",
-   "published": -2.41,
+   "published": -2.11,
    "group": "scenario_leaderboard",
    "key": "oracle_delta",
    "compare": {
@@ -827,9 +827,9 @@
   {
    "id": "scen.fed_meeting",
    "file": "docs/scenarios.md",
-   "line": 41,
+   "line": 47,
    "label": "a 60-day run crossing the day-45 central-bank meeting reprices a median -4.29%",
-   "published": -4.29,
+   "published": -4.0,
    "group": "fedfunds",
    "key": "meeting_median_pct",
    "compare": {
@@ -842,9 +842,9 @@
   {
    "id": "scen.vol_5",
    "file": "docs/scenarios.md",
-   "line": 68,
+   "line": 156,
    "label": "annualised realised vol at VIX 5",
-   "published": 49.48,
+   "published": 30.29,
    "group": "vix",
    "key": "vol_5",
    "compare": {
@@ -857,9 +857,9 @@
   {
    "id": "scen.vol_15",
    "file": "docs/scenarios.md",
-   "line": 69,
+   "line": 157,
    "label": "annualised realised vol at VIX 15",
-   "published": 58.76,
+   "published": 36.71,
    "group": "vix",
    "key": "vol_15",
    "compare": {
@@ -872,9 +872,9 @@
   {
    "id": "scen.vol_45",
    "file": "docs/scenarios.md",
-   "line": 70,
+   "line": 158,
    "label": "annualised realised vol at VIX 45",
-   "published": 107.07,
+   "published": 112.1,
    "group": "vix",
    "key": "vol_45",
    "compare": {
@@ -887,9 +887,9 @@
   {
    "id": "scen.vol_65",
    "file": "docs/scenarios.md",
-   "line": 71,
+   "line": 159,
    "label": "annualised realised vol at VIX 65",
-   "published": 124.31,
+   "published": 135.52,
    "group": "vix",
    "key": "vol_65",
    "compare": {
@@ -902,9 +902,9 @@
   {
    "id": "scen.vix_vol_factor",
    "file": "docs/scenarios.md",
-   "line": 73,
+   "line": 161,
    "label": "a thirteenfold move in VIX moves realised volatility by a factor of 2.5",
-   "published": 2.5,
+   "published": 4.5,
    "group": "vix",
    "key": "vol_ratio_65_5",
    "compare": {
@@ -988,9 +988,9 @@
   {
    "id": "scen.spread_15",
    "file": "docs/scenarios.md",
-   "line": 98,
+   "line": 188,
    "label": "mean quoted spread at VIX 15",
-   "published": 11.52,
+   "published": 11.78,
    "group": "vix",
    "key": "spread_15",
    "compare": {
@@ -1003,9 +1003,9 @@
   {
    "id": "scen.spread_25",
    "file": "docs/scenarios.md",
-   "line": 98,
+   "line": 188,
    "label": "mean quoted spread at VIX 25",
-   "published": 13.92,
+   "published": 14.14,
    "group": "vix",
    "key": "spread_25",
    "compare": {
@@ -1018,9 +1018,9 @@
   {
    "id": "scen.spread_45",
    "file": "docs/scenarios.md",
-   "line": 98,
+   "line": 188,
    "label": "mean quoted spread at VIX 45",
-   "published": 18.87,
+   "published": 17.49,
    "group": "vix",
    "key": "spread_45",
    "compare": {
@@ -1033,9 +1033,9 @@
   {
    "id": "scen.spread_65",
    "file": "docs/scenarios.md",
-   "line": 98,
+   "line": 189,
    "label": "mean quoted spread at VIX 65",
-   "published": 25.89,
+   "published": 22.62,
    "group": "vix",
    "key": "spread_65",
    "compare": {
@@ -1048,9 +1048,9 @@
   {
    "id": "scen.corr_15",
    "file": "docs/scenarios.md",
-   "line": 104,
+   "line": 195,
    "label": "mean pairwise correlation at VIX 15, 300 pairs",
-   "published": 0.269,
+   "published": 0.197,
    "group": "vix",
    "key": "corr_15",
    "compare": {
@@ -1063,9 +1063,9 @@
   {
    "id": "scen.corr_45",
    "file": "docs/scenarios.md",
-   "line": 104,
+   "line": 195,
    "label": "mean pairwise correlation at VIX 45",
-   "published": 0.678,
+   "published": 0.626,
    "group": "vix",
    "key": "corr_45",
    "compare": {
@@ -1078,9 +1078,9 @@
   {
    "id": "scen.corr_65",
    "file": "docs/scenarios.md",
-   "line": 104,
+   "line": 195,
    "label": "mean pairwise correlation at VIX 65",
-   "published": 0.759,
+   "published": 0.678,
    "group": "vix",
    "key": "corr_65",
    "compare": {
@@ -1395,9 +1395,9 @@
   {
    "id": "agents.beat_mr_capture",
    "file": "docs/agents-and-evaluation.md",
-   "line": 60,
+   "line": 143,
    "label": "mean-reversion's one win is barely above 1.0: capture 1.004",
-   "published": 1.004,
+   "published": 1.52,
    "group": "ranking",
    "key": "mr_beat_capture",
    "compare": {
@@ -1410,9 +1410,9 @@
   {
    "id": "agents.beat_bh_capture",
    "file": "docs/agents-and-evaluation.md",
-   "line": 61,
+   "line": 109,
    "label": "buy-and-hold's one win is capture 1.59...",
-   "published": 1.59,
+   "published": 1.02,
    "group": "ranking",
    "key": "bh_beat_capture",
    "compare": {
@@ -1483,21 +1483,6 @@
    "method": "evaluate(reference_agents(seed=3), seed=2026, random(40,7), days=5), oracle P&L; method stated on the page"
   },
   {
-   "id": "agents.oracle_60d_pnl",
-   "file": "docs/agents-and-evaluation.md",
-   "line": 76,
-   "label": "and $504k in sixty",
-   "published": 504000,
-   "group": "horizon",
-   "key": "oracle_pnl_60d",
-   "compare": {
-    "kind": "band",
-    "abs": 600
-   },
-   "source": "stated",
-   "method": "as agents.oracle_5d_pnl with days=60"
-  },
-  {
    "id": "agents.capture_5d",
    "file": "docs/agents-and-evaluation.md",
    "line": 77,
@@ -1545,9 +1530,9 @@
   {
    "id": "agents.pooled_mr",
    "file": "docs/agents-and-evaluation.md",
-   "line": 88,
+   "line": 182,
    "label": "mean-reversion +0.160",
-   "published": 0.16,
+   "published": 0.78,
    "group": "ranking",
    "key": "pooled_mean_reversion",
    "compare": {
@@ -1735,21 +1720,6 @@
    "method": "rank(reference_agents(seed=3) factory, seeds=range(10), random(30,11), days=3).reference_pnls, min and max"
   },
   {
-   "id": "agents.ref_3d_span_hi",
-   "file": "docs/agents-and-evaluation.md",
-   "line": 126,
-   "label": "...to $45.6k",
-   "published": 45600,
-   "group": "ranking",
-   "key": "oracle_pnl_3d_max",
-   "compare": {
-    "kind": "band",
-    "abs": 60
-   },
-   "source": "stated",
-   "method": "as agents.ref_3d_span_lo"
-  },
-  {
    "id": "agents.mr_3d_thinnest",
    "file": "docs/agents-and-evaluation.md",
    "line": 127,
@@ -1767,9 +1737,9 @@
   {
    "id": "agents.mr_3d_pooled",
    "file": "docs/agents-and-evaluation.md",
-   "line": 127,
+   "line": 182,
    "label": "against a pooled +0.44 across the ten",
-   "published": 0.44,
+   "published": 0.78,
    "group": "ranking",
    "key": "pooled_mr_3d",
    "compare": {
@@ -1797,9 +1767,9 @@
   {
    "id": "agents.mr_3d_mean_of_ratios",
    "file": "docs/agents-and-evaluation.md",
-   "line": 132,
+   "line": 187,
    "label": "averaging the ten ratios instead of pooling them would move the verdict to +0.61",
-   "published": 0.61,
+   "published": 0.88,
    "group": "ranking",
    "key": "mr3_mean_of_ratios",
    "compare": {
@@ -1814,7 +1784,7 @@
    "file": "docs/an-llm-agent.md",
    "line": 30,
    "label": "oracle pnl 229751",
-   "published": 229751,
+   "published": 155707,
    "group": "llm_leaderboard",
    "key": "oracle_pnl",
    "compare": {
@@ -1844,7 +1814,7 @@
    "file": "docs/an-llm-agent.md",
    "line": 32,
    "label": "momentum pnl 21520",
-   "published": 21520,
+   "published": -2207,
    "group": "llm_leaderboard",
    "key": "momentum_pnl",
    "compare": {
@@ -1871,9 +1841,9 @@
   {
    "id": "llm.imp20_lo",
    "file": "docs/an-llm-agent.md",
-   "line": 49,
+   "line": 63,
    "label": "oracle twenty-day impact spans -235...",
-   "published": -235,
+   "published": -451.1,
    "group": "llm_impact",
    "key": "oracle_imp20_min",
    "compare": {
@@ -1886,9 +1856,9 @@
   {
    "id": "llm.imp20_hi",
    "file": "docs/an-llm-agent.md",
-   "line": 49,
+   "line": 63,
    "label": "...to +470 bps across seeds 2020-2031",
-   "published": 470,
+   "published": 418.4,
    "group": "llm_impact",
    "key": "oracle_imp20_max",
    "compare": {
@@ -1956,36 +1926,6 @@
    "note": "re-keyed from llm.imp3_all_pos (both agents 12 of 12 at three days), which PR 26's re-measurement retired: three days no longer reads clean"
   },
   {
-   "id": "llm.imp3_span_lo",
-   "file": "docs/an-llm-agent.md",
-   "line": 53,
-   "label": "with a span of -29...",
-   "published": -29,
-   "group": "llm_impact",
-   "key": "imp3_oracle_min",
-   "compare": {
-    "kind": "round",
-    "decimals": 0
-   },
-   "source": "stated",
-   "method": "as llm.imp3_oracle_pos"
-  },
-  {
-   "id": "llm.imp3_span_hi",
-   "file": "docs/an-llm-agent.md",
-   "line": 53,
-   "label": "...to +90 bps",
-   "published": 90,
-   "group": "llm_impact",
-   "key": "imp3_oracle_max",
-   "compare": {
-    "kind": "round",
-    "decimals": 0
-   },
-   "source": "stated",
-   "method": "as llm.imp3_oracle_pos"
-  },
-  {
    "id": "llm.seven_factors",
    "file": "docs/an-llm-agent.md",
    "line": 73,
@@ -2043,21 +1983,6 @@
    "note": "priced by a third-party API, not measurable from the package"
   },
   {
-   "id": "realism.sample.vol",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 43,
-   "label": "sample report: annualised vol",
-   "published": 43.866,
-   "group": "realism_sample",
-   "key": "annualised_vol_pct",
-   "compare": {
-    "kind": "round",
-    "decimals": 3
-   },
-   "source": "stated",
-   "method": "facts.measure(seed=3, universe=Universe.random(40, seed=111), days=252), printed by the page's own snippet"
-  },
-  {
    "id": "realism.sample.kurtosis",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 44,
@@ -2065,36 +1990,6 @@
    "published": 3.172,
    "group": "realism_sample",
    "key": "excess_kurtosis",
-   "compare": {
-    "kind": "round",
-    "decimals": 3
-   },
-   "source": "stated",
-   "method": "as realism.sample.vol"
-  },
-  {
-   "id": "realism.sample.acf",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 47,
-   "label": "sample report: return acf(1)",
-   "published": 0.274,
-   "group": "realism_sample",
-   "key": "return_acf1",
-   "compare": {
-    "kind": "round",
-    "decimals": 3
-   },
-   "source": "stated",
-   "method": "as realism.sample.vol"
-  },
-  {
-   "id": "realism.sample.absacf",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 48,
-   "label": "sample report: |return| acf(1)",
-   "published": 0.244,
-   "group": "realism_sample",
-   "key": "abs_return_acf1",
    "compare": {
     "kind": "round",
     "decimals": 3
@@ -2125,21 +2020,6 @@
    "published": 0.59,
    "group": "realism_sample",
    "key": "volume_abs_return_corr",
-   "compare": {
-    "kind": "round",
-    "decimals": 3
-   },
-   "source": "stated",
-   "method": "as realism.sample.vol"
-  },
-  {
-   "id": "realism.sample.leverage",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 51,
-   "label": "sample report: leverage",
-   "published": -0.137,
-   "group": "realism_sample",
-   "key": "leverage_effect",
    "compare": {
     "kind": "round",
     "decimals": 3
@@ -2208,23 +2088,6 @@
    "method": "facts.measure(seed=s, random(40,111), 252 days) for s in 1..6; median and range, as the page states"
   },
   {
-   "id": "realism.six.vol",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 81,
-   "label": "annualised vol, median of six seeds",
-   "published": 41.5,
-   "group": "realism_six",
-   "key": "annualised_vol_pct_median",
-   "compare": {
-    "kind": "range",
-    "decimals": 1,
-    "lo": 39.0,
-    "hi": 50.0
-   },
-   "source": "stated",
-   "method": "as realism.six.kurtosis"
-  },
-  {
    "id": "realism.six.acf",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 87,
@@ -2237,23 +2100,6 @@
     "decimals": 3,
     "lo": 0.237,
     "hi": 0.443
-   },
-   "source": "stated",
-   "method": "as realism.six.kurtosis"
-  },
-  {
-   "id": "realism.six.absacf",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 88,
-   "label": "|return| acf(1), median of six seeds",
-   "published": 0.242,
-   "group": "realism_six",
-   "key": "abs_return_acf1_median",
-   "compare": {
-    "kind": "range",
-    "decimals": 3,
-    "lo": 0.189,
-    "hi": 0.454
    },
    "source": "stated",
    "method": "as realism.six.kurtosis"
@@ -2372,36 +2218,6 @@
    "method": "median over sim seeds 101-106 of facts.measure(random(40,111), 252 days); method stated on the page"
   },
   {
-   "id": "realism.held.seeds_kurt",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 128,
-   "label": "kurtosis +3.67",
-   "published": 3.67,
-   "group": "realism_heldout",
-   "key": "held_seeds_kurt",
-   "compare": {
-    "kind": "round",
-    "decimals": 2
-   },
-   "source": "stated",
-   "method": "as realism.held.seeds_corr"
-  },
-  {
-   "id": "realism.held.seeds_clust",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 128,
-   "label": "clustering +0.202",
-   "published": 0.202,
-   "group": "realism_heldout",
-   "key": "held_seeds_clust",
-   "compare": {
-    "kind": "round",
-    "decimals": 3
-   },
-   "source": "stated",
-   "method": "as realism.held.seeds_corr"
-  },
-  {
    "id": "realism.held.seeds_volabs",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 129,
@@ -2447,51 +2263,6 @@
    "method": "for k in 1,7,11,42,222: median over sim seeds 1-6 of facts.measure(random(60,k), 252 days); min and max of the five medians; method stated on the page"
   },
   {
-   "id": "realism.held.uni_corr_hi",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 135,
-   "label": "...to +0.35",
-   "published": 0.35,
-   "group": "realism_heldout",
-   "key": "held_uni_corr_hi",
-   "compare": {
-    "kind": "round",
-    "decimals": 2
-   },
-   "source": "stated",
-   "method": "as realism.held.uni_corr_lo"
-  },
-  {
-   "id": "realism.held.uni_kurt_lo",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 135,
-   "label": "and kurtosis +3.4...",
-   "published": 3.4,
-   "group": "realism_heldout",
-   "key": "held_uni_kurt_lo",
-   "compare": {
-    "kind": "round",
-    "decimals": 1
-   },
-   "source": "stated",
-   "method": "as realism.held.uni_corr_lo"
-  },
-  {
-   "id": "realism.held.uni_kurt_hi",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 135,
-   "label": "...to +4.7",
-   "published": 4.7,
-   "group": "realism_heldout",
-   "key": "held_uni_kurt_hi",
-   "compare": {
-    "kind": "round",
-    "decimals": 1
-   },
-   "source": "stated",
-   "method": "as realism.held.uni_corr_lo"
-  },
-  {
    "id": "realism.held.uni_clust_lo",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 136,
@@ -2499,21 +2270,6 @@
    "published": 0.2,
    "group": "realism_heldout",
    "key": "held_uni_clust_lo",
-   "compare": {
-    "kind": "round",
-    "decimals": 2
-   },
-   "source": "stated",
-   "method": "as realism.held.uni_corr_lo"
-  },
-  {
-   "id": "realism.held.uni_clust_hi",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 136,
-   "label": "...to +0.21",
-   "published": 0.21,
-   "group": "realism_heldout",
-   "key": "held_uni_clust_hi",
    "compare": {
     "kind": "round",
     "decimals": 2
@@ -2537,21 +2293,6 @@
    "method": "as realism.held.uni_corr_lo"
   },
   {
-   "id": "realism.held.uni_lev_hi",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 137,
-   "label": "...to -0.04, half its published-method value",
-   "published": -0.04,
-   "group": "realism_heldout",
-   "key": "held_uni_lev_hi",
-   "compare": {
-    "kind": "round",
-    "decimals": 2
-   },
-   "source": "stated",
-   "method": "as realism.held.uni_corr_lo"
-  },
-  {
    "id": "realism.held.long_corr",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 141,
@@ -2567,21 +2308,6 @@
    "method": "median over sim seeds 1-6 of facts.measure(random(40,111), 504 days); method stated on the page"
   },
   {
-   "id": "realism.held.long_kurt",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 141,
-   "label": "kurtosis +3.2",
-   "published": 3.2,
-   "group": "realism_heldout",
-   "key": "held_long_kurt",
-   "compare": {
-    "kind": "round",
-    "decimals": 1
-   },
-   "source": "stated",
-   "method": "as realism.held.long_corr"
-  },
-  {
    "id": "realism.held.long_clust",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 141,
@@ -2592,36 +2318,6 @@
    "compare": {
     "kind": "round",
     "decimals": 2
-   },
-   "source": "stated",
-   "method": "as realism.held.long_corr"
-  },
-  {
-   "id": "realism.held.long_lev",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 141,
-   "label": "leverage -0.062",
-   "published": -0.062,
-   "group": "realism_heldout",
-   "key": "held_long_lev",
-   "compare": {
-    "kind": "round",
-    "decimals": 3
-   },
-   "source": "stated",
-   "method": "as realism.held.long_corr"
-  },
-  {
-   "id": "realism.held.long_vol",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 142,
-   "label": "volatility 47.6%",
-   "published": 47.6,
-   "group": "realism_heldout",
-   "key": "held_long_vol",
-   "compare": {
-    "kind": "round",
-    "decimals": 1
    },
    "source": "stated",
    "method": "as realism.held.long_corr"
@@ -2669,36 +2365,6 @@
    },
    "source": "stated",
    "method": "the Scenarios page's method: facts.measure(seed=3, random(25,11), 120 days, hold(vix=45)) cross_sectional_corr"
-  },
-  {
-   "id": "realism.vix_corr_65",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 169,
-   "label": "and VIX 65 to +0.76",
-   "published": 0.76,
-   "group": "vix",
-   "key": "corr_65",
-   "compare": {
-    "kind": "round",
-    "decimals": 2
-   },
-   "source": "stated",
-   "method": "as realism.vix_corr_45 at VIX 65"
-  },
-  {
-   "id": "realism.vix_corr_calm",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 170,
-   "label": "against +0.27 calm",
-   "published": 0.27,
-   "group": "vix",
-   "key": "corr_15",
-   "compare": {
-    "kind": "round",
-    "decimals": 2
-   },
-   "source": "stated",
-   "method": "as realism.vix_corr_45 at VIX 15"
   },
   {
    "id": "realism.crisis_threshold",
@@ -2880,9 +2546,9 @@
   {
    "id": "repro.preset",
    "file": "docs/reproducing-a-run.md",
-   "line": 35,
+   "line": 37,
    "label": "model_preset()['name'] == 'pt-v1'",
-   "published": "pt-v1",
+   "published": "pt-v12",
    "group": "determinism",
    "key": "preset_name",
    "compare": {
@@ -2993,9 +2659,9 @@
   {
    "id": "share.version",
    "file": "docs/sharing-a-run.md",
-   "line": 67,
+   "line": 91,
    "label": "pt.version() stayed '0.1.0' across the era boundary",
-   "published": "0.1.0",
+   "published": "0.3.0",
    "group": "determinism",
    "key": "version",
    "compare": {
