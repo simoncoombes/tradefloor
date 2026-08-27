@@ -153,6 +153,7 @@ pub fn build_company(c: &Json) -> TickCompany {
             mispricing_momentum: maybe(&s["mispricingMomentum"]),
             maker_inventory: maybe(&s["makerInventory"]),
             garch_variance: bits(s["garchVariance"].as_str().unwrap()),
+            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
             last_daily_return: maybe(&s["lastDailyReturn"]),
             beta: maybe(&s["beta"]),
             short_interest: bits(s["shortInterest"].as_str().unwrap()),

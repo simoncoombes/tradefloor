@@ -360,6 +360,15 @@ PARAM_SPECS: dict[str, dict] = {
                                 "hard_range": (0.0, 0.99)},
     "volume_idio_sigma": {"kind": "abs", "step_unit": 0.02,
                           "hard_range": (0.0, 0.6)},
+    # The variance cascade (§122). `components` is a COUNT: integer-valued,
+    # so its step is one whole component and a search that lands between two
+    # is truncated by the engine rather than interpolated.
+    "garch_cascade_components": {"kind": "abs", "step_unit": 1.0,
+                                 "hard_range": (0.0, 8.0)},
+    "garch_cascade_ratio": {"kind": "log", "step_unit": None,
+                            "hard_range": (1.5, 8.0)},
+    "garch_cascade_weight": {"kind": "abs", "step_unit": 0.05,
+                             "hard_range": (0.0, 1.0)},
     # The volume-move expression (§113); ships at the old literals.
     # LOG, not abs: the cap ships at 4.0 with a box out to 30, and a raw
     # difference of 26 squared dominates a regulariser whose median squared

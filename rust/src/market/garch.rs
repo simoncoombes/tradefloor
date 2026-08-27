@@ -98,6 +98,123 @@ pub const CEILING_MULTIPLE: f64 = 5.0;
 /// cannot drive volatility to zero and freeze the price.
 pub const FLOOR_MULTIPLE: f64 = 0.25;
 
+/// The most components a variance cascade may carry.
+///
+/// Fixed rather than heap-allocated: eight f64 per name is 64 bytes, and a
+/// `Vec` per company would put an allocation in the close path for every
+/// name every day. Eight spans lags 1 to 2187 at ratio 3, which is past any
+/// horizon this model is measured at.
+pub const CASCADE_MAX: usize = 8;
+
+/// One day's update for a multi-component variance cascade.
+///
+/// **Why a cascade at all.** A single GJR recursion decays exponentially. Real
+/// volatility memory decays hyperbolically, and the `decay-shape` gap has
+/// carried that difference since it was written, with the note that "a
+/// two-component mixture was tried and is not sufficient".
+///
+/// Two was never the interesting number. A superposition of exponentials with
+/// GEOMETRICALLY SPACED timescales approximates a power law closely over the
+/// range those timescales span, and the count you need is about
+/// `log(range)/log(ratio)` -- six components at ratio 3 to cover lags 1 to 60,
+/// not two. Measured on a toy validated against this engine's own one-component
+/// reading (CALIBRATION-FOLLOWUPS §122): the latent log-log slope over lags
+/// 1-20 goes from -1.273 at one component to -0.536 at six, against a real
+/// -0.436, and lag-60 autocorrelation turns positive for the first time.
+///
+/// **How the components relate.** Component 0 IS today's process: it takes the
+/// name's own `garch_beta`, so the per-name persistence dispersion `pt-v7`
+/// introduced survives untouched. Component `k` has a half-life `ratio^k`
+/// times component 0's, achieved by moving beta alone -- `alpha` and `gamma`
+/// stay put, so every component re-excites on the same surprise with the same
+/// leverage asymmetry. Each carries its own `omega`, scaled to hold its
+/// unconditional variance at the sector base, which is what stops the mix from
+/// drifting as weights change.
+///
+/// Weights are FLAT across components. Weighting evenly across geometrically
+/// spaced timescales is what approximates a power law; tilting toward the fast
+/// end undoes it, measured at -1.077 for `1/sqrt(tau)` weights against -0.536
+/// for flat ones.
+///
+/// Returns the blended variance and updates `cascade` in place. At
+/// `components == 0` this is never called and the single-component path runs
+/// bit-for-bit.
+pub fn update_garch_cascade(
+    params: &crate::params::ModelParams,
+    garch_beta: f64,
+    cascade: &mut [f64; CASCADE_MAX],
+    last_daily_return: f64,
+    sector_base_variance: f64,
+) -> f64 {
+    // A COUNT, so it truncates rather than rounds, and it is clamped to the
+    // array. `usize::min` on an integer is not the NaN-swallowing `f64::min`
+    // the guard is about, but the guard matches on text and is right to: a
+    // reader scanning for float mins should not have to check the type.
+    let requested = params.garch_cascade_components as usize;
+    let k = if requested > CASCADE_MAX { CASCADE_MAX } else { requested };
+    let asym = if last_daily_return < 0.0 { params.garch_gamma } else { 0.0 };
+    let shock = (params.garch_alpha + asym) * last_daily_return * last_daily_return;
+
+    // Component 0's half-life, from the name's OWN effective persistence, so
+    // the cascade is anchored to the process it replaces rather than to a
+    // constant. `persistence` at or above 1 cannot happen -- the settable
+    // range is bounded below GARCH_PERSISTENCE_CEILING -- but a caller can
+    // build a custom preset, and a non-finite half-life here would poison
+    // every component, so it is guarded rather than asserted.
+    let persistence = params.garch_alpha + garch_beta + params.garch_gamma / 2.0;
+    if !(persistence > 0.0 && persistence < 1.0) {
+        return update_garch_variance_for(
+            params, garch_beta, cascade[0], last_daily_return, sector_base_variance);
+    }
+    // `mathx::log`, not `f64::ln`. The cascade has no TypeScript reference to
+    // hold parity with -- it is new mechanism and ships switched off -- but
+    // `no_std_transcendentals_outside_mathx` is a rule about the crate, not
+    // about the parity corpus, and it caught the first version of this line.
+    // Routing through libm also makes the cascade reproduce across platforms,
+    // which a mechanism that will be calibrated needs anyway.
+    let base_half_life = mathx::log(0.5) / mathx::log(persistence);
+
+    let mut total = 0.0;
+    for i in 0..k {
+        let half_life = base_half_life * powi(params.garch_cascade_ratio, i);
+        // beta that puts THIS component at that half-life, with alpha and
+        // gamma/2 already spending part of the persistence budget.
+        let target = pow_half(half_life);
+        let beta_i = target - params.garch_alpha - params.garch_gamma / 2.0;
+        let beta_i = if beta_i < 0.0 { 0.0 } else { beta_i };
+        let pers_i = params.garch_alpha + beta_i + params.garch_gamma / 2.0;
+        let omega_i = sector_base_variance * (1.0 - pers_i);
+        let raw = omega_i + shock + beta_i * cascade[i];
+        cascade[i] = mathx::max(
+            mathx::min(raw, sector_base_variance * params.garch_ceiling_multiple),
+            sector_base_variance * params.garch_floor_multiple,
+        );
+        total += cascade[i];
+    }
+    let cascade_variance = total / (k as f64);
+
+    // The blend is a dial rather than a switch, so a preset can take part of
+    // the cascade's shape without paying all of its cost.
+    let w = params.garch_cascade_weight;
+    let legacy = update_garch_variance_for(
+        params, garch_beta, cascade[0], last_daily_return, sector_base_variance);
+    (1.0 - w) * legacy + w * cascade_variance
+}
+
+/// `0.5^(1/half_life)`, the AR(1) coefficient with that half-life.
+fn pow_half(half_life: f64) -> f64 {
+    mathx::exp(mathx::log(0.5) / half_life)
+}
+
+/// Integer power, so the component spacing needs no `powf`.
+fn powi(base: f64, n: usize) -> f64 {
+    let mut out = 1.0;
+    for _ in 0..n {
+        out *= base;
+    }
+    out
+}
+
 /// One day's GARCH(1,1) update.
 ///
 /// `sector_base_variance` is the sector's long-run daily variance and sets

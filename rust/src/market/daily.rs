@@ -187,13 +187,27 @@ pub fn close_day_with(
         let c = params.garch_vix_coupling;
         inputs.sector_base_daily_variance * (1.0 - c + c * ratio * ratio)
     };
-    stock.garch_variance = super::garch::update_garch_variance_for(
-        params,
-        beta,
-        stock.garch_variance,
-        innovation,
-        base_variance,
-    );
+    // The cascade, when a preset asks for one, otherwise the single-component
+    // process bit for bit. Branch rather than a blend at zero: `pt-v12` and
+    // everything before it must not owe a trajectory to an argument about how
+    // a zero-weight multiply rounds.
+    stock.garch_variance = if params.garch_cascade_components >= 1.0 {
+        super::garch::update_garch_cascade(
+            params,
+            beta,
+            &mut stock.garch_cascade,
+            innovation,
+            base_variance,
+        )
+    } else {
+        super::garch::update_garch_variance_for(
+            params,
+            beta,
+            stock.garch_variance,
+            innovation,
+            base_variance,
+        )
+    };
 
     stock.last_daily_return = Some(daily_return);
 
@@ -265,6 +279,7 @@ mod tests {
             mispricing_momentum: Some(0.0),
             maker_inventory: Some(0.0),
             garch_variance: 0.015 * 0.015,
+            garch_cascade: [0.015 * 0.015; crate::market::garch::CASCADE_MAX],
             last_daily_return: None,
             beta: Some(1.0),
             short_interest: 0.0,

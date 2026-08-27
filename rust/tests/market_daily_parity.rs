@@ -121,6 +121,7 @@ fn company(price: f64, previous_close: f64) -> TickCompany {
             mispricing_momentum: None,
             maker_inventory: None,
             garch_variance: 0.0,
+            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
             last_daily_return: None,
             beta: Some(1.0),
             short_interest: 0.0,

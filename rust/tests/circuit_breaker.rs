@@ -84,6 +84,7 @@ fn company(price: f64, previous_close: f64, eps: f64, s: Option<f64>) -> TickCom
             mispricing_momentum: Some(0.0),
             maker_inventory: None,
             garch_variance: 0.015 * 0.015,
+            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
             last_daily_return: Some(0.0),
             beta: Some(1.0),
             short_interest: 0.0,

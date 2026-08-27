@@ -157,6 +157,15 @@ pub struct TickStock {
     pub mispricing_momentum: Option<f64>,
     pub maker_inventory: Option<f64>,
     pub garch_variance: f64,
+    /// The variance cascade's components, when one is running.
+    ///
+    /// A fixed array rather than a `Vec`: this is per-name state touched at
+    /// every close, and a heap allocation per company per day would be a real
+    /// cost for a mechanism that ships switched off. All zeros means the
+    /// cascade has never run, and `update_garch_cascade` seeds from the
+    /// sector base on its first call. See
+    /// [`crate::market::garch::update_garch_cascade`].
+    pub garch_cascade: [f64; crate::market::garch::CASCADE_MAX],
     pub last_daily_return: Option<f64>,
     pub beta: Option<f64>,
     pub short_interest: f64,
