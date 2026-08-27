@@ -83,8 +83,8 @@ def roster(shape: str, seed: int):
 
 
 def one(job):
-    shape, days, seed, universe_seed = job
-    m = pt.ModelParams.from_preset()
+    shape, days, seed, universe_seed, base, ov = job
+    m = pt.ModelParams.from_preset(base, **ov) if base else pt.ModelParams.from_preset()
     row = facts.measure(seed=seed, universe=roster(shape, universe_seed),
                         days=days, model=m)
     return shape, days, dict(row)
@@ -96,11 +96,27 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--universe-seed", type=int, default=111)
     ap.add_argument("--out", default=None)
+    ap.add_argument(
+        "--preset", default=None,
+        help="preset to measure instead of the shipped one. The gap this "
+             "script serves is about the SHIPPED preset, so the default "
+             "stays the shipped preset and a candidate has to be asked for.")
+    ap.add_argument(
+        "--overrides", default="",
+        help="comma separated name=value applied to --preset")
     args = ap.parse_args()
 
-    preset = pt.ModelParams.from_preset().fingerprint
+    ov = {}
+    for item in filter(None, args.overrides.split(",")):
+        k, _, v = item.partition("=")
+        ov[k.strip()] = float(v)
+    m = (pt.ModelParams.from_preset(args.preset, **ov) if args.preset
+         else pt.ModelParams.from_preset())
+    preset = m.fingerprint
+    if ov and preset == pt.ModelParams.from_preset(args.preset).fingerprint:
+        raise SystemExit(f"overrides {ov} did not change the fingerprint")
     seeds = list(range(101, 101 + args.seeds))
-    jobs = [(s, d, seed, args.universe_seed)
+    jobs = [(s, d, seed, args.universe_seed, args.preset, ov)
             for s in SHAPES for d in (252, 504) for seed in seeds]
     print(f"{preset}: {len(SHAPES)} shapes x 2 horizons x {len(seeds)} seeds "
           f"= {len(jobs)} panels, {args.workers} workers", flush=True)
