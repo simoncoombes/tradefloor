@@ -91,6 +91,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidates", required=True)
     ap.add_argument("--seeds", type=int, default=30)
+    ap.add_argument("--seed-start", type=int, default=None,
+                    help="first seed of a disjoint confirmation block")
     ap.add_argument("--years", type=int, default=5)
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--out", required=True)
@@ -98,7 +100,12 @@ def main() -> None:
 
     cands = json.loads(pathlib.Path(args.candidates).read_text(encoding="utf-8"))
     days = args.years * 252
-    seeds = list(gate_pick.TRAIN[: args.seeds])
+    if args.seed_start is None:
+        seeds = list(gate_pick.TRAIN[: args.seeds])
+    else:
+        seeds = list(range(args.seed_start, args.seed_start + args.seeds))
+        if set(seeds) & set(gate_pick.TRAIN):
+            sys.exit("the confirmation block overlaps the calibration seeds")
     jobs = [(c["label"], c["base"], c["overrides"], s, days)
             for c in cands for s in seeds]
     print(f"{len(cands)} candidates x {len(seeds)} seeds x {days} days "

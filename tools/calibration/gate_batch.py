@@ -115,12 +115,29 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidates", required=True)
     ap.add_argument("--seeds", type=int, default=30)
+    ap.add_argument(
+        "--seed-start", type=int, default=None,
+        help="first seed of a DISJOINT confirmation block, e.g. 201. Without "
+             "it the run uses the calibration seeds in gate_pick.TRAIN, which "
+             "is discovery rather than validation: a candidate found on those "
+             "seeds and re-measured on them reproduces its own fluctuation "
+             "exactly. Principle 6.")
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--out", default=None, help="write the verdicts as JSON")
     args = ap.parse_args()
 
     cands = load(args.candidates)
-    train = gate_pick.TRAIN[:args.seeds]
+    if args.seed_start is None:
+        train = gate_pick.TRAIN[:args.seeds]
+    else:
+        train = tuple(range(args.seed_start, args.seed_start + args.seeds))
+        overlap = set(train) & set(gate_pick.TRAIN)
+        if overlap:
+            sys.exit(f"--seed-start {args.seed_start} overlaps the calibration "
+                     f"seeds on {sorted(overlap)[:5]}; a confirmation block "
+                     "that shares seeds with discovery confirms nothing")
+    print(f"seeds {train[0]}-{train[-1]} "
+          f"({'calibration' if args.seed_start is None else 'DISJOINT'})", flush=True)
 
     jobs = []
     for c in cands:

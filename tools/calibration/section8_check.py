@@ -95,7 +95,11 @@ def median_panel(panels):
 
 def main():
     jobs = [(ax, s) for ax, (seeds, *_ ) in AXES.items() for s in seeds]
-    with mp.Pool(8) as p: res = p.map(job, jobs)
+    # 8 is the laptop default. On a 192 vCPU box four of these run side by
+    # side, one per candidate, so the pool size is the knob that decides
+    # whether the control finishes beside the candidate or an hour after it.
+    with mp.Pool(int(os.environ.get("PRETIUM_S8_WORKERS", "8"))) as p:
+        res = p.map(job, jobs)
     by = {}
     for ax, pn in res: by.setdefault(ax, []).append(pn)
     # The flip test wants band_distance_loss's per-statistic breakdown.
