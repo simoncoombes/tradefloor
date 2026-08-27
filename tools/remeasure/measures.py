@@ -416,18 +416,28 @@ def g_ranking(ctx: Ctx) -> dict:
     mr3 = {r.name: r for r in rk3.table()}["mean_reversion"]
     thin = min(range(len(rk3.reference_pnls)), key=rk3.reference_pnls.__getitem__)
 
-    # "every ratio above 1.0 it posts sits on one of the four thinnest
-    # denominators", and averaging the ten ratios instead of pooling them
-    # would read +0.61
+    # The page says "three of the four ratios above 1.0 it posts sit on the
+    # four thinnest denominators" -- three of four, not all of them. An
+    # earlier draft said "every", and the inventory row kept checking the
+    # earlier draft long after the sentence was corrected, so the gate
+    # reported a structural_fail against prose that was already right.
+    # Counted rather than asserted, so the report shows which way it moved.
+    #
+    # `c is not None` because capture is undefined where the reference P&L
+    # is at or below zero. That does not happen on this 30-name grid, but it
+    # does on a 20-name one, where the bare `c > 1.0` raises TypeError and
+    # takes the whole group down.
     thin4 = set(sorted(range(len(rk3.reference_pnls)),
                        key=rk3.reference_pnls.__getitem__)[:4])
-    gt1 = {i for i, c in enumerate(mr3.captures) if c > 1.0}
+    gt1 = {i for i, c in enumerate(mr3.captures) if c is not None and c > 1.0}
 
     return {
         "mr_beat_capture": mr_beat,
         "bh_beat_capture": bh_beat,
         "bh_beat_is_grid_max": bh_beat == grid_max,
         "mr3_gt1_all_on_4_thinnest": bool(gt1) and gt1 <= thin4,
+        "mr3_gt1_count": len(gt1),
+        "mr3_gt1_on_thin4": len(gt1 & thin4),
         "mr3_mean_of_ratios": sum(mr3.captures) / len(mr3.captures),
         "pooled_momentum": mom.pooled_capture,
         "pooled_mean_reversion": mr.pooled_capture,

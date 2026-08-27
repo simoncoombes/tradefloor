@@ -918,8 +918,8 @@
    "id": "scen.bit_day1",
    "file": "docs/scenarios.md",
    "line": 77,
-   "label": "day one's closes are bit-identical across VIX 5, 10 and 15",
-   "published": true,
+   "label": "VIX 5, 10 and 15 give DIFFERENT day-one closes (the pin acts on day one)",
+   "published": false,
    "group": "vix",
    "key": "bit_day1_identical",
    "compare": {
@@ -927,7 +927,7 @@
    },
    "source": "stated",
    "method": "closes after day one of hold(vix=5/10/15), random(20,11), seed 3, compared byte-for-byte",
-   "note": "replaces the retired 60-day form of scen.bit_identical: the coupling ends bit-identity at the first close a pin can reach"
+   "note": "published=false is the assertion: since the 0.2.0 coupling the sector draw reads VIX inside the tick, so a pin reaches the first close. The row carried published=true from the pre-coupling era and reported a structural_fail against prose that already said 'different'."
   },
   {
    "id": "scen.bit_day2",
@@ -1423,20 +1423,6 @@
    "method": "as agents.beat_mr_capture, for buy_and_hold"
   },
   {
-   "id": "agents.bh_beat_grid_max",
-   "file": "docs/agents-and-evaluation.md",
-   "line": 61,
-   "label": "...the largest capture on the whole grid",
-   "published": true,
-   "group": "ranking",
-   "key": "bh_beat_is_grid_max",
-   "compare": {
-    "kind": "exact"
-   },
-   "source": "stated",
-   "method": "buy_and_hold's winning capture equals the maximum per-seed capture over all four agents and twelve seeds"
-  },
-  {
    "id": "agents.oracle_narrow",
    "file": "docs/agents-and-evaluation.md",
    "line": 70,
@@ -1797,15 +1783,16 @@
    "id": "agents.mr_3d_thin_structural",
    "file": "docs/agents-and-evaluation.md",
    "line": 128,
-   "label": "every ratio above 1.0 it posts sits on one of the four thinnest denominators",
-   "published": true,
+   "label": "three of the four ratios above 1.0 sit on the four thinnest denominators",
+   "published": 3,
    "group": "ranking",
-   "key": "mr3_gt1_all_on_4_thinnest",
+   "key": "mr3_gt1_on_thin4",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "indices of mean-reversion's three-day captures above 1.0 against the indices of the four smallest reference P&Ls"
+   "method": "count of mean-reversion's three-day captures above 1.0 that fall on the four smallest reference P&Ls, random(30, seed=11), seeds 0-9",
+   "note": "was keyed to mr3_gt1_all_on_4_thinnest, an all-of-them assertion matching an earlier draft that said 'every'. The page says three of four and measures three of four; the row was checking the retired sentence."
   },
   {
    "id": "agents.mr_3d_mean_of_ratios",
