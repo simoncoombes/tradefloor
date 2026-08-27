@@ -539,7 +539,17 @@ GUIDE
 
 pretium publishes what it gets right and what it gets wrong: fourteen statistics measured against real markets, how long those results hold for, the roster they were measured on, and five known gaps. Each gap ends with a plain rule about what not to use the simulator for.
 
+This page is both loops, what the calibrated market is measured to reproduce. It is what bounds any claim from either. The two loops says which is which.
+
 ## Read This Before You Conclude Anything
+
+### What never to claim from a run
+
+- Good results here do not predict real returns. The market is synthetic. A strategy that earns in it has earned in it.
+- The realism certification is not an empirical train/test split. The bands were used both to tune against and to grade against, and "held out" means unseen seeds and rosters rather than withheld market data.
+- One run does not size a scenario. The expected response is calibrated and the dispersion around it is not, which is the scenario-magnitude gap.
+- Two runs are not comparable without naming the preset. Every preset is frozen under its own name, and a result recorded without one does not replay.
+- A capture ratio means nothing without its Oracle configuration and horizon. Both move the denominator, so both are quoted with any ratio.
 
 Any simulator will hand you a number for a question it cannot answer. This page tells you which questions it can, with the measurements behind each claim. Reading it first costs you five minutes. Finding out afterwards that your two-year backtest ran a year past the tested horizon costs you the study.
 
@@ -1021,6 +1031,8 @@ REFERENCE
 
 Atlas runs your measurement in hundreds of slightly different markets and builds a table of what came out. You then ask the table which model settings your result actually depends on.
 
+This page is Loop A, calibrating the market model. You do not need this to test a strategy. The two loops says which is which.
+
 ## What It Does, Step by Step
 
 - You name some model settings and a range for each. Say herding between 0 and 0.4.
@@ -1046,6 +1058,23 @@ If you already know which settings matter, run a search. If you do not, a search
 The other half of the problem was that nobody had measured how the settings move the outputs. Every search was a walk across a room no one had mapped, in a direction someone had guessed at. A survey maps it first. A Pareto front then puts every available trade side by side so a person picks, rather than an optimiser picking quietly.
 
 ## The Methods
+
+axes_forname the boxsurveysample itsensitivityprofile, paretoa human picksa vectorconfirmdisjoint seedsgatesthirty seedscontroloverfittingemit_preseta new name
+
+on seeds disjoint from the survey's, or confirm refuses to run
+MAP -- screening resolution
+PROVE -- full resolution
+
+thenthen
+then
+thenthen
+then
+
+A survey runs at screening resolution, which is enough
+to rank and describe and not enough to believe. Everything on the second
+row re-measures at full resolution, and the connector is the requirement
+confirm enforces: the seed blocks
+it is handed must be disjoint from the ones the survey recorded.
 
 MethodQuestion it answers
 
@@ -1480,6 +1509,8 @@ GUIDE
 
 Any object with an act method is an agent. This page is the whole contract with the harness: what it hands you, what you return, and how it scores you.
 
+This page is Loop B, evaluating a strategy against a market that already exists. The preset is a fixed input here. The two loops says which is which.
+
 ## The Contract
 
 An agent needs one method: act(obs) receives an Observation and returns a dict of share quantities keyed by ticker, where positive buys, negative sells, and a ticker you omit or set to zero does nothing. There is no base class to inherit and nothing to register, so any object with that method will do.
@@ -1677,6 +1708,8 @@ GUIDE
 # Presets and Custom Models
 
 The model's coefficients ship as named presets. You can change any settable coefficient at runtime, and the fingerprint makes sure a changed model can never pass as the shipped one.
+
+This page is Loop A, the coefficients a calibration produces. Loop B cites a preset rather than changing one. The two loops says which is which.
 
 ## Reasons to Touch the Model
 
@@ -2380,6 +2413,21 @@ The rule behind that move is worth stating, because it is what keeps two surface
 
 ## How a Price Is Built
 
+Factorsone normal, one uniformPrices-process, then breakerVolumespends phase 1's uniformSettlementthe book printsthenthenthen
+
+the uniform is stashed, not used
+
+the breaker runs again, on the print
+
+one tick, per company
+
+The order of operations is the model. The uniform drawn
+in phase 1 is not used there; it is consumed in phase 3, so a port that
+drew it where it is used would produce identical draw counts and a
+different stream. The circuit breaker is applied twice, and the second
+application is the one that matters, because the settled print becomes
+the next tick's reference.
+
 Layer 1: fair value from fundamentals. Each instrument gets a true value computed from its fundamentals, discounted at the prevailing rates. This anchor moves: when the central bank's meeting calendar moves the discount rate, fair value reprices per instrument. The one exception is a loss-maker valued off book value, which carries no discount rate.
 
 Layer 2: an autoregressive mispricing process. The market price wanders around fair value through a mispricing term with mean reversion, momentum and a herding component, plus news shocks. This wedge between price and value is the ground truth the truth table records, and its momentum term is what makes returns trend. Under pt-v1 that reads +0.249 at lag one against a real band around zero; the shipped pt-v12 turns the term down to 0.0186 and measures +0.0239, inside the band. The herding term is load-bearing for the model's identity, and the counterfactual is one line: ModelParams.from_preset("pt-v1", momentum_theta=0.05) measured in band, honestly fingerprinted as custom.
@@ -2889,6 +2937,18 @@ Function and symbol names from the original stay: simulateMarketTick, updateEcon
 
 No behavioural change. No trajectory moved, no preset was touched, and no golden vector was edited: 342 Rust tests, 1337 Python tests, the eight notebooks executing end to end, and the 46/46 golden verification all pass. The parity contract is untouched, including the rule in rust/goldens/README.md that the vectors must never be regenerated from the Rust, which survives word for word apart from the paths inside it.
 
+### Three new pages, and four that show their material instead of describing it
+
+A glossary, a page on the two loops, and the twelve principles this project works under. All three are authored as markdown in docs/ and rendered into the built site from that one source, so they cannot drift from it the way the two existing doc sets have.
+
+The glossary is the entry point the docs did not have. band, era boundary, capture ratio, structural, screening resolution and draw schedule each mean something specific here and something else elsewhere, and a reader who met one mid-page had no exit. Each term gets a one-line gloss and a link to the page that owns it, sourced from that page rather than rewritten, and terms no page owns say so.
+
+The two loops page separates calibrating the market model from evaluating a strategy against it. Both were called "training" and nothing on the site said they were different jobs with different seeds. atlas, trust, change and agents now each say in one line which loop they belong to.
+
+Four existing pages gained a shape for material they were assembling sentence by sentence: the four tick phases with the uniform that is drawn in phase 1 and spent in phase 3 and the circuit breaker that runs twice, the Loop A pipeline with the disjoint-seed requirement marked on the connector between mapping and proving, the three roles in pretium.loss with membership read from the module at build time, and a list on the realism page of what a run never licenses you to claim.
+
+No engine behaviour changed, no coefficient moved, and no existing published figure was edited.
+
 ### The brand commitments are now enforced by a test
 
 PRODUCT.md has said since the project began that the repository must not reference the commercial product the engine was ported from. Nothing checked it, and the checkable parts had drifted: a third-party site brief naming that product had been committed to tools/docs/ and sat in the public repository for three days, and eighteen published modules carried the original's file paths.
@@ -3328,6 +3388,23 @@ band_distance(value, low, high)Zero inside the band, distance to the nearer edge
 compare_to_real_markets(facts) · report(facts)Per-statistic verdicts, as data and as a printed table. Refuses to aggregate into one score.
 
 ## pretium.loss
+
+### What each of the fourteen does in the loss
+
+Each statistic has one of three roles, and the roles are one tuple
+each in pretium.loss. The third is
+derived as the complement of the first two, so promoting a statistic is a
+one-tuple edit and a statistic added to
+facts.REAL_MARKETS is excluded and
+reported by default rather than silently optimised against.
+
+rolemembers
+what the role means
+
+live target5 of 14
+annualised_vol_pctreturn_acf1abs_return_acf1abs_return_acf5cross_sectional_corrIn the loss with a band and a weight. The search moves these.constraint4 of 14
+excess_kurtosisvolume_abs_return_corrleverage_effectabs_return_acf20Measured and penalised outside its band, so an optimiser cannot break it for free.structural5 of 14
+volume_change_acf1corr_asymmetrycorr_asymmetry_laggedsector_excess_corrcorr_persistence_acf1Zero weight in the objective. Membership describes the objective rather than reachability: the shipped preset holds all five in band at the certified horizon.
 
 band_distance_loss(panel, seed_sd=None, bands=None)L_real: squared band distances in units of each statistic's own seed noise, summed over the live set. Returns the breakdown with the scalar inside it, never a bare float.
 seed_sd_from_panels(panels)Across-seed standard deviation per statistic, from per-seed panels.
