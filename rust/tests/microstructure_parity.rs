@@ -186,7 +186,7 @@ fn check(problems: &mut Vec<String>, note: &str, label: &str, got: f64, want_hex
 }
 
 #[test]
-fn pure_functions_match_typescript_bit_for_bit() {
+fn pure_functions_match_the_reference_bit_for_bit() {
     let vectors = load();
     let mut problems: Vec<String> = Vec::new();
     let mut compared = 0usize;
@@ -311,7 +311,7 @@ fn pure_functions_match_typescript_bit_for_bit() {
 }
 
 #[test]
-fn settlement_matches_typescript_in_output_and_in_draws_consumed() {
+fn settlement_matches_the_reference_in_output_and_in_draws_consumed() {
     let vectors = load();
     let mut problems: Vec<String> = Vec::new();
 

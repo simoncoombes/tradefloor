@@ -116,7 +116,7 @@ fn diff(label: &str, note: &str, got: f64, want_hex: &str) -> Option<String> {
 }
 
 #[test]
-fn matches_typescript_bit_for_bit() {
+fn matches_the_reference_bit_for_bit() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("goldens/marketmaker.json");
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {

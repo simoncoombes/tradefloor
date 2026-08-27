@@ -172,7 +172,7 @@ fn check_side(
 }
 
 #[test]
-fn matches_typescript_across_a_replayed_program() {
+fn matches_the_reference_across_a_replayed_program() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("goldens/orderbook.json");
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {

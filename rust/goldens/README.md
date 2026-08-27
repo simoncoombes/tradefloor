@@ -250,7 +250,7 @@ cost a day if missed.
 1. **`MISPRICING_PHI = Math.pow(0.5, 1/60)` is a transcendental result computed
    by V8 at module load.** Rust `f64::powf` may differ in the last ULP, and a
    one-ULP φ compounds through the entire `s`-process. Hardcode the literal from
-   `mispricing-constants.json` → `constants.MISPRICING_PHI.bits`
+   `mispricing-constants.json` -> `constants.MISPRICING_PHI.bits`
    (`3FEFA1E827A1B38C` = `0.9885140203528962`).
 
 2. **`clamp` is `x < lo ? lo : x > hi ? hi : x`.** NaN fails both comparisons and

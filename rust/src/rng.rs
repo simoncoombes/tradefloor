@@ -28,7 +28,7 @@
 //! Measured across all 60,000 recorded draws in `prng-normals.json` by
 //! `tests/prng_normals_full.rs`. **The first divergence is at draw 12.**
 //!
-//! `ts_parity_smoke.rs` checks six normals and passes — it stops six draws
+//! `reference_parity_smoke.rs` checks six normals and passes — it stops six draws
 //! short of the first mismatch. A test can pass because it is too small, and
 //! this is what that looks like.
 //!
