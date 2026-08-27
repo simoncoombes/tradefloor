@@ -25,6 +25,11 @@ hand, or manual and ordered so the irreversible steps come last.
 the day the version was tagged. A version without the date it shipped is half
 a citation.
 
+`date-released` is the field that goes stale silently. At 0.3.0 it still read
+`2026-08-26`, which is when v0.2.0 was tagged, sitting under `version: 0.3.0`.
+Nothing tests it, so it reaches a citation field pointing at the previous
+release. Set it to the day you intend to tag, and check it again at the tag.
+
 Then `cargo update -p pretium` so `Cargo.lock` follows, and rebuild
 (`maturin develop --release`) so the installed package reports the new
 number rather than the old one.
@@ -40,8 +45,28 @@ calls `sys.exit("CHANGELOG.md has no section for ...")`, the step runs under
 the time you see the failure the wheels are already on PyPI, which is the one
 step that cannot be undone. Write the section before you tag, not after.
 
-Prose, not a bulleted catalogue. No em dashes or en dashes anywhere: a test
-does not enforce this, a reader notices it.
+Prose, not a bulleted catalogue. No em dashes or en dashes anywhere.
+`tests/test_brand_commitments.py` enforces that on `CHANGELOG.md`.
+
+**Lead the section, then mark where the lead ends.** The whole section is what
+`release.yml` publishes as the GitHub release note and what the release-notes
+page renders, and this project writes changelog sections as essays: 0.3.0 ran
+to 2,370 words across eight subsections, which is the right permanent record
+and an unreadable release page.
+
+```markdown
+## X.Y.Z
+
+<what changed, what to pin, what got worse: a few hundred words>
+
+<!-- release-note-ends -->
+
+### the detail, and how it was measured
+```
+
+Everything above `<!-- release-note-ends -->` becomes the release note, and
+the page folds the rest behind a disclosure. A section without the marker
+publishes whole, which is what every version before 0.3.0 does.
 
 ### 3. Run the suite, including the slow half AND the Rust one
 
@@ -87,6 +112,25 @@ method no longer produces, and a figure it flags is a documentation defect
 until someone corrects it." Nothing in CI runs it, so if it is not run here
 the guarantee is a sentence rather than a process.
 
+**Check what it actually ran before reading it.** The report's header used to
+say "Full run" whatever `--only` was passed. The 0.3.0 report on disk covered
+3 of 30 groups and 54 of 308 figures in 3 seconds, said "Full run", and showed
+no `MOVED` rows at all, because the groups that move were never measured. A
+partial run now labels itself `PARTIAL RUN: n of N`, and `meta.groups_run` in
+`figures.json` is the field that settles it.
+
+**Run it on AWS, not here.** A 504-day 40-name measurement holds about 1.6 GB
+per worker, so eight workers is roughly 13 GB, and it has taken this machine
+out once mid-run. `tools/calibration/aws/user-data-remeasure.sh` runs it on a
+96-vCPU box: 285 figures in 301 seconds at 64 workers, about twenty cents.
+Sixty-four rather than ninety-six because `remeasure` uses a thread pool, so
+the ceiling is how much of the engine releases the GIL rather than the core
+count.
+
+**The `perf` group's figures are laptop-bound.** They are marked
+`machine_bound` and never fail, and a cloud run reports its own hardware. Do
+not let a cloud number rewrite a published laptop one.
+
 It writes `tools/remeasure/out/REPORT.md`. Read the **Doc edits needed**
 table: every row is a published number this build does not produce. `MOVED`
 after an engine change is an edit list, not a failure -- a new default preset
@@ -99,11 +143,57 @@ The last stored run is the record of what was current at that release. The
 106 reproduced against 165 MOVED and 5 `structural_fail`, which is what a
 release looks like when the preset moved and the prose did not follow yet.
 
+### 4b. Re-point the inventory before believing a MOVED row
+
+Run this whenever the documentation has been rewritten since the last
+release, which at an era boundary is always.
+
+```
+python tools/remeasure/resync.py --report      # says what it would do
+python tools/remeasure/resync.py --apply
+```
+
+`inventory.json` records, per published figure, the value the page states and
+the line it states it on. A docs rewrite moves both and nothing re-reads them,
+so the gate ends up comparing today's engine against yesterday's prose. At
+0.3.0 that produced **106 MOVED rows and three structural_fail rows, and not
+one of them was a documentation defect.** Fifty described content the rewrite
+had deleted, several were reading the wrong column of a table the page gets
+right, and the rest recorded a value the page no longer prints.
+
+`resync` re-points a row when the measured value appears exactly once on its
+page and the surrounding lines mention what the row measures, and retires a
+row only when neither the value nor its subject is there. Anything else it
+leaves for a human, and that residue needs reading rather than clearing.
+
+**Three of the 0.3.0 rows were the measurement tool, not the inventory.**
+`measures.py` called `separation("momentum", "mean_reversion")` where the page
+prints `separation("mean_reversion", "momentum")`, which reverses every win
+count, and compared momentum to random where the page compares mean-reversion
+to random -- a different test. The horizon bullet measured momentum's capture
+where the page says "the same mean-reversion agent". When a row disagrees,
+check what the tool measures against what the page claims before editing
+either.
+
+The gate is worth reading only once it comes back clean. 0.3.0 finished at 285
+figures, 199 reproduced, zero MOVED.
+
 ### 5. Rebuild the documentation site
 
 ```
 python tools/docs/build_site.py
 ```
+
+Build it, commit, then build again. Each page's `dateModified` comes from the
+last commit touching its sources, which include `CHANGELOG.md` and the files
+under `tools/docs/`, so committing those moves the date the next build writes.
+The second build is the no-op that proves it settled. A build that still
+dirties the tree on the third run is a bug rather than churn.
+
+Adding a page needs three things and asserts on all of them: a markdown file
+in `docs/`, an entry in `newpages.NEW_PAGES`, and a description in
+`seo.DESCRIPTIONS` of 120 to 165 characters. The build fails naming the
+missing one.
 
 It reads the version from `pyproject.toml`, so the nav badge and the BibTeX
 block follow automatically. Two version strings in the bundle are HISTORY
@@ -133,6 +223,13 @@ any relative link and on any absolute link naming a file that is not there.
 gh workflow run determinism.yml --ref <branch> -f targets=all
 ```
 
+**Read the run you just started, not the newest one in the list.**
+`gh run list --workflow=determinism.yml --branch <b> --limit 1` returns the
+previous run until the new one registers, and that previous run is green on an
+older commit. Take the run id from the `gh workflow run` output or from
+`gh run view <id>`, and check `headSha` matches the commit you mean to tag.
+Reading the wrong row is a green tick on the wrong artefact.
+
 `targets=all` is spelled out because the dispatch default is `unverified`,
 which runs only `macos-x86_64` and `windows-x86_64`. Those two are the
 default because nothing else in the project touches them: `macos-arm64` is
@@ -151,6 +248,32 @@ It also runs on pushes to `main` touching `rust/**`, `python/**`,
 `pyproject.toml` or the workflow itself, so on a release from `main` it has
 usually already run. A tag push runs all five regardless of any input: a
 release must not ship on a partial gate.
+
+## Shipping it, in order
+
+The seven steps above run on `dev`. This is what puts them out.
+
+1. **Push `dev`.** An AWS run clones the branch, so anything the release
+   needs has to be on the remote before it is launched.
+2. **Merge to `main` and push.** Pages serves from `main/docs`, so this is
+   the step that publishes the site. Nothing before it is visible to a reader.
+3. **Dispatch the determinism gate on `main` with `targets=all`** and wait.
+   The push itself fires the gate at two targets, not five.
+4. **Check the tag target is the gated commit.** `git rev-parse HEAD` against
+   the run's `headSha`, compared rather than assumed.
+5. **Tag and push the tag.** That is the irreversible step: a PyPI version
+   number cannot be reused.
+6. **Publish the crate.** Separate registry, separate command, below.
+7. **Check docs.rs.** A 404 in the first minutes is the build queue, not a
+   failure. Compare against an earlier version: if `0.2.0` returns 200 and the
+   new one still 404s after ten minutes, the build failed and the crate page
+   says why.
+
+**Check the branch after any step that moves branches.** A `git push origin
+main` run from `dev` reports `Everything up-to-date` and pushes nothing, which
+reads exactly like a successful deploy. `git branch --show-current` after
+every checkout or merge, and compare `git rev-parse --short main origin/main`
+before believing a push.
 
 ## Tagging
 
@@ -229,6 +352,11 @@ crates.io versions are permanent and cannot be replaced, only yanked.
 | `calibrate.py --help` crashed on a literal `%` in prose | trying to use it | `tests/test_tool_help.py`, every tool in the directory |
 | a release job half-published: wheels up, sdist refused, no way to replace | the job failed after uploading | `skip-existing`, so a re-run fills the gap |
 | the docs site claimed the package was unreleased | reading the built page | the build asserts on that text and fails |
+| the re-measurement gate ran 3 of 30 groups and reported "Full run" | reading `meta.groups_run` after the report looked too clean | a partial run prints `PARTIAL RUN: n of N` |
+| 106 figures reported as MOVED, none of them a documentation defect | checking three of them against the page by hand | `resync.py`, run before the gate is believed |
+| two gate rows measured a different pair, and a different agent, from the ones the page names | the rows disagreeing with prose that was right | the measurement follows the call the page prints |
+| `CITATION.cff` shipped the previous release's date | reading the field at the tag | it is named in step 1 as the field that goes stale |
+| a push reported `Everything up-to-date` while the fix sat on another branch | comparing SHAs rather than reading the push output | the branch check in the shipping list |
 
 The pattern in all five: **correct everywhere the author looks, wrong only in
 the destination.** That is why the checks above run against the artifact
