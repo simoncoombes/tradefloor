@@ -264,7 +264,19 @@ jobs:
               sys.exit(f"CHANGELOG.md has no section for {version}. A release "
                        f"without notes is a tag, and the point of using "
                        f"releases is that it is not one.")
-          print(m.group(1).strip())
+          body = m.group(1)
+          # A release note and a changelog entry are read by different people
+          # in different states of patience. The 0.3.0 section is 2,370 words
+          # across eight subsections, which is the right permanent record and
+          # an unreadable release page. Everything above the marker is the
+          # note; everything below it stays in the file.
+          #
+          # Sections without the marker publish whole, so every tag before
+          # this change still cuts the notes it always did.
+          MARKER = "<!-- release-note-ends -->"
+          if MARKER in body:
+              body = body.split(MARKER, 1)[0]
+          print(body.strip())
           PY
 
           # The determinism digest belongs in the notes. It is the claim the

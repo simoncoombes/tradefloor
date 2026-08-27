@@ -2,6 +2,45 @@
 
 ## 0.3.0
 
+**`pt-v12` is the default.** It is the first preset that looks like a real
+market over two years as well as one.
+
+| in band | before (`pt-v10`) | now (`pt-v12`) |
+|---|---|---|
+| over one year | 14 of 14 | 14 of 14 |
+| **over two years** | 13 of 14 | **14 of 14** |
+| on a roster it was never tuned on | 14 of 14 | 14 of 14 |
+
+Thirty-seed medians. The two-year row is the one that moved, and it was not
+paid for at one year or on a fresh roster.
+
+**Results recorded without naming a preset will differ.** Every earlier preset
+still exists and still reproduces bit for bit, so pin it if you have numbers to
+reproduce:
+
+```python
+eng = pt.Engine(seed=42, universe=u, model="pt-v10")   # exactly as before
+```
+
+**What was wrong.** Volume stopped responding to a move at four percent, so a
+stock down twelve traded like one down four. That single cap had been in the
+engine since the first version and nobody had chosen it.
+
+**What got worse.** Driven by a real macro path, daily swings run 1.57x as wide
+as the real stock they are compared against, against 1.555x before. It is
+written up as the `scenario-magnitude` gap.
+
+Seventeen new settings, all shipping at the value the engine already used, so
+no preset from `pt-v1` to `pt-v10` moves.
+
+The documentation was audited against the engine and corrected, every published
+figure was re-measured, and there are three new pages: a glossary, the two
+loops, and the principles.
+
+Everything below is the detail behind those claims.
+
+<!-- release-note-ends -->
+
 ### `pt-v12` is the new default: two years in band, from one number
 
 **What changed for you.** Every simulation now runs `pt-v12` unless you ask
