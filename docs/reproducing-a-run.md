@@ -32,7 +32,7 @@ against the wrong starting conditions is a thing you have to do on purpose.
 
 ```python
 pt.version()                      # '0.2.0'
-pt.model_preset()["name"]         # 'pt-v10', the shipped default
+pt.model_preset()["name"]         # 'pt-v12', the shipped default
 ```
 
 Coefficients ship as a named preset rather than as constructor keywords, so
@@ -210,6 +210,18 @@ again. Treat "the same seed gives the same market on any platform" as
 measured for all five targets at `ad91026`, and as engineering intent --
 backed by a test that no platform-varying transcendental reaches the source
 (`rust/tests/mathx_parity.rs`) -- for the current baseline.
+
+<!-- STALE, needs a measured number before this paragraph is true again.
+     The pt-v10 -> pt-v12 era boundary moved every seeded trajectory: pt-v11
+     added the crisis work and pt-v12 replaced the hard-coded 4.0 volume-move
+     cap in tick.rs with volume_move_cap 12.0, both of which the known-answer
+     digest covers. So "the current digest, 1ee64998...fe3581c at v8" is no
+     longer the current one. The replacement known-answer version and digest
+     were not supplied with the era-boundary measurements, so the sentence is
+     left as written rather than guessed at; regenerate it from
+     tests/known_answer.json and say which platform confirmed it. The
+     preceding five-target and two-platform records are at named commits and
+     stay true as history. -->
 
 **Across versions, not at all.** A change to a coefficient, to the universe
 generator, or to the engine moves every seed's trajectory. This is why the

@@ -293,7 +293,7 @@ crisis -56.6869  95.0928
 
 6.06 11.69          # shortfall bps, calm then VIX 45</code></pre>
         </div>
-        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Every line in that block is a measurement on pretium 0.2.0 under pt-v10, from the code above it. The scenario rows are elided in the middle and rounded to two decimals; nothing else is edited. Note what the path actually does: <code style="font-size:12.5px">vix_shock</code> puts the peak on day <code style="font-size:12.5px">at</code> and decays it over the window, rather than ramping up to it.</p>
+        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Every line in that block is a measurement on pretium 0.2.0 under pt-v10, the default before 0.3.0, from the code above it and left as measured rather than relabelled. The scenario rows are elided in the middle and rounded to two decimals; nothing else is edited. Note what the path actually does: <code style="font-size:12.5px">vix_shock</code> puts the peak on day <code style="font-size:12.5px">at</code> and decays it over the window, rather than ramping up to it.</p>
         <p>Volatility goes from 40% to 68%, and correlation climbs with it, 0.49 to 0.62. The strategy's drawdown grows, and you can separate the causes: fair value repricing, wider spreads, and a cross-section that stopped diversifying. Execution cost nearly doubles on all twelve seeds, so that result belongs to the regime rather than to one path.</p>
         <p>Do not quote the sizes as real. A crisis here is about four fifths as violent as a real one (gap 5), and the pinned pair above is a different measurement again. Read the direction and the ordering; leave the magnitudes alone.</p>
 </main>

@@ -18,10 +18,11 @@ pretium does not publish one. It publishes this envelope instead: the
 statistics it matches, the horizon it matches them at, the axes the claim
 survives, and every gap that has been measured rather than assumed.
 
-Every number on this page is measured against the shipped default preset
-with a verified known-answer digest, so the claims and the caveats share a
-provenance. Numbers here are reproducible; the section at the end says how,
-and says exactly which runs produced them.
+Every number on this page is measured rather than asserted, and where a
+figure has not been re-measured since an earlier preset the text names the
+preset it belongs to, so the claims and the caveats share a provenance.
+Numbers here are reproducible; the section at the end says how, and says
+exactly which runs produced them.
 
 If you want to know what any of these statistics actually measures, and
 what a failure on it means for your results,
@@ -30,34 +31,37 @@ parameters move them, or which move YOUR result, see [Atlas](atlas.md).
 
 ## The claim, in one sentence
 
-**At a 252-day measurement horizon, the shipped `pt-v10` preset matches ALL
+**At a 252-day measurement horizon, the shipped `pt-v12` preset matches ALL
 FOURTEEN realism statistics pretium measures, on thirty calibration seeds
 and on a held-out 60-name universe measured at the same resolution.** At 504
-days it holds thirteen, and the gaps below say which and why.
+days, measured against bands re-derived at that length, it holds all
+fourteen as well. On a held-out set of seeds it holds thirteen, and the axes
+section below says which and why. The certified horizon is still 252 days,
+because that is the horizon the certification was measured at.
 
 ## What is certified
 
-Shipped default `pt-v10`, 30 seeds, 40 instruments, 252 trading days.
+Shipped default `pt-v12`, 30 seeds, 40 instruments, 252 trading days.
 Bands are `pretium.facts.REAL_MARKETS`, derived from real-market windows
 of the same length by the method in the calibration docs.
 
 | statistic | measured | band | verdict |
 |---|---|---|---|
-| `annualised_vol_pct` | +31.4632 | 15.0 to 36.0 | in band |
-| `excess_kurtosis` | +7.7618 | 1.6 to 41.0 | in band |
-| `return_acf1` | +0.0195 | -0.08 to 0.06 | in band |
-| `abs_return_acf1` | +0.0994 | 0.02 to 0.22 | in band |
-| `abs_return_acf5` | +0.0487 | 0.02 to 0.09 | in band |
-| `abs_return_acf20` | +0.0043 | -0.04 to 0.08 | in band |
-| `cross_sectional_corr` | +0.3063 | 0.08 to 0.56 | in band |
-| `volume_abs_return_corr` | +0.4784 | 0.46 to 0.66 | in band |
-| `leverage_effect` | -0.0336 | -0.16 to 0.0 | in band |
-| `volume_change_acf1` | -0.3130 | -0.32 to -0.2 | in band |
-| `corr_asymmetry` | -0.0034 | -0.25 to 0.45 | in band |
-| `corr_asymmetry_lagged` | +0.0054 | -0.2 to 0.55 | in band |
-| `sector_excess_corr` | +0.1346 | 0.11 to 0.23 | in band |
-| `corr_persistence_acf1` | +0.1622 | -0.19 to 0.54 | in band |
-Band-distance loss `L_real` = **0.0000**, and every statistic is inside its band: pt-v10 is the first preset with no miss at this horizon. The volume-change row was called structurally unreachable until 2026-08-26; gap 1 below says what changed. `corr_persistence_acf1` also carries a 504-day band of 0.19 to 0.49, which is the one that can judge it: twelve 21-day windows in a year cannot.
+| `annualised_vol_pct` | +32.7604 | 15.0 to 36.0 | in band |
+| `excess_kurtosis` | +6.7001 | 1.6 to 41.0 | in band |
+| `return_acf1` | +0.0239 | -0.08 to 0.06 | in band |
+| `abs_return_acf1` | +0.1107 | 0.02 to 0.22 | in band |
+| `abs_return_acf5` | +0.0428 | 0.02 to 0.09 | in band |
+| `abs_return_acf20` | +0.0040 | -0.04 to 0.08 | in band |
+| `cross_sectional_corr` | +0.3177 | 0.08 to 0.56 | in band |
+| `volume_abs_return_corr` | +0.5599 | 0.46 to 0.66 | in band |
+| `leverage_effect` | -0.0401 | -0.16 to 0.0 | in band |
+| `volume_change_acf1` | -0.2656 | -0.32 to -0.2 | in band |
+| `corr_asymmetry` | -0.0147 | -0.25 to 0.45 | in band |
+| `corr_asymmetry_lagged` | +0.0181 | -0.2 to 0.55 | in band |
+| `sector_excess_corr` | +0.2079 | 0.11 to 0.23 | in band |
+| `corr_persistence_acf1` | +0.1525 | -0.19 to 0.54 | in band |
+Band-distance loss `L_real` = **0.0000**, and every statistic is inside its band: `pt-v10` was the first preset with no miss at this horizon, and `pt-v12` is the first to carry that to 504 days as well. The volume-change row was called structurally unreachable until the `pt-v10` era boundary and was still out of band at two years until `pt-v12`; the retired-gap note below says what changed. `corr_persistence_acf1` also carries a 504-day band of 0.19 to 0.49, which is the one that can judge it: twelve 21-day windows in a year cannot. It reads 0.2077 there, inside.
 
 ## The claim survives the axes it was not fitted to
 
@@ -68,88 +72,115 @@ calibration never saw:
 | axis | seeds | result |
 |---|---|---|
 | training seeds (101-130), 40 names | 30 | **14/14** in band |
-| **held-out seeds** (1-30), 40 names | 30 | **14/14** in band |
+| **held-out seeds** (1-30), 40 names | 30 | **13/14** in band, missing `corr_persistence_acf1` |
 | **held-out universe** (60 names, seed 909), held-out seeds | 30 | **14/14** in band |
 
-All three re-measured on pt-v10 for this release, at the same thirty-seed
-resolution as the certification itself. Nothing the calibration fitted to is
-load-bearing: the same fourteen statistics land in band on seeds it never
-used and on a universe it never saw.
+All three re-measured on `pt-v12` at the same thirty-seed resolution as the
+certification itself. Almost nothing the calibration fitted to is
+load-bearing: fourteen of fourteen land in band on a universe the model
+never saw, and thirteen of fourteen on seeds it never used. The single miss
+is `corr_persistence_acf1`, which is the statistic this page already warns
+is the hardest of the fourteen to estimate at a one-year window.
 
 **Read the resolution before the count.** The project's gate tool screens
-held-out axes on six seeds, and at six seeds both held-out rows read 13/14,
-dropping `corr_persistence_acf1`. That is a property of six seeds rather
-than of the model: the statistic's across-seed standard deviation is 0.28,
-and its estimate moves from -0.220 at six seeds to +0.183 at thirty, against
-a band floor of -0.19. An earlier draft of this page reported the six-seed
-count as though it were the certified one. On the same held-out universe and
-the same thirty seeds, `pt-v3` holds twelve of fourteen.
+held-out axes on six seeds, which is not enough for that statistic. Measured
+on `pt-v10`, its across-seed standard deviation was 0.28 and its estimate
+moved from -0.220 at six seeds to +0.183 at thirty, against a band floor of
+-0.19: a six-seed miss on this row is a property of six seeds rather than of
+the model. An earlier draft of this page reported the six-seed count as
+though it were the certified one. What is different under `pt-v12` is that
+the held-out-seed row misses it at thirty seeds too, so the miss is now
+reported in the table above rather than argued away, and the 504-day band of
+0.19 to 0.49 is the ruler that can settle it. On the same held-out universe
+and the same thirty seeds, `pt-v3` holds twelve of fourteen.
 
 ## The gaps, measured
 
-Six, down from eight at 0.1.4. Two closed at the era boundary and are
-recorded here rather than deleted quietly. **Tails are too thin over
-multi-year windows** closed because excess kurtosis at 504 days moved from
-5.23, below its band, to 8.26, inside it; it sits about 0.3 seed-sd above
-the floor, so Gap 2 carries the caution that remains. **The model has no
-sector structure** closed because `sector_excess_corr` moved from 0.0037 to
-0.1346 at 252 days and 0.1201 at 504, inside both bands, on training seeds
-and on a held-out universe. What that gap said about crises did not close,
-and is now measured under Gap 4.
+Five, down from six at the `pt-v12` boundary and from eight at 0.1.4. Three
+have closed, and they are recorded here rather than deleted quietly.
 
-### Gap 1: volume change, reachable since the era boundary and not before
+**Tails are too thin over multi-year windows** closed because excess
+kurtosis at 504 days moved from 5.23, below its band, to 8.26 under `pt-v10`
+and 7.7528 under `pt-v12`, inside it both times. It clears the 7.1 floor by
+0.65, so Gap 1 carries the caution that remains.
 
-`volume_change_acf1` is the autocorrelation of day-to-day volume changes.
-Every preset through pt-v9 read about -0.42 against a real band of -0.32 to
--0.20, and this page called it unreachable without spending a passing
-statistic, because the engine's common log-volume state reaches the band and
-takes `volume_abs_return_corr` out with it: a market-wide volume multiplier
-adds volume variance unrelated to any name's own moves.
+**The model has no sector structure** closed because `sector_excess_corr`
+moved from 0.0037 to 0.2079 at 252 days and 0.1761 at 504, inside both
+bands, on training seeds and on a held-out universe. What that gap said
+about crises stayed open through `pt-v11` and closed at `pt-v12`; the
+measurement that closed it is recorded under Gap 3.
 
-That trade was real, and it was priced on the pt-v3 era base. On the pt-v10
-base both bands are reachable together, in a window about 0.03 wide in the
-innovation sigma. The default now reads **-0.3130** on the statistic and
-**0.4784** on the correlation, both inside. Calibration record §73.
+**Volume change cannot be reached without spending a passing statistic**
+closed in two steps, and the second step is what took this list from six
+gaps to five. `volume_change_acf1` is the autocorrelation of day-to-day
+volume changes. Every preset through pt-v9 read about -0.42 against a real
+band of -0.32 to -0.20, and this page called the row unreachable because the
+engine's common log-volume state reaches the band and takes
+`volume_abs_return_corr` out with it: a market-wide volume multiplier adds
+volume variance unrelated to any name's own moves. That trade was real, and
+it was priced on the pt-v3 era base. On the pt-v10 base both one-year bands
+became reachable together, in a window about 0.03 wide in the innovation
+sigma, and the row read -0.3130 at 252 days but -0.3156 at 504 against a
+band of -0.29 to -0.21, outside it (calibration record §73). What closed the
+two-year half was not more volume memory but `volume_move_cap`, shipped at
+12.0 in `pt-v12`. The cap had been a hard-coded literal 4.0 in `tick.rs`,
+which saturated a name's volume response at a 4% daily move, so every crisis
+day traded like a bad Tuesday. Lifting it reads **-0.2656** at 252 days and
+**-0.2572** at 504, inside both, with `volume_abs_return_corr` at 0.5599 and
+0.6088, also inside both. A strategy trading the change in volume is now
+inside the envelope at one year and at two.
 
-**What remains.** At 504 days the band tightens to -0.29 to -0.21 and the
-default reads -0.3156, outside it. Longer volume memory moves the figure the
-wrong way, and reaching the two-year band needs a bigger innovation, which
-takes the correlation through its one-year floor. **So a strategy trading
-the change in volume is on solid ground at one year and outside the envelope
-at two.**
-
-### Gap 2: the certified horizon is 252 days, and the model does not hold beyond it
+### Gap 1: certification is a 252-day measurement, and the horizon is not free
 
 The statistics are horizon-dependent, and the model is roughly five times
-more horizon-sensitive than the market it imitates. Measured against
-bands re-derived at the *matching* 504-day window, not the 252-day bands,
-which would be the wrong ruler, the shipped model holds **13 of 14**, missing only the volume-change row:
+more horizon-sensitive than the market it imitates.
+<!-- FLAG: the "five times more horizon-sensitive" ratio was measured in the
+     pt-v10 era and has not been re-measured on pt-v12. -->
+Measured against bands re-derived at the *matching* 504-day window, not the
+252-day bands, which would be the wrong ruler, the shipped model holds
+**14 of 14**:
 
 | statistic | 252d | 504d | 504-matched band | verdict at 504d |
 |---|---|---|---|---|
-| `annualised_vol_pct` | 31.46 | 32.69 | 16 to 34 | in |
-| `excess_kurtosis` | 7.76 | 8.26 | 7.1 to 22 | in |
-| `return_acf1` | 0.0195 | 0.0213 | -0.03 to 0.04 | in |
-| `abs_return_acf1` | 0.0994 | 0.1749 | 0.04 to 0.22 | in |
-| `abs_return_acf5` | 0.0487 | 0.0830 | 0.02 to 0.1 | in |
-| `abs_return_acf20` | 0.0043 | 0.0088 | -0.02 to 0.07 | in |
-| `cross_sectional_corr` | 0.3063 | 0.3533 | 0.23 to 0.41 | in |
-| `volume_abs_return_corr` | 0.4784 | 0.5174 | 0.48 to 0.65 | in |
-| `leverage_effect` | -0.0336 | -0.0375 | -0.13 to 0.02 | in |
-| `volume_change_acf1` | -0.3130 | -0.3156 | -0.29 to -0.21 | **out** |
-| `corr_asymmetry` | -0.0034 | 0.0133 | -0.04 to 0.13 | in |
-| `corr_asymmetry_lagged` | 0.0054 | -0.0247 | -0.1 to 0.47 | in |
-| `sector_excess_corr` | 0.1346 | 0.1201 | 0.11 to 0.22 | in |
-| `corr_persistence_acf1` | 0.1622 | 0.1908 | 0.19 to 0.49 | in |
+| `annualised_vol_pct` | 32.76 | 33.89 | 16 to 34 | in |
+| `excess_kurtosis` | 6.70 | 7.75 | 7.1 to 22 | in |
+| `return_acf1` | 0.0239 | 0.0250 | -0.03 to 0.04 | in |
+| `abs_return_acf1` | 0.1107 | 0.2084 | 0.04 to 0.22 | in |
+| `abs_return_acf5` | 0.0428 | 0.0864 | 0.02 to 0.1 | in |
+| `abs_return_acf20` | 0.0040 | 0.0052 | -0.02 to 0.07 | in |
+| `cross_sectional_corr` | 0.3177 | 0.3797 | 0.23 to 0.41 | in |
+| `volume_abs_return_corr` | 0.5599 | 0.6088 | 0.48 to 0.65 | in |
+| `leverage_effect` | -0.0401 | -0.0543 | -0.13 to 0.02 | in |
+| `volume_change_acf1` | -0.2656 | -0.2572 | -0.29 to -0.21 | in |
+| `corr_asymmetry` | -0.0147 | -0.0049 | -0.04 to 0.13 | in |
+| `corr_asymmetry_lagged` | 0.0181 | -0.0017 | -0.1 to 0.47 | in |
+| `sector_excess_corr` | 0.2079 | 0.1761 | 0.11 to 0.22 | in |
+| `corr_persistence_acf1` | 0.1525 | 0.2077 | 0.19 to 0.49 | in |
 
-**Consequence: pretium is not certified for multi-year backtests.** Not
-because the two-year panel is bad, since one row of fourteen misses it, but
-because certification is a measurement and this one was taken at 252 days.
-Two figures deserve a reader's caution at the longer horizon: excess
-kurtosis sits inside its band at 8.26 but only about 0.3 seed-sd above the
-floor of 7.1, and beyond 504 days nothing has been measured at all.
+**Consequence: pretium is still not certified for multi-year backtests, and
+the reason is now only the measurement.** The two-year panel is not bad, and
+since `pt-v12` no row of the fourteen misses it. Certification remains a
+252-day claim because that is where it was taken, on the axes above, and a
+504-day claim would have to be certified the same way before it could be
+quoted the same way.
 
-### Gap 3: volatility memory has the wrong *shape* rather than the wrong length
+Three figures deserve a reader's caution at the longer horizon. Volatility
+reads 33.89 against a 34.0 ceiling, clearing it by about a tenth of a point.
+`corr_persistence_acf1` reads 0.2077 against a 0.19 floor. Excess kurtosis
+reads 7.75 against a 7.1 floor. None of the three has room to spare, and a
+single seed can sit on the wrong side of any of them.
+
+**Beyond 504 days is now measured, and that sentence used to say
+otherwise.** `pt-v12` has been run to 756, 1260 and 2520 days on thirty
+seeds. At 2520 days it holds 10 of 14, but against the 504-day bands, which
+are the wrong ruler for a ten-year window and are quoted here only because
+no ten-year bands have been derived. The one thing that ruler does settle is
+that nothing runs away: annualised volatility year by year over the ten
+years reads 31.5, 35.6, 30.2, 33.5, 33.0, 33.1, 31.3, 32.4, 32.4 and 31.6
+percent, which is flat. A long run drifts out of the panel because the
+statistics move with the window, not because the market it describes decays.
+
+### Gap 2: volatility memory has the wrong *shape* rather than the wrong length
 
 Real markets' volatility autocorrelation decays hyperbolically. The
 model's decays exponentially, because it is built from exponentials: a
@@ -158,6 +189,11 @@ exponentials fake a power law well enough that no statistic in the panel
 objects. The fake thins out as the window grows.
 
 Measured at the certified horizon, 30 seeds, median across instruments:
+
+<!-- FLAG: this decay curve, the log-log slopes below it and the
+     two-component mixture result were measured in the pt-v10 era and have
+     not been re-measured on pt-v12. The gap is a mechanism gap and pt-v12
+     changed no variance mechanism, but the figures are an earlier era's. -->
 
 | lag | model | real markets |
 |---|---|---|
@@ -190,23 +226,29 @@ memory beyond about two weeks.** Vol-targeting and risk-parity overlays
 that use a one-month or longer volatility estimate are outside the
 envelope.
 
-### Gap 4: scenario response is directional rather than calibrated
+### Gap 3: a scenario's size is right on average and unreliable in one run
 
-Two separate quantities, and they fail differently.
+Two separate quantities, and they fail differently. The first one no longer
+fails, and that is the change at this era boundary.
 
 **The steady-state lever**, how much more violent a sustained crisis is
-than a calm market, reads **×5.05** against real markets' **×6.16**, about
-four fifths, up from ×3.07 at the previous default. It is measured from a
-held VIX 5 to a held VIX 65 on the certified 40-name roster over 252 days at
-thirty seeds, which is not the quantity a pair of pinned 120-day runs on a
-20-name roster gives (that reads about ×2.8 from VIX 15 to VIX 45). Three
+than a calm market, reads **×6.04** against real markets' **×6.16**, up from
+×5.05 at `pt-v10` and ×3.07 at the default before that. It is measured from
+a held VIX 5 to a held VIX 65 on the certified 40-name roster over 252 days
+at thirty seeds, which is not the quantity a pair of pinned 120-day runs on
+a 20-name roster gives (that reads about ×2.8 from VIX 15 to VIX 45). Three
 numbers on this site describe how violent a crisis is; check which one you
 are reading. This is a ratio of annualised **volatility** at high VIX to
 volatility at low VIX; it is not a correlation lever, and a mechanism that
 only reallocates variance between the market factor and the idiosyncratic
-term cannot move it by construction. Crisis correlation is a separate
-quantity and is already near the real crisis band: pinned VIX 45 reads
-0.66 and VIX 65 reads 0.73.
+term cannot move it by construction. It moved across two presets: `pt-v11`'s
+crisis work (`crisis_blend_gain`, `sector_vix_coupling`, endogenous news
+with peer transfer) and then `pt-v12` lifting `volume_move_cap` off the
+literal 4.0 that had been compiled into `tick.rs`, which saturated a name's
+volume response at a 4% daily move and left the engine no way to trade a
+crisis day differently from a bad Tuesday. Crisis correlation is a separate
+quantity and is inside the real crisis range: at a held VIX 45 co-movement
+reads 0.696 against a real 0.664 to 0.727.
 
 **The direction of response is right, and that is measured rather than
 asserted.** Driving the real 2020-21 macro path through the model and

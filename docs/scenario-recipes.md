@@ -298,9 +298,12 @@ and credit scenarios, which move fair value directionally, with
 
 Every "in this model" figure on this page was measured on engine commit
 `9b485a0`, pretium 0.1.0, under model preset `pt-v1`, which was the default
-at the time and is not any more. The shipped default is now `pt-v10`, so
-these figures describe an earlier era. Every one of them is an inventory row
-in the re-measurement harness under the group `recipes`:
+at the time and is not any more. The shipped default is now `pt-v12`, so
+these figures describe an earlier era, and by now a distant one. `pt-v1` is
+still selectable and still reproduces bit for bit, so every number below is
+re-runnable exactly as written; it is just no longer what a default run
+produces. Every one of them is an inventory row in the re-measurement harness
+under the group `recipes`:
 
 ```
 .venv/bin/python tools/remeasure/remeasure.py --only recipes
@@ -533,9 +536,25 @@ market factor, so a crisis VIX is a correlation regime as well as a volatility
 regime, and diversification measurably stops working, which is what a real
 crisis does to a portfolio.
 
+<!-- ERA CHECK (pt-v12 boundary): the blend itself survives and is now well
+     calibrated -- pt-v12 crisis sector excess at held VIX 45 is +0.109 against
+     a real +0.103, and crisis co-movement 0.696 against a real 0.664 to 0.727.
+     The threshold "25.5" is a pt-v1 constant and pt-v11 added crisis_blend_gain
+     and sector_vix_coupling on top of it. No measured pt-v12 threshold was
+     supplied, so the number is left as written rather than guessed at. -->
+
+
 The response saturates: the factor's variance is clamped at 8× its baseline,
 so pushing `peak` from 80 to 120 buys almost nothing. Recipe 3 sits near the
 top of the usable range already.
+
+<!-- ERA CHECK (pt-v12 boundary): "8x" is a pt-v1 constant. pt-v12's one change
+     over pt-v11 was raising a saturating cap of exactly this kind -- the
+     hard-coded volume_move_cap literal 4.0 in tick.rs, now 12.0 -- so a
+     saturation claim in this family is worth re-measuring. That cap is on the
+     volume response, not on factor variance, and no measured pt-v12 figure for
+     the variance clamp was supplied, so the sentence stands unchanged. -->
+
 
 Measured on price instead, the same config reports a median **−8.29%** and a
 worst name at **−13.07%** on sim seed 5, but per the seed band under rule 3,

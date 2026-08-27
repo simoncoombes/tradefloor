@@ -8,16 +8,17 @@ rack: experiment
 
 The model's coefficients ship as a named, versioned preset. A preset names
 the complete set, frozen and documented: the variance processes, the factor
-structure, the mispricing dynamics and the guards. **`"pt-v10"` is the
-current default**; most users never touch it. `"pt-v1"` and `"pt-v2"` remain
-selectable and bit-reproducing forever.
+structure, the mispricing dynamics and the guards. **`"pt-v12"` is the
+current default**; most users never touch it. Every earlier preset, `"pt-v1"`
+through `"pt-v11"`, remains selectable and bit-reproducing forever.
 
 ```python
-eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the default, spelled out
+eng = pt.Engine(seed=42, universe=u, model="pt-v12")  # the default, spelled out
+eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the previous default, still exact
 eng = pt.Engine(seed=42, universe=u, model="pt-v1")   # an earlier era, still exact
 ```
 
-The reason is comparability. `(package version, model="pt-v10", universe
+The reason is comparability. `(package version, model="pt-v12", universe
 fingerprint, seed)` is a complete, minimal, citable specification of a
 market. If every user ran a bespoke coefficient set, no two published
 results would be comparable, and "tested on the pretium simulator" would
@@ -25,28 +26,46 @@ mean nothing.
 
 ## Which preset to use
 
-Ten presets ship. Four are recommendations; the rest exist so that
+Twelve presets ship. Four are recommendations; the rest exist so that
 results already published on them keep reproducing bit for bit, and a
 new preset never moves an old one.
 
 | preset | use it for | status |
 |---|---|---|
-| `pt-v10` | anything: the default, the one the realism envelope certifies, and the only preset with all fourteen statistics in band at 252 days, on thirty training seeds and on a held-out universe | recommended |
-| `pt-v3` | reproducing work published before the 2026-08-26 era boundary, when it was the default | reproduction only |
+| `pt-v12` | anything: the default, the one the realism envelope certifies, with all fourteen statistics in band at 252 days *and* all fourteen again at 504, on thirty training seeds, on a held-out sixty-name universe, and thirteen of fourteen on held-out seeds | recommended |
+| `pt-v10` | reproducing work published before the 2026-08-26 era boundary, when it was the default: all fourteen statistics in band at 252 days, on thirty training seeds and on a held-out universe | reproduction only |
+| `pt-v11` | reproducing a run that names it: `pt-v10` plus the crisis work (`crisis_blend_gain`, `sector_vix_coupling`, endogenous news and peer transfer) that `pt-v12` inherits unchanged | reproduction only |
+| `pt-v3` | reproducing work published when it was the default, the era before `pt-v10` | reproduction only |
 | `pt-v7` | studies whose thesis is a sector, or a crisis: the first preset with industries that survive a crisis, twelve of thirteen realism statistics in band at both horizons | recommended, opt in by name |
 | `pt-v8` | crisis studies and anything that measures how correlation moves through time: the factor's variance has a memory, the crisis lever is 4.34x, thirteen of fourteen in band at 504 days | recommended, opt in by name |
 | `pt-v9` | anything measuring volatility regimes, clustering or crises the market makes itself: thirteen of fourteen statistics in band at both horizons, and the first preset whose VIX responds to the day's move rather than to the closing minute | recommended, opt in by name |
 | `pt-v1`, `pt-v2`, `pt-v4`, `pt-v5`, `pt-v6` | reproducing a run that names them | reproduction only |
 
-The three opt-in recommendations are the steps between `pt-v3` and
-`pt-v10`, kept selectable because each one is the best preset for a
+The three opt-in recommendations are steps on the way from `pt-v3` to
+`pt-v12`, kept selectable because each one is the best preset for a
 narrower question and because a run that named one must keep reproducing.
 `pt-v7` is the one to reach for when the thesis is a sector, `pt-v8` when
 it is how correlation moves through time, `pt-v9` when it is the volatility
 regime itself. If the question is none of those, the default already
 carries their gains.
 
-The default moved from `pt-v3` to `pt-v10` on 2026-08-26. Re-certifying
+`pt-v12` is `pt-v11` plus one number. `volume_move_cap` was a hard-coded
+literal 4.0 in `tick.rs`, which saturated a name's volume response at a
+4 percent daily move: past that the tape stopped reacting, so every crisis
+day traded like a bad Tuesday. Raising it to 12.0 is what brings
+`volume_change_acf1` inside its band at both horizons, -0.2656 against
+(-0.32, -0.20) at 252 days and -0.2572 against (-0.29, -0.21) at 504, and
+retires the volume-change gap [the realism envelope](realism-envelope.md)
+used to carry. `pt-v11` in turn is `pt-v10` plus the crisis work, so the
+default carries both steps. The certified horizon is still 252 days: the
+504-day panel is measured, not certified, and the envelope says why.
+
+<!-- ERA CHECK (pt-v12 boundary): the paragraph below, and the pt-v3 row
+     above, used to date pt-v3's handover to the 2026-08-26 era boundary.
+     That boundary now names the pt-v10 -> pt-v12 move. No date for the
+     pt-v3 -> pt-v10 move was supplied, so neither place states one. -->
+
+The default moved from `pt-v10` to `pt-v12` on 2026-08-26. Re-certifying
 moves every published number at once, which is why it happens rarely and
 why the old default stays selectable by name. The per-preset record of
 what moved and what it measured is in the
@@ -136,7 +155,7 @@ A calibrated preset arrives as a new named entry in the shipped table,
 produced by the calibration tooling with its provenance committed; every
 earlier preset stays selectable and bit-reproducing forever. That has now
 happened several times. `"pt-v2"`, `"pt-v3"` and everything through
-`"pt-v10"` were produced this way, and `"pt-v10"` is the current default. The library consumes presets; it does not
+`"pt-v12"` were produced this way, and `"pt-v12"` is the current default. The library consumes presets; it does not
 ship an optimiser.
 
 What the shipped default is certified to reproduce, and where it is not, is

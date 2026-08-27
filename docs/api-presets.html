@@ -141,8 +141,8 @@ and copy buttons.</p>
             <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
             
           </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">eng = pt.Engine(seed=42, universe=u)                  # pt-v10, the default
-eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the same, spelled out
+          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">eng = pt.Engine(seed=42, universe=u)                  # pt-v12, the default
+eng = pt.Engine(seed=42, universe=u, model="pt-v12")  # the same, spelled out
 eng = pt.Engine(seed=42, universe=u, model="pt-v1")   # an earlier era, still exact
 eng = pt.Engine(seed=42, universe=u, model="pt-v4")   # for multi-year questions</code></pre>
         </div>
@@ -156,7 +156,7 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v4")   # for multi-year questions
           </tbody>
         </table></div>
         <h2 style="font-size:19px;margin:42px 0 8px">Choosing Between pt-v3 and pt-v4</h2>
-        <p>A historical choice, kept because work published against either preset still reproduces. Neither is the default: <code style="font-size:13px">pt-v10</code> has been since 2026-08-26, and it holds all fourteen statistics at 252 days and thirteen at 504, so it dominates both rows below. The full table of the ten shipped presets is on <a href="change.html">Presets and Custom Models</a>.</p>
+        <p>A historical choice, kept because work published against either preset still reproduces. Neither is the default: <code style="font-size:13px">pt-v12</code> has been since 2026-08-26, and it holds all fourteen statistics at 252 days AND all fourteen at 504, so it dominates both rows below. The full table of the twelve shipped presets is on <a href="change.html">Presets and Custom Models</a>.</p>
         <p>The two counts below are out of the ten-statistic panel of the pt-v3 era, and the two horizons disagree.</p>
         <div class="tablewrap"><table style="max-width:520px">
           <thead><tr><th>Horizon</th><th style="text-align:right">pt-v3</th><th style="text-align:right">pt-v4</th></tr></thead>
@@ -165,7 +165,7 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v4")   # for multi-year questions
             <tr><td>504 days</td><td style="text-align:right">5/10</td><td style="text-align:right">7/10</td></tr>
           </tbody>
         </table></div>
-        <p style="margin:14px 0 0"><strong>Between these two, and only these two: pt-v3 at or under a year, pt-v4 for INVESTIGATING longer horizons.</strong> Neither licenses a multi-year backtest, which the realism page forbids on every preset, and pt-v10 beats both at both horizons.</p>
+        <p style="margin:14px 0 0"><strong>Between these two, and only these two: pt-v3 at or under a year, pt-v4 for INVESTIGATING longer horizons.</strong> Neither licenses a multi-year backtest, which the realism page forbids on every preset, and pt-v12 beats both at both horizons.</p>
         <p>What pt-v4 buys is the thin-tails gap, which nothing before it had moved: excess kurtosis at 504 days goes from 5.23 to 9.19, inside the horizon-matched band of 7.1 to 22. It halves the dual-horizon objective, 0.9887 to 0.4863 on training seeds and 1.3990 to 0.7493 on thirty seeds the search never saw.</p>
         <p>What it costs is <code style="font-size:13px">return_acf1</code> at the certified horizon: 0.0739 on training seeds, 0.0838 on held-out seeds, and 0.0801 on a held-out 60-name universe, against a band ceiling of 0.06. Three independent axes agreeing makes that a regression rather than seed noise.</p>
         <p>That is why it is not the default. Promoting it would turn the envelope's nine-of-ten into eight-of-ten, and the statistic it gives up is the one behind "momentum works here for the wrong reason", which is the defect pt-v3 exists to have fixed.</p>

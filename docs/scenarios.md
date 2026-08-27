@@ -25,6 +25,12 @@ scenario. Same market, same agents, only the macro path differs:
 | momentum | -7.88% | -9.74% | -1.86 |
 | oracle | +14.98% | +12.99% | -1.99 |
 
+<!-- STALE, NOT RE-MEASURED: this table, and the seed-5-to-9 spans in the
+     paragraph below it, were measured before the 2026-08-26 pt-v12 boundary.
+     pt-v11 moved `idio_sigma_scale`, `jump_intensity_idio` and turned
+     endogenous news on, and pt-v12 raised `volume_move_cap`, so the agent
+     returns will have moved. Re-measure on pt-v12 before quoting. -->
+
 Nobody escapes the walk here. Buy-and-hold is long-only, holds through the
 repricing, and loses the most. Momentum and the Oracle can trade around it
 and each give up about two and a half points. The Oracle stays far ahead in
@@ -41,6 +47,9 @@ central-bank meeting - a policy-rate `ramp` from 2.5% to 5% over thirty days
 0.00% over 40 days, and a median -4.29% once a 60-day run crosses the
 meeting at day 45, where the corporate yield is recomputed off the 10Y
 (-4.11% on the shipped preset).
+<!-- STALE NAME AND NUMBER: "the shipped preset" now means pt-v12, and both
+     medians here were measured before the 2026-08-26 boundary. The day-45
+     mechanism is unchanged; the sizes need re-measuring on pt-v12. -->
 Equities discount off the corporate bond yield, so a short policy-only study
 sees nothing, silently. `rate_shock` moves the whole curve for an immediate
 repricing; `ramp` isolates a single lever when that is what you want.
@@ -67,6 +76,12 @@ Measured by holding a 20-name universe fixed, introducing each shock on **day
 | `federal_funds_rate` 1.6% to 10% | 0.00% | unchanged | only by steering the yield, at the next meeting |
 | `inflation_rate` 2% to 9% | 0.00% | unchanged | only by steering the reaction function, at the next meeting |
 | `fear_greed_index` 50 to 0 | 0.00% | unchanged | none. Nothing reads it |
+
+<!-- PARTLY STALE: the three zero rows are structural (no route exists before
+     the first meeting) and survive the pt-v12 boundary unchanged. The three
+     non-zero median price moves, and the "worth about 10%" figure two
+     paragraphs down that reads off the -9.9% fair-value column, were measured
+     before it and have not been re-measured on pt-v12. -->
 
 Three consequences worth stating separately.
 
@@ -118,6 +133,14 @@ scenario API:
 | 45 | 104.94% |
 | 65 | 125.75% |
 
+<!-- STALE, NOT RE-MEASURED: measured before the 2026-08-26 pt-v12 boundary.
+     pt-v11 raised `crisis_blend_gain` 0.5 to 0.8 and `sector_vix_coupling`
+     0.25 to 1.0, both of which act on exactly this pin, so the VIX 45 and 65
+     rows in particular will have moved, and with them the "factor of 4.0" and
+     the "roughly twice its calm volatility" sentence below. The anchoring
+     argument (VIX 15 reproduces the uncoupled process) is structural and
+     holds. Re-measure the four rows on pt-v12 before quoting. -->
+
 A thirteenfold move in VIX moves realised volatility by a factor of 4.0, and
 a sub-15 pin calms the market rather than doing nothing. Since the 0.2.0 era
 boundary a pin acts on the FIRST day rather than the second, because the
@@ -131,14 +154,14 @@ central-bank meeting reprices the corporate yield off a VIX-bearing spread.)
 The response to a held pin saturates. The factor's variance is clamped at
 `market_vol_ceiling_multiple` times its baseline for reasons independent of
 the coupling (the clamp carries the process's fourth moment). That was 8x
-through pt-v3 and is 32x on the shipped pt-v10, set at the level a record VIX
+through pt-v3 and is 32x on the shipped pt-v12, set at the level a record VIX
 actually implies, so the saturation sits far higher than it used to:
 quadratic across the plausible band rather than flat above VIX ~42.
 A researcher pinning VIX 65 for a year gets a market realising roughly twice
 its calm volatility with crisis-level correlation. That is 2008 sustained,
 not a numerical blow-up.
 
-Four channels:
+Five channels:
 
 1. **The factor's variance target**, above. The channel that answers "what
    happens when volatility triples", and, through the same mechanism,
@@ -146,21 +169,42 @@ Four channels:
 2. **Quoted bid-ask**, through a multiplier `1 + max(0, (vix - 15) / 30)`.
    Mean quoted spread across `Universe.random(25, seed=11)` after five days,
    sim seed 3: 11.68 bps at VIX 15, 13.42 at 25, 17.16 at 45, 21.52 at 65.
+   <!-- The multiplier is a closed form in VIX and is untouched by pt-v11 and
+        pt-v12. The four measured means are not: they were taken before the
+        2026-08-26 boundary and have not been re-measured on pt-v12. -->
 3. **Cross-sectional correlation above VIX 25.5** (the crisis threshold since
    the 2026-08 re-site; the old `vix > 40` trigger sat above the endogenous
    ceiling and could never fire), where sector factors blend toward the
    market factor. Together with channel 1, mean pairwise correlation of daily
    log returns over the same 25-name universe's 300 pairs, 120 days, sim
    seed 3: +0.196 at VIX 15, +0.622 at 45, +0.680 at 65.
+   <!-- STALE, NOT RE-MEASURED: pt-v11 raised `crisis_blend_gain` 0.5 to 0.8,
+        which multiplies the market factor in exactly this regime, so the
+        VIX 45 and 65 figures are understated. The pt-v12 crisis co-movement
+        at a held VIX 45 is 0.696 against a real 0.664 to 0.727, but that is
+        the thirty-seed calibration harness, not this 25-name single-seed
+        setup, so it is not a drop-in replacement. Re-measure here. -->
    Diversification genuinely stops working at crisis VIX. See
    [How realistic is this market](how-realistic-is-this-market.html).
 4. **Credit spreads** in the daily economy step, recomputed at central-bank
    meetings (the first sits at day 45), so a VIX path also reprices the
    yield equities discount off, at meeting cadence. See
    [Core concepts](core-concepts.html).
+5. **Company news reaching sector peers**, since pt-v11. A peer weight that
+   was constant could not tell March 2020 from a quiet July, so the transfer
+   is scaled by `1 + news_peer_vix_coupling * crisis_spike`
+   (`news_peer_vix_coupling` 8.0 on the shipped preset) and the spike is zero
+   below the same 25.5 threshold: a calm market is untouched at any coupling
+   and only the crisis moves. This is the channel that carries crisis sector
+   structure. At a held VIX 45, pt-v12's sector excess correlation reads
+   +0.109 against a real +0.103, measured on thirty seeds. The older claim
+   that industries hold together in a crisis about a third as tightly as real
+   ones was withdrawn at this boundary: it was measured before this channel
+   existed.
 
 So a VIX path stresses execution and strategy at once: spreads widen,
-volatility rises, and the cross-section starts moving together. Since the
+volatility rises, the cross-section starts moving together, and one company's
+bad news reaches its sector peers harder than it would on a quiet day. Since the
 0.2.0 era boundary it also moves a name's OWN variance, through
 `garch_vix_coupling` 0.3 on the shipped preset: this page used to say VIX
 sized the shared factor's share and never each name's own noise, and that

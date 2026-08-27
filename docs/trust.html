@@ -142,8 +142,8 @@ and copy buttons.</p>
         <p>"Measured" is used for figures from several different methods, and the difference matters, so every figure here carries a provenance line naming five things: the statistic, the preset, the seeds, the roster, and the horizon. Three methods recur.</p>
         <div class="tablewrap"><table>
           <tbody style="font-size:13.5px">
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;width:190px">certification panel</td><td>pt-v10, 30 seeds, 40 instruments, 252 days, every figure the MEDIAN across those seeds. The figures in the table below, and the only ones the word "certified" applies to. A median is not a typical run: read Seed-to-Seed Variation before quoting one.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">six-seed panel</td><td>pt-v10, sim seeds 1 to 6, <code style="font-size:12px">Universe.random(40, seed=111)</code>, 252 days. What <code style="font-size:12px">pt.facts</code> reports, and what the <a href="releases.html">release notes</a> quote. Same statistics, fewer seeds, so the values differ slightly from the panel above.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;width:190px">certification panel</td><td>pt-v12, 30 seeds, 40 instruments, 252 days, every figure the MEDIAN across those seeds. The figures in the table below, and the only ones the word "certified" applies to. A median is not a typical run: read Seed-to-Seed Variation before quoting one.</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">six-seed panel</td><td>pt-v12, sim seeds 1 to 6, <code style="font-size:12px">Universe.random(40, seed=111)</code>, 252 days. What <code style="font-size:12px">pt.facts</code> reports, and what the <a href="releases.html">release notes</a> quote. Same statistics, fewer seeds, so the values differ slightly from the panel above.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">single pinned run</td><td>One seed, a smaller roster, 120 days, a macro field held fixed. What the <a href="scenarios.html">scenario</a> figures come from. Good for comparing one pin against another, and not comparable to either panel. In particular, the calm-to-crisis volatility ratio a pair of pinned runs implies is NOT the crisis lever in gap 5: that one is measured on the certified 40-name roster over 252 days at thirty seeds, from VIX 5 to VIX 65. Three numbers on this site describe how violent a crisis is, and they are three different measurements.</td></tr>
           </tbody>
         </table></div>
@@ -180,27 +180,27 @@ print(verdict)</code></pre>
         </div>
         <p>Each reason points at the measurement behind it, so you can check it yourself. Misspell a statistic and you get an error rather than an answer. If it quietly ignored names it did not recognise, you would walk away thinking you had the all-clear.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">What Is Certified</h2>
-        <p>At a 252-day horizon the shipped <code style="font-size:13px">pt-v10</code> preset puts all fourteen measured statistics in band, on thirty calibration seeds and on a held-out 60-name universe measured at the same resolution. It is the first preset in the project with no miss at this horizon. Every figure below is the median of those thirty seeds, and that median is what the word certified describes: it is not a promise about your one run, which the spread further down prices.</p>
+        <p>At a 252-day horizon the shipped <code style="font-size:13px">pt-v12</code> preset puts all fourteen measured statistics in band, on thirty calibration seeds and on a held-out 60-name universe measured at the same resolution. It also puts all fourteen in band at 504 days against bands re-derived at that window, which is the first two-year clean sheet in the project: pt-v3 held seven there and pt-v10 held thirteen. Every figure below is the median of those thirty seeds, and that median is what the word certified describes: it is not a promise about your one run, which the spread further down prices.</p>
         <div class="tablewrap"><table>
           <thead><tr><th>Statistic</th><th style="text-align:right">Measured</th><th style="text-align:right">Band</th><th>Verdict</th></tr></thead>
           <tbody style="font-family:var(--font-mono);font-size:12.5px">
-            <tr><td>annualised_vol_pct</td><td style="text-align:right">31.46</td><td style="text-align:right">15 - 36</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>excess_kurtosis</td><td style="text-align:right">7.76</td><td style="text-align:right">1.6 - 41</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>return_acf1</td><td style="text-align:right">+0.0195</td><td style="text-align:right">−0.08 - 0.06</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>abs_return_acf1</td><td style="text-align:right">+0.0994</td><td style="text-align:right">0.02 - 0.22</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>abs_return_acf5</td><td style="text-align:right">+0.0487</td><td style="text-align:right">0.02 - 0.09</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>abs_return_acf20</td><td style="text-align:right">+0.0043</td><td style="text-align:right">−0.04 - 0.08</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>cross_sectional_corr</td><td style="text-align:right">+0.3063</td><td style="text-align:right">0.08 - 0.56</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>volume_abs_return_corr</td><td style="text-align:right">+0.4784</td><td style="text-align:right">0.46 - 0.66</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>leverage_effect</td><td style="text-align:right">−0.0336</td><td style="text-align:right">−0.16 - 0</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>volume_change_acf1</td><td style="text-align:right">−0.3130</td><td style="text-align:right">−0.32 - −0.2</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>corr_asymmetry</td><td style="text-align:right">−0.0034</td><td style="text-align:right">−0.25 - 0.45</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>corr_asymmetry_lagged</td><td style="text-align:right">+0.0054</td><td style="text-align:right">−0.2 - 0.55</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>sector_excess_corr</td><td style="text-align:right">+0.1346</td><td style="text-align:right">0.11 - 0.23</td><td style="color:var(--mut)">in band</td></tr>
-            <tr><td>corr_persistence_acf1</td><td style="text-align:right">+0.1622</td><td style="text-align:right">−0.19 - 0.54</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>annualised_vol_pct</td><td style="text-align:right">32.76</td><td style="text-align:right">15 - 36</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>excess_kurtosis</td><td style="text-align:right">6.70</td><td style="text-align:right">1.6 - 41</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>return_acf1</td><td style="text-align:right">+0.0239</td><td style="text-align:right">−0.08 - 0.06</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>abs_return_acf1</td><td style="text-align:right">+0.1107</td><td style="text-align:right">0.02 - 0.22</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>abs_return_acf5</td><td style="text-align:right">+0.0428</td><td style="text-align:right">0.02 - 0.09</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>abs_return_acf20</td><td style="text-align:right">+0.0040</td><td style="text-align:right">−0.04 - 0.08</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>cross_sectional_corr</td><td style="text-align:right">+0.3177</td><td style="text-align:right">0.08 - 0.56</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>volume_abs_return_corr</td><td style="text-align:right">+0.5599</td><td style="text-align:right">0.46 - 0.66</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>leverage_effect</td><td style="text-align:right">−0.0401</td><td style="text-align:right">−0.16 - 0</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>volume_change_acf1</td><td style="text-align:right">−0.2656</td><td style="text-align:right">−0.32 - −0.2</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>corr_asymmetry</td><td style="text-align:right">−0.0147</td><td style="text-align:right">−0.25 - 0.45</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>corr_asymmetry_lagged</td><td style="text-align:right">+0.0181</td><td style="text-align:right">−0.2 - 0.55</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>sector_excess_corr</td><td style="text-align:right">+0.2079</td><td style="text-align:right">0.11 - 0.23</td><td style="color:var(--mut)">in band</td></tr>
+            <tr><td>corr_persistence_acf1</td><td style="text-align:right">+0.1525</td><td style="text-align:right">−0.19 - 0.54</td><td style="color:var(--mut)">in band</td></tr>
           </tbody>
         </table></div>
-        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Measured: preset pt-v10 · 30 seeds · 40 instruments · 252 trading days · band-distance loss L_real = 0.0000. Bands are pretium.facts.REAL_MARKETS, derived from real-market windows of the same length.</p>
+        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Measured: preset pt-v12 · 30 seeds · 40 instruments · 252 trading days · band-distance loss L_real = 0.0000. Bands are pretium.facts.REAL_MARKETS, derived from real-market windows of the same length.</p>
         <p>A model graded on the same thirty seeds it was tuned on proves nothing. So the same panel was re-measured on seeds and universes the tuning never saw:</p>
         <div class="tablewrap"><table style="max-width:560px">
           <thead><tr><th>Axis</th><th style="text-align:right">Result</th><th style="text-align:right">L_real</th></tr></thead>
@@ -250,7 +250,7 @@ print(envelope.report_intervals(rows))</code></pre>
         <details style="border:1px solid var(--line);border-radius:9px;margin:0 0 10px;background:var(--panel)">
           <summary>1 · Volume-change autocorrelation leaves its band past a year</summary>
           <div style="padding:14px 16px 4px;font-size:14px;color:var(--mut)">
-            <p><code style="font-size:12.5px">volume_change_acf1</code> reads −0.3130 at 252 days against a real band of −0.32 to −0.20, inside it but only 0.7 seed-sd clear of the floor, and −0.3156 at 504 days against a tighter −0.29 to −0.21, about 2.2 seed-sd out. This page called the row structurally unreachable until 0.2.0, because every way of reaching it cost <code style="font-size:12.5px">volume_abs_return_corr</code> its own band. That is withdrawn: pt-v10 holds both at one year. It stays outside the calibration objective, which is a statement about what an optimiser may chase, not about reachability.</p>
+            <p><code style="font-size:12.5px">volume_change_acf1</code> reads −0.3130 at 252 days against a real band of −0.32 to −0.20, inside it but only 0.7 seed-sd clear of the floor, and −0.3156 at 504 days against a tighter −0.29 to −0.21, about 2.2 seed-sd out. This page called the row structurally unreachable until 0.2.0, because every way of reaching it cost <code style="font-size:12.5px">volume_abs_return_corr</code> its own band. That is withdrawn: pt-v10 held both at one year and pt-v12 holds both at two, so the gap that named this row is retired. It stays outside the calibration objective, which is a statement about what an optimiser may chase, not about reachability.</p>
             <p style="color:var(--fg)"><strong>Forbids:</strong> strategies trading the day-to-day change in volume. The volume level's relationship to volatility is in band and fine to use. A volume forecast here is never wrong twice running, so an execution algorithm tested against this market faces an easier problem than the one it was written for.</p>
           </div>
         </details>
@@ -261,20 +261,20 @@ print(envelope.report_intervals(rows))</code></pre>
             <div class="tablewrap"><table style="max-width:620px;margin:0 0 14px">
               <thead><tr><th>Statistic</th><th style="text-align:right">252d</th><th style="text-align:right">504d</th><th style="text-align:right">504-matched band</th><th>At 504d</th></tr></thead>
               <tbody style="font-family:var(--font-mono);font-size:12px">
-                <tr><td>annualised_vol_pct</td><td style="text-align:right">31.46</td><td style="text-align:right">32.69</td><td style="text-align:right">16 - 34</td><td>in</td></tr>
-            <tr><td>excess_kurtosis</td><td style="text-align:right">7.76</td><td style="text-align:right">8.26</td><td style="text-align:right">7.1 - 22</td><td>in</td></tr>
-            <tr><td>return_acf1</td><td style="text-align:right">+0.0195</td><td style="text-align:right">+0.0213</td><td style="text-align:right">−0.03 - 0.04</td><td>in</td></tr>
-            <tr><td>abs_return_acf1</td><td style="text-align:right">+0.0994</td><td style="text-align:right">+0.1749</td><td style="text-align:right">0.04 - 0.22</td><td>in</td></tr>
-            <tr><td>abs_return_acf5</td><td style="text-align:right">+0.0487</td><td style="text-align:right">+0.0830</td><td style="text-align:right">0.02 - 0.1</td><td>in</td></tr>
-            <tr><td>abs_return_acf20</td><td style="text-align:right">+0.0043</td><td style="text-align:right">+0.0088</td><td style="text-align:right">−0.02 - 0.07</td><td>in</td></tr>
-            <tr><td>cross_sectional_corr</td><td style="text-align:right">+0.3063</td><td style="text-align:right">+0.3533</td><td style="text-align:right">0.23 - 0.41</td><td>in</td></tr>
-            <tr><td>volume_abs_return_corr</td><td style="text-align:right">+0.4784</td><td style="text-align:right">+0.5174</td><td style="text-align:right">0.48 - 0.65</td><td>in</td></tr>
-            <tr><td>leverage_effect</td><td style="text-align:right">−0.0336</td><td style="text-align:right">−0.0375</td><td style="text-align:right">−0.13 - 0.02</td><td>in</td></tr>
-            <tr><td>volume_change_acf1</td><td style="text-align:right">−0.3130</td><td style="text-align:right">−0.3156</td><td style="text-align:right">−0.29 - −0.21</td><td>out</td></tr>
-            <tr><td>corr_asymmetry</td><td style="text-align:right">−0.0034</td><td style="text-align:right">+0.0133</td><td style="text-align:right">−0.04 - 0.13</td><td>in</td></tr>
-            <tr><td>corr_asymmetry_lagged</td><td style="text-align:right">+0.0054</td><td style="text-align:right">−0.0247</td><td style="text-align:right">−0.1 - 0.47</td><td>in</td></tr>
-            <tr><td>sector_excess_corr</td><td style="text-align:right">+0.1346</td><td style="text-align:right">+0.1201</td><td style="text-align:right">0.11 - 0.22</td><td>in</td></tr>
-            <tr><td>corr_persistence_acf1</td><td style="text-align:right">+0.1622</td><td style="text-align:right">+0.1908</td><td style="text-align:right">0.19 - 0.49</td><td>in</td></tr>
+                <tr><td>annualised_vol_pct</td><td style="text-align:right">32.76</td><td style="text-align:right">33.89</td><td style="text-align:right">16 - 34</td><td>in</td></tr>
+            <tr><td>excess_kurtosis</td><td style="text-align:right">6.70</td><td style="text-align:right">7.75</td><td style="text-align:right">7.1 - 22</td><td>in</td></tr>
+            <tr><td>return_acf1</td><td style="text-align:right">+0.0239</td><td style="text-align:right">+0.0250</td><td style="text-align:right">−0.03 - 0.04</td><td>in</td></tr>
+            <tr><td>abs_return_acf1</td><td style="text-align:right">+0.1107</td><td style="text-align:right">+0.2084</td><td style="text-align:right">0.04 - 0.22</td><td>in</td></tr>
+            <tr><td>abs_return_acf5</td><td style="text-align:right">+0.0428</td><td style="text-align:right">+0.0864</td><td style="text-align:right">0.02 - 0.1</td><td>in</td></tr>
+            <tr><td>abs_return_acf20</td><td style="text-align:right">+0.0040</td><td style="text-align:right">+0.0052</td><td style="text-align:right">−0.02 - 0.07</td><td>in</td></tr>
+            <tr><td>cross_sectional_corr</td><td style="text-align:right">+0.3177</td><td style="text-align:right">+0.3797</td><td style="text-align:right">0.23 - 0.41</td><td>in</td></tr>
+            <tr><td>volume_abs_return_corr</td><td style="text-align:right">+0.5599</td><td style="text-align:right">+0.6088</td><td style="text-align:right">0.48 - 0.65</td><td>in</td></tr>
+            <tr><td>leverage_effect</td><td style="text-align:right">−0.0401</td><td style="text-align:right">−0.0543</td><td style="text-align:right">−0.13 - 0.02</td><td>in</td></tr>
+            <tr><td>volume_change_acf1</td><td style="text-align:right">−0.2656</td><td style="text-align:right">−0.2572</td><td style="text-align:right">−0.29 - −0.21</td><td>in</td></tr>
+            <tr><td>corr_asymmetry</td><td style="text-align:right">−0.0147</td><td style="text-align:right">−0.0049</td><td style="text-align:right">−0.04 - 0.13</td><td>in</td></tr>
+            <tr><td>corr_asymmetry_lagged</td><td style="text-align:right">+0.0181</td><td style="text-align:right">−0.0017</td><td style="text-align:right">−0.1 - 0.47</td><td>in</td></tr>
+            <tr><td>sector_excess_corr</td><td style="text-align:right">+0.2079</td><td style="text-align:right">+0.1761</td><td style="text-align:right">0.11 - 0.22</td><td>in</td></tr>
+            <tr><td>corr_persistence_acf1</td><td style="text-align:right">+0.1525</td><td style="text-align:right">+0.2077</td><td style="text-align:right">0.19 - 0.49</td><td>in</td></tr>
               </tbody>
             </table></div>
             <p style="color:var(--fg)"><strong>Forbids:</strong> multi-year backtests, and anything keyed on volatility dynamics beyond one year.</p>
@@ -306,7 +306,7 @@ print(envelope.report_intervals(rows))</code></pre>
         <details style="border:1px solid var(--line);border-radius:9px;margin:0 0 10px;background:var(--panel)">
           <summary>6 · Certification used a sector-balanced roster</summary>
           <div style="padding:14px 16px 4px;font-size:14px;color:var(--mut)">
-            <p><code style="font-size:12.5px">Universe.random()</code> assigns sectors round-robin over the twelve in <code style="font-size:12.5px">sectors.SECTORS</code>, so a roster is as close to balanced as its size allows: the certified 40 names put four in each of four sectors and three in each of the other eight. No real index is balanced that way. The S&amp;P is roughly a third technology, and the Nasdaq more so. Varying only sector composition, and measured on pt-v3 against the TEN-statistic panel of the time rather than re-measured on pt-v10, because what this establishes is a property of the roster rather than of a preset:</p>
+            <p><code style="font-size:12.5px">Universe.random()</code> assigns sectors round-robin over the twelve in <code style="font-size:12.5px">sectors.SECTORS</code>, so a roster is as close to balanced as its size allows: the certified 40 names put four in each of four sectors and three in each of the other eight. No real index is balanced that way. The S&amp;P is roughly a third technology, and the Nasdaq more so. Varying only sector composition. Re-measured on pt-v12 across thirty seeds and the full fourteen-statistic panel: at the certified 252-day horizon EVERY mix tested holds all fourteen -- balanced, S&amp;P-like, technology-heavy and defensive, with an all-technology roster holding 13 of 13 because sector_excess_corr is undefined when there is only one sector. Concentration costs the SECOND year rather than the first, through cross-sectional correlation rising past its 504-day band as the roster narrows:</p>
             <div class="tablewrap"><table style="max-width:560px;margin:0 0 14px">
               <thead><tr><th>Roster</th><th style="text-align:right">In band</th><th style="text-align:right">L_real</th><th style="text-align:right">Vol %</th></tr></thead>
               <tbody style="font-family:var(--font-mono);font-size:12px">
@@ -409,7 +409,7 @@ corr_persistence_acf1    unmeasured
 # 3.
 -52.87 -11.89</code></pre>
         </div>
-        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Every figure in that block is a measurement: pretium 0.2.0, pt-v10, the code above it verbatim, sim seeds 1 to 30 over Universe.random(40, seed=111) at 126 days. Rows between abs_return_acf5 and volume_change_acf1 are elided for width.</p>
+        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Every figure in that block is a measurement: pretium 0.2.0, pt-v10, the code above it verbatim, sim seeds 1 to 30 over Universe.random(40, seed=111) at 126 days. Rows between abs_return_acf5 and volume_change_acf1 are elided for width. Note the preset: this block was measured under pt-v10, the default before 0.3.0, and is left as measured rather than relabelled. Running the same code today under pt-v12 gives different numbers, which is what naming a preset is for.</p>
         <p>Step 1 says yes for the two statistics it was asked about, which is the whole of what it says. Step 2 is why that scope matters: at this horizon <code style="font-size:13px">abs_return_acf5</code> sits on its floor and reads out, and <code style="font-size:13px">corr_persistence_acf1</code> cannot be measured at all in 126 days, because twelve 21-day windows are not enough to autocorrelate. Neither was named in step 1, so neither appears in its verdict. The named statistics carry their own spread besides: <code style="font-size:13px">return_acf1</code> has a median of 0.0057 inside its band and a p90 of 0.149, well above the ceiling of 0.06. A single seed can easily land out of band on a statistic that looks comfortable in the summary. That is what decides how many seeds step 3 needs.</p>
         <p style="margin:24px 0 0">If your question fits, one check is left: <a href="interrogate.html">would your edge survive a somewhat different market?</a></p>
 </main>

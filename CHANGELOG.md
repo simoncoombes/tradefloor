@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 ### `pt-v12` is the new default: two years in band, from one number
 

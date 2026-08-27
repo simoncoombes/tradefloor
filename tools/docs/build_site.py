@@ -165,7 +165,7 @@ ERA_FIXES = [
     ),
     (
         'is a preset name or a ModelParams; the default is pt-v3.',
-        'is a preset name or a ModelParams; the default is pt-v10.',
+        'is a preset name or a ModelParams; the default is pt-v12.',
     ),
     (
         "The current default, and the one the realism numbers describe.",
@@ -189,9 +189,9 @@ ERA_FIXES = [
         '<code style="font-size:13px">pt-v1</code> and '
         '<code style="font-size:13px">pt-v2</code> stay selectable and '
         "bit-reproducing forever.",
-        '<code style="font-size:13px">pt-v10</code> is the current default, '
+        '<code style="font-size:13px">pt-v12</code> is the current default, '
         'and every earlier preset from <code style="font-size:13px">pt-v1'
-        '</code> to <code style="font-size:13px">pt-v9</code> stays '
+        '</code> to <code style="font-size:13px">pt-v11</code> stays '
         "selectable and reproduces bit for bit. What that guarantee covers is "
         "the PRESET: naming one pins the coefficient set and the market it "
         "produces on a given package version, and a run is only fully "
@@ -202,7 +202,7 @@ ERA_FIXES = [
     (
         "Three presets ship. All three stay selectable and bit-reproducing "
         "forever.",
-        "Ten presets ship. pt-v10 is the default; the other nine are "
+        "Twelve presets ship. pt-v12 is the default; the other eleven are "
         "selectable by name and none of them has ever been un-shipped.",
     ),
     (
@@ -225,17 +225,18 @@ ERA_FIXES = [
         "optimiser is only allowed to chase what the project decided it may "
         "chase. That is a policy about the search, not a claim that the rows "
         "are unreachable: the volume-change row was called unreachable until "
-        "0.2.0, and pt-v10 holds it at one year.",
+        "0.2.0, pt-v10 held it at one year, and pt-v12 holds it at two -- the "
+        "gap that named it is retired.",
     ),
     (
         'eng = pt.Engine(seed=42, universe=u, model="pt-v3")  # the default, spelled out',
-        'eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the default, spelled out',
+        'eng = pt.Engine(seed=42, universe=u, model="pt-v12")  # the default, spelled out',
     ),
     (
         'eng = pt.Engine(seed=42, universe=u)                  # pt-v3, the default\n'
         'eng = pt.Engine(seed=42, universe=u, model="pt-v3")   # the same, spelled out',
-        'eng = pt.Engine(seed=42, universe=u)                  # pt-v10, the default\n'
-        'eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the same, spelled out',
+        'eng = pt.Engine(seed=42, universe=u)                  # pt-v12, the default\n'
+        'eng = pt.Engine(seed=42, universe=u, model="pt-v12")  # the same, spelled out',
     ),
     (
         '<h2 style="font-size:21px;margin:46px 0 10px">Build Targets</h2>',
@@ -370,9 +371,9 @@ ERA_FIXES = [
         "Strategies were evaluated on pretium 0.1.0 (commit "
         '<code style="font-size:12px">&lt;sha&gt;</code>), model preset '
         '<code style="font-size:12px">pt-v3</code>,',
-        "Strategies were evaluated on pretium 0.2.0 (commit "
+        "Strategies were evaluated on pretium 0.3.0 (commit "
         '<code style="font-size:12px">&lt;sha&gt;</code>), model preset '
-        '<code style="font-size:12px">pt-v10</code>,',
+        '<code style="font-size:12px">pt-v12</code>,',
     ),
     (
         "Realism of the shipped preset at this horizon is as published in "
@@ -432,10 +433,10 @@ ERA_FIXES = [
         '<h2 style="font-size:19px;margin:42px 0 8px">Choosing Between '
         "pt-v3 and pt-v4</h2>\n        <p>A historical choice, kept because "
         "work published against either preset still reproduces. Neither is "
-        "the default: <code style=\"font-size:13px\">pt-v10</code> has been "
+        "the default: <code style=\"font-size:13px\">pt-v12</code> has been "
         "since 2026-08-26, and it holds all fourteen statistics at 252 days "
-        "and thirteen at 504, so it dominates both rows below. The full "
-        "table of the ten shipped presets is on "
+        "AND all fourteen at 504, so it dominates both rows below. The full "
+        "table of the twelve shipped presets is on "
         '<a href="#/change">Presets and Custom Models</a>.</p>\n        '
         "<p>The two counts below are out of the ten-statistic panel of the "
         "pt-v3 era, and the two horizons disagree.</p>",
@@ -446,7 +447,7 @@ ERA_FIXES = [
         "<strong>Between these two, and only these two: pt-v3 at or under a "
         "year, pt-v4 for INVESTIGATING longer horizons.</strong> Neither "
         "licenses a multi-year backtest, which the realism page forbids on "
-        "every preset, and pt-v10 beats both at both horizons.",
+        "every preset, and pt-v12 beats both at both horizons.",
     ),
     ("The Seven Components", "The Nine Components"),
     ("seven components", "nine components"),
@@ -1005,7 +1006,7 @@ def apply_trust_fixes(doc: str) -> str:
             "certification panel</sc-raw-td><sc-raw-td>pt-v3, 30 seeds, 40 "
             "instruments, 252 days. The figures in the table below, and the "
             'only ones the word "certified" applies to.</sc-raw-td>',
-            "certification panel</sc-raw-td><sc-raw-td>pt-v10, 30 seeds, 40 "
+            "certification panel</sc-raw-td><sc-raw-td>pt-v12, 30 seeds, 40 "
             "instruments, 252 days, every figure the MEDIAN across those "
             "seeds. The figures in the table below, and the only ones the "
             'word "certified" applies to. A median is not a typical run: '
@@ -1013,7 +1014,7 @@ def apply_trust_fixes(doc: str) -> str:
         ),
         (
             "six-seed panel</sc-raw-td><sc-raw-td>pt-v3, sim seeds 1 to 6,",
-            "six-seed panel</sc-raw-td><sc-raw-td>pt-v10, sim seeds 1 to 6,",
+            "six-seed panel</sc-raw-td><sc-raw-td>pt-v12, sim seeds 1 to 6,",
         ),
         (
             "One seed, a smaller roster, 120 days, a macro field held fixed. "
@@ -1036,10 +1037,12 @@ def apply_trust_fixes(doc: str) -> str:
             "band. The tenth fails structurally and is named, in every result "
             "the library produces.</p>",
             "<p>At a 252-day horizon the shipped <code style=\"font-size:13px\">"
-            "pt-v10</code> preset puts all fourteen measured statistics in "
+            "pt-v12</code> preset puts all fourteen measured statistics in "
             "band, on thirty calibration seeds and on a held-out 60-name "
-            "universe measured at the same resolution. It is the first preset "
-            "in the project with no miss at this horizon. Every figure below "
+            "universe measured at the same resolution. It also puts all "
+            "fourteen in band at 504 days against bands re-derived at that "
+            "window, which is the first two-year clean sheet in the project: "
+            "pt-v3 held seven there and pt-v10 held thirteen. Every figure below "
             "is the median of those thirty seeds, and that median is what the "
             "word certified describes: it is not a promise about your one "
             "run, which the spread further down prices.</p>",
@@ -1047,7 +1050,7 @@ def apply_trust_fixes(doc: str) -> str:
         (
             "Measured: preset pt-v3 · 30 seeds · 40 instruments · 252 trading "
             "days · band-distance loss L_real = 0.0000.",
-            "Measured: preset pt-v10 · 30 seeds · 40 instruments · 252 trading "
+            "Measured: preset pt-v12 · 30 seeds · 40 instruments · 252 trading "
             "days · band-distance loss L_real = 0.0000.",
         ),
         (
@@ -1071,9 +1074,11 @@ def apply_trust_fixes(doc: str) -> str:
             "This page called the row structurally unreachable until 0.2.0, "
             "because every way of reaching it cost "
             "<code style=\"font-size:12.5px\">volume_abs_return_corr</code> its "
-            "own band. That is withdrawn: pt-v10 holds both at one year. It "
-            "stays outside the calibration objective, which is a statement "
-            "about what an optimiser may chase, not about reachability.</p>",
+            "own band. That is withdrawn: pt-v10 held both at one year and "
+            "pt-v12 holds both at two, so the gap that named this row is "
+            "retired. It stays outside the calibration objective, which is a "
+            "statement about what an optimiser may chase, not about "
+            "reachability.</p>",
         ),
         (
             "Measured against bands re-derived at the matching 504-day window, "
@@ -1254,7 +1259,11 @@ def apply_trust_fixes(doc: str) -> str:
             "Every figure in that block is a measurement: pretium 0.2.0, "
             "pt-v10, the code above it verbatim, sim seeds 1 to 30 over "
             "Universe.random(40, seed=111) at 126 days. Rows between "
-            "abs_return_acf5 and volume_change_acf1 are elided for width.",
+            "abs_return_acf5 and volume_change_acf1 are elided for width. "
+            "Note the preset: this block was measured under pt-v10, the "
+            "default before 0.3.0, and is left as measured rather than "
+            "relabelled. Running the same code today under pt-v12 gives "
+            "different numbers, which is what naming a preset is for.",
         ),
         (
             "Step 1 says yes, with two warnings. Step 2 shows why they were "
@@ -1414,10 +1423,15 @@ def apply_trust_fixes(doc: str) -> str:
             "40 names put four in each of four sectors and three in each of "
             "the other eight. No real index is balanced that way. The "
             "S&amp;P is roughly a third technology, and the Nasdaq more so. "
-            "Varying only sector composition, and measured on pt-v3 against "
-            "the TEN-statistic panel of the time rather than re-measured on "
-            "pt-v10, because what this establishes is a property of the "
-            "roster rather than of a preset:</p>",
+            "Varying only sector composition. Re-measured on pt-v12 across "
+            "thirty seeds and the full fourteen-statistic panel: at the "
+            "certified 252-day horizon EVERY mix tested holds all fourteen -- "
+            "balanced, S&amp;P-like, technology-heavy and defensive, with an "
+            "all-technology roster holding 13 of 13 because "
+            "sector_excess_corr is undefined when there is only one sector. "
+            "Concentration costs the SECOND year rather than the first, "
+            "through cross-sectional correlation rising past its 504-day "
+            "band as the roster narrows:</p>",
         ),
         (
             "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> inheriting "
@@ -1637,7 +1651,8 @@ def apply_scenarios_fixes(doc: str) -> str:
             "rows and the two strategy lines are composed to show the shape "
             "of the output.",
             "Every line in that block is a measurement on pretium 0.2.0 "
-            "under pt-v10, from the code above it. The scenario rows are "
+            "under pt-v10, the default before 0.3.0, from the code above it "
+            "and left as measured rather than relabelled. The scenario rows are "
             "elided in the middle and rounded to two decimals; nothing else "
             "is edited. Note what the path actually does: "
             "<code style=\"font-size:12.5px\">vix_shock</code> puts the peak "
@@ -1699,8 +1714,8 @@ def apply_internals_fixes(doc: str) -> str:
         (
             "the shipped <code style=\"font-size:13px\">pt-v3</code> turns the "
             "term down to 0.0742 and measures +0.0375, inside the band.",
-            "the shipped <code style=\"font-size:13px\">pt-v10</code> turns the "
-            "term down to 0.0186 and measures +0.0195, inside the band.",
+            "the shipped <code style=\"font-size:13px\">pt-v12</code> turns the "
+            "term down to 0.0186 and measures +0.0239, inside the band.",
         ),
         (
             "On top sits a shared market factor with its own conditional "

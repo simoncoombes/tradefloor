@@ -31,7 +31,9 @@ outstanding, with roughly one name in eleven above the 20% squeeze threshold.
 
 **Coefficients ship as a preset.** They are named and versioned rather than
 passed as constructor keywords, so two published results can be compared.
-`pt-v10` is the current default.
+`pt-v12` is the current default, as of the 2026-08-26 era boundary; `pt-v10`
+was the default before it, and every earlier name from `pt-v1` on is still
+selectable and still reproduces bit for bit.
 `model_preset()` returns it, and the returned values are folded into the
 known-answer digest and parity-tested against the reference implementation.
 
@@ -42,7 +44,12 @@ crowd terms. Eight numbers, and every one of them live.
 **It is not a complete listing of the model's coefficients.** The GARCH
 parameters, the market and sector factor sigmas, and the order-flow
 coefficient are all live and none of them appear. Nor is there anything that
-forces the name `pt-v1` to change if one of the absent constants moves. So
+forces the name `pt-v1` to change if one of the absent constants moves. How
+much can hide in one of them is not hypothetical: `volume_move_cap` was a
+literal `4.0` in `tick.rs` through `pt-v11`, saturating a name's volume
+response at a 4% daily move, so every crisis day traded like a bad Tuesday.
+Promoting it to a preset coefficient at 12.0 is the whole of `pt-v12`, and
+`model_preset()` still does not return it. So
 quote the preset name AND `pt.version()` when you publish - the version is
 what actually pins the build. See
 [Reproducing a run](reproducing-a-run.html).
