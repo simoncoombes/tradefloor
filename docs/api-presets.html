@@ -4,17 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Shipped Presets · pretium docs</title>
-<meta name="description" content="A preset is a complete, named, frozen set of model coefficients. Name one when you build an engine, or pass nothing and get the default.">
+<meta name="description" content="A preset is a complete, named, frozen set of model coefficients. The twelve shipped presets, why they exist, and how to choose between them for a run.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/api-presets.html">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="pretium docs">
 <meta property="og:title" content="Shipped Presets">
-<meta property="og:description" content="A preset is a complete, named, frozen set of model coefficients. Name one when you build an engine, or pass nothing and get the default.">
+<meta property="og:description" content="A preset is a complete, named, frozen set of model coefficients. The twelve shipped presets, why they exist, and how to choose between them for a run.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/api-presets.html">
+<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
+<meta property="article:modified_time" content="2026-08-26T20:52:20-04:00">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Shipped Presets">
-<meta name="twitter:description" content="A preset is a complete, named, frozen set of model coefficients. Name one when you build an engine, or pass nothing and get the default.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Shipped Presets","description":"A preset is a complete, named, frozen set of model coefficients. Name one when you build an engine, or pass nothing and get the default.","url":"https://simoncoombes.github.io/pretium/api-presets.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<meta name="twitter:description" content="A preset is a complete, named, frozen set of model coefficients. The twelve shipped presets, why they exist, and how to choose between them for a run.">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Shipped Presets","description":"A preset is a complete, named, frozen set of model coefficients. The twelve shipped presets, why they exist, and how to choose between them for a run.","url":"https://simoncoombes.github.io/pretium/api-presets.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-26T20:52:20-04:00"}</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -151,7 +153,7 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v4")   # for multi-year questions
           <tbody style="font-size:13.5px">
             <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">pt-v1</td><td>The original reference model, ported from the engine this library grew out of. Herding runs strong (momentum_theta 0.25), which is what made momentum so profitable in early eras. Kept selectable and bit-reproducing forever, so old results stay checkable.</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">pt-v2</td><td>The first calibrated preset, produced by the calibration tooling against the re-derived realism bands. Selectable, never the default. Its certificate and report are committed in the repository.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">pt-v3</td><td>The default until the 2026-08-26 era boundary, produced the same way, and the preset the realism numbers described then: nine of the ten statistics measured at the time were in band at 252 days. Herding is turned well down (momentum_theta 0.0742).</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">pt-v3</td><td>The default until pt-v10 replaced it at 0.2.0, produced the same way, and the preset the realism numbers described then: nine of the ten statistics measured at the time were in band at 252 days. Herding is turned well down (momentum_theta 0.0742).</td></tr>
             <tr><td style="font-family:var(--font-mono);font-size:12.5px">pt-v4</td><td>Selectable, and deliberately not the default. pt-v3 plus nine parameters that ship inert on pt-v3: five endogenous jump coefficients, three volume-process parameters, and market_factor_sigma. Built to investigate horizons past a year, which is not the same as being certified for them: nothing in this project is certified past 252 days.</td></tr>
           </tbody>
         </table></div>
@@ -180,10 +182,6 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v4")   # for multi-year questions
           </tbody>
         </table></div>
         <p style="margin:24px 0 0">The workflow for changing coefficients, and why the fingerprint rule exists, is the guide chapter <a href="change.html">Presets and custom models</a>. What each coefficient does is <a href="api-params.html">Model parameters</a>.</p>
-      </div>
-
-    </div>
-  </main>
 </main>
 </div>
 <footer class="site"><div class="layout" style="display:block">

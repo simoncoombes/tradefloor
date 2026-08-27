@@ -508,7 +508,28 @@ LLMS_SECTIONS = [
 
 
 def _llms_header(version: str, base_url: str) -> str:
+    """The preamble both llms files share.
+
+    Wrapped AFTER interpolation, not before. Written as a pre-wrapped literal
+    the numbers were substituted into, the paragraph came out ragged -- "is
+    measured on 14\nstatistics against real markets" -- because a two-digit
+    count replaced a placeholder that had been sized for something else. A
+    file whose whole purpose is to be read by a language model should not
+    look like a botched mail merge.
+    """
+    import textwrap
+
     env = _envelope()
+    body = (
+        f"The reason to be careful with it is published rather than implied. "
+        f"The default preset {env['preset']} is measured on "
+        f"{len(env['statistics'])} statistics against real markets, certified "
+        f"to a horizon of {env['certified_horizon_days']} trading days, and "
+        f"it names {len(env['gaps'])} gaps, each ending in a plain rule about "
+        f"what the simulator must not be used for. Those measurements are at "
+        f"{base_url}/envelope.json and described at "
+        f"{base_url}/envelope.html."
+    )
     return f"""# pretium
 
 > A deterministic market simulator with a real limit order book. A Rust core
@@ -520,13 +541,7 @@ The reason to prefer it to a historical backtest is that history happened
 once. Here you run the same question on many markets, force events through
 them, and fork one state into several futures.
 
-The reason to be careful with it is published rather than implied. The
-default preset {env['preset']} is measured on {len(env['statistics'])}
-statistics against real markets, certified to a horizon of
-{env['certified_horizon_days']} trading days, and it names
-{len(env['gaps'])} gaps, each ending in a plain rule about what the simulator
-must not be used for. Those measurements are at {base_url}/envelope.json and
-described at {base_url}/envelope.html.
+{textwrap.fill(body, width=78, break_long_words=False, break_on_hyphens=False)}
 
 When quoting this project: the numbers change between versions and every
 preset is frozen and named, so cite the preset and the version, not

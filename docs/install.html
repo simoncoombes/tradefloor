@@ -4,17 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Install and Versioning · pretium docs</title>
-<meta name="description" content="Wheels, extras, what moves between versions, and how to check bit-identity on your own machine.">
+<meta name="description" content="Install pretium from PyPI, choose an extra, and check bit identity on your own machine. What moves between versions and what is guaranteed to stay put.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/install.html">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="pretium docs">
 <meta property="og:title" content="Install and Versioning">
-<meta property="og:description" content="Wheels, extras, what moves between versions, and how to check bit-identity on your own machine.">
+<meta property="og:description" content="Install pretium from PyPI, choose an extra, and check bit identity on your own machine. What moves between versions and what is guaranteed to stay put.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/install.html">
+<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
+<meta property="article:modified_time" content="2026-08-26T11:36:43-04:00">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Install and Versioning">
-<meta name="twitter:description" content="Wheels, extras, what moves between versions, and how to check bit-identity on your own machine.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Install and Versioning","description":"Wheels, extras, what moves between versions, and how to check bit-identity on your own machine.","url":"https://simoncoombes.github.io/pretium/install.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<meta name="twitter:description" content="Install pretium from PyPI, choose an extra, and check bit identity on your own machine. What moves between versions and what is guaranteed to stay put.">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Install and Versioning","description":"Install pretium from PyPI, choose an extra, and check bit identity on your own machine. What moves between versions and what is guaranteed to stay put.","url":"https://simoncoombes.github.io/pretium/install.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-26T11:36:43-04:00"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I install pretium?","acceptedAnswer":{"@type":"Answer","text":"pip install pretium. The core package has no dependencies at all. The extras are opt-in: [rl] adds numpy and gymnasium, [arrow] adds pyarrow, [mcp] adds the MCP server, and [claude] adds what the Claude agent example needs."}},{"@type":"Question","name":"Does it need numpy or pandas?","acceptedAnswer":{"@type":"Answer","text":"No. The core package depends on nothing. Runs come back as Arrow tables that read zero copy into polars, pandas, pyarrow or duckdb, and the package requires none of them: you use whichever you already have."}},{"@type":"Question","name":"How do I check I am getting bit-identical results?","acceptedAnswer":{"@type":"Answer","text":"The repository ships a known-answer baseline: a fixed seed and roster with a recorded SHA-256 of the resulting simulation. Re-running it on your machine and comparing the digest is the check, and it is what the determinism workflow runs on every supported platform."}},{"@type":"Question","name":"Will upgrading change my results?","acceptedAnswer":{"@type":"Answer","text":"Only at an era boundary, and the release notes say when one happens. Pin the preset by name and your numbers survive the upgrade; the current default is pt-v12."}}]}</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -171,7 +173,7 @@ pip install "pretium[mcp]"       # + the MCP server</code></pre>
             <tr><td>Windows</td><td style="font-family:var(--font-mono);font-size:12.5px">x86_64</td></tr>
           </tbody>
         </table></div>
-        <p>There is a sixth target that is not a wheel. The crate also compiles to <code style="font-size:13px">wasm32-unknown-unknown</code> for the browser, and that build produces a digest identical to the native one: 182 KB raw, 68 KB gzipped. Build it with <code style="font-size:13px">tools/wasm/build.sh</code>, which builds, runs wasm-bindgen and verifies the digest in one command. <a href="wasm.html">Running in the Browser</a> has the measurement and the two places it is still loose.</p>
+        <p>There is a sixth target that is not a wheel. The crate also compiles to <code style="font-size:13px">wasm32-unknown-unknown</code> for the browser, and that build produces a digest identical to the native one, and at 0.3.0 it is 204,290 bytes raw and 72,981 gzipped. Build it with <code style="font-size:13px">tools/wasm/build.sh</code>, which builds, runs wasm-bindgen and verifies the digest in one command. <a href="wasm.html">Running in the Browser</a> has the measurement and the two places it is still loose.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">If the Import Fails</h2>
         <div class="tablewrap"><table>
           <thead><tr><th>Symptom</th><th>Cause</th></tr></thead>
@@ -184,7 +186,7 @@ pip install "pretium[mcp]"       # + the MCP server</code></pre>
           </tbody>
         </table></div>
         <h2 style="font-size:21px;margin:46px 0 10px">What Moves Between Versions</h2>
-        <p>Pre-1.0, the API may change. What has a stated policy is the simulated output, and it has three independent version numbers:</p>
+        <p>Pre-1.0, the API may change. What has a stated policy is the simulated output, and it has five independent version numbers:</p>
         <div class="tablewrap"><table>
           <thead><tr><th>Versioned thing</th><th>Policy</th></tr></thead>
           <tbody style="font-size:13.5px">
@@ -227,10 +229,19 @@ left.pin_macro(corporate_bond_yield=0.09)
 left.run_days(30)
 right.run_days(30)                      # same noise, different macro</code></pre>
         </div>
-        <p>A checkpoint carries nine RNG numbers: state, increment and Box-Muller spare for each of the three streams. A pre-split snapshot with three numbers is refused on restore with its era named, because it froze a single-stream market this version cannot continue bit-exactly.</p>
+        <p>A checkpoint carries twenty-one RNG numbers: state, increment and Box-Muller spare for each of the seven streams, which are market, economy, external, jumps, volume, news and per-name volume. It carried nine when there were three streams and grew by three each time a mechanism got its own, so restore reads the era off the length: nine, twelve, fifteen and eighteen all still restore, keeping this engine's seed-derived position for the streams the snapshot predates, which is what lets a checkpoint written before a mechanism existed replay as it did then. Only a pre-split snapshot with three numbers is refused, with its era named, because it froze a single-stream market this version cannot continue bit-exactly.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">Support and Contributing</h2>
-        <p>The repository is <a href="https://github.com/simoncoombes/pretium">simoncoombes/pretium</a>. Issues and pull requests go there. Licensed Apache-2.0.</p>
+        <p>The repository is <a href="https://github.com/simoncoombes/pretium">simoncoombes/pretium</a>. Issues and pull requests go there. Licensed MIT OR Apache-2.0, at your option.</p>
         <p>If you are reporting a numerical disagreement, include your platform, <code style="font-size:13px">pt.__version__</code>, <code style="font-size:13px">pt.model_preset()["name"]</code>, the seed, and the universe fingerprint.</p>
+<section id="faq">
+<h2>Common questions</h2>
+<h3 id="faq-1">How do I install pretium?</h3>
+<p>pip install pretium. The core package has no dependencies at all. The extras are opt-in: [rl] adds numpy and gymnasium, [arrow] adds pyarrow, [mcp] adds the MCP server, and [claude] adds what the Claude agent example needs.</p><h3 id="faq-2">Does it need numpy or pandas?</h3>
+<p>No. The core package depends on nothing. Runs come back as Arrow tables that read zero copy into polars, pandas, pyarrow or duckdb, and the package requires none of them: you use whichever you already have.</p><h3 id="faq-3">How do I check I am getting bit-identical results?</h3>
+<p>The repository ships a known-answer baseline: a fixed seed and roster with a recorded SHA-256 of the resulting simulation. Re-running it on your machine and comparing the digest is the check, and it is what the determinism workflow runs on every supported platform.</p><h3 id="faq-4">Will upgrading change my results?</h3>
+<p>Only at an era boundary, and the release notes say when one happens. Pin the preset by name and your numbers survive the upgrade; the current default is pt-v12.</p>
+</section>
+
 </main>
 </div>
 <footer class="site"><div class="layout" style="display:block">

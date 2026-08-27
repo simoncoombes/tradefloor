@@ -4,17 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Presets and Custom Models · pretium docs</title>
-<meta name="description" content="The model&#x27;s coefficients ship as named presets. You can change any settable coefficient at runtime, and the fingerprint makes sure a changed model can...">
+<meta name="description" content="Model coefficients ship as named presets. Change any settable one at runtime; the model fingerprint stops a changed market ever passing as the shipped one.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/change.html">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="pretium docs">
 <meta property="og:title" content="Presets and Custom Models">
-<meta property="og:description" content="The model&#x27;s coefficients ship as named presets. You can change any settable coefficient at runtime, and the fingerprint makes sure a changed model can...">
+<meta property="og:description" content="Model coefficients ship as named presets. Change any settable one at runtime; the model fingerprint stops a changed market ever passing as the shipped one.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/change.html">
+<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
+<meta property="article:modified_time" content="2026-08-26T20:52:20-04:00">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Presets and Custom Models">
-<meta name="twitter:description" content="The model&#x27;s coefficients ship as named presets. You can change any settable coefficient at runtime, and the fingerprint makes sure a changed model can...">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Presets and Custom Models","description":"The model's coefficients ship as named presets. You can change any settable coefficient at runtime, and the fingerprint makes sure a changed model can...","url":"https://simoncoombes.github.io/pretium/change.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<meta name="twitter:description" content="Model coefficients ship as named presets. Change any settable one at runtime; the model fingerprint stops a changed market ever passing as the shipped one.">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Presets and Custom Models","description":"Model coefficients ship as named presets. Change any settable one at runtime; the model fingerprint stops a changed market ever passing as the shipped one.","url":"https://simoncoombes.github.io/pretium/change.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-26T20:52:20-04:00"}</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -149,60 +151,118 @@ and copy buttons.</p>
 eng = pt.Engine(seed=42, universe=u, model="pt-v1")  # an earlier era, still exact</code></pre>
         </div>
         <p>Twelve presets ship. pt-v12 is the default; the other eleven are selectable by name and none of them has ever been un-shipped.</p>
+        <h3 style="font-size:16px;margin:30px 0 10px">How the presets compare, and how each compares to a real market</h3>
+        <p>Real stock markets have habits, and this simulator is measured against <strong>14 of them</strong>: how far prices swing over a year, how often a wild day happens, whether a wild day tends to be followed by another one, whether shares fall together harder than they rise together, whether heavy trading shows up alongside big moves, and nine more. Each habit has a range measured from a real US large-cap market between 2015 and 2025. A preset <strong>matches</strong> a habit when its own measurement lands inside that range, so <strong>14 of 14</strong> means it behaved like a real market on every habit tested. The full list, with every range and every measurement, is on <a href="trust.html">Realism and limits</a>.</p>
+        <p>The first row is the real market itself. All twelve presets were measured in one run, thirty seeds each, one method throughout, so the rows compare. Ranked best first.</p>
+        <p style="font-size:14px;color:var(--mut)">This is a ranking, not a menu. Use the default unless you have a reason not to, and name it either way: the earlier presets are here so a result recorded under one still replays bit for bit, not so you can shop among them. A preset further down this table is not broken, it is earlier.</p>
         <div class="tablewrap"><table>
-          <thead><tr><th>Preset</th><th>What it is</th><th>Behaviour to know about</th></tr></thead>
+          <thead><tr><th style="vertical-align:bottom">Preset</th><th style="text-align:right;vertical-align:bottom">Realistic over one&nbsp;year<div style="font-weight:400;font-size:11.5px;color:var(--mut);margin:3px 0 0;max-width:180px;white-space:normal">habits matched, out of 14</div></th><th style="text-align:right;vertical-align:bottom">&hellip;and over two&nbsp;years<div style="font-weight:400;font-size:11.5px;color:var(--mut);margin:3px 0 0;max-width:180px;white-space:normal">scored against ranges re-derived for a two-year window, which is a stricter ruler</div></th><th style="text-align:right;vertical-align:bottom">&hellip;on companies it never saw<div style="font-weight:400;font-size:11.5px;color:var(--mut);margin:3px 0 0;max-width:180px;white-space:normal">one year, on a 60-name roster no preset was tuned against</div></th><th style="text-align:right;vertical-align:bottom">A typical year&rsquo;s swing<div style="font-weight:400;font-size:11.5px;color:var(--mut);margin:3px 0 0;max-width:180px;white-space:normal">annualised volatility: how far prices move over a year</div></th><th style="text-align:right;vertical-align:bottom">Crisis severity<div style="font-weight:400;font-size:11.5px;color:var(--mut);margin:3px 0 0;max-width:180px;white-space:normal">how much more violently prices swing in a crisis than in a calm market</div></th><th style="vertical-align:bottom">What it is</th></tr></thead>
           <tbody style="font-size:13.5px">
-            <tr>
-              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v1</td>
-              <td style="vertical-align:top">The original reference model, ported from the engine this library grew out of. Uncalibrated.</td>
-              <td>Strong herding (<code style="font-size:12px">momentum_theta</code> 0.25), so returns trend hard: autocorrelation +0.249 at lag one against a real band around zero. Momentum strategies look brilliant here for that reason. No GJR term, so no leverage effect. A constant market-factor sigma, so cross-sectional correlation sits near +0.024 against a real +0.08 to +0.56.</td>
+            <tr style="background:var(--panel)">
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top"><strong>Real markets</strong></td>
+              <td colspan="3" style="vertical-align:top" style="vertical-align:top;font-size:12.5px;color:var(--mut)">the 14 ranges these three columns score against are measured from here, so real markets sit inside all of them by construction</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right"><strong>18% to 31%</strong></td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right"><strong>6.16x</strong></td>
+              <td style="vertical-align:top">A 40-stock US large-cap cross-section, 2015 to 2025. The swing column is its three one-year windows; the crisis column is about 17% annualised on days the VIX sat below 12 against about 106% on days it sat above 45.</td>
             </tr>
             <tr>
-              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v2</td>
-              <td style="vertical-align:top">The first calibrated preset, fitted against the re-derived realism bands. Selectable, never the default.</td>
-              <td>Carries the era's structural changes (GJR asymmetry, a conditional-variance market factor, VIX coupling) at the first converged coefficient set. Stronger scenario response than pt-v3: it retains more of pt-v1's shock transient, at the cost of weaker volatility clustering.</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v12 <span style="font-family:var(--font-sans);font-size:11px;color:var(--accent)">default</span></td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right"><strong>14 of 14</strong></td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right"><strong>14 of 14</strong></td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right"><strong>14 of 14</strong></td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">32.8%</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">6.04x</td>
+              <td style="vertical-align:top">The default. Lets a day's volume keep responding to moves as far as 12%, roughly where a real exchange starts halting trade. One number, and the largest single measured gain in this project's record.</td>
             </tr>
             <tr>
-              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v3</td>
-              <td style="vertical-align:top">The default until the 2026-08-26 era boundary, kept selectable so work published against it keeps reproducing.</td>
-              <td>Nine of ten statistics in band at 252 days. Herding turned well down (<code style="font-size:12px">momentum_theta</code> 0.0742), so return autocorrelation drops to +0.0375. Factor-variance persistence raised to 0.989 to buy clustering, which is what weakened the crisis transient to 27.6% of pt-v1's. Idiosyncratic noise scaled to 0.84 to fund the bigger market factor.</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v10</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right"><strong>14 of 14</strong></td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">13 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right"><strong>14 of 14</strong></td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">31.5%</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">4.97x</td>
+              <td style="vertical-align:top">Trading volume that remembers: busy days follow busy days, the way they do in a real market.</td>
             </tr>
             <tr>
-              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v4</td>
-              <td style="vertical-align:top">Selectable, and deliberately not the default. pt-v3 plus nine parameters that ship inert on pt-v3: five endogenous jump coefficients, three volume-process parameters, and <code style="font-size:12px">market_factor_sigma</code>.</td>
-              <td>Built to INVESTIGATE long-horizon realism, which is not the same as being certified for long-horizon strategy studies: nothing in this project is certified past 252 days. It halves the dual-horizon objective (0.9887 to 0.4863 on training seeds, 1.3990 to 0.7493 on thirty seeds it never saw) and is the first change in the project's history to move the thin-tails gap: excess kurtosis at 504 days goes from 5.23 to 9.19, inside the 7.1 to 22 band. The cost is at the certified horizon, where it holds 8 of 10 rather than 9, having surrendered <code style="font-size:12px">return_acf1</code>.</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v11</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right"><strong>14 of 14</strong></td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">13 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">13 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">32.8%</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">6.01x</td>
+              <td style="vertical-align:top">The first market whose crises are about as violent as real ones, and where shares crash together the way they really do.</td>
             </tr>
             <tr>
-              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v5</td>
-              <td style="vertical-align:top">Selectable, not the default. pt-v4 with the jump decoupled from the herding term, via <code style="font-size:12px">jump_momentum_share</code>.</td>
-              <td>pt-v4's trade was a wiring accident rather than a law. A jump was applied to the mispricing state at the day close, after the momentum roll had already recorded the pre-jump level, so at the next close herding read the jump as a re-rating and continued it. Fattening the tail and adding return continuation were the same write to the same variable, which is why no search over those coefficients escaped it. Separating them recovers <code style="font-size:12px">return_acf1</code> at the certified horizon: 9 of 10 at 252 days and 7 of 10 at 504.</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v9</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">13 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">13 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">13 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">28.9%</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">4.14x</td>
+              <td style="vertical-align:top">A market that frightens itself. A bad day raises its own fear gauge, so a crisis is something this market produces rather than something you have to script.</td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v7</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">13 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">13 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">13 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">29.1%</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">3.27x</td>
+              <td style="vertical-align:top">The first market where companies in the same industry move together more than companies in different ones, in calm weather and in a crash alike.</td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v8</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">12 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">13 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">13 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">27.1%</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">4.14x</td>
+              <td style="vertical-align:top">Gives correlation a memory: how much shares move together carries over from one day to the next instead of being redrawn each morning.</td>
             </tr>
             <tr>
               <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v6</td>
-              <td style="vertical-align:top">Selectable, not the default. pt-v5 with the herding term halved, <code style="font-size:12px">momentum_theta</code> 0.0742 to 0.0371.</td>
-              <td>Holds 11 of 13 at 252 days and 10 of 13 at 504 on the thirteen-statistic panel (9 of the original 10 and 8, before the conditional correlation statistics were added). pt-v3 manages 11 and 6. Halving herding brings two-year return autocorrelation into band, 0.0605 to 0.0346 against a ceiling of 0.04, and no other statistic changes band at either horizon. It is not strictly better than pt-v3: at the certified horizon the two tie on count, and pt-v3 sits more comfortably inside its bands on six of the ten, while pt-v6 buys one large gain, kurtosis room 0.80 to 7.20 seed-sd. Choose it to STUDY two-year behaviour, in the sense the realism page means: nothing here is certified past 252 days, so a better two-year panel is a research result rather than a licence to run a two-year backtest.</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">12 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">11 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">12 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">28.5%</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">2.64x</td>
+              <td style="vertical-align:top">Halves how much traders here follow each other, which was still making prices trend more than real ones do.</td>
             </tr>
-              <tr>
-                <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v7</td>
-                <td style="vertical-align:top">Selectable, not the default. pt-v6 with industries: <code style="font-size:12px">sector_factor_sigma</code> 0.002 to 0.012, the crisis blend taken from the idiosyncratic term instead of the sector draw, a quarter of sector variance following VIX, <code style="font-size:12px">idio_sigma_scale</code> trimmed ten percent, <code style="font-size:12px">crisis_blend_cap</code> raised to 0.98, and <code style="font-size:12px">market_vol_ceiling_multiple</code> 8 to 16.</td>
-                <td>The first preset in which names in the same sector co-move more than names in different ones, in calm markets and in a crisis. Twelve of thirteen in band at 252 days and twelve at 504, the only miss the structural volume-change row; pt-v6 holds eleven and ten. Sector excess correlation 0.128 against a real band of 0.11 to 0.23, and +0.079 in a held VIX 45 against the real 2020 window's +0.103, with crisis correlation 0.61 against pt-v6's 0.60. The crisis volatility lever reads 3.06x against pt-v6's 2.68x, because a quarter of the sector variance scales with stress, and calm volatility is lower than the base because the trim paid for it. Passed the response instrument, held-out seeds and universe, and the section 8 overfitting control. Calibration record sections 58 to 62.</td>
-              </tr>
-              <tr>
-                <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v8</td>
-                <td style="vertical-align:top">Selectable, not the default. pt-v7 with the market factor's GARCH memory freed: <code style="font-size:12px">market_vol_alpha</code> 0.468 to 0.298 and <code style="font-size:12px">market_vol_beta</code> 0.521 to 0.665, the factor's calm sigma 0.0159 to 0.0088 and <code style="font-size:12px">idio_sigma_scale</code> 0.733 to 0.653 to re-set the levels, market jumps and sector sigma at the surveyed values.</td>
-                <td>The first preset whose correlation has a memory: correlation persistence +0.315 at 504 days against a real band of 0.19 to 0.49, thirteen of fourteen in band there, twelve of fourteen at 252 (lag-5 clustering a quarter of a noise unit under its floor). Crisis lever 4.34x against pt-v7's 3.31x and a real 6.16x. Crisis-state sector excess +0.053 against pt-v7's +0.079. Calibration record §64.</td>
-              </tr>
-              <tr>
-                <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v9</td>
-                <td style="vertical-align:top">Selectable, not the default. pt-v8 with a market that frightens itself: the VIX's fear channel reads the day's index return rather than the closing minute (<code style="font-size:12px">vix_return_source</code> 1.0), calibrated at about 2 VIX points per percent the index falls, with the volatility regimes taken off the multi-year business cycle clock (<code style="font-size:12px">vix_cycle_amplitude</code> 0.6) and <code style="font-size:12px">momentum_theta</code> halved again.</td>
-                <td>The first preset holding thirteen of fourteen statistics in band at 252 days AND at 504, the only miss being the structural volume-change row. The endogenous VIX reaches its own crisis threshold on 6.7% of days against a real 12.5% and pt-v8's 0.0%, so a crisis is something this market produces rather than something a scenario drives. Costs: the crisis blend falls from 3.16x to 2.29x under a pinned VIX. Calibration record §68 to §71.</td>
-              </tr>
-              <tr>
-                <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v10</td>
-                <td style="vertical-align:top">THE DEFAULT since the 2026-08-26 era boundary. pt-v9 with the engine's common log-volume state switched on: <code style="font-size:12px">volume_persistence</code> 0.70 and <code style="font-size:12px">volume_innovation_sigma</code> 0.21.</td>
-                <td>The first preset holding ALL FOURTEEN realism statistics in band at the certified 252-day horizon, on training seeds and on a held-out 60-name universe alike, including the volume-change statistic every earlier preset misses. At 504 days it holds thirteen of fourteen. It costs nothing measured: the crisis lever, the correlation blend and the shock ratio are all within noise of pt-v9's. Calibration record §73.</td>
-              </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v5</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">12 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">11 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">12 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">28.6%</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">2.64x</td>
+              <td style="vertical-align:top">Separates two things that had been one: a sudden jump in a price no longer drags the following days along behind it.</td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v3</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">12 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">7 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">11 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">24.1%</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">3.18x</td>
+              <td style="vertical-align:top">The default until August 2026, and the market three releases of published numbers describe.</td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top">pt-v4</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">11 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">10 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">11 of 14</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">28.7%</td>
+              <td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap;vertical-align:top;text-align:right">2.64x</td>
+              <td style="vertical-align:top">Built for two-year questions, back when one year was all that had been measured.</td>
+            </tr>
           </tbody>
+        </table></div>
+        <p style="font-size:14px;color:var(--mut)">Showing the top 10 of 12. <code style="font-size:12px">pt-v2</code>, <code style="font-size:12px">pt-v1</code> are still selectable and still reproduce bit for bit; they rank below the rows above on the same measurement, which is why they are not listed rather than because they were withdrawn.</p>
+        <h3 style="font-size:16px;margin:34px 0 10px">The 14 habits</h3>
+        <p>Each one is a thing real stock markets are known to do, with the range a real US large-cap market stayed inside between 2015 and 2025. A preset matches a habit when its own measurement lands in that range. The ranges are wide because real markets are: a calm year and a crisis year are both real.</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Habit</th><th>What it means</th><th style="text-align:right">Real markets</th></tr></thead>
+          <tbody style="font-size:13.5px"><tr><td style="vertical-align:top"><strong>How far prices move over a year</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">annualised_vol_pct</div></td><td style="vertical-align:top">The size of a typical stock&#x27;s ups and downs, scaled up from daily moves to a yearly figure.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">15% to 36%</td></tr><tr><td style="vertical-align:top"><strong>How often a wild day happens</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">excess_kurtosis</div></td><td style="vertical-align:top">Markets produce far more extreme days than a bell curve allows. This measures how much fatter those tails are.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">1.6 to 41</td></tr><tr><td style="vertical-align:top"><strong>Whether yesterday&#x27;s direction predicts today&#x27;s</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">return_acf1</div></td><td style="vertical-align:top">Close to zero in a real market. If it were not, the trade would be obvious and somebody would already have taken it.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">-0.08 to 0.06</td></tr><tr><td style="vertical-align:top"><strong>Whether a wild day is followed by another one</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">abs_return_acf1</div></td><td style="vertical-align:top">Volatility arrives in clusters rather than evenly. Measured one trading day apart.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">0.02 to 0.22</td></tr><tr><td style="vertical-align:top"><strong>Whether that clustering lasts a week</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">abs_return_acf5</div></td><td style="vertical-align:top">The same effect, measured five trading days apart, where it has weakened but not gone.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">0.02 to 0.09</td></tr><tr><td style="vertical-align:top"><strong>Whether it lasts a month</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">abs_return_acf20</div></td><td style="vertical-align:top">The same effect at twenty trading days, by which point a real market has nearly forgotten.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">-0.04 to 0.08</td></tr><tr><td style="vertical-align:top"><strong>How much shares move together</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">cross_sectional_corr</div></td><td style="vertical-align:top">What the average pair of stocks in the same market does over a year: some of every price move is the whole market moving.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">0.08 to 0.56</td></tr><tr><td style="vertical-align:top"><strong>Whether big moves come with heavy trading</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">volume_abs_return_corr</div></td><td style="vertical-align:top">On days a price moves a long way, more shares change hands.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">0.46 to 0.66</td></tr><tr><td style="vertical-align:top"><strong>Whether falls unsettle the market more than rises</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">leverage_effect</div></td><td style="vertical-align:top">A drop today raises tomorrow&#x27;s volatility more than an equally sized gain does.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">-0.16 to 0</td></tr><tr><td style="vertical-align:top"><strong>Whether trading volume swings back</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">volume_change_acf1</div></td><td style="vertical-align:top">An unusually busy day tends to be followed by a quieter one rather than by another busy one.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">-0.32 to -0.2</td></tr><tr><td style="vertical-align:top"><strong>Whether shares fall together harder than they rise together</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">corr_asymmetry</div></td><td style="vertical-align:top">How much more tightly prices move as a group on sharp down days than on sharp up days.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">-0.25 to 0.45</td></tr><tr><td style="vertical-align:top"><strong>And whether that grip lasts a day</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">corr_asymmetry_lagged</div></td><td style="vertical-align:top">The same comparison, measured on the day after the sharp move rather than on the day itself.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">-0.2 to 0.55</td></tr><tr><td style="vertical-align:top"><strong>Whether an industry moves as a bloc</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">sector_excess_corr</div></td><td style="vertical-align:top">How much more two companies in the same industry move together than two companies in different ones.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">0.11 to 0.23</td></tr><tr><td style="vertical-align:top"><strong>Whether moving together is itself persistent</strong><div style="font-family:var(--font-mono);font-size:11.5px;color:var(--mut);margin:2px 0 0">corr_persistence_acf1</div></td><td style="vertical-align:top">Once shares start moving as a group, that state carries over instead of being redrawn from scratch.</td><td style="vertical-align:top;text-align:right;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">-0.19 to 0.54</td></tr></tbody>
         </table></div>
         <h2 style="font-size:21px;margin:46px 0 10px">Custom Models and Fingerprints</h2>
         <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
@@ -212,7 +272,7 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v1")  # an earlier era, still exa
           </div>
           <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">custom = pt.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
 eng = pt.Engine(seed=42, universe=u, model=custom)
-eng.model_fingerprint     # "custom-0c04c4ba" -- never "pt-v1"</code></pre>
+eng.model_fingerprint     # "custom-7f290e34" -- never "pt-v1"</code></pre>
         </div>
         <p>The fingerprint is the first 8 hex characters of a sha256 over the canonical serialisation: names sorted, values as raw IEEE-754 bit patterns. A coefficient set bit-identical to a shipped preset fingerprints as that preset's name. Anything else fingerprints as <code style="font-size:13px">custom-XXXXXXXX</code>. <code style="font-size:13px">ModelParams</code> is immutable once built, so a fingerprint someone quoted cannot drift afterwards. The rule is simple: you may change the model, and a changed model has a different name.</p>
         <p>The fingerprint travels everywhere a result does: scorecards, manifests, checkpoints, forks, replay. A manifest for a custom-model run embeds the full coefficient dictionary and <code style="font-size:13px">reproduce()</code> rebuilds that exact market or refuses by name.</p>

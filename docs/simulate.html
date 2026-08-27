@@ -4,17 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Running a Market · pretium docs</title>
-<meta name="description" content="Build a universe, run a market, test a strategy. For most users this page is the whole library.">
+<meta name="description" content="Build a universe, run a market and score a trading strategy in a few lines of Python, and why a simulated market answers questions a historical backtest cannot.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/simulate.html">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="pretium docs">
 <meta property="og:title" content="Running a Market">
-<meta property="og:description" content="Build a universe, run a market, test a strategy. For most users this page is the whole library.">
+<meta property="og:description" content="Build a universe, run a market and score a trading strategy in a few lines of Python, and why a simulated market answers questions a historical backtest cannot.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/simulate.html">
+<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
+<meta property="article:modified_time" content="2026-08-26T11:29:27-04:00">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Running a Market">
-<meta name="twitter:description" content="Build a universe, run a market, test a strategy. For most users this page is the whole library.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Running a Market","description":"Build a universe, run a market, test a strategy. For most users this page is the whole library.","url":"https://simoncoombes.github.io/pretium/simulate.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<meta name="twitter:description" content="Build a universe, run a market and score a trading strategy in a few lines of Python, and why a simulated market answers questions a historical backtest cannot.">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Running a Market","description":"Build a universe, run a market and score a trading strategy in a few lines of Python, and why a simulated market answers questions a historical backtest cannot.","url":"https://simoncoombes.github.io/pretium/simulate.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-26T11:29:27-04:00"}</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -237,7 +239,7 @@ ranking.separation("momentum", "mean_reversion")   # wins-losses, sign-test p</c
         <p>On the twelve-market grid the agents docs measure, momentum's pooled capture is nearly four times mean-reversion's. Paired across the same twelve markets it wins only 7 to 5, p = 0.77. Its lead lives in how big its wins are, and a single seed picks the pooled leader only five times in twelve.</p>
         <div style="border:1px solid var(--line);border-radius:9px;padding:14px 18px 4px;margin:26px 0;background:var(--panel)">
           <div style="font:600 10.5px/1 var(--font-mono);letter-spacing:0.09em;color:var(--bad);margin:0 0 9px">LIMITS TO CARRY WITH YOU</div>
-          <p style="font-size:13.5px;color:var(--mut)">Momentum can be profitable here for a reason real markets do not supply. Returns trend, because the mispricing process has a herding term with a dial on it. The shipped <code style="font-size:12px">pt-v3</code> preset turns that dial well down: return autocorrelation at lag one reads +0.0375 against a real band of −0.08 to 0.06, so it is in band. Earlier presets did not. <code style="font-size:12px">pt-v1</code> ships the same knob at 0.25 and measures +0.249, roughly a fifth of it. Either way the dial exists and real markets have no equivalent, so a strategy whose edge tracks it is exploiting the model. <a href="interrogate.html">Testing Your Edge</a> shows how to check whether yours does. <span style="font:400 11px/1.5 var(--font-mono);color:var(--faint)">pt-v3: 30 seeds, 40 instruments, 252 days. pt-v1: median of six seeds, Universe.random(40, seed=111), 252 days, sim seeds 1-6.</span></p>
+          <p style="font-size:13.5px;color:var(--mut)">Momentum can be profitable here for a reason real markets do not supply. Returns trend, because the mispricing process has a herding term with a dial on it. The shipped <code style="font-size:12px">pt-v12</code> preset turns that dial well down: <code style="font-size:12px">momentum_theta</code> sits at 0.0186 and return autocorrelation at lag one reads +0.0239 against a real band of −0.08 to 0.06, so it is in band. Earlier presets did not. <code style="font-size:12px">pt-v1</code> ships the same knob at 0.25, thirteen times higher, and measures +0.249, which is ten times the shipped figure and outside the band rather than inside it. Either way the dial exists and real markets have no equivalent, so a strategy whose edge tracks it is exploiting the model. <a href="interrogate.html">Testing Your Edge</a> shows how to check whether yours does. <span style="font:400 11px/1.5 var(--font-mono);color:var(--faint)">pt-v12: the certified panel, 30 seeds, 40 instruments, 252 days. pt-v1: median of six seeds, Universe.random(40, seed=111), 252 days, sim seeds 1-6.</span></p>
           <p style="font-size:13.5px;color:var(--mut)">One venue, no latency, no strategic counterparties. Orders arrive instantly, there is one book per name, and you trade against a market maker and aggregate flow, never against agents that adapt to you.</p>
         </div>
         <h2 style="font-size:21px;margin:46px 0 10px">A Year, End to End</h2>
@@ -278,7 +280,7 @@ print(ranking.separation("momentum", "mean_reversion"))</code></pre>
           <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">OUTPUT</span><span title="Shapes and field names are real; the numeric values were composed for the example." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--codemut);border:1px solid var(--codeline)">ILLUSTRATIVE</span></div>
           <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);color:var(--codemut)"># 1.
 30 4c1e9f77a3b8d502
-pt-v3
+pt-v12
 
 # 2.
 7560 2948400
