@@ -280,7 +280,7 @@ fn fair_value(
     })?;
 
     // Finite floats everywhere, per the validation policy. The core
-    // reproduces the TypeScript's NaN behaviour faithfully -- that is what
+    // reproduces the reference implementation's NaN behaviour faithfully -- that is what
     // the golden vectors pin -- but a NaN admitted HERE propagates silently
     // into prices: a NaN fair value takes early returns in settlement, books
     // stop trading, and the user gets a quietly frozen market instead of an

@@ -4,7 +4,7 @@
 //!
 //! the invariants notes records 1.13 as **"CLAIMED, NOT DIRECTLY TESTED"**, and is
 //! blunt about why that matters: the closest thing to a check in the
-//! TypeScript suite (`tests/unit/simulation.test.ts:895-944`) explicitly
+//! reference-implementation suite (its own suite) explicitly
 //! EXCLUDES any day whose move exceeds 40% before asserting the remaining days
 //! stay under 50%. The one test that looks at daily moves is written to route
 //! around the exact bound this invariant is about.
@@ -127,7 +127,7 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
     (c.stock.price, previous_close)
 }
 
-/// The bound, exactly as `market.ts` computes it.
+/// The bound, exactly as the market module computes it.
 fn assert_within_band(price: f64, previous_close: f64, note: &str) {
     let max = previous_close * 1.25;
     // The floor is a MAX, not a separate clamp: for a penny stock the dollar

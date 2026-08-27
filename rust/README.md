@@ -67,8 +67,8 @@ suitable for, is at <https://simoncoombes.github.io/pretium/>.
 
 The published crate carries the engine, its unit tests and three
 integration tests that run standalone. The parity corpus that pins this
-port against its TypeScript original is 140 MB of fixtures and stays in the
-repository, so the tests that read it are excluded here rather than shipped
+port against the reference implementation is 140 MB of fixtures and stays
+in the repository, so the tests that read it are excluded here rather than shipped
 in a state where they cannot pass.
 
 That corpus is not run by CI. The two workflows -- `determinism.yml` and

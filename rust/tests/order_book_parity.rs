@@ -1,7 +1,7 @@
 //! Bit-identical parity for `order_book`, by replaying a scripted program.
 //!
-//! **A hard gate.** `orderBook.ts` has zero imports and zero transcendentals,
-//! so every operation is exactly specified by IEEE-754 and any mismatch is a
+//! **A hard gate.** The reference implementation's order book has zero
+//! imports and zero transcendentals, so every operation is exactly specified by IEEE-754 and any mismatch is a
 //! defect in the port.
 //!
 //! The vectors are a single stateful PROGRAM rather than isolated cases,
@@ -177,7 +177,7 @@ fn matches_typescript_across_a_replayed_program() {
         .join("goldens/orderbook.json");
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "{}: {e}\nRun: npx tsx scripts/rust-port/orderbook-vectors.ts",
+            "{}: {e}\nRegenerate from the reference implementation's order-book generator",
             path.display()
         )
     });
@@ -330,7 +330,7 @@ fn matches_typescript_across_a_replayed_program() {
 
     assert!(
         problems.is_empty(),
-        "diverged from the TypeScript:\n  {}",
+        "diverged from the reference implementation:\n  {}",
         problems.join("\n  ")
     );
 }

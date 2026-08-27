@@ -1,7 +1,7 @@
-//! Microstructure — ported from `src/lib/engine/microstructure.ts`.
+//! Microstructure — ported from the reference implementation.
 //!
 //! One spread model, one book, shared by display and execution. The
-//! TypeScript header explains why that matters and is not repeated here; what
+//! reference-implementation header explains why that matters and is not repeated here; what
 //! follows is what the PORT has to be careful about.
 //!
 //! # Tier
@@ -81,7 +81,7 @@ const FLOW_SLICES: usize = 4;
 const GAP_PRESSURE: f64 = 40.0;
 
 /// Converts a crowd flow lean (a daily-equivalent log-price shock, bounded at
-/// ±0.02 in `mispricing.ts`) into a buy-fraction tilt.
+/// ±0.02 in the mispricing module) into a buy-fraction tilt.
 const FLOW_LEAN_TILT: f64 = 10.0;
 
 /// The company fields this module reads, and only those.
@@ -204,7 +204,7 @@ pub fn compute_spread_bps_with(
     let vol_multiplier = 0.7 + 0.3 * sector_vol * beta;
 
     let mut vix_multiplier = 1.0 + mathx::max(0.0, (vix - 15.0) / 30.0);
-    // The TypeScript is `if (difficulty === 'hard' && vix > 25) … else if
+    // The reference implementation is `if (difficulty === 'hard' && vix > 25) … else if
     // (difficulty === 'expert' && vix > 25)`. A hard run below VIX 25 falls
     // through BOTH arms, which the guards reproduce.
     //
@@ -265,7 +265,7 @@ pub struct RestingOrder {
     pub owner_id: String,
 }
 
-/// Options for [`build_live_book`]. `Default` carries the TypeScript
+/// Options for [`build_live_book`]. `Default` carries the reference implementation
 /// destructuring defaults (`vix = 15`, `levels = BOOK_LEVELS`).
 #[derive(Debug, Clone)]
 pub struct LiveBookOptions {
@@ -325,7 +325,7 @@ pub fn build_live_book(company: &CompanyMicrostructure, options: &LiveBookOption
                 position: company.maker_inventory.unwrap_or(0.0),
                 limit: mathx::max(1.0, base_size * INVENTORY_LIMIT_LEVELS),
             },
-            // The TypeScript passes neither `volatilityMultiplier` nor
+            // The reference implementation passes neither `volatilityMultiplier` nor
             // `maxSkew`, so both take their destructuring default of 1.
             ..QuoteParams::default()
         },
@@ -373,7 +373,8 @@ pub struct SettleOptions {
     pub vix: f64,
     pub difficulty: Option<Difficulty>,
     /// Crowd flow lean: the bounded daily-equivalent log shock from
-    /// `mispricing.ts::crowdLean`. `None` means no crowd, matching legacy
+    /// the mispricing module's `crowdLean`. `None` means no crowd, matching
+    /// legacy
     /// callers where behaviour is unchanged.
     pub flow_lean: Option<f64>,
     /// The size-curve settings, carried so a settlement quotes against the
@@ -401,7 +402,7 @@ impl Default for SettleOptions {
 pub fn maker_delta_from_fills(fills: &[Fill]) -> f64 {
     // Folded explicitly from `0.0`, not `.sum()`, for the same reason
     // `order_book::depth` is: `Sum for f64` starts from `-0.0`, so an empty
-    // or fully-skipped set would return a negative zero the TypeScript never
+    // or fully-skipped set would return a negative zero the reference implementation never
     // produces.
     let mut delta = 0.0;
     for f in fills {
@@ -885,7 +886,7 @@ mod tests {
 
     #[test]
     fn an_empty_fill_set_yields_positive_zero() {
-        // `.sum()` would give -0.0 here; the TypeScript gives +0.
+        // `.sum()` would give -0.0 here; the reference implementation gives +0.
         assert_eq!(maker_delta_from_fills(&[]).to_bits(), 0.0f64.to_bits());
     }
 }

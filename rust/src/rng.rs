@@ -1,9 +1,9 @@
-//! PCG32, ported from `src/lib/engine/prng.ts`.
+//! PCG32, ported from the reference implementation.
 //!
 //! # What this is a port of, and why it can be exact
 //!
-//! The TypeScript emulates a 64-bit PCG32 using pairs of 32-bit integers,
-//! because JavaScript's bitwise operators are 32-bit (`Math.imul`, `>>> 0`).
+//! The reference implementation emulates a 64-bit PCG32 using pairs of 32-bit
+//! integers, because its bitwise operators are 32-bit (`Math.imul`, `>>> 0`).
 //! Rust has native `u64`, so this implementation is shorter than the original
 //! while producing **bit-identical** output.
 //!
@@ -64,7 +64,7 @@
 //!
 //! That buys two things, and the second matters more than the first:
 //!
-//! 1. **Parity with V8**, so the port can be verified against the TypeScript.
+//! 1. **Parity with V8**, so the port can be verified against the reference implementation.
 //! 2. **Determinism across platforms.** With `std`, the same Python wheel
 //!    would produce different numbers on Linux and Windows. For a library
 //!    whose entire selling point is reproducible markets, that is disqualifying
@@ -77,11 +77,11 @@
 //!
 //! # Faithfulness over correctness
 //!
-//! Where the TypeScript does something odd, this reproduces the oddity rather
+//! Where the reference implementation does something odd, this reproduces the oddity rather
 //! than improving on it. A port that "fixes" the source is not a port; it is a
 //! second model, and two models that disagree is the outcome this entire
 //! project exists to avoid. Every such case is commented with what the
-//! TypeScript does and why the Rust matches it.
+//! the reference implementation does and why the Rust matches it.
 
 use crate::mathx;
 
@@ -269,7 +269,8 @@ impl Rng for GameRng {
 
 /// JavaScript's `ToUint32` coercion, as applied by `>>> 0`.
 ///
-/// The TypeScript constructor does `seed >>> 0` and `sequence << 1`, which
+/// The reference implementation's constructor does `seed >>> 0` and
+/// `sequence << 1`, which
 /// means a seed of `2^32` becomes `0` and a seed of `-1` becomes `4294967295`.
 /// Callers reaching this crate from Python or Rust will not naturally apply
 /// that, so it is applied here — otherwise the same nominal seed would produce
@@ -304,18 +305,18 @@ pub struct Pcg32 {
     inc: u64,
 }
 
-/// `6364136223846793005`, split as `0x5851F42D_4C957F2D` in the TypeScript.
+/// `6364136223846793005`, split as `0x5851F42D_4C957F2D` in the reference implementation.
 const PCG_MULTIPLIER: u64 = 0x5851_F42D_4C95_7F2D;
 
 impl Pcg32 {
-    /// Mirrors the TypeScript constructor exactly:
+    /// Mirrors the reference implementation's constructor exactly:
     ///
     /// ```text
     /// inc   = (sequence << 1) | 1     // 32-bit shift, so the top bit lands in incHi
     /// state = 0; step(); state += seed; step();
     /// ```
     ///
-    /// The TypeScript builds `inc` from `incHi = sequence >>> 31` and
+    /// The reference implementation builds `inc` from `incHi = sequence >>> 31` and
     /// `incLo = (sequence << 1) | 1`, which together are exactly
     /// `((sequence as u64) << 1) | 1` — the high half is the bit that `<< 1`
     /// pushes out of 32 bits. Verified rather than assumed, because getting
@@ -334,7 +335,7 @@ impl Pcg32 {
 
     /// Advance the state and return the XSH-RR permutation of the OLD state.
     ///
-    /// The TypeScript computes the permutation from `oldHi`/`oldLo` captured
+    /// The reference implementation computes the permutation from `oldHi`/`oldLo` captured
     /// before the multiply-add, which is standard PCG and is what makes the
     /// output independent of the next state. Ordering matters: permuting the
     /// new state would produce a valid-looking but different generator.
@@ -347,7 +348,7 @@ impl Pcg32 {
         // rot = old >> 59 — the top 5 bits
         let rot = (old >> 59) as u32;
 
-        // The TypeScript writes this as `(xs >>> rot) | (xs << ((-rot) & 31))`.
+        // The reference implementation writes this as `(xs >>> rot) | (xs << ((-rot) & 31))`.
         // The `(-rot) & 31` exists to make a rotation of 0 shift by 0 rather
         // than by 32, which would be undefined. `rotate_right` has that
         // behaviour natively.
@@ -361,7 +362,7 @@ impl Pcg32 {
 
     /// Uniform float in `[0, 1)`.
     ///
-    /// The TypeScript divides by `4294967296` (2^32). Division of an exactly
+    /// The reference implementation divides by `4294967296` (2^32). Division of an exactly
     /// representable integer by a power of two is exact in IEEE-754, so this
     /// is one of the float operations that carries no parity risk at all.
     pub fn next_f64(&mut self) -> f64 {
@@ -390,7 +391,7 @@ impl GameRng {
         }
     }
 
-    /// `createGameRng(seed)` in the TypeScript — note it uses sequence **0**,
+    /// `createGameRng(seed)` in the reference implementation — note it uses sequence **0**,
     /// while the `GameRng` constructor defaults to **1**. That asymmetry is in
     /// the original and is load-bearing: the two entry points produce
     /// different streams from the same seed.
@@ -462,7 +463,7 @@ impl GameRng {
     ///
     /// Two faithfulness details, both easy to "improve" and both wrong to:
     ///
-    /// 1. The TypeScript writes `const u = this.nextFloat() || 1e-10`. That is
+    /// 1. The reference implementation writes `const u = this.nextFloat() || 1e-10`. That is
     ///    a truthiness guard, not a comparison: it substitutes `1e-10` when
     ///    `nextFloat()` returns exactly `0.0`, which would otherwise make
     ///    `ln(0) = -inf`. It fires on exactly one of 2^32 outcomes. Reproduced
@@ -484,7 +485,7 @@ impl GameRng {
 
     /// Integer in `[min, max]` inclusive.
     ///
-    /// The TypeScript is `min + (this.pcg.next() % range)`, where `next()` is
+    /// The reference implementation is `min + (this.pcg.next() % range)`, where `next()` is
     /// an unsigned 32-bit value held in a JS double, so `%` is exact integer
     /// remainder. Both languages truncate toward zero and both operands are
     /// non-negative, so the result matches.
@@ -497,7 +498,7 @@ impl GameRng {
         if range <= 0 {
             // JS would produce NaN or Infinity here and poison downstream
             // arithmetic silently. Returning `min` is a deliberate divergence
-            // from a case the TypeScript never exercises; if a golden vector
+            // from a case the reference implementation never exercises; if a golden vector
             // ever hits it, this must be revisited rather than papered over.
             return min;
         }
@@ -514,7 +515,7 @@ impl GameRng {
 mod tests {
     use super::*;
 
-    /// The state after construction is not something the TypeScript exposes,
+    /// The state after construction is not something the reference implementation exposes,
     /// so this pins the internal sequence instead: the first outputs must be
     /// stable across refactors of this file.
     #[test]

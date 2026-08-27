@@ -1,7 +1,7 @@
 # Golden vectors
 
-These files record what `src/lib/engine/prng.ts` and `src/lib/engine/mispricing.ts`
-**do**, value by value, at full `f64` precision. They are the reference the Rust
+These files record what the reference implementation's PRNG and mispricing
+modules **do**, value by value, at full `f64` precision. They are the reference the Rust
 port must reproduce.
 
 **995,783 assertions across 20 files, 39.2 MB.**
@@ -18,13 +18,14 @@ up below.
 
 ## The one rule
 
-> **These are generated from the TypeScript. They must never be regenerated
-> from the Rust.**
+> **These are generated from the reference implementation. They must never
+> be regenerated from the Rust.**
 
-The TypeScript is the only implementation that exists today, which makes it the
-only independent oracle. The moment the Rust regenerates these files, the Rust
-becomes its own oracle and any divergence is silently legitimised. The parity
-test then proves nothing except that Rust agrees with Rust.
+The reference implementation is the only other implementation that exists,
+which makes it the only independent oracle. The moment the Rust regenerates
+these files, the Rust becomes its own oracle and any divergence is silently
+legitimised. The parity test then proves nothing except that Rust agrees
+with Rust.
 
 If the Rust disagrees with a vector, exactly two responses are legitimate:
 
@@ -38,8 +39,8 @@ If the Rust disagrees with a vector, exactly two responses are legitimate:
    absorbed. See `CONTRIBUTING.md`, "The one rule everything else follows".
 
 Regenerating the vector is not on the list. The only reason to re-run the
-generator is that the **TypeScript itself** changed, and that is a formula-era
-change whether or not anyone intended it to be.
+generator is that the **reference implementation itself** changed, and that is
+a formula-era change whether or not anyone intended it to be.
 
 Every file records the SHA-256 of both source files it was generated from, so a
 stale vector set is detectable rather than merely suspected.
@@ -48,13 +49,12 @@ stale vector set is detectable rather than merely suspected.
 
 ## Regenerating and verifying
 
-Two commands, and both of them run in the reference TypeScript checkout,
-which is where the generator lives and where `scripts/rust-port/` and
-`src/lib/engine/prng.ts` are real paths:
+Two commands, and both of them run in the reference implementation's own
+checkout, which is where the generator lives:
 
-```bash
-npx tsx scripts/rust-port/generate-goldens.ts            # write the vectors
-npx tsx scripts/rust-port/generate-goldens.ts --check    # verify them
+```
+<generator>            # write the vectors
+<generator> --check    # verify them
 ```
 
 Neither runs here. This repository carries the corpus and a checker, not the
@@ -65,8 +65,8 @@ missing, corrupted or edited vector; it cannot catch a vector that was
 generated wrongly, which is what `--check` above is for.
 
 `--check` re-reads every file from disk, decodes the recorded **inputs** from
-their IEEE-754 bit patterns, re-runs the TypeScript, and compares every recorded
-**output** bit for bit. It also verifies each file against the SHA-256 and byte
+their IEEE-754 bit patterns, re-runs the reference implementation, and compares
+every recorded **output** bit for bit. It also verifies each file against the SHA-256 and byte
 count in `index.json`. It exits non-zero on any mismatch.
 
 Generation is deterministic: no `Date.now()`, no `Math.random()`, ASCII output

@@ -1,6 +1,6 @@
-//! Smoke parity against real TypeScript output.
+//! Smoke parity against real output from the reference implementation.
 //!
-//! These values were produced by running `src/lib/engine/prng.ts` under `tsx`
+//! These values were produced by running the reference implementation's PRNG
 //! and printing raw IEEE-754 bit patterns, not decimals — a decimal comparison
 //! can agree while the underlying doubles differ, which is exactly the failure
 //! this crate must not ship.
@@ -16,7 +16,7 @@
 
 use pretium::GameRng;
 
-/// Parse the `f64` bit patterns emitted by the TypeScript probe.
+/// Parse the `f64` bit patterns emitted by the reference implementation's probe.
 fn f64s(hex_csv: &str) -> Vec<f64> {
     hex_csv
         .split(',')

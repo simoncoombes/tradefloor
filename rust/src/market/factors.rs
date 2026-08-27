@@ -1,5 +1,5 @@
-//! Price factors — the LIVE subset, ported from
-//! `src/lib/engine/market.ts:217`.
+//! Price factors — the LIVE subset, ported from the reference
+//! implementation.
 //!
 //! # Only four factors reach the price
 //!
@@ -18,7 +18,7 @@
 //! earnings drift) now lives inside fair value, and every anchor
 //! (`meanReversion`, `peMeanReversion`, `valueGrowthEffect`) is replaced by
 //! the `s`-process's own reversion. Applying them here too would
-//! double-count. The kill switch falls back to TypeScript rather than to a
+//! double-count. The kill switch falls back to the reference implementation rather than to a
 //! Rust legacy mode, so a Rust copy would be a second dead model.
 //!
 //! # Draw schedule
@@ -475,7 +475,8 @@ fn truthy(value: Option<f64>) -> f64 {
     }
 }
 
-/// Order imbalance from a tick's pending orders, from `market.ts:1347-1350`.
+/// Order imbalance from a tick's pending orders, from the reference
+/// implementation.
 ///
 /// Scales with volume RELATIVE to the name's own average, so a 10,000-share
 /// order moves a thin stock and not a liquid one — impact is about

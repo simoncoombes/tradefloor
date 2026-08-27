@@ -1,11 +1,13 @@
-//! Mispricing — the daily `s`-process, ported from `src/lib/engine/mispricing.ts`.
+//! Mispricing — the daily `s`-process, ported from the reference
+//! implementation.
 //!
 //! # What this module is, and what it is NOT
 //!
-//! **It is not the model the tick loop runs.** `mispricing.ts` has zero callers in
-//! `src/`: the shipping game uses a per-tick inline variant inside `market.ts`
+//! **It is not the model the tick loop runs.** It has zero callers in the
+//! reference implementation, which uses a per-tick inline variant inside its
+//! market module
 //! (WP4), which applies the same ideas at 1/390 of a day per tick and never
-//! calls through here. The TypeScript file's own header claims to own the live
+//! calls through here. The reference implementation file's own header claims to own the live
 //! price model, and that claim is wrong — see the port plan, Phase 2 course
 //! correction, item 4. It is deliberately not repeated above.
 //!
@@ -53,7 +55,7 @@ pub const MISPRICING_HALF_LIFE_DAYS: f64 = 60.0;
 /// Daily AR(1) coefficient implied by the half-life.
 ///
 /// **Hardcoded from V8's recorded bits, deliberately not computed.** The
-/// TypeScript evaluates `Math.pow(0.5, 1/60)` at module load, so the value is
+/// The reference implementation evaluates `Math.pow(0.5, 1/60)` at module load, so the value is
 /// a transcendental result and φ compounds through every step of the process
 /// — a one-ULP difference is not a rounding curiosity here, it is a different
 /// half-life applied 100,000 times.
@@ -101,7 +103,7 @@ pub struct MispricingState {
     pub s_prev: f64,
 }
 
-/// The TypeScript default is `createMispricingState(0)`.
+/// The reference implementation default is `createMispricingState(0)`.
 impl Default for MispricingState {
     fn default() -> Self {
         create_mispricing_state(0.0)
@@ -193,7 +195,7 @@ pub fn crowd_adjusted_root_moduli() -> (f64, f64) {
 ///
 /// `z² − (φ+θ)z + θ = 0`.
 ///
-/// `None` selects the TypeScript default argument, so a `None` call depends
+/// `None` selects the reference implementation's default argument, so a `None` call depends
 /// on [`MISPRICING_PHI`] — a φ one ULP out shows up here too.
 pub fn characteristic_root_moduli(phi: Option<f64>, theta: Option<f64>) -> (f64, f64) {
     let phi = phi.unwrap_or(MISPRICING_PHI);
@@ -230,7 +232,7 @@ pub fn characteristic_root_moduli(phi: Option<f64>, theta: Option<f64>) -> (f64,
 /// The analytic replacement for a two-world simulation harness at this layer
 /// — no RNG, so no de-sync problem, and instant.
 ///
-/// `horizon_days` is an `i64` even though the TypeScript parameter is a
+/// `horizon_days` is an `i64` even though the reference implementation's parameter is a
 /// `number`, and unlike `market_maker::LadderParams::levels` that narrowing
 /// is faithful. The loop is `for (d = 1; d <= horizonDays; d++)` with an
 /// integer `d`, so `d <= 2.5` and `d <= 2` admit the same iterations, and a
@@ -454,7 +456,8 @@ mod tests {
 
     #[test]
     fn the_crowd_lean_is_bounded_including_for_pathological_inputs() {
-        // The table from `crowd-flow.test.ts`, ported as the spec asks.
+        // The table from the reference implementation's crowd-flow tests,
+        // ported as the spec asks.
         for (s, momentum) in [
             (5.0, 5.0),
             (-5.0, -5.0),
@@ -476,7 +479,8 @@ mod tests {
         // at test time something the compiler already knows.
         //
         // The bound is HALF the daily shock cap, not merely under it. That is
-        // what `crowd-flow.test.ts` asserts, and the weaker form would still
+        // what the reference implementation's crowd-flow tests assert, and
+        // the weaker form would still
         // pass while the crowd had grown to rival a news day.
         const { assert!(CROWD_LEAN_CAP < DAILY_SHOCK_CAP / 2.0) };
     }
