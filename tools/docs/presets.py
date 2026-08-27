@@ -28,37 +28,45 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PANEL_JSON = ROOT / "tools" / "docs" / "preset-panel.json"
 
-#: One line per preset, from `rust/src/params.rs`. What the preset IS, not
-#: how well it does: the columns beside it are what it does, and they are
-#: measured.
+#: One line per preset: what the MARKET is like, not what changed since the
+#: preset before it.
+#:
+#: The first version of this column read "pt-v6 with sector structure that
+#: survives a crisis", which asks a reader to chain backwards through five
+#: presets they have never heard of to learn anything. Each line now stands
+#: on its own, and the mechanism it names is the one in that preset's Rust
+#: docstring, which is the definition rather than a description.
 NOTES = {
-    "pt-v1": "The original reference model, ported from the engine this "
-             "library grew out of. Uncalibrated, and herding runs strong, so "
-             "returns trend far harder than a real market's.",
-    "pt-v2": "The first calibrated preset, fitted against the re-derived "
-             "realism bands. Selectable, never the default.",
-    "pt-v3": "The default until the first 2026-08-26 era boundary, and the "
-             "preset the realism numbers described through three releases.",
-    "pt-v4": "pt-v3 plus nine coefficients that ship inert: the 504-day "
-             "variant, built for two-year questions.",
-    "pt-v5": "pt-v4 with the jump decoupled from herding, which had been one "
-             "write to one variable rather than two mechanisms.",
-    "pt-v6": "pt-v5 with the herding term halved.",
-    "pt-v7": "pt-v6 with sector structure that survives a crisis: the first "
-             "preset where names in a sector co-move more than names across "
-             "sectors, in calm markets and in a crisis alike.",
-    "pt-v8": "pt-v7 with the market factor's variance given a memory, so "
-             "correlation persists rather than resetting each day.",
-    "pt-v9": "pt-v8 with a market that frightens itself: the VIX reads the "
-             "day's index return, so a crisis is something this market "
-             "produces rather than something a scenario drives.",
-    "pt-v10": "pt-v9 with volume that remembers.",
-    "pt-v11": "pt-v10 with a crisis that behaves like one: the first preset "
-              "to hold the crisis lever, crisis co-movement and crisis "
-              "sector structure at the same time.",
-    "pt-v12": "pt-v11 with the volume-move cap lifted from 4% to 12%, "
-              "roughly where a real exchange starts halting. One number, and "
-              "the largest single measured gain in the project's record.",
+    "pt-v1": "The original reference model, never calibrated. Trends far "
+             "harder than a real market, so momentum strategies look "
+             "brilliant here for a reason that is not real.",
+    "pt-v2": "The first preset fitted to real-market ranges rather than "
+             "chosen by hand.",
+    "pt-v3": "The default until August 2026, and the market three releases "
+             "of published numbers describe.",
+    "pt-v4": "Built for two-year questions, back when one year was all that "
+             "had been measured.",
+    "pt-v5": "Separates two things that had been one: a sudden jump in a "
+             "price no longer drags the following days along behind it.",
+    "pt-v6": "Halves how much traders here follow each other, which was "
+             "still making prices trend more than real ones do.",
+    "pt-v7": "The first market where companies in the same industry move "
+             "together more than companies in different ones, in calm "
+             "weather and in a crash alike.",
+    "pt-v8": "Gives correlation a memory: how much shares move together "
+             "carries over from one day to the next instead of being redrawn "
+             "each morning.",
+    "pt-v9": "A market that frightens itself. A bad day raises its own fear "
+             "gauge, so a crisis is something this market produces rather "
+             "than something you have to script.",
+    "pt-v10": "Trading volume that remembers: busy days follow busy days, "
+              "the way they do in a real market.",
+    "pt-v11": "The first market whose crises are about as violent as real "
+              "ones, and where shares crash together the way they really do.",
+    "pt-v12": "The default. Lets a day's volume keep responding to moves as "
+              "far as 12%, roughly where a real exchange starts halting "
+              "trade. One number, and the largest single measured gain in "
+              "this project's record.",
 }
 
 #: How many rows the table shows. Ten of the twelve, because a ranking is
@@ -127,6 +135,14 @@ def _count(n: int, total: int) -> str:
 def table_html(data: dict) -> str:
     """The replacement table, in the bundle's own escaped markup.
 
+    Written for a reader with no context. The first version of this table
+    published columns headed "1 year" and "2 years" with cells reading
+    "14 of 14", which is meaningless unless you already know what the
+    fourteen are -- and the people who most need this table are exactly the
+    ones who do not. So the fourteen are named in plain English above it,
+    every column carries what it measures underneath its title, and the
+    crisis column shows the real-market figure beside the model's.
+
     `sc-raw-*` is how the design bundle carries table tags through its
     bundler; `clean_content` in build_site.py unescapes them back to real
     ones. Writing plain `<tr>` here would survive the build and then be
@@ -157,33 +173,55 @@ def table_html(data: dict) -> str:
             f"            </sc-raw-tr>"
         )
 
+    def th(title, explain, align=""):
+        style = ' style="text-align:right;vertical-align:bottom"' if align \
+            else ' style="vertical-align:bottom"'
+        sub = (f'<div style="font-weight:400;font-size:11.5px;color:var(--mut);'
+               f'margin:3px 0 0;max-width:170px;white-space:normal">'
+               f'{explain}</div>') if explain else ""
+        return f"<sc-raw-th{style}>{title}{sub}</sc-raw-th>"
+
     head = (
         "<sc-raw-thead><sc-raw-tr>"
-        "<sc-raw-th>Preset</sc-raw-th>"
-        "<sc-raw-th>Realistic over 1 year</sc-raw-th>"
-        "<sc-raw-th>over 2 years</sc-raw-th>"
-        "<sc-raw-th>on a roster it never saw</sc-raw-th>"
-        "<sc-raw-th>How violent a crisis gets</sc-raw-th>"
-        "<sc-raw-th>What it is</sc-raw-th>"
-        "</sc-raw-tr></sc-raw-thead>"
+        + th("Preset", "")
+        + th("Realistic over one&nbsp;year",
+             f"properties passed, out of {total}", align=True)
+        + th("&hellip;and over two&nbsp;years",
+             "scored against bands re-derived for a two-year window, which "
+             "is a stricter ruler", align=True)
+        + th("&hellip;on companies it never saw",
+             "one year, on a 60-name roster no preset was tuned against",
+             align=True)
+        + th("Crisis severity",
+             f"how much more violently prices swing in a crisis than in a "
+             f"calm market. Real markets: {real:.2f}x", align=True)
+        + th("What it is", "")
+        + "</sc-raw-tr></sc-raw-thead>"
     )
 
     lede = (
-        f'<p>Ranked best first, and every number measured in one run so the '
-        f'rows compare. The first three columns count how many of the '
-        f'{total} realism statistics land inside their real-market band, on '
-        f'the median of thirty seeds: over one year, over two years against '
-        f'the bands re-derived at that window, and over one year on a '
-        f'60-name roster no preset was calibrated against. The last number '
-        f'is how much more violent a crisis is than a calm market, held at '
-        f'VIX 65 against VIX 5 -- real markets read '
-        f'<strong>{real:.2f}x</strong>.</p>\n'
-        f'        <p style="font-size:14px;color:var(--mut)">This is a '
-        f'ranking, not a menu. Use the default unless you have a reason not '
-        f'to, and name it either way: the earlier presets are here so a '
-        f'result recorded under one still replays bit for bit, not so you '
-        f'can shop among them. A preset further down this table is not '
-        f'broken, it is earlier.</p>\n        '
+        '<h3 style="font-size:16px;margin:30px 0 10px">How the presets '
+        "compare</h3>\n        "
+        f"<p>Real stock markets have habits, and this simulator is measured "
+        f"against <strong>{total} of them</strong>: how far prices swing over "
+        f"a year, how often a wild day happens, whether a wild day tends to "
+        f"be followed by another one, whether shares fall together harder "
+        f"than they rise together, whether heavy trading shows up alongside "
+        f"big moves, and nine more. Each habit has a range measured from real "
+        f"market data. A preset <strong>passes</strong> one when its own "
+        f"measurement lands inside that range, so "
+        f"<strong>{total} of {total}</strong> means it behaved like a real "
+        f"market on every habit tested. The full list, with every range and "
+        f'every measurement, is on <a href="#/trust">Realism and '
+        f"limits</a>.</p>\n        "
+        f"<p>All twelve presets were measured in one run, thirty seeds each, "
+        f"one method throughout, so the rows compare. Ranked best first.</p>"
+        f'\n        <p style="font-size:14px;color:var(--mut)">This is a '
+        f"ranking, not a menu. Use the default unless you have a reason not "
+        f"to, and name it either way: the earlier presets are here so a "
+        f"result recorded under one still replays bit for bit, not so you "
+        f"can shop among them. A preset further down this table is not "
+        f"broken, it is earlier.</p>\n        "
     )
 
     tail = ""
@@ -196,8 +234,9 @@ def table_html(data: dict) -> str:
             f'\n        <p style="font-size:14px;color:var(--mut)">Showing '
             f'the top {len(shown)} of {len(order)}. {names} '
             f'{"are" if len(rest) > 1 else "is"} still selectable and still '
-            f'reproduces bit for bit; {"they rank" if len(rest) > 1 else "it ranks"} '
-            f'below the rows above on the same measurement, which is why '
+            f'{"reproduce" if len(rest) > 1 else "reproduces"} bit for bit; '
+            f'{"they rank" if len(rest) > 1 else "it ranks"} below the rows '
+            f'above on the same measurement, which is why '
             f'{"they are" if len(rest) > 1 else "it is"} not listed rather '
             f'than because {"they were" if len(rest) > 1 else "it was"} '
             f'withdrawn.</p>'
@@ -261,8 +300,18 @@ def markdown_table(data: dict) -> str:
     real = data["method"]["real_crisis_lever"]
     default = data["default_preset"]
     lines = [
-        f"| preset | 1 year | 2 years | untuned roster | crisis lever "
-        f"(real {real:.2f}x) | what it is |",
+        f"Real stock markets have habits, and this simulator is measured "
+        f"against **{total} of them**: how far prices swing over a year, how "
+        f"often a wild day happens, whether a wild day tends to be followed "
+        f"by another one, whether shares fall together harder than they rise "
+        f"together, and ten more. Each habit has a range measured from real "
+        f"market data, and a preset **passes** one when its own measurement "
+        f"lands inside that range. All twelve were measured in a single run, "
+        f"thirty seeds each. Ranked best first.",
+        "",
+        f"| preset | realistic over 1 year "
+        f"(of {total}) | over 2 years, stricter ruler | on companies it "
+        f"never saw | crisis severity (real {real:.2f}x) | what it is |",
         "|---|---|---|---|---|---|",
     ]
     for name in rank(data)[:TOP_N]:
