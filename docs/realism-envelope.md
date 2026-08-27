@@ -61,7 +61,15 @@ of the same length by the method in the calibration docs.
 | `corr_asymmetry_lagged` | +0.0181 | -0.2 to 0.55 | in band |
 | `sector_excess_corr` | +0.2079 | 0.11 to 0.23 | in band |
 | `corr_persistence_acf1` | +0.1525 | -0.19 to 0.54 | in band |
-Band-distance loss `L_real` = **0.0000**, and every statistic is inside its band: `pt-v10` was the first preset with no miss at this horizon, and `pt-v12` is the first to carry that to 504 days as well. The volume-change row was called structurally unreachable until the `pt-v10` era boundary and was still out of band at two years until `pt-v12`; the retired-gap note below says what changed. `corr_persistence_acf1` also carries a 504-day band of 0.19 to 0.49, which is the one that can judge it: twelve 21-day windows in a year cannot. It reads 0.2077 there, inside.
+
+Band-distance loss `L_real` = **0.0000**, and every statistic is inside its
+band: `pt-v10` was the first preset with no miss at this horizon, and
+`pt-v12` is the first to carry that to 504 days as well. The volume-change
+row was called structurally unreachable until the `pt-v10` era boundary and
+was still out of band at two years until `pt-v12`; the retired-gap note below
+says what changed. `corr_persistence_acf1` also carries a 504-day band of
+0.19 to 0.49, which is the one that can judge it: twelve 21-day windows in a
+year cannot. It reads 0.2077 there, inside.
 
 ## The claim survives the axes it was not fitted to
 
@@ -132,13 +140,14 @@ inside the envelope at one year and at two.
 
 ### Gap 1: certification is a 252-day measurement, and the horizon is not free
 
+<!-- FLAG: the "five times more horizon-sensitive" ratio in the next
+     sentence was measured in the pt-v10 era and has not been re-measured on
+     pt-v12. -->
+
 The statistics are horizon-dependent, and the model is roughly five times
-more horizon-sensitive than the market it imitates.
-<!-- FLAG: the "five times more horizon-sensitive" ratio was measured in the
-     pt-v10 era and has not been re-measured on pt-v12. -->
-Measured against bands re-derived at the *matching* 504-day window, not the
-252-day bands, which would be the wrong ruler, the shipped model holds
-**14 of 14**:
+more horizon-sensitive than the market it imitates. Measured against bands
+re-derived at the *matching* 504-day window, not the 252-day bands, which
+would be the wrong ruler, the shipped model holds **14 of 14**:
 
 | statistic | 252d | 504d | 504-matched band | verdict at 504d |
 |---|---|---|---|---|
@@ -164,11 +173,13 @@ since `pt-v12` no row of the fourteen misses it. Certification remains a
 504-day claim would have to be certified the same way before it could be
 quoted the same way.
 
-Three figures deserve a reader's caution at the longer horizon. Volatility
+Four figures deserve a reader's caution at the longer horizon. Volatility
 reads 33.89 against a 34.0 ceiling, clearing it by about a tenth of a point.
-`corr_persistence_acf1` reads 0.2077 against a 0.19 floor. Excess kurtosis
-reads 7.75 against a 7.1 floor. None of the three has room to spare, and a
-single seed can sit on the wrong side of any of them.
+`abs_return_acf1` reads 0.2084 against a 0.22 ceiling, having nearly doubled
+from the 0.1107 it reads at one year. `corr_persistence_acf1` reads 0.2077
+against a 0.19 floor. Excess kurtosis reads 7.75 against a 7.1 floor. None of
+the four has room to spare, and a single seed can sit on the wrong side of
+any of them.
 
 **Beyond 504 days is now measured, and that sentence used to say
 otherwise.** `pt-v12` has been run to 756, 1260 and 2520 days on thirty
@@ -255,6 +266,10 @@ asserted.** Driving the real 2020-21 macro path through the model and
 correlating daily returns against each driver over 504 sessions, beside the
 same correlations computed on real AAPL over the same window:
 
+<!-- FLAG: the driven-window channel table and the OLS gains below it were
+     measured on pt-v10 and have not been re-measured on pt-v12. The one
+     figure from this run that has been re-measured is the noise ratio. -->
+
 | channel | simulated | real AAPL | sign fixed in advance |
 |---|---|---|---|
 | return vs change in VIX | -0.423 | -0.622 | negative |
@@ -275,23 +290,31 @@ against real AAPL's -0.00500 for the VIX, **-8.106** against -7.445 for the
 credit yield, and **+1.226** against +1.272 for valuation. All within ten
 percent, with real AAPL inside the model's six-seed range every time.
 
-The denominator is the defect. Over the same runs the model's daily return sd
-is **0.0355** against real AAPL's **0.0236**, and its residual sd is 1.76x
-real. The expected response to a scenario is calibrated; the dispersion
-around it is too wide, so one run understates how much of its own move was
-the scenario. Calibration record §81.
+The denominator is the defect, and it is what keeps this a gap now that the
+crisis lever has arrived. Over the same driven window the model's residual sd
+is **1.565x** real, down from 1.76x at `pt-v10` and barely moved from 1.555x
+at `pt-v11`. That is the worst axis in the model. The expected response to a
+scenario is calibrated; the dispersion around it is too wide, so one run
+understates how much of its own move was the scenario. On `pt-v10` the daily
+return sd behind that ratio was 0.0355 against real AAPL's 0.0236.
+Calibration record §81.
+<!-- FLAG: the daily-return-sd pair (0.0355 / 0.0236) is the pt-v10
+     measurement; only the noise ratio has been re-measured on pt-v12. -->
 
-An event study over the
-five sessions after each of six dated events agrees on sign five times out of
-six; the exception is the Fed's intermeeting cut of 3 March 2020, where an
+An event study over the five sessions after each of six dated events agrees
+on sign five times out of six; the exception is the Fed's intermeeting cut of 3 March 2020, where an
 announcement-effect channel is missing rather than miscalibrated. Worked
 through in `examples/09-a-pandemic-shaped-market.ipynb`.
 
 **The transient**, how fast the market *reacts* to a shock as distinct from
-where it settles, is weaker still. The shipped preset retains **27.6%**
-of the previous preset's shock response, because it raised factor-variance
-persistence to 0.989 to buy volatility clustering, and a 63-day half-life
-cannot track a twenty-day spike.
+where it settles, is the half of this gap that did not close. Measured on
+`pt-v10`, the preset retained **27.6%** of its predecessor's shock response,
+because it raised factor-variance persistence to 0.989 to buy volatility
+clustering, and a 63-day half-life cannot track a twenty-day spike. Nothing
+in `pt-v11` or `pt-v12` touched that persistence, so the ceiling it imposes
+is unchanged.
+<!-- FLAG: 27.6% is the pt-v10 measurement and has not been re-measured on
+     pt-v12; the claim carried forward is the unchanged persistence. -->
 
 **This has been attacked directly and the attack failed, which is why it is
 a gap rather than a task.** A two-timescale variance mixture was built to
@@ -306,26 +329,36 @@ So within this model class, **restoring the crisis transient costs
 long-horizon realism, and the mechanism built to buy it back cannot.** That
 is a structural limit, not a calibration that has not been run yet.
 
-**Sector structure is the same shortfall measured a second way.** In calm
-markets it is in band, 0.1346 at 252 days and 0.1201 at 504 against bands
-starting at 0.11. Under a held VIX 45 it reads **+0.035** against a real
-**+0.103** in the 2020 window, thirty seeds at 252 days; `pt-v7` on the same
-recipe reads +0.064. Industries exist in this market and they hold together
-in a crisis about a third as tightly as real ones, which is why the crisis
-half of the retired sector gap is carried here.
+**Sector structure used to be this same shortfall measured a second way, and
+is not any more.** In calm markets it is in band, 0.2079 at 252 days and
+0.1761 at 504 against bands starting at 0.11. Under a held VIX 45 it reads
+**+0.109** against a real **+0.103** in the 2020 window, thirty seeds at 252
+days. This page said until the `pt-v12` boundary that industries here hold
+together in a crisis about a third as tightly as real ones, on a measurement
+of +0.035 against that same +0.103; `pt-v7` on the same recipe read +0.064.
+That claim is withdrawn. A sector thesis tested through a crisis is now
+being tested in a market whose industries tighten about as much as a real
+one's.
 
-**Consequence: use scenarios to ask *whether* a strategy breaks, not *how
-much*.** A crisis here is about four fifths as violent as a real one and arrives
-more slowly, so a strategy that survives one has not been tested as hard as
-the label suggests. A sector thesis tested through a crisis is being tested
-in a market whose industries loosen when a real one's would tighten.
+**Consequence: use scenarios to ask *whether* a strategy breaks and to size
+the break across seeds, not from one run.** How violent a sustained crisis
+is, how tightly names co-move in it and how tightly sectors hold in it are
+all now measured against real and land there. What is left is the speed and
+the spread: the shock arrives more slowly than a real one, and a single run's
+dispersion around the calibrated response is 1.565x real, so one run can put
+the size almost anywhere. Read the scenario's effect as a distribution over
+seeds, which is the resolution every other number on this page is quoted at.
 
-### Gap 5: the endogenous economy cannot reach its own *macro* crisis regimes
+### Gap 4: the endogenous economy cannot reach its own *macro* crisis regimes
 
 Distinguish two kinds of crisis. A **volatility** crisis is endogenous since
-0.2.0: the shipped preset's own VIX crosses its crisis threshold on 10.2% of
-days against a real 12.5%, where the previous default reached it on none. A
-**macro** crisis is not, and that is this gap.
+0.2.0: measured on `pt-v10`, the preset's own VIX crossed its crisis
+threshold on 10.2% of days against a real 12.5%, where the default before it
+reached the threshold on none. A **macro** crisis is not, and that is this
+gap.
+
+<!-- FLAG: the 10.2% crisis-day frequency is the pt-v10 measurement and has
+     not been re-measured on pt-v12. -->
 
 Left to itself the macro state stays in a moderate band. Endogenous inflation
 peaks at 4.06% to 4.11% over five seeds and five years against a clamp of
@@ -357,49 +390,68 @@ the ceiling at 10 the endogenous series matches the real 2015 to 2025 mean and
 dispersion, and the long-horizon equity panel pays two statistics for it, so
 no preset takes them. Calibration record §65.
 
-### Gap 6: certification was measured on a sector-balanced roster
+### Gap 5: certification was measured on a sector-balanced roster
 
 `Universe.random()` assigns sectors round-robin over the twelve in
 `sectors.SECTORS`, so a roster is as close to balanced as its size allows:
 the certified 40 names put four in each of four sectors and three in each of
 the other eight. No real index is balanced that way. The S&P is roughly a
 third technology and the Nasdaq more so. (This gap said "exactly five names
-in each of twelve sectors" until 2026-08-26, which is 60 names and describes
-no roster the certification used.) Varying **only** sector composition, with
+in each of twelve sectors" until 2026-08-26, which is 60 names: that
+describes the held-out universe above, not the certified 40-name roster this
+gap is about.) Varying **only** sector composition, with
 every name drawn from one pool:
 
-| roster | in band | `L_real` | vol% |
-|---|---|---|---|
-| balanced (the certified one) | 9 of 10 | 0.0000 | 27.9 |
-| S&P-like mix | 8 of 10 | 0.0176 | 27.4 |
-| all technology | 7 of 10 | 0.0043 | 32.8 |
+| roster | in band at 252 days |
+|---|---|
+| balanced (the certified one) | 14 of 14 |
+| S&P-like mix | 14 of 14 |
+| tech-heavy | 14 of 14 |
+| defensive | 14 of 14 |
+| all technology | 13 of 13, `sector_excess_corr` undefined |
 
-**Measured on `pt-v3` against the ten-statistic panel of the time, and not
-re-measured on `pt-v10`.** It is kept because what it establishes is a
-property of roster composition rather than of a preset: the more
-concentrated the roster, the less of the certification transfers, and part
-of the certification is an artifact of that balance. The magnitudes should
-be read as an earlier era's.
+**Every mix tested holds the full panel at one year on `pt-v12`.** The
+all-technology roster is 13 of 13 rather than 14 of 14 because a
+single-sector roster has no cross-sector excess to measure, so
+`sector_excess_corr` is undefined rather than missed. The earlier era's
+measurement, on `pt-v3` against the ten-statistic panel of the time, read 9
+of 10 balanced, 8 of 10 for the S&P-like mix and 7 of 10 all technology, and
+is what this gap used to quote; concentration cost the one-year panel then
+and does not now.
 
-**Consequence: do not inherit this envelope for a sector-concentrated
-roster.** Re-measure the panel on your own universe. `facts.measure()`
-takes it directly, and `envelope.intervals()` will report the spread.
+**What concentration costs on `pt-v12` is the second year, not the first.**
+The gap is kept for that reason, and because what it establishes is a
+property of roster composition rather than of a preset: part of a
+certification measured on a balanced roster is an artifact of that balance,
+and the further out you measure the more of it is.
+
+**Consequence: a one-year panel transfers to a concentrated roster and a
+two-year one does not.** Re-measure the panel on your own universe rather
+than inheriting either. `facts.measure()` takes it directly, and
+`envelope.intervals()` will report the spread.
 
 ## The numbers above are medians, and one run is not the median
 
 Every figure on this page is a median across thirty seeds. That is not what
 a single run shows you.
 
-Measured on the shipped preset over thirty seeds, **nine of the fourteen
-statistics have their 10th-to-90th-percentile range across seeds crossing a
-band edge**. `abs_return_acf1` reads a median of 0.0994 against a ceiling of
-0.22, with a p90 of 0.4063 and an across-seed standard deviation of 0.1467,
-larger than the median itself.
+Measured on `pt-v10` over thirty seeds, **nine of the fourteen statistics
+have their 10th-to-90th-percentile range across seeds crossing a band
+edge**. `abs_return_acf1` read a median of 0.0994 against a ceiling of 0.22,
+with a p90 of 0.4063 and an across-seed standard deviation of 0.1467, larger
+than the median itself. `pt-v12` moves that median to 0.1107 and the spread
+has not been re-measured, so read those dispersion figures as the previous
+era's.
+<!-- FLAG: the nine-of-fourteen count and the abs_return_acf1 p90/sd are
+     pt-v10 measurements awaiting a re-run on pt-v12. -->
 
 A statistic can be comfortably in band on the median and out of band on a
-large minority of individual seeds. `pretium.envelope.intervals()` reports
-the spread beside each median, and reading it before relying on one run is
-the difference between a certified claim and a misread one.
+large minority of individual seeds. The held-out-seed row above is that
+effect happening in public: `corr_persistence_acf1` is in band at 0.1525 on
+the certification's seeds and out of it on thirty seeds the calibration
+never used. `pretium.envelope.intervals()` reports the spread beside each
+median, and reading it before relying on one run is the difference between a
+certified claim and a misread one.
 
 ## What this licenses
 
@@ -408,8 +460,8 @@ the difference between a certified claim and a misread one.
 - Strategy evaluation over horizons up to about one year, where the edge
   depends on volatility level, lag-1 to lag-5 volatility clustering,
   day-to-day return autocorrelation, cross-sectional co-movement, fat
-  tails at the annual scale, the volume-level/volatility relationship, or
-  the leverage effect.
+  tails at the annual scale, the volume-level/volatility relationship, the
+  day-to-day change in volume, or the leverage effect.
 - **Relative** comparison of strategies under identical conditions. The
   engine is deterministic and bit-reproducible across platforms, so two
   strategies on the same seed differ because of the strategies.
@@ -420,16 +472,17 @@ the difference between a certified claim and a misread one.
 
 **Do not use pretium for:**
 
-- Multi-year backtests (Gap 2). Nothing beyond 504 days has been measured.
-- Sizing a scenario's impact rather than detecting it (Gap 4). A crisis here
-  is about four fifths as violent as a real one, and sector structure holds
-  together in one about a third as tightly.
-- Inheriting these numbers for a sector-concentrated roster (Gap 6).
-- Strategies keyed on long-horizon volatility memory (Gap 3).
-- Strategies trading the change in volume beyond one year (Gap 1). At one
-  year the row is in band, and this list said otherwise before 0.2.0.
+- Multi-year backtests (Gap 1). The 504-day panel now holds all fourteen
+  against matched bands, and runs out to 2520 days have been measured, but
+  certification is a 252-day measurement and only the 252-day claim is one.
+- Sizing a scenario's impact from a single run (Gap 3). The crisis lever, the
+  crisis co-movement and the crisis sector structure all land on real now;
+  what does not is one run's dispersion around them, at 1.565x real.
+- Inheriting the *two-year* panel for a sector-concentrated roster (Gap 5).
+  At one year every mix tested holds, so this list is narrower than it was.
+- Strategies keyed on long-horizon volatility memory (Gap 2).
 - Studying an inflation regime or a policy crisis from the endogenous
-  economy alone (Gap 5).
+  economy alone (Gap 4).
 - Any claim that absolute simulated performance forecasts live results.
   That is not a gap in this model; it is true of every market simulator,
   and no amount of realism work will change it.
@@ -445,8 +498,8 @@ from a handful of windows whose own dispersion is large, and in one case
 real markets' window-to-window spread is six times the model's entire
 defect.
 
-Fitting ten numbers at every scale simultaneously optimises against that
-noise. Naming what is certified, at what scale, with the gaps measured
+Fitting all fourteen numbers at every scale simultaneously optimises against
+that noise. Naming what is certified, at what scale, with the gaps measured
 and published, is both more honest and more useful.
 
 ## Reproducing this page
@@ -455,17 +508,21 @@ The machine-readable companion is [`envelope.json`](envelope.json), which
 carries the full per-statistic detail, the gap list, and the provenance.
 Cite that rather than this prose.
 
-**Two runs, not one, and the reason is worth stating.** The certified
-panel, both held-out axes and the 504-day horizon table come from one run;
-the decay curve in Gap 3 comes from a second. The first run was killed at
-its 1260-day stage by an out-of-memory kill, after it had persisted
-everything through 504 days. Nothing was lost, and the 1260-day column
-that would have appeared here is simply absent rather than quietly
-back-filled from an older measurement. Both runs built from the same
-source and report the same known-answer digest,
+**More than one run, and which figure came from which is worth stating.**
+The certified panel, both held-out axes and the 504-day horizon table come
+from the `pt-v12` measurement run at thirty seeds; the long horizons quoted
+under Gap 1 come from a later `pt-v12` run that reached 2520 days. The
+figures still carrying an earlier preset's name, flagged inline where they
+appear, come from the paired runs of that era: the first carried the
+certified panel and the 504-day table of the time, the second the decay curve
+in Gap 2. That first run was killed at its 1260-day stage by an
+out-of-memory kill, after it had persisted everything through 504 days, so no
+1260-day column appeared here at the time rather than one being quietly
+back-filled from an older measurement. Both of that era's runs built from the
+same source and report the same known-answer digest,
 `992ef95d98e075846f13d0a312231642b26c2030833b10bd8536e374bdc185e3`.
 
-**One caveat on that digest.** After these measurements were taken, a
+**One caveat on that digest.** After those two runs were taken, a
 reporting bug was fixed: `model_preset()`'s default argument was the
 literal `"pt-v1"` and had not moved when the engine's default became
 `pt-v3`, so the library reported the wrong preset name and one wrong
@@ -478,9 +535,11 @@ the known-answer digest, because the digest hashes the reported preset.
 The measurements on this page are unaffected.
 
 That digest is the pt-v3 era's, and it is kept as the record of what those
-two runs ran. The current era's determinism baseline is known-answer v10,
-`4e22d5a6...e860378`, which the release workflow checks inside every wheel
-before it uploads.
+two runs ran. The determinism baseline of the era before this one is
+known-answer v10, `4e22d5a6...e860378`, which the release workflow checks
+inside every wheel before it uploads.
+<!-- FLAG: no known-answer digest for the pt-v12 era was supplied; confirm
+     whether v10 is still the baseline the release workflow checks. -->
 
 The envelope is re-measured whenever the default preset changes.
 `envelope.json` carries the preset the figures describe rather than a

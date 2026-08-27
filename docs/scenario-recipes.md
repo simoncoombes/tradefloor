@@ -300,10 +300,11 @@ Every "in this model" figure on this page was measured on engine commit
 `9b485a0`, pretium 0.1.0, under model preset `pt-v1`, which was the default
 at the time and is not any more. The shipped default is now `pt-v12`, so
 these figures describe an earlier era, and by now a distant one. `pt-v1` is
-still selectable and still reproduces bit for bit, so every number below is
-re-runnable exactly as written; it is just no longer what a default run
-produces. Every one of them is an inventory row in the re-measurement harness
-under the group `recipes`:
+still selectable and still reproduces bit for bit, so every measured figure on
+this page is re-runnable exactly as written; it is just no longer what a
+default run produces. That includes the figures quoted above this section, in
+the trap and in rule 3, which were measured the same way. Every one of them is
+an inventory row in the re-measurement harness under the group `recipes`:
 
 ```
 .venv/bin/python tools/remeasure/remeasure.py --only recipes
@@ -539,22 +540,33 @@ crisis does to a portfolio.
 <!-- ERA CHECK (pt-v12 boundary): the blend itself survives and is now well
      calibrated -- pt-v12 crisis sector excess at held VIX 45 is +0.109 against
      a real +0.103, and crisis co-movement 0.696 against a real 0.664 to 0.727.
-     The threshold "25.5" is a pt-v1 constant and pt-v11 added crisis_blend_gain
-     and sector_vix_coupling on top of it. No measured pt-v12 threshold was
-     supplied, so the number is left as written rather than guessed at. -->
+     The threshold "25.5" needs no re-measurement: it is CRISIS_VIX_THRESHOLD
+     in rust/src/economy/state.rs:99, an engine base constant that no preset
+     overrides, so it reads the same on pt-v1 and on pt-v12. pt-v11's
+     crisis_blend_gain and sector_vix_coupling change how hard the blend pulls
+     past that threshold, not where the threshold sits. -->
 
+The response saturates, but the point at which it does is a preset
+coefficient rather than a property of the engine. `market_vol_ceiling_multiple`
+caps the market factor's variance at a multiple of its calm baseline, and
+under `pt-v1` that multiple was 8, which is why pushing `peak` from 80 to 120
+bought almost nothing when this page was measured, and why recipe 3 sat near
+the top of the usable range. The ceiling has been raised since, to the level a
+record VIX actually implies, so on the shipped default the saturation sits far
+higher and that `peak` change is no longer inert.
+[Scenarios](scenarios.html) carries the current multiple and the reasoning
+behind it.
 
-The response saturates: the factor's variance is clamped at 8× its baseline,
-so pushing `peak` from 80 to 120 buys almost nothing. Recipe 3 sits near the
-top of the usable range already.
-
-<!-- ERA CHECK (pt-v12 boundary): "8x" is a pt-v1 constant. pt-v12's one change
-     over pt-v11 was raising a saturating cap of exactly this kind -- the
-     hard-coded volume_move_cap literal 4.0 in tick.rs, now 12.0 -- so a
-     saturation claim in this family is worth re-measuring. That cap is on the
-     volume response, not on factor variance, and no measured pt-v12 figure for
-     the variance clamp was supplied, so the sentence stands unchanged. -->
-
+<!-- ERA CHECK (pt-v12 boundary): corrected. The clamp is the preset
+     coefficient market_vol_ceiling_multiple, not a fixed engine constant:
+     rust/src/params.rs sets it to 16.0 in pt-v7 (line 1439) and to 32.0 in
+     pt-v10 (line 1596), and neither pt-v11 nor pt-v12 touches it, so the
+     shipped default carries 32. The "8x" this paragraph used to state in the
+     present tense is therefore a pt-v1 value and was wrong for the default,
+     not merely unverified. It is NOT the same cap as pt-v12's volume_move_cap
+     4.0 -> 12.0, which is on the volume response. docs/scenarios.md already
+     publishes the current multiple, so this page points there rather than
+     restating a number the recipes harness does not own. -->
 
 Measured on price instead, the same config reports a median **−8.29%** and a
 worst name at **−13.07%** on sim seed 5, but per the seed band under rule 3,

@@ -33,8 +33,8 @@ scenario. Same market, same agents, only the macro path differs:
 
 Nobody escapes the walk here. Buy-and-hold is long-only, holds through the
 repricing, and loses the most. Momentum and the Oracle can trade around it
-and each give up about two and a half points. The Oracle stays far ahead in
-both worlds because it trades mispricing, and the shock moves fair value
+and each give up about two points. The Oracle stays far ahead in both worlds
+because it trades mispricing, and the shock moves fair value
 along with price - but holding positions through a repricing still costs it,
 so its edge survives the shock where its level does not. The sizes are the
 seed's, as ever: across sim seeds 5 to 9 buy-and-hold gives up 3.0 to 5.0
@@ -119,12 +119,16 @@ one that never said it.
 **VIX is the market factor's implied volatility.** The factor's variance
 reverts to a target proportional to `(vix / 15)^2`, anchored so that VIX 15,
 the endogenous mean, reproduces the uncoupled process exactly. The per-name
-GARCH recursion (`omega + alpha * r^2 + beta * v`) still has no VIX term:
-what VIX scales is the shared component of every return, so a crisis VIX is a
-volatility regime and a correlation regime at once, which is what a real
-crisis is. Annualised realised volatility, measured over
-`Universe.random(20, seed=11)`, 120 days, sim seed 3, pinned through the
-scenario API:
+GARCH recursion (`omega + alpha * r^2 + beta * v`) still has no VIX term, and
+up to pt-v9 that settled it. It does not now: since pt-v10 the static
+per-sector variance the recursion's clamps are multiples of carries the same
+`(vix / 15)^2` map, through `garch_vix_coupling` (below), so the anchor is
+again exact and the regime reaches a name's own variance as well as the
+shared one. VIX scales the shared component of every return and the level
+each name's own variance is held to, so a crisis VIX is a volatility regime
+and a correlation regime at once, which is what a real crisis is. Annualised
+realised volatility, measured over `Universe.random(20, seed=11)`, 120 days,
+sim seed 3, pinned through the scenario API:
 
 | VIX | annualised realised vol |
 |---|---|
@@ -137,7 +141,7 @@ scenario API:
      pt-v11 raised `crisis_blend_gain` 0.5 to 0.8 and `sector_vix_coupling`
      0.25 to 1.0, both of which act on exactly this pin, so the VIX 45 and 65
      rows in particular will have moved, and with them the "factor of 4.0" and
-     the "roughly twice its calm volatility" sentence below. The anchoring
+     the sentence below that reads a held VIX 65 against calm. The anchoring
      argument (VIX 15 reproduces the uncoupled process) is structural and
      holds. Re-measure the four rows on pt-v12 before quoting. -->
 
@@ -157,8 +161,8 @@ the coupling (the clamp carries the process's fourth moment). That was 8x
 through pt-v3 and is 32x on the shipped pt-v12, set at the level a record VIX
 actually implies, so the saturation sits far higher than it used to:
 quadratic across the plausible band rather than flat above VIX ~42.
-A researcher pinning VIX 65 for a year gets a market realising roughly twice
-its calm volatility with crisis-level correlation. That is 2008 sustained,
+A researcher pinning VIX 65 for a year gets a market realising roughly four
+times its calm volatility with crisis-level correlation. That is 2008 sustained,
 not a numerical blow-up.
 
 Five channels:
@@ -222,7 +226,12 @@ spike = pt.tca.analyse(agent, seed=s, universe=u, days=10,
 Does execution cost more when VIX is high? Measured with `BuyAndHold` over
 `Universe.random(20, seed=11)`, ten days, seeds 1 to 12: the VIX 45 regime
 costs more in 12 of 12, median shortfall 11.69 bps against 6.06, paired median
-delta +5.62 bps. That is mostly the spread channel, because `BuyAndHold`
+delta +5.62 bps.
+<!-- STALE, NOT RE-MEASURED: taken before the 2026-08-26 pt-v12 boundary. The
+     spread channel these figures are mostly made of is untouched by pt-v11
+     and pt-v12, but the prices the shortfall is measured against are not.
+     Re-run the twelve seeds on pt-v12 before quoting the bps. -->
+That is mostly the spread channel, because `BuyAndHold`
 trades on day one, before a pin has reached the variance process, and the figures
 re-verified bit-for-bit after the volatility coupling for exactly that
 reason. An agent trading through the following days pays the volatility
@@ -242,13 +251,22 @@ are drawn unconditionally, and the market stream's schedule is a pure
 function of (market status, active roster, sector count), so two runs under
 different macro paths see identical market noise, draw for draw. The VIX
 volatility coupling preserves this, because the variance target reads macro state
-already evolved, never a new draw. `compare()` reports `draw_delta` from the
-market stream rather than asserting zero: a non-zero delta means the scenario
+already evolved, never a new draw. pt-v11's endogenous news preserves it for
+the same kind of reason on its own stream: its two draws per company are taken
+unconditionally at the day boundary, and the crisis coupling scales an impact
+that was already drawn rather than deciding whether to draw it.
+`compare()` reports `draw_delta` from the market stream rather than
+asserting zero: a non-zero delta means the scenario
 changed the market's own draw schedule (a halt, a delisting, a roster
 change), and the result compares two structurally different markets, which is
 worth surfacing rather than averaging away. Measured at zero across every
 comparison on this build: four scenarios at seed 3, three of them repeated
 across seeds 1 to 8.
+<!-- The mechanism argument survives the pt-v12 boundary intact (news draws
+     are unconditional and on the NEWS stream, so they cannot shift the market
+     stream's schedule), but "on this build" points at a measurement taken
+     before it. Re-run those comparisons on pt-v12 to keep the sentence
+     literal. -->
 
 `pin_macro` is logged, so a scenario run replays from its own log with no
 special handling.

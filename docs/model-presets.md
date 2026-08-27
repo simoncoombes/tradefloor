@@ -26,7 +26,7 @@ mean nothing.
 
 ## Which preset to use
 
-Twelve presets ship. Four are recommendations; the rest exist so that
+Twelve presets ship. Two are recommendations; the rest exist so that
 results already published on them keep reproducing bit for bit, and a
 new preset never moves an old one.
 
@@ -36,18 +36,28 @@ new preset never moves an old one.
 | `pt-v10` | reproducing work published before the 2026-08-26 era boundary, when it was the default: all fourteen statistics in band at 252 days, on thirty training seeds and on a held-out universe | reproduction only |
 | `pt-v11` | reproducing a run that names it: `pt-v10` plus the crisis work (`crisis_blend_gain`, `sector_vix_coupling`, endogenous news and peer transfer) that `pt-v12` inherits unchanged | reproduction only |
 | `pt-v3` | reproducing work published when it was the default, the era before `pt-v10` | reproduction only |
-| `pt-v7` | studies whose thesis is a sector, or a crisis: the first preset with industries that survive a crisis, twelve of thirteen realism statistics in band at both horizons | recommended, opt in by name |
-| `pt-v8` | crisis studies and anything that measures how correlation moves through time: the factor's variance has a memory, the crisis lever is 4.34x, thirteen of fourteen in band at 504 days | recommended, opt in by name |
-| `pt-v9` | anything measuring volatility regimes, clustering or crises the market makes itself: thirteen of fourteen statistics in band at both horizons, and the first preset whose VIX responds to the day's move rather than to the closing minute | recommended, opt in by name |
+| `pt-v7` | reproducing a sector or crisis study that names it: the first preset with industries that survive a crisis, twelve of thirteen realism statistics in band at both horizons. It is no longer the preset to opt into for that thesis: at a held VIX 45 `pt-v12` reads a crisis sector excess of +0.109 against a real +0.103 | reproduction only |
+| `pt-v8` | anything that measures how correlation moves through time: the factor's variance has a memory, thirteen of fourteen in band at 504 days. Its crisis lever of 4.34x is no longer a reason to prefer it, because `pt-v12`'s steady-state crisis lever is 6.04 against a real 6.16 | recommended, opt in by name |
+| `pt-v9` | reproducing a run that names it: thirteen of fourteen statistics in band at both horizons, and the first preset whose VIX responds to the day's move rather than to the closing minute, which `pt-v12` inherits while holding fourteen of fourteen at both horizons | reproduction only |
 | `pt-v1`, `pt-v2`, `pt-v4`, `pt-v5`, `pt-v6` | reproducing a run that names them | reproduction only |
 
-The three opt-in recommendations are steps on the way from `pt-v3` to
-`pt-v12`, kept selectable because each one is the best preset for a
-narrower question and because a run that named one must keep reproducing.
-`pt-v7` is the one to reach for when the thesis is a sector, `pt-v8` when
-it is how correlation moves through time, `pt-v9` when it is the volatility
-regime itself. If the question is none of those, the default already
-carries their gains.
+`pt-v7`, `pt-v8` and `pt-v9` are steps on the way from `pt-v3` to `pt-v12`,
+and all three stay selectable because a run that named one must keep
+reproducing. Only `pt-v8` is still worth opting into, when the thesis is how
+correlation moves through time. `pt-v7` and `pt-v9` were recommendations
+while the default was weaker than they were on a sector thesis, a crisis or
+a volatility regime, and `pt-v12` is not weaker: it holds all fourteen
+statistics in band at both horizons, its crisis sector excess at a held VIX
+45 reads +0.109 against a real +0.103, its steady-state crisis lever 6.04
+against a real 6.16, and its crisis co-movement 0.696 against a real 0.664
+to 0.727. The narrower question each was better at is one the default now
+answers at least as well.
+
+<!-- STATUS CHECK (pt-v12 boundary): `pt-v7` and `pt-v9` were moved from
+     "recommended, opt in by name" to "reproduction only" because the
+     pt-v12 measurements cited here dominate the axes they were
+     recommended for. No supplied list of recommended presets states that
+     directly, so the demotion is an inference from the measurements. -->
 
 `pt-v12` is `pt-v11` plus one number. `volume_move_cap` was a hard-coded
 literal 4.0 in `tick.rs`, which saturated a name's volume response at a
@@ -106,8 +116,10 @@ The fingerprint travels everywhere a result does:
 `pt.ModelParams.settable()` lists the runtime-settable surface: the two
 variance processes (per-name GJR-GARCH and the market factor's), the factor
 sigmas and the idiosyncratic scale, the mispricing dynamics, the news and
-flow coefficients, and the guards that live in the tick chain (the
-mispricing cap, the crowd lean cap, the session breaker, the price cap).
+flow coefficients, the volume expression's coefficients (`volume_move_cap`
+among them, the one `pt-v12` moved off its compiled literal), and the guards
+that live in the tick chain (the mispricing cap, the crowd lean cap, the
+session breaker, the price cap).
 Guards are settable but are worst-case guarantees rather than tuning knobs,
 and a calibration search excludes them.
 
@@ -155,8 +167,8 @@ A calibrated preset arrives as a new named entry in the shipped table,
 produced by the calibration tooling with its provenance committed; every
 earlier preset stays selectable and bit-reproducing forever. That has now
 happened several times. `"pt-v2"`, `"pt-v3"` and everything through
-`"pt-v12"` were produced this way, and `"pt-v12"` is the current default. The library consumes presets; it does not
-ship an optimiser.
+`"pt-v12"` were produced this way, and `"pt-v12"` is the current default.
+The library consumes presets; it does not ship an optimiser.
 
 What the shipped default is certified to reproduce, and where it is not, is
 [the realism envelope](realism-envelope.md).
