@@ -568,6 +568,21 @@ RELEASE_STATUS_FIXES = [
 #: than keeping a second copy that can disagree with the first.
 CHANGELOG = ROOT / "CHANGELOG.md"
 
+#: Everything above this in a version's section is what the release page and
+#: the GitHub release note both lead with. `release.yml` cuts there; this page
+#: folds there. A version without the marker renders whole, which is what
+#: 0.2.0 and earlier do.
+RELEASE_NOTE_MARKER = "<!-- release-note-ends -->"
+
+_DETAILS_OPEN = (
+    '<details style="border:1px solid var(--line);border-radius:9px;'
+    'margin:10px 0 18px;background:var(--panel)">'
+    '<summary style="padding:10px 14px;cursor:pointer;font-size:13.5px">'
+    "What changed in detail, and how it was measured</summary>"
+    '<div style="padding:4px 16px 8px">'
+)
+_DETAILS_CLOSE = "</div></details>"
+
 #: The heading the rendered changelog is inserted before, so the page reads
 #: status, then what changed in each release, then the era boundary note.
 #: Asserted at build time: a reworded bundle fails loudly rather than
@@ -623,6 +638,7 @@ def changelog_html(version: str, dates: dict[str, str]) -> str:
     table: list[str] = []
     fence: list[str] | None = None
     skipping = False
+    in_details = False
 
     def flush() -> None:
         nonlocal para, table
@@ -646,8 +662,21 @@ def changelog_html(version: str, dates: dict[str, str]) -> str:
             continue
         if fence is not None:
             fence.append(line); continue
+        if line.strip() == RELEASE_NOTE_MARKER:
+            # The same marker release.yml cuts the GitHub notes at. Here the
+            # detail is folded rather than dropped: the release-notes page ran
+            # to 7,432 words across twelve versions, which is a permanent
+            # record nobody scrolls. Above the marker is what a reader
+            # deciding whether to upgrade needs; below it is why.
+            flush()
+            out.append(_DETAILS_OPEN)
+            in_details = True
+            continue
         if line.startswith("## "):
             flush()
+            if in_details:
+                out.append(_DETAILS_CLOSE)
+                in_details = False
             title = line[3:].strip()
             skipping = title.lower().startswith("unreleased")
             if skipping:
@@ -663,6 +692,12 @@ def changelog_html(version: str, dates: dict[str, str]) -> str:
             continue
         if line.startswith("### "):
             flush()
+            # Versions from before the marker existed fold at their first
+            # subsection instead, so every entry on the page is a heading, a
+            # short lead and a disclosure rather than twelve essays in a row.
+            if not in_details:
+                out.append(_DETAILS_OPEN)
+                in_details = True
             out.append(f'<h3 style="font-size:15px;margin:24px 0 6px">'
                        f"{_inline(line[4:].strip())}</h3>")
             continue
@@ -678,6 +713,8 @@ def changelog_html(version: str, dates: dict[str, str]) -> str:
             flush()
         para.append(line.strip())
     flush()
+    if in_details:
+        out.append(_DETAILS_CLOSE)
     return "\n        ".join(out)
 
 

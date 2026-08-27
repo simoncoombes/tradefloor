@@ -1735,20 +1735,17 @@ Real stock markets have habits, and this simulator is measured against 14 of the
 
 The first row is the real market itself. All twelve presets were measured in one run, thirty seeds each, one method throughout, so the rows compare. Ranked best first.
 
+The columns. 1 year and 2 years count habits matched out of 14; the two-year column scores against ranges re-derived for a two-year window, which is a stricter ruler. New roster is one year on a 60-name roster no preset was tuned against. Typical year is annualised volatility, how far prices move over a year. Crisis is how much more violently prices swing in a crisis than in a calm market.
+
 This is a ranking, not a menu. Use the default unless you have a reason not to, and name it either way: the earlier presets are here so a result recorded under one still replays bit for bit, not so you can shop among them. A preset further down this table is not broken, it is earlier.
 
-PresetRealistic over one yearhabits matched, out of 14
-…and over two yearsscored against ranges re-derived for a two-year window, which is a stricter ruler
-…on companies it never sawone year, on a 60-name roster no preset was tuned against
-A typical year’s swingannualised volatility: how far prices move over a year
-Crisis severityhow much more violently prices swing in a crisis than in a calm market
-What it is
+Preset1 year2 yearsNew rosterTypical yearCrisisWhat it is
 
 Real markets
-the 14 ranges these three columns score against are measured from here, so real markets sit inside all of them by construction
+the ranges these three columns score against are measured from here
 18% to 31%
 6.16x
-A 40-stock US large-cap cross-section, 2015 to 2025. The swing column is its three one-year windows; the crisis column is about 17% annualised on days the VIX sat below 12 against about 106% on days it sat above 45.
+A 40-stock US large-cap cross-section, 2015 to 2025.
 
 pt-v12 default
 14 of 14
@@ -2847,6 +2844,33 @@ Published on PyPI as pretium and on crates.io as the pretium crate. The API is e
 
 ## 0.3.0 - current
 
+pt-v12 is the default. It is the first preset that looks like a real market over two years as well as one.
+
+| in band | before ( pt-v10 ) | now ( pt-v12 ) |
+| over one year | 14 of 14 | 14 of 14 |
+| over two years | 13 of 14 | 14 of 14 |
+| on a roster it was never tuned on | 14 of 14 | 14 of 14 |
+
+Thirty-seed medians. The two-year row is the one that moved, and it was not paid for at one year or on a fresh roster.
+
+Results recorded without naming a preset will differ. Every earlier preset still exists and still reproduces bit for bit, so pin it if you have numbers to reproduce:
+
+```
+eng = pt.Engine(seed=42, universe=u, model="pt-v10") # exactly as before
+```
+
+What was wrong. Volume stopped responding to a move at four percent, so a stock down twelve traded like one down four. That single cap had been in the engine since the first version and nobody had chosen it.
+
+What got worse. Driven by a real macro path, daily swings run 1.57x as wide as the real stock they are compared against, against 1.555x before. It is written up as the scenario-magnitude gap.
+
+Seventeen new settings, all shipping at the value the engine already used, so no preset from pt-v1 to pt-v10 moves.
+
+The documentation was audited against the engine and corrected, every published figure was re-measured, and there are three new pages: a glossary, the two loops, and the principles.
+
+Everything below is the detail behind those claims.
+
+What changed in detail, and how it was measured
+
 ### pt-v12 is the new default: two years in band, from one number
 
 What changed for you. Every simulation now runs pt-v12 unless you ask for something else, and it is the first version of this market that looks like a real one over a two-year run as well as a one-year run.
@@ -2963,6 +2987,8 @@ The market this library simulates is a different, and much better, market. Every
 
 What that guarantee covers is the PRESET, and a fully specified run is still (package version, model, universe fingerprint, seed). Naming a preset pins the coefficient set and the market it produces; the package version is what pins the implementation those coefficients run through.
 
+What changed in detail, and how it was measured
+
 ### What you get by default now
 
 pt.Engine(seed=..., universe=...) runs pt-v10, the first preset that matches real markets on every statistic pretium measures at the certified one-year horizon, and on thirteen of fourteen at two years. The previous default managed twelve and seven.
@@ -3016,6 +3042,8 @@ inflation_reversion, inflation_ceiling and inflation_floor make the monthly infl
 ## 0.1.4 - 2026-08-25
 
 Two new presets, four new panel statistics, five parameters that used to be literals, and the measurements behind each. Nothing that already shipped moves: the known-answer digest is unchanged, pt-v1 through pt-v6 reproduce bit for bit, and pt-v3 remains the default and the certified preset.
+
+What changed in detail, and how it was measured
 
 ### Presets
 
@@ -3119,6 +3147,8 @@ examples/09-a-pandemic-shaped-market.ipynb gains a section testing whether its e
 
 Two new model presets and the mechanism behind them. Nothing existing moves: the known-answer digest is unchanged, pt-v1 through pt-v4 reproduce exactly, and pt-v3 remains the default. If you do not ask for a new preset by name, this release changes nothing about your results.
 
+What changed in detail, and how it was measured
+
 ### pt-v6
 
 The first preset to hold nine of ten statistics in band at 252 days and eight of ten at 504. pt-v3 manages nine and five; pt-v4 eight and seven.
@@ -3180,6 +3210,8 @@ Two smaller things. The publish step now skips files already present, so a rejec
 First release.
 
 pretium simulates an equity market you can run a strategy against. Give it a seed and a roster of companies and it runs prices, a limit order book, fills and a macro economy forward. Orders match against real depth, so trading moves the price.
+
+What changed in detail, and how it was measured
 
 ### What's in it
 

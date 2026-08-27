@@ -320,34 +320,19 @@ def table_html(data: dict) -> str:
     shown, rest = order[:TOP_N], order[TOP_N:]
     vol_lo, vol_hi = real_vol_window()
 
-    def th(title, explain, align=False):
+    def th(title, align=False):
+        """A column heading, and nothing else.
+
+        The design renders `th` as 10.5px uppercase monospace with letter
+        spacing, which is right for one to three words and unreadable for a
+        sentence. An earlier version of this table put a sentence of
+        explanation under each heading; they rendered as six-line columns of
+        shouting monospace, taller than the data they labelled. The
+        explanations moved into the paragraph above the table.
+        """
         style = ('style="text-align:right;vertical-align:bottom"' if align
                  else 'style="vertical-align:bottom"')
-        sub = (f'<div style="font-weight:400;font-size:11.5px;color:var(--mut);'
-               f'margin:3px 0 0;max-width:180px;white-space:normal">'
-               f'{explain}</div>') if explain else ""
-        return f"<sc-raw-th {style}>{title}{sub}</sc-raw-th>"
-
-    head = (
-        "<sc-raw-thead><sc-raw-tr>"
-        + th("Preset", "")
-        + th("Realistic over one&nbsp;year",
-             f"habits matched, out of {total}", align=True)
-        + th("&hellip;and over two&nbsp;years",
-             "scored against ranges re-derived for a two-year window, which "
-             "is a stricter ruler", align=True)
-        + th("&hellip;on companies it never saw",
-             "one year, on a 60-name roster no preset was tuned against",
-             align=True)
-        + th("A typical year&rsquo;s swing",
-             "annualised volatility: how far prices move over a year",
-             align=True)
-        + th("Crisis severity",
-             "how much more violently prices swing in a crisis than in a "
-             "calm market", align=True)
-        + th("What it is", "")
-        + "</sc-raw-tr></sc-raw-thead>"
-    )
+        return f"<sc-raw-th {style}>{title}</sc-raw-th>"
 
     #: Real markets first, and styled apart, because a ranked table of models
     #: with nothing real in it invites the reader to treat the top row as
@@ -356,21 +341,16 @@ def table_html(data: dict) -> str:
         '<sc-raw-tr style="background:var(--panel)">\n'
         f'              <sc-raw-td {_TD_MONO}><strong>Real markets</strong>'
         "</sc-raw-td>\n"
-        f'              <sc-raw-td colspan="3" {_TD} '
+        f'              <sc-raw-td colspan="3" '
         'style="vertical-align:top;font-size:12.5px;color:var(--mut)">'
-        f"the {total} ranges these three columns score against are measured "
-        "from here, so real markets sit inside all of them by construction"
+        "the ranges these three columns score against are measured from here"
         "</sc-raw-td>\n"
         f'              <sc-raw-td {_TD_NUM}><strong>{vol_lo:.0f}% to '
         f"{vol_hi:.0f}%</strong></sc-raw-td>\n"
         f'              <sc-raw-td {_TD_NUM}><strong>{real:.2f}x</strong>'
         "</sc-raw-td>\n"
         f"              <sc-raw-td {_TD}>A 40-stock US large-cap "
-        "cross-section, 2015 to 2025. The swing column is its three "
-        "one-year windows; the crisis column is about "
-        f"{REAL_CALM_VOL_PCT:.0f}% annualised on days the VIX sat below 12 "
-        f"against about {REAL_CRISIS_VOL_PCT:.0f}% on days it sat above 45."
-        "</sc-raw-td>\n"
+        "cross-section, 2015 to 2025.</sc-raw-td>\n"
         "            </sc-raw-tr>"
     )
 
@@ -392,6 +372,18 @@ def table_html(data: dict) -> str:
             f"            </sc-raw-tr>"
         )
 
+    head = (
+        "<sc-raw-thead><sc-raw-tr>"
+        + th("Preset")
+        + th("1 year", align=True)
+        + th("2 years", align=True)
+        + th("New roster", align=True)
+        + th("Typical year", align=True)
+        + th("Crisis", align=True)
+        + th("What it is")
+        + "</sc-raw-tr></sc-raw-thead>"
+    )
+
     lede = (
         '<h3 style="font-size:16px;margin:30px 0 10px">How the presets '
         "compare, and how each compares to a real market</h3>\n        "
@@ -409,8 +401,17 @@ def table_html(data: dict) -> str:
         f"Realism and limits</a>.</p>\n        "
         f"<p>The first row is the real market itself. All twelve presets were "
         f"measured in one run, thirty seeds each, one method throughout, so "
-        f"the rows compare. Ranked best first.</p>"
-        f'\n        <p style="font-size:14px;color:var(--mut)">This is a '
+        f"the rows compare. Ranked best first.</p>\n        "
+        f'<p style="font-size:13.5px;color:var(--mut)"><strong>The columns.</strong> '
+        f"<strong>1 year</strong> and <strong>2 years</strong> count habits "
+        f"matched out of {total}; the two-year column scores against ranges "
+        f"re-derived for a two-year window, which is a stricter ruler. "
+        f"<strong>New roster</strong> is one year on a 60-name roster no "
+        f"preset was tuned against. <strong>Typical year</strong> is "
+        f"annualised volatility, how far prices move over a year. "
+        f"<strong>Crisis</strong> is how much more violently prices swing in "
+        f"a crisis than in a calm market.</p>\n        "
+        f'<p style="font-size:14px;color:var(--mut)">This is a '
         f"ranking, not a menu. Use the default unless you have a reason not "
         f"to, and name it either way: the earlier presets are here so a "
         f"result recorded under one still replays bit for bit, not so you "
