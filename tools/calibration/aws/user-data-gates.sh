@@ -12,7 +12,7 @@ shutdown -h +60
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates20
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates21
 # `dev`, not `main`. Experimental model work lives on `dev` and is merged to
 # `main` in reviewed units; a calibration box should run what is being
 # EXPERIMENTED on. Pointing this at `main` is what forced a merge to main
@@ -111,12 +111,12 @@ setsid nohup /home/ec2-user/stream.sh "$BUCKET" >/var/log/pretium-stream.log 2>&
 cat > /home/ec2-user/candidates.json <<'CANDS'
 [
   {"label": "v12-control", "base": "pt-v12", "overrides": {}},
-  {"label": "vec1061", "base": "pt-v12", "overrides": {"crisis_blend_gain": 0.648499, "idio_sigma_scale": 0.546644, "sector_vix_coupling": 0.910312, "volume_idio_variance_gain": 0.219882, "volume_innovation_sigma": 0.118254, "volume_move_cap": 3.013256, "volume_move_floor": 0.140432, "volume_move_noise": 0.365983, "volume_move_response": 0.749642, "volume_persistence": 0.491954, "volume_variance_gain": 0.062803}},
-  {"label": "vec1288", "base": "pt-v12", "overrides": {"crisis_blend_gain": 0.734399, "idio_sigma_scale": 0.531347, "sector_vix_coupling": 0.77525, "volume_idio_variance_gain": 0.499705, "volume_innovation_sigma": 0.141562, "volume_move_cap": 10.1718, "volume_move_floor": 1.005313, "volume_move_noise": 0.25205, "volume_move_response": 0.61197, "volume_persistence": 0.577486, "volume_variance_gain": 0.087624}},
-  {"label": "vec2804", "base": "pt-v12", "overrides": {"crisis_blend_gain": 0.790898, "idio_sigma_scale": 0.521331, "sector_vix_coupling": 0.665161, "volume_idio_variance_gain": 0.26794, "volume_innovation_sigma": 0.275734, "volume_move_cap": 11.781186, "volume_move_floor": 0.524826, "volume_move_noise": 0.220313, "volume_move_response": 1.250432, "volume_persistence": 0.871256, "volume_variance_gain": 0.035018}},
-  {"label": "vec874", "base": "pt-v12", "overrides": {"crisis_blend_gain": 1.153458, "idio_sigma_scale": 0.53787, "sector_vix_coupling": 0.817114, "volume_idio_variance_gain": 0.171636, "volume_innovation_sigma": 0.295779, "volume_move_cap": 3.930694, "volume_move_floor": 0.290545, "volume_move_noise": 0.271421, "volume_move_response": 0.847297, "volume_persistence": 0.534128, "volume_variance_gain": 0.035453}},
-  {"label": "vec2128", "base": "pt-v12", "overrides": {"crisis_blend_gain": 0.947031, "idio_sigma_scale": 0.528633, "sector_vix_coupling": 0.519649, "volume_idio_variance_gain": 0.224339, "volume_innovation_sigma": 0.351569, "volume_move_cap": 10.814352, "volume_move_floor": 0.644524, "volume_move_noise": 0.513579, "volume_move_response": 1.130649, "volume_persistence": 0.529637, "volume_variance_gain": 0.063428}},
-  {"label": "response1.25 only", "base": "pt-v12", "overrides": {"volume_move_response": 1.25}}
+  {"label": "w0.5 hl60", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.5, "market_vol_slow_persistence": 0.988514, "market_vol_slow_gain": 0.1}},
+  {"label": "w0.7 hl60", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.7, "market_vol_slow_persistence": 0.988514, "market_vol_slow_gain": 0.1}},
+  {"label": "w0.9 hl60", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.9, "market_vol_slow_persistence": 0.988514, "market_vol_slow_gain": 0.1}},
+  {"label": "w0.7 hl120", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.7, "market_vol_slow_persistence": 0.99424, "market_vol_slow_gain": 0.1}},
+  {"label": "w0.7 hl250", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.7, "market_vol_slow_persistence": 0.997231, "market_vol_slow_gain": 0.1}},
+  {"label": "w0.7 hl60 damp0.5", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.7, "market_vol_slow_persistence": 0.988514, "market_vol_slow_gain": 0.1, "market_vol_slow_vix_damp": 0.5}}
 ]
 CANDS
 chown ec2-user:ec2-user /home/ec2-user/candidates.json
