@@ -95,6 +95,11 @@ def main() -> int:
     ap.add_argument("--seeds", type=int, default=30)
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--universe-seed", type=int, default=111)
+    ap.add_argument(
+        "--seed-start", type=int, default=101,
+        help="first simulation seed. 101 is the calibration block, which is "
+             "what the shipped roster numbers were measured on; a disjoint "
+             "block says whether a one-block result was a draw.")
     ap.add_argument("--out", default=None)
     ap.add_argument(
         "--preset", default=None,
@@ -115,7 +120,7 @@ def main() -> int:
     preset = m.fingerprint
     if ov and preset == pt.ModelParams.from_preset(args.preset).fingerprint:
         raise SystemExit(f"overrides {ov} did not change the fingerprint")
-    seeds = list(range(101, 101 + args.seeds))
+    seeds = list(range(args.seed_start, args.seed_start + args.seeds))
     jobs = [(s, d, seed, args.universe_seed, args.preset, ov)
             for s in SHAPES for d in (252, 504) for seed in seeds]
     print(f"{preset}: {len(SHAPES)} shapes x 2 horizons x {len(seeds)} seeds "
