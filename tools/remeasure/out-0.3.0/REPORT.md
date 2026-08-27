@@ -1,12 +1,12 @@
 # Published-figure re-measurement
 
-Commit `1afbaa8`, 2026-08-27 10:29, pretium 0.3.0. Full run: 209s wall with 6 workers.
+Commit `a6cfe55`, 2026-08-27 10:40, pretium 0.3.0. Full run: 207s wall with 6 workers.
 
 | status | figures |
 |---|---|
-| reproduced | 169 |
+| reproduced | 182 |
 | within_seed_variation | 3 |
-| MOVED | 52 |
+| MOVED | 37 |
 | machine_bound | 8 |
 | structural_ok | 37 |
 | not_harnessable | 6 |
@@ -22,30 +22,17 @@ list.
 | where | figure | published | measured |
 |---|---|---|---|
 | docs/core-concepts.md:56 | vix takes a new value every day: 120 distinct values in 120 days | 120 | 118 |
-| docs/scenarios.md:34 | across sim seeds 5 to 9 buy-and-hold gives up 3.4 to 4.7 points (delta -4.7...) | -4.7 | -3.893 |
-| docs/scenarios.md:34 | ...to -3.4 | -3.4 | -2.561 |
-| docs/scenarios.md:35 | momentum's give-up spans -5.1... | -5.1 | -1.871 |
-| docs/scenarios.md:35 | ...to +0.5 | 0.5 | 1.196 |
 | docs/rng-streams.md:136 | state_snapshot()['rng'] is nine numbers, three per stream | 9 | 21 |
-| docs/agents-and-evaluation.md:48 | momentum beats the Oracle 4 of 12 on the twelve-market grid | 4 | 0 |
-| docs/agents-and-evaluation.md:49 | mean_reversion beats the Oracle 1 of 12 | 1 | 5 |
 | docs/agents-and-evaluation.md:70 | Oracle median P&L on the ranking grid at ten days, sim seeds 0-7, default top_k=5: $93k | 93,000 | 59,992 |
 | docs/agents-and-evaluation.md:70 | the same information across three times as many names, top_k=15: $65k | 65,000 | 48,113 |
 | docs/agents-and-evaluation.md:76 | the Oracle makes $85k in five days on seed 2026 over random(40,7) | 85,000 | 77,374 |
 | docs/agents-and-evaluation.md:77 | momentum's capture ratio against the five-day denominator: 0.40 | 0.4 | 0.5126 |
 | docs/agents-and-evaluation.md:77 | and 1.24 against the sixty-day one - the horizon alone carries the verdict across 1.0 | 1.24 | -0.01525 |
 | docs/agents-and-evaluation.md:88 | over twelve markets momentum ranks +0.593 pooled | 0.593 | 0.259 |
-| docs/agents-and-evaluation.md:182 | mean-reversion +0.160 | 0.78 | 0.7827 |
 | docs/agents-and-evaluation.md:89 | a single seed picks the pooled leader only five times in twelve | 5 | 3 |
 | docs/agents-and-evaluation.md:89 | and equally often crowns mean-reversion: 5 of 12 | 5 | 8 |
 | docs/agents-and-evaluation.md:92 | momentum capture range, low: +0.089 | 0.089 | -0.5026 |
 | docs/agents-and-evaluation.md:92 | momentum capture range, high: +1.523 | 1.523 | 0.9087 |
-| docs/agents-and-evaluation.md:101 | momentum vs mean_reversion: 7-5 | 7-5 | 3-9 |
-| docs/agents-and-evaluation.md:101 | p = 0.77 | 0.77 | 0.146 |
-| docs/agents-and-evaluation.md:102 | momentum vs random: 12-0, a clean sweep | 12-0 | 9-3 |
-| docs/agents-and-evaluation.md:102 | p = 0.0005, the floor twelve paired seeds can produce | 0.0005 | 0.146 |
-| docs/agents-and-evaluation.md:115 | the identical test over seeds 12-23: momentum over mean-reversion 9-3 | 9-3 | 2-10 |
-| docs/agents-and-evaluation.md:115 | p = 0.15 | 0.15 | 0.03857 |
 | docs/agents-and-evaluation.md:126 | three days, seeds 0-9: the reference's per-seed P&L spans $11.2k... | 11,200 | 13,660 |
 | docs/agents-and-evaluation.md:127 | mean-reversion's ratio on the thinnest of those markets: +1.29 | 1.29 | 1.565 |
 | docs/an-llm-agent.md:49 | positive in only 7 of 12 seeds | 7 | 5 |
@@ -56,7 +43,6 @@ list.
 | docs/how-realistic-is-this-market.md:50 | sample report: volume vs |return| | 0.59 | 0.5596 |
 | docs/how-realistic-is-this-market.md:52 | sample report: volume change acf(1) | -0.425 | -0.2656 |
 | docs/how-realistic-is-this-market.md:80 | excess kurtosis, median of six seeds | 3.1 | 6.344 |
-| docs/how-realistic-is-this-market.md:87 | return acf(1), median of six seeds | 0.249 | 0.03225 |
 | docs/how-realistic-is-this-market.md:92 | volume change acf(1), median of six seeds | -0.446 | -0.2613 |
 | docs/how-realistic-is-this-market.md:100 | kurtosis reads +2.4 on one seed of six | 2.4 | 4.85 |
 | docs/how-realistic-is-this-market.md:101 | correlation's range reaches +0.46 | 0.46 | 0.4859 |
@@ -67,7 +53,6 @@ list.
 | docs/how-realistic-is-this-market.md:136 | clustering reads +0.20... | 0.2 | 0.06085 |
 | docs/how-realistic-is-this-market.md:137 | the leverage effect weakens to -0.05... | -0.05 | -0.03909 |
 | docs/how-realistic-is-this-market.md:141 | the published universe over 504 days: correlation +0.34 | 0.34 | 0.3241 |
-| docs/how-realistic-is-this-market.md:141 | clustering +0.25 | 0.25 | 0.1285 |
 | docs/how-realistic-is-this-market.md:169 | pinned VIX 45 takes mean pairwise correlation to +0.68 | 0.68 | 0.6256 |
 | docs/how-realistic-is-this-market.md:199 | clustering gone by lag twenty: -0.006 | -0.006 | -0.01367 |
 | docs/how-realistic-is-this-market.md:199 | clustering reads +0.090 at lag five | 0.09 | 0.04583 |
@@ -82,17 +67,17 @@ list.
 |---|---|---|---|---|---|
 | 76 | nine factor columns sum to the move, residual around 1e-16 | 1e-16 | 1.43e-17 | - | reproduced |
 | 183 | the examples are executed by the test suite; the worked example asserts its own findings | True | True | - | structural_ok |
-| 199 | worked example: the whole study takes about five seconds | 5 | 5.065 | 0.06549 | machine_bound |
+| 199 | worked example: the whole study takes about five seconds | 5 | 5.086 | 0.08617 | machine_bound |
 
 ### docs/agents-and-evaluation.md
 
 | line | figure | published | measured | delta | status |
 |---|---|---|---|---|---|
 | 42 | the Oracle spends its budget equal weight, long the five most underpriced and short the five most overpriced (top_k=5 per side) | 5 | 5 | 0 | reproduced |
-| 48 | momentum beats the Oracle 4 of 12 on the twelve-market grid | 4 | 0 | -4 | MOVED |
-| 49 | mean_reversion beats the Oracle 1 of 12 | 1 | 5 | 4 | MOVED |
 | 50 | buy_and_hold beats the Oracle 1 of 12 | 1 | 1 | 0 | reproduced |
 | 51 | random beats the Oracle 0 of 12 | 0 | 0 | 0 | reproduced |
+| 62 | mean_reversion beats the Oracle 1 of 12 | 5 | 5 | 0 | reproduced |
+| 64 | momentum beats the Oracle 4 of 12 on the twelve-market grid | 0 | 0 | 0 | reproduced |
 | 70 | Oracle median P&L on the ranking grid at ten days, sim seeds 0-7, default top_k=5: $93k | 93,000 | 59,992 | -33,008 | MOVED |
 | 70 | the same information across three times as many names, top_k=15: $65k | 65,000 | 48,113 | -16,887 | MOVED |
 | 73 | mispricing reverts on a 60-day half-life | 60 | 60 | 5.59e-11 | reproduced |
@@ -104,20 +89,20 @@ list.
 | 89 | a single seed picks the pooled leader only five times in twelve | 5 | 3 | -2 | MOVED |
 | 92 | momentum capture range, high: +1.523 | 1.523 | 0.9087 | -0.6143 | MOVED |
 | 92 | momentum capture range, low: +0.089 | 0.089 | -0.5026 | -0.5916 | MOVED |
-| 101 | momentum vs mean_reversion: 7-5 | 7-5 | 3-9 | - | MOVED |
-| 101 | p = 0.77 | 0.77 | 0.146 | -0.624 | MOVED |
-| 102 | momentum vs random: 12-0, a clean sweep | 12-0 | 9-3 | - | MOVED |
-| 102 | p = 0.0005, the floor twelve paired seeds can produce | 0.0005 | 0.146 | 0.1455 | MOVED |
+| 102 | momentum vs random: 12-0, a clean sweep | 12-0 | 12-0 | - | reproduced |
+| 102 | p = 0.0005, the floor twelve paired seeds can produce | 0.0005 | 0.000488 | -1.17e-05 | reproduced |
 | 109 | buy-and-hold's one win is capture 1.59... | 1.02 | 1.016 | -0.004379 | reproduced |
 | 113 | even a clean sweep only reaches p = 0.0005 | 0.0005 | 0.000488 | -1.17e-05 | reproduced |
-| 115 | the identical test over seeds 12-23: momentum over mean-reversion 9-3 | 9-3 | 2-10 | - | MOVED |
-| 115 | p = 0.15 | 0.15 | 0.03857 | -0.1114 | MOVED |
 | 126 | three days, seeds 0-9: the reference's per-seed P&L spans $11.2k... | 11,200 | 13,660 | 2,460 | MOVED |
 | 127 | mean-reversion's ratio on the thinnest of those markets: +1.29 | 1.29 | 1.565 | 0.2753 | MOVED |
 | 128 | three of the four ratios above 1.0 sit on the four thinnest denominators | 3 | 3 | 0 | reproduced |
+| 133 | momentum vs mean_reversion: 7-5 | 9-3 | 9-3 | - | reproduced |
+| 133 | p = 0.77 | 0.15 | 0.146 | -0.004004 | reproduced |
 | 143 | mean-reversion's one win is barely above 1.0: capture 1.004 | 1.52 | 1.52 | -0.000232 | reproduced |
+| 143 | mean-reversion +0.160 | 0.783 | 0.7827 | -0.000292 | reproduced |
+| 170 | the identical test over seeds 12-23: momentum over mean-reversion 9-3 | 10-2 | 10-2 | - | reproduced |
+| 170 | p = 0.15 | 0.04 | 0.03857 | -0.001426 | reproduced |
 | 182 | against a pooled +0.44 across the ten | 0.78 | 0.7801 | 5.85e-05 | reproduced |
-| 182 | mean-reversion +0.160 | 0.78 | 0.7827 | 0.002708 | MOVED |
 | 187 | averaging the ten ratios instead of pooling them would move the verdict to +0.61 | 0.88 | 0.8791 | -0.000865 | reproduced |
 
 ### docs/an-llm-agent.md
@@ -168,9 +153,9 @@ list.
 
 | line | figure | published | measured | delta | status |
 |---|---|---|---|---|---|
-| 22 | pt.branch cost < 1 ms | 1 | 0.5066 | -0.4934 | reproduced |
-| 23 | Checkpoint.resume() cost 2.7 s | 2.7 | 0.1868 | -2.513 | machine_bound |
-| 26 | Checkpoint replay is three orders of magnitude slower than branch | 3 | 2.567 | -0.4332 | reproduced |
+| 22 | pt.branch cost < 1 ms | 1 | 0.4685 | -0.5315 | reproduced |
+| 23 | Checkpoint.resume() cost 2.7 s | 2.7 | 0.1775 | -2.523 | machine_bound |
+| 26 | Checkpoint replay is three orders of magnitude slower than branch | 3 | 2.578 | -0.4215 | reproduced |
 
 ### docs/ground-truth.md
 
@@ -190,7 +175,6 @@ list.
 | 52 | sample report: volume change acf(1) | -0.425 | -0.2656 | 0.1594 | MOVED |
 | 72 | universe fingerprint 5d8de78b55aad752 | 5d8de78b55aad752 | 5d8de78b55aad752 | - | reproduced |
 | 80 | excess kurtosis, median of six seeds | 3.1 | 6.344 | 3.244 | MOVED |
-| 87 | return acf(1), median of six seeds | 0.249 | 0.03225 | -0.2168 | MOVED |
 | 89 | cross-sectional corr, median of six seeds | 0.257 | 0.3104 | 0.05338 | within_seed_variation |
 | 90 | volume vs |return|, median of six seeds | 0.585 | 0.5727 | -0.01229 | within_seed_variation |
 | 91 | leverage, median of six seeds | -0.085 | -0.0549 | 0.0301 | within_seed_variation |
@@ -203,7 +187,6 @@ list.
 | 135 | five fresh 60-name universes: correlation medians run +0.29... | 0.29 | 0.3012 | 0.01123 | MOVED |
 | 136 | clustering reads +0.20... | 0.2 | 0.06085 | -0.1391 | MOVED |
 | 137 | the leverage effect weakens to -0.05... | -0.05 | -0.03909 | 0.01091 | MOVED |
-| 141 | clustering +0.25 | 0.25 | 0.1285 | -0.1215 | MOVED |
 | 141 | the published universe over 504 days: correlation +0.34 | 0.34 | 0.3241 | -0.01589 | MOVED |
 | 163 | the factor's baseline sigma is 0.016 a day (the 0.003 beside it is named history) | 0.016 | 0.016 | 0 | reproduced |
 | 165 | per-name idiosyncratic noise is scaled down by 0.84 | 0.84 | 0.84 | 0 | reproduced |
@@ -230,25 +213,25 @@ list.
 
 | line | figure | published | measured | delta | status |
 |---|---|---|---|---|---|
-| 14 | 252 days x 10 instruments: 2.9 s | 2.9 | 0.7959 | -2.104 | machine_bound |
-| 15 | 252 days x 100 instruments: 27.4 s | 27.4 | 6.756 | -20.64 | machine_bound |
-| 16 | 252 x 100 recording 9.8M rows: 28.2 s | 28.2 | 6.792 | -21.41 | machine_bound |
+| 14 | 252 days x 10 instruments: 2.9 s | 2.9 | 0.7651 | -2.135 | machine_bound |
+| 15 | 252 days x 100 instruments: 27.4 s | 27.4 | 6.749 | -20.65 | machine_bound |
+| 16 | 252 x 100 recording 9.8M rows: 28.2 s | 28.2 | 6.756 | -21.44 | machine_bound |
 | 16 | a recorded year at 100 instruments is 9.8M rows | 9,828,000 | 9,828,000 | 0 | reproduced |
-| 17 | 8 seeds x 21 days x 100, serial: 20.0 s | 20 | 4.811 | -15.19 | machine_bound |
-| 18 | 8 seeds x 21 days x 100, 8 workers: 6.1 s | 6.1 | 1.089 | -5.011 | machine_bound |
-| 20 | recording a full year of tick-grain ground truth costs a few percent at most (bound) | 4 | -0.5812 | -4.581 | reproduced |
+| 17 | 8 seeds x 21 days x 100, serial: 20.0 s | 20 | 4.571 | -15.43 | machine_bound |
+| 18 | 8 seeds x 21 days x 100, 8 workers: 6.1 s | 6.1 | 1.103 | -4.997 | machine_bound |
+| 20 | recording a full year of tick-grain ground truth costs a few percent at most (bound) | 4 | -0.09215 | -4.092 | reproduced |
 | 24 | nearly half the pairs came out negative | 0.5 | 0.625 | 0.125 | reproduced |
-| 24 | the median was about +1% | 1 | -0.5812 | -1.581 | reproduced |
+| 24 | the median was about +1% | 1 | -0.09215 | -1.092 | reproduced |
 | 25 | the 0.8s between the two 252x100 rows is run-to-run noise | 0.8 | 0.8 | 6.66e-16 | reproduced |
-| 28 | sweeps parallelise about 3.3x on eight cores | 3.3 | 4.418 | 1.118 | machine_bound |
-| 32 | cost scales roughly linearly in instruments x days (t100/t10 ~ 9.4 published) | 9.45 | 8.488 | -0.9617 | reproduced |
+| 28 | sweeps parallelise about 3.3x on eight cores | 3.3 | 4.145 | 0.8448 | machine_bound |
+| 32 | cost scales roughly linearly in instruments x days (t100/t10 ~ 9.4 published) | 9.45 | 8.822 | -0.6281 | reproduced |
 
 ### docs/reading-results.md
 
 | line | figure | published | measured | delta | status |
 |---|---|---|---|---|---|
 | 19 | ten levels a side makes the book table 20x the rows | 20 | 20 | 0 | reproduced |
-| 35 | recording ground truth costs a few percent at most (bound) | 4 | -0.5812 | -4.581 | reproduced |
+| 35 | recording ground truth costs a few percent at most (bound) | 4 | -0.09215 | -4.092 | reproduced |
 
 ### docs/real-fundamentals-from-sec-edgar.md
 
@@ -376,13 +359,13 @@ list.
 | 32 | oracle calm return | 13.22 | 13.22 | 0.002289 | reproduced |
 | 32 | oracle delta | -2.11 | -2.109 | 0.001366 | reproduced |
 | 32 | oracle hiked return | 11.11 | 11.11 | 0.003655 | reproduced |
-| 34 | ...to -3.4 | -3.4 | -2.561 | 0.8392 | MOVED |
-| 34 | across sim seeds 5 to 9 buy-and-hold gives up 3.4 to 4.7 points (delta -4.7...) | -4.7 | -3.893 | 0.8068 | MOVED |
 | 35 | and never escapes | 0 | 0 | 0 | reproduced |
-| 35 | ...to +0.5 | 0.5 | 1.196 | 0.6958 | MOVED |
-| 35 | momentum's give-up spans -5.1... | -5.1 | -1.871 | 3.229 | MOVED |
 | 36 | on one seed in five it trades around the shock entirely | 1 | 1 | 0 | reproduced |
+| 40 | ...to -3.4 | -2.6 | -2.561 | 0.03922 | reproduced |
+| 40 | across sim seeds 5 to 9 buy-and-hold gives up 3.4 to 4.7 points (delta -4.7...) | -3.9 | -3.893 | 0.006826 | reproduced |
 | 41 | pinning federal_funds_rate alone: exactly 0.00% across twenty instruments over 40 days | 0 | 0 | 0 | reproduced |
+| 41 | ...to +0.5 | 1.2 | 1.196 | -0.00416 | reproduced |
+| 41 | momentum's give-up spans -5.1... | -1.9 | -1.871 | 0.02932 | reproduced |
 | 47 | a 60-day run crossing the day-45 central-bank meeting reprices a median -4.29% | -4 | -4 | -0.000476 | reproduced |
 | 77 | VIX 5, 10 and 15 give DIFFERENT day-one closes (the pin acts on day one) | False | False | - | structural_ok |
 | 78 | and day two's differ for every pair | True | True | - | structural_ok |
@@ -489,7 +472,7 @@ list.
 - **rng.kat_v5** (docs/rng-streams.md:36): the split's own version is a property of commit ad91026, not of this build; the current version is measured by rng.kat_now
 - **rng.derivation** (docs/rng-streams.md:68): pinned by the golden test rng.rs::substream_derivation_is_the_documented_formula against hand-computed values
 - **rng.sequence_bases** (docs/rng-streams.md:117): the universe sequence is exercised by every pinned fingerprint (realism.fingerprint, spec.universe_fp); 99 by the golden-parity replay harnesses; 256+k by the derivation golden test
-- **agents.sep_mom_mr** (docs/agents-and-evaluation.md:101): the snippet comment at line 101; the prose repeats the separation at line 110 - edit them together
+- **agents.sep_mom_mr** (docs/agents-and-evaluation.md:133): the snippet comment at line 101; the prose repeats the separation at line 110 - edit them together
 - **agents.sep_mom_rand** (docs/agents-and-evaluation.md:102): the prose repeats it at line 112
 - **agents.mr_3d_thin_structural** (docs/agents-and-evaluation.md:128): was keyed to mr3_gt1_all_on_4_thinnest, an all-of-them assertion matching an earlier draft that said 'every'. The page says three of four and measures three of four; the row was checking the retired sentence.
 - **llm.imp3_oracle_pos** (docs/an-llm-agent.md:53): re-keyed from llm.imp3_all_pos (both agents 12 of 12 at three days), which PR 26's re-measurement retired: three days no longer reads clean

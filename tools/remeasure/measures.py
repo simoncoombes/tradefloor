@@ -383,8 +383,18 @@ def g_ranking(ctx: Ctx) -> dict:
                  universe=u, days=10, workers=min(4, ctx.workers))
     records = {r.name: r for r in rk.table()}
     mom, mr = records["momentum"], records["mean_reversion"]
-    sep_mr = rk.separation("momentum", "mean_reversion")
-    sep_rand = rk.separation("momentum", "random")
+    # Argument order and PAIR both follow the page, which prints its own
+    # calls at docs/agents-and-evaluation.md:133-135:
+    #   separation("mean_reversion", "momentum")   # 9-3,  p = 0.15
+    #   separation("mean_reversion", "random")     # 12-0, p = 0.0005
+    #   separation("buy_and_hold", "random")       # 5-7,  p = 0.77
+    # This measured momentum-first, which reverses every win count, and
+    # measured momentum-vs-random where the page compares mean-reversion to
+    # random -- a different test entirely. Both showed up as MOVED rows
+    # against prose that was correct.
+    sep_mr = rk.separation("mean_reversion", "momentum")
+    sep_rand = rk.separation("mean_reversion", "random")
+    sep_bh_rand = rk.separation("buy_and_hold", "random")
 
     # the beats-the-Oracle table: paired per-seed P&L against the reference
     beats = {name: sum(1 for pnl, ref in zip(records[name].pnls,
@@ -407,7 +417,7 @@ def g_ranking(ctx: Ctx) -> dict:
     # the second twelve-seed window (seeds 12-23): same test, different verdict
     rk_b = pt.rank(factory, seeds=range(12, 24),
                    universe=u, days=10, workers=min(4, ctx.workers))
-    sep_mr_b = rk_b.separation("momentum", "mean_reversion")
+    sep_mr_b = rk_b.separation("mean_reversion", "momentum")
 
     # three-day companion study, seeds 0-9: the reference P&L span, the pooled
     # mean-reversion figure, and mean-reversion's ratio on the thinnest market
@@ -450,6 +460,8 @@ def g_ranking(ctx: Ctx) -> dict:
         "sep_mom_mr_p": sep_mr["p_value"],
         "sep_mom_rand": f"{sep_rand['wins_a']}-{sep_rand['wins_b']}",
         "sep_mom_rand_p": sep_rand["p_value"],
+        "sep_bh_rand": f"{sep_bh_rand['wins_a']}-{sep_bh_rand['wins_b']}",
+        "sep_bh_rand_p": sep_bh_rand["p_value"],
         "beat12_momentum": beats["momentum"],
         "beat12_mean_reversion": beats["mean_reversion"],
         "beat12_buy_and_hold": beats["buy_and_hold"],

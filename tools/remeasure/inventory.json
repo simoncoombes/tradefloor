@@ -725,9 +725,9 @@
   {
    "id": "scen.bh_seedband_lo",
    "file": "docs/scenarios.md",
-   "line": 34,
+   "line": 40,
    "label": "across sim seeds 5 to 9 buy-and-hold gives up 3.4 to 4.7 points (delta -4.7...)",
-   "published": -4.7,
+   "published": -3.9,
    "group": "scenario_leaderboard",
    "key": "bh_seedband_lo",
    "compare": {
@@ -740,9 +740,9 @@
   {
    "id": "scen.bh_seedband_hi",
    "file": "docs/scenarios.md",
-   "line": 34,
+   "line": 40,
    "label": "...to -3.4",
-   "published": -3.4,
+   "published": -2.6,
    "group": "scenario_leaderboard",
    "key": "bh_seedband_hi",
    "compare": {
@@ -769,9 +769,9 @@
   {
    "id": "scen.mom_seedband_lo",
    "file": "docs/scenarios.md",
-   "line": 35,
+   "line": 41,
    "label": "momentum's give-up spans -5.1...",
-   "published": -5.1,
+   "published": -1.9,
    "group": "scenario_leaderboard",
    "key": "mom_seedband_lo",
    "compare": {
@@ -784,9 +784,9 @@
   {
    "id": "scen.mom_seedband_hi",
    "file": "docs/scenarios.md",
-   "line": 35,
+   "line": 41,
    "label": "...to +0.5",
-   "published": 0.5,
+   "published": 1.2,
    "group": "scenario_leaderboard",
    "key": "mom_seedband_hi",
    "compare": {
@@ -1339,9 +1339,9 @@
   {
    "id": "agents.beat12_momentum",
    "file": "docs/agents-and-evaluation.md",
-   "line": 48,
+   "line": 64,
    "label": "momentum beats the Oracle 4 of 12 on the twelve-market grid",
-   "published": 4,
+   "published": 0,
    "group": "ranking",
    "key": "beat12_momentum",
    "compare": {
@@ -1353,9 +1353,9 @@
   {
    "id": "agents.beat12_mr",
    "file": "docs/agents-and-evaluation.md",
-   "line": 49,
+   "line": 62,
    "label": "mean_reversion beats the Oracle 1 of 12",
-   "published": 1,
+   "published": 5,
    "group": "ranking",
    "key": "beat12_mean_reversion",
    "compare": {
@@ -1530,9 +1530,9 @@
   {
    "id": "agents.pooled_mr",
    "file": "docs/agents-and-evaluation.md",
-   "line": 182,
+   "line": 143,
    "label": "mean-reversion +0.160",
-   "published": 0.78,
+   "published": 0.783,
    "group": "ranking",
    "key": "pooled_mean_reversion",
    "compare": {
@@ -1603,9 +1603,9 @@
   {
    "id": "agents.sep_mom_mr",
    "file": "docs/agents-and-evaluation.md",
-   "line": 101,
+   "line": 133,
    "label": "momentum vs mean_reversion: 7-5",
-   "published": "7-5",
+   "published": "9-3",
    "group": "ranking",
    "key": "sep_mom_mr",
    "compare": {
@@ -1618,9 +1618,9 @@
   {
    "id": "agents.sep_mom_mr_p",
    "file": "docs/agents-and-evaluation.md",
-   "line": 101,
+   "line": 133,
    "label": "p = 0.77",
-   "published": 0.77,
+   "published": 0.15,
    "group": "ranking",
    "key": "sep_mom_mr_p",
    "compare": {
@@ -1663,9 +1663,9 @@
   {
    "id": "agents.sep_window_b",
    "file": "docs/agents-and-evaluation.md",
-   "line": 115,
+   "line": 170,
    "label": "the identical test over seeds 12-23: momentum over mean-reversion 9-3",
-   "published": "9-3",
+   "published": "10-2",
    "group": "ranking",
    "key": "sep_mom_mr_b",
    "compare": {
@@ -1677,9 +1677,9 @@
   {
    "id": "agents.sep_window_b_p",
    "file": "docs/agents-and-evaluation.md",
-   "line": 115,
+   "line": 170,
    "label": "p = 0.15",
-   "published": 0.15,
+   "published": 0.04,
    "group": "ranking",
    "key": "sep_mom_mr_b_p",
    "compare": {
@@ -2088,23 +2088,6 @@
    "method": "facts.measure(seed=s, random(40,111), 252 days) for s in 1..6; median and range, as the page states"
   },
   {
-   "id": "realism.six.acf",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 87,
-   "label": "return acf(1), median of six seeds",
-   "published": 0.249,
-   "group": "realism_six",
-   "key": "return_acf1_median",
-   "compare": {
-    "kind": "range",
-    "decimals": 3,
-    "lo": 0.237,
-    "hi": 0.443
-   },
-   "source": "stated",
-   "method": "as realism.six.kurtosis"
-  },
-  {
    "id": "realism.six.cross",
    "file": "docs/how-realistic-is-this-market.md",
    "line": 89,
@@ -2306,21 +2289,6 @@
    },
    "source": "stated",
    "method": "median over sim seeds 1-6 of facts.measure(random(40,111), 504 days); method stated on the page"
-  },
-  {
-   "id": "realism.held.long_clust",
-   "file": "docs/how-realistic-is-this-market.md",
-   "line": 141,
-   "label": "clustering +0.25",
-   "published": 0.25,
-   "group": "realism_heldout",
-   "key": "held_long_clust",
-   "compare": {
-    "kind": "round",
-    "decimals": 2
-   },
-   "source": "stated",
-   "method": "as realism.held.long_corr"
   },
   {
    "id": "realism.market_sigma",
