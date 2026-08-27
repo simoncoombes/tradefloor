@@ -84,7 +84,8 @@ pub fn load() -> Json {
         .join("goldens/divergence-multiday.json");
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "{}: {e}\nRun: npx tsx scripts/rust-port/divergence-multiday-vectors.ts",
+            "{}: {e}\nRegenerate from the reference implementation's\
+             divergence multi-day generator",
             path.display()
         )
     });

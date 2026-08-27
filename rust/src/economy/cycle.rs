@@ -1,4 +1,5 @@
-//! Business-cycle transitions, ported from `src/lib/engine/economy.ts:1088`.
+//! Business-cycle transitions, ported from the reference implementation's
+//! economy module.
 //!
 //! Phase duration is modelled as a Weibull hazard rather than a fixed length,
 //! so how long a phase has already lasted changes how likely it is to end.
@@ -64,7 +65,7 @@ pub fn get_cycle_transition_probability(economy: &EconomyState) -> (f64, CyclePh
 
 /// The condition ladder shared, in the original, by both entry points.
 ///
-/// Factored out here only because the two copies in the TypeScript are
+/// Factored out here only because the two copies in the reference implementation are
 /// semantically identical — compared branch by branch, not assumed. They are
 /// not textually identical (one inlines the inversion depth, the other binds
 /// it to a temporary), but every condition, constant and operation matches.

@@ -1,7 +1,7 @@
 //! INVARIANTS 6.1–6.8, as property tests.
 //!
 //! These are deliberately NOT parity tests. The vectors already hold the port
-//! to the TypeScript bit for bit; what these assert is that the MODEL is
+//! to the reference implementation bit for bit; what these assert is that the MODEL is
 //! right — that Okun's law has the sign economics gives it, that the Fed cuts
 //! into a collapse. A port can be perfectly faithful to a broken model, and
 //! these are the tests that would notice.
@@ -282,7 +282,7 @@ fn qe_engages_only_at_the_zero_bound_in_a_contraction() {
     );
     assert!(
         out.economy.qe_pe_boost > 0.0,
-        "QE must feed the PE boost market.ts reads"
+        "QE must feed the PE boost the market module reads"
     );
 
     // Not in an expansion, however low the rate.

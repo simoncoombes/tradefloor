@@ -419,7 +419,7 @@ pub struct ModelParams {
     /// the realised variance. 0.0 disables it.
     /// Applies the loss-maker book floor to PROFITABLE companies too.
     ///
-    /// At 0.0 this is off and the valuation is bit-identical to the TypeScript
+    /// At 0.0 this is off and the valuation is bit-identical to the reference implementation
     /// reference, which switches hard at `eps > 0`: a company earning 0.01 is
     /// valued on earnings and one earning exactly 0 is valued at
     /// `book * LOSS_MAKING_PRICE_TO_BOOK`. Fair value therefore JUMPS UP as

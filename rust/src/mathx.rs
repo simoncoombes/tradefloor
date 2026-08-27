@@ -15,7 +15,7 @@
 //! V8's by 1 ULP on a real Box-Muller input. Since `price = fairValue x exp(s)`
 //! is a non-linear feedback loop, a single last-ULP difference becomes a
 //! visibly different market within a simulated year. Verifying the port against
-//! the TypeScript requires the maths to agree exactly.
+//! the reference implementation requires the maths to agree exactly.
 //!
 //! **2. Determinism across platforms.** `std`'s float maths delegates to the
 //! platform libm — MSVC's CRT on Windows, glibc on Linux, Apple's on macOS.
@@ -44,7 +44,7 @@ pub fn exp(x: f64) -> f64 {
 }
 
 /// Natural logarithm. Named `log` to match the `libm`/C convention rather than
-/// Rust's `ln`, because the TypeScript being ported says `Math.log` and the
+/// Rust's `ln`, because the reference implementation being ported says `Math.log` and the
 /// port reads more obviously against its source this way.
 #[inline]
 pub fn log(x: f64) -> f64 {
@@ -54,7 +54,8 @@ pub fn log(x: f64) -> f64 {
 /// `base^exponent`.
 ///
 /// The risky call sites are the intraday U-shape and volume curves in
-/// `market.ts`, which evaluate `pow` fresh every tick with a time-varying base
+/// the reference implementation, which evaluate `pow` fresh every tick with
+/// a time-varying base
 /// and a non-integer exponent (2.5). Non-integer exponents are exactly where
 /// `pow` implementations diverge, because they route through `exp(y * log(x))`
 /// with implementation-specific extra precision.
@@ -219,7 +220,7 @@ pub fn js_round(x: f64) -> f64 {
 
 /// The engine's `clamp`, which is a ternary and NOT `f64::clamp`.
 ///
-/// Both `marketMaker.ts` and `mispricing.ts` define it identically as
+/// Both the market-maker and mispricing modules define it identically as
 /// `x < lo ? lo : x > hi ? hi : x`, and the behaviour that matters is what
 /// that does to values the comparisons cannot order:
 ///
@@ -242,11 +243,11 @@ pub fn clamp(x: f64, lo: f64, hi: f64) -> f64 {
 }
 
 /// The OTHER clamp — `Math.max(lo, Math.min(hi, x))`, from
-/// `src/lib/engine/utils/mathUtils.ts`.
+/// the reference implementation's math utilities.
 ///
 /// The engine has two clamps and they are **not interchangeable**.
-/// `marketMaker.ts` and `mispricing.ts` define a ternary locally ([`clamp`]);
-/// `economy.ts` imports this one. They agree on NaN (both propagate) and on
+/// The market-maker and mispricing modules define a ternary locally
+/// ([`clamp`]); the economy module imports this one. They agree on NaN (both propagate) and on
 /// ordinary values, and differ on signed zero:
 ///
 /// ```text

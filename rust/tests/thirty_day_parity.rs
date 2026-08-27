@@ -99,7 +99,7 @@ impl Tape {
         if self.at >= self.draws.len() {
             self.problems.push(format!(
                 "{}: asked for draw #{} ('{want}') but the tape holds only {} — \
-                 the port takes MORE draws than the TypeScript",
+                 the port takes MORE draws than the reference implementation",
                 self.label,
                 self.at + 1,
                 self.draws.len()
@@ -111,7 +111,8 @@ impl Tape {
         let kind = entry.as_bytes()[0] as char;
         if kind != want {
             self.problems.push(format!(
-                "{}: draw #{} is '{kind}' in the TypeScript but the port asked for '{want}' — \
+                "{}: draw #{} is '{kind}' in the reference implementation but the port \
+                asked for '{want}' — \
                  same count, different schedule",
                 self.label,
                 self.at + 1
@@ -169,7 +170,7 @@ fn load(name: &str) -> Json {
         .join(name);
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "{}: {e}\nRun: npx tsx scripts/rust-port/thirty-day-vectors.ts",
+            "{}: {e}\nRegenerate from the reference implementation's thirty-day generator",
             path.display()
         )
     });
@@ -322,7 +323,7 @@ fn check(file: &str) {
         // difference rather than a bug.
         assert!(
             tape_of(&draws["open"]).is_empty(),
-            "day {day}: the TypeScript open reset drew — the schedule has changed"
+            "day {day}: the reference implementation open reset drew — the schedule has changed"
         );
         engine.open_market();
 
@@ -365,7 +366,7 @@ fn check(file: &str) {
         // ── 4. CLOSE ──────────────────────────────────────────────────────
         assert!(
             tape_of(&draws["close"]).is_empty(),
-            "day {day}: the TypeScript close drew — the schedule has changed"
+            "day {day}: the reference implementation close drew — the schedule has changed"
         );
         // `ReferenceEma`, because this replays a recorded reference run and
         // must reproduce the reference's state evolution exactly -- the

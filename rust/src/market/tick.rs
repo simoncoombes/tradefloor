@@ -1,5 +1,5 @@
-//! `simulateMarketTick`'s live path, ported from
-//! `src/lib/engine/market.ts:1230`.
+//! `simulateMarketTick`'s live path, ported from the reference
+//! implementation.
 //!
 //! # The order of operations IS the model
 //!
@@ -140,7 +140,7 @@ pub const PRICE_HARD_CAP: f64 = 50_000.0;
 pub struct TickStock {
     pub price: f64,
     pub previous_close: f64,
-    /// `undefined` until the first tick prints — the TypeScript field is
+    /// `undefined` until the first tick prints — the reference implementation's field is
     /// optional, and a fabricated default here would diverge on tick zero of
     /// any freshly generated company.
     pub previous_tick_price: Option<f64>,

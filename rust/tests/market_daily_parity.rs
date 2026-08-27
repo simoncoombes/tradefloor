@@ -13,9 +13,9 @@
 //! **Provenance caveat, carried from the generator.** `resetDailyPrices` and
 //! `updateGarchVariance` are called for real, but the momentum roll,
 //! innovation selection and volume EMA are transcribed from
-//! `transitions.ts:105-128` rather than invoked — `tickMarketTransitions`
+//! the reference implementation's day transitions rather than invoked — `tickMarketTransitions`
 //! needs a full TickWork/TickState/TickContext. That means these vectors can
-//! go stale silently if `transitions.ts` changes. Nothing here detects that;
+//! go stale silently if the day transitions changes. Nothing here detects that;
 //! the mitigation is the source lines recorded in the generator so a reviewer
 //! can diff them.
 //!
@@ -83,7 +83,7 @@ fn load() -> Json {
         .join("goldens/market-daily.json");
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "{}: {e}\nRun: npx tsx scripts/rust-port/market-daily-vectors.ts",
+            "{}: {e}\nRegenerate from the reference implementation's market-daily generator",
             path.display()
         )
     });
@@ -165,7 +165,7 @@ fn replay_case(case: &Json) -> (TickCompany, String) {
         &CloseInputs {
             daily_innovation: maybe(&i["dailyInnovation"]),
             // Passed in rather than looked up, following the crate's
-            // convention: the sector table lives in the TypeScript.
+            // convention: the sector table lives in the reference implementation.
             sector_base_daily_variance: bits(i["sectorBaseDailyVariance"].as_str().unwrap()),
             vix: 15.0,
             avg_volume: AvgVolumePolicy::ReferenceEma,

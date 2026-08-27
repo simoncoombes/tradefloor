@@ -27,8 +27,8 @@ exclude = [
     # They live in the repository, where the corpus is.
     "examples/**",
     # The parity tests read the excluded corpus and PANIC when it is absent,
-    # with a message telling you to regenerate it from a TypeScript script
-    # that is not in the package either. Shipping a test that cannot pass is
+    # with a message telling you to regenerate it from a generator that is
+    # not in the package either. Shipping a test that cannot pass is
     # worse than shipping no test: a consumer running `cargo test` would
     # conclude the crate is broken.
     #
@@ -53,7 +53,7 @@ exclude = [
     "tests/prng_normals_full.rs",
     "tests/thirty_day_parity.rs",
     "tests/tick_regression.rs",
-    "tests/ts_parity_smoke.rs",
+    "tests/reference_parity_smoke.rs",
 ]
 
 [lib]

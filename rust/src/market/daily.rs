@@ -1,9 +1,10 @@
-//! The daily lifecycle, ported from `src/lib/stores/tick/transitions.ts`
-//! and `market.ts:1708`.
+//! The daily lifecycle, ported from the reference implementation's day
+//! transitions and its market module.
 //!
 //! # These are state transitions, not glue
 //!
-//! They live outside `market.ts` in the TypeScript, which makes them easy to
+//! They live outside the market module in the reference implementation,
+//! which makes them easy to
 //! mistake for store plumbing. They are not. Two of them are what make the
 //! `s`-process and GARCH behave across DAYS rather than within one:
 //!
@@ -60,7 +61,8 @@ pub enum AvgVolumePolicy {
     /// The reference feeds realised volume back into a 20-day EMA, divided
     /// by assumed multiplier means (intraday curve ~1.45, volumeScale ~1.4)
     /// to remove the volume model's own multiplicative bias
-    /// (`transitions.ts:119-125`). The correction is present, deliberate,
+    /// (the reference implementation's day transitions). The correction is
+    /// present, deliberate,
     /// and correctly reasoned -- and calibrated for a market this engine
     /// does not produce. Measured here (20 instruments, 252 days, seed 3):
     /// realised volume runs well above the assumed product, so the EMA is
@@ -95,7 +97,7 @@ pub enum AvgVolumePolicy {
     ReferenceEma,
 }
 
-/// Reset the daily bars at the open (`market.ts:1708`).
+/// Reset the daily bars at the open.
 ///
 /// `previousClose` is set from the price at the OPEN, not at the close. That
 /// is what makes the circuit-breaker band a session band: it is measured

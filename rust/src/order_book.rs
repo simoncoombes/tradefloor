@@ -1,8 +1,9 @@
 //! Central limit order book — price-time priority matching.
 //!
-//! Ported from `src/lib/engine/orderBook.ts`, which is **zero imports and zero
-//! transcendentals**: the most self-contained module in the whole port, and
-//! therefore held to strict bit-identical parity like `fair_value`.
+//! Ported from the reference implementation's order book, which is
+//! **zero imports and zero transcendentals**: the most self-contained module
+//! in the whole port, and therefore held to strict bit-identical parity like
+//! `fair_value`.
 //!
 //! # What this module is for
 //!
@@ -156,7 +157,7 @@ impl OrderBook {
     /// Folded explicitly from `0.0` rather than using `Iterator::sum`, and the
     /// difference is observable. Rust's `Sum for f64` uses **`-0.0`** as its
     /// identity — a deliberate choice, since `-0.0 + x == x` preserves sign
-    /// where `0.0 + (-0.0)` would not. The TypeScript starts from `let total =
+    /// where `0.0 + (-0.0)` would not. The reference implementation starts from `let total =
     /// 0`, which is `+0.0`.
     ///
     /// So on an empty side `sum()` returns `-0.0` and the original returns

@@ -68,7 +68,7 @@ use crate::market::{
 use crate::params::ModelParams;
 use crate::rng::{stream, GameRng, Rng, RngState};
 
-/// The reference MAIN stream's sequence, from `rng.ts:32`. Not 0 and not 1 —
+/// The reference MAIN stream's sequence. Not 0 and not 1 —
 /// both are different streams from the same seed, and picking the wrong one
 /// produces a plausible market that matches nothing.
 ///
@@ -516,7 +516,7 @@ impl Engine {
     /// Run one simulated minute against an EXTERNAL draw source.
     ///
     /// This is what a replay harness needs: the engine's own generator cannot
-    /// reproduce a recorded TypeScript stream, because `next_normal` routes
+    /// reproduce a recorded the reference implementation stream, because `next_normal` routes
     /// through `cos` and diverges on 1.545% of draws. Feeding recorded draws
     /// separates the arithmetic under test from the generator that is known to
     /// differ.
@@ -859,7 +859,7 @@ impl Engine {
     /// Must run BEFORE any earnings shock the embedder applies that evening:
     /// the momentum roll reads `s` as it stands at the close, and an earnings
     /// gap applied first would be counted again as next-day herding. The
-    /// TypeScript's earnings path patches `sPrevClose` by the shock for the
+    /// the reference implementation's earnings path patches `sPrevClose` by the shock for the
     /// same reason.
     pub fn close_market(&mut self, request: &DayCloseRequest) {
         assert_eq!(
@@ -1064,7 +1064,7 @@ impl Engine {
 
     /// The daily macro step: economy, cycle roll, then the central bank.
     ///
-    /// The order is the TypeScript's and is load-bearing — the rates and VIX
+    /// The order is the reference implementation's and is load-bearing — the rates and VIX
     /// the factor model reads on the first tick of a new day are already the
     /// day's NEW values, not yesterday's.
     pub fn advance_day(&mut self, request: &DayAdvanceRequest) -> DayAdvanceOutcome {
@@ -1336,12 +1336,12 @@ impl Engine {
     /// Step the macro chain into the next day.
     ///
     /// Inputs assembled the way the reference implementation's day
-    /// transition assembles them (`tick/daily.ts:87-98`):
+    /// transition assembles them:
     ///
     /// - `market_pe`: market-cap-weighted trailing PE over public, solvent,
     ///   positive-earnings names, with the same `0 < pe < 200` filter.
     ///   Written BEFORE the step because the cycle-transition logic reads
-    ///   it; the TypeScript computes it in the same breath.
+    ///   it; the reference implementation computes it in the same breath.
     /// - `market_return_pct`: the reference feeds the average of its
     ///   indices' per-TICK `changePercent` (percent units, so a routine
     ///   value is a few hundredths). There is no index state on this
@@ -1808,7 +1808,7 @@ impl Engine {
     /// For the embedder to apply an effect this engine does not model — an
     /// earnings gap, a corporate action. It does NOT recompute `s`, so a
     /// caller changing the price must also decide what that means for the
-    /// mispricing, exactly as the TypeScript's earnings path does.
+    /// mispricing, exactly as the reference implementation's earnings path does.
     pub fn write_prices(&mut self, prices: &[f64]) {
         assert_eq!(prices.len(), self.companies.len(), "one price per company");
         for (company, &price) in self.companies.iter_mut().zip(prices) {

@@ -1,4 +1,5 @@
-//! Bit-identical parity for `market.ts`'s Tier-1 islands — WP4, part 1.
+//! Bit-identical parity for the market module's Tier-1 islands — WP4,
+//! part 1.
 //!
 //! GARCH, session logic, the intraday curves and the index divisor maths.
 //! These carry no draws and no hidden state, so they are held to bit equality
@@ -83,7 +84,7 @@ fn load() -> Json {
         .join("goldens/market-islands.json");
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "{}: {e}\nRun: npx tsx scripts/rust-port/market-islands-vectors.ts",
+            "{}: {e}\nRegenerate from the reference implementation's market-islands generator",
             path.display()
         )
     });

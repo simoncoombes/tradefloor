@@ -1,5 +1,5 @@
-//! Market sessions and the intraday curves, ported from
-//! `src/lib/engine/market.ts:60` and the tick preamble at `:1315`.
+//! Market sessions and the intraday curves, ported from the reference
+//! implementation's market module and its tick preamble.
 //!
 //! **Tier 1 for the session logic** (comparisons only). The intraday curves
 //! use `pow` with integer and non-integer exponents; the non-integer one is a

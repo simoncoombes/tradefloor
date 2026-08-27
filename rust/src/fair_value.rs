@@ -1,14 +1,15 @@
 //! Fair value — Layer 2 of the stationary price decomposition.
 //!
-//! Ported from `src/lib/engine/fairValue.ts`.
+//! Ported from the reference implementation's fair-value module.
 //!
 //! # Why this module is held to a stricter standard than the rest
 //!
-//! `fairValue.ts` contains **zero transcendental calls** — `Math.max` and
+//! The reference implementation's fair-value module contains **zero
+//! transcendental calls** — `Math.max` and
 //! ordinary arithmetic only. Every operation is exactly specified by IEEE-754,
 //! so unlike the mispricing path (where Chrome, Firefox and Safari disagree
 //! with each other about `Math.cos`; see the determinism notes) this
-//! module can and must be **bit-identical** to the TypeScript.
+//! module can and must be **bit-identical** to the reference implementation.
 //!
 //! `tests/fair_value_parity.rs` therefore gates on exact equality across 250
 //! recorded cases. Any mismatch is a defect here, not a rounding disagreement.
@@ -52,7 +53,7 @@ pub const FAIR_VALUE_FLOOR: f64 = 0.01;
 
 /// Fallback sector anchor.
 ///
-/// The TypeScript writes `sectorConfig?.avgPe || 18`. That `||` is
+/// The reference implementation writes `sectorConfig?.avgPe || 18`. That `||` is
 /// **truthiness**, not a null check — see [`sector_anchor_pe`].
 pub const DEFAULT_SECTOR_ANCHOR_PE: f64 = 18.0;
 
@@ -71,7 +72,7 @@ pub struct CompanyValuationInputs {
     ///
     /// Passed in rather than looked up here so this crate does not have to
     /// own a copy of the sector table, which would be a second source of
-    /// truth for numbers the TypeScript already owns.
+    /// truth for numbers the reference implementation already owns.
     pub sector_avg_pe: Option<f64>,
     pub eps: Option<f64>,
     pub book_value_per_share: Option<f64>,
@@ -184,7 +185,7 @@ pub fn compute_fair_value(
 /// [`compute_fair_value`] with the book floor extended to profitable companies.
 ///
 /// `book_floor` is `ModelParams::fair_value_book_floor`. At 0.0 this is exactly
-/// the function above and the TypeScript's behaviour; `fair_value_parity` calls
+/// the function above and the reference implementation's behaviour; `fair_value_parity` calls
 /// the two-argument form and is untouched.
 ///
 /// # The discontinuity this exists to close
@@ -255,7 +256,7 @@ pub fn compute_fair_value_with(
         target_pe: 0.0,
         // Note: the anchor is still reported on the book path, but the rate
         // and QE adjustments are hardcoded to 1 rather than computed. That is
-        // the TypeScript's behaviour and callers may read it, so it is
+        // the reference implementation's behaviour and callers may read it, so it is
         // reproduced rather than "improved" into a full breakdown.
         sector_anchor_pe: sector_anchor_pe(company.sector_avg_pe),
         rate_adjustment: 1.0,

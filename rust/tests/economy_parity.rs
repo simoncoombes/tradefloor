@@ -1,4 +1,4 @@
-//! Parity for `economy`, against the TypeScript.
+//! Parity for `economy`, against the reference implementation.
 //!
 //! # Why the draws are replayed rather than generated
 //!
@@ -22,7 +22,7 @@
 //! than being rediscovered at every layer above it.
 //!
 //! Vectors: `goldens/economy-*.json`, from
-//! `scripts/rust-port/economy-vectors.ts`, which **asserts** WASM was absent
+//! the reference implementation's economy generator, which **asserts** WASM was absent
 //! (decisions D1–D3 and D5 all select the JS formulas) rather than assuming it.
 //!
 //! # Status under the 2026-08 fork (D-P1)
@@ -109,7 +109,7 @@ impl ScriptedRng {
         if self.at >= self.tape.len() {
             self.problems.push(format!(
                 "{}: asked for draw #{} ({want_kind}) but the tape holds only {} — \
-                 the port takes MORE draws than the TypeScript",
+                 the port takes MORE draws than the reference implementation",
                 self.label,
                 self.at + 1,
                 self.tape.len()
@@ -120,7 +120,8 @@ impl ScriptedRng {
         let d = &self.tape[self.at];
         if d.kind != want_kind {
             self.problems.push(format!(
-                "{}: draw #{} is a '{}' in the TypeScript but the port asked for a '{want_kind}' — \
+                "{}: draw #{} is a '{}' in the reference implementation but the port \
+                 asked for a '{want_kind}' — \
                  same count, different schedule",
                 self.label,
                 self.at + 1,
@@ -137,7 +138,7 @@ impl ScriptedRng {
         if self.at < self.tape.len() {
             self.problems.push(format!(
                 "{}: {} draws left unconsumed ({} of {} taken) — \
-                 the port takes FEWER draws than the TypeScript",
+                 the port takes FEWER draws than the reference implementation",
                 self.label,
                 self.tape.len() - self.at,
                 self.at,
@@ -173,7 +174,7 @@ fn load(name: &str) -> Json {
         .join(name);
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "{}: {e}\nRun: npx tsx scripts/rust-port/economy-vectors.ts",
+            "{}: {e}\nRegenerate from the reference implementation's economy generator",
             path.display()
         )
     });
@@ -522,7 +523,7 @@ fn check_trajectory_mode(file: &str, mode: TrajectoryMode) {
                 game_day: day,
                 // `crisis_vix_threshold` and `vix_mean_reversion` became
                 // parameters after these vectors were generated. `Default`
-                // carries the constants the TypeScript used, so the parity
+                // carries the constants the reference implementation used, so the parity
                 // contract is unchanged by their promotion.
                 ..Default::default()
             },

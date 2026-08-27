@@ -1,6 +1,6 @@
-//! Smoke parity against real TypeScript output.
+//! Smoke parity against real output from the reference implementation.
 //!
-//! These values were produced by running `src/lib/engine/prng.ts` under `tsx`
+//! These values were produced by running the reference implementation's PRNG
 //! and printing raw IEEE-754 bit patterns, not decimals — a decimal comparison
 //! can agree while the underlying doubles differ, which is exactly the failure
 //! this crate must not ship.
@@ -16,7 +16,7 @@
 
 use pretium::GameRng;
 
-/// Parse the `f64` bit patterns emitted by the TypeScript probe.
+/// Parse the `f64` bit patterns emitted by the reference implementation's probe.
 fn f64s(hex_csv: &str) -> Vec<f64> {
     hex_csv
         .split(',')
@@ -39,7 +39,7 @@ fn assert_stream(label: &str, actual: Vec<f64>, expected_hex: &str) {
 }
 
 #[test]
-fn uniform_floats_match_typescript() {
+fn uniform_floats_match_the_reference() {
     let mut rng = GameRng::from_seed(42);
     let got: Vec<f64> = (0..6).map(|_| rng.next_f64()).collect();
     assert_stream(
@@ -50,7 +50,7 @@ fn uniform_floats_match_typescript() {
 }
 
 #[test]
-fn sequence_one_matches_typescript() {
+fn sequence_one_matches_the_reference() {
     let mut rng = GameRng::new(42, 1);
     let got: Vec<f64> = (0..4).map(|_| rng.next_f64()).collect();
     assert_stream(
@@ -61,7 +61,7 @@ fn sequence_one_matches_typescript() {
 }
 
 #[test]
-fn seed_zero_matches_typescript() {
+fn seed_zero_matches_the_reference() {
     let mut rng = GameRng::from_seed(0);
     let got: Vec<f64> = (0..4).map(|_| rng.next_f64()).collect();
     assert_stream(
@@ -74,7 +74,7 @@ fn seed_zero_matches_typescript() {
 /// 2^31 exercises the top bit of the seed, where a sign-extension mistake in
 /// the port would show up.
 #[test]
-fn seed_two_to_the_31_matches_typescript() {
+fn seed_two_to_the_31_matches_the_reference() {
     let mut rng = GameRng::from_seed(2147483648);
     let got: Vec<f64> = (0..4).map(|_| rng.next_f64()).collect();
     assert_stream(
@@ -85,7 +85,7 @@ fn seed_two_to_the_31_matches_typescript() {
 }
 
 #[test]
-fn ranged_ints_match_typescript() {
+fn ranged_ints_match_the_reference() {
     let mut rng = GameRng::from_seed(42);
     let got: Vec<i64> = (0..8).map(|_| rng.next_int(0, 99)).collect();
     assert_eq!(got, vec![70, 84, 29, 69, 97, 99, 66, 90]);
@@ -98,7 +98,7 @@ fn ranged_ints_match_typescript() {
 /// because normal draws feed the GARCH noise term for every company on every
 /// tick, a mismatch here means the whole market diverges.
 #[test]
-fn normal_draws_match_typescript() {
+fn normal_draws_match_the_reference() {
     let mut rng = GameRng::from_seed(42);
     let got: Vec<f64> = (0..6).map(|_| rng.next_normal()).collect();
     assert_stream(

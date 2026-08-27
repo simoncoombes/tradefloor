@@ -6,7 +6,7 @@
 //!
 //! Every parity gate in this crate replays RECORDED draws, isolating the
 //! arithmetic from the generator. This does the opposite: Rust runs its own
-//! generator from the same seed as the TypeScript reference.
+//! generator from the same seed as the reference implementation.
 //!
 //! The two DO disagree at the generator. Measured against this Node build,
 //! **1.586% of normals differ, first at draw 31, by 1 to 2 ULP** -- because
@@ -76,9 +76,9 @@
 //!
 //! The reference generator called `resetDailyPrices(companies)` and DISCARDED
 //! the result -- that function returns a new array rather than mutating. The
-//! TypeScript therefore ran WITHOUT the open reset while Rust called
+//! The reference implementation therefore ran WITHOUT the open reset while Rust called
 //! `open_market()`, and the resulting starting-state mismatch was reported as
-//! a `cos` divergence curve reaching 0.07%. Fixed in `divergence-vectors.ts`.
+//! a `cos` divergence curve reaching 0.07%. Fixed in the divergence vector generator.
 //! The curve was an artefact of the harness, not a property of the port.
 //!
 //! # The second table: what the split prevents
@@ -117,7 +117,7 @@ pub fn load() -> Json {
         .join("goldens/divergence-reference.json");
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "{}: {e}\nRun: npx tsx scripts/rust-port/divergence-vectors.ts",
+            "{}: {e}\nRegenerate from the reference implementation's divergence generator",
             path.display()
         )
     });
@@ -227,7 +227,7 @@ fn tick_request(hour: i64, minute: i64, volatility: f64) -> TickRequest<'static>
 /// Drive the REFERENCE's era: one shared `GameRng(seed, MAIN_STREAM)` fed
 /// through `tick_with`, which consumes it in the pre-split shared-stream
 /// order, settlement's four-or-zero included. Bit-exactly what the pre-split
-/// engine's own `tick()` did, and the only schedule the TypeScript recording
+/// engine's own `tick()` did, and the only schedule the reference implementation recording
 /// can be compared against.
 ///
 /// `extra_draw_at`: before that tick, ONE uniform is taken from the shared

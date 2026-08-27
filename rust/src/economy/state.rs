@@ -1,10 +1,10 @@
-//! Economy state, ported from `src/lib/engine/economy.ts` and
-//! `src/types/economy.ts`.
+//! Economy state, ported from the reference implementation's economy
+//! module and its economy types.
 //!
 //! # What is here, and what is deliberately absent
 //!
 //! Only the fields the price-relevant chain reads or writes. `EconomyState`
-//! in the TypeScript is wider; the omissions are listed in
+//! in the reference implementation is wider; the omissions are listed in
 //! the port notes under WP3 and summarised here:
 //!
 //! - **`derived` / `computeDerivedIndicators`** — a 70-field struct that
@@ -39,7 +39,7 @@ pub const INFLATION_FLOOR: f64 = -1.0;
 ///
 /// **D3, decided:** magnitude `0.20`. The SIGN lives at the use site
 /// (`daily.rs`: `-unemployment_gap * PHILLIPS_CURVE_COEFF`), matching
-/// `economy.ts:718` — so this constant is positive and must stay positive.
+/// the reference implementation — so this constant is positive and must stay positive.
 ///
 /// `wasm/src/economy.rs:9` reads `-0.20` and is
 /// commented "aligned with JS"; only the stale compiled binary in
@@ -144,7 +144,7 @@ impl CyclePhase {
         }
     }
 
-    /// Not `FromStr`: the name is the TypeScript union member, and a failed
+    /// Not `FromStr`: the name is the reference implementation's union member, and a failed
     /// parse is a malformed vector rather than a user input error, so it
     /// returns `Option` rather than a `Result` nobody would read.
     pub fn from_name(name: &str) -> Option<Self> {
@@ -217,7 +217,7 @@ pub fn phase_characteristics(phase: CyclePhase) -> PhaseCharacteristics {
 /// The economy fields the ported chain touches.
 ///
 /// A plain struct of `f64` rather than `Option<f64>` everywhere: the
-/// TypeScript declares most of these as required and reaches for `?? default`
+/// The reference implementation declares most of these as required and reaches for `?? default`
 /// only on the handful that were added later. Those defaults are applied at
 /// construction, so the `??` sites in the original become ordinary reads
 /// here — with one exception noted at [`EconomyState::market_pe`].
@@ -303,7 +303,7 @@ pub struct EconomyState {
 }
 
 /// Options for [`create_initial_economy_state`]. `None` selects the
-/// TypeScript default parameter.
+/// reference-implementation default parameter.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct InitialEconomyOptions {
     pub cycle_phase: Option<CyclePhase>,

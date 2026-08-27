@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased
+
+### Documentation references to the reference implementation were generalised
+
+The engine is a port. Where the documentation said so it also disclosed the
+original's file paths, line numbers, language and build commands, which
+`PRODUCT.md` commits this repository not to do. Those references now say
+"the reference implementation" instead.
+
+Function and symbol names from the original stay: `simulateMarketTick`,
+`updateEconomyDaily` and `calculateLiveFactors` help a maintainer read the
+port and disclose almost nothing. What went is the locators.
+
+**No behavioural change.** No trajectory moved, no preset was touched, and
+no golden vector was edited: 342 Rust tests, 1322 Python tests and the
+46/46 golden verification all pass unchanged.
+
+### The brand commitments are now enforced by a test
+
+`PRODUCT.md` has said since the project began that the repository must not
+reference the commercial product the engine was ported from. Nothing checked
+it, and the checkable parts had drifted: a third-party site brief naming that
+product had been committed to `tools/docs/` and sat in the public repository
+for three days, and eighteen published modules carried the original's file
+paths.
+
+`tests/test_brand_commitments.py` now fails on any of it: the product name,
+origin source paths, origin build commands, and the origin's language outside
+the one sentence about what downstream consumers of the wasm build get. It
+also pins ASCII punctuation on the seven prose surfaces that hold to it, and
+checks both manifests still declare `MIT OR Apache-2.0`.
+
+One of its tests exists to prove the others can fail. The banned strings do
+not appear in this repository by construction, so without it a typo in a
+pattern would leave a guard passing against an empty haystack, which is the
+failure mode the guard was written to prevent. The parity contract is
+untouched, including the rule in `rust/goldens/README.md` that the vectors
+must never be regenerated from the Rust, which survives word for word apart
+from the paths inside it.
+
 ## 0.3.0
 
 ### `pt-v12` is the new default: two years in band, from one number

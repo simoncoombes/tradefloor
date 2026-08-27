@@ -1,5 +1,6 @@
 //! GJR-GARCH(1,1) volatility, extending the GARCH(1,1) ported from
-//! `src/lib/engine/market.ts:36` with a leverage-effect asymmetry term.
+//! the reference implementation's GARCH update, with a leverage-effect
+//! asymmetry term.
 //!
 //! **Tier 1: no transcendentals, no RNG.** A handful of multiplies, one
 //! sign compare, a clamp, and a lookup — held to bit-parity.
@@ -166,7 +167,7 @@ pub fn update_garch_cascade(
         return update_garch_variance_for(
             params, garch_beta, cascade[0], last_daily_return, sector_base_variance);
     }
-    // `mathx::log`, not `f64::ln`. The cascade has no TypeScript reference to
+    // `mathx::log`, not `f64::ln`. The cascade has no reference-implementation counterpart to
     // hold parity with -- it is new mechanism and ships switched off -- but
     // `no_std_transcendentals_outside_mathx` is a rule about the crate, not
     // about the parity corpus, and it caught the first version of this line.
