@@ -19,7 +19,13 @@ BRANCH=dev
 # how much of the engine runs with the GIL released rather than the core
 # count. 64 is eight times the laptop's 8 with headroom left for the serial
 # wall-clock groups that follow.
-WORKERS=190
+# 40, not 190. driven_buckets holds a full pyarrow bar table per job -- 504
+# days x 40 instruments -- where a panel job holds a summary, so it cannot
+# use the worker count the gate launchers inherit. At 190 on a 96-vCPU box
+# the pool died with BrokenProcessPool partway through the first candidate
+# and the run delivered nothing. This is the second resource ceiling in this
+# programme reached by copying a launcher rather than sizing one.
+WORKERS=40
 
 dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
 
