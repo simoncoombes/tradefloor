@@ -341,15 +341,20 @@ def g_rebalance(ctx: Ctx) -> dict:
 
 def g_horizon(ctx: Ctx) -> dict:
     """agents-and-evaluation horizon bullet: on seed 2026 over random(40,7)
-    the Oracle makes $21k in five days and $568k in sixty, and the same
-    momentum agent captures 2.98 against the first denominator and 1.47
-    against the second. Method stated on the page."""
+    the Oracle makes $77.4k in five days and $565.4k in sixty, and the same
+    MEAN-REVERSION agent captures 0.066 against the first denominator and
+    1.18 against the second. Method stated on the page.
+
+    The agent is mean_reversion because that is the agent the page's
+    sentence is about. This measured momentum, left over from an era when
+    the bullet was written about momentum, and reported the horizon captures
+    as MOVED ever since against prose that was correct."""
     u = _u(40, 7)
     out = {}
     for days in (5, 60):
         scores = pt.evaluate(reference_agents(seed=3), seed=2026,
                              universe=u, days=days)
-        out[f"capture_{days}d"] = capture_ratio(scores).get("momentum")
+        out[f"capture_{days}d"] = capture_ratio(scores).get("mean_reversion")
         out[f"oracle_pnl_{days}d"] = scores["oracle"].pnl
     return out
 
