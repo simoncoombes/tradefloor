@@ -31,7 +31,7 @@ authors:
     given-names: Simon
     email: simon@coombes.io
 version: 0.3.0
-date-released: "2026-08-26"
+date-released: "2026-08-27"
 license:
   - MIT
   - Apache-2.0
