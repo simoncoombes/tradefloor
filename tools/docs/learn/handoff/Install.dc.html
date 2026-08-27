@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Install and versioning · pretium</title>
+<meta name="description" content="Install pretium from PyPI or crates.io, and what a version number promises about a published result.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<script src="./pt-search.js"></script>
+<style>
+:root{
+--ground:#FAFBFA;--surface:#F1F4F3;--card:#FFFFFF;
+--line:#D2DBD9;--line-soft:#E3E9E7;
+--ink:#101A18;--ink-2:#3C4A47;--ink-3:#5A6864;
+--accent:#0E6B65;--accent-deep:#0A4F4A;--accent-soft:#DDEEEC;--accent-line:#8FC2BD;
+--chip-bg:#EDF3F2;--chip-line:#CBD9D6;--chip-teal:#CBE7E3;--band:#C9DEDB;
+--red:#8A3A3A;--green:#2F6B4A;--amber:#7A5C2E;
+--header-bg:rgba(250,251,250,0.93);
+}
+html[data-theme="dark"]{
+--ground:#0D1312;--surface:#151D1C;--card:#111917;
+--line:#2B3735;--line-soft:#202B2A;
+--ink:#E5ECEA;--ink-2:#B2C0BD;--ink-3:#8A9895;
+--accent:#5FC9BE;--accent-deep:#8ADDD4;--accent-soft:#10302E;--accent-line:#2E6B65;
+--chip-bg:#14201F;--chip-line:#2B3735;--chip-teal:#173B38;--band:#24413E;
+--red:#E2938E;--green:#7FD3A6;--amber:#D3AC63;
+--header-bg:rgba(13,19,18,0.92);
+}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:'Public Sans',system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-deep);text-decoration:underline}
+::selection{background:var(--accent-soft)}
+p{margin:0 0 0.9rem;text-wrap:pretty}
+h1,h2,h3{margin:0;font-family:'Source Serif 4',ui-serif,Georgia,serif;font-weight:600;letter-spacing:-0.015em;line-height:1.15}
+summary::marker{color:var(--accent-line)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ptmenu > summary::-webkit-details-marker{display:none}
+.ptmenu > summary::marker{content:""}
+.ptmenu > summary:hover{color:var(--ink)}
+
+@media (max-width: 900px){
+  main div{grid-template-columns:1fr !important}
+  header > div{flex-wrap:wrap;row-gap:0.5rem}
+  header nav{order:3;width:100%;gap:1rem !important}
+  h1{font-size:2rem !important}
+  main{padding-left:1.1rem !important;padding-right:1.1rem !important}
+  pre{font-size:0.75rem !important}
+}
+@media (max-width: 620px){
+  header nav{gap:0.8rem !important;font-size:0.8125rem}
+  .ptmenu > div{left:0 !important;right:auto;min-width:min(14rem,80vw) !important}
+  h1{font-size:1.75rem !important}
+  h2{font-size:1.3rem !important}
+  table{font-size:0.75rem}
+  td,th{padding-left:0.55rem !important;padding-right:0.55rem !important}
+  main div > span:first-child{width:auto !important}
+}
+@media (max-width: 460px){
+  header nav{gap:0.7rem !important;font-size:0.75rem}
+  h1{font-size:1.55rem !important}
+  main{padding-left:0.9rem !important;padding-right:0.9rem !important}
+}
+</style>
+</helmet>
+
+<div data-screen-label="Install" style="min-height:100vh;padding:0 0 5rem">
+
+<div style="position:fixed;inset:0;z-index:80;display:{{ searchShow }};align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)" onClick="{{ closeSearch }}">
+<div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden">
+<input type="text" value="{{ searchQuery }}" onInput="{{ setSearchQuery }}" onKeyDown="{{ searchKey }}" placeholder="Search the docs" aria-label="Search the docs" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"></input>
+<div style="max-height:22rem;overflow-y:auto;padding:0.4rem">
+<sc-for list="{{ searchHits }}" as="h" hint-placeholder-count="5">
+<a href="{{ h.href }}" style="display:flex;justify-content:space-between;gap:0.9rem;align-items:baseline;padding:0.55rem 0.7rem;border-radius:6px;background:{{ h.bg }};color:var(--ink)">
+<span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:{{ h.titleCol }}">{{ h.title }}</span>
+<span style="font-size:0.75rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ h.hint }}</span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.06em;color:var(--ink-3);flex:none">{{ h.door }}</span>
+</a>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">
+<span>{{ searchCount }}</span>
+<span>ENTER OPENS, ESC CLOSES</span>
+</div>
+</div>
+</div>
+<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)">
+<div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem">
+<a href="./Learn pretium.dc.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)">
+<img src="./mark-pretium.png" alt="pretium" width="15" height="22" style="display:{{ showLight }};flex:none"></img><img src="./mark-pretium-dark.png" alt="pretium" width="15" height="22" style="display:{{ showDark }};flex:none"></img>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span>
+</a>
+<nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap">
+<details class="ptmenu" style="position:relative">
+<summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--accent);cursor:pointer;list-style:none;padding:0.2rem 0">Start<span style="font-size:0.5rem;color:var(--accent-line)">&#9660;</span></summary>
+<div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60">
+<span style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--accent);background:var(--accent-soft);white-space:nowrap">Install</span>
+<a href="./Running a market.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Running a market</a>
+<a href="./Core concepts.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core concepts</a>
+<a href="./The two loops.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The two loops</a>
+</div>
+</details>
+<details class="ptmenu" style="position:relative">
+<summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Use it<span style="font-size:0.5rem;color:var(--accent-line)">&#9660;</span></summary>
+<div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60">
+<a href="./Agents.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Agents</a>
+<a href="./Scenarios.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Scenarios</a>
+<a href="./Execution cost.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Execution cost</a>
+<a href="./RL environment.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">RL environment</a>
+</div>
+</details>
+<details class="ptmenu" style="position:relative">
+<summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Trust it<span style="font-size:0.5rem;color:var(--accent-line)">&#9660;</span></summary>
+<div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60">
+<a href="./Realism envelope.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Realism envelope</a>
+<a href="./The metrics.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The metrics</a>
+<a href="./Principles.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Principles</a>
+<a href="./Citing a run.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Citing a run</a>
+</div>
+</details>
+<details class="ptmenu" style="position:relative">
+<summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Reference<span style="font-size:0.5rem;color:var(--accent-line)">&#9660;</span></summary>
+<div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60">
+<a href="./Glossary.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Glossary</a>
+<a href="./Conventions.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a>
+<a href="./Schemas.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a>
+<a href="./Presets.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Presets</a>
+</div>
+</details>
+<details class="ptmenu" style="position:relative">
+<summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">API<span style="font-size:0.5rem;color:var(--accent-line)">&#9660;</span></summary>
+<div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60">
+<a href="./Core types.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a>
+<a href="./Evaluate.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a>
+<a href="./Parameters.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a>
+<a href="./The MCP server.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">MCP server</a>
+</div>
+</details>
+</nav>
+<span style="flex:1"></span>
+<button onClick="{{ openSearch }}" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">{{ searchKeyHint }}</span></button>
+<button onClick="{{ toggleTheme }}" aria-label="{{ themeLabel }}" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer">{{ themeGlyph }}</button>
+</div>
+</header>
+
+<main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="./Learn pretium.dc.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">INSTALL</span>
+</div>
+
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.3rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Install</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">One command, and no dependencies. Prebuilt wheels cover Linux, macOS and Windows on CPython 3.11 and up.</p>
+
+<div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+<sc-for list="{{ targets }}" as="t" hint-placeholder-count="3">
+<button onClick="{{ t.pick }}" style="display:flex;align-items:center;gap:0.5rem;font-family:'Public Sans',sans-serif;font-size:0.8125rem;padding:0.45rem 0.8rem;border-radius:6px;cursor:pointer;border:1px solid {{ t.border }};background:{{ t.bg }};color:{{ t.fg }}">
+<img src="{{ t.logoLight }}" alt="" width="14" height="14" style="display:{{ showLight }};flex:none"></img><img src="{{ t.logoDark }}" alt="" width="14" height="14" style="display:{{ showDark }};flex:none"></img>{{ t.label }}
+</button>
+</sc-for>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
+<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">{{ install.code }}</pre>
+<div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
+<h3 style="font-size:1.0625rem;margin:0">{{ install.title }}</h3>
+<sc-for list="{{ install.facts }}" as="f" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">{{ f.k }}</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">{{ f.v }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+
+<section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<h2 style="font-size:1.5rem">What a version promises</h2>
+<p style="color:var(--ink-2);margin:0">The API can still move before 1.0. A published result can not. A change to a simulated trajectory arrives as a new preset with a new name. It is never an edit to a preset that ships. A run that you cited last month therefore reproduces this month.</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem">
+<sc-for list="{{ promises }}" as="p" hint-placeholder-count="3">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
+<h3 style="font-size:1.0625rem;margin:0">{{ p.head }}</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">{{ p.body }}</p>
+</div>
+</sc-for>
+</div>
+</section>
+
+<section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<h2 style="font-size:1.5rem">The determinism check</h2>
+<p style="color:var(--ink-2);margin:0">Every release builds five targets, runs one fixed simulation inside each, and compares the digests. A disagreement stops the release. This is why the crate ships its own <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">exp</span>, <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">log</span>, <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">sin</span> and <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">cos</span> The crate does not call the platform libm, because the platform libm does not agree with itself across operating systems.</p>
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0">
+<sc-for list="{{ wheels }}" as="w" hint-placeholder-count="5">
+<div style="padding:0.85rem 0.95rem;border-right:1px solid var(--line-soft);display:flex;flex-direction:column;gap:0.35rem">
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-2)">{{ w }}</span>
+<span style="display:flex;align-items:center;gap:0.3rem;font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:var(--green)"><span style="width:7px;height:7px;border-radius:50%;background:var(--green);flex:none"></span>digests match</span>
+</div>
+</sc-for>
+</div>
+<div style="padding:0.65rem 0.95rem;border-top:1px solid var(--line-soft);background:var(--surface);font-size:0.8125rem;color:var(--ink-2)">A person does a check of the WebAssembly build by hand, because it needs a toolchain that CI does not carry. On 2026-08-24 the native and wasm32 builds hashed the same fixed simulation, twelve instruments over five days on pt-v3, to <span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem">2b2f3141...</span></div>
+</div>
+</section>
+
+<section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:0.9rem">
+<h2 style="font-size:1.5rem">Presets and the era boundary</h2>
+<p style="color:var(--ink-2);margin:0">Twelve presets ship, <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">pt-v1</span> through <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">pt-v12</span>. You can select all of them, and all of them reproduce bit for bit.</p>
+<div style="display:flex;gap:3px;align-items:flex-end;padding:0.3rem 0 0">
+<sc-for list="{{ presets }}" as="p" hint-placeholder-count="12">
+<div style="flex:1;display:flex;flex-direction:column;gap:4px;align-items:center">
+<span style="width:100%;height:{{ p.h }};border-radius:3px 3px 0 0;background:{{ p.col }}"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:{{ p.label }}">{{ p.n }}</span>
+</div>
+</sc-for>
+</div>
+<p style="color:var(--ink-2);margin:0.4rem 0 0">pt-v12 became the default on 2026-08-26. That date is an era boundary, because every trajectory from the default changed. You can not compare a run from before that date to a run from after it, unless each run names its preset.</p>
+
+<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+<summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--ink)">What fully specifies a run</summary>
+<div style="padding:0 0.9rem 0.9rem;border-top:1px solid var(--line-soft);padding-top:0.7rem">
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Package version, model preset, universe fingerprint, and seed. The preset pins the coefficients. The package version pins the implementation. This is measured, not asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
+</div>
+</details>
+</section>
+
+<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem">
+<h2 style="font-size:1.25rem">All pages</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem">
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Start</span>
+<div style="display:flex;flex-direction:column;gap:0.3rem">
+<span style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--accent)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;flex:none">&gt;</span><span style="white-space:nowrap">Install</span></span>
+<a href="./Running a market.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Running a market</span></a>
+<a href="./Core concepts.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Core concepts</span></a>
+<a href="./The two loops.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The two loops</span></a>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Use it</span>
+<div style="display:flex;flex-direction:column;gap:0.3rem">
+<a href="./Agents.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Agents</span></a>
+<a href="./Scenarios.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Scenarios</span></a>
+<a href="./Execution cost.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Execution cost</span></a>
+<a href="./RL environment.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">RL environment</span></a>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Trust it</span>
+<div style="display:flex;flex-direction:column;gap:0.3rem">
+<a href="./Realism envelope.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Realism envelope</span></a>
+<a href="./The metrics.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The metrics</span></a>
+<a href="./Principles.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Principles</span></a>
+<a href="./Citing a run.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Citing a run</span></a>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Reference</span>
+<div style="display:flex;flex-direction:column;gap:0.3rem">
+<a href="./Glossary.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Glossary</span></a>
+<a href="./Conventions.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Conventions</span></a>
+<a href="./Schemas.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Schemas</span></a>
+<a href="./Presets.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Presets</span></a>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">API</span>
+<div style="display:flex;flex-direction:column;gap:0.3rem">
+<a href="./Core types.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Core types</span></a>
+<a href="./Evaluate.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Evaluate</span></a>
+<a href="./Parameters.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Parameters</span></a>
+<a href="./The MCP server.dc.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">MCP server</span></a>
+</div>
+</div>
+</div>
+</section>
+
+<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem">
+<a href="./Learn pretium.dc.html" style="display:flex;flex-direction:column;gap:2px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span>
+<span>Learn pretium</span>
+</a>
+<a href="./Running a market.dc.html" style="display:flex;flex-direction:column;gap:2px;text-align:right">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span>
+<span>Running a market</span>
+</a>
+</nav>
+</main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180}}">
+class Component extends DCLogic {
+  state = { dark: false, target: 'py' , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+
+    // One menu open at a time, and a click anywhere else closes them.
+    // <details> has no such behaviour on its own.
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) {
+        if (all[i] !== inside) all[i].removeAttribute('open');
+      }
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const t = this.state.target;
+    const INSTALL = {
+      py: {
+        code: 'pip install pretium\n\npython -c "import pretium as pt; \\\n  print(pt.__version__)"',
+        title: 'From PyPI',
+        facts: [
+          { k: 'No dependencies', v: 'The core package pulls nothing in. Read results into polars, pandas, pyarrow or duckdb if you want them.' },
+          { k: 'CPython 3.11 and up', v: 'Prebuilt wheels for Linux x86_64 and aarch64, macOS arm64 and x86_64, and Windows x86_64.' },
+          { k: 'Rust core', v: 'The engine is compiled. Nothing here is a Python loop over ticks.' }
+        ]
+      },
+      rs: {
+        code: 'cargo add pretium\n\n# https://crates.io/crates/pretium',
+        title: 'From crates.io',
+        facts: [
+          { k: 'No Python needed', v: 'The engine is published as a Rust crate and runs on its own.' },
+          { k: 'Same source, same version', v: 'Both packages are built from one source at the same version, and run the same market.' },
+          { k: 'Also compiles to wasm', v: 'The wasm32 target runs in a browser, checked by hand against the native build.' }
+        ]
+      },
+      mcp: {
+        code: 'pip install "pretium[mcp]"\n\nclaude mcp add pretium -- pretium-mcp',
+        title: 'For an agent',
+        facts: [
+          { k: 'Eleven read-only tools', v: 'A model can ask whether a strategy beats buy-and-hold here, and whether the difference is real.' },
+          { k: 'Everything is data', v: 'Strategies, universes and scenarios are composed as data. There is no path from a tool argument to code execution.' },
+          { k: 'Caveats travel with results', v: 'Every result carries computed caveats and full provenance, because the model has the tool output and nothing else.' }
+        ]
+      }
+    };
+    const pill = (on) => on
+      ? { border: 'var(--accent-line)', bg: 'var(--accent-soft)', fg: 'var(--accent-deep)' }
+      : { border: 'var(--line)', bg: 'var(--card)', fg: 'var(--ink-2)' };
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      markLogo: dark ? './mark-pretium-dark.png' : './mark-pretium.png',
+      showLight: this.state.dark ? 'none' : 'block',
+      showDark: this.state.dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      install: INSTALL[t],
+      targets: [
+        ['py', 'Python', './logo-python.png', './logo-python-dark.png'],
+        ['rs', 'Rust', './logo-rust.png', './logo-rust-dark.png'],
+        ['mcp', 'MCP', './mark-pretium.png', './mark-pretium-dark.png']
+      ].map(([k, label, light, darkSrc]) => {
+        const p = pill(t === k);
+        return { label: label, logoLight: light, logoDark: darkSrc,
+          border: p.border, bg: p.bg, fg: p.fg,
+          pick: () => this.setState({ target: k }) };
+      }),
+      promises: [
+        { head: 'A trajectory change is a breaking change',
+          body: 'Whatever its size. A market that runs differently from the same seed invalidates every published result that cited it.' },
+        { head: 'Old presets never move',
+          body: 'Every preset from pt-v1 onward stays selectable and reproduces bit for bit, so an old result replays under its own name.' },
+        { head: 'A citation names software, not a run',
+          body: 'A RunManifest names the run: package version, preset, seed, universe fingerprint, macro conditions, scenario and strategy.' }
+      ],
+      wheels: ['linux-x86_64', 'linux-aarch64', 'macos-arm64', 'macos-x86_64', 'windows-x86_64'],
+      presets: Array.from({ length: 12 }, (_, i) => {
+        const n = i + 1;
+        const current = n === 12;
+        return { n: 'v' + n, h: (12 + i * 3) + 'px',
+          col: current ? 'var(--accent)' : 'var(--band)',
+          label: current ? 'var(--accent)' : 'var(--ink-3)' };
+      })
+    });
+  }
+}
+
+</script>
+</body>
+</html>

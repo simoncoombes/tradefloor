@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Schemas · pretium</title>
+<meta name="description" content="Every column of the five Arrow tables, the constructor fields, and where each call refuses rather than guesses.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<script src="./pt-search.js"></script>
+<style>
+:root{
+--ground:#FAFBFA;--surface:#F1F4F3;--card:#FFFFFF;
+--line:#D2DBD9;--line-soft:#E3E9E7;
+--ink:#101A18;--ink-2:#3C4A47;--ink-3:#5A6864;
+--accent:#0E6B65;--accent-deep:#0A4F4A;--accent-soft:#DDEEEC;--accent-line:#8FC2BD;
+--chip-bg:#EDF3F2;--chip-line:#CBD9D6;--chip-teal:#CBE7E3;--band:#C9DEDB;
+--red:#8A3A3A;--green:#2F6B4A;--amber:#7A5C2E;
+--header-bg:rgba(250,251,250,0.93);
+}
+html[data-theme="dark"]{
+--ground:#0D1312;--surface:#151D1C;--card:#111917;
+--line:#2B3735;--line-soft:#202B2A;
+--ink:#E5ECEA;--ink-2:#B2C0BD;--ink-3:#8A9895;
+--accent:#5FC9BE;--accent-deep:#8ADDD4;--accent-soft:#10302E;--accent-line:#2E6B65;
+--chip-bg:#14201F;--chip-line:#2B3735;--chip-teal:#173B38;--band:#24413E;
+--red:#E2938E;--green:#7FD3A6;--amber:#D3AC63;
+--header-bg:rgba(13,19,18,0.92);
+}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:'Public Sans',system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-deep);text-decoration:underline}
+::selection{background:var(--accent-soft)}
+p{margin:0 0 0.9rem;text-wrap:pretty}
+h1,h2,h3{margin:0;font-family:'Source Serif 4',ui-serif,Georgia,serif;font-weight:600;letter-spacing:-0.015em;line-height:1.15}
+input{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ptmenu > summary::-webkit-details-marker{display:none}
+.ptmenu > summary::marker{content:""}
+.ptmenu > summary:hover{color:var(--ink)}
+
+@media (max-width: 900px){
+  main div{grid-template-columns:1fr !important}
+  header > div{flex-wrap:wrap;row-gap:0.5rem}
+  header nav{order:3;width:100%;gap:1rem !important}
+  h1{font-size:2rem !important}
+  main{padding-left:1.1rem !important;padding-right:1.1rem !important}
+  pre{font-size:0.75rem !important}
+}
+@media (max-width: 620px){
+  header nav{gap:0.8rem !important;font-size:0.8125rem}
+  .ptmenu > div{left:0 !important;right:auto;min-width:min(14rem,80vw) !important}
+  h1{font-size:1.75rem !important}
+  h2{font-size:1.3rem !important}
+  table{font-size:0.75rem}
+  td,th{padding-left:0.55rem !important;padding-right:0.55rem !important}
+  main div > span:first-child{width:auto !important}
+}
+@media (max-width: 460px){
+  header nav{gap:0.7rem !important;font-size:0.75rem}
+  h1{font-size:1.55rem !important}
+  main{padding-left:0.9rem !important;padding-right:0.9rem !important}
+}
+</style>
+</helmet>
+
+<div data-screen-label="Schemas" style="min-height:100vh;padding:0 0 5rem">
+
+<div style="position:fixed;inset:0;z-index:80;display:{{ searchShow }};align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)" onClick="{{ closeSearch }}">
+<div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden">
+<input type="text" value="{{ searchQuery }}" onInput="{{ setSearchQuery }}" onKeyDown="{{ searchKey }}" placeholder="Search the docs" aria-label="Search the docs" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"></input>
+<div style="max-height:22rem;overflow-y:auto;padding:0.4rem">
+<sc-for list="{{ searchHits }}" as="h" hint-placeholder-count="5">
+<a href="{{ h.href }}" style="display:flex;justify-content:space-between;gap:0.9rem;align-items:baseline;padding:0.55rem 0.7rem;border-radius:6px;background:{{ h.bg }};color:var(--ink)">
+<span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:{{ h.titleCol }}">{{ h.title }}</span>
+<span style="font-size:0.75rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ h.hint }}</span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.06em;color:var(--ink-3);flex:none">{{ h.door }}</span>
+</a>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">
+<span>{{ searchCount }}</span>
+<span>ENTER OPENS, ESC CLOSES</span>
+</div>
+</div>
+</div>
+<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)">
+<div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem">
+<a href="./Learn pretium.dc.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)">
+<img src="./mark-pretium.png" alt="pretium" width="15" height="22" style="display:{{ showLight }};flex:none"></img><img src="./mark-pretium-dark.png" alt="pretium" width="15" height="22" style="display:{{ showDark }};flex:none"></img>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span>
+</a>
+<nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap">
+<sc-for list="{{ nav }}" as="d" hint-placeholder-count="5">
+<details class="ptmenu" style="position:relative">
+<summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:{{ d.col }};cursor:pointer;list-style:none;padding:0.2rem 0">{{ d.title }}<span style="font-size:0.5rem;color:var(--accent-line)">&#9660;</span></summary>
+<div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60">
+<sc-for list="{{ d.links }}" as="l" hint-placeholder-count="4">
+<a href="{{ l.href }}" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:{{ l.col }};background:{{ l.bg }};white-space:nowrap">{{ l.label }}</a>
+</sc-for>
+</div>
+</details>
+</sc-for>
+</nav>
+<span style="flex:1"></span>
+<button onClick="{{ openSearch }}" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">{{ searchKeyHint }}</span></button>
+<button onClick="{{ toggleTheme }}" aria-label="{{ themeLabel }}" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer">{{ themeGlyph }}</button>
+</div>
+</header>
+
+<main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="./Learn pretium.dc.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">SCHEMAS</span>
+</div>
+
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Schemas</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Every column of the five tables, and the fields you construct a run from. Every numeric column is float64.</p>
+
+<div style="display:flex;gap:0.4rem;flex-wrap:wrap">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="7">
+<button onClick="{{ t.pick }}" style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.4rem 0.7rem;border-radius:5px;cursor:pointer;border:1px solid {{ t.border }};background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+</sc-for>
+</div>
+</section>
+
+<section style="padding:1.5rem 0 0;display:flex;flex-direction:column;gap:0.9rem">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
+<h2 style="font-size:1.5rem">{{ table.title }}</h2>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">{{ table.grain }}</span>
+</div>
+<p style="color:var(--ink-2);margin:0">{{ table.lede }}</p>
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<div style="overflow-x:auto;transition:opacity 0.13s ease;opacity:{{ fade }}">
+<table style="width:100%;border-collapse:collapse">
+<thead>
+<tr>
+<th style="text-align:left;font:500 0.625rem/1.3 'Spline Sans Mono',monospace;letter-spacing:0.06em;color:var(--ink-3);padding:0.55rem 0.95rem;border-bottom:1px solid var(--line);border-right:1px solid var(--line-soft);white-space:nowrap">column</th>
+<th style="text-align:left;font:500 0.625rem/1.3 'Spline Sans Mono',monospace;letter-spacing:0.06em;color:var(--ink-3);padding:0.55rem 0.95rem;border-bottom:1px solid var(--line);border-right:1px solid var(--line-soft);white-space:nowrap">type</th>
+<th style="text-align:left;font:500 0.625rem/1.3 'Spline Sans Mono',monospace;letter-spacing:0.06em;color:var(--ink-3);padding:0.55rem 0.95rem;border-bottom:1px solid var(--line)">what it is</th>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{ table.rows }}" as="r" hint-placeholder-count="8">
+<tr>
+<td style="padding:0.45rem 0.95rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--accent);vertical-align:top">{{ r.c }}</td>
+<td style="padding:0.45rem 0.95rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:var(--ink-3);vertical-align:top;white-space:nowrap">{{ r.t }}</td>
+<td style="padding:0.45rem 0.95rem;border-bottom:1px solid var(--line-soft);font-size:0.8125rem;color:var(--ink-2);vertical-align:top">{{ r.d }}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+<div style="padding:0.65rem 0.95rem;border-top:1px solid var(--line-soft);background:var(--surface);font-size:0.8125rem;color:var(--ink-2)">{{ table.note }}</div>
+</div>
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h2 style="font-size:1.5rem">Where a call refuses</h2>
+<p style="color:var(--ink-2);margin:0">Each of these raises rather than returning a number it can not support. The list is the shape of the library's judgment about its own limits.</p>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<sc-for list="{{ refusals }}" as="r" hint-placeholder-count="8">
+<div style="display:grid;grid-template-columns:minmax(0,12rem) minmax(0,1fr);gap:0.9rem;padding:0.5rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">{{ r.k }}</span>
+<span style="font-size:0.8125rem;color:var(--ink-2)">{{ r.v }}</span>
+</div>
+</sc-for>
+</div>
+</section>
+
+<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem">
+<h2 style="font-size:1.25rem">All pages</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem">
+<sc-for list="{{ nav }}" as="d" hint-placeholder-count="5">
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">{{ d.title }}</span>
+<div style="display:flex;flex-direction:column;gap:0.3rem">
+<sc-for list="{{ d.links }}" as="l" hint-placeholder-count="4">
+<a href="{{ l.href }}" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:{{ l.col }}"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">{{ l.label }}</span></a>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem">
+<a href="./Conventions.dc.html" style="display:flex;flex-direction:column;gap:2px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span>
+<span>Conventions</span>
+</a>
+<a href="./Presets.dc.html" style="display:flex;flex-direction:column;gap:2px;text-align:right">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span>
+<span>Presets</span>
+</a>
+</nav>
+</main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180}}">
+class Component extends DCLogic {
+  state = { dark: false, tab: 'bars', fade: 1 , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) if (all[i] !== inside) all[i].removeAttribute('open');
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+    if (this.tt) clearTimeout(this.tt);
+  }
+
+  swapTab(k) {
+    if (k === this.state.tab) return;
+    if (this.tt) clearTimeout(this.tt);
+    this.setState({ fade: 0 });
+    this.tt = setTimeout(() => { this.tt = null; this.setState({ tab: k, fade: 1 }); }, 130);
+  }
+
+  DOORS = [
+    ['Start', [['Install', './Install.dc.html'], ['Running a market', './Running a market.dc.html'], ['Core concepts', './Core concepts.dc.html'], ['The two loops', './The two loops.dc.html']]],
+    ['Use it', [['Agents', './Agents.dc.html'], ['Scenarios', './Scenarios.dc.html'], ['Execution cost', './Execution cost.dc.html'], ['RL environment', './RL environment.dc.html']]],
+    ['Trust it', [['Realism envelope', './Realism envelope.dc.html'], ['The metrics', './The metrics.dc.html'], ['Principles', './Principles.dc.html'], ['Citing a run', './Citing a run.dc.html']]],
+    ['Reference', [['Glossary', './Glossary.dc.html'], ['Conventions', './Conventions.dc.html'], ['Schemas', './Schemas.dc.html'], ['Presets', './Presets.dc.html']]],
+    ['API', [['Core types', './Core types.dc.html'], ['Evaluate', './Evaluate.dc.html'], ['Parameters', './Parameters.dc.html'], ['MCP server', './The MCP server.dc.html']]]
+  ];
+
+  TABLES = {
+    bars: { title: 'bars', grain: 'engine.bars(grain="day" or "tick")',
+      lede: 'OHLCV per instrument. This is the table a historical backtest would also give you.',
+      note: 'Day grain carries open, high, low and bar. Tick grain carries tick instead, and a tick is one minute of the 390 in a session.',
+      rows: [
+        { c: 'day', t: 'uint32', d: 'Day index.' },
+        { c: 'tick', t: 'uint32', d: 'Tick index. A tick is a minute, and there are 390 in a day. Tick grain only.' },
+        { c: 'bar', t: 'uint32', d: 'Bar index within the day. Day grain only.' },
+        { c: 'instrument_id', t: 'uint32', d: 'Roster index.' },
+        { c: 'open · high · low', t: 'float64', d: 'Day grain only.' },
+        { c: 'close', t: 'float64', d: 'What the book actually settled.' },
+        { c: 'volume', t: 'float64', d: 'Shares.' }
+      ] },
+    truth: { title: 'truth', grain: 'engine.truth()',
+      lede: 'One row per instrument per tick. This is the table no market data feed can supply, because it reports what the simulator decided rather than what a tape observed.',
+      note: 'The nine factors sum to the change in mispricing_s, with a worst residual of 1.9e-16 over the 39,000 rows of a 20-name 5-day run. Anything larger means the join is wrong: sorting tick without day takes that same run to 0.149.',
+      rows: [
+        { c: 'day · tick · instrument_id', t: 'uint32', d: 'Keys.' },
+        { c: 'mispricing_s', t: 'float64', d: 'Log gap between price and fair value.' },
+        { c: 'fundamental_value', t: 'float64', d: 'What the company is worth: earnings, growth, the sector anchor, rates. No mispricing in it.' },
+        { c: 'anchor_price', t: 'float64', d: 'fundamental_value times exp(mispricing_s): the price the model wanted before the book touched it. So close minus anchor_price isolates microstructure, and mispricing_s isolates the valuation gap.' },
+        { c: 'reversion', t: 'float64', d: 'Pull back toward fair value. A model dynamic, not a shock.' },
+        { c: 'momentum', t: 'float64', d: 'The herding term. A model dynamic, and the one real markets have no equivalent for.' },
+        { c: 'crowd_lean', t: 'float64', d: 'The crowd buying below fair value and selling above it, capped at 0.02 in log price.' },
+        { c: 'company_news', t: 'float64', d: 'Per-name news shocks.' },
+        { c: 'order_flow_impact', t: 'float64', d: 'The permanent share of order flow, 0.35 of the total impact coefficient of 50.0.' },
+        { c: 'short_squeeze_effect', t: 'float64', d: 'Fires when short interest against the float crosses the squeeze threshold.' },
+        { c: 'random_noise', t: 'float64', d: 'Market component times the crash amplifier, plus sector, plus idiosyncratic, summed into one column. truth can not separate the three.' },
+        { c: 'circuit_breaker', t: 'float64', d: 'Books the rewrite when the model price leaves the session band. Omit it and the sum misses that correction on any day the breaker binds.' },
+        { c: 'jump', t: 'float64', d: 'Applied after the tick loop. Dropping it takes the worst residual from 1.9e-16 to 0.090 on a run carrying one jump row in 39,000.' }
+      ] },
+    macro: { title: 'macro', grain: 'engine.macro_table()',
+      lede: 'The economy, day by day. Not the same field set as the Macro object you construct the engine with, which is worth knowing before you reach for the wrong one.',
+      note: 'unemployment_rate, gdp_growth and universe_stress live only in the table. cycle lives only on Macro. The row carries the values the day traded under, and the close then advances the chain.',
+      rows: [
+        { c: 'day', t: 'uint32', d: 'Day index.' },
+        { c: 'vix', t: 'float64', d: 'Takes a new value on almost every day: 118 distinct values over a 120-day run.' },
+        { c: 'federal_funds_rate', t: 'float64', d: 'Fractional, so 0.025 is 2.5 percent. Steps at the central bank meeting calendar.' },
+        { c: 'corporate_bond_yield', t: 'float64', d: 'What equities discount off.' },
+        { c: 'inflation_rate · unemployment_rate · gdp_growth', t: 'float64', d: 'The Taylor, Phillips and Okun loop\u0027s state.' },
+        { c: 'qe_pe_boost', t: 'float64', d: 'Valuation support from policy.' },
+        { c: 'fear_greed_index', t: 'float64', d: 'Sentiment level.' },
+        { c: 'universe_stress', t: 'float64', d: 'Remembered stress. It ratchets up on a shock and decays over weeks, which is what keeps correlation elevated after an event.' }
+      ] },
+    fills: { title: 'fills', grain: 'one row per fill',
+      lede: 'What you asked for against what you got, and how far you walked the book to get it.',
+      note: 'worst_price minus price is the cost of size on that order. No slippage formula produced it: the order consumed real levels.',
+      rows: [
+        { c: 'day · step · tick · instrument_id', t: 'uint32', d: 'When and what. step is the run-wide decision index, not a per-day counter.' },
+        { c: 'quantity', t: 'float64', d: 'Shares. Signed.' },
+        { c: 'price', t: 'float64', d: 'Average fill price.' },
+        { c: 'worst_price', t: 'float64', d: 'The worst level you reached. The distance from price is how far you walked the book.' },
+        { c: 'notional', t: 'float64', d: 'Traded value.' }
+      ] },
+    book: { title: 'book', grain: 'engine.book(ticker)',
+      lede: 'The resting quotes, level by level. A detached snapshot, so reading it leaves prices() byte-identical to the run that never traded.',
+      note: 'level is the depth index from the touch, so level 0 is the best quote on that side.',
+      rows: [
+        { c: 'day · tick · instrument_id', t: 'uint32', d: 'Keys.' },
+        { c: 'side', t: 'uint32', d: 'Bid or ask.' },
+        { c: 'level', t: 'uint32', d: 'Depth index from the touch.' },
+        { c: 'price · size', t: 'float64', d: 'The resting quote.' }
+      ] },
+    instrument: { title: 'Instrument', grain: 'constructor fields',
+      lede: 'One tradable company. Ticker and sector are positional, the rest are keyword-only.',
+      note: 'market_cap is derived and read-only. eps of None marks a loss-maker, which is valued off book value and never reprices on rates.',
+      rows: [
+        { c: 'initial_price', t: 'float64', d: 'Day-zero price.' },
+        { c: 'shares_outstanding', t: 'float64', d: 'Share count. With price, this gives market_cap.' },
+        { c: 'eps', t: 'float64 or None', d: 'Earnings per share, or None for a loss-maker.' },
+        { c: 'book_value_per_share', t: 'float64', d: 'Balance-sheet value per share.' },
+        { c: 'revenue_growth', t: 'float64', d: 'Growth rate, fractional.' },
+        { c: 'avg_volume', t: 'float64', d: 'Average daily volume. Held fixed through a run, and what participation is measured against.' },
+        { c: 'beta', t: 'float64', d: 'Loading on the shared market factor.' },
+        { c: 'short_interest', t: 'float64', d: 'A share count, not a fraction. Values strictly between 0 and 1 are refused for a company with a real share count.' },
+        { c: 'market_cap', t: 'float64', d: 'Derived, read-only.' }
+      ] },
+    spec: { title: 'StrategySpec', grain: 'the JSON grammar',
+      lede: 'Four dimensions repeat across every shipped baseline: a signal, a concentration, an exposure and a participation cap.',
+      note: 'signal.kind is one of hold, random, momentum, mean_reversion, oracle or blend. hold and random refuse top_k, because one owns the whole roster and the other weights every name.',
+      rows: [
+        { c: 'signal.lookback_days', t: 'float64', d: 'On momentum and mean_reversion. Days only, never steps, because a step is a harness artifact. Default 1.0.' },
+        { c: 'signal.components', t: 'list', d: 'On blend: a list of kind, weight and optional lookback_days. Ranks combine first, then top_k selects from the blended ranking.' },
+        { c: 'portfolio.top_k', t: 'int', d: 'How many names to hold. Ranked kinds only. Default 5.' },
+        { c: 'portfolio.gross', t: 'float64', d: 'Gross exposure. Default 1.0, or 0.5 for random.' },
+        { c: 'execution.max_participation', t: 'float64', d: 'Cap on any order as a fraction of average daily volume. Default 0.02, or 0.05 for hold.' },
+        { c: 'execution.cadence', t: 'str', d: '"step" re-decides at every decision point. "daily" only at each day\u0027s first step. hold must be "step".' },
+        { c: 'seed', t: 'int or None', d: 'Required when the signal contains random, and refused otherwise.' }
+      ] }
+  };
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const self = './Schemas.dc.html';
+    const tab = this.state.tab;
+    const pill = (on) => on
+      ? { border: 'var(--accent-line)', bg: 'var(--accent-soft)', fg: 'var(--accent-deep)' }
+      : { border: 'var(--line)', bg: 'var(--card)', fg: 'var(--ink-2)' };
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      showLight: dark ? 'none' : 'block',
+      showDark: dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      fade: this.state.fade === 0 ? '0' : '1',
+      nav: this.DOORS.map(([title, links]) => ({
+        title: title,
+        col: links.some(l => l[1] === self) ? 'var(--accent)' : 'var(--ink-2)',
+        links: links.map(([label, href]) => ({
+          label: label, href: href,
+          col: href === self ? 'var(--accent)' : 'var(--ink-2)',
+          bg: href === self ? 'var(--accent-soft)' : 'transparent'
+        }))
+      })),
+      tabs: ['bars', 'truth', 'macro', 'fills', 'book', 'instrument', 'spec'].map(k => {
+        const p = pill(tab === k);
+        return { label: this.TABLES[k].title, border: p.border, bg: p.bg, fg: p.fg,
+          pick: () => this.swapTab(k) };
+      }),
+      table: this.TABLES[tab],
+      refusals: [
+        { k: 'envelope.intervals', v: 'Fewer than two panels. A spread over one observation is not a spread.' },
+        { k: 'atlas.plan', v: 'Fewer than 8 samples.' },
+        { k: 'Survey.sensitivity', v: 'Fewer than 8 usable rows, or an output no row measured.' },
+        { k: 'Survey.profile', v: 'Fewer than three rows per bin.' },
+        { k: 'Survey.attribution', v: 'A vector value outside the surveyed range, a parameter set on one side only, or a parameter that was not surveyed.' },
+        { k: 'Survey.confirm', v: 'Any seed shared with the survey or between blocks, and a survey with no seed record at all. An empty list is the absence of a record wearing the key.' },
+        { k: 'ModelParams.from_preset', v: 'An override of a compile-time constant, by name. Accepting one the engine would ignore would make the fingerprint a lie.' },
+        { k: 'Scenario', v: 'Chaining a shape constructor onto a built scenario, or a compare() baseline that realises the same path as the scenario.' },
+        { k: 'RunManifest.reproduce', v: 'A build whose arithmetic does not match the manifest\u0027s. It names the culprit rather than replaying a different market.' },
+        { k: 'Checkpoint restore', v: 'A pre-split snapshot with three RNG numbers instead of nine, naming the era. It can not be continued bit-exactly.' },
+        { k: 'Instrument', v: 'A short_interest between 0 and 1 on a real share count, and an unknown sector key.' },
+        { k: 'loss.band_distance_loss', v: 'A missing or zero noise scale. An unweighted sum is a choice, and it will not happen by accident.' }
+      ]
+    });
+  }
+}
+
+</script>
+</body>
+</html>

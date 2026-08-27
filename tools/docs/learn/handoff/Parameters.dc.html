@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Parameters · pretium</title>
+<meta name="description" content="What ModelParams exposes: 87 settable names, 118 visible entries, and why the gap between them exists.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<script src="./pt-search.js"></script>
+<style>
+:root{
+--ground:#FAFBFA;--surface:#F1F4F3;--card:#FFFFFF;
+--line:#D2DBD9;--line-soft:#E3E9E7;
+--ink:#101A18;--ink-2:#3C4A47;--ink-3:#5A6864;
+--accent:#0E6B65;--accent-deep:#0A4F4A;--accent-soft:#DDEEEC;--accent-line:#8FC2BD;
+--chip-bg:#EDF3F2;--chip-line:#CBD9D6;--chip-teal:#CBE7E3;--band:#C9DEDB;
+--red:#8A3A3A;--green:#2F6B4A;--amber:#7A5C2E;
+--header-bg:rgba(250,251,250,0.93);
+}
+html[data-theme="dark"]{
+--ground:#0D1312;--surface:#151D1C;--card:#111917;
+--line:#2B3735;--line-soft:#202B2A;
+--ink:#E5ECEA;--ink-2:#B2C0BD;--ink-3:#8A9895;
+--accent:#5FC9BE;--accent-deep:#8ADDD4;--accent-soft:#10302E;--accent-line:#2E6B65;
+--chip-bg:#14201F;--chip-line:#2B3735;--chip-teal:#173B38;--band:#24413E;
+--red:#E2938E;--green:#7FD3A6;--amber:#D3AC63;
+--header-bg:rgba(13,19,18,0.92);
+}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:'Public Sans',system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-deep);text-decoration:underline}
+::selection{background:var(--accent-soft)}
+p{margin:0 0 0.9rem;text-wrap:pretty}
+h1,h2,h3{margin:0;font-family:'Source Serif 4',ui-serif,Georgia,serif;font-weight:600;letter-spacing:-0.015em;line-height:1.15}
+input{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ptmenu > summary::-webkit-details-marker{display:none}
+.ptmenu > summary::marker{content:""}
+.ptmenu > summary:hover{color:var(--ink)}
+
+@media (max-width: 900px){
+  main div{grid-template-columns:1fr !important}
+  header > div{flex-wrap:wrap;row-gap:0.5rem}
+  header nav{order:3;width:100%;gap:1rem !important}
+  h1{font-size:2rem !important}
+  main{padding-left:1.1rem !important;padding-right:1.1rem !important}
+  pre{font-size:0.75rem !important}
+}
+@media (max-width: 620px){
+  header nav{gap:0.8rem !important;font-size:0.8125rem}
+  .ptmenu > div{left:0 !important;right:auto;min-width:min(14rem,80vw) !important}
+  h1{font-size:1.75rem !important}
+  h2{font-size:1.3rem !important}
+  table{font-size:0.75rem}
+  td,th{padding-left:0.55rem !important;padding-right:0.55rem !important}
+  main div > span:first-child{width:auto !important}
+}
+@media (max-width: 460px){
+  header nav{gap:0.7rem !important;font-size:0.75rem}
+  h1{font-size:1.55rem !important}
+  main{padding-left:0.9rem !important;padding-right:0.9rem !important}
+}
+</style>
+</helmet>
+
+<div data-screen-label="Parameters" style="min-height:100vh;padding:0 0 5rem">
+
+<div style="position:fixed;inset:0;z-index:80;display:{{ searchShow }};align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)" onClick="{{ closeSearch }}">
+<div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden">
+<input type="text" value="{{ searchQuery }}" onInput="{{ setSearchQuery }}" onKeyDown="{{ searchKey }}" placeholder="Search the docs" aria-label="Search the docs" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"></input>
+<div style="max-height:22rem;overflow-y:auto;padding:0.4rem">
+<sc-for list="{{ searchHits }}" as="h" hint-placeholder-count="5">
+<a href="{{ h.href }}" style="display:flex;justify-content:space-between;gap:0.9rem;align-items:baseline;padding:0.55rem 0.7rem;border-radius:6px;background:{{ h.bg }};color:var(--ink)">
+<span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:{{ h.titleCol }}">{{ h.title }}</span>
+<span style="font-size:0.75rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ h.hint }}</span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.06em;color:var(--ink-3);flex:none">{{ h.door }}</span>
+</a>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">
+<span>{{ searchCount }}</span>
+<span>ENTER OPENS, ESC CLOSES</span>
+</div>
+</div>
+</div>
+<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)">
+<div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem">
+<a href="./Learn pretium.dc.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)">
+<img src="./mark-pretium.png" alt="pretium" width="15" height="22" style="display:{{ showLight }};flex:none"></img><img src="./mark-pretium-dark.png" alt="pretium" width="15" height="22" style="display:{{ showDark }};flex:none"></img>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span>
+</a>
+<nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap">
+<sc-for list="{{ nav }}" as="d" hint-placeholder-count="5">
+<details class="ptmenu" style="position:relative">
+<summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:{{ d.col }};cursor:pointer;list-style:none;padding:0.2rem 0">{{ d.title }}<span style="font-size:0.5rem;color:var(--accent-line)">&#9660;</span></summary>
+<div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60">
+<sc-for list="{{ d.links }}" as="l" hint-placeholder-count="4">
+<a href="{{ l.href }}" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:{{ l.col }};background:{{ l.bg }};white-space:nowrap">{{ l.label }}</a>
+</sc-for>
+</div>
+</details>
+</sc-for>
+</nav>
+<span style="flex:1"></span>
+<button onClick="{{ openSearch }}" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">{{ searchKeyHint }}</span></button>
+<button onClick="{{ toggleTheme }}" aria-label="{{ themeLabel }}" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer">{{ themeGlyph }}</button>
+</div>
+</header>
+
+<main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="./Learn pretium.dc.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">PARAMETERS</span>
+</div>
+
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Parameters</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Most people never touch these. Read this page if you are calibrating the model rather than running one.</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1rem">
+<sc-for list="{{ counts }}" as="c" hint-placeholder-count="4">
+<div style="border:1px solid {{ c.border }};border-radius:6px;background:{{ c.bg }};padding:1rem 1.1rem;display:flex;flex-direction:column;gap:2px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:{{ c.fg }};font-variant-numeric:tabular-nums">{{ c.n }}</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.06em;color:{{ c.fg }}">{{ c.k }}</span>
+<span style="font-size:0.8125rem;color:{{ c.fg }}">{{ c.v }}</span>
+</div>
+</sc-for>
+</div>
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<h2 style="font-size:1.5rem">Four kinds of coefficient</h2>
+<p style="color:var(--ink-2);margin:0">The difference matters, because a change you make in one category renames the preset and a change in another is refused outright.</p>
+<sc-for list="{{ kinds }}" as="k" hint-placeholder-count="4">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,11rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<h3 style="font-size:1.0625rem;margin:0">{{ k.head }}</h3>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:{{ k.tagCol }}">{{ k.tag }}</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:0.4rem">
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">{{ k.body }}</p>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-3)">{{ k.eg }}</span>
+</div>
+</div>
+</sc-for>
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h2 style="font-size:1.5rem">What the settable surface covers</h2>
+<p style="color:var(--ink-2);margin:0">Read the list rather than a summary of it, with <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">pt.ModelParams.settable()</span>. The shape of it:</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.7rem">
+<sc-for list="{{ surface }}" as="s" hint-placeholder-count="8">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.8rem 0.9rem;display:flex;flex-direction:column;gap:2px">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">{{ s.k }}</span>
+<span style="font-size:0.8125rem;color:var(--ink-2)">{{ s.v }}</span>
+</div>
+</sc-for>
+</div>
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h2 style="font-size:1.5rem">Change one, and the name changes</h2>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
+<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">params = pt.ModelParams.from_preset(
+    "pt-v12",
+    momentum_theta=0.05)
+
+e = pt.Engine(seed=42, universe=u,
+              model=params)
+
+e.model_fingerprint
+# "custom-7f290e34"</pre>
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
+<h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">Why it renames rather than warns</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">A changed preset that still called itself pt-v12 would let two different markets share one citation. The fingerprint is the first 8 hex characters of a sha256 over the canonical serialisation, so any settable change produces a new name.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">An override of a compile-time constant is refused by name. Accepting one the engine would ignore would make the fingerprint a lie.</p>
+</div>
+</div>
+</section>
+
+<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem">
+<h2 style="font-size:1.25rem">All pages</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem">
+<sc-for list="{{ nav }}" as="d" hint-placeholder-count="5">
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">{{ d.title }}</span>
+<div style="display:flex;flex-direction:column;gap:0.3rem">
+<sc-for list="{{ d.links }}" as="l" hint-placeholder-count="4">
+<a href="{{ l.href }}" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:{{ l.col }}"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">{{ l.label }}</span></a>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+</section>
+
+<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem">
+<a href="./Evaluate.dc.html" style="display:flex;flex-direction:column;gap:2px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span>
+<span>Evaluate</span>
+</a>
+<a href="./The MCP server.dc.html" style="display:flex;flex-direction:column;gap:2px;text-align:right">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span>
+<span>MCP server</span>
+</a>
+</nav>
+</main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180}}">
+class Component extends DCLogic {
+  state = { dark: false , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) if (all[i] !== inside) all[i].removeAttribute('open');
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  DOORS = [
+    ['Start', [['Install', './Install.dc.html'], ['Running a market', './Running a market.dc.html'], ['Core concepts', './Core concepts.dc.html'], ['The two loops', './The two loops.dc.html']]],
+    ['Use it', [['Agents', './Agents.dc.html'], ['Scenarios', './Scenarios.dc.html'], ['Execution cost', './Execution cost.dc.html'], ['RL environment', './RL environment.dc.html']]],
+    ['Trust it', [['Realism envelope', './Realism envelope.dc.html'], ['The metrics', './The metrics.dc.html'], ['Principles', './Principles.dc.html'], ['Citing a run', './Citing a run.dc.html']]],
+    ['Reference', [['Glossary', './Glossary.dc.html'], ['Conventions', './Conventions.dc.html'], ['Schemas', './Schemas.dc.html'], ['Presets', './Presets.dc.html']]],
+    ['API', [['Core types', './Core types.dc.html'], ['Evaluate', './Evaluate.dc.html'], ['Parameters', './Parameters.dc.html'], ['MCP server', './The MCP server.dc.html']]]
+  ];
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const self = './Parameters.dc.html';
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      showLight: dark ? 'none' : 'block',
+      showDark: dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      nav: this.DOORS.map(([title, links]) => ({
+        title: title,
+        col: links.some(l => l[1] === self) ? 'var(--accent)' : 'var(--ink-2)',
+        links: links.map(([label, href]) => ({
+          label: label, href: href,
+          col: href === self ? 'var(--accent)' : 'var(--ink-2)',
+          bg: href === self ? 'var(--accent-soft)' : 'transparent'
+        }))
+      })),
+      counts: [
+        { n: '87', k: 'SETTABLE()', v: 'Names you can override at runtime.',
+          border: 'var(--accent-line)', bg: 'var(--accent-soft)', fg: 'var(--accent-deep)' },
+        { n: '118', k: 'TO_DICT()', v: 'Entries visible in the preset and covered by the fingerprint.',
+          border: 'var(--line)', bg: 'var(--card)', fg: 'var(--ink-2)' },
+        { n: '31', k: 'THE GAP', v: 'Visible, fingerprinted, and refused as an override.',
+          border: 'var(--line)', bg: 'var(--card)', fg: 'var(--ink-2)' },
+        { n: '8', k: 'IN THE PRESET DICT', v: 'The mispricing and crowd model, which is what a preset name carries in prose.',
+          border: 'var(--line)', bg: 'var(--card)', fg: 'var(--ink-2)' }
+      ],
+      kinds: [
+        { head: 'Settable', tag: 'RENAMES THE PRESET', tagCol: 'var(--accent)',
+          body: '87 names. Override one and the fingerprint becomes custom-, followed by 8 hex characters, so the changed model can not present as the shipped one.',
+          eg: 'momentum_theta, garch_alpha, market_factor_sigma' },
+        { head: 'Derived', tag: 'RECOMPUTED, NOT SET', tagCol: 'var(--amber)',
+          body: 'Two coefficients are carried as recorded bit patterns and can not be set directly. Overriding the half-life recomputes both, deterministically on a given build but not bit-identically to any recorded constant.',
+          eg: 'mispricing_phi, s_phi_tick' },
+        { head: 'Guards', tag: 'SETTABLE, EXCLUDED FROM SEARCH', tagCol: 'var(--amber)',
+          body: 'Four guards live in the tick chain and are settable, but a calibration search excludes them, because they are worst-case guarantees rather than tuning knobs. One more is not settable at all.',
+          eg: 'the mispricing cap, the crowd lean cap, the session breaker, the price cap. daily_shock_cap is fixed' },
+        { head: 'Compile-time', tag: 'REFUSED BY NAME', tagCol: 'var(--red)',
+          body: '28 constants are visible in to_dict() and covered by the fingerprint, and an override is refused. The engine would ignore it, and accepting it would make the fingerprint a lie.',
+          eg: 'the sector table among them' }
+      ],
+      surface: [
+        { k: 'The two variance processes', v: 'Per-name GJR-GARCH and the market factor\u0027s, cascade components and the slow term included.' },
+        { k: 'The factor sigmas', v: 'Market and sector, plus the sector loadings and the idiosyncratic scale.' },
+        { k: 'Size and spread effects', v: 'What a large order pays, and how wide the maker quotes.' },
+        { k: 'Mispricing and crowd dynamics', v: 'The half-life, the herding term and the three crowd coefficients.' },
+        { k: 'News and flow coefficients', v: 'Endogenous news and peer news among them.' },
+        { k: 'Jump sizes and intensities', v: 'How often a jump fires and how large it is.' },
+        { k: 'The VIX channel', v: 'How the fear gauge reaches the market factor\u0027s variance.' },
+        { k: 'Crisis blend and stress', v: 'The crisis lever, the sector coupling and the remembered stress terms.' },
+        { k: 'The volume expression', v: 'volume_move_cap among them, the one pt-v12 moved off its compiled literal.' },
+        { k: 'The guards', v: 'Settable, and excluded from every calibration search.' }
+      ]
+    });
+  }
+}
+
+</script>
+</body>
+</html>

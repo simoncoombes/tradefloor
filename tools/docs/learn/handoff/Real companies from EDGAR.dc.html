@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Real companies from EDGAR · pretium</title>
+<meta name="description" content="Seed a universe from real SEC filings: real valuation dispersion, real sector weights, synthetic price paths.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<script src="./pt-data.js"></script>
+<script src="./pt-search.js"></script>
+<style>
+:root{--ground:#FAFBFA;--surface:#F1F4F3;--card:#FFFFFF;--line:#D2DBD9;--line-soft:#E3E9E7;--ink:#101A18;--ink-2:#3C4A47;--ink-3:#5A6864;--accent:#0E6B65;--accent-deep:#0A4F4A;--accent-soft:#DDEEEC;--accent-line:#8FC2BD;--chip-bg:#EDF3F2;--chip-line:#CBD9D6;--header-bg:rgba(250,251,250,0.93)}
+html[data-theme="dark"]{--ground:#0D1312;--surface:#151D1C;--card:#111917;--line:#2B3735;--line-soft:#202B2A;--ink:#E5ECEA;--ink-2:#B2C0BD;--ink-3:#8A9895;--accent:#5FC9BE;--accent-deep:#8ADDD4;--accent-soft:#10302E;--accent-line:#2E6B65;--chip-bg:#14201F;--chip-line:#2B3735;--header-bg:rgba(13,19,18,0.92)}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:'Public Sans',system-ui,sans-serif;font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box} a{color:var(--accent);text-decoration:none} a:hover{color:var(--accent-deep);text-decoration:underline}
+p{margin:0 0 0.9rem;text-wrap:pretty} h1,h2,h3{margin:0;font-family:'Source Serif 4',ui-serif,Georgia,serif;font-weight:600;letter-spacing:-0.015em;line-height:1.15}
+</style>
+</helmet>
+<div data-screen-label="Real companies from EDGAR" style="min-height:100vh;padding:0 0 5rem">
+<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)">
+<div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem">
+<a href="./Learn pretium.dc.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)">
+<img src="{{ markLogo }}" alt="pretium" width="15" height="22" style="display:block;flex:none"></img>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span>
+</a>
+<a href="./Learn pretium.dc.html" style="font-size:0.875rem;color:var(--ink-2)">All pages</a>
+<span style="flex:1"></span>
+<button onClick="{{ toggleTheme }}" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer">{{ themeGlyph }}</button>
+</div>
+</header>
+<main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="./Learn pretium.dc.html" style="color:var(--ink-3)">USE IT</a><span>/</span><span style="color:var(--accent)">REAL COMPANIES FROM EDGAR</span>
+</div>
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Real companies from EDGAR</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Seed a universe from real SEC filings. Real valuation dispersion, real sector weights, loss-makers in realistic proportion. The price path stays synthetic.</p>
+<pre style="margin:0.4rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">snap = pt.edgar.fetch(as_of="2024-06-30", limit=100,
+                      user_agent="Jane Roe jane@example.org")
+snap.save("edgar-2024h1.json")            # the artifact, hashed and citable
+
+universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)</pre>
+<p style="color:var(--ink-2);margin:0;font-size:0.875rem"><code>user_agent</code> must carry a contact address — the SEC's fair-access policy asks for one, and this library will not send a fabricated one for you.</p>
+</section>
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem">
+<h2 style="font-size:1.5rem">Save the snapshot, cite that</h2>
+<p style="color:var(--ink-2);margin:0;max-width:70ch">EDGAR is not append-only: the same request returns different numbers next year. A snapshot is hashed and serialisable, so cite the file, not the query.</p>
+</section>
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem">
+<h2 style="font-size:1.5rem">Two ways to rank, two different biases</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">rank_by="equity" (default)</span>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">EDGAR carries no market cap, so ranking by shareholders' equity skews balance-sheet-heavy. Measured on the live SEC for CY2025, the top 150 by equity came back 27% financial services and 17% technology, against roughly 13% and 30% for the S&amp;P 500, with five banks in the top ten.</p>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">rank_by="public_float"</span>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Ranks by the one market-derived number EDGAR has, producing a roster that resembles a real index. Costs: stale by six to eighteen months, and understates founder-controlled companies since float excludes what insiders hold.</p>
+</div>
+</div>
+<p style="color:var(--ink-2);margin:0;max-width:70ch">Neither is a market-cap ranking, because EDGAR has no prices. For that, set <code>initial_price</code> yourself from a market data source. And this loads fundamentals, not behaviour: a loaded ticker gives you a stock with that company's fundamentals under this model's assumptions, not that company's volatility or microstructure.</p>
+</section>
+<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem">
+<a href="./Checkpoints and forking.dc.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>Checkpoints and forking</span></a>
+<a href="./The nine factors.dc.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>The nine factors</span></a>
+</nav>
+</main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180}}">
+class Component extends DCLogic {
+  state = { dark: false };
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (e) {}
+  }
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark' : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (e) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+  }
+  renderVals() {
+    return {
+      markLogo: this.state.dark ? './mark-pretium-dark.png' : './mark-pretium.png',
+      themeGlyph: this.state.dark ? 'light' : 'dark',
+      toggleTheme: () => { const n = !this.state.dark; this.setState({ dark: n }); this.applyTheme(n); }
+    };
+  }
+}
+
+</script>
+</body>
+</html>
