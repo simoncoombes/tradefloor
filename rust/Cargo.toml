@@ -14,7 +14,7 @@ homepage = "https://simoncoombes.github.io/pretium"
 keywords = ["simulation", "finance", "market", "orderbook", "deterministic"]
 categories = ["simulation", "science"]
 readme = "README.md"
-# The golden vectors are 135 MB of parity fixtures. They are the test
+# The golden vectors are 140 MB of parity fixtures. They are the test
 # contract, not library content, and must never ride along in a published
 # sdist -- excluded explicitly rather than trusted to a .gitignore.
 exclude = [
@@ -35,7 +35,9 @@ exclude = [
     # What remains is a suite that runs on its own: circuit_breaker,
     # roster_mutation and stream_alignment, plus the unit tests in 21 source
     # modules. The parity corpus is the port contract and lives in the
-    # repository, where the release gate runs it.
+    # repository, where `cargo test --offline` runs it as a manual step in
+    # RELEASING.md. No workflow invokes cargo, so this is a checklist item
+    # rather than a gate, and calling it a gate would overstate it.
     "tests/divergence_statistics.rs",
     "tests/economy_parity.rs",
     "tests/fair_value_parity.rs",

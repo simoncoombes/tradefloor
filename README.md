@@ -61,9 +61,15 @@ test.
 
 **Determinism that's checked.** The crate ships its own `exp`, `log`, `sin`
 and `cos` instead of calling the platform libm. Every release builds five
-targets, runs one fixed simulation inside each, and compares digests. A
-disagreement fails the release. A WebAssembly build produces the same digest
-as the native one.
+targets -- linux-x86_64, linux-aarch64, macos-arm64, macos-x86_64 and
+windows-x86_64 -- runs one fixed simulation inside each, and compares
+digests. A disagreement fails the release.
+
+The WebAssembly build is checked by hand rather than by that gate, because it
+needs a toolchain CI does not carry: on 2026-08-24 the native and
+`wasm32-unknown-unknown` builds hashed the same fixed simulation to
+`2b2f3141...`, and `tests/test_wasm_parity.py` pins the Python half of that
+pair so the two cannot drift apart unnoticed.
 
 **Ground truth you can read.** The simulator computed every price, so it can
 tell you why. One row per instrument per tick, with nine factor
@@ -115,12 +121,12 @@ fourteen again at 504 days against bands re-derived at that window, and all
 fourteen again on a 60-name universe it never saw. Read that as fourteen
 in-band verdicts rather than fourteen independent validations: five of the
 fourteen were live calibration targets, the bands were used both to tune
-against and to grade against, and "held out" means unseen simulation seeds and
-another roster from the same generator rather than withheld market data. That is a market with the
-right
-volatility, the right tails, the right co-movement, industries that co-move
-more than strangers, correlation that stays elevated after a panic, volume
-that behaves, and volatility episodes it produces itself.
+against and to grade against, and "held out" means unseen simulation seeds
+and another roster from the same generator rather than withheld market data.
+That is a market with the right volatility, the right tails, the right
+co-movement, industries that co-move more than strangers, correlation that
+stays elevated after a panic, volume that behaves, and volatility episodes it
+produces itself.
 
 pt-v12 became the default on 2026-08-26, an era boundary: every trajectory
 that came from the default changed. Runs recorded before it are not
@@ -213,8 +219,10 @@ that cited it.
 ## Citing this
 
 See [CITATION.cff](https://github.com/simoncoombes/pretium/blob/main/CITATION.cff), or cite a specific result by its manifest.
-The seed, the universe fingerprint, the model fingerprint and the strategy
-fingerprint together identify exactly what ran.
+A citation identifies the software; it does not identify a run. A
+`RunManifest` does: it carries the package version and preset it was written
+by, the seed, the universe fingerprint, the macro conditions, the scenario
+and the strategy fingerprint.
 
 ## Licence
 

@@ -39,13 +39,18 @@ happened had I traded differently, and what actually caused this price move.
 
 Three mechanisms a neighbouring product could not truthfully copy:
 
-1. **Bit-identical determinism across platforms.** The crate ships its own
-   `exp`, `log`, `sin` and `cos` rather than calling the platform libm. Every
-   release builds wheels for five targets, runs one fixed simulation inside
-   each and compares digests; any disagreement fails the release. Verified in
-   CI, not asserted.
+1. **Bit-identical determinism across platforms.** Every transcendental goes
+   through `rust/src/mathx.rs`, which routes `exp`, `log`, `pow`, `sin` and
+   `cos` to the pure-Rust `libm` crate rather than to the platform libm, which
+   is MSVC's CRT on Windows, glibc on Linux and Apple's on macOS and which do
+   not agree with each other. A grep test,
+   `no_std_transcendentals_outside_mathx` in `rust/tests/mathx_parity.rs`,
+   fails if anything calls `f64::exp` and friends directly. Every release then
+   builds wheels for five targets, runs one fixed simulation inside each and
+   compares digests; any disagreement fails the release. Verified in CI, not
+   asserted.
 2. **Readable ground truth.** The simulator computed every price, so the
-   `truth` table reports one row per instrument per tick with seven factor
+   `truth` table reports one row per instrument per tick with nine factor
    contributions that sum to the move, residual around 1e-16.
 3. **Runnable counterfactuals.** The same seed can be run with and without the
    user's orders, so every fill is priced against the world where they never
@@ -67,7 +72,9 @@ published result can be re-run by someone else.
 Confirmed in the shipped package: `Engine`, `EngineBatch`, `Universe`, `Macro`,
 `Scenario`, `Checkpoint`, agent evaluation with reference baselines and an
 Oracle, ranking with paired sign tests, TCA, sweeps, replay, an SEC EDGAR
-loader, a Gymnasium environment, and five Arrow output tables.
+loader, a Gymnasium environment, an MCP server (`pretium.mcp`), and five
+Arrow output tables. Twelve model presets ship, `pt-v1` through `pt-v12`, all
+selectable and all reproducing bit for bit; `pt-v12` is the default.
 
 Stated limitations, which the documentation must keep visible rather than bury:
 
@@ -75,16 +82,23 @@ Stated limitations, which the documentation must keep visible rather than bury:
 - Zero latency; orders arrive instantly.
 - No strategic counterparties; the user trades against a market maker and
   aggregate flow, not agents that adapt.
-- Return autocorrelation measures +0.219 at lag one where real equities sit
-  near zero, so momentum is mechanically profitable here for reasons that do
-  not transfer.
+- The realism envelope is certified to 252 trading days and no further
+  (`envelope.CERTIFIED_HORIZON_DAYS`). Five gaps stand behind that number:
+  horizon, decay-shape, scenario-magnitude, macro-range and
+  roster-concentration, each enumerated in `pretium.envelope.GAPS` with what
+  it forbids.
+- Volatility memory decays exponentially rather than hyperbolically. The
+  log-log slope over lags 1 to 20 measures -0.953 against real markets'
+  -0.436 (`envelope.DECAY_SLOPE` and `REAL_DECAY_SLOPE`), so an edge keyed on
+  volatility memory beyond about lag 20 -- vol targeting, risk parity on a
+  one-month or longer estimate -- does not transfer.
 - Good results do not predict real returns. The price process comes from a
   known model.
 
 Rates are fractional. Roster order is contractual. Every numeric column is f64.
 
-Pre-release: the package is not yet published to PyPI or crates.io, and the
-API may move before 1.0.
+Published on PyPI as `pretium` and on crates.io as the `pretium` crate. The
+API may still move before 1.0.
 
 ## Brand Commitments
 
@@ -96,8 +110,10 @@ capabilities. Specific bans, set by the plan owner: no "X is not the Y, it is
 the Z" constructions, no marketing abstraction, ASCII punctuation only (no em
 dashes, en dashes, typographic minus signs or arrows).
 
-Licence Apache-2.0. The repository must not reference the commercial product
-the engine was ported from.
+Dual-licensed MIT OR Apache-2.0, at the user's option, which is the
+Rust-ecosystem norm and what `pyproject.toml` and `rust/Cargo.toml` both
+declare. The repository must not reference the commercial product the engine
+was ported from.
 
 **The visual identity is deliberately decoupled from the subject matter.** A
 first attempt themed the documentation as trading-desk stationery, deriving
@@ -112,13 +128,20 @@ supported.
 ## Evidence on Hand
 
 Real, measured, and already in the docs: the five matching cross-platform
-digests; the rebalance-frequency table (+88.7% / +30.9% / -13.2%); the
-agent-versus-Oracle table over 384 agent-seed pairs; the paired sign tests;
-the four realism statistics against real-equity ranges; the performance
-timings; the volatile-regime TCA result over twelve seeds.
+digests, one per wheel target, compared inside the release workflow; the
+rebalance-cadence measurement, which on `pt-v12` swings one signal from
++37.5% at three decisions a day to +9.8% at six and -27.5% at twelve
+(`tools/remeasure/remeasure.py --only rebalance`, 2026-08-27); the
+agent-versus-Oracle table over the twelve-market grid; the paired sign tests
+beside it; the fourteen realism statistics against real-equity ranges; the
+performance timings; the round-trip shortfall range, -17.72 to +2.03 bps over
+eight sim seeds.
 
-`examples/07-research-workflow.py` runs end to end in about fifteen seconds and is
-exercised by the test suite.
+`examples/07-research-workflow.py` runs end to end in about five seconds on
+an idle Apple-silicon laptop, the figure `README.md` and `examples/README.md`
+both publish, and is exercised by the test suite. A wall-clock time is
+machine-bound rather than reproducible, which is the status `tools/remeasure`
+gives every timing it carries rather than claiming to reproduce one.
 
 No testimonials, customers, benchmarks against competitors, pricing or
 adoption numbers exist. None may be invented.

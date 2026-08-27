@@ -22,17 +22,19 @@ simulator that repairs your inputs gives you a market you did not specify.
 without them is not realistic.
 
 **Short interest is a share count, not a fraction.** The squeeze rule divides it
-by the float, so `short_interest=0.03` means three hundredths of one share.
-`Universe.random` generates a realistic spread - median about 3.7% of shares
-outstanding, with roughly one name in eleven above the 20% squeeze threshold.
-
-<!-- CHECK the 3.7%: the generator draws short interest log-uniform between
-     0.4% and 30% of shares outstanding, and float equals shares outstanding
-     for a random universe (rust/src/universe.rs), which puts the median of
-     that draw below the 3.7% quoted here. The one-in-eleven figure matches
-     the generator's own comment and the 20% threshold matches the squeeze
-     rule. No measured replacement for the median was supplied, so the
-     sentence is left as written rather than guessed at. -->
+by the float, so 3% of a hundred million shares is `short_interest=3_000_000`.
+Passing `0.03` does not quietly mean three hundredths of a share: values
+strictly between 0 and 1 raise `ValidationError` for a company with a real
+share count, because three hundredths of one share is a squeeze ratio of 3e-11
+and a squeeze that can never fire, and that mistake would otherwise be silent.
+`Universe.random` generates a realistic spread: the draw is log-uniform between
+0.4% and 30% of shares outstanding, so the median is the geometric mean of
+those bounds, 3.46%, and about one name in eleven clears the 20% squeeze
+threshold. Measured across the whole three-letter ticker space, 17,576 names
+at seed 7: median 3.45%, 9.54% of names above 0.20. A roster the size these
+docs use runs lower and noisier - 2.53% on `Universe.random(108, seed=7)` -
+because a hundred names is a small sample of a draw whose top and bottom
+differ by a factor of seventy-five.
 
 **Roster order is contractual.** A re-sorted universe is a different market.
 `universe.fingerprint` covers order as well as content.
@@ -58,7 +60,9 @@ much can hide in one of them is not hypothetical: `volume_move_cap` was a
 literal `4.0` in `tick.rs` through `pt-v11`, saturating a name's volume
 response at a 4% daily move, so every crisis day traded like a bad Tuesday.
 Raising it to 12.0 is the whole of `pt-v12`, and every earlier preset still
-runs the 4.0, which is why they replay unchanged. `model_preset()` shows
-neither number. So quote the preset name AND `pt.version()` when you
+runs the 4.0, which is why they replay unchanged. It is a real parameter now,
+one of the 87 `ModelParams.settable()` lists, and readable as
+`ModelParams.from_preset("pt-v12").volume_move_cap`. `model_preset()` still
+shows neither number. So quote the preset name AND `pt.version()` when you
 publish - the version is what actually pins the build. See
-[Reproducing a run](reproducing-a-run.html).
+[Reproducing a run](reproducing-a-run.md).

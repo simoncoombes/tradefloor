@@ -21,6 +21,10 @@ hand, or manual and ordered so the irreversible steps come last.
 | `CITATION.cff` | anyone citing a result |
 | `docs/reproducing-a-run.md` | the worked example that prints it |
 
+`CITATION.cff` carries two fields, not one: `version:` and `date-released:`,
+the day the version was tagged. A version without the date it shipped is half
+a citation.
+
 Then `cargo update -p pretium` so `Cargo.lock` follows, and rebuild
 (`maturin develop --release`) so the installed package reports the new
 number rather than the old one.
@@ -29,7 +33,12 @@ number rather than the old one.
 
 `CHANGELOG.md`, newest first, heading `## X.Y.Z`. The release workflow cuts
 the GitHub release notes from this section, matching `## X.Y.Z` or
-`## [X.Y.Z]`. If it finds nothing the release ships with empty notes.
+`## [X.Y.Z]`. If it finds nothing it does not ship empty notes: the script
+calls `sys.exit("CHANGELOG.md has no section for ...")`, the step runs under
+`set -euo pipefail`, and the whole `github_release` job fails before
+`gh release create` runs. That job `needs: [setup, verify, publish]`, so by
+the time you see the failure the wheels are already on PyPI, which is the one
+step that cannot be undone. Write the section before you tag, not after.
 
 Prose, not a bulleted catalogue. No em dashes or en dashes anywhere: a test
 does not enforce this, a reader notices it.
@@ -49,11 +58,42 @@ default preset, and the parity tests would not compile against a struct that
 had gained a field. Neither is visible from pytest, and the first one only
 surfaced from the packaged-crate check in the crate section below.
 
-The second executes all six notebooks and the research workflow end to end.
-It is skipped by default because it takes half a minute, which is exactly
-why it goes stale.
+The second executes all eight notebooks and the research workflow end to end
+(`tests/test_examples.py` globs `0*.ipynb`, which matches 00 through 06 and
+09), 21 tests in all. It is skipped by default because it runs for a minute
+or more on an idle machine, with the largest single share in
+`09-a-pandemic-shaped-market.ipynb`, which runs about twice as long as the
+next slowest notebook, and because it needs `nbclient`, which the library
+does not depend on. Both are exactly why it goes stale. Time it on a quiet
+machine or not at all: the figure is machine-bound, and this tree has
+measured at both 83s and 96s.
 
-### 4. Rebuild the documentation site
+### 4. Re-measure the published figures
+
+```
+python tools/remeasure/remeasure.py
+```
+
+This is the step the site's own status paragraph promises.
+`docs/releases.html` tells every reader that published figures "are
+re-measured by `tools/remeasure`, which reports every number the stated
+method no longer produces, and a figure it flags is a documentation defect
+until someone corrects it." Nothing in CI runs it, so if it is not run here
+the guarantee is a sentence rather than a process.
+
+It writes `tools/remeasure/out/REPORT.md`. Read the **Doc edits needed**
+table: every row is a published number this build does not produce. `MOVED`
+after an engine change is an edit list, not a failure -- a new default preset
+moves figures by design -- but the edits have to land before the next step,
+because step 5 is what publishes them. `structural_fail` rows are boolean
+claims that stopped being true and are worse than a moved number.
+
+The last stored run is the record of what was current at that release. The
+0.2.0 run (`tools/remeasure/out-0.2.0/REPORT.md`, commit `e3396b9`) reported
+106 reproduced against 165 MOVED and 5 `structural_fail`, which is what a
+release looks like when the preset moved and the prose did not follow yet.
+
+### 5. Rebuild the documentation site
 
 ```
 python tools/docs/build_site.py
@@ -69,7 +109,7 @@ If a new design bundle has landed, drop it at `tools/docs/design-bundle.html`
 first. The build asserts on the release-status text it expects to find, so a
 reworded bundle fails loudly rather than shipping a stale claim.
 
-### 5. Check the README survives PyPI
+### 6. Check the README survives PyPI
 
 ```
 python -m pytest tests/test_readme_links.py -q
@@ -81,15 +121,29 @@ resolves to `pypi.org/project/pretium/examples/...` and 404s. It renders
 correctly on GitHub, which is why it survived two releases. The test fails on
 any relative link and on any absolute link naming a file that is not there.
 
-### 6. Run the determinism gate on the branch
+### 7. Run the determinism gate on the branch
 
 ```
 gh workflow run determinism.yml --ref <branch> -f targets=all
 ```
 
-Free on a public repository. It also runs on pushes to `main` touching
-`rust/**`, `python/**`, `pyproject.toml` or the workflow itself, so on a
-release from `main` it has usually already run.
+`targets=all` is spelled out because the dispatch default is `unverified`,
+which runs only `macos-x86_64` and `windows-x86_64`. Those two are the
+default because nothing else in the project touches them: every AWS
+calibration run builds the crate and executes `tests/known_answer.py` before
+its own work, which covers `linux-aarch64`, `macos-arm64` and `linux-x86_64`
+between them. The default is the narrow path to the gap, not the cheap one.
+Money is not the reason for it -- the repository is public, so standard
+runners are free, and the workflow's own note records the five-target run of
+2026-08-27 (run 33028345268) at 3m35s of wall clock and about ten minutes of
+runner time across all seven jobs. Ask for `all` here anyway, because the
+point of a release gate is that the whole artifact set was checked in one
+place, together, on the commit being shipped.
+
+It also runs on pushes to `main` touching `rust/**`, `python/**`,
+`pyproject.toml` or the workflow itself, so on a release from `main` it has
+usually already run. A tag push runs all five regardless of any input: a
+release must not ship on a partial gate.
 
 ## Tagging
 
@@ -131,11 +185,12 @@ cd target/package/pretium-X.Y.Z && cargo test --offline
 ```
 
 This matters more than it sounds. Sixteen of the nineteen integration tests
-read the 135 MB parity corpus, which `exclude` deliberately keeps out, and
-they panic when it is absent. They are excluded **by name**, so a new test is
-not silently dropped: add one that reads `goldens/` and you must add it to
-`exclude` too, or a consumer running `cargo test` concludes the crate is
-broken.
+read the 140 MB parity corpus in `rust/goldens/`, which `exclude` deliberately
+keeps out, and they panic when it is absent. What is left to run on its own is
+`circuit_breaker`, `roster_mutation` and `stream_alignment`, plus the unit
+tests. They are excluded **by name**, so a new test is not silently dropped:
+add one that reads `goldens/` and you must add it to `exclude` too, or a
+consumer running `cargo test` concludes the crate is broken.
 
 crates.io versions are permanent and cannot be replaced, only yanked.
 
@@ -148,8 +203,13 @@ crates.io versions are permanent and cannot be replaced, only yanked.
   ```
   The second is the path that was broken in 0.1.0 and nobody noticed until
   the release had gone out.
-- The GitHub Pages deploy runs on the push to `main`. Check the site actually
-  serves: `curl -sI https://simoncoombes.github.io/pretium/`.
+- **There is no Pages deploy workflow.** `.github/workflows/` holds exactly
+  two files, `determinism.yml` and `release.yml`. The site is the committed
+  `docs/` tree (56 tracked files, including `.nojekyll`), so it is only as
+  current as the last hand-run of `build_site.py` in step 5, and it changes
+  only when that rebuild is committed and pushed. Nothing fails if you skip
+  it; the site just goes on describing the previous release. Check it serves:
+  `curl -sI https://simoncoombes.github.io/pretium/`.
 - Submit the sitemap in Search Console if the page set changed. Google
   removed the ping endpoint in 2024, so it is a manual step.
 
@@ -176,8 +236,12 @@ every published result that cited it. Coefficient changes therefore arrive as
 a **new model preset**, never as an edit to an existing one, and old presets
 keep running exactly as they did.
 
-That is why `pt-v1` through `pt-v8` all still exist and reproduce, and why a
-patch release can carry a new preset without being a breaking change.
+That is why `pt-v1` through `pt-v12` all still exist and reproduce, and why a
+patch release can carry a new preset without being a breaking change. Check
+the range rather than trusting this sentence: the shipped list is what
+`pt.ModelParams.from_preset("pt-v99")` names in its error, and the default is
+whatever `DEFAULT_PRESET_NAME` in `rust/src/params.rs` says. At 0.3.0 that is
+twelve presets with `pt-v12` as the default.
 
 ## The release-notes page
 

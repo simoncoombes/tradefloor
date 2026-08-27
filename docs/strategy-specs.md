@@ -25,8 +25,12 @@ The scorecard now carries the strategy's identity next to the seed and the
 universe fingerprint, so a methods section becomes:
 
 > Evaluated over 12 seeds against universe `a7861d15...`, model preset
-> `pt-v3`, strategy spec `e6bbc35c...`, capture ratio quoted against oracle
+> `pt-v12`, strategy spec `e6bbc35c...`, capture ratio quoted against oracle
 > spec `f383b990...`.
+
+The preset in that line is the one you ran, not a fixed string: `pt-v12` is
+the default at 0.3.0, and a result produced under an older preset should cite
+that preset and say it was the default at the time.
 
 Every one of those is checkable by someone who has the package and nothing
 else of yours.
@@ -149,11 +153,12 @@ demands: a version bump, not a patch.
 
 How often a strategy re-decides moves results more than any signal parameter:
 the rebalance measurement behind `pretium.baselines` swings the same one-day
-signal from +97.5% at three decisions a day to +0.1% at twelve, purely by
-trading it more often (seed 2026, `Universe.random(40, seed=7)`, 30 days,
-measured at `a7994e2`). A strategy whose identity excluded that would not be
-identified, because two runs of the same fingerprint could differ by the whole
-return.
+signal from +37.55% at three decisions a day, to +9.79% at six, to -27.46% at
+twelve, purely by trading it more often (seed 2026, `Universe.random(40,
+seed=7)`, 30 days, ticks per step set to keep the day at roughly 390 ticks;
+pretium 0.3.0 under `pt-v12`). A strategy whose identity excluded that would
+not be identified, because two runs of the same fingerprint could differ by the
+whole return -- here, by its sign.
 
 So `execution.cadence` is part of the spec, with two values:
 
@@ -203,7 +208,7 @@ so a results table can label the row.
 Its `top_k` matters more than any other parameter in the library: capture
 ratios are quoted against the Oracle, and its configuration moves the
 denominator substantially (see [Agents and
-evaluation](agents-and-evaluation.html)). A capture ratio without the
+evaluation](agents-and-evaluation.md)). A capture ratio without the
 oracle's spec fingerprint attached is not a number anyone can compare, which
 is why the methods section at the top of this page quotes two fingerprints,
 not one.

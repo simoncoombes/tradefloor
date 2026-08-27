@@ -4,7 +4,15 @@ These files record what `src/lib/engine/prng.ts` and `src/lib/engine/mispricing.
 **do**, value by value, at full `f64` precision. They are the reference the Rust
 port must reproduce.
 
-**995,783 assertions across 20 files, 37.4 MB.**
+**995,783 assertions across 20 files, 39.2 MB.**
+
+That is the subset this page documents. The directory itself now holds 46
+vector files and 140 MB, because the same generator was later pointed at the
+economy, market tick and daily loops, the order book, the market maker,
+microstructure, fair value, `mathx` and the thirty-day and divergence runs.
+`index.json` is the manifest for all of them; this page covers the two modules
+the port started from, which are also the two whose failure modes are written
+up below.
 
 ---
 
@@ -21,9 +29,13 @@ test then proves nothing except that Rust agrees with Rust.
 If the Rust disagrees with a vector, exactly two responses are legitimate:
 
 1. Fix the Rust.
-2. Decide the divergence is acceptable, record *why* in `docs/rust-port/PLAN.md`,
-   and bump `daily_runs.formula_version`, because the daily challenge is the
-   one surface where "same seed, same market" is a promise to users.
+2. Decide the divergence is acceptable, record *why* in `CHANGELOG.md` under
+   the release that carries it, and treat it as an era boundary: a new model
+   preset rather than an edit to an existing one, and a `KAT_VERSION` bump in
+   `tests/known_answer.py` with `tests/known_answer.json` regenerated to
+   match. "Same seed, same market" is a promise to everyone who has published
+   a fingerprint, so a trajectory change has to be announced rather than
+   absorbed. See `CONTRIBUTING.md`, "The one rule everything else follows".
 
 Regenerating the vector is not on the list. The only reason to re-run the
 generator is that the **TypeScript itself** changed, and that is a formula-era
@@ -139,26 +151,26 @@ vector set.
 
 | File | `kind` | Assertions | Size |
 |---|---|---:|---:|
-| `prng-raw-u32.json` | `prng.rawU32` | 138,432 | 1.69 MB |
-| `prng-floats.json` | `prng.floats` | 60,000 | 1.23 MB |
-| `prng-normals.json` | `prng.normals` | 60,000 | 1.23 MB |
-| `prng-nextint.json` | `prng.nextInt` | 32,256 | 0.66 MB |
+| `prng-raw-u32.json` | `prng.rawU32` | 138,432 | 1.77 MB |
+| `prng-floats.json` | `prng.floats` | 60,000 | 1.29 MB |
+| `prng-normals.json` | `prng.normals` | 60,000 | 1.29 MB |
+| `prng-nextint.json` | `prng.nextInt` | 32,256 | 0.69 MB |
 | `prng-nextbool.json` | `prng.nextBool` | 33,822 | 0.14 MB |
-| `prng-mixed-sequence.json` | `prng.mixed` | 32,008 | 1.01 MB |
+| `prng-mixed-sequence.json` | `prng.mixed` | 32,008 | 1.06 MB |
 | `prng-checkpoints.json` | `prng.checkpoints` | 48 | 0.01 MB |
-| `prng-derived.json` | `prng.derived` | 7,032 | 0.16 MB |
+| `prng-derived.json` | `prng.derived` | 7,032 | 0.17 MB |
 | `mispricing-constants.json` | `mispricing.constants` | 13 | 0.00 MB |
 | `mispricing-create-state.json` | `mispricing.createState` | 52 | 0.01 MB |
-| `mispricing-step-cases.json` | `mispricing.step` | 116,952 | 7.05 MB |
+| `mispricing-step-cases.json` | `mispricing.step` | 116,952 | 7.39 MB |
 | `mispricing-apply.json` | `mispricing.apply` | 375 | 0.09 MB |
 | `mispricing-crowd-lean.json` | `mispricing.crowdLean` | 441 | 0.10 MB |
 | `mispricing-roots.json` | `mispricing.roots` | 589 | 0.08 MB |
-| `mispricing-impulse.json` | `mispricing.impulse` | 13,653 | 0.29 MB |
-| `mispricing-trajectory-calm.json` | `mispricing.trajectory` | 100,022 | 3.95 MB |
-| `mispricing-trajectory-garch-clustered.json` | `mispricing.trajectory` | 100,022 | 3.95 MB |
-| `mispricing-trajectory-news-shocks.json` | `mispricing.trajectory` | 100,022 | 5.90 MB |
-| `mispricing-trajectory-extreme-clamped.json` | `mispricing.trajectory` | 100,022 | 5.90 MB |
-| `mispricing-trajectory-denormal-drift.json` | `mispricing.trajectory` | 100,022 | 3.94 MB |
+| `mispricing-impulse.json` | `mispricing.impulse` | 13,653 | 0.31 MB |
+| `mispricing-trajectory-calm.json` | `mispricing.trajectory` | 100,022 | 4.14 MB |
+| `mispricing-trajectory-garch-clustered.json` | `mispricing.trajectory` | 100,022 | 4.14 MB |
+| `mispricing-trajectory-news-shocks.json` | `mispricing.trajectory` | 100,022 | 6.19 MB |
+| `mispricing-trajectory-extreme-clamped.json` | `mispricing.trajectory` | 100,022 | 6.19 MB |
+| `mispricing-trajectory-denormal-drift.json` | `mispricing.trajectory` | 100,022 | 4.13 MB |
 
 Seeds used throughout: `0`, `1`, `42`, `2^31`, `0xDEADBEEF`, `2^32-1`.
 Sequences: `0`, `1`, `2`, `3`, `4`, `2^31-1`, `2^31`, `2^32-1`.

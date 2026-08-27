@@ -217,11 +217,13 @@ Measured at the certified horizon, 30 seeds, median across instruments:
 | 60 | **−0.0142** | +0.0054 |
 
 On log-log axes, where a power law is a straight line, real markets fit a
-slope of **−0.436** over lags 1-20, inside the 0.2-0.4 exponent range the
-literature publishes. The model fits **−0.953**, about 2.2 times
-steeper. In plain terms: slightly too much clustering at lag 1, tracking
-real closely at lag 5, crossing below at about lag 8, and **negative** by
-lag 30, where real markets stay weakly positive out to lag 60.
+slope of **−0.436** over lags 1-20, a shade steeper than the 0.2-0.4
+power-law exponent Cont (2001) reports, which is the source
+`facts.REAL_MARKETS_PROVENANCE` cites for this band. The model fits
+**−0.953**, about 2.2 times steeper still. In plain terms: slightly too much
+clustering at lag 1, tracking real closely at lag 5, crossing below at about
+lag 8, and **negative** by lag 30, where real markets stay weakly positive out
+to lag 60.
 
 The model's volatility memory does not merely fade early. It changes
 sign. Where a real market still says "yesterday's turbulence makes today's
@@ -233,9 +235,10 @@ variance mixture, the obvious fix, lands lag 20 while getting lag 60 wrong
 in both directions at once.
 
 **Consequence: do not trust strategies whose edge depends on volatility
-memory beyond about two weeks.** Vol-targeting and risk-parity overlays
-that use a one-month or longer volatility estimate are outside the
-envelope.
+memory beyond about lag 20**, a trading month, which is where
+`pretium.envelope.MEMORY_VALID_TO_LAG` draws the line in code.
+Vol-targeting and risk-parity overlays that use a one-month or longer
+volatility estimate are outside the envelope.
 
 ### Gap 3: a scenario's size is right on average and unreliable in one run
 
@@ -246,8 +249,12 @@ fails, and that is the change at this era boundary.
 than a calm market, reads **×6.04** against real markets' **×6.16**, up from
 ×5.05 at `pt-v10` and ×3.07 at the default before that. It is measured from
 a held VIX 5 to a held VIX 65 on the certified 40-name roster over 252 days
-at thirty seeds, which is not the quantity a pair of pinned 120-day runs on
-a 20-name roster gives (that reads about ×2.8 from VIX 15 to VIX 45). Three
+at thirty seeds, which is not the quantity a pair of pinned 120-day runs on a
+20-name roster gives. That second recipe is the held-VIX half of
+`tools/calibration/scenario_response.py`, and on `pt-v12` it reads **×3.51**
+from VIX 15 to VIX 45 on the medians of thirty seeds: 27.29% annualised held
+at 15 against 95.92% held at 45. One pinned pair lands anywhere from ×2.50 to
+×4.41, which is the reason to read even that number at thirty seeds. Three
 numbers on this site describe how violent a crisis is; check which one you
 are reading. This is a ratio of annualised **volatility** at high VIX to
 volatility at low VIX; it is not a correlation lever, and a mechanism that
@@ -302,9 +309,17 @@ Calibration record §81.
      measurement; only the noise ratio has been re-measured on pt-v12. -->
 
 An event study over the five sessions after each of six dated events agrees
-on sign five times out of six; the exception is the Fed's intermeeting cut of 3 March 2020, where an
-announcement-effect channel is missing rather than miscalibrated. Worked
-through in `examples/09-a-pandemic-shaped-market.ipynb`.
+on sign **two times out of six**, and the four misses say what the driven
+window can and cannot carry. The Fed's intermeeting cut of 3 March 2020 goes
+the wrong way, +9.9% simulated against AAPL's -1.4%: the model reads a cut as
+good for equities and has no representation of an emergency cut reading as a
+panic signal, so that channel is missing rather than miscalibrated. The VIX
+record close of 16 March misses by declining to move, +0.3% against -7.4%. The
+vaccine result and Omicron are single-name news for Apple, and nothing in a
+run driven only by a macro path can know that. The two that agree are the two
+the macro path does carry, the February selloff and the trough with unlimited
+QE. Worked through in `examples/09-a-pandemic-shaped-market.ipynb`, which
+prints the table and the count.
 
 **The transient**, how fast the market *reacts* to a shock as distinct from
 where it settles, is the half of this gap that did not close. Measured on
@@ -360,11 +375,19 @@ gap.
 <!-- FLAG: the 10.2% crisis-day frequency is the pt-v10 measurement and has
      not been re-measured on pt-v12. -->
 
-Left to itself the macro state stays in a moderate band. Endogenous inflation
-peaks at 4.06% to 4.11% over five seeds and five years against a clamp of
-6.0% and a US CPI that reached 9.1% in June 2022. The cause is dispersion, sd
-1.23 around a mean of 1.99%, not persistence: the monthly series has AR(1)
-+0.936 against +0.894 for real CPI across 2020 and 2021.
+Left to itself the macro state stays in a moderate band. Measured over thirty
+seeds and five years, endogenous inflation peaks at 4.0% on every seed against
+a clamp of 6.0%, with sd 1.2 around a mean of 2.0%. US CPI year-on-year over
+2015-2025 (FRED CPIAUCSL) has sd 2.18 and a peak of 9.0% in June 2022. What
+the endogenous series is short of is spread, sd 1.2 against 2.18, rather than
+memory: the monthly series has AR(1) +0.958 against real CPI's +0.978, so the
+model is slightly the *less* persistent of the two rather than the more. An
+earlier five-seed reading of the same measurement is still quoted in two
+places and should not be mistaken for this one: the `macro_regime` reason
+string in `envelope.check` gives the peaks as 4.06% to 4.11% against a real
+9.1%, and the 0.1.4 changelog entry adds sd 1.23 around a mean of 1.99%. The
+thirty-seed figures here are the ones `envelope.json` publishes and are the
+ones to cite.
 
 The central bank's crisis cadence depends on it, so it is unreachable too.
 That path pulls the next meeting in to 21 to 30 days when a decision leaves
@@ -381,49 +404,62 @@ S&P of -20.0%: no scenario returns -12.6%, the real seven-hike path alone
 returns -13.1%, and the published CPI path returns -23.3%. Inflation is the
 lever because it steers the bank's own reaction into the corporate bond
 yield; a pinned policy rate does not reproduce that, and `corporate_bond_yield`
-must be left free or the channel is severed. `envelope.check(macro_regime=True)`
-refuses the question and quotes these figures.
+must be left free or the channel is severed.
+`envelope.check(horizon_days=252, macro_regime=True)` refuses the question and
+quotes this gap. `horizon_days` is keyword-only and has no default, so the
+call needs it; without it the check raises `TypeError`.
 
-`inflation_reversion`, `inflation_ceiling` and `inflation_floor` are dials
-since 0.1.4, shipped at the values every preset ran on. At reversion 0.20 with
-the ceiling at 10 the endogenous series matches the real 2015 to 2025 mean and
-dispersion, and the long-horizon equity panel pays two statistics for it, so
-no preset takes them. Calibration record §65.
+`inflation_reversion` and `inflation_ceiling` are dials since 0.1.4, and
+`inflation_floor` since 0.2.0, all three shipped at the values every preset
+ran on. At reversion 0.15 the endogenous series matches the real 2015 to 2025
+mean and sd to the second decimal, 2.85 and 2.10 against 2.87 and 2.18, and
+then sits on the clamps; persistence does not move with the dial, because it
+comes from the cycle, wages and unemployment rather than from the reversion.
+No preset takes any of the three, and the repository records two different
+reasons: the gap text in `envelope.py` says what a real inflation range does
+to the equity panel has not been scored, while the 0.2.0 release note says it
+costs the two-year panel. That disagreement is not settled here. Calibration
+record §65.
 
 ### Gap 5: certification was measured on a sector-balanced roster
 
-`Universe.random()` assigns sectors round-robin over the twelve in
-`sectors.SECTORS`, so a roster is as close to balanced as its size allows:
-the certified 40 names put four in each of four sectors and three in each of
-the other eight. No real index is balanced that way. The S&P is roughly a
-third technology and the Nasdaq more so. (This gap said "exactly five names
-in each of twelve sectors" until 2026-08-26, which is 60 names: that
-describes the held-out universe above, not the certified 40-name roster this
-gap is about.) Varying **only** sector composition, with
+`Universe.random()` assigns sectors round-robin over the twelve that
+`pretium.sectors()` lists, so a roster is as close to balanced as its size
+allows: the certified 40 names put four in each of four sectors and three in
+each of the other eight. No real index is balanced that way. The S&P is
+roughly a third technology and the Nasdaq more so. (This gap said "exactly
+five names in each of twelve sectors" until 2026-08-26, which is 60 names:
+that describes the held-out universe above, not the certified 40-name roster
+this gap is about.) Varying **only** sector composition, thirty seeds, with
 every name drawn from one pool:
 
-| roster | in band at 252 days |
-|---|---|
-| balanced (the certified one) | 14 of 14 |
-| S&P-like mix | 14 of 14 |
-| tech-heavy | 14 of 14 |
-| defensive | 14 of 14 |
-| all technology | 13 of 13, `sector_excess_corr` undefined |
+| roster | 252 days | 504 days | out at 504 |
+|---|---|---|---|
+| balanced (the certified one) | 14 of 14 | 14 of 14 | -- |
+| S&P-like mix | 14 of 14 | 13 of 14 | `annualised_vol_pct` |
+| technology-heavy | 14 of 14 | 11 of 14 | vol, `corr_persistence_acf1`, `cross_sectional_corr` |
+| defensive | 14 of 14 | 14 of 14 | -- |
+| all technology | 13 of 13 | 10 of 13 | vol, `corr_persistence_acf1`, `cross_sectional_corr` |
 
 **Every mix tested holds the full panel at one year on `pt-v12`.** The
-all-technology roster is 13 of 13 rather than 14 of 14 because a
-single-sector roster has no cross-sector excess to measure, so
-`sector_excess_corr` is undefined rather than missed. The earlier era's
-measurement, on `pt-v3` against the ten-statistic panel of the time, read 9
-of 10 balanced, 8 of 10 for the S&P-like mix and 7 of 10 all technology, and
-is what this gap used to quote; concentration cost the one-year panel then
-and does not now.
+all-technology roster is 13 rather than 14 because a single-sector roster has
+no cross-sector excess to measure, so `sector_excess_corr` is undefined rather
+than missed. The earlier era's measurement, on `pt-v3` at six seeds against
+the ten-statistic panel of the time, read 9 of 10 balanced, 8 of 10 for the
+S&P-like mix and 7 of 10 all technology, and is what this gap used to quote;
+concentration cost the one-year panel then and does not now.
 
-**What concentration costs on `pt-v12` is the second year, not the first.**
-The gap is kept for that reason, and because what it establishes is a
-property of roster composition rather than of a preset: part of a
-certification measured on a balanced roster is an artifact of that balance,
-and the further out you measure the more of it is.
+**What concentration costs on `pt-v12` is the second year, not the first**,
+and the mechanism is visible rather than mysterious. Cross-sectional
+correlation rises monotonically with concentration at 504 days, 0.3797
+balanced, 0.3813 S&P-like, 0.4112 technology-heavy and 0.5316 all technology,
+which is the model behaving *correctly*, since names in one industry should
+move together more. It rises past the 504-day band's top of 0.41 and
+annualised volatility follows it out, so part of what the table records is a
+broad-market band being the wrong ruler for a single-sector portfolio. The gap
+is kept for that reason, and because what it establishes is a property of
+roster composition rather than of a preset. Measured by
+`tools/calibration/roster_shapes.py`.
 
 **Consequence: a one-year panel transfers to a concentrated roster and a
 two-year one does not.** Re-measure the panel on your own universe rather
@@ -534,12 +570,18 @@ in that dictionary is one the reporting path alone consumed. It does move
 the known-answer digest, because the digest hashes the reported preset.
 The measurements on this page are unaffected.
 
-That digest is the pt-v3 era's, and it is kept as the record of what those
-two runs ran. The determinism baseline of the era before this one is
-known-answer v10, `4e22d5a6...e860378`, which the release workflow checks
-inside every wheel before it uploads.
-<!-- FLAG: no known-answer digest for the pt-v12 era was supplied; confirm
-     whether v10 is still the baseline the release workflow checks. -->
+That digest is the pt-v3 era's, and it is kept as the record of what those two
+runs ran. It is not the determinism baseline. The baseline is whatever
+`tests/known_answer.json` carries, because that is the file the release
+workflow reads when it checks every wheel before uploading. At 0.3.0 it is
+known-answer **v11**,
+`60d475726c8b270df0894da7577523e98d044dd09afc6b536377eaf4b40de590`, whose
+simulation digest is
+`7c63282b57955400bad4c61ca7c24c9f6bb0b94b9486870f491eac00cf157a20`. Running
+`tests/known_answer.py` prints both. The v10 digest `4e22d5a6...e860378` was
+the baseline of the era before this one and is now checked by nothing;
+`katVersion` 10 in fact carried three digests over its life, so quote the
+version and the digest together or neither.
 
 The envelope is re-measured whenever the default preset changes.
 `envelope.json` carries the preset the figures describe rather than a

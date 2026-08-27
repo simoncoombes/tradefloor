@@ -48,40 +48,59 @@ had surveyed, in a direction someone had guessed.
 ## The shape of a session
 
 ```python
+import statistics
+
 from pretium import atlas
 import pretium as pt
 
 universe = pt.Universe.random(40, seed=111)
+SURVEY_SEEDS = [11, 12, 13]     # the paths this screening pass runs on
 
 axes = atlas.axes_for(
     ["market_factor_sigma", "garch_alpha", "momentum_theta"],
+    preset="pt-v12",                         # box around the shipped values
     ranges={"momentum_theta": (0.0, 0.4)},   # override any default box
 )
 
 def measure(vector):
-    model = pt.ModelParams.from_preset("pt-v3", **vector)
-    scores = pt.evaluate({"mine": MyAgent()}, seed=7,
-                         universe=universe, model=model)
-    return {"sharpe": scores["mine"].sharpe,
-            "drawdown": scores["mine"].max_drawdown}
+    model = pt.ModelParams.from_preset("pt-v12", **vector)
+    runs = [pt.evaluate({"mine": pt.reference_agents(seed=3)["momentum"]},
+                        seed=s, universe=universe, days=3, model=model)["mine"]
+            for s in SURVEY_SEEDS]     # your agent goes where momentum is
+    return {"return_pct": statistics.median(r.return_pct for r in runs),
+            "turnover": statistics.median(r.turnover for r in runs)}
 
 s = atlas.survey(axes, measure, samples=500)
+s.meta["seeds"] = SURVEY_SEEDS  # what confirm() checks its blocks against
 s.save("survey.json")           # measure once, ask many questions later
 ```
 
+Pass `preset=` rather than taking the default. `axes_for` still defaults to
+`preset="pt-v3"`, three eras behind the shipped `pt-v12`, and every box is a
+multiple of whatever preset it reads: `market_factor_sigma` ships at 0.016 on
+pt-v3 and 0.0088291 on pt-v12, so the default box runs 0.004 to 0.064 where
+the pt-v12 box runs 0.0022073 to 0.035316. The pt-v3 ceiling is 7.2 times the
+value the shipped model actually uses. Surveying a pt-v12 model through pt-v3
+boxes is a map of the wrong room.
+
 `measure` is yours, and that is the point: Atlas has no opinion about
 whether the outputs are realism statistics, a Sharpe ratio, a fill rate or
-an agent's score. They are all the same shape of question.
+an agent's score. They are all the same shape of question. It has to be
+yours for a second reason: a `Scorecard` carries `pnl`, `return_pct`,
+`turnover`, `impact_bps`, `trades`, `max_leverage`, `explanation_accuracy`
+and the run's fingerprints, and it carries no Sharpe and no drawdown. If you
+want a risk-adjusted number, `measure` is where you compute it, from the run
+you just did.
 
 Then interrogate it:
 
 ```python
-s.sensitivity("sharpe")            # which parameters move it, ranked
-s.profile("momentum_theta", "sharpe")   # what shape: monotone? an optimum?
-s.unidentified(["sharpe", "drawdown"])  # which move nothing at all
-s.pareto({"sharpe": "max", "drawdown": "min"})
-print(s.explain("sharpe"))
-print(s.report_front({"sharpe": "max", "drawdown": "min"}))
+s.sensitivity("return_pct")            # which parameters move it, ranked
+s.profile("momentum_theta", "return_pct")  # what shape: monotone? optimum?
+s.unidentified(["return_pct", "turnover"]) # which move nothing at all
+s.pareto({"return_pct": "max", "turnover": "min"})
+print(s.explain("return_pct"))
+print(s.report_front({"return_pct": "max", "turnover": "min"}))
 ```
 
 ### Ranges are the most consequential thing you choose
@@ -124,7 +143,7 @@ sentence has to carry its own.
 ### `attribution`, or why does B beat A?
 
 ```python
-s.attribution(vector_a, vector_b, "sharpe", measured=(y_a, y_b))
+s.attribution(vector_a, vector_b, "return_pct", measured=(y_a, y_b))
 ```
 
 Decomposes the difference across the parameters that differ. It **assumes
@@ -143,6 +162,17 @@ the map is affordable. That is enough to rank and describe. It is not enough
 to believe.
 
 ```python
+shipped = pt.ModelParams.from_preset("pt-v12").to_dict()
+baseline = {a.name: shipped[a.name] for a in s.axes}
+candidate = s.pareto({"return_pct": "max",
+                      "turnover": "min"})["front"][0]["parameters"]
+
+def measure_with_seed(vector, seed):        # one vector, one seed, full res
+    model = pt.ModelParams.from_preset("pt-v12", **vector)
+    r = pt.evaluate({"mine": pt.reference_agents(seed=3)["momentum"]},
+                    seed=seed, universe=universe, days=3, model=model)["mine"]
+    return {"return_pct": r.return_pct, "turnover": r.turnover}
+
 s.confirm(candidate, baseline, measure_with_seed,
           seed_blocks=[range(201, 231), range(301, 331)])
 ```
@@ -151,9 +181,20 @@ s.confirm(candidate, baseline, measure_with_seed,
 the survey's, and reports the paired difference in each block. It refuses to
 run on overlapping seeds.
 
+Note the two shapes. `measure(vector)` screens, and chooses its own seeds;
+`measure(vector, seed)` confirms, and is handed one. The gate compares
+`seed_blocks` against `meta["seeds"]`, which is why the session above sets
+it. `atlas.survey` records only `samples` and its sampling `seed`, so a
+survey built by hand and not told its seeds cannot reach this step at all:
+`confirm` raises rather than assuming, with *this survey does not record
+which seeds measured it (meta['seeds'] is missing or empty), so the
+seed-overlap check cannot run -- and it runs on records, not on trust*. The
+gate can only see the integers it is handed, so a `measure` that ignores its
+`seed` argument still defeats it. That honesty stays with you.
+
 That refusal exists because of a real loss. A candidate here was declared
 shippable on a 13% improvement. Measured on fresh seeds it read
-+0.1297 where it was found, and −0.0315, +0.0209, +0.0233 elsewhere,
++0.1297 where it was found, and -0.0315, +0.0209, +0.0233 elsewhere,
 reversing sign once. Discovery and validation had used the same thirty
 seeds, so re-measuring reproduced the same fluctuation exactly and reported
 it as confirmation. **It tested reproducibility of the measurement, not of

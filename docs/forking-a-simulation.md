@@ -19,8 +19,12 @@ Two mechanisms for different jobs:
 
 | | cost | survives the process |
 |---|---|---|
-| `pt.branch(engine, 2, ...)` | < 1 ms | no |
-| `Checkpoint.resume()` | 2.7 s | yes |
+| `pt.branch(engine, 2, ...)` | 0.6 ms | no |
+| `Checkpoint.resume()` | 1.4 s | yes |
+
+Both figures are medians of five calls on one laptop, forking a 40-name
+`Universe.random(40, seed=7)` engine at day 60; `resume` is the noisier of the
+two and ranged 0.8 s to 1.5 s over those five.
 
 `branch` copies engine state - every column plus the generator position - in
 constant time. `Checkpoint` replays the order log, three orders of magnitude
@@ -33,5 +37,9 @@ right prices and wrong fair values - plausible everywhere visible, wrong in the
 one place that drives everything.
 
 The low-level `restore_state` cannot make that check, since an engine holds no
-fundamentals. It verifies roster order and size only. Prefer `branch` and
+fundamentals. It verifies roster order and size, and it verifies the model
+fingerprint the snapshot was taken under -- restoring a `pt-v12` snapshot into
+a `pt-v1` engine raises `ValidationError: this snapshot was taken under model
+"pt-v12" and this engine runs "pt-v1"`. What it cannot see is a roster whose
+tickers still match but whose fundamentals do not, so prefer `branch` and
 `Checkpoint`.

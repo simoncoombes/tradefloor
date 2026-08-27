@@ -89,7 +89,7 @@ The escape hatch exists and is deliberately ceremonial:
 ```python
 custom = pt.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
 eng = pt.Engine(seed=42, universe=u, model=custom)
-eng.model_fingerprint        # "custom-0c04c4ba", never "pt-v1"
+eng.model_fingerprint        # "custom-7f290e34", never "pt-v1"
 ```
 
 `ModelParams` is immutable once built. The fingerprint is the first 8 hex
@@ -113,27 +113,51 @@ The fingerprint travels everywhere a result does:
 
 ## What is settable, and what is not
 
-`pt.ModelParams.settable()` lists the runtime-settable surface: the two
-variance processes (per-name GJR-GARCH and the market factor's), the factor
-sigmas and the idiosyncratic scale, the mispricing dynamics, the news and
-flow coefficients, the volume expression's coefficients (`volume_move_cap`
-among them, the one `pt-v12` moved off its compiled literal), and the guards
-that live in the tick chain (the mispricing cap, the crowd lean cap, the
-session breaker, the price cap).
-Guards are settable but are worst-case guarantees rather than tuning knobs,
-and a calibration search excludes them.
+`pt.ModelParams.settable()` lists the runtime-settable surface, 87 names at
+0.3.0. Read the list rather than a summary of it, but the shape is: the two
+variance processes (per-name GJR-GARCH and the market factor's, cascade
+components and slow term included), the factor sigmas, the sector loadings
+and the idiosyncratic scale, the size and spread effects, the mispricing and
+crowd dynamics, the news and flow coefficients (endogenous and peer news
+among them), the jump sizes and intensities, the VIX channel, the crisis
+blend and the stress terms, the volume expression's coefficients
+(`volume_move_cap` among them, the one `pt-v12` moved off its compiled
+literal), and the guards that live in the tick chain (the mispricing cap,
+the crowd lean cap, the session breaker, the price cap).
+Those four guards are settable but are worst-case guarantees rather than
+tuning knobs, and a calibration search excludes them; `daily_shock_cap` is a
+guard too and is not settable at all.
 
 Two coefficients are *derived*: `mispricing_phi` and `s_phi_tick` are
 carried as recorded bit patterns and cannot be set directly. Overriding
 `mispricing_half_life_days` recomputes both, deterministically on a given
 build but not bit-identically to any recorded constant.
 
-The rest of the preset surface, meaning the fair-value coefficients, the
-macro chain's constants, the book geometry and the sector sigma table, is *visible* in
-`ModelParams.to_dict()` and covered by the fingerprint, but overriding it
-is refused by name: those constants are compile-time in this build, and
-accepting an override the engine would ignore would make the fingerprint a
-lie.
+The rest of the preset surface is *visible* in `ModelParams.to_dict()` and
+covered by the fingerprint, but overriding it is refused by name: those
+constants are compile-time in this build, and accepting an override the
+engine would ignore would make the fingerprint a lie. The two counts are the
+size of that gap: `to_dict()` carries 118 entries against `settable()`'s 87,
+which was 70 at 0.2.0. The 31 that differ are the preset `name`, the two
+derived coefficients above, and 28 compile-time constants: the sector
+daily-sigma table (twelve entries), the book geometry (`book_levels`,
+`inventory_limit_levels`), the `daily_shock_cap` guard, most of the
+fair-value chain (`fair_value_floor`,
+`default_sector_anchor_pe`, `neutral_discount_rate`, `rate_pe_sensitivity`,
+`growth_duration_scale`, `loss_making_price_to_book`) and most of the macro
+chain (`inflation_target`, `phillips_curve_coeff`, `fiscal_multiplier`,
+`oil_baseline`, `gold_equilibrium_base`, `gold_mean_reversion`,
+`rate_adjustment_floor`).
+
+"Most" and not "all" in both of those, because the line moves every time a
+parameter is promoted off its literal, the way `volume_move_cap` was for
+`pt-v12`. `fair_value_book_floor` is a settable fair-value coefficient, and
+`inflation_reversion`, `inflation_ceiling` and `inflation_floor` are
+settable macro-chain constants -- the three dials
+[the realism envelope](realism-envelope.md) points at its macro-range gap,
+shipped at the values every preset ran on. So read `settable()` rather than
+a category: the refusal names the key and prints the whole settable surface
+beside it, which is the answer that cannot go stale.
 
 One rule governs membership: **nothing settable may change how many draws
 are taken or in what order.** Market hours, the 390-tick day, the calendar,
@@ -174,7 +198,14 @@ What the shipped default is certified to reproduce, and where it is not, is
 [the realism envelope](realism-envelope.md).
 
 For the compact coefficient table the known-answer test hashes, see
-`pt.model_preset()`, which returns the mispricing coefficient dictionary and
-keeps its exact historical shape, because the cross-platform determinism
-gate digests every value in it. The full surface lives on
+`pt.model_preset()`, which returns the nine-key mispricing and crowd
+dictionary and keeps its exact historical shape. It has to:
+`metadata_buffer()` in `tests/known_answer.py` packs every value in it bar
+`name` as a canonical f64, sorted by key so the bytes cannot depend on dict
+ordering, and the committed `sha256` the cross-platform gate compares is
+taken over that buffer appended to the simulation's own, 64 bytes onto
+16,856. Adding a key, renaming one or moving a value moves the baseline.
+It moves only what should move: those 64 bytes are also hashed on their own
+as `metadataSha256`, so a fix to what the library *reports* can be re-based
+without asserting that any trajectory changed. The full surface lives on
 `ModelParams.to_dict()`.

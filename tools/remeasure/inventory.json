@@ -3842,26 +3842,26 @@
    "id": "tca.roundtrip_cost",
    "file": "docs/transaction-cost-analysis.md",
    "line": 35,
-   "label": "the round trip's median across the eight published seeds: -8.4 bps",
-   "published": -8.4,
+   "label": "the round trip's median across the eight published seeds: -12.40 bps",
+   "published": -12.4,
    "group": "tca_example",
    "key": "rt_median",
    "compare": {
     "kind": "range",
-    "decimals": 1,
-    "lo": -13.3,
-    "hi": 5.8
+    "decimals": 2,
+    "lo": -17.72,
+    "hi": 2.03
    },
    "source": "stated",
-   "note": "was method_unknown and a point (-10.8); the era's re-deal flipped the anchor seed, so the page now publishes a seed range and this row is judged as one: the median against the printed -8.4, falling back to the published -13.3..+5.8 range",
+   "note": "was -8.4 with a -13.3..+5.8 range; the pt-v12 default re-dealt the round trip, so the whole row moved together. Judged as the median against the printed -12.40, falling back to the published -17.72..+2.03 range",
    "method": "tca.analyse(RoundTrip(0.01)).shortfall_bps() over sim seeds 2026,1,2,3,4,5,7,11; same configuration as tca.entry_cost"
   },
   {
    "id": "tca.roundtrip_lo",
    "file": "docs/transaction-cost-analysis.md",
    "line": 33,
-   "label": "the round trip ends anywhere between -13.3...",
-   "published": -13.3,
+   "label": "the round trip ends anywhere between -17.72...",
+   "published": -17.72,
    "group": "tca_example",
    "key": "rt_lo",
    "compare": {
@@ -3870,14 +3870,14 @@
    },
    "source": "stated",
    "method": "min over the eight published seeds",
-   "note": "the page rounds the range outward (measured -13.25 prints as -13.3), so the endpoints are judged to within one outward-rounding step rather than at nearest-decimal precision"
+   "note": "measured -17.7188; the page prints two decimals, so the endpoints are judged inside a 0.1 bps band rather than at nearest-decimal precision"
   },
   {
    "id": "tca.roundtrip_hi",
    "file": "docs/transaction-cost-analysis.md",
    "line": 34,
-   "label": "...and +5.8 bps",
-   "published": 5.8,
+   "label": "...and +2.03 bps",
+   "published": 2.03,
    "group": "tca_example",
    "key": "rt_hi",
    "compare": {
@@ -3886,14 +3886,14 @@
    },
    "source": "stated",
    "method": "max over the eight published seeds",
-   "note": "see tca.roundtrip_lo on outward rounding"
+   "note": "see tca.roundtrip_lo on the band"
   },
   {
    "id": "tca.roundtrip_neg",
    "file": "docs/transaction-cost-analysis.md",
    "line": 34,
-   "label": "negative on six of the eight",
-   "published": 6,
+   "label": "negative on seven of the eight",
+   "published": 7,
    "group": "tca_example",
    "key": "rt_neg",
    "compare": {
@@ -3979,8 +3979,8 @@
    "id": "tca.ripple_traded",
    "file": "docs/transaction-cost-analysis.md",
    "line": 65,
-   "label": "the agent traded 46 names",
-   "published": 46,
+   "label": "the agent traded 57 names",
+   "published": 57,
    "group": "tca_ripple",
    "key": "traded_names",
    "compare": {
@@ -3993,8 +3993,8 @@
    "id": "tca.ripple_untouched",
    "file": "docs/transaction-cost-analysis.md",
    "line": 65,
-   "label": "leaving fourteen untouched",
-   "published": 14,
+   "label": "leaving three untouched",
+   "published": 3,
    "group": "tca_ripple",
    "key": "untouched_names",
    "compare": {
@@ -4002,14 +4002,14 @@
    },
    "source": "stated",
    "method": "as tca.ripple_traded",
-   "note": "PR 25 said '2 of 44 untraded names'; on this build Momentum trades 46 of the 60, so the page's 14 is the honest denominator and it reproduces"
+   "note": "Momentum trades 57 of the 60 over ten days on the pt-v12 default, so three is the denominator and all three of them leak"
   },
   {
    "id": "tca.ripple_moved",
    "file": "docs/transaction-cost-analysis.md",
    "line": 65,
-   "label": "two of the fourteen it never touched moved",
-   "published": 2,
+   "label": "all three it never touched moved",
+   "published": 3,
    "group": "tca_ripple",
    "key": "leaked_count",
    "compare": {
@@ -4022,43 +4022,59 @@
    "id": "tca.ripple_lo",
    "file": "docs/transaction-cost-analysis.md",
    "line": 66,
-   "label": "by -6.5...",
-   "published": -6.5,
+   "label": "by -10.72...",
+   "published": -10.72,
    "group": "tca_ripple",
    "key": "leak_min_bps",
    "compare": {
     "kind": "round",
-    "decimals": 1
+    "decimals": 2
    },
    "source": "stated",
-   "method": "impact_bps of the two leaked names, smaller"
+   "method": "impact_bps of the three leaked names, smallest",
+   "note": "this is the LARGEST ripple in magnitude and it exceeds tca.ripple_direct, which is the point the page now makes"
   },
   {
    "id": "tca.ripple_hi",
    "file": "docs/transaction-cost-analysis.md",
    "line": 66,
-   "label": "...and +3.2 bps",
-   "published": 3.2,
+   "label": "...+2.00 and +1.97 bps",
+   "published": 2.0,
    "group": "tca_ripple",
    "key": "leak_max_bps",
    "compare": {
     "kind": "round",
-    "decimals": 1
+    "decimals": 2
    },
    "source": "stated",
-   "method": "impact_bps of the two leaked names, larger"
+   "method": "impact_bps of the three leaked names, largest"
+  },
+  {
+   "id": "tca.ripple_mid",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 66,
+   "label": "the third leaked name: +1.97 bps",
+   "published": 1.97,
+   "group": "tca_ripple",
+   "key": "leak_mid_bps",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "impact_bps of the three leaked names, middle"
   },
   {
    "id": "tca.ripple_direct",
    "file": "docs/transaction-cost-analysis.md",
    "line": 66,
-   "label": "against a 13.0 bps median direct impact on the traded names",
-   "published": 13.0,
+   "label": "against a 9.71 bps median direct impact on the traded names",
+   "published": 9.71,
    "group": "tca_ripple",
    "key": "direct_median_bps",
    "compare": {
     "kind": "round",
-    "decimals": 1
+    "decimals": 2
    },
    "source": "stated",
    "method": "median |impact_bps| over the traded names, exactly as examples/research_workflow.py computes it"
@@ -4066,21 +4082,50 @@
   {
    "id": "tca.ripple_short_horizon",
    "file": "docs/transaction-cost-analysis.md",
-   "line": 69,
-   "label": "the same configuration run for two, three or four days leaks nothing",
-   "published": true,
+   "line": 81,
+   "label": "nothing leaks at one or two days; nine untouched names leak at three",
+   "published": 9,
    "group": "tca_ripple",
-   "key": "short_horizon_no_leak",
+   "key": "leak_d3",
    "compare": {
     "kind": "exact"
    },
    "source": "stated",
-   "method": "untouched_moved() empty at days=2, 3 and 4 on the same configuration"
+   "method": "len(untouched_moved()) at days=3 on the same configuration",
+   "note": "replaces the retired claim that days 2, 3 and 4 all leak nothing, which held only while vix_return_clamp was 0.03 (pt-v1..pt-v8). See tca.ripple_horizon_d2 and tca.ripple_horizon_d4"
+  },
+  {
+   "id": "tca.ripple_horizon_d2",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 79,
+   "label": "at one and two days untouched_moved() is still empty",
+   "published": true,
+   "group": "tca_ripple",
+   "key": "no_leak_through_d2",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "untouched_moved() empty at days=1 and days=2 on the same configuration; at one day Momentum places no orders at all (tca_ripple.d1_no_orders)"
+  },
+  {
+   "id": "tca.ripple_horizon_d4",
+   "file": "docs/transaction-cost-analysis.md",
+   "line": 82,
+   "label": "at four days eighteen untouched names move",
+   "published": 18,
+   "group": "tca_ripple",
+   "key": "leak_d4",
+   "compare": {
+    "kind": "exact"
+   },
+   "source": "stated",
+   "method": "len(untouched_moved()) at days=4 on the same configuration"
   },
   {
    "id": "tca.ripple_pinned_empty",
    "file": "docs/transaction-cost-analysis.md",
-   "line": 84,
+   "line": 100,
    "label": "pinned, untouched_moved() comes back empty - byte-exact",
    "published": true,
    "group": "tca_ripple",
@@ -4096,8 +4141,8 @@
    "id": "sweeps.buffers",
    "file": "docs/sweeps-and-parallelism.md",
    "line": 17,
-   "label": "twelve buffers of 9.8 million f64 - about 940 MB",
-   "published": 940.0,
+   "label": "fourteen buffers of 9.8 million f64 - 1.10 GB",
+   "published": 1100.7,
    "group": "arith",
    "key": "buffers_mb",
    "compare": {
@@ -4105,13 +4150,29 @@
     "abs": 15.0
    },
    "source": "stated",
-   "method": "12 x 252 x 390 x 100 x 8 bytes",
-   "note": "the truth table has 13 columns; 'twelve' undercounts by one, though the byte arithmetic still lands on the page's 'about 940 MB'"
+   "method": "14 x 252 x 390 x 100 x 8 bytes",
+   "note": "fourteen f64 buffers per recorded day: prices, volumes, mispricing, fundamental, anchor and the nine attribution components (rust/src/python_arrow.rs, struct RecordedDay). Raw-buffer arithmetic only; resident cost is not published, because peak RSS on macOS is deflated by memory compression and ranged 66 to 165 MB across repeats of the same 26-day recording"
+  },
+  {
+   "id": "sweeps.buffers_per_day",
+   "file": "docs/sweeps-and-parallelism.md",
+   "line": 20,
+   "label": "4.37 MB a day of buffers",
+   "published": 4.37,
+   "group": "arith",
+   "key": "buffers_mb_per_day",
+   "compare": {
+    "kind": "round",
+    "decimals": 2
+   },
+   "source": "stated",
+   "method": "14 x 390 x 100 x 8 bytes, one recorded day of the same fourteen buffers sweeps.buffers counts over 252",
+   "note": "published alongside the 1.10 GB total so the per-day cost of `record=True` is legible without dividing; measured 4.368"
   },
   {
    "id": "sweeps.rows",
    "file": "docs/sweeps-and-parallelism.md",
-   "line": 18,
+   "line": 20,
    "label": "materialises 9.8 million rows",
    "published": 9828000,
    "group": "perf",
@@ -4125,9 +4186,9 @@
   {
    "id": "sweeps.hundred_gb",
    "file": "docs/sweeps-and-parallelism.md",
-   "line": 19,
-   "label": "a hundred resident engines is roughly 90 GB",
-   "published": 90.0,
+   "line": 22,
+   "label": "a hundred resident engines is roughly 110 GB",
+   "published": 110.0,
    "group": "arith",
    "key": "hundred_engines_gb",
    "compare": {
@@ -4140,16 +4201,18 @@
   {
    "id": "sweeps.three_streams",
    "file": "docs/sweeps-and-parallelism.md",
-   "line": 29,
-   "label": "per-seed parallelism survives the split into three per-domain substreams",
-   "published": 3,
-   "group": "rng",
-   "key": "stream_count",
+   "line": 32,
+   "label": "per-seed parallelism survives the split into seven per-domain substreams",
+   "published": 7,
+   "group": null,
+   "key": null,
    "compare": {
-    "kind": "exact"
+    "kind": "none"
    },
    "source": "stated",
-   "method": "len(Engine.draws_by_stream())"
+   "status_override": "covered_by_tests",
+   "method": "rust/src/rng.rs `mod stream` defines ids 0-6",
+   "note": "seven substreams: market, economy, external, jumps, volume, news, volume_idio. tests/test_streams.py asserts len(state_snapshot()['rng']) == 3 * 7. NOT verifiable through the `stream_count` key, whose measure reads the legacy `draws_by_stream()` reporter and still returns three"
   },
   {
    "id": "edgar.requests",

@@ -54,11 +54,12 @@ false.
 call that cannot return inside a conversation is not a tool. Atlas stays a
 library API, driven by `tools/calibration/atlas_survey.py`.
 
-**Arbitrary model parameters.** `ModelParams` has 54 settable coefficients
+**Arbitrary model parameters.** `ModelParams` has 87 settable coefficients
 and a preset fingerprint that makes a result citable. Letting a model
 improvise coefficients produces markets nobody calibrated, reported with
-the authority of a named preset. Presets are selectable by name; the
-coefficients behind them are not.
+the authority of a named preset. No tool here takes a preset argument
+either: every run is the shipped default, named in provenance, and
+selecting another of the twelve is a library call.
 
 **Anything that writes.** Every tool is read-only and pure: same arguments,
 same bytes, on every platform.
@@ -635,10 +636,13 @@ def describe_simulator() -> dict[str, Any]:
         },
         "not_exposed_here": {
             "atlas": "Response-surface surveys run for hours. Library only.",
-            "model_coefficients": "Presets are selectable by name; the 54 "
-                                  "coefficients behind them are not, because "
-                                  "improvised coefficients produce a market "
-                                  "nobody calibrated.",
+            "model_coefficients": "Every run here uses the shipped default "
+                                  "preset and no tool takes a preset "
+                                  "argument; the 87 settable coefficients "
+                                  "behind a preset are not exposed either, "
+                                  "because improvised coefficients produce a "
+                                  "market nobody calibrated. Selecting "
+                                  "another preset is a library call.",
         },
         "provenance": _provenance(),
     }

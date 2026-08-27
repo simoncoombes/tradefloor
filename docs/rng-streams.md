@@ -7,11 +7,11 @@ rack: reference
 # RNG streams
 
 One seed drives the whole simulation, but not through one generator. The
-engine derives **three independent substreams** from the root seed, one each
-for market, economy and external, so that changing what one consumer draws cannot shift
-any other consumer's sequence. This page is the derivation contract: what a
-reader needs to reproduce every stream from the seed, and the argument for
-why the streams are independent.
+engine derives **seven independent substreams** from the root seed -- market,
+economy, external, jumps, volume, news and per-name volume -- so that changing
+what one consumer draws cannot shift any other consumer's sequence. This page
+is the derivation contract: what a reader needs to reproduce every stream from
+the seed, and the argument for why the streams are independent.
 
 ## Why streams exist
 
@@ -34,16 +34,32 @@ sequence for everyone after it. Three consumers hit exactly this wall:
 
 The split landed inside the 2026-08 era boundary, regenerating the
 known-answer baseline. `KAT_VERSION` was 5 at the split; the era's later
-model changes have since taken it to 8: every trajectory changed, once, and
-these three questions became answerable.
+model changes have since taken it to 11 (`tests/known_answer.py`): every
+trajectory changed, once, and these three questions became answerable.
 
-## The three streams
+Then the split paid a second time, which is why there are seven streams and
+not three. A mechanism that *consumes* draws cannot be added to a shared
+stream without shifting every draw after it, so a jump process bolted onto
+`market` would have moved every preset's trajectory the moment the code
+landed, calibrated or not. Endogenous jumps, common volume persistence,
+endogenous news and per-name volume persistence therefore each got a stream of
+their own. On its own stream a new mechanism perturbs nothing, however it
+draws: at zero intensity no jump fires, `market`, `economy` and `external`
+are untouched, every preset shipped before it reproduces bit for bit, and
+the known-answer digest does not move. That is what let those mechanisms
+ship inert and be calibrated afterwards.
+
+## The seven streams
 
 | stream | id | serves |
 |---|---|---|
 | `market` | 0 | every draw in the tick: the market factor, sector factors, per-company noise, volume, book settlement |
 | `economy` | 1 | the daily macro chain: economy update, cycle transition, central bank |
 | `external` | 2 | the embedder, through `Engine.draw_uniform()` / `draw_normal()` |
+| `jumps` | 3 | endogenous jumps at the close: two draws for the market, then two per company, always |
+| `volume` | 4 | the common volume-persistence AR(1): one draw per day at the close |
+| `news` | 5 | endogenous company news at the open: two draws per company per day, taken only when `endogenous_news_intensity` is non-zero |
+| `volume_idio` | 6 | per-name volume persistence: one draw per company per day at the close |
 
 The **market stream's schedule is a pure function of (market status, active
 roster, sector count)**. Settlement historically drew four uniforms *or
@@ -54,10 +70,22 @@ the market stream's position. The economy stream's count still varies with
 macro state, since a chain in contraction draws a shock the expansion never
 rolls, which is precisely why it has its own stream.
 
-`Engine.draws_by_stream()` reports the per-stream counts:
-`{"market": n, "economy": n, "external": n}`. Equal `market` counts between
-two runs of the same tick schedule mean the two markets consumed, and
-therefore saw, an identical noise sequence.
+Streams 3, 4 and 6 hold themselves to the market stream's discipline for the
+same reason: jumps take two draws for the market and two more per name whether
+or not a jump fires, and both volume states draw *before* the guard that would
+skip the update, so no settable parameter can move a stream position.
+Stream 5 is the exception and is documented as one: at
+`endogenous_news_intensity = 0` the news draws are skipped entirely rather
+than taken and discarded, so the news stream's position is a function of
+that one parameter. It costs nothing, because the stream is separate: no
+other stream can see it.
+
+`Engine.draws_by_stream()` reports counts for the first three:
+`{"market": n, "economy": n, "external": n}`, and `draws_consumed` is their
+total. Equal `market` counts between two runs of the same tick schedule mean
+the two markets consumed, and therefore saw, an identical noise sequence,
+which is the whole point of the diagnostic. The four later streams are not
+counted there; their positions are visible in `state_snapshot()["rng"]`.
 
 ## The derivation contract
 
@@ -133,10 +161,19 @@ recorded sequence number identifies its era at a glance.
 
 ## What lands in a checkpoint
 
-`state_snapshot()["rng"]` is nine numbers: `(state, increment, spare)` for
-the market, economy and external streams, in that order. The u64 halves
-ride as f64 bit patterns so they round-trip exactly. Each stream carries
-its own Box-Muller spare, because the parity of normal draws is per-stream state
-and never crosses domains. A pre-split snapshot (three numbers) is refused
-on restore with its era named: it froze a single-stream market that this
+`state_snapshot()["rng"]` is twenty-one numbers: `(state, increment, spare)`
+for the market, economy, external, jumps, volume, news and per-name volume
+streams, in that order. The u64 halves ride as f64 bit patterns so they
+round-trip exactly. Each stream carries its own Box-Muller spare, because the
+parity of normal draws is per-stream state and never crosses domains.
+
+The length *is* the version marker: there is no version field, because the
+count of streams already is one. Restore accepts 9, 12, 15, 18 and 21 and
+nothing else -- 9 predates the jump stream, 12 carries it, 15 adds volume, 18
+adds news, 21 adds per-name volume. A short snapshot keeps this engine's own
+seed-derived position for the streams it does not carry, which is the only
+choice that lets a checkpoint written before a mechanism existed replay
+exactly as it did then; a zeroed generator would be a different sequence
+wearing the same seed. A pre-split snapshot (three numbers) is refused
+outright, with its era named: it froze a single-stream market that this
 version cannot continue bit-exactly.

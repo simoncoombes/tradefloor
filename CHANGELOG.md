@@ -12,7 +12,13 @@ like a real one over a two-year run as well as a one-year run.
 |---|---|---|
 | over one year | 14 of 14 | 14 of 14 |
 | **over two years** | 13 of 14 | **14 of 14** |
-| on a universe it was never tuned on | 13 of 14 | **14 of 14** |
+| on a universe it was never tuned on | 14 of 14 | 14 of 14 |
+
+The two-year row is the one that moved, and the other two are here because a
+two-year gain paid for at the certified horizon, or paid for on a roster the
+calibration never saw, would not be worth having. Neither was spent. All
+three are thirty-seed medians; the third runs a 60-name universe the
+calibration never used, on thirty seeds it never used either.
 
 Nothing you have written stops working. Every earlier preset still exists
 and still reproduces bit for bit, so a result you recorded last week replays
@@ -59,22 +65,29 @@ volume beyond one year", because that statistic sat outside its band at two
 years. `pt-v12` holds it inside at both horizons, so the gap is retired
 rather than reworded.
 
-**Two-year and five-year runs are now measured.** The envelope used to say
-that nothing beyond 504 days had been measured at all, so a five-year study
-was reading numbers nobody had checked. `pt-v12` is now measured at 756,
-1260 and 2520 days on thirty seeds. Nothing runs away and nothing drifts:
-annualised volatility year by year across ten years reads 31.5, 35.6, 30.2,
-33.5, 33.0, 33.1, 31.3, 32.4, 32.4 and 31.6 percent. The certified horizon is
-still 252 days, because that is where the certification is measured; what has
-changed is that the longer horizons are now numbers rather than silence.
+**Two-year and five-year runs are now measured.** The horizon gap rested on
+there being no measurement past 504 days at all, so a five-year study was
+reading numbers nobody had checked. `tools/calibration/long_horizon.py`
+measures `pt-v12` at 756, 1260 and 2520 days on thirty seeds, and
+`memory_vs_drift.py` measures the level directly: annualised volatility year
+by year across ten years reads 31.5, 35.6, 30.2, 33.5, 33.0, 33.1, 31.3,
+32.4, 32.4 and 31.6 percent on twenty seeds, so nothing runs away and nothing
+drifts. What those runs cannot do is GRADE themselves: the real-market bands
+were derived at one-year and two-year windows, and there is no committed tool
+to re-derive them at five. So the certified horizon is still 252 days and the
+gap stays; what changed is that the longer horizons are numbers rather than
+silence.
 
 **The envelope transfers to a realistic roster.** It used to warn that
 certification was measured on a sector-balanced roster, which no real index
 is, and told you to re-measure on your own universe. Re-measured on `pt-v12`
-across thirty seeds and the full panel, every sector mix tested holds all
-fourteen statistics at one year: balanced, S&P-like, technology-heavy and
-defensive. Concentration costs the second year instead, through names in one
-industry correctly moving together more than a broad-market band expects.
+across thirty seeds and the full panel, balanced, S&P-like, technology-heavy
+and defensive rosters all hold fourteen of fourteen at one year, and an
+all-technology roster holds the thirteen that are defined on it --
+`sector_excess_corr` asks how much a name moves with its own industry beyond
+the market, which a one-sector roster cannot answer. Concentration costs the
+second year instead, through names in one industry correctly moving together
+more than a broad-market band expects.
 
 ### Seventeen new settings
 
@@ -154,11 +167,14 @@ shock, and a jump lands on one company and reaches no other.
 
 Real earnings surprises spread. Switch these on with `news_peer_weight` and
 one company's surprise moves its sector's other members, which is a route
-for industries to move together that this market has never had. Measured at
-thirty seeds, that lands crisis-time industry co-movement on +0.107 against
-a real +0.103, where the default reads +0.040. Both ship off, and no preset
-uses them yet: news is company-specific movement before it is contagion, and
-switching it on as-is costs more elsewhere than it buys.
+for industries to move together that this market has never had. `pt-v11`
+ships them on, at intensity 0.05 and sigma 0.03 with peer weight 0.05 and
+peer-VIX coupling 8.0, and `pt-v12` inherits all four unchanged. Measured at
+thirty seeds under a held VIX 45, that lands crisis-time industry co-movement
+on +0.110 at `pt-v11` and +0.109 at `pt-v12` against a real +0.103, where
+`pt-v10`, the default before this release, reads +0.040. Every preset from
+`pt-v1` to `pt-v10` reads zero on all four, so nothing that already shipped
+moves.
 
 `volume_idio_persistence` and `volume_idio_sigma` give each company its own
 trading-volume rhythm. Until now a single number made the whole market busy
@@ -182,7 +198,9 @@ market's movement and 1% of a panic's. It ships off, and `pt-v11` does not
 use it, because buying a violent crisis through company-specific jumps is
 what pulls names apart.
 
-Both ship at the values every earlier preset already ran on, bit for bit.
+Every one of these ships at the value the engine already used, so no preset
+from `pt-v1` to `pt-v10` moves: `sector_loading` at 0.5 and its slope at 0,
+`jump_vix_coupling` at 0, `volume_idio_*` at 0.
 
 ## 0.2.0
 
@@ -239,7 +257,7 @@ In plain terms, this market now has:
 
 ### What changed under the hood
 
-Ten new parameters, every one shipped at the value the engine already used,
+Nine new parameters, every one shipped at the value the engine already used,
 so each arrived as a measurement rather than a guess. The ones that ended up
 in the default: the VIX's fear channel now reads the day's index return
 instead of the closing minute; volatility regimes come from the market
@@ -339,7 +357,7 @@ on thirty training seeds at both horizons.
 
 | preset | base | coefficients moved | measured |
 |---|---|---|---|
-| `pt-v7` | pt-v6 | `sector_factor_sigma` 0.002 to 0.012, `crisis_blend_source` 0 to 1, `sector_vix_coupling` 0 to 0.25, `idio_sigma_scale` down ten percent, `crisis_blend_cap` 0.8 to 0.98, `market_vol_ceiling_multiple` 8 to 16 | 12 of 13 in band at 252 and at 504 days; sector excess 0.128 and 0.118 against a band of 0.11 to 0.23; crisis volatility lever 3.31x |
+| `pt-v7` | pt-v6 | `sector_factor_sigma` 0.002 to 0.012, `crisis_blend_source` 0 to 1, `sector_vix_coupling` 0 to 0.25, `idio_sigma_scale` down ten percent, `crisis_blend_cap` 0.8 to 0.98, `market_vol_ceiling_multiple` 8 to 16 | 13 of 14 in band at 252 and at 504 days, the miss being `volume_change_acf1` at both; sector excess 0.128 and 0.118 against a band of 0.11 to 0.23; crisis volatility lever 3.31x |
 | `pt-v8` | pt-v7 | market factor GARCH alpha 0.468 to 0.298 and beta 0.521 to 0.665, `market_factor_sigma` 0.0159 to 0.0088, `idio_sigma_scale` 0.733 to 0.653, market jumps and sector sigma at surveyed values | 13 of 14 at 504 days and 12 of 14 at 252; correlation persistence +0.315 against a band of 0.19 to 0.49; crisis volatility lever 4.34x |
 
 pt-v7 is the first preset in which same-sector pairs co-move more than
