@@ -7,7 +7,7 @@ short: Sharing a run
 
 # Sharing a run
 
-[Reproducing a run](reproducing-a-run.html) lists the five things that
+[Reproducing a run](reproducing-a-run.md) lists the five things that
 identify a run and shows how to archive each one by hand. `RunManifest` is
 that procedure as one object: written by whoever ran the simulation, checked
 by whoever wants to.
@@ -64,7 +64,7 @@ agents: the escape hatch declares itself.
 ## It refuses across an era boundary
 
 A run is only reproducible on a build whose arithmetic matches the one that
-ran it, and [across versions, not at all](reproducing-a-run.html). The hazard
+ran it, and [across versions, not at all](reproducing-a-run.md). The hazard
 is not hypothetical: one calendar day brought three trajectory-changing
 fixes (the macro-chain and volume fixes, then the market-factor-sigma
 recalibration) while `pt.version()` stayed `0.1.0` and the preset stayed
@@ -87,16 +87,16 @@ fails with its key named, but none of them is trusted as the era.
 
 ## What a successful reproduction says about platforms
 
-Cross-OS bit-identity is measured by commit. The five-target release gate
-has run: at `ad91026` (known-answer v5, the RNG stream split), all five
-targets (Linux x86_64 and aarch64, macOS arm64 and x86_64, and Windows
-x86_64) produced the identical digest, `76983e65...3180eeb`, each also
-passing against the committed baseline. It has not yet run against a tagged
-release, and the current digest, `1ee64998...fe3581c` at v8, was regenerated
-on macOS arm64 and has one platform's confirmation behind it until the gate
-runs again. See [Reproducing a run](reproducing-a-run.html) for the full
-record. The manifest records the platform it was written on and claims
-nothing beyond that. What it offers is sharper than a claim: a successful `reproduce()` on
+Cross-OS bit-identity is measured by commit, and the five-target gate has
+run against the baseline this release ships. At `f722ce3`, the 0.3.0 version
+bump, all five targets (Linux x86_64 and aarch64, macOS arm64 and x86_64,
+and Windows x86_64) reported the identical known-answer v11 digest,
+`60d47572...de590`, which is the `sha256` committed in
+`tests/known_answer.json`. It has run against tagged releases too: the
+determinism run on each of v0.1.0 through v0.2.0 had all five targets agree.
+See [Reproducing a run](reproducing-a-run.md) for the full record. The
+manifest records the platform it was written on and claims nothing beyond
+that. What it offers is sharper than a claim: a successful `reproduce()` on
 a different machine **is** a cross-platform measurement for that run, made
 by the reader rather than promised by the library. A failure after every
 input and the era have verified is reported as exactly what it is, an
@@ -106,7 +106,7 @@ start a bisection from (`pt.replay(log, ..., until=n)`).
 ## Manifest or checkpoint?
 
 Both serialise a run's history; they answer different questions.
-[`Checkpoint`](forking-a-simulation.html) is a point to **return to**: fork
+[`Checkpoint`](forking-a-simulation.md) is a point to **return to**: fork
 it, drive the branches apart, ask what happens next. `RunManifest` is a
 finished result to **hand over**: it adds the era guard, the per-component
 fingerprints, the result digest and the completeness declaration, none of

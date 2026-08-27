@@ -60,25 +60,45 @@ worthless. `compare()` refuses a shock that begins *after* the horizon ends
 horizon by every test the library can apply. It simply has nothing to transmit
 through yet.
 
-This is documented in full on [Scenarios](scenarios.html), with the
-measurement: a policy-rate `ramp` from 2.5% to 5% over thirty days moves every
-price by exactly 0.00% over 40 days, and a median −4.29% once the run is long
-enough to cross day 45. It is not restated here; go and read it, because
-every rate-bearing recipe below is sized around it.
+This is documented in full on [Scenarios](scenarios.md), with the
+measurement on the shipped `pt-v12`: a policy-rate `ramp` from 2.5% to 5% over
+thirty days moves every price by exactly 0.00% over 40 days, and a median
+−4.00% once the run is long enough to cross day 45. It is not restated here;
+go and read it, because every rate-bearing recipe below is sized around it.
+(The measured figures further down this page are `pt-v1`, for the reason given
+under "How the measured effects below were produced". The trap itself is
+structural and reads the same on every preset.)
 
 **Read the heading precisely.** It says a *policy-only rate path*, and the
 qualifier is the whole content. Most of the macro surface transmits the day you
-move it: a VIX shock on day 5 has moved prices by a median 39% at day 25, and
-`qe_pe_boost` and `corporate_bond_yield` both act immediately. Only
-`federal_funds_rate` and `inflation_rate` wait for a meeting, because both work
-by steering the corporate bond yield and nothing else. The per-field table is
-on [Scenarios](scenarios.html).
+move it: `qe_pe_boost` and `corporate_bond_yield` both reach fair value
+immediately, and a VIX shock moves prices immediately without touching fair
+value at all. Only `federal_funds_rate` and `inflation_rate` work by steering
+the corporate bond yield, and only they can be made to wait. The per-field
+table is on [Scenarios](scenarios.md).
 
-The consequence for this page is a rule: **run rate and inflation recipes for
-at least 90 days.** A 30-day study of a hiking cycle measures nothing and
-says so silently. Recipe 2 shows the same trap arriving through inflation
-rather than the policy rate, which is worth seeing because it is not the case
-the existing documentation warns about.
+Only one of the two always waits, and the exception is worth knowing before it
+surprises you. `federal_funds_rate` waits for the calendar every time.
+`inflation_rate` does not: an inflation rate running more than 4pp above the
+policy rate, and itself above 4%, forces an emergency meeting on the next
+daily step. A `step` from 2% to 9% on day 5 therefore reprices on day 6 --
+`federal_funds_rate` 2.500% to 7.167%, `corporate_bond_yield` 4.560% to
+10.392% -- and moves the median instrument −11.12% inside a 25-day run, on
+the shipped `pt-v12`.
+
+The consequence for this page is still a rule: **run rate and inflation
+recipes for at least 90 days.** A 30-day study of a hiking cycle measures
+nothing and says so silently. The emergency meeting does not weaken the rule,
+it sharpens it: what trips the emergency is the *gap*, and a gradual path
+opens a gap slowly. Recipe 2 is exactly that case. Its hundred-day ramp is at
+4.095% on day 40 against a policy rate still sitting at 2.500%, a gap of
+1.595pp and nowhere near the trigger, so it waits for the day-45 calendar like
+a policy-only path would. It does reach the emergency eventually, just not
+soon: the rate moves 2.500% to 3.101% at that day-45 scheduled meeting,
+inflation keeps climbing faster than the rate does, the gap crosses 4pp on
+day 80, and the emergency fires on day 81 at 3.101% to 6.551%. Both events
+sit outside a 40-day window and inside a 120-day one, which is the whole of
+the rule.
 
 ### Rule 1: pins on one field layer as consecutive segments
 
@@ -272,7 +292,7 @@ from pretium.scenario import compare
 u = pt.Universe.random(20, seed=4)
 held = Scenario("held crisis").hold(vix=45.0)
 
-r = compare(held, seed=5, universe=u, days=30,
+r = compare(held, seed=5, universe=u, days=30, model="pt-v1",
             baseline=Scenario("calm").hold(vix=15.0))
 print(f"explicit baseline: median {r['median_pct']:+.2f}%")
 ```
@@ -284,10 +304,15 @@ explicit baseline: median +29.72%
 **Whenever a recipe pins levels rather than paths, pass `baseline=`
 explicitly.** Recipe 4 does, and says so at the point of use.
 
+(The `model="pt-v1"` is not decoration. Every measured figure on this page
+comes from that preset, which is no longer the default, so every block that
+runs the engine pins it. The next section says why.)
+
 There is a second lesson in that +29.72%, and it is not that a crisis makes
-prices go up. Run the same comparison across sim seeds 1 to 8 and the median
-move spans **−26.56% to +29.72%, negative on 2 of the 8**. A price delta on a
-single seed is simply the wrong instrument for a volatility scenario: what a
+prices go up. Run the same comparison across sim seeds 1 to 8, still on
+`pt-v1`, and the median move spans **−26.56% to +29.72%, negative on 2 of the
+8**. A price delta on a single seed is simply the wrong instrument for a
+volatility scenario: what a
 VIX pin changes is the *variance* of the shared market factor, and one seed's
 realisation of a higher variance is a coin flip with a wide edge. Measure
 volatility scenarios with `pt.facts.measure`, as recipe 3 does. Measure rate
@@ -298,9 +323,17 @@ and credit scenarios, which move fair value directionally, with
 
 Every "in this model" figure on this page was measured on engine commit
 `9b485a0`, pretium 0.1.0, under model preset `pt-v1`, which was the default
-at the time and is not any more. The shipped default is now `pt-v10`, so
-these figures describe an earlier era. Every one of them is an inventory row
-in the re-measurement harness under the group `recipes`:
+at the time and is not any more. The shipped default is now `pt-v12`, so
+these figures describe an earlier era, and by now a distant one. `pt-v1` is
+still selectable and still reproduces bit for bit, which is why every block on
+this page that runs the engine passes `model="pt-v1"` explicitly: with it, the
+block reproduces the fence beneath it to the digit; without it, a paste runs
+`pt-v12` and prints something else, in one case with the opposite sign. Do not
+delete the argument to "modernise" a recipe -- change it to `"pt-v12"` and
+expect the fence to be wrong, because it is a figure from a different model.
+That applies to the figures quoted above this section too, in rule 3, which
+were measured the same way. Every one of them is an inventory row in the
+re-measurement harness under the group `recipes`:
 
 ```
 .venv/bin/python tools/remeasure/remeasure.py --only recipes
@@ -314,7 +347,7 @@ are this build's answer, and a calibration change moves all of them. If you
 are reading a number below and the harness reports it `MOVED`, trust the
 harness.
 
-Two conventions, both borrowed from [Scenarios](scenarios.html) so that one
+Two conventions, both borrowed from [Scenarios](scenarios.md) so that one
 set of habits covers both pages:
 
 - **price effects** use `Universe.random(20, seed=4)` at sim seed 5, via
@@ -336,7 +369,7 @@ hiking = Scenario.rate_shock(start=0.00125, end=0.0538, over=90,
                              credit_spread=0.02)
 
 u = pt.Universe.random(20, seed=4)
-r = compare(hiking, seed=5, universe=u, days=120)
+r = compare(hiking, seed=5, universe=u, days=120, model="pt-v1")
 print(f"median {r['median_pct']:+.2f}%  worst {r['worst_pct']:+.2f}%  "
       f"best {r['best_pct']:+.2f}%  exact={r['exact']}")
 ```
@@ -389,9 +422,15 @@ moved every name identically would tell a stock-picking strategy nothing.
 `exact=True` means the two worlds consumed identical market-noise draws, so the
 difference is the macro path and nothing else.
 
-Note the horizon. At 120 days the run crosses two central-bank meetings; the
-same config measured at 40 days would report roughly nothing, for the reason
-in the meeting trap.
+Note the horizon, and note what it is **not** about. `rate_shock` ramps the
+corporate bond yield alongside the policy rate, so this recipe is not caught
+by the meeting trap: the same config measured at 40 days already reports a
+median **−4.09%**, which is about 44% of the 120-day move and about where a
+linear 90-day ramp read at day 40 ought to sit. The horizon is 120 days
+because the ramp needs 90 to finish, not because anything is waiting for a
+meeting. Strip the credit leg out and ramp `federal_funds_rate` alone over
+the same 90 days and the trap comes straight back: exactly 0.00% on every
+name at 40 days, and a median −8.07% at 120.
 
 ## Recipe 2: An inflation shock
 
@@ -404,8 +443,8 @@ inflation = Scenario("inflation shock").ramp(
     "inflation_rate", start=0.014, end=0.091, over=100, begin=5)
 
 u = pt.Universe.random(20, seed=4)
-early = compare(inflation, seed=5, universe=u, days=40)
-late = compare(inflation, seed=5, universe=u, days=120)
+early = compare(inflation, seed=5, universe=u, days=40, model="pt-v1")
+late = compare(inflation, seed=5, universe=u, days=120, model="pt-v1")
 print(f"40 days:  largest absolute move {max(abs(x) for x in early['move_pct']):.2f}%")
 print(f"120 days: median {late['median_pct']:+.2f}%")
 ```
@@ -445,7 +484,9 @@ policy rate.** `inflation_rate` never reaches fair value directly. The valuation
 takes earnings, growth, the corporate bond yield, the policy rate and the QE
 multiple adjustment, and inflation is not among them. Inflation transmits only
 by steering the macro chain into a central-bank reaction, and that reaction
-lands at meetings.
+lands at a meeting -- a scheduled one here, because this ramp is gradual
+enough never to open the 4pp gap that would convene an emergency inside the
+first forty days.
 
 So the largest absolute price move anywhere in the cross-section after **40
 days is 0.26%**, against a median of **−10.01%** at 120 days. That is not
@@ -465,8 +506,9 @@ crisis = (Scenario.vix_shock(calm=18.0, peak=80.0, at=20, over=60)
                 over=40, begin=20))
 
 u = pt.Universe.random(20, seed=11)
-shocked = pt.facts.measure(seed=3, universe=u, days=120, scenario=crisis)
-calm = pt.facts.measure(seed=3, universe=u, days=120,
+shocked = pt.facts.measure(seed=3, universe=u, days=120, scenario=crisis,
+                           model="pt-v1")
+calm = pt.facts.measure(seed=3, universe=u, days=120, model="pt-v1",
                         scenario=Scenario("calm").hold(vix=18.0))
 print(f"annualised vol: {calm['annualised_vol_pct']:.2f}% calm -> "
       f"{shocked['annualised_vol_pct']:.2f}% crisis")
@@ -533,9 +575,42 @@ market factor, so a crisis VIX is a correlation regime as well as a volatility
 regime, and diversification measurably stops working, which is what a real
 crisis does to a portfolio.
 
-The response saturates: the factor's variance is clamped at 8× its baseline,
-so pushing `peak` from 80 to 120 buys almost nothing. Recipe 3 sits near the
-top of the usable range already.
+<!-- ERA CHECK (pt-v12 boundary): the blend itself survives and is now well
+     calibrated -- pt-v12 crisis sector excess at held VIX 45 is +0.109 against
+     a real +0.103, and crisis co-movement 0.696 against a real 0.664 to 0.727.
+     The threshold "25.5" needs no re-measurement: it is CRISIS_VIX_THRESHOLD
+     in rust/src/economy/state.rs:99, an engine base constant that no preset
+     overrides, so it reads the same on pt-v1 and on pt-v12. pt-v11's
+     crisis_blend_gain and sector_vix_coupling change how hard the blend pulls
+     past that threshold, not where the threshold sits. -->
+
+The response saturates, but the point at which it does is a preset
+coefficient rather than a property of the engine. `market_vol_ceiling_multiple`
+caps the market factor's variance at a multiple of its calm baseline, and
+under `pt-v1` that multiple was 8. That flattened the top of the range without
+closing it: pushing `peak` from 80 to 120 under `pt-v1` still raises
+annualised realised volatility from 82.16% to 92.16% and mean pairwise
+correlation from 0.636 to 0.692, so recipe 3 at `peak=80` sits near the top of
+that preset's usable range rather than past it. The ceiling has been raised
+since, to 32 on the shipped default, at the level a record VIX actually
+implies. The same 80-to-120 change measured there runs 74.78% to 96.83%, a
+22.1-point rise against `pt-v1`'s 10.0, which is what a raised ceiling buys:
+not a new response where there was none, but a band that keeps responding
+across the plausible range instead of flattening inside it.
+[Scenarios](scenarios.md) carries the current multiple and the reasoning
+behind it.
+
+<!-- ERA CHECK (pt-v12 boundary): corrected. The clamp is the preset
+     coefficient market_vol_ceiling_multiple, not a fixed engine constant:
+     rust/src/params.rs sets it to 16.0 in pt-v7 (line 1439) and to 32.0 in
+     pt-v10 (line 1596), and neither pt-v11 nor pt-v12 touches it, so the
+     shipped default carries 32. The "8x" this paragraph used to state in the
+     present tense is therefore a pt-v1 value and was wrong for the default,
+     not merely unverified. It is NOT the same cap as pt-v12's volume_move_cap
+     4.0 -> 12.0, which is on the volume response. The "bought almost nothing"
+     and "no longer inert" framing was wrong too, and is now measured on both
+     presets: peak 80 -> 120 gives 82.16% -> 92.16% on pt-v1 and 74.78% ->
+     96.83% on pt-v12, same config, vol convention, model= pinned. -->
 
 Measured on price instead, the same config reports a median **−8.29%** and a
 worst name at **−13.07%** on sim seed 5, but per the seed band under rule 3,
@@ -562,7 +637,8 @@ baseline = (Scenario("expansion baseline")
             .hold(fear_greed_index=50.0))
 
 u = pt.Universe.random(20, seed=4)
-r = compare(contraction, seed=5, universe=u, days=120, baseline=baseline)
+r = compare(contraction, seed=5, universe=u, days=120, baseline=baseline,
+            model="pt-v1")
 print(f"median {r['median_pct']:+.2f}%  exact={r['exact']}")
 ```
 
@@ -658,7 +734,7 @@ def pandemic_shape(days=120):
             vix = 18.0
 
         if d < 18:                      # policy: two cuts, ten days apart
-            ff = 0.0155
+            ff = 0.01625
         elif d < 28:
             ff = 0.01125
         else:
@@ -684,7 +760,7 @@ def pandemic_shape(days=120):
 
 compound = pandemic_shape()
 u = pt.Universe.random(20, seed=4)
-r = compare(compound, seed=5, universe=u, days=120)
+r = compare(compound, seed=5, universe=u, days=120, model="pt-v1")
 print(f"median {r['median_pct']:+.2f}%  worst {r['worst_pct']:+.2f}%  "
       f"best {r['best_pct']:+.2f}%  exact={r['exact']}")
 ```
@@ -704,8 +780,8 @@ for d in (0, 17, 30, 119, 500):
 ```
 
 ```
-0 {'corporate_bond_yield': 0.036, 'federal_funds_rate': 0.0155, 'qe_pe_boost': 0.0, 'vix': 15.0}
-17 {'corporate_bond_yield': 0.036, 'federal_funds_rate': 0.0155, 'qe_pe_boost': 0.0, 'vix': 79.15556}
+0 {'corporate_bond_yield': 0.036, 'federal_funds_rate': 0.01625, 'qe_pe_boost': 0.0, 'vix': 15.0}
+17 {'corporate_bond_yield': 0.036, 'federal_funds_rate': 0.01625, 'qe_pe_boost': 0.0, 'vix': 79.15556}
 30 {'corporate_bond_yield': 0.07364, 'federal_funds_rate': 0.00125, 'qe_pe_boost': 0.0, 'vix': 60.66667}
 119 {'corporate_bond_yield': 0.045, 'federal_funds_rate': 0.00125, 'qe_pe_boost': 0.1, 'vix': 18.0}
 500 {'corporate_bond_yield': 0.045, 'federal_funds_rate': 0.00125, 'qe_pe_boost': 0.1, 'vix': 18.0}
@@ -722,8 +798,8 @@ moving on day zero:
 chained = (Scenario("compound: chained")
            .hold(vix=15.0)
            .ramp("vix", start=82.0, end=18.0, over=45, begin=15)
-           .hold(federal_funds_rate=0.0155)
-           .step("federal_funds_rate", before=0.0155, after=0.01125, at=18)
+           .hold(federal_funds_rate=0.01625)
+           .step("federal_funds_rate", before=0.01625, after=0.01125, at=18)
            .step("federal_funds_rate", before=0.01125, after=0.00125, at=28)
            .hold(corporate_bond_yield=0.036)
            .ramp("corporate_bond_yield", start=0.036, end=0.105, over=22, begin=18)
@@ -754,8 +830,9 @@ different clocks and in different directions.
 - **Policy**: two cuts, ten sessions apart, mirroring the Federal Reserve's
   two intermeeting moves: **50bp on 3 March 2020** taking the target range to
   1.00-1.25%, then **100bp on 15 March 2020** taking it to 0-0.25%. The three
-  levels `0.0155 → 0.01125 → 0.00125` are the midpoints of 1.50-1.75%,
-  1.00-1.25% and 0-0.25%.
+  levels `0.01625 → 0.01125 → 0.00125` are the midpoints of 1.50-1.75%,
+  1.00-1.25% and 0-0.25%, so the two steps are exactly 50bp and 100bp, which
+  is the check worth doing on any hand-built policy path.
 - **Credit**: the blow-out-then-compression shape follows the US High Yield
   option-adjusted spread, which peaked around **10.9% on 23 March 2020**
   before the Fed's corporate credit facilities were announced, and then
@@ -816,7 +893,7 @@ print(compound.to_json(days=120)[:120], "...")
 ```
 
 ```
-{"days":120,"label":"compound: pandemic shape","path":[{"corporate_bond_yield":0.036,"day":0,"federal_funds_rate":0.0155 ...
+{"days":120,"label":"compound: pandemic shape","path":[{"corporate_bond_yield":0.036,"day":0,"federal_funds_rate":0.0162 ...
 ```
 
 `to_json` serialises the realised values rather than the constructor call,

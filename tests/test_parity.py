@@ -2,7 +2,7 @@
 
 WP7's acceptance asks for "a determinism test in the package's own suite (same
 seed -> same bits, run twice, plus a committed known-answer file)". This is
-that, plus the stronger claim: the Python surface reproduces the TypeScript
+that, plus the stronger claim: the Python surface reproduces the reference implementation
 reference bit-for-bit, not merely itself.
 
 Run with the goldens present:
@@ -132,7 +132,7 @@ def test_normal_draws_carry_the_box_muller_spare():
 
 
 # --------------------------------------------------------------------------
-# Parity against the TypeScript reference
+# Parity against the reference implementation
 # --------------------------------------------------------------------------
 
 def test_uniform_draws_match_the_reference_bit_for_bit():
@@ -156,7 +156,7 @@ def test_fair_value_matches_the_reference_bit_for_bit():
     measured by this test, and currently is, for every admitted case.
 
     Cases the boundary rejects (NaN, out-of-band rates) are counted, not
-    skipped silently: they exist because the core reproduces the TypeScript's
+    skipped silently: they exist because the core reproduces the reference implementation's
     NaN behaviour faithfully while the boundary refuses to let a user reach
     it. Both halves of that policy are asserted.
     """
@@ -232,7 +232,7 @@ def test_absent_yield_falls_through_but_zero_does_not():
 # --------------------------------------------------------------------------
 
 def test_nan_is_refused_at_the_boundary():
-    # The core reproduces the TypeScript's NaN behaviour on purpose; the
+    # The core reproduces the reference implementation's NaN behaviour on purpose; the
     # boundary makes sure no user arrives there by accident, because a NaN
     # fair value freezes a book rather than raising anything.
     for field in ("eps", "revenue_growth", "qe_pe_boost", "book_value_per_share"):
@@ -335,7 +335,7 @@ def test_hundred_thousand_step_trajectories_do_not_drift(name):
 def test_model_constants_match_the_reference():
     golden = load("mispricing-constants.json")["constants"]
     # Named explicitly, because the golden is a pt-v1-era artifact: it records
-    # what the reference TypeScript implementation computes. Reading the
+    # what the reference implementation computes. Reading the
     # DEFAULT preset here made a parity check against a fixed reference depend
     # on which era ships, so moving the default to pt-v3 broke a test that has
     # nothing to do with the default. Parity is against pt-v1 forever.

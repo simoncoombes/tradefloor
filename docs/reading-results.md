@@ -12,26 +12,35 @@ and duckdb all read them zero-copy, and the package depends on none of them.
 
 | table | grain |
 |---|---|
-| `bars` | tick, N-minute or daily OHLCV, downsampled in Rust |
-| `truth` | valuation, mispricing and a 7-way decomposition of every move |
+| `bars` | tick close and volume, or N-minute and daily OHLCV, downsampled in Rust |
+| `truth` | valuation, mispricing and a 9-way decomposition of every move |
 | `macro` | evolved macro state, per day |
 | `fills` | your executions, joinable to `bars` |
 | `book` | order-book depth, opt-in because ten levels a side makes it 20x the rows |
 
 ```python
 import polars as pl
+import pretium as pt
 
-bars = pl.from_arrow(engine.bars(grain="day"))
-truth = pl.from_arrow(engine.truth())
+engine = pt.Engine(seed=42, universe=pt.Universe.random(10, seed=3))
+engine.run_days(5)
+
+bars = pl.DataFrame(engine.bars(grain="day"))
+truth = pl.DataFrame(engine.truth())
+print(bars.shape, truth.shape)
+# (50, 8) (19500, 15)
 ```
 
-Every numeric column is `f64`. There is no `f32` option, because the
+Every measurement column is `f64`. There is no `f32` option, because the
 known-answer tests and the cross-platform release gate hash these buffers, and
 a half-precision copy would be a different market that happens to plot the
-same.
+same. The keys are `uint32` -- `day`, `tick`, `bar`, `instrument_id`, `step` in
+`fills`, and `side` and `level` in `book` -- because they are indices, not
+measurements.
 
-Results stream one batch per day. Grain is a read-time decision - the raw
-buffers are kept and Arrow batches are built on read - which is why recording
-ground truth costs a few percent at most rather than doubling the run.
-[Performance](performance.html) has the measurement; the overhead is below
-what wall-clock timing resolves.
+`bars` and `truth` stream one batch per recorded day; `macro`, `fills` and
+`book` come back as a single batch covering the whole run. Grain is a
+read-time decision - the raw buffers are kept and Arrow batches are built on
+read - which is why recording ground truth costs a few percent at most rather
+than doubling the run. [Performance](performance.md) has the measurement; the
+overhead is below what wall-clock timing resolves.

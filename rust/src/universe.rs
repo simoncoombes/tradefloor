@@ -322,6 +322,11 @@ impl InstrumentInit {
                 mispricing_momentum: None,
                 maker_inventory: None,
                 garch_variance: sector.base_daily_variance(),
+                // Seeded at the sector base, like `garch_variance` beside
+                // it, so a cascade switched on mid-life starts where the
+                // single-component process already is.
+                garch_cascade: [sector.base_daily_variance();
+                                crate::market::garch::CASCADE_MAX],
                 last_daily_return: None,
                 beta: Some(self.beta),
                 short_interest: self.short_interest,

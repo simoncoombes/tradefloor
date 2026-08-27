@@ -1,6 +1,6 @@
 [package]
 name = "pretium"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Deterministic market simulation with a real limit order book."
 # Dual-licensed, the Rust-ecosystem norm (serde, tokio, rand): a downstream
@@ -14,7 +14,7 @@ homepage = "https://simoncoombes.github.io/pretium"
 keywords = ["simulation", "finance", "market", "orderbook", "deterministic"]
 categories = ["simulation", "science"]
 readme = "README.md"
-# The golden vectors are 135 MB of parity fixtures. They are the test
+# The golden vectors are 140 MB of parity fixtures. They are the test
 # contract, not library content, and must never ride along in a published
 # sdist -- excluded explicitly rather than trusted to a .gitignore.
 exclude = [
@@ -27,15 +27,17 @@ exclude = [
     # They live in the repository, where the corpus is.
     "examples/**",
     # The parity tests read the excluded corpus and PANIC when it is absent,
-    # with a message telling you to regenerate it from a TypeScript script
-    # that is not in the package either. Shipping a test that cannot pass is
+    # with a message telling you to regenerate it from a generator that is
+    # not in the package either. Shipping a test that cannot pass is
     # worse than shipping no test: a consumer running `cargo test` would
     # conclude the crate is broken.
     #
     # What remains is a suite that runs on its own: circuit_breaker,
     # roster_mutation and stream_alignment, plus the unit tests in 21 source
     # modules. The parity corpus is the port contract and lives in the
-    # repository, where the release gate runs it.
+    # repository, where `cargo test --offline` runs it as a manual step in
+    # RELEASING.md. No workflow invokes cargo, so this is a checklist item
+    # rather than a gate, and calling it a gate would overstate it.
     "tests/divergence_statistics.rs",
     "tests/economy_parity.rs",
     "tests/fair_value_parity.rs",
@@ -51,7 +53,7 @@ exclude = [
     "tests/prng_normals_full.rs",
     "tests/thirty_day_parity.rs",
     "tests/tick_regression.rs",
-    "tests/ts_parity_smoke.rs",
+    "tests/reference_parity_smoke.rs",
 ]
 
 [lib]

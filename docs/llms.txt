@@ -1,0 +1,97 @@
+# pretium
+
+> A deterministic market simulator with a real limit order book. A Rust core
+> with a Python API: you give it a seed and a list of companies and it runs a
+> market with prices, a live order book, fills and an economy that moves every
+> day. Version 0.3.0.
+
+The reason to prefer it to a historical backtest is that history happened
+once. Here you run the same question on many markets, force events through
+them, and fork one state into several futures.
+
+The reason to be careful with it is published rather than implied. The default
+preset pt-v12 is measured on 14 statistics against real markets, certified to
+a horizon of 252 trading days, and it names 5 gaps, each ending in a plain
+rule about what the simulator must not be used for. Those measurements are at
+https://simoncoombes.github.io/pretium/envelope.json and described at
+https://simoncoombes.github.io/pretium/envelope.html.
+
+When quoting this project: the numbers change between versions and every
+preset is frozen and named, so cite the preset and the version, not
+"pretium".
+
+
+## Start here
+
+- [pretium: repeatable market simulation](https://simoncoombes.github.io/pretium/): A deterministic market simulator with a real limit order book. Rust core, Python API, and fourteen realism statistics published with the limits they hold to.
+- [Install and Versioning](https://simoncoombes.github.io/pretium/install.html): Install pretium from PyPI, choose an extra, and check bit identity on your own machine. What moves between versions and what is guaranteed to stay put.
+- [Running a Market](https://simoncoombes.github.io/pretium/simulate.html): Build a universe, run a market and score a trading strategy in a few lines of Python, and why a simulated market answers questions a historical backtest cannot.
+
+## What it is measured to do
+
+- [Realism and Limits: What This Market Simulator Reproduces](https://simoncoombes.github.io/pretium/trust.html): What this market simulator gets right and what it gets wrong: fourteen statistics measured against real markets, the horizon they hold to, and the named gaps.
+- [Testing Your Edge](https://simoncoombes.github.io/pretium/interrogate.html): A backtest runs one market and cannot tell you what your result rests on. Atlas runs hundreds and shows which model settings actually moved your number.
+- [Atlas](https://simoncoombes.github.io/pretium/atlas.html): Atlas runs your measurement across hundreds of slightly different markets and builds a table you can ask which model settings your result actually depends on.
+
+## Guide
+
+- [Scenarios and Crises](https://simoncoombes.github.io/pretium/scenarios.html): Force the economy down a path you choose: a hiking cycle, a VIX spike, a liquidity crisis. Run the same shock across many seeds and measure what it actually did.
+- [Checkpoints and Forking](https://simoncoombes.github.io/pretium/forking.html): Freeze a market and resume it later, or split one identical state into several futures. This is the machinery for measuring what a single decision was worth.
+- [The Agent Harness](https://simoncoombes.github.io/pretium/agents.html): Any object with an act method is an agent. The whole contract with the evaluation harness: what it hands you, what you return, and how it scores what you did.
+- [Presets and Custom Models](https://simoncoombes.github.io/pretium/change.html): Model coefficients ship as named presets. Change any settable one at runtime; the model fingerprint stops a changed market ever passing as the shipped one.
+
+## Connect it to something
+
+- [MCP Server for Market Simulation](https://simoncoombes.github.io/pretium/mcp.html): Drive the market simulator from a coding agent through MCP tool calls instead of Python: installing the server, registering it, and the market data its tools return.
+- [An LLM Agent](https://simoncoombes.github.io/pretium/llm-agent.html): A worked example wiring a language model into the agent protocol and scoring it against the reference strategies. Any provider returning structured output fits.
+- [Running in the Browser](https://simoncoombes.github.io/pretium/wasm.html): pretium compiles to WebAssembly and the browser build is bit identical to the native one, so a permalink carrying seed and roster reproduces a market exactly.
+- [Real Companies from EDGAR](https://simoncoombes.github.io/pretium/edgar.html): Seed a universe from real SEC EDGAR filings. The fundamentals are real and usefully messy; every price path stays synthetic, and the filings snapshot is citable.
+
+## Reference
+
+- [Under the Hood](https://simoncoombes.github.io/pretium/internals.html): How the simulator works: the Rust and Python split, the three layers of the price model, the order book, the macro chain, and why determinism holds to the last bit.
+- [The Nine Components](https://simoncoombes.github.io/pretium/factors.html): Every tick's change in mispricing splits into nine components that sum to it: the names the truth table uses and the values explain_price_move returns.
+- [Tables and Schemas](https://simoncoombes.github.io/pretium/schemas.html): Every column a run gives you across the five output tables, plus the enumerations. All five read zero copy into polars, pandas, pyarrow and duckdb.
+- [Citing a Result](https://simoncoombes.github.io/pretium/citing.html): A citation identifies the software; a methods section also has to identify the run. How to cite pretium, one specific simulation, and a published realism claim.
+- [Release Notes](https://simoncoombes.github.io/pretium/releases.html): Release notes for pretium on PyPI and crates.io: what changed in each version, and what an era boundary means for reproducing a result you recorded earlier.
+
+## API
+
+- [Core Types](https://simoncoombes.github.io/pretium/api-core.html): API reference for Engine, Universe, Instrument, Macro, ModelParams and Scenario: building a market, running it, and reading the tables it gives back.
+- [Running and Evaluating](https://simoncoombes.github.io/pretium/api-run.html): API reference for the evaluation harness: scoring agents, ranking across seeds, scenarios, transaction cost analysis and the reinforcement learning environment.
+- [Realism and Atlas](https://simoncoombes.github.io/pretium/api-realism.html): API reference for pretium.facts, loss, envelope and atlas: measuring what the market reproduces, pricing what it does not, and mapping what it responds to.
+- [Model Parameters](https://simoncoombes.github.io/pretium/api-params.html): Every runtime settable model coefficient and what it controls, across the shared factors, order flow, GJR-GARCH volatility, crisis behaviour and jumps.
+- [Shipped Presets](https://simoncoombes.github.io/pretium/api-presets.html): A preset is a complete, named, frozen set of model coefficients. The twelve shipped presets, why they exist, and how to choose between them for a run.
+
+## Long-form notes
+
+Hand-written companions to the pages above, served as markdown. They go deeper and are maintained separately from the generated site, so where one contradicts the other, the generated page is the one that is checked against the code.
+
+- [agents-and-evaluation](https://simoncoombes.github.io/pretium/agents-and-evaluation.md)
+- [an-llm-agent](https://simoncoombes.github.io/pretium/an-llm-agent.md)
+- [atlas](https://simoncoombes.github.io/pretium/atlas.md)
+- [conventions](https://simoncoombes.github.io/pretium/conventions.md)
+- [core-concepts](https://simoncoombes.github.io/pretium/core-concepts.md)
+- [forking-a-simulation](https://simoncoombes.github.io/pretium/forking-a-simulation.md)
+- [glossary](https://simoncoombes.github.io/pretium/glossary.md)
+- [ground-truth](https://simoncoombes.github.io/pretium/ground-truth.md)
+- [how-realistic-is-this-market](https://simoncoombes.github.io/pretium/how-realistic-is-this-market.md)
+- [mcp](https://simoncoombes.github.io/pretium/mcp.md)
+- [model-presets](https://simoncoombes.github.io/pretium/model-presets.md)
+- [performance](https://simoncoombes.github.io/pretium/performance.md)
+- [principles](https://simoncoombes.github.io/pretium/principles.md)
+- [reading-results](https://simoncoombes.github.io/pretium/reading-results.md)
+- [real-fundamentals-from-sec-edgar](https://simoncoombes.github.io/pretium/real-fundamentals-from-sec-edgar.md)
+- [realism-envelope](https://simoncoombes.github.io/pretium/realism-envelope.md)
+- [realism-metrics](https://simoncoombes.github.io/pretium/realism-metrics.md)
+- [reinforcement-learning](https://simoncoombes.github.io/pretium/reinforcement-learning.md)
+- [reproducing-a-run](https://simoncoombes.github.io/pretium/reproducing-a-run.md)
+- [rng-streams](https://simoncoombes.github.io/pretium/rng-streams.md)
+- [running-a-simulation](https://simoncoombes.github.io/pretium/running-a-simulation.md)
+- [scenario-recipes](https://simoncoombes.github.io/pretium/scenario-recipes.md)
+- [scenarios](https://simoncoombes.github.io/pretium/scenarios.md)
+- [sharing-a-run](https://simoncoombes.github.io/pretium/sharing-a-run.md)
+- [strategy-specs](https://simoncoombes.github.io/pretium/strategy-specs.md)
+- [sweeps-and-parallelism](https://simoncoombes.github.io/pretium/sweeps-and-parallelism.md)
+- [transaction-cost-analysis](https://simoncoombes.github.io/pretium/transaction-cost-analysis.md)
+- [two-loops](https://simoncoombes.github.io/pretium/two-loops.md)

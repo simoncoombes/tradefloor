@@ -141,16 +141,20 @@ A strategy is not the only thing you compose. `build_universe` and
 
 A sector-**concentrated** roster is not a convenience setting. "Certification
 was measured on a sector-balanced roster, which no real index is" is one of
-the six named gaps in [the realism envelope](realism-envelope.md), and
+the five named gaps in [the realism envelope](realism-envelope.md), and
 `envelope.check` already takes `sector_concentrated` as an argument. So
 concentrating a roster is the honest way to ask a real question, and the
 answer comes back labelled uncertified, automatically, in the caveats of
 every result that used it.
 
 You can also hand-author the roster outright, passing `instruments` with
-explicit tickers, sectors, prices and betas. Unknown fields are refused by
-name rather than ignored, because a silently dropped field produces a roster
-you did not describe.
+explicit rows. Four fields are required per row -- `ticker`, `sector`,
+`initial_price` and `shares_outstanding` -- and `beta`, `eps`,
+`book_value_per_share`, `revenue_growth`, `avg_volume` and `short_interest`
+are optional. Unknown fields are refused by name rather than ignored,
+because a silently dropped field produces a roster you did not describe; the
+refusal lists what was allowed, so `price` for `initial_price` costs a parse
+rather than a wrong market.
 
 Either way you get back a `universe` document. Pass it to any run tool as
 `universe` and it supersedes that tool's inline arguments, so a roster is
@@ -186,9 +190,13 @@ not.
 
 ## Long runs, and the horizon they unlock
 
-A direct tool call is capped at 60 days, because 40 names with the baselines
-takes about 95 seconds at 252 days and a tool call has to answer inside a
-conversation.
+A direct tool call is capped at 60 days, because a tool call has to answer
+inside a conversation and the certified 252-day horizon cannot be promised
+inside one. Forty names over the full 252 days works out at roughly 22s on
+the machine this page was written on, projected from the per-name rate
+measured below, and the server, planning against a deliberately pessimistic
+rate, budgets 95.8s; the largest roster it accepts, 120 names, triples that
+budget to 287.3s.
 
 That cap had a consequence worth stating plainly: **every result a direct
 call can produce is a SHORT WINDOW** on a market whose realism is certified
@@ -201,7 +209,7 @@ measurements.
 ```
 start_job(tool="evaluate_strategies",
           arguments={"strategies": {...}, "days": 252})
-→ {"job_id": "job-1", "estimated_seconds": 96}
+→ {"job_id": "job-1", "estimated_seconds": 95.8}
 
 check_job("job-1")
 → {"status": "running", "elapsed_seconds": 42}
@@ -214,9 +222,9 @@ it is no longer a slice. This is the point of having jobs at all; the
 convenience of not blocking is secondary.
 
 Jobs run inside the server process. Two run at once (a third would slow both
-without finishing sooner), finished results are kept for later collection,
-and **nothing survives a server restart**. There is no queue and no
-database, and `check_job` says so rather than leaving you to infer it. The
+without finishing sooner), the last 32 finished results are kept for later
+collection, and **nothing survives a server restart**. There is no queue and
+no database, and `check_job` says so rather than leaving you to infer it. The
 `estimated_seconds` figure comes from measured cost and is an estimate, not
 a promise: a long overrun usually means the machine is loaded, not that the
 job has hung.
@@ -237,13 +245,17 @@ So every result carries a `caveats` list beside its numbers:
 ```
 caveats:
   - The price process is a known model, not a forecast...
-  - ONE SEED. A single seed measures that seed as much as the strategy...
   - SHORT WINDOW: 5 trading days against a realism certification
     measured over 252...
-  - This strategy trades a return-continuation signal, so its edge depends
-    on the simulator's return autocorrelation: return_acf1 measures 0.0375
-    against a real-market band of -0.08 to 0.06 (in band) at the certified
-    252-day horizon.
+  - ONE SEED. A single seed measures that seed as much as the strategy...
+  - This strategy trades a return-continuation or reversal signal, so its
+    edge depends on the simulator's return autocorrelation: return_acf1
+    measures 0.0239 against a real-market band of -0.08 to 0.06 (in band)
+    at the certified 252-day horizon.
+  - The roster is sector-BALANCED, which no real index is -- a named gap
+    in the envelope. Pass `sectors` to concentrate it.
+  - The market is single-venue with zero latency and no strategic
+    counterparties...
 ```
 
 Two properties make this more than a disclaimer.
@@ -255,23 +267,29 @@ always says the same thing stops being read.
 
 **They are computed, not typed.** Every number in them is read from the
 realism envelope at call time. This rule paid for itself immediately: while
-this server was being written, `PRODUCT.md` and `README.md` were both found
-still asserting a return autocorrelation of `+0.219` and `+0.249` from a
-superseded preset. The shipped `pt-v3` certifies `return_acf1` at `0.0375`,
-and re-measuring it across the README's own published method (40 names,
-universe seed 111, 252 days, sim seeds 1 to 6) gives a median of `0.0485`.
-Both are comfortably *inside* the real-market band of −0.08 to 0.06, and
-both are a fifth of the figure the prose still quotes. A hardcoded caveat is
-how a caveat becomes false, and a false caveat told to a model is worse than
-none.
+this server was being written, `PRODUCT.md` was still asserting a return
+autocorrelation of `+0.219` and `README.md` `+0.249` -- the second a median
+of six seeds at that README's own published method, `Universe.random(40,
+seed=111)` over 252 days -- both from a preset that had already been
+superseded. It has kept paying since. The server shipped when `pt-v3` was
+the default; the default is now `pt-v12`, nine preset boundaries later, and
+every caveat the server emits moved with them without an edit. Today
+`return_acf1` certifies at `0.0239`, on the panel the envelope publishes
+(thirty seeds, forty names, 252 days), comfortably *inside* the real-market
+band of -0.08 to 0.06. The `+0.219` the stale prose was quoting is 9.2 times
+that, and it sits outside the band rather than inside it. A hardcoded caveat
+is how a caveat becomes false, and a false caveat told to a model is worse
+than none.
 
 A summary of a pretium result that drops the caveats is a misreport.
 
 ## Provenance on every result
 
 Every successful call returns what someone else needs to re-run it: the
-pretium version, the model preset and its fingerprint, the seed, the
-universe and its fingerprint, and the horizon.
+pretium version, the model preset by name, the spec version, the seed, the
+universe document and its fingerprint, and the horizon. The preset name is
+what pins the coefficients, because a preset is never edited in place: a
+coefficient change arrives as a new name.
 
 A number from a simulator without its seed is not a measurement. It is an
 anecdote, and a model summarising it cannot tell the difference.
@@ -286,11 +304,13 @@ strategy.
 `paired_sign_tests`: both entrants traded the **same** market on each seed,
 so pairing removes the market from the question.
 
-Read `pooled_capture`, which is total P&L over the reference's total, rather than
-`seeds_first`, which counts league positions among all entrants and splits
-arbitrarily on a tie. A submitted momentum spec compared against the
-momentum baseline comes back as all ties and zero paired seeds, which is the
-correct answer for two identical strategies rather than a coin-flip winner.
+Both per-entrant figures live in `records`. Read `pooled_capture`, which is
+total P&L over the reference's total, rather than `seeds_first`, which
+counts the seeds an entrant ranked first on among *all* entrants, baselines
+included, and so splits arbitrarily between two entrants that behave
+identically. A submitted momentum spec compared against the momentum
+baseline comes back as all ties and zero paired seeds, which is the correct
+answer for two identical strategies rather than a coin-flip winner.
 
 ## Limits, and why they exist
 
@@ -304,14 +324,24 @@ correct answer for two identical strategies rather than a coin-flip winner.
 | concurrent jobs | 2 |
 
 These are wall-clock decisions rather than modelling ones, and the library
-imposes none of them. Forty names with the baselines takes about 0.5s at 5 days,
-20s at 60, and 95s at 252, and a tool call has to answer inside a
-conversation.
+imposes none of them. Cost is flat per simulated day, so the horizon is
+almost the whole of it: ten names against the five reference baselines
+measured 0.104s at 5 days and 1.30s at 60 on the machine this page was
+written on, which is 0.021 and 0.022 s/day across a 12x span in horizon.
+Roster size is the other multiplier, and it is close to linear: 0.0021 s per
+name per day, fitted over rosters of two to ten. So the certified forty
+names come out at 0.086 s/day, about 5.2s at 60 days and 22s at 252 --
+projections from the small-roster rate rather than timings, which is why
+they are quoted to two figures. `estimated_seconds` does not use that rate.
+It assumes 0.38 s/day scaled by roster size, four times the projection, and
+overshooting is the safe direction: a model deciding whether to wait or poll
+needs an order of magnitude, and a job that beats its estimate costs nothing
+while one that looks hung gets abandoned.
 
-That last figure is why a direct call is capped below the certified 252-day
-horizon, and why every directly-returned result carries the SHORT WINDOW
-caveat. Use `start_job` to reach the certified horizon without leaving the
-server.
+Flat per day is why the cap is on days rather than on anything else, why a
+direct call is capped below the certified 252-day horizon, and why every
+directly-returned result carries the SHORT WINDOW caveat. Use `start_job` to
+reach the certified horizon without leaving the server.
 
 ## What is deliberately not exposed
 
@@ -319,9 +349,14 @@ server.
 and runs for hours. A tool call that cannot return inside a conversation is
 not a tool.
 
-**Model coefficients.** Presets are selectable by name. The 54 coefficients
-behind them are not, because improvised coefficients produce a market nobody
-calibrated, reported with the authority of a named preset.
+**Model coefficients.** Every run here is the shipped default preset, and
+no tool takes a preset argument, so the market a model measures against
+cannot drift mid-conversation. Provenance names it (`"model_preset":
+"pt-v12"`) on every result. The 87 settable coefficients behind a preset are
+not exposed either, because improvised coefficients produce a market nobody
+calibrated, reported with the authority of a named preset. Twelve presets
+ship, `pt-v1` through `pt-v12`, and choosing another of them is a library
+call: `ModelParams.from_preset("pt-v3")`.
 
 **Writes.** Every tool is read-only and pure: same arguments, same bytes, on
 every platform.

@@ -10,24 +10,29 @@
 # Each target builds a wheel, runs the known-answer simulation inside it, and
 # reports a digest. The final job fails if any two targets disagree.
 #
-# Note on cost: this repository's Actions usage is billed, and the multipliers
-# are not uniform -- Linux is 1x, Windows 2x, macOS 10x. A full five-target run
-# is roughly 96 billed minutes and is dominated by the two macOS jobs.
+# Note on cost: there is not one. The repository is public, so standard
+# runners are free, which is what RELEASING.md says of this workflow too. The
+# five-target run on 2026-08-27 (run 33028345268) took 3m35s of wall clock and
+# about ten minutes of runner time across all seven jobs. Nothing here needs
+# rationing, and an earlier version of this comment that argued the full gate
+# out of the default on billed-minute grounds was wrong once the repository
+# went public.
 #
-# THREE OF THE FIVE TARGETS ARE ALREADY VERIFIED FOR FREE. Every AWS
+# THREE OF THE FIVE TARGETS ARE COVERED ELSEWHERE ANYWAY. Every AWS
 # calibration run in this project builds the crate on Graviton and executes
 # `tests/known_answer.py` before doing its own work, so `linux-aarch64` has
 # been shown to agree with `macos-arm64` repeatedly; an x86_64 run on
 # 2026-08-24 added `linux-x86_64` for about six cents
 # (CALIBRATION-FOLLOWUPS §26).
 #
-# That leaves `macos-x86_64` and `windows-x86_64` genuinely unverified, and
-# they are what the `unverified` target set runs. It is the DEFAULT because
-# spending ten times the money to re-prove three targets that a free run
-# already proves is not diligence, it is habit.
+# That leaves `macos-x86_64` and `windows-x86_64` as the two nothing else
+# touches, and they are what the `unverified` target set runs. It is the
+# default because it is the narrow, fast path to the gap -- not because the
+# alternative is expensive.
 #
-# Use `all` before a release, where the point is that the artifact set was
-# checked in one place, together, on the commit being shipped.
+# Prefer `all` whenever the answer matters, and use it before a release, where
+# the point is that the artifact set was checked in one place, together, on
+# the commit being shipped. It costs a few minutes and no money.
 
 name: determinism
 
@@ -72,15 +77,15 @@ jobs:
           # Chosen by EVENT, not by input alone.
           #
           # A tag push always runs everything: a release must not ship on a
-          # partial gate, whatever was cheap to check that week.
+          # partial gate, whatever the last manual dispatch happened to aim at.
           #
           # A manual dispatch defaults to `unverified` when no input arrives.
-          # That matters beyond convenience -- a dispatch aimed at a branch
-          # whose workflow definition differs from the default branch's may
-          # not carry the input through at all, and the old fallback
-          # (`|| 'all'`) would then have quietly spent ten times the money.
-          # The cheap set is the safe thing to fall back to; the expensive
-          # one should require asking for it.
+          # A dispatch aimed at a branch whose workflow definition differs
+          # from the default branch's may not carry the input through at all,
+          # so the fallback is the set that runs in the fewest minutes rather
+          # than the one that runs the most jobs. Runners are free on a public
+          # repository, so this is a latency choice, not a money one: ask for
+          # `all` and you get it in about three and a half minutes.
           set -euo pipefail
           if [ "${{ github.event_name }}" = "push" ]; then
             MODE=all

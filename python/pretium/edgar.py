@@ -520,15 +520,19 @@ def fetch(
     ``"Jane Roe jane@example.org"``. Requests without one are refused at the
     edge, and this function will not invent one on your behalf.
 
-    Companies are ranked by shareholders' equity and the largest ``limit``
-    that map to a sector are kept. Equity is a mediocre size proxy -- it
-    understates asset-light companies badly -- and it is used anyway because
-    the alternative is market capitalisation, which EDGAR does not carry.
-    Said plainly rather than discovered later: **the ranking is by book size,
-    not market size**, so the universe skews towards balance-sheet-heavy
-    names. Take a larger ``limit`` and filter yourself if that matters.
+    Whichever ranking you pick, the largest ``limit`` companies that map to a
+    sector are kept. Under the default ``"equity"``, said plainly rather than
+    discovered later: **the ranking is by book size, not market size**, so the
+    universe skews towards balance-sheet-heavy names. Take a larger ``limit``
+    and filter yourself if that matters.
 
-    Roughly ``5 + limit`` requests, rate limited to eight a second.
+    Ten market-wide frame requests plus one submissions request per company
+    kept, rate limited to eight a second. The ten are diluted EPS,
+    shareholders' equity, two share-count tags, and three revenue tags at two
+    periods each; ``rank_by="public_float"`` adds an eleventh. Counted through
+    the recording transport in ``tests/test_edgar.py``: 10 frame calls and 4
+    submissions calls on a four-filer market, 11 frame calls under
+    ``public_float``.
 
     The result is a frozen artifact. Save it, hash it, cite it -- and do not
     expect a re-fetch to reproduce it. EDGAR is not append-only: companies

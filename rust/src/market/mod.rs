@@ -1,14 +1,14 @@
-//! Market — the stationary price path, ported from `src/lib/engine/market.ts`
-//! plus the daily-lifecycle pieces in `src/lib/stores/tick/transitions.ts`.
+//! Market — the stationary price path, ported from the reference
+//! implementation's market module plus its daily-lifecycle transitions.
 //!
 //! # Scope
 //!
 //! The LIVE branch only. `STATIONARY_PRICE_MODEL` and `BOOK_PRICE_DISCOVERY`
-//! are both hardcoded `true` (`market.ts:1225`, `:1208`), so the legacy
+//! are both hardcoded `true` in the reference implementation, so the legacy
 //! 14-factor path and the pre-book settlement path are dead code.
 //!
 //! **D7, decided:** the legacy branch is NOT ported as a Rust revert path.
-//! The kill switch falls back to TypeScript, not to a Rust legacy mode, so a
+//! The kill switch falls back to the reference implementation, not to a Rust legacy mode, so a
 //! Rust copy would be a second dead model — and two models that can disagree
 //! is the outcome this project exists to avoid.
 //!

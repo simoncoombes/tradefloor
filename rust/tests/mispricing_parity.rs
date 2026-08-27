@@ -54,7 +54,7 @@ impl Val {
 }
 
 /// An argument that may be the literal string `"default"`, meaning the
-/// TypeScript default parameter applied.
+/// reference-implementation default parameter applied.
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Arg {
@@ -289,7 +289,7 @@ fn create_state_matches() {
     }
 
     // The no-argument call. `MispricingState::default()` is the port's
-    // spelling of the TypeScript default parameter.
+    // spelling of the reference-implementation default parameter.
     check_state(
         "createMispricingState() [default]".to_string(),
         MispricingState::default(),

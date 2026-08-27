@@ -1,0 +1,729 @@
+{
+ "pretium_version": "0.3.0",
+ "default_preset": "pt-v12",
+ "wall_s": 88.22898173332214,
+ "workers": 190,
+ "panel": [
+  "annualised_vol_pct",
+  "excess_kurtosis",
+  "return_acf1",
+  "abs_return_acf1",
+  "abs_return_acf5",
+  "abs_return_acf20",
+  "cross_sectional_corr",
+  "volume_abs_return_corr",
+  "leverage_effect",
+  "volume_change_acf1",
+  "corr_asymmetry",
+  "corr_asymmetry_lagged",
+  "sector_excess_corr",
+  "corr_persistence_acf1"
+ ],
+ "method": {
+  "roster": "Universe.random(40, seed=111)",
+  "heldout_universe": "Universe.random(60, seed=909)",
+  "train_seeds": "101-130 (30)",
+  "heldout_seeds": "1-30 (30)",
+  "bands_252": "facts.REAL_MARKETS",
+  "bands_504": "facts.REAL_MARKETS_504",
+  "crisis_lever": "annualised vol at held VIX 65 over held VIX 5, certified roster, 252 days, thirty seeds",
+  "real_crisis_lever": 6.16
+ },
+ "presets": {
+  "pt-v1": {
+   "panel_252": {
+    "annualised_vol_pct": 41.2952214284926,
+    "excess_kurtosis": 3.55969030087272,
+    "return_acf1": 0.243136340038777,
+    "abs_return_acf1": 0.2419205758511671,
+    "abs_return_acf5": 0.09377130118415128,
+    "abs_return_acf20": 0.01106024611423212,
+    "cross_sectional_corr": 0.2748171142005753,
+    "volume_abs_return_corr": 0.5680812264346169,
+    "leverage_effect": -0.06864223432979573,
+    "volume_change_acf1": -0.4497640129203039,
+    "corr_asymmetry": -0.010747751653572397,
+    "corr_asymmetry_lagged": -0.07648465277316607,
+    "sector_excess_corr": -0.005183823121351294,
+    "corr_persistence_acf1": 0.03686945562793198
+   },
+   "panel_504": {
+    "annualised_vol_pct": 47.91734635211854,
+    "excess_kurtosis": 3.7157273729113274,
+    "return_acf1": 0.26458092668730054,
+    "abs_return_acf1": 0.32134939243059335,
+    "abs_return_acf5": 0.1469834733224412,
+    "abs_return_acf20": 0.032299772066695265,
+    "cross_sectional_corr": 0.38981720484622423,
+    "volume_abs_return_corr": 0.6034685271036562,
+    "leverage_effect": -0.07180571449563891,
+    "volume_change_acf1": -0.4377463539127374,
+    "corr_asymmetry": 0.014374723098072556,
+    "corr_asymmetry_lagged": -0.08289148950406774,
+    "sector_excess_corr": -0.006560021182636683,
+    "corr_persistence_acf1": 0.1448427677059529
+   },
+   "in_band_252": 8,
+   "misses_252": [
+    "annualised_vol_pct",
+    "return_acf1",
+    "abs_return_acf1",
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_504": 6,
+   "misses_504": [
+    "annualised_vol_pct",
+    "excess_kurtosis",
+    "return_acf1",
+    "abs_return_acf1",
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "sector_excess_corr",
+    "corr_persistence_acf1"
+   ],
+   "in_band_heldout_universe": 8,
+   "misses_heldout_universe": [
+    "annualised_vol_pct",
+    "return_acf1",
+    "abs_return_acf1",
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_heldout_seeds": 8,
+   "misses_heldout_seeds": [
+    "annualised_vol_pct",
+    "return_acf1",
+    "abs_return_acf1",
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "annualised_vol_pct": 41.2952214284926,
+   "vol_at_vix_5": 33.705600985984134,
+   "vol_at_vix_65": 114.16818893604714,
+   "crisis_lever": 3.3872171270146443
+  },
+  "pt-v2": {
+   "panel_252": {
+    "annualised_vol_pct": 29.302358923521485,
+    "excess_kurtosis": 4.376019252945246,
+    "return_acf1": 0.037823056668285754,
+    "abs_return_acf1": 0.18151006344874246,
+    "abs_return_acf5": 0.09083526781999346,
+    "abs_return_acf20": 0.008218527600471315,
+    "cross_sectional_corr": 0.16970224943302234,
+    "volume_abs_return_corr": 0.5547284596441923,
+    "leverage_effect": -0.05596463962063859,
+    "volume_change_acf1": -0.4574961118632608,
+    "corr_asymmetry": -0.0017204029608458658,
+    "corr_asymmetry_lagged": -0.039819502548523546,
+    "sector_excess_corr": -0.000928145853281423,
+    "corr_persistence_acf1": 0.017541248921926877
+   },
+   "panel_504": {
+    "annualised_vol_pct": 31.038547259774298,
+    "excess_kurtosis": 4.676058810298212,
+    "return_acf1": 0.055059641243668835,
+    "abs_return_acf1": 0.22640968266703412,
+    "abs_return_acf5": 0.12384969452113964,
+    "abs_return_acf20": 0.016027022250218632,
+    "cross_sectional_corr": 0.24376274757471839,
+    "volume_abs_return_corr": 0.6141779445638957,
+    "leverage_effect": -0.05600336689622229,
+    "volume_change_acf1": -0.4303470760556656,
+    "corr_asymmetry": -0.041829869326124175,
+    "corr_asymmetry_lagged": -0.08637720416155698,
+    "sector_excess_corr": -0.00010663989558122589,
+    "corr_persistence_acf1": 0.1317628444438092
+   },
+   "in_band_252": 11,
+   "misses_252": [
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_504": 6,
+   "misses_504": [
+    "excess_kurtosis",
+    "return_acf1",
+    "abs_return_acf1",
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "corr_asymmetry",
+    "sector_excess_corr",
+    "corr_persistence_acf1"
+   ],
+   "in_band_heldout_universe": 11,
+   "misses_heldout_universe": [
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_heldout_seeds": 11,
+   "misses_heldout_seeds": [
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "annualised_vol_pct": 29.302358923521485,
+   "vol_at_vix_5": 28.813038942513533,
+   "vol_at_vix_65": 54.44916505142899,
+   "crisis_lever": 1.8897404456386393
+  },
+  "pt-v3": {
+   "panel_252": {
+    "annualised_vol_pct": 24.097214072272823,
+    "excess_kurtosis": 2.530521316735698,
+    "return_acf1": 0.03745060296347685,
+    "abs_return_acf1": 0.14127142910145438,
+    "abs_return_acf5": 0.04962379448651105,
+    "abs_return_acf20": 0.008165975509233512,
+    "cross_sectional_corr": 0.25580280330473915,
+    "volume_abs_return_corr": 0.5339084256109392,
+    "leverage_effect": -0.034862857561783395,
+    "volume_change_acf1": -0.4598243679770862,
+    "corr_asymmetry": 0.003649435106042865,
+    "corr_asymmetry_lagged": -0.03299460921484411,
+    "sector_excess_corr": 0.0037173504458217765,
+    "corr_persistence_acf1": 0.04132575446778962
+   },
+   "panel_504": {
+    "annualised_vol_pct": 29.289300720522625,
+    "excess_kurtosis": 5.227444947706776,
+    "return_acf1": 0.05706444563840943,
+    "abs_return_acf1": 0.28867078274248614,
+    "abs_return_acf5": 0.1524266091550004,
+    "abs_return_acf20": 0.012671879348595644,
+    "cross_sectional_corr": 0.4057350603766128,
+    "volume_abs_return_corr": 0.6300893543564667,
+    "leverage_effect": -0.04609670946770761,
+    "volume_change_acf1": -0.4327261554164075,
+    "corr_asymmetry": -0.042431554772633495,
+    "corr_asymmetry_lagged": -0.07634903570434631,
+    "sector_excess_corr": 0.005077983252719354,
+    "corr_persistence_acf1": 0.22492494332772428
+   },
+   "in_band_252": 12,
+   "misses_252": [
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_504": 7,
+   "misses_504": [
+    "excess_kurtosis",
+    "return_acf1",
+    "abs_return_acf1",
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "corr_asymmetry",
+    "sector_excess_corr"
+   ],
+   "in_band_heldout_universe": 11,
+   "misses_heldout_universe": [
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_heldout_seeds": 12,
+   "misses_heldout_seeds": [
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "annualised_vol_pct": 24.097214072272823,
+   "vol_at_vix_5": 22.663705678113217,
+   "vol_at_vix_65": 72.00868038864725,
+   "crisis_lever": 3.1772685990264793
+  },
+  "pt-v4": {
+   "panel_252": {
+    "annualised_vol_pct": 28.676269191559655,
+    "excess_kurtosis": 9.55932397273747,
+    "return_acf1": 0.07390373370176888,
+    "abs_return_acf1": 0.10993833682208932,
+    "abs_return_acf5": 0.02995476162034857,
+    "abs_return_acf20": -0.0006208093632430135,
+    "cross_sectional_corr": 0.1931298847801046,
+    "volume_abs_return_corr": 0.624444714920461,
+    "leverage_effect": -0.033279000988304594,
+    "volume_change_acf1": -0.3959873302693795,
+    "corr_asymmetry": 0.014069492482822944,
+    "corr_asymmetry_lagged": -0.04653769961143793,
+    "sector_excess_corr": 0.006458638636710742,
+    "corr_persistence_acf1": 0.01758919340889048
+   },
+   "panel_504": {
+    "annualised_vol_pct": 33.021349828136024,
+    "excess_kurtosis": 9.185430853470622,
+    "return_acf1": 0.07857934957410548,
+    "abs_return_acf1": 0.2058709209408608,
+    "abs_return_acf5": 0.10009856639685902,
+    "abs_return_acf20": 0.008884098972696857,
+    "cross_sectional_corr": 0.31538303401836754,
+    "volume_abs_return_corr": 0.6353335178750475,
+    "leverage_effect": -0.03677393700887544,
+    "volume_change_acf1": -0.3953789865497497,
+    "corr_asymmetry": -0.016098414870222073,
+    "corr_asymmetry_lagged": -0.067028473170825,
+    "sector_excess_corr": 0.00843042499170088,
+    "corr_persistence_acf1": 0.21467831113059666
+   },
+   "in_band_252": 11,
+   "misses_252": [
+    "return_acf1",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_504": 10,
+   "misses_504": [
+    "return_acf1",
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_heldout_universe": 11,
+   "misses_heldout_universe": [
+    "return_acf1",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_heldout_seeds": 11,
+   "misses_heldout_seeds": [
+    "return_acf1",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "annualised_vol_pct": 28.676269191559655,
+   "vol_at_vix_5": 27.86458329104323,
+   "vol_at_vix_65": 73.52280234279155,
+   "crisis_lever": 2.63857534041877
+  },
+  "pt-v5": {
+   "panel_252": {
+    "annualised_vol_pct": 28.61784491866869,
+    "excess_kurtosis": 9.747714344133072,
+    "return_acf1": 0.037077543874526726,
+    "abs_return_acf1": 0.08342815925322637,
+    "abs_return_acf5": 0.030757347270698836,
+    "abs_return_acf20": 3.977193227965194e-05,
+    "cross_sectional_corr": 0.19538354787533668,
+    "volume_abs_return_corr": 0.6242267301334645,
+    "leverage_effect": -0.021211659199274088,
+    "volume_change_acf1": -0.39975268729926927,
+    "corr_asymmetry": 0.009065046091295204,
+    "corr_asymmetry_lagged": -0.04911195738452673,
+    "sector_excess_corr": 0.006937543829998616,
+    "corr_persistence_acf1": 0.01748191379978232
+   },
+   "panel_504": {
+    "annualised_vol_pct": 33.02713942952427,
+    "excess_kurtosis": 9.212701423775997,
+    "return_acf1": 0.057603887210025094,
+    "abs_return_acf1": 0.20015188669207495,
+    "abs_return_acf5": 0.09997232289526761,
+    "abs_return_acf20": 0.01145724623885199,
+    "cross_sectional_corr": 0.317491043882001,
+    "volume_abs_return_corr": 0.635321659083151,
+    "leverage_effect": -0.03247862005782945,
+    "volume_change_acf1": -0.3956066992844859,
+    "corr_asymmetry": -0.017536986237965353,
+    "corr_asymmetry_lagged": -0.06679582072885559,
+    "sector_excess_corr": 0.007934249638933175,
+    "corr_persistence_acf1": 0.2122024057065924
+   },
+   "in_band_252": 12,
+   "misses_252": [
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_504": 11,
+   "misses_504": [
+    "return_acf1",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_heldout_universe": 12,
+   "misses_heldout_universe": [
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_heldout_seeds": 12,
+   "misses_heldout_seeds": [
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "annualised_vol_pct": 28.61784491866869,
+   "vol_at_vix_5": 27.812500866705186,
+   "vol_at_vix_65": 73.52058410163164,
+   "crisis_lever": 2.6434366493681396
+  },
+  "pt-v6": {
+   "panel_252": {
+    "annualised_vol_pct": 28.544466120380008,
+    "excess_kurtosis": 9.753985500811998,
+    "return_acf1": 0.02087793609341719,
+    "abs_return_acf1": 0.08292621426628231,
+    "abs_return_acf5": 0.029729314612470213,
+    "abs_return_acf20": 0.0011698587380003292,
+    "cross_sectional_corr": 0.19411871960810928,
+    "volume_abs_return_corr": 0.6223373036603386,
+    "leverage_effect": -0.02000883752394591,
+    "volume_change_acf1": -0.3977494887716955,
+    "corr_asymmetry": 0.013565280899844212,
+    "corr_asymmetry_lagged": -0.04817746466994366,
+    "sector_excess_corr": 0.006810297289669517,
+    "corr_persistence_acf1": 0.029218097982970155
+   },
+   "panel_504": {
+    "annualised_vol_pct": 32.868459122931576,
+    "excess_kurtosis": 9.258576886279908,
+    "return_acf1": 0.033251933588548395,
+    "abs_return_acf1": 0.19933730679469464,
+    "abs_return_acf5": 0.1024437572228186,
+    "abs_return_acf20": 0.010814640822206092,
+    "cross_sectional_corr": 0.31553443954031335,
+    "volume_abs_return_corr": 0.6340244151559521,
+    "leverage_effect": -0.03244766658190864,
+    "volume_change_acf1": -0.395206504948288,
+    "corr_asymmetry": -0.006470796384890731,
+    "corr_asymmetry_lagged": -0.06350672726924089,
+    "sector_excess_corr": 0.0075061640230942445,
+    "corr_persistence_acf1": 0.2090968458526222
+   },
+   "in_band_252": 12,
+   "misses_252": [
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_504": 11,
+   "misses_504": [
+    "abs_return_acf5",
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_heldout_universe": 12,
+   "misses_heldout_universe": [
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "in_band_heldout_seeds": 12,
+   "misses_heldout_seeds": [
+    "volume_change_acf1",
+    "sector_excess_corr"
+   ],
+   "annualised_vol_pct": 28.544466120380008,
+   "vol_at_vix_5": 27.754444005007272,
+   "vol_at_vix_65": 73.17344462238346,
+   "crisis_lever": 2.636458673399546
+  },
+  "pt-v7": {
+   "panel_252": {
+    "annualised_vol_pct": 29.066497423206076,
+    "excess_kurtosis": 8.751646593947498,
+    "return_acf1": 0.022183949445107695,
+    "abs_return_acf1": 0.07076584036513092,
+    "abs_return_acf5": 0.026991274733325302,
+    "abs_return_acf20": 0.0012863947820171333,
+    "cross_sectional_corr": 0.18175704378137664,
+    "volume_abs_return_corr": 0.6122746359894349,
+    "leverage_effect": -0.025680277653647016,
+    "volume_change_acf1": -0.40340958612574196,
+    "corr_asymmetry": 0.013781001486827218,
+    "corr_asymmetry_lagged": -0.016773555121700257,
+    "sector_excess_corr": 0.12826755950557167,
+    "corr_persistence_acf1": 0.058810500204114116
+   },
+   "panel_504": {
+    "annualised_vol_pct": 33.67623698236406,
+    "excess_kurtosis": 8.406733284047828,
+    "return_acf1": 0.037116191456769726,
+    "abs_return_acf1": 0.18210570680392993,
+    "abs_return_acf5": 0.09639716454235658,
+    "abs_return_acf20": 0.011229067894502145,
+    "cross_sectional_corr": 0.30802005648741493,
+    "volume_abs_return_corr": 0.6238725239479908,
+    "leverage_effect": -0.030740856884526713,
+    "volume_change_acf1": -0.40287263135285256,
+    "corr_asymmetry": -0.0005905042445107922,
+    "corr_asymmetry_lagged": -0.05837754386500349,
+    "sector_excess_corr": 0.11838904099420819,
+    "corr_persistence_acf1": 0.250830562173605
+   },
+   "in_band_252": 13,
+   "misses_252": [
+    "volume_change_acf1"
+   ],
+   "in_band_504": 13,
+   "misses_504": [
+    "volume_change_acf1"
+   ],
+   "in_band_heldout_universe": 13,
+   "misses_heldout_universe": [
+    "volume_change_acf1"
+   ],
+   "in_band_heldout_seeds": 13,
+   "misses_heldout_seeds": [
+    "volume_change_acf1"
+   ],
+   "annualised_vol_pct": 29.066497423206076,
+   "vol_at_vix_5": 27.706077786147482,
+   "vol_at_vix_65": 90.50651989935866,
+   "crisis_lever": 3.2666666353117013
+  },
+  "pt-v8": {
+   "panel_252": {
+    "annualised_vol_pct": 27.096391046899164,
+    "excess_kurtosis": 10.425451317096737,
+    "return_acf1": 0.018967897959500338,
+    "abs_return_acf1": 0.05842937000724081,
+    "abs_return_acf5": 0.018338722919480036,
+    "abs_return_acf20": 0.001667283086752808,
+    "cross_sectional_corr": 0.19963320772339604,
+    "volume_abs_return_corr": 0.6211539516638795,
+    "leverage_effect": -0.021153845918008132,
+    "volume_change_acf1": -0.40078667205965063,
+    "corr_asymmetry": 0.010857576776012533,
+    "corr_asymmetry_lagged": 0.0023114253232152243,
+    "sector_excess_corr": 0.14549219643459238,
+    "corr_persistence_acf1": 0.066777315577113
+   },
+   "panel_504": {
+    "annualised_vol_pct": 31.679166810511617,
+    "excess_kurtosis": 8.664237014910398,
+    "return_acf1": 0.036774702756126966,
+    "abs_return_acf1": 0.15365856278424525,
+    "abs_return_acf5": 0.08806302435750982,
+    "abs_return_acf20": 0.017715971867274027,
+    "cross_sectional_corr": 0.3406223944190446,
+    "volume_abs_return_corr": 0.6258342261077959,
+    "leverage_effect": -0.0241654581288041,
+    "volume_change_acf1": -0.4013196180276837,
+    "corr_asymmetry": -0.023674083783086275,
+    "corr_asymmetry_lagged": -0.06233639070246377,
+    "sector_excess_corr": 0.12941726863263908,
+    "corr_persistence_acf1": 0.31509953176168143
+   },
+   "in_band_252": 12,
+   "misses_252": [
+    "abs_return_acf5",
+    "volume_change_acf1"
+   ],
+   "in_band_504": 13,
+   "misses_504": [
+    "volume_change_acf1"
+   ],
+   "in_band_heldout_universe": 13,
+   "misses_heldout_universe": [
+    "volume_change_acf1"
+   ],
+   "in_band_heldout_seeds": 13,
+   "misses_heldout_seeds": [
+    "volume_change_acf1"
+   ],
+   "annualised_vol_pct": 27.096391046899164,
+   "vol_at_vix_5": 24.362462545198852,
+   "vol_at_vix_65": 100.81312541532148,
+   "crisis_lever": 4.138051530229602
+  },
+  "pt-v9": {
+   "panel_252": {
+    "annualised_vol_pct": 28.86936869639875,
+    "excess_kurtosis": 8.90456137668927,
+    "return_acf1": 0.012729728442120449,
+    "abs_return_acf1": 0.06576996059769656,
+    "abs_return_acf5": 0.03750145932135526,
+    "abs_return_acf20": 0.006453142421035141,
+    "cross_sectional_corr": 0.25229914016292654,
+    "volume_abs_return_corr": 0.6095855856861189,
+    "leverage_effect": -0.02706012449497331,
+    "volume_change_acf1": -0.40814340270577654,
+    "corr_asymmetry": -0.010455302161768973,
+    "corr_asymmetry_lagged": -0.011649638885113667,
+    "sector_excess_corr": 0.14442739748053202,
+    "corr_persistence_acf1": 0.1563857587300606
+   },
+   "panel_504": {
+    "annualised_vol_pct": 32.78373338898546,
+    "excess_kurtosis": 8.45899546664467,
+    "return_acf1": 0.027351690151367406,
+    "abs_return_acf1": 0.16205178988031224,
+    "abs_return_acf5": 0.09610699938470242,
+    "abs_return_acf20": 0.011498702169459186,
+    "cross_sectional_corr": 0.3523204311782011,
+    "volume_abs_return_corr": 0.6363735696859234,
+    "leverage_effect": -0.042221808216501726,
+    "volume_change_acf1": -0.4005215588069758,
+    "corr_asymmetry": 0.014697641516035823,
+    "corr_asymmetry_lagged": -0.019995794237638476,
+    "sector_excess_corr": 0.12051379654108949,
+    "corr_persistence_acf1": 0.2755502741734162
+   },
+   "in_band_252": 13,
+   "misses_252": [
+    "volume_change_acf1"
+   ],
+   "in_band_504": 13,
+   "misses_504": [
+    "volume_change_acf1"
+   ],
+   "in_band_heldout_universe": 13,
+   "misses_heldout_universe": [
+    "volume_change_acf1"
+   ],
+   "in_band_heldout_seeds": 13,
+   "misses_heldout_seeds": [
+    "volume_change_acf1"
+   ],
+   "annualised_vol_pct": 28.86936869639875,
+   "vol_at_vix_5": 24.319323360544274,
+   "vol_at_vix_65": 100.64625822781365,
+   "crisis_lever": 4.138530366807095
+  },
+  "pt-v10": {
+   "panel_252": {
+    "annualised_vol_pct": 31.46317088200093,
+    "excess_kurtosis": 7.7618350675644265,
+    "return_acf1": 0.019477505884010145,
+    "abs_return_acf1": 0.09939647245257721,
+    "abs_return_acf5": 0.048689096264285414,
+    "abs_return_acf20": 0.004253914127950666,
+    "cross_sectional_corr": 0.3062636939976834,
+    "volume_abs_return_corr": 0.4783742462798686,
+    "leverage_effect": -0.033583214569255206,
+    "volume_change_acf1": -0.31299842684138957,
+    "corr_asymmetry": -0.0033501930644714573,
+    "corr_asymmetry_lagged": 0.005412276552206496,
+    "sector_excess_corr": 0.134603019848167,
+    "corr_persistence_acf1": 0.16223423592088848
+   },
+   "panel_504": {
+    "annualised_vol_pct": 32.69191010733188,
+    "excess_kurtosis": 8.26308817413813,
+    "return_acf1": 0.02130695766995773,
+    "abs_return_acf1": 0.17493999340293948,
+    "abs_return_acf5": 0.08299673343903445,
+    "abs_return_acf20": 0.008778893111016428,
+    "cross_sectional_corr": 0.35328741377532213,
+    "volume_abs_return_corr": 0.5173604025238738,
+    "leverage_effect": -0.03746723009621815,
+    "volume_change_acf1": -0.3156080846947651,
+    "corr_asymmetry": 0.013336338142225512,
+    "corr_asymmetry_lagged": -0.02467595893214969,
+    "sector_excess_corr": 0.12010132994401759,
+    "corr_persistence_acf1": 0.1908199417772689
+   },
+   "in_band_252": 14,
+   "misses_252": [],
+   "in_band_504": 13,
+   "misses_504": [
+    "volume_change_acf1"
+   ],
+   "in_band_heldout_universe": 14,
+   "misses_heldout_universe": [],
+   "in_band_heldout_seeds": 14,
+   "misses_heldout_seeds": [],
+   "annualised_vol_pct": 31.46317088200093,
+   "vol_at_vix_5": 24.120430963543885,
+   "vol_at_vix_65": 119.85676479538562,
+   "crisis_lever": 4.9690971515616615
+  },
+  "pt-v11": {
+   "panel_252": {
+    "annualised_vol_pct": 32.81367118793246,
+    "excess_kurtosis": 6.65712595950831,
+    "return_acf1": 0.027022989579100595,
+    "abs_return_acf1": 0.10669293890734007,
+    "abs_return_acf5": 0.04550527237306837,
+    "abs_return_acf20": 0.0016163485578048937,
+    "cross_sectional_corr": 0.3187975510443913,
+    "volume_abs_return_corr": 0.4822320925441027,
+    "leverage_effect": -0.042181913130720505,
+    "volume_change_acf1": -0.3159114843043765,
+    "corr_asymmetry": -0.014587760213791188,
+    "corr_asymmetry_lagged": 0.03358411692278376,
+    "sector_excess_corr": 0.2065314920649438,
+    "corr_persistence_acf1": 0.15268537659930048
+   },
+   "panel_504": {
+    "annualised_vol_pct": 33.875831934837535,
+    "excess_kurtosis": 7.7182881547887545,
+    "return_acf1": 0.02845538087751981,
+    "abs_return_acf1": 0.205805624372757,
+    "abs_return_acf5": 0.08743458395088398,
+    "abs_return_acf20": 0.004363896992253302,
+    "cross_sectional_corr": 0.3799180343099018,
+    "volume_abs_return_corr": 0.5189426233688874,
+    "leverage_effect": -0.05388447150351769,
+    "volume_change_acf1": -0.31533014415659366,
+    "corr_asymmetry": -0.004924275806775763,
+    "corr_asymmetry_lagged": 0.007546799879139393,
+    "sector_excess_corr": 0.17515069733856456,
+    "corr_persistence_acf1": 0.21107461434705063
+   },
+   "in_band_252": 14,
+   "misses_252": [],
+   "in_band_504": 13,
+   "misses_504": [
+    "volume_change_acf1"
+   ],
+   "in_band_heldout_universe": 13,
+   "misses_heldout_universe": [
+    "volume_change_acf1"
+   ],
+   "in_band_heldout_seeds": 14,
+   "misses_heldout_seeds": [],
+   "annualised_vol_pct": 32.81367118793246,
+   "vol_at_vix_5": 22.670737087165513,
+   "vol_at_vix_65": 136.16297070364968,
+   "crisis_lever": 6.006111322279637
+  },
+  "pt-v12": {
+   "panel_252": {
+    "annualised_vol_pct": 32.76036046708565,
+    "excess_kurtosis": 6.700098644365375,
+    "return_acf1": 0.023931844097884195,
+    "abs_return_acf1": 0.11073742742411358,
+    "abs_return_acf5": 0.042770986154747295,
+    "abs_return_acf20": 0.00399956270460511,
+    "cross_sectional_corr": 0.31770458774893373,
+    "volume_abs_return_corr": 0.5599442151619296,
+    "leverage_effect": -0.040140181067312944,
+    "volume_change_acf1": -0.2655720212577639,
+    "corr_asymmetry": -0.014654221245841467,
+    "corr_asymmetry_lagged": 0.01807184180353405,
+    "sector_excess_corr": 0.20785580445510612,
+    "corr_persistence_acf1": 0.15246050265390515
+   },
+   "panel_504": {
+    "annualised_vol_pct": 33.893934298845636,
+    "excess_kurtosis": 7.7527556105678395,
+    "return_acf1": 0.02500578542167333,
+    "abs_return_acf1": 0.20836350308126406,
+    "abs_return_acf5": 0.08641989826863503,
+    "abs_return_acf20": 0.0052246127690575754,
+    "cross_sectional_corr": 0.37972915693544407,
+    "volume_abs_return_corr": 0.6088183717798348,
+    "leverage_effect": -0.05431980108556665,
+    "volume_change_acf1": -0.2571703695174374,
+    "corr_asymmetry": -0.004921721949588925,
+    "corr_asymmetry_lagged": -0.0016894687749732518,
+    "sector_excess_corr": 0.17610490289603295,
+    "corr_persistence_acf1": 0.2076965607280865
+   },
+   "in_band_252": 14,
+   "misses_252": [],
+   "in_band_504": 14,
+   "misses_504": [],
+   "in_band_heldout_universe": 14,
+   "misses_heldout_universe": [],
+   "in_band_heldout_seeds": 14,
+   "misses_heldout_seeds": [],
+   "annualised_vol_pct": 32.76036046708565,
+   "vol_at_vix_5": 22.681340107056123,
+   "vol_at_vix_65": 136.99379940758342,
+   "crisis_lever": 6.039934093883849
+  }
+ }
+}

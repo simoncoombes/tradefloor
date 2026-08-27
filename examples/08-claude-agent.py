@@ -40,11 +40,15 @@ except ImportError:
     sys.exit('This example needs the extra: pip install "pretium[claude]"')
 
 
-# The seven components the engine decomposes every price move into. Claude
+# The nine components the engine decomposes every price move into. Claude
 # picks from exactly this list so the answer is checkable rather than prose.
+# It has to be all nine: the harness scores against pt.Engine.FACTORS, so a
+# list missing `circuit_breaker` and `jump` -- as this one was until 0.3.0 --
+# marks the agent wrong on a day it was never offered the right answer to.
 Factor = Literal[
     "reversion", "momentum", "crowd_lean", "company_news",
     "order_flow_impact", "short_squeeze_effect", "random_noise",
+    "circuit_breaker", "jump",
 ]
 
 
@@ -92,8 +96,9 @@ toward zero on a 60-day half-life.
 - Your orders consume real depth. A large order pays worse prices because it \
 ate the book, so size relative to average daily volume matters more than \
 notional size.
-- Returns here are positively autocorrelated at lag one, which is NOT true of \
-real equities. Momentum works in this market partly as an artefact.
+- Returns carry only a small lag-one autocorrelation, +0.0239 on the shipped \
+model, which is inside the range real equities show. Momentum is not a free \
+edge here, and it was in earlier versions of this simulator.
 
 Give a portfolio, not a trade list. Concentration is allowed and often \
 correct; equal-weighting everything is a way of declining to have a view.\

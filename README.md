@@ -61,9 +61,16 @@ test.
 
 **Determinism that's checked.** The crate ships its own `exp`, `log`, `sin`
 and `cos` instead of calling the platform libm. Every release builds five
-targets, runs one fixed simulation inside each, and compares digests. A
-disagreement fails the release. A WebAssembly build produces the same digest
-as the native one.
+targets -- linux-x86_64, linux-aarch64, macos-arm64, macos-x86_64 and
+windows-x86_64 -- runs one fixed simulation inside each, and compares
+digests. A disagreement fails the release.
+
+The WebAssembly build is checked by hand rather than by that gate, because it
+needs a toolchain CI does not carry: on 2026-08-24 the native and
+`wasm32-unknown-unknown` builds hashed the same fixed simulation -- twelve
+instruments, five days, `pt-v3` -- to `2b2f3141...`, and
+`tests/test_wasm_parity.py` pins the Python half of that pair so the two
+cannot drift apart unnoticed.
 
 **Ground truth you can read.** The simulator computed every price, so it can
 tell you why. One row per instrument per tick, with nine factor
@@ -109,19 +116,22 @@ informative, because it broke against a live order book under honest impact
 costs.
 
 **Realism is a stated envelope, not a score.** `pt.facts.measure()` reports
-fourteen statistics against real-market bands. At 252 days the shipped `pt-v10`
-preset holds **all fourteen in band** on thirty calibration seeds, and all
-fourteen again on a 60-name universe it never saw. Read that as fourteen
-in-band verdicts rather than fourteen independent validations: five of the
-fourteen were live calibration targets, the bands were used both to tune
-against and to grade against, and "held out" means unseen simulation seeds and
-another roster from the same generator rather than withheld market data. That is a market with the
-right
-volatility, the right tails, the right co-movement, industries that co-move
-more than strangers, correlation that stays elevated after a panic, volume
-that behaves, and volatility episodes it produces itself.
+fourteen statistics against real-market bands. At 252 days the shipped `pt-v12`
+preset holds **all fourteen in band** on thirty calibration seeds, all
+fourteen again at 504 days against bands re-derived at that window, and all
+fourteen again on a 60-name universe it never saw. On thirty seeds it never
+used it holds thirteen, the single miss being `corr_persistence_acf1`. Read
+that as fourteen in-band verdicts rather than fourteen independent
+validations: five of the fourteen were live calibration targets, the bands
+were used both to tune against and to grade against, and "held out" means
+unseen simulation seeds and another roster from the same generator rather
+than withheld market data.
+That is a market with the right volatility, the right tails, the right
+co-movement, industries that co-move more than strangers, correlation that
+stays elevated after a panic, volume that behaves, and volatility episodes it
+produces itself.
 
-pt-v10 became the default on 2026-08-26, an era boundary: every trajectory
+pt-v12 became the default on 2026-08-26, an era boundary: every trajectory
 that came from the default changed. Runs recorded before it are not
 comparable to runs after it unless they name their preset, and every earlier
 preset from `pt-v1` onward stays selectable and reproduces bit for bit.
@@ -130,21 +140,35 @@ market digests under 0.1.4 and 0.2.0. A fully specified run is still
 (package version, model, universe fingerprint, seed), since the preset pins
 the coefficients and the package version pins the implementation.
 
-At 504 days pt-v10 holds thirteen of fourteen. The one it misses there,
-volume-change autocorrelation, is stated as a gap.
+At 504 days pt-v12 holds all fourteen, which is the first two-year clean
+sheet this project has measured -- pt-v3 held seven there and pt-v10 held
+thirteen, missing volume-change autocorrelation. Read the headroom rather
+than the count: annualised volatility reads 33.89 against a band ending at
+34.0, so that row is genuine but thin, and the certified horizon stays 252
+days because that is where the certification is measured.
 
-**Six gaps are measured and named rather than assumed.** The certified
-horizon is 252 days, and nothing beyond 504 days has been measured at all.
-Volatility memory decays exponentially where real markets decay
-hyperbolically. Volume-change autocorrelation leaves its band at two years.
-Scenario response has the right size, measured as a regression gain, but too
-much noise around it for one run to size a scenario from, and industries hold
-together in a crisis about a third as tightly as real ones. The endogenous
-MACRO economy cannot reach its own crisis regimes, so an inflation regime or
-a policy crisis has to be driven through a scenario; a volatility crisis does
-not, since the default reaches its own crisis threshold on 10.2% of days
-against a real 12.5%. And certification was measured on a
-sector-balanced roster, which no real index is.
+Beyond two years the model has now been measured rather than assumed. At
+2520 days it holds ten of the fourteen against the (horizon-mismatched)
+two-year bands, and nothing runs away or drifts: measured year by year over
+ten years, annualised volatility reads 31.5, 35.6, 30.2, 33.5, 33.0, 33.1,
+31.3, 32.4, 32.4, 31.6 percent -- flat, with the year-to-year variation a
+real market has.
+
+**Five gaps are measured and named rather than assumed.** The certified
+horizon is 252 days; two and five-year panels are measured but not
+certified. Volatility memory decays exponentially where real markets decay
+hyperbolically. Scenario response has the right size, measured as a
+regression gain, but too much noise around it for one run to size a scenario
+from -- the driven-window noise ratio is 1.57x real. The endogenous MACRO
+economy cannot reach its own crisis regimes, so an inflation regime or a
+policy crisis has to be driven through a scenario; a volatility crisis does
+not: measured on `pt-v10`, the preset's own VIX crossed its crisis threshold
+on 10.2% of days against a real 12.5%, and that figure has not been
+re-measured on `pt-v12`. And certification was measured on a sector-balanced
+roster, which no real index is: re-measured on pt-v12, an S&P-like or
+technology-heavy roster holds all fourteen at one year, so the envelope
+transfers at the certified horizon, and the cost of concentration shows up
+in the second year instead.
 [The realism envelope](https://simoncoombes.github.io/pretium/trust.html)
 states each gap and what it forbids. `pt.envelope.check()` refuses to certify
 a question that falls outside one.
@@ -199,8 +223,10 @@ that cited it.
 ## Citing this
 
 See [CITATION.cff](https://github.com/simoncoombes/pretium/blob/main/CITATION.cff), or cite a specific result by its manifest.
-The seed, the universe fingerprint, the model fingerprint and the strategy
-fingerprint together identify exactly what ran.
+A citation identifies the software; it does not identify a run. A
+`RunManifest` does: it carries the package version and preset it was written
+by, the seed, the universe fingerprint, the macro conditions, the scenario
+and the strategy fingerprint.
 
 ## Licence
 

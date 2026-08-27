@@ -4,26 +4,26 @@
 //!
 //! `fair_value.rs` takes `sector_avg_pe` as an already-looked-up number, with
 //! a comment explaining that the crate deliberately does not own the sector
-//! table because "the TypeScript already owns it" and a copy would be a
+//! table because "the reference implementation already owns it" and a copy would be a
 //! second source of truth.
 //!
 //! That reasoning was right and has now expired. Once this crate IS the
-//! published library there is no TypeScript alongside it, and a Python user
+//! published library there is no reference implementation alongside it, and a Python user
 //! passes `sector="technology"`, not an anchor P/E they looked up themselves.
 //! Requiring them to supply the multiple would export an internal detail and
 //! guarantee that no two users' "technology" meant the same thing.
 //!
 //! So the table lives here, and the second-source-of-truth risk is answered
 //! by a test rather than by not having the data: [`tests::anchors_match_the_
-//! typescript_goldens`] checks every anchor against `meta.sectorAnchors` in
-//! `goldens/fairvalue.json`, which is generated from TypeScript and is the
-//! parity contract.
+//! reference_goldens`] checks every anchor against `meta.sectorAnchors` in
+//! `goldens/fairvalue.json`, which is generated from the reference
+//! implementation and is the parity contract.
 //!
 //! # Order is contractual
 //!
 //! Sectors iterate in the declared order below — `technology` through
 //! `transportation` — because draw schedules depend on it. This is the order
-//! in the TypeScript `SECTOR_CONFIGS` literal. A `HashMap` here would be a
+//! in the reference implementation's `SECTOR_CONFIGS` literal. A `HashMap` here would be a
 //! correctness bug, not a style choice, which is why it is a fixed array.
 
 /// One sector's model parameters.
@@ -109,10 +109,10 @@ mod tests {
     }
 
     #[test]
-    fn anchors_match_the_typescript_goldens() {
+    fn anchors_match_the_reference_goldens() {
         // The answer to "isn't this a second source of truth?" -- it is, and
         // this is the gate that keeps the two identical. meta.sectorAnchors is
-        // generated from TypeScript and is the parity contract.
+        // generated from the reference implementation and is the parity contract.
         // Skip rather than fail when the corpus is absent. The goldens are
         // 135 MB and are excluded from the published crate, so a consumer
         // running `cargo test` would otherwise see a failure that says

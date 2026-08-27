@@ -1,4 +1,5 @@
-//! The central bank, ported from `src/lib/engine/economy.ts:1204`.
+//! The central bank, ported from the reference implementation's economy
+//! module.
 //!
 //! # Draw schedule
 //!
@@ -280,8 +281,8 @@ pub fn update_central_bank(
             mathx::max(0.1, new_economy.treasury_yield_10y - qe_suppression / 252.0);
     }
 
-    // Cheap money inflates multiples. Stored on the economy so `market.ts`
-    // can read it without a central-bank reference.
+    // Cheap money inflates multiples. Stored on the economy so the market
+    // module can read it without a central-bank reference.
     if new_cb.qe_active && new_cb.qe_monthly_purchases > 0.0 {
         new_economy.qe_pe_boost = 0.10 * (new_cb.qe_monthly_purchases / 120.0);
     } else {

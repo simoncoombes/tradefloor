@@ -25,21 +25,23 @@ does not guarantee about the result.
 | every input to the run | `engine.order_log` | yes |
 
 Four of the five are not in the log, and that is deliberate. `replay()` takes
-the seed, the universe and the macro as arguments so that replaying a log
-against the wrong starting conditions is a thing you have to do on purpose.
+the seed, the universe, the macro and the `model` as arguments so that
+replaying a log against the wrong starting conditions is a thing you have to
+do on purpose. `model` defaults to the shipped preset, which is why a run
+recorded under a custom coefficient set has to name it back.
 
 ### 1. Version and preset
 
 ```python
-pt.version()                      # '0.2.0'
-pt.model_preset()["name"]         # 'pt-v10', the shipped default
+pt.version()                      # '0.3.0'
+pt.model_preset()["name"]         # 'pt-v12', the shipped default
 ```
 
 Coefficients ship as a named preset rather than as constructor keywords, so
 two published results can be compared. Quote both: the version pins the build,
 the preset name pins the coefficient set.
 
-Read [Conventions](conventions.html) for what the preset dictionary contains
+Read [Conventions](conventions.md) for what the preset dictionary contains
 and, just as importantly, what it does not.
 
 ### 2. The seed
@@ -67,7 +69,7 @@ rebuilt the same thing:
 - `pt.Universe.random(n, seed=k)` - the two integers are the whole recipe.
 - An explicit roster of `Instrument`s - publish the roster.
 - `pt.Universe.from_edgar(snapshot)` - publish the snapshot, not the query.
-  See [SEC EDGAR](real-fundamentals-from-sec-edgar.html).
+  See [SEC EDGAR](real-fundamentals-from-sec-edgar.md).
 
 Roster **order** is contractual. A re-sorted universe is a different market,
 and the fingerprint covers order as well as content, so a reversed roster
@@ -89,9 +91,9 @@ macro = pt.Macro(vix=15.0, federal_funds_rate=0.025,
 ```
 
 `corporate_bond_yield=None` is not the same as `0.0` - see
-[Conventions](conventions.html). Record the `None`.
+[Conventions](conventions.md). Record the `None`.
 
-If you drove a macro path with a [Scenario](scenarios.html), serialise the
+If you drove a macro path with a [Scenario](scenarios.md), serialise the
 realised path rather than the constructor call:
 
 ```python
@@ -110,10 +112,11 @@ same = pt.replay(log, seed=42, universe=universe, macro=macro)
 ```
 
 The log holds every input the engine consumed: `open_market`, `run_session`
-with its hour, minute, day of week, tick count, news and order flow,
-`close_market`, `record`, `pin_macro`, listings and delistings, and any
-explicit RNG draws. `pin_macro` is logged, so a scenario run replays from its
-own log with no special handling.
+with its hour, minute, day of week, tick count, volatility, news, order flow
+and whether it closes the market at the end, `tick` for a session driven one
+tick at a time, `close_market`, `record`, `pin_macro`, listings and
+delistings, and any explicit RNG draws. `pin_macro` is logged, so a scenario
+run replays from its own log with no special handling.
 
 An unknown operation raises on replay rather than being skipped, because a
 replay that silently ignored an entry would produce a market that is not the
@@ -158,7 +161,8 @@ rebuilt = pt.Universe.random(archive["universe"]["n"],
 assert rebuilt.fingerprint == archive["universe"]["fingerprint"]
 
 replayed = pt.replay(archive["order_log"], seed=archive["seed"],
-                     universe=rebuilt, macro=pt.Macro(**archive["macro"]))
+                     universe=rebuilt, macro=pt.Macro(**archive["macro"]),
+                     model=archive["model_preset"])
 assert replayed.prices() == engine.prices()
 assert replayed.draws_consumed == engine.draws_consumed
 ```
@@ -182,34 +186,48 @@ same = pt.RunManifest.from_json(manifest.to_json()).reproduce()
 the expected result digest so the reviewer's check runs itself, and refuses -
 loudly, naming the culprit - rather than replaying against a changed
 component or a build whose trajectories have moved. See
-[Sharing a run](sharing-a-run.html).
+[Sharing a run](sharing-a-run.md).
 
 ## What the reproduction guarantees
 
-**Across machines -- measured on all five targets at one commit, one
-platform since.** The library carries its own `exp`, `log`, `sin` and `cos`
+**Across machines -- measured on all five targets, at the baseline this
+release ships.** The library carries its own `exp`, `log`, `sin` and `cos`
 rather than calling the platform's, specifically so builds on different
 operating systems can't drift apart in the low bits. Every release builds
 wheels for five targets, runs one fixed simulation inside each, and compares
-digests (`.github/workflows/determinism.yml`); any disagreement fails the
-release.
+the digests against each other **and** against the committed baseline in
+`tests/known_answer.json`. That comparison is the `verify` job of
+`.github/workflows/release.yml`, and both `publish` and `github_release`
+declare it in `needs:`, so a disagreement stops the upload rather than
+merely reporting one. The same check also runs on its own as
+`.github/workflows/determinism.yml`, which asks the question of a commit
+rather than of the artefacts about to be published. A tag or a push to
+`main` runs all five targets there; a manual dispatch defaults to the two
+that nothing else covers, `macos-x86_64` and `windows-x86_64`, and runs all
+five when asked for `all`.
 
-That gate has run. At `ad91026` (known-answer v5, the RNG stream split), all
-five targets -- Linux x86_64 and aarch64, macOS arm64 and x86_64, Windows
-x86_64 -- produced the identical digest, `76983e65...3180eeb`. It has not yet
-run against a tagged release. An earlier two-platform record also stands: at
-`a5afd1c` (v3), independent Windows x86_64 and macOS arm64 builds agreed on
-`112fd73e...6eff337`.
+The determinism workflow has run against the current baseline. Dispatched
+over `f722ce3`, the 0.3.0 version bump, asking for all five targets, each
+one -- Linux x86_64 and aarch64, macOS arm64 and x86_64, Windows x86_64 --
+reported the identical known-answer v11 digest:
 
-The baseline has moved since the five-target run. The era's model changes
-took the known-answer version from v5 to v6 (the GJR asymmetry term), v7
-(the market factor's conditional volatility) and v8 (that volatility's VIX
-coupling); the current digest, `1ee64998...fe3581c` at v8, was regenerated on
-macOS arm64 and has one platform's confirmation behind it until the gate runs
-again. Treat "the same seed gives the same market on any platform" as
-measured for all five targets at `ad91026`, and as engineering intent --
-backed by a test that no platform-varying transcendental reaches the source
-(`rust/tests/mathx_parity.rs`) -- for the current baseline.
+```
+60d475726c8b270df0894da7577523e98d044dd09afc6b536377eaf4b40de590
+```
+
+That is the `sha256` committed in `tests/known_answer.json`, and that
+commit's copy of the file is byte-identical to the one shipping here, so the
+measurement covers the baseline a reader can check against today. The file
+also carries the simulation and metadata digests separately, which is what
+lets a mismatch say whether the prices moved or only the run's metadata did.
+
+It has run against tagged releases too. A `v*` tag starts both workflows, and
+the determinism run on each of v0.1.0, v0.1.1, v0.1.2, v0.1.3, v0.1.4 and
+v0.2.0 had all five targets agree. So treat "the same seed gives the same
+market on any platform" as a measurement rather than as intent. The test that
+no platform-varying transcendental reaches the source
+(`rust/tests/mathx_parity.rs`) is what keeps it true between runs; it is not
+the evidence for it.
 
 **Across versions, not at all.** A change to a coefficient, to the universe
 generator, or to the engine moves every seed's trajectory. This is why the

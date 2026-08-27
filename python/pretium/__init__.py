@@ -362,13 +362,14 @@ def run_many(
     # Per seed is the only safe boundary
 
     This parallelises across seeds and nothing else, and that survives the
-    2026-08 split of the engine's RNG into three per-domain substreams
-    (market, economy and external, see ``docs/rng-streams.md``), because the split
-    is by DOMAIN, not by unit of work. The market stream alone serves every
-    draw in a tick: the market factor, each sector factor, per-company
-    noise, volume and book settlement, in one fixed order across the whole
-    roster, with the Box-Muller spare cached per stream so even the parity
-    of normal draws is that stream's state. Any within-run decomposition
+    2026-08 split of the engine's RNG into seven per-domain substreams
+    (market, economy, external, jumps, volume, news and volume_idio, see
+    ``docs/rng-streams.md``), because the split is by DOMAIN, not by unit of
+    work. The market stream alone serves every draw in a tick: the market
+    factor, each sector factor, per-company noise, the intraday volume noise
+    and book settlement, in one fixed order across the whole roster, with the
+    Box-Muller spare cached per stream so even the parity of normal draws is
+    that stream's state. Any within-run decomposition
     would repartition a single sequence, and the draw schedule does not
     survive that. The economy's separate stream bought comparability, not
     concurrency: a pinned macro path no longer reshuffles the market's

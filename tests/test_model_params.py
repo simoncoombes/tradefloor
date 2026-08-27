@@ -262,6 +262,12 @@ PERTURBATIONS = [
     ("volume_move_floor", 0.9, True),            # every name trades more on every day
     ("volume_move_noise", 0.05, True),           # narrows the return-unrelated part of volume
     ("volume_move_response", 0.9, True),         # steepens volume against the size of the day's move
+    ("garch_cascade_components", 6.0, True),     # replaces one variance timescale with six
+    # Inert ALONE: both only read inside the cascade, and the cascade only
+    # runs when garch_cascade_components >= 1. A PAIR, like the endogenous
+    # news dials above.
+    ("garch_cascade_ratio", 5.0, False),
+    ("garch_cascade_weight", 0.5, False),
     ("volume_idio_persistence", 0.8, False),     # a PAIR like the news dials: persistence alone carries an innovation of zero, so every per-name state stays exactly 0.0
     ("volume_idio_sigma", 0.25, True),           # the innovation half: non-zero sigma moves volume from the first day, and volume reaches price through the book      # the crisis blend only fires above the VIX gate, which the harness does not cross         # anchored: the harness runs near market_vol_vix_anchor, where the rate scale is exactly 1.0 at any coupling
 ]

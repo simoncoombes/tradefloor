@@ -1,4 +1,5 @@
-//! Market-maker quoting — ported from `src/lib/engine/marketMaker.ts`.
+//! Market-maker quoting — ported from the reference implementation's
+//! market-maker module.
 //!
 //! **Tier 1: zero transcendentals, zero RNG, zero imports.** Every operation
 //! is exactly specified by IEEE-754, so this is held to bit-identical parity
@@ -63,11 +64,11 @@ pub struct QuoteParams {
     pub inventory: MakerInventory,
     /// Volatility multiplier, typically VIX-derived. Makers widen when risk
     /// rises — the same reason real spreads blow out in a crisis.
-    /// TypeScript default: 1.
+    /// Reference default: 1.
     pub volatility_multiplier: f64,
     /// Maximum skew as a fraction of the half-spread. At 1.0 a fully-loaded
     /// maker shifts its mid by an entire half-spread, putting one side at
-    /// fair value and pushing the other away. TypeScript default: 1.
+    /// fair value and pushing the other away. Reference default: 1.
     pub max_skew: f64,
 }
 
@@ -81,7 +82,7 @@ impl Default for QuoteParams {
                 position: 0.0,
                 limit: 0.0,
             },
-            // Mirrors the TypeScript destructuring defaults
+            // Mirrors the reference implementation's destructuring defaults
             // (`volatilityMultiplier = 1`, `maxSkew = 1`).
             volatility_multiplier: 1.0,
             max_skew: 1.0,
@@ -100,7 +101,7 @@ pub struct LadderParams {
     pub quote: QuoteParams,
     /// Number of price levels to quote per side.
     ///
-    /// `f64` and not an integer type, because the TypeScript field is a
+    /// `f64` and not an integer type, because the reference implementation's field is a
     /// plain `number` and the loop is `for (i = 0; i < Math.max(1, levels))`.
     /// Two behaviours depend on that and are lost by narrowing to an integer:
     /// `2.5` yields THREE levels, and `NaN` yields ZERO — where any integer

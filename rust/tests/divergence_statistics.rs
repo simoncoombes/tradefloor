@@ -25,7 +25,7 @@
 //!
 //! # The bounds are re-derived, not inherited
 //!
-//! INVARIANTS §5.2 warns explicitly against copying the TypeScript suite's
+//! INVARIANTS §5.2 warns explicitly against copying the reference implementation's suite's
 //! thresholds, and the warning is right: those were chosen to catch modelling
 //! regressions in a single engine, not to bound a cross-language comparison.
 //! Reusing them would be a number with no argument behind it.
@@ -38,7 +38,7 @@
 //! relative error 7.2e-4 and max 2.9e-3 over a session, roughly an order of
 //! magnitude above it. That measurement was WRONG — it was the harness bug
 //! corrected in `afd67b9`, where the reference generator discarded the return
-//! value of `resetDailyPrices`, so the TypeScript ran without the open reset
+//! value of `resetDailyPrices`, so the reference implementation ran without the open reset
 //! while Rust called `open_market()`. The curve was a starting-state mismatch
 //! wearing the costume of a `cos` divergence.
 //!

@@ -322,6 +322,14 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     "volume_move_floor": (0.0, 1.5),
     "volume_move_noise": (0.0, 0.6),
     "volume_move_response": (0.2, 1.5),
+    # The variance cascade (§122). `components` ships at zero and the other
+    # two ship NON-zero, so the trio needs explicit ranges rather than a
+    # convention box: a box around a zero count is a box around "off".
+    # Ratio starts at 2.0 because below it the components overlap and the
+    # cascade is a slower single process rather than a spread of timescales.
+    "garch_cascade_components": (0.0, 8.0),
+    "garch_cascade_ratio": (2.0, 6.0),
+    "garch_cascade_weight": (0.0, 1.0),
 }
 
 

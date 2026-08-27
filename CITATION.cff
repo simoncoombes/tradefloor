@@ -12,8 +12,10 @@
 # a release; a version without the date it shipped is half a citation.
 #
 # A citation identifies the software. It does not identify a RUN. Reproducing a
-# published result needs the seed, the universe fingerprint, the model preset
-# name and the order log as well; see docs/reproducing-a-run.md.
+# published result needs four more things: the seed, the universe fingerprint
+# and how it was built, the macro initial conditions, and the order log. The
+# package version and preset name come from the citation itself. All five are
+# in docs/reproducing-a-run.md.
 
 cff-version: 1.2.0
 message: "If you use this software, please cite it using these metadata."
@@ -28,8 +30,8 @@ authors:
   - family-names: Coombes
     given-names: Simon
     email: simon@coombes.io
-version: 0.2.0
-date-released: "2026-08-26"
+version: 0.3.0
+date-released: "2026-08-27"
 license:
   - MIT
   - Apache-2.0

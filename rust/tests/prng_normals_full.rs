@@ -2,7 +2,7 @@
 //!
 //! Added because the crate claimed `rng.rs` was "bit-identical" while nothing
 //! read this file — the only normals ever checked were six values in
-//! `ts_parity_smoke.rs`. Box-Muller routes through `cos`, and `mathx`'s own V8
+//! `reference_parity_smoke.rs`. Box-Muller routes through `cos`, and `mathx`'s own V8
 //! sweep shows libm and Chrome disagreeing on roughly 0.75% of cosine inputs,
 //! so a mismatch rate near 1% was the prediction. This measures it.
 //!

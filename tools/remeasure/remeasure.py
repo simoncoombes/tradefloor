@@ -130,6 +130,28 @@ def _fmt(v) -> str:
     return str(v)
 
 
+def _scope_line(meta: dict) -> str:
+    """Say whether this was the whole inventory or a slice of it.
+
+    This line used to read "Full run" unconditionally. On 2026-08-27 a
+    three-group smoke test (`--only arith,tca_example,tca_ripple`, 3s wall)
+    overwrote `out/REPORT.md` with 54 of 355 figures and a header claiming a
+    full run, and no MOVED rows -- because the groups that move were never
+    measured. RELEASING.md step 4 tells the releaser to read that file, so a
+    partial that presents as complete is the one failure mode this report
+    must not have.
+    """
+    ran, total = len(meta.get("groups_run", [])), meta.get("groups_total", 0)
+    wall = f"{meta['wall_s']:.0f}s wall with {meta['workers']} workers"
+    if total and ran < total:
+        return (
+            f"**PARTIAL RUN: {ran} of {total} measurement groups.** {wall}. "
+            f"Groups run: {', '.join(meta['groups_run'])}. "
+            f"This is not the release gate; re-run without `--only`."
+        )
+    return f"Full run: {wall}."
+
+
 def write_report(rows: list[dict], meta: dict, path: Path) -> None:
     counts: dict[str, int] = {}
     for r in rows:
@@ -139,7 +161,7 @@ def write_report(rows: list[dict], meta: dict, path: Path) -> None:
         "# Published-figure re-measurement",
         "",
         f"Commit `{meta['commit']}`, {meta['date']}, pretium {meta['pretium_version']}. "
-        f"Full run: {meta['wall_s']:.0f}s wall with {meta['workers']} workers.",
+        f"{_scope_line(meta)}",
         "",
         "| status | figures |",
         "|---|---|",
@@ -270,6 +292,7 @@ def main() -> int:
         "wall_s": time.time() - started,
         "workers": args.workers,
         "groups_run": sorted(results),
+        "groups_total": len(GROUPS),
         "errors": errors,
     }
 

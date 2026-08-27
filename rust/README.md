@@ -21,8 +21,9 @@ libm.
 - **Ground truth.** The simulator knows the fair value it computed and the
   macro regime it is in, so both are readable. No real dataset has labels.
 - **Named, frozen model presets.** Coefficients ship as `pt-v1` through
-  `pt-v8`. `pt-v3` is the default. A modified coefficient set fingerprints
-  as `custom-XXXXXXXX` and can never present as a shipped one.
+  `pt-v12`, all twelve selectable and all twelve bit-reproducing. `pt-v12` is
+  the default (`params::DEFAULT_PRESET_NAME`). A modified coefficient set
+  fingerprints as `custom-XXXXXXXX` and can never present as a shipped one.
 - **A published realism envelope.** Fourteen statistics measured against
   real-market bands, with the misses named as gaps rather than omitted.
   See <https://simoncoombes.github.io/pretium/trust.html>.
@@ -66,9 +67,16 @@ suitable for, is at <https://simoncoombes.github.io/pretium/>.
 
 The published crate carries the engine, its unit tests and three
 integration tests that run standalone. The parity corpus that pins this
-port against its TypeScript original is 135 MB of fixtures and stays in the
-repository, where the release gate runs it, so the tests that read it are
-excluded here rather than shipped in a state where they cannot pass.
+port against the reference implementation is 140 MB of fixtures and stays
+in the repository, so the tests that read it are excluded here rather than shipped
+in a state where they cannot pass.
+
+That corpus is not run by CI. The two workflows -- `determinism.yml` and
+`release.yml` -- build wheels and compare known-answer digests; neither
+invokes `cargo` at all. `cargo test --offline` is a manual step in
+`RELEASING.md`, run against the repository and again against the packaged
+crate before a publish. It is a release checklist item, not automation, and
+saying so beats implying a gate that does not exist.
 
 ## Licence
 

@@ -84,7 +84,8 @@ pub fn load() -> Json {
         .join("goldens/divergence-multiday.json");
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "{}: {e}\nRun: npx tsx scripts/rust-port/divergence-multiday-vectors.ts",
+            "{}: {e}\nRegenerate from the reference implementation's\
+             divergence multi-day generator",
             path.display()
         )
     });
@@ -120,6 +121,7 @@ fn build_company(c: &Json) -> TickCompany {
             mispricing_momentum: maybe(&s["mispricingMomentum"]),
             maker_inventory: maybe(&s["makerInventory"]),
             garch_variance: bits(s["garchVariance"].as_str().unwrap()),
+            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
             last_daily_return: maybe(&s["lastDailyReturn"]),
             beta: maybe(&s["beta"]),
             short_interest: bits(s["shortInterest"].as_str().unwrap()),

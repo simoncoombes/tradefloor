@@ -1,4 +1,4 @@
-//! `updateEconomyDaily`, ported from `src/lib/engine/economy.ts:545`.
+//! `updateEconomyDaily`, ported from the reference implementation.
 //!
 //! # The draw schedule is the contract
 //!
@@ -41,7 +41,8 @@ use super::state::*;
 use crate::mathx::{self, clamp_via_min_max as clamp};
 use crate::rng::Rng;
 
-/// `randomNormal(mean, stdDev)` — the local wrapper at `economy.ts:364`.
+/// `randomNormal(mean, stdDev)` — the reference implementation's local
+/// wrapper.
 ///
 /// One normal draw per call, with mean and scale applied **outside** the
 /// draw. Ported as a wrapper rather than inlined so the call sites read the
@@ -54,10 +55,10 @@ fn random_normal(rng: &mut impl Rng, mean: f64, std_dev: f64) -> f64 {
 /// Inputs that the caller supplies per day.
 #[derive(Debug, Clone, Copy)]
 pub struct DailyInputs<'a> {
-    /// TypeScript default: 1.0.
+    /// Reference default: 1.0.
     pub volatility: f64,
     pub active_shocks: &'a [EconomicShock],
-    /// TypeScript default: 0.
+    /// Reference default: 0.
     pub market_return_pct: f64,
     /// `gameDay ?? 0`.
     pub game_day: i64,
@@ -137,7 +138,7 @@ impl<'a> Default for DailyInputs<'a> {
 
 /// One simulated day of the macro chain.
 ///
-/// The TypeScript spread-copies (`{ ...economy }`) and returns new state.
+/// The reference implementation spread-copies (`{ ...economy }`) and returns new state.
 /// This takes `&EconomyState` and returns a new one for the same reason: the
 /// observable contract is the returned value, and a `&mut` version would make
 /// the "reads `economy.x`, writes `newState.x`" distinction — which is
@@ -651,8 +652,8 @@ pub fn update_economy_daily(
     );
 
     // ── VIX ───────────────────────────────────────────────────────────────
-    // Pure JS since "Cycle 71". `wasmCalculateVixTarget` is imported at
-    // `economy.ts:16` and never called — an import-driven worklist would
+    // Pure JS since "Cycle 71". `wasmCalculateVixTarget` is imported by
+    // the economy module and never called — an import-driven worklist would
     // invent work here.
     let phase_vix = match economy.cycle_phase {
         CyclePhase::Expansion => 14.0,

@@ -13,7 +13,7 @@
 //! this file cannot make them differently from the Python binding.
 //!
 //! That constraint is the reason this module exists at all rather than a
-//! TypeScript port maintained beside it. The crate header puts it plainly:
+//! reference implementation maintained beside it. The crate header puts it plainly:
 //! two models that quietly disagree about the same prices are worse than
 //! having no second binding. A wasm binding that re-implemented the day loop
 //! would be that same fork one layer down, and the drift would be invisible

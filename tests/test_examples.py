@@ -10,9 +10,9 @@ notebook read correctly, the output looked right, and the code raised
 `TypeError`. It was caught because the notebooks are executed rather than
 written and hoped over.
 
-Opt-in because executing four notebooks takes about a minute -- longer than
-the rest of the suite -- and needs `jupyter`, which the library does not
-depend on. Set `PRETIUM_SLOW_TESTS=1` to run it; the release check does.
+Opt-in because executing eight notebooks takes about a minute and needs
+`jupyter`, which the library does not depend on. Set `PRETIUM_SLOW_TESTS=1`
+to run it; the release check does.
 """
 
 import os

@@ -1,5 +1,5 @@
-//! `simulateMarketTick`'s live path, ported from
-//! `src/lib/engine/market.ts:1230`.
+//! `simulateMarketTick`'s live path, ported from the reference
+//! implementation.
 //!
 //! # The order of operations IS the model
 //!
@@ -140,7 +140,7 @@ pub const PRICE_HARD_CAP: f64 = 50_000.0;
 pub struct TickStock {
     pub price: f64,
     pub previous_close: f64,
-    /// `undefined` until the first tick prints — the TypeScript field is
+    /// `undefined` until the first tick prints — the reference implementation's field is
     /// optional, and a fabricated default here would diverge on tick zero of
     /// any freshly generated company.
     pub previous_tick_price: Option<f64>,
@@ -157,6 +157,15 @@ pub struct TickStock {
     pub mispricing_momentum: Option<f64>,
     pub maker_inventory: Option<f64>,
     pub garch_variance: f64,
+    /// The variance cascade's components, when one is running.
+    ///
+    /// A fixed array rather than a `Vec`: this is per-name state touched at
+    /// every close, and a heap allocation per company per day would be a real
+    /// cost for a mechanism that ships switched off. All zeros means the
+    /// cascade has never run, and `update_garch_cascade` seeds from the
+    /// sector base on its first call. See
+    /// [`crate::market::garch::update_garch_cascade`].
+    pub garch_cascade: [f64; crate::market::garch::CASCADE_MAX],
     pub last_daily_return: Option<f64>,
     pub beta: Option<f64>,
     pub short_interest: f64,

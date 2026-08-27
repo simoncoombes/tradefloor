@@ -9,7 +9,7 @@ Two things live here, and neither is a score.
 **Per-statistic intervals** (`intervals`). Every panel statistic is reported
 with the spread it actually has across seeds, not as a bare median. A point
 estimate from a stochastic simulator invites a precision it does not have:
-`abs_return_acf20` reads +0.008 at the shipped preset, and the across-seed
+`abs_return_acf20` reads +0.004 at the shipped preset, and the across-seed
 range is wide enough that a single seed can read either side of zero. The
 band distance is reported in units of that spread, which is the same
 weighting `pretium.loss` uses -- so "how far out" is denominated in the
@@ -27,20 +27,28 @@ that aggregation destroys the only information that matters here: a model
 is realistic in some respects, at some measurement scale, and not others.
 
 There is also a practical failure mode. A scalar travels and a caveat does
-not. "87% realistic" is quotable in a way that "volatility clustering runs
-roughly twice real beyond one year" is not, so a single number reliably
-becomes the thing people cite INSTEAD of the gaps -- which is exactly
-backwards, because the gaps are what decide whether a result means
-anything. A boolean with reasons attached cannot be quoted without its
-reasons.
+not. "87% realistic" is quotable in a way that "volatility memory turns
+negative by lag 30, where real markets stay weakly positive out to lag 60"
+is not, so a single number reliably becomes the thing people cite INSTEAD
+of the gaps -- which is exactly backwards, because the gaps are what decide
+whether a result means anything. A boolean with reasons attached cannot be
+quoted without its reasons.
 
 ## Provenance
 
 The constants below are measurements, not judgements, and every one is
 reproducible from the tooling in `tools/calibration/`. They describe the
-shipped default preset. If `pretium.model_preset()["name"]` is not
-`PRESET`, this module is describing a different model than the one you are
-running, and `check` says so rather than answering.
+shipped default preset, which `PRESET` names.
+
+Nothing here re-checks that at call time. `check` reads these constants and
+the question you asked; it never looks at the engine you are about to run.
+So if `pretium.model_preset()["name"]` is not `PRESET`, this module is
+describing a different model than the one you are running and will NOT say
+so. This docstring claimed until 2026-08-27 that `check` said so, and it
+never did. The comparison is one line and belongs beside any citation of
+these numbers:
+
+    pretium.model_preset()["name"] == pretium.envelope.PRESET
 """
 
 from __future__ import annotations
@@ -56,8 +64,14 @@ from .facts import REAL_MARKETS, SEED_SD, SEED_SD_504, band_distance
 PRESET = "pt-v12"
 
 #: The measurement horizon the envelope certifies, in trading days.
-#: Not a soft preference: three statistics that are in band here leave it by
-#: 504 days, and `check` refuses to certify beyond it.
+#: Not a soft preference, though the reason is no longer a band count: since
+#: pt-v12 all fourteen are in band at 504 days as well (`MEASURED_504`). What
+#: holds the horizon here is that `CERTIFIED` was MEASURED here, on thirty
+#: seeds and two held-out axes, and that the thinnest 504-day row clears its
+#: ceiling by 0.11 on a statistic whose seed spread is many times that.
+#: This comment read "three statistics that are in band here leave it by 504
+#: days" until 2026-08-27, which described pt-v3. `check` refuses to certify
+#: beyond this horizon.
 CERTIFIED_HORIZON_DAYS = 252
 
 #: Measured at the certified horizon: 30 seeds, 40 instruments, 252 days.
@@ -235,15 +249,27 @@ GAPS: tuple[Gap, ...] = (
             "What remains is a SHAPE problem rather than a level one. "
             "Volatility itself stabilises near 32%, so a long run does not "
             "drift or blow up, and clustering at lags one and five stays "
-            "inside its bands. The decay curve is the defect, and gap 3 "
-            "carries it: exponential memory imitating hyperbolic memory "
-            "holds up over one year and comes apart over several.\n\n"
-            "The certification itself is the reason for the horizon, not the "
-            "band counts. CERTIFIED is measured at 252 days on thirty seeds; "
-            "the 504-day table is measured but not certified, and nothing "
-            "beyond 504 has been measured at all. A two-year study is "
-            "reading numbers this page publishes; a five-year study is "
-            "reading numbers nobody has checked."
+            "inside its bands. The decay curve is the defect, and the "
+            "decay-shape gap carries it: exponential memory imitating "
+            "hyperbolic memory holds up over one year and comes apart over "
+            "several.\n\n"
+            "AND THE LONGER HORIZONS ARE MEASURED NOW. This gap ended "
+            "\'nothing beyond 504 has been measured at all\' until "
+            "2026-08-27, and pt-v12 made that untrue. "
+            "tools/calibration/long_horizon.py runs 756, 1260 and 2520 days "
+            "on thirty seeds, and at 2520 days the panel holds 10 of 14 -- "
+            "against the 504-day bands, which are the wrong ruler for a "
+            "ten-year window and are quoted only because no ten-year bands "
+            "have been derived. That nothing RUNS AWAY is settled by a "
+            "second measurement needing no band at all: "
+            "tools/calibration/memory_vs_drift.py reads annualised "
+            "volatility year by year over ten years on twenty seeds, and it "
+            "gives 31.5, 35.6, 30.2, 33.5, 33.0, 33.1, 31.3, 32.4, 32.4 and "
+            "31.6 percent, which is flat. So a five-year study is "
+            "reading numbers that exist and are published. What it does not "
+            "have is a band derived at its own horizon, and there is no "
+            "committed tool to derive one -- which is what keeps the "
+            "certification at 252 days."
         ),
         forbids="multi-year backtests, and anything keyed on volatility dynamics beyond one year",
         statistics=("abs_return_acf1", "abs_return_acf5", "return_acf1", "excess_kurtosis"),
@@ -261,6 +287,40 @@ GAPS: tuple[Gap, ...] = (
             f"two of them fake a power law well enough that no panel "
             f"statistic objects. A two-component mixture was tried and is "
             f"not sufficient.\n\n"
+            f"SHARPENED 2026-08-26. The model already HAS two timescales, "
+            f"which had not been established. De-trending |r| by a centred "
+            f"252-day rolling mean over 2520 days on twenty seeds and "
+            f"re-measuring: 86% of the lag-1 autocorrelation survives, 77% "
+            f"of lag-5, 29% of lag-20. Lags 1 and 5 are genuine memory from "
+            f"the GJR recursion, whose shock half-life is 3.9 days; lag 20 "
+            f"is mostly a slowly-varying variance LEVEL fed by the VIX and "
+            f"business-cycle channels. That slow component is not a trend -- "
+            f"annualised volatility year by year over ten years is flat, "
+            f"+0.6% from the first year to the tenth.\n\n"
+            f"The flattering reading is refused. The raw log-log slope at "
+            f"2520 days is -0.597, much closer to real markets than the "
+            f"-0.847 read at 252 days, and it would be easy to call this gap "
+            f"an artefact of a short estimator. Strip the slow level and the "
+            f"slope returns to -0.867. The long horizon adds regime "
+            f"variation on top of the defect rather than curing it.\n\n"
+            f"So the target is specific now: not 'add long memory', which is "
+            f"already present and already does its job at lag 20, but make "
+            f"the FAST component decay hyperbolically rather than "
+            f"exponentially.\n\n"
+            f"AND THE SLOPE ALONE IS NOT THE TARGET. Measured 2026-08-26 on "
+            f"thirty seeds: turning on the market factor's slow variance "
+            f"component improves the log-log slope from -0.716 to -0.504 by "
+            f"LOWERING lag-1 autocorrelation from 0.1107 to 0.0693, while "
+            f"lag 20 does not move at all. A flatter line through a lower "
+            f"point is a better slope and a worse market -- real markets "
+            f"have BOTH short-lag clustering, `abs_return_acf1` between 0.02 "
+            f"and 0.22, and weakly positive autocorrelation out to lag 60. "
+            f"The slope is a ratio of shape to level and can be improved by "
+            f"destroying the level.\n\n"
+            f"Score work on this gap at lag 20 and beyond WITH LAG 1 HELD, "
+            f"never on the slope alone. The same run cost `excess_kurtosis` "
+            f"its 504-day band on five arms of six, because a smoother "
+            f"variance has thinner tails.\n\n"
             f"Read the scope of that claim precisely. It says no setting of "
             f"THIS model's parameters turns one slope into the other, "
             f"because a sum of exponentials is not a power law. It does not "
@@ -278,11 +338,20 @@ GAPS: tuple[Gap, ...] = (
     ),
     Gap(
         id="scenario-magnitude",
-        summary="scenario response is directional, not calibrated",
+        summary="a scenario's size is right on average and unreliable in one run",
         detail=(
-            "The VIX shock response is materially weaker than the previous "
-            "preset's. The direction of response is right; the magnitude is "
-            "not certified.\n\n"
+            "The expected size of a scenario\'s response is calibrated; "
+            "the dispersion around it is not, and that is the whole gap "
+            "now.\n\n"
+            "The steady-state lever -- how much more violent a sustained "
+            "crisis is than a calm market -- reads 6.04x on pt-v12 against "
+            "real markets\' 6.16x, measured from a held VIX 5 to a held VIX "
+            "65 on the certified 40-name roster over 252 days at thirty "
+            "seeds. pt-v10 read 5.05x there and the default before it 3.07x. "
+            "This gap opened by saying the VIX shock response was materially "
+            "weaker than the previous preset\'s; on pt-v12 it is stronger "
+            "than any preset before it and within two percent of real, so "
+            "that sentence is WITHDRAWN.\n\n"
             "'Direction is right' is measured rather than asserted. Driving "
             "the real 2020-21 macro path through the model and correlating "
             "daily returns against each driver, over 504 sessions, against "
@@ -305,26 +374,42 @@ GAPS: tuple[Gap, ...] = (
             "yield, and +1.226 against +1.272 for valuation, all within ten "
             "percent, with real AAPL inside the model\'s six-seed range on "
             "every channel.\n\n"
-            "The denominator is the defect. Over those same runs the model\'s "
-            "daily return sd is 0.0355 against real AAPL\'s 0.0236, 1.51x, "
-            "and its residual sd is 1.76x. So the expected response to a "
-            "scenario is calibrated and the dispersion around it is too wide: "
-            "one run understates how much of its own move was the scenario. "
-            "An event study over the five sessions after each of "
-            "six dated 2020-21 events agrees on sign five times out of six. "
-            "The exception is the Fed's intermeeting cut of 3 March 2020, "
-            "where an announcement-effect channel is absent rather than "
-            "miscalibrated; see examples/09-a-pandemic-shaped-market.ipynb."
-            "\n\n"
-            "Sector structure is the same shortfall measured a second "
-            "way. In calm markets it is in band on the shipped preset, "
-            "0.1346 at 252 days and 0.1201 at 504 against bands starting "
-            "at 0.11, which is why the separate sector-structure gap was "
-            "retired at 0.2.0. Under a held VIX 45 it reads +0.035 "
-            "against a real +0.103 in the 2020 window, on thirty seeds "
-            "at 252 days; pt-v7 measured on the same recipe reads "
-            "+0.064. Industries exist in this market and they hold "
-            "together in a crisis about a third as tightly as real ones."
+            "The denominator is the defect, and it is what keeps this a "
+            "gap now that the lever has arrived. Over the driven window the "
+            "model\'s residual sd is 1.565x real on pt-v12, down from 1.76x "
+            "at pt-v10 and barely moved from 1.555x at pt-v11. That is the "
+            "worst axis in the model. So the expected response to a scenario "
+            "is calibrated and the dispersion around it is too wide: one run "
+            "understates how much of its own move was the scenario. The "
+            "daily-return-sd pair behind the pt-v10 ratio, 0.0355 against "
+            "real AAPL\'s 0.0236, has not been re-measured since, so it is "
+            "quoted with its era rather than as a current reading.\n\n"
+            "An event study over the five sessions after each of six dated "
+            "2020-21 events agrees on sign TWO times out of six. This "
+            "paragraph said five of six until 2026-08-27; the notebook it "
+            "cites prints 2/6. The Fed\'s intermeeting cut of 3 March "
+            "2020 goes the wrong way, +9.9% against AAPL\'s -1.4%, because "
+            "an announcement-effect channel is absent rather than "
+            "miscalibrated; the VIX record close of 16 March misses by "
+            "declining to move, +0.3% against -7.4%; and the vaccine result "
+            "and Omicron are single-name Apple news, which a run driven only "
+            "by a macro path cannot know. The two that agree are the two the "
+            "macro path carries. See "
+            "examples/09-a-pandemic-shaped-market.ipynb.\n\n"
+            "Sector structure was the same shortfall measured a second "
+            "way, and it is now CLOSED. In calm markets it is in band on "
+            "the shipped preset, 0.2079 at 252 days and 0.1761 at 504 "
+            "against bands starting at 0.11, which is why the separate "
+            "sector-structure gap was retired at 0.2.0. Under a held VIX "
+            "45 pt-v12 reads +0.109 against a real +0.103, and crisis "
+            "co-movement reads 0.696 against a real 0.664 to 0.727.\n\n"
+            "This paragraph read 'industries hold together in a crisis "
+            "about a third as tightly as real ones' until 2026-08-26, "
+            "measured at +0.035 on pt-v10 and +0.064 on pt-v7. pt-v11's "
+            "crisis work closed it and pt-v12 carries that, so the claim "
+            "is WITHDRAWN. The crisis shape is right; what remains in "
+            "this gap is the dispersion above, which is about sizing a "
+            "scenario rather than about structure."
         ),
         forbids="sizing a scenario's impact rather than detecting it",
     ),
@@ -380,32 +465,53 @@ GAPS: tuple[Gap, ...] = (
     ),
     Gap(
         id="roster-concentration",
-        summary="certification was measured on a sector-balanced roster",
+        summary="a concentrated roster holds at one year and comes apart at two",
         detail=(
             "`Universe.random()` assigns sectors round-robin over the twelve "
             "in `sectors.SECTORS`, so a roster is as close to balanced as its "
             "size allows: the certified 40 names put four in each of four "
             "sectors and three in each of the other eight. No real index is "
             "balanced that way -- the S&P is roughly a third technology and "
-            "the Nasdaq more so. (This gap said 'exactly five names in each "
-            "of twelve sectors' until 2026-08-26, which is 60 names and "
-            "describes no roster the certification used.)\n\n"
-            "Varying ONLY sector composition, with every name drawn from one "
-            "pool: balanced holds 9 at L_real 0.0000; an S&P-like mix holds 8 "
-            "at 0.0176, losing abs_return_acf5; an all-technology roster "
-            "holds 7 and runs 32.8% volatility. Those three counts are out "
-            "of the TEN-statistic panel of the pt-v3 era and have not been "
-            "re-measured on pt-v10; they are kept because what they "
-            "establish is a property of roster composition rather than of a "
-            "preset. So part of the certification is an artifact of that "
-            "balance, and the more concentrated the roster, the less of it "
-            "transfers."
+            "the Nasdaq more so.\n\n"
+            "RE-MEASURED 2026-08-26 on pt-v12: thirty seeds, the fourteen-"
+            "statistic panel, both horizons. This gap previously carried "
+            "'balanced 9, S&P-like 8, all-technology 7', counts out of the "
+            "TEN-statistic panel of the pt-v3 era at six seeds, and said so. "
+            "Superseded:\n\n"
+            "                      252d     504d   out at 504\n"
+            "  balanced           14/14    14/14   --\n"
+            "  S&P-like           14/14    13/14   annualised_vol_pct\n"
+            "  technology-heavy   14/14    11/14   vol, corr_persistence, xs_corr\n"
+            "  all-technology     13/13    10/13   vol, corr_persistence, xs_corr\n"
+            "  defensive          14/14    14/14   --\n\n"
+            "The finding has changed shape. AT THE CERTIFIED HORIZON, "
+            "concentration costs nothing: every shape tested holds the whole "
+            "panel, so the envelope transfers to a roster shaped like a real "
+            "index. This gap used to say part of the certification was an "
+            "artifact of balance; on pt-v12 at 252 days that is no longer "
+            "measurable.\n\n"
+            "What concentration costs is the SECOND year, and the mechanism "
+            "is visible rather than mysterious. Cross-sectional correlation "
+            "rises monotonically with it -- 0.3797 balanced, 0.3813 S&P-like, "
+            "0.4112 technology-heavy, 0.5316 all-technology -- which is the "
+            "model behaving CORRECTLY, since names in one industry should "
+            "move together more. It rises past the 504-day band's top of "
+            "0.41 and annualised volatility follows it out. A band derived "
+            "from broad real-market windows is the wrong ruler for a "
+            "single-sector portfolio, so part of this is a statement about "
+            "the grading rather than about the model.\n\n"
+            "`sector_excess_corr` is UNDEFINED on an all-technology roster "
+            "rather than out of band: it asks how much a name moves with its "
+            "own industry beyond the market, and with one sector those are "
+            "the same thing. Hence 13 rather than 14 in that row. Measured by "
+            "`tools/calibration/roster_shapes.py`."
         ),
         forbids=(
-            "inheriting this envelope for a sector-concentrated roster -- "
-            "re-measure the panel on your own universe instead"
+            "inheriting this envelope for a sector-concentrated roster BEYOND "
+            "one year -- at the certified horizon it now transfers"
         ),
-        statistics=("abs_return_acf5", "return_acf1", "annualised_vol_pct"),
+        statistics=("cross_sectional_corr", "annualised_vol_pct",
+                    "corr_persistence_acf1"),
     ),
 )
 
@@ -644,15 +750,29 @@ def check(
             f"{CERTIFIED_HORIZON_DAYS}d. At 504 days the model {held}. The "
             f"thin one is annualised_vol_pct at "
             f"{MEASURED_504['annualised_vol_pct']:.2f} against "
-            f"{BANDS_504['annualised_vol_pct']}. Beyond 504 days nothing has "
-            f"been measured at all"
+            f"{BANDS_504['annualised_vol_pct']}. Beyond 504 days the panel "
+            f"is measured but has no ruler of its own: at 2520 days it holds "
+            f"10 of 14 against the 504-day bands "
+            f"(tools/calibration/long_horizon.py), and annualised volatility "
+            f"is flat year by year across those ten years "
+            f"(tools/calibration/memory_vs_drift.py). No bands have been "
+            f"derived at a five-year window, which is why the certification "
+            f"stops here"
         ))
         if "excess_kurtosis" in wanted:
+            # COMPUTED, for the reason the horizon count above is computed.
+            # This read "about 0.3 seed-sd above the floor" until 2026-08-27,
+            # which was right for the 8.26 pt-v10 measured at 504 days and
+            # wrong for the 7.75 pt-v12 reads there: the room halved and the
+            # sentence did not move.
+            room_sd = ((MEASURED_504["excess_kurtosis"]
+                        - BANDS_504["excess_kurtosis"][0])
+                       / SEED_SD_504["excess_kurtosis"])
             warnings.append(
                 f"excess_kurtosis reads {MEASURED_504['excess_kurtosis']:.2f} "
                 f"at 504 days against {BANDS_504['excess_kurtosis']}: inside "
-                f"it, but about 0.3 seed-sd above the floor, so a tail study "
-                f"at this horizon is reading the low edge of the band"
+                f"it, but {room_sd:.2f} seed-sd above the floor, so a tail "
+                f"study at this horizon is reading the low edge of the band"
             )
 
     for name in wanted:
@@ -683,36 +803,47 @@ def check(
         g = by_id["roster-concentration"]
         fire(g, (
             "the roster is sector-concentrated, and certification was "
-            "measured on a sector-balanced one. Measured on pt-v3 against "
-            "the ten-statistic panel of the time, and not re-measured "
-            "since: an S&P-like mix holds 8 of 10 (abs_return_acf5 leaves "
-            "band); an all-technology roster holds 7 of 10 at 32.8% "
-            "volatility. Re-measure on your own universe"
+            "measured on a sector-balanced one. Re-measured on pt-v12 over "
+            "thirty seeds and the fourteen-statistic panel "
+            "(tools/calibration/roster_shapes.py): at the certified horizon "
+            "that costs nothing any more -- balanced, S&P-like, "
+            "technology-heavy and defensive rosters all hold 14 of 14 at 252 "
+            "days, and an all-technology roster holds the 13 that are "
+            "defined on it, sector_excess_corr having no meaning with one "
+            "sector. What concentration costs is the SECOND year: 13 of 14 "
+            "S&P-like, 11 of 14 technology-heavy and 10 of 13 "
+            "all-technology at 504 days, as cross-sectional correlation "
+            "rises past a band derived from broad-market windows. So this "
+            "refusal is about the two-year panel and about grading your "
+            "roster with the right ruler: re-measure on your own universe"
         ))
 
     if scenario_magnitude:
         g = by_id["scenario-magnitude"]
         fire(g, (
-            "the result depends on the SIZE of a scenario's response, which "
-            "is not certified -- only its direction is. Measured: the "
-            "steady-state volatility lever from VIX 5 to VIX 65 reads 5.05x "
-            "on the shipped preset against real markets' 6.16x, so a crisis "
-            "here is about four fifths as violent as a real one. The "
-            "response SIZE is calibrated: measured as a regression gain "
+            "the result depends on the SIZE of a scenario's response. Its "
+            "EXPECTED size is calibrated: measured as a regression gain "
             "rather than a correlation, the three driver channels run within "
-            "ten percent of real AAPL (§81). What is too wide is the "
-            "dispersion around it, with daily return sd 1.51x real over the "
-            "same runs. Use a scenario to ask WHETHER a strategy breaks, not "
-            "how much"
+            "ten percent of real AAPL (§81), and the steady-state volatility "
+            "lever from VIX 5 to VIX 65 reads 6.04x on the shipped pt-v12 "
+            "against real markets' 6.16x, where pt-v10 read 5.05x. What is "
+            "not calibrated is the DISPERSION around that response: over the "
+            "driven 2020-21 window the model's residual sd is 1.565x real, "
+            "down from 1.76x at pt-v10 and still the worst axis in the "
+            "model, so one run understates how much of its own move was the "
+            "scenario. Use a scenario to ask WHETHER a strategy breaks, and "
+            "read the size as a distribution over seeds"
         ))
 
     if macro_regime:
         g = by_id["macro-range"]
         fire(g, (
             "the result depends on the economy reaching a regime it does not "
-            "reach on its own. Endogenous inflation peaks at 4.06% to 4.11% "
-            "over five seeds and five years, against a 6.0% clamp and a US CPI "
-            "that reached 9.1% in 2022, so the central bank's own inflation "
+            "reach on its own. Measured over thirty seeds and five years, "
+            "endogenous inflation peaks at 4.0% on every seed against a 6.0% "
+            "clamp, with sd 1.2 around a mean of 2.0%, where US CPI "
+            "year-on-year over 2015-2025 (FRED CPIAUCSL) has sd 2.18 and a "
+            "peak of 9.0% in June 2022. So the central bank's own inflation "
             "crisis cadence -- correct, and firing in 22.0% of the parity "
             "corpus -- is unreachable from a default run. Drive the regime "
             "through a scenario, and note that the crisis cadence responds to "
@@ -751,9 +882,11 @@ def score(panel: Mapping[str, float], *,
     as a function rather than a comparison anyone can write inline: a
     504-day panel scored against the 252-day bands is the wrong-ruler
     error, and it has been made repeatedly in this project. It flatters the
-    model on kurtosis -- 5.2 reads comfortably inside the 252-day band of
-    1.6 to 41 and is OUT of the horizon-matched 7.1 to 22 -- while being
-    harsher elsewhere.
+    model on kurtosis -- the 5.2 that pt-v3 read at 504 days sits
+    comfortably inside the 252-day band of 1.6 to 41 and is OUT of the
+    horizon-matched 7.1 to 22 -- while being harsher elsewhere. The shipped
+    preset reads 7.75 there, inside, which is the point of grading a
+    504-day panel with `BANDS_504`.
 
     `room_sd` is how far inside its band a statistic sits, in that
     horizon's own seed noise, signed so negative means out. A statistic

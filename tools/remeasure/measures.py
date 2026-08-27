@@ -180,8 +180,14 @@ def g_arith(ctx: Ctx) -> dict:
     rows_100x252 = 252 * 390 * 100
     return {
         "truth_rows_100x252": rows_100x252,            # "9.8 million rows"
-        "buffers_mb": 12 * rows_100x252 * 8 / 1e6,     # "about 940 MB"
-        "hundred_engines_gb": 100 * 12 * rows_100x252 * 8 / 1e9,  # "roughly 90 GB"
+        # Fourteen f64 buffers per recorded day, not twelve: prices, volumes,
+        # mispricing, fundamental and anchor, plus the nine attribution
+        # components (rust/src/python_arrow.rs, `struct RecordedDay`).
+        "buffers_mb": 14 * rows_100x252 * 8 / 1e6,     # "1.10 GB"
+        # The same fourteen buffers for ONE day, which is the figure the page
+        # quotes for what each recorded day adds.
+        "buffers_mb_per_day": 14 * 390 * 100 * 8 / 1e6,  # "4.37 MB a day"
+        "hundred_engines_gb": 100 * 14 * rows_100x252 * 8 / 1e9,  # "roughly 110 GB"
         "crossings_per_year": 252 * 390,               # "about 98,000"
         "crossings_five_fields": 252 * 390 * 5,        # "roughly 500,000"
         "workflow_truth_rows": 10 * 390 * 60,          # "234,000 rows"
@@ -335,15 +341,20 @@ def g_rebalance(ctx: Ctx) -> dict:
 
 def g_horizon(ctx: Ctx) -> dict:
     """agents-and-evaluation horizon bullet: on seed 2026 over random(40,7)
-    the Oracle makes $21k in five days and $568k in sixty, and the same
-    momentum agent captures 2.98 against the first denominator and 1.47
-    against the second. Method stated on the page."""
+    the Oracle makes $77.4k in five days and $565.4k in sixty, and the same
+    MEAN-REVERSION agent captures 0.066 against the first denominator and
+    1.18 against the second. Method stated on the page.
+
+    The agent is mean_reversion because that is the agent the page's
+    sentence is about. This measured momentum, left over from an era when
+    the bullet was written about momentum, and reported the horizon captures
+    as MOVED ever since against prose that was correct."""
     u = _u(40, 7)
     out = {}
     for days in (5, 60):
         scores = pt.evaluate(reference_agents(seed=3), seed=2026,
                              universe=u, days=days)
-        out[f"capture_{days}d"] = capture_ratio(scores).get("momentum")
+        out[f"capture_{days}d"] = capture_ratio(scores).get("mean_reversion")
         out[f"oracle_pnl_{days}d"] = scores["oracle"].pnl
     return out
 
@@ -377,8 +388,18 @@ def g_ranking(ctx: Ctx) -> dict:
                  universe=u, days=10, workers=min(4, ctx.workers))
     records = {r.name: r for r in rk.table()}
     mom, mr = records["momentum"], records["mean_reversion"]
-    sep_mr = rk.separation("momentum", "mean_reversion")
-    sep_rand = rk.separation("momentum", "random")
+    # Argument order and PAIR both follow the page, which prints its own
+    # calls at docs/agents-and-evaluation.md:133-135:
+    #   separation("mean_reversion", "momentum")   # 9-3,  p = 0.15
+    #   separation("mean_reversion", "random")     # 12-0, p = 0.0005
+    #   separation("buy_and_hold", "random")       # 5-7,  p = 0.77
+    # This measured momentum-first, which reverses every win count, and
+    # measured momentum-vs-random where the page compares mean-reversion to
+    # random -- a different test entirely. Both showed up as MOVED rows
+    # against prose that was correct.
+    sep_mr = rk.separation("mean_reversion", "momentum")
+    sep_rand = rk.separation("mean_reversion", "random")
+    sep_bh_rand = rk.separation("buy_and_hold", "random")
 
     # the beats-the-Oracle table: paired per-seed P&L against the reference
     beats = {name: sum(1 for pnl, ref in zip(records[name].pnls,
@@ -401,7 +422,7 @@ def g_ranking(ctx: Ctx) -> dict:
     # the second twelve-seed window (seeds 12-23): same test, different verdict
     rk_b = pt.rank(factory, seeds=range(12, 24),
                    universe=u, days=10, workers=min(4, ctx.workers))
-    sep_mr_b = rk_b.separation("momentum", "mean_reversion")
+    sep_mr_b = rk_b.separation("mean_reversion", "momentum")
 
     # three-day companion study, seeds 0-9: the reference P&L span, the pooled
     # mean-reversion figure, and mean-reversion's ratio on the thinnest market
@@ -410,18 +431,28 @@ def g_ranking(ctx: Ctx) -> dict:
     mr3 = {r.name: r for r in rk3.table()}["mean_reversion"]
     thin = min(range(len(rk3.reference_pnls)), key=rk3.reference_pnls.__getitem__)
 
-    # "every ratio above 1.0 it posts sits on one of the four thinnest
-    # denominators", and averaging the ten ratios instead of pooling them
-    # would read +0.61
+    # The page says "three of the four ratios above 1.0 it posts sit on the
+    # four thinnest denominators" -- three of four, not all of them. An
+    # earlier draft said "every", and the inventory row kept checking the
+    # earlier draft long after the sentence was corrected, so the gate
+    # reported a structural_fail against prose that was already right.
+    # Counted rather than asserted, so the report shows which way it moved.
+    #
+    # `c is not None` because capture is undefined where the reference P&L
+    # is at or below zero. That does not happen on this 30-name grid, but it
+    # does on a 20-name one, where the bare `c > 1.0` raises TypeError and
+    # takes the whole group down.
     thin4 = set(sorted(range(len(rk3.reference_pnls)),
                        key=rk3.reference_pnls.__getitem__)[:4])
-    gt1 = {i for i, c in enumerate(mr3.captures) if c > 1.0}
+    gt1 = {i for i, c in enumerate(mr3.captures) if c is not None and c > 1.0}
 
     return {
         "mr_beat_capture": mr_beat,
         "bh_beat_capture": bh_beat,
         "bh_beat_is_grid_max": bh_beat == grid_max,
         "mr3_gt1_all_on_4_thinnest": bool(gt1) and gt1 <= thin4,
+        "mr3_gt1_count": len(gt1),
+        "mr3_gt1_on_thin4": len(gt1 & thin4),
         "mr3_mean_of_ratios": sum(mr3.captures) / len(mr3.captures),
         "pooled_momentum": mom.pooled_capture,
         "pooled_mean_reversion": mr.pooled_capture,
@@ -434,6 +465,8 @@ def g_ranking(ctx: Ctx) -> dict:
         "sep_mom_mr_p": sep_mr["p_value"],
         "sep_mom_rand": f"{sep_rand['wins_a']}-{sep_rand['wins_b']}",
         "sep_mom_rand_p": sep_rand["p_value"],
+        "sep_bh_rand": f"{sep_bh_rand['wins_a']}-{sep_bh_rand['wins_b']}",
+        "sep_bh_rand_p": sep_bh_rand["p_value"],
         "beat12_momentum": beats["momentum"],
         "beat12_mean_reversion": beats["mean_reversion"],
         "beat12_buy_and_hold": beats["buy_and_hold"],
@@ -823,8 +856,8 @@ def g_tca_example(ctx: Ctx) -> dict:
     page: the first name of Universe.random(20, seed=7) (ADV 9,713 shares),
     one six-step day. Entry: 97 shares (1% ADV) at the first step costs
     +16.71 bps on every seed measured. Round trip (sell three steps later):
-    a seed range, -13.3 to +5.8 bps over sim seeds 2026,1,2,3,4,5,7,11,
-    negative on 6 of 8, median -8.4. Partial fill: a request for 4,856
+    a seed range, -17.72 to +2.03 bps over sim seeds 2026,1,2,3,4,5,7,11,
+    negative on 7 of 8, median -12.40. Partial fill: a request for 4,856
     shares (half ADV, sim seed 2026) fills 483 - the whole displayed
     depth - and requests of 9,713 and 48,563 fill the same 483, on every
     seed measured."""
@@ -874,10 +907,12 @@ def g_tca_example(ctx: Ctx) -> dict:
 def g_tca_ripple(ctx: Ctx) -> dict:
     """transaction-cost-analysis.md's macro boundary, method stated on the
     page: Momentum() over Universe.random(60, seed=11), sim seed 7, ten
-    days. The agent trades 46 names; 2 of the 14 untouched names move (-6.5
-    and +3.2 bps) against a 13.0 bps median direct impact; the same
-    configuration over two, three or four days leaks nothing; pinning VIX
-    returns untouched_moved() to empty, byte-exact. Mirrors the assertions
+    days. The agent trades 57 names; all 3 untouched names move (-10.72,
+    +1.97 and +2.00 bps) against a 9.71 bps median direct impact, so the
+    largest ripple now EXCEEDS the median direct impact. The channel needs a
+    horizon: nothing leaks at one or two days, nine untouched names leak at
+    three and eighteen at four. Pinning VIX returns untouched_moved() to
+    empty, byte-exact. Mirrors the assertions
     examples/07-research-workflow.py runs every time."""
     u = _u(60, 11)
 
@@ -888,11 +923,12 @@ def g_tca_ripple(ctx: Ctx) -> dict:
     jobs = {
         "full": lambda: analyse(10),
         "pinned": lambda: analyse(10, Scenario().hold(vix=15.0)),
+        "d1": lambda: analyse(1),
         "d2": lambda: analyse(2),
         "d3": lambda: analyse(3),
         "d4": lambda: analyse(4),
     }
-    with ThreadPoolExecutor(max_workers=min(5, ctx.workers)) as pool:
+    with ThreadPoolExecutor(max_workers=min(6, ctx.workers)) as pool:
         done = dict(zip(jobs, pool.map(lambda f: f(), jobs.values())))
 
     ex = done["full"]
@@ -907,10 +943,20 @@ def g_tca_ripple(ctx: Ctx) -> dict:
         "untouched_names": len(u) - len(traded),
         "leaked_count": len(leaked),
         "leak_min_bps": leak_bps[0] if leak_bps else None,
+        "leak_mid_bps": leak_bps[len(leak_bps) // 2] if leak_bps else None,
         "leak_max_bps": leak_bps[-1] if leak_bps else None,
         "direct_median_bps": direct[len(direct) // 2] if direct else None,
-        "short_horizon_no_leak": all(not done[k].untouched_moved()
-                                     for k in ("d2", "d3", "d4")),
+        # The horizon profile, one number per day count. The old
+        # `short_horizon_no_leak` boolean asserted that days 2, 3 and 4 all
+        # leak nothing, which stopped being true when `vix_return_source`
+        # went to 1.0: the page publishes the counts instead.
+        "leak_d1": len(done["d1"].untouched_moved()),
+        "leak_d2": len(done["d2"].untouched_moved()),
+        "leak_d3": len(done["d3"].untouched_moved()),
+        "leak_d4": len(done["d4"].untouched_moved()),
+        "no_leak_through_d2": not (done["d1"].untouched_moved()
+                                   or done["d2"].untouched_moved()),
+        "d1_no_orders": len({f["ticker"] for f in done["d1"].fills}) == 0,
         "pinned_empty": done["pinned"].untouched_moved() == [],
     }
 
@@ -1160,6 +1206,11 @@ def g_workflow(ctx: Ctx) -> dict:
 _RECIPE_PRICE_U, _RECIPE_PRICE_SEED = (20, 4), 5
 #: The pair both pages use for every VOLATILITY claim, for the same reason.
 _RECIPE_VOL_U, _RECIPE_VOL_SEED = (20, 11), 3
+#: Every published figure on the recipe page was measured under pt-v1, which
+#: was the default at the time and is not any more. The page pins it in every
+#: block that runs the engine; this harness has to pin the same preset or it
+#: measures pt-v12 against pt-v1 figures and reports the whole group MOVED.
+_RECIPE_MODEL = "pt-v1"
 
 
 def _r1_hiking_cycle() -> Scenario:
@@ -1223,7 +1274,7 @@ def _r5_compound_path(days: int = 120) -> Scenario:
             vix = 18.0
 
         if d < 18:                      # policy: two cuts, ten days apart
-            ff = 0.0155
+            ff = 0.01625
         elif d < 28:
             ff = 0.01125
         else:
@@ -1259,8 +1310,8 @@ def _r5_compound_chained() -> Scenario:
     return (Scenario("compound: chained")
             .hold(vix=15.0)
             .ramp("vix", start=82.0, end=18.0, over=45, begin=15)
-            .hold(federal_funds_rate=0.0155)
-            .step("federal_funds_rate", before=0.0155, after=0.01125, at=18)
+            .hold(federal_funds_rate=0.01625)
+            .step("federal_funds_rate", before=0.01625, after=0.01125, at=18)
             .step("federal_funds_rate", before=0.01125, after=0.00125, at=28)
             .hold(corporate_bond_yield=0.036)
             .ramp("corporate_bond_yield", start=0.036, end=0.105,
@@ -1320,11 +1371,12 @@ def g_recipes(ctx: Ctx) -> dict:
 
     def price(scenario, days, baseline=None):
         return compare(scenario, seed=_RECIPE_PRICE_SEED, universe=up,
-                       days=days, baseline=baseline)
+                       days=days, baseline=baseline, model=_RECIPE_MODEL)
 
     def vol(scenario, days=120):
         return pt.facts.measure(seed=_RECIPE_VOL_SEED, universe=uv,
-                                days=days, scenario=scenario)
+                                days=days, scenario=scenario,
+                                model=_RECIPE_MODEL)
 
     jobs = {
         "r1": lambda: price(_r1_hiking_cycle(), 120),
@@ -1369,7 +1421,7 @@ def g_recipes(ctx: Ctx) -> dict:
     # macro rather than inferring it from the price delta.
     def macro_end(scenario):
         e = run_scenario(scenario, seed=_RECIPE_PRICE_SEED, universe=up,
-                         days=120, record=True)
+                         days=120, record=True, model=_RECIPE_MODEL)
         t = pa.RecordBatchReader.from_stream(
             e.macro_table()).read_all().to_pydict()
         return {"ff": t["federal_funds_rate"][119],
@@ -1515,8 +1567,8 @@ def g_recipes(ctx: Ctx) -> dict:
     # to measure realised volatility instead, and this band is the evidence.
     def vix_delta(seed):
         return compare(Scenario().hold(vix=45.0), seed=seed, universe=up,
-                       days=30, baseline=Scenario().hold(vix=15.0)
-                       )["median_pct"]
+                       days=30, baseline=Scenario().hold(vix=15.0),
+                       model=_RECIPE_MODEL)["median_pct"]
 
     with ThreadPoolExecutor(max_workers=min(8, ctx.workers)) as pool:
         band = list(pool.map(vix_delta, range(1, 9)))

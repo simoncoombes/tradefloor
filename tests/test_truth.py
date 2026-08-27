@@ -22,7 +22,7 @@ def _f64(buf):
     return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
 
 
-# The seven, in schema order. Kept here as a literal rather than read from the
+# The nine, in schema order. Kept here as a literal rather than read from the
 # table, so a column silently disappearing from the schema fails a test instead
 # of shrinking the thing under test.
 COMPONENTS = [

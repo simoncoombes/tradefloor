@@ -13,7 +13,12 @@ exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
 BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/survey7
-BRANCH=main
+# `dev`, not `main`. Experimental model work lives on `dev` and is merged to
+# `main` in reviewed units; a calibration box should run what is being
+# EXPERIMENTED on. Pointing this at `main` is what forced a merge to main
+# before every launch, which is exactly the drip of half-measured commits
+# onto the release line that the dev branch exists to prevent.
+BRANCH=dev
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
 SAMPLES=3000

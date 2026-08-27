@@ -419,7 +419,7 @@ pub struct ModelParams {
     /// the realised variance. 0.0 disables it.
     /// Applies the loss-maker book floor to PROFITABLE companies too.
     ///
-    /// At 0.0 this is off and the valuation is bit-identical to the TypeScript
+    /// At 0.0 this is off and the valuation is bit-identical to the reference implementation
     /// reference, which switches hard at `eps > 0`: a company earning 0.01 is
     /// valued on earnings and one earning exactly 0 is valued at
     /// `book * LOSS_MAKING_PRICE_TO_BOOK`. Fair value therefore JUMPS UP as
@@ -503,6 +503,33 @@ pub struct ModelParams {
     /// Innovation of the per-name volume state. See
     /// [`ModelParams::volume_idio_persistence`].
     pub volume_idio_sigma: f64,
+
+    /// How many components a name's variance cascade carries. 0 is OFF and
+    /// is what every preset before pt-v13 ships, so the single-component
+    /// GJR recursion runs bit for bit.
+    ///
+    /// See [`crate::market::garch::update_garch_cascade`] for why more than
+    /// two matters: a superposition of exponentials with geometrically
+    /// spaced timescales approximates a power law, and the count you need is
+    /// about `log(range)/log(ratio)`. Six at ratio 3 covers lags 1 to 60.
+    /// Capped at [`crate::market::garch::CASCADE_MAX`].
+    pub garch_cascade_components: f64,
+    /// Half-life spacing between cascade components. Component `k` has a
+    /// half-life `ratio^k` times component 0's, and component 0 keeps the
+    /// name's own `garch_beta`, so per-name persistence dispersion survives.
+    ///
+    /// Measured (§122): at ratio 3 with six components the latent decay slope
+    /// reads -0.536 against a one-component -1.273 and a real -0.436.
+    pub garch_cascade_ratio: f64,
+    /// How much of the variance comes from the cascade rather than from the
+    /// single-component process. 0.0 is the legacy process exactly; 1.0 is
+    /// the cascade alone.
+    ///
+    /// A dial rather than a switch so a preset can take part of the
+    /// cascade's shape without paying all of its cost, and so the two can be
+    /// separated in a search: `components` sets the SHAPE, this sets how much
+    /// of it reaches the price.
+    pub garch_cascade_weight: f64,
 
     /// Base volume a name trades on a day it does not move at all.
     ///
@@ -1138,6 +1165,9 @@ impl ModelParams {
             volume_idio_variance_gain: 0.0,
             volume_idio_persistence: 0.0,
             volume_idio_sigma: 0.0,
+            garch_cascade_components: 0.0,
+            garch_cascade_ratio: 3.0,
+            garch_cascade_weight: 1.0,
             volume_move_floor: 0.6,
             volume_move_response: 0.6,
             volume_move_cap: 4.0,
@@ -1786,6 +1816,9 @@ impl ModelParams {
             "volume_idio_variance_gain" => self.volume_idio_variance_gain,
             "volume_idio_persistence" => self.volume_idio_persistence,
             "volume_idio_sigma" => self.volume_idio_sigma,
+            "garch_cascade_components" => self.garch_cascade_components,
+            "garch_cascade_ratio" => self.garch_cascade_ratio,
+            "garch_cascade_weight" => self.garch_cascade_weight,
             "volume_move_floor" => self.volume_move_floor,
             "volume_move_response" => self.volume_move_response,
             "volume_move_cap" => self.volume_move_cap,
@@ -1907,6 +1940,9 @@ impl ModelParams {
             "volume_idio_variance_gain" => out.volume_idio_variance_gain = value,
             "volume_idio_persistence" => out.volume_idio_persistence = value,
             "volume_idio_sigma" => out.volume_idio_sigma = value,
+            "garch_cascade_components" => out.garch_cascade_components = value,
+            "garch_cascade_ratio" => out.garch_cascade_ratio = value,
+            "garch_cascade_weight" => out.garch_cascade_weight = value,
             "volume_move_floor" => out.volume_move_floor = value,
             "volume_move_response" => out.volume_move_response = value,
             "volume_move_cap" => out.volume_move_cap = value,
@@ -2062,6 +2098,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "garch_alpha",
         "garch_beta",
         "garch_beta_dispersion",
+        "garch_cascade_components",
+        "garch_cascade_ratio",
+        "garch_cascade_weight",
         "garch_ceiling_multiple",
         "garch_floor_multiple",
         "garch_gamma",

@@ -4,17 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Running in the Browser · pretium docs</title>
-<meta name="description" content="pretium compiles to WebAssembly, and the browser build produces bit-identical results to the native one. So you can put a market in a web page and every...">
+<meta name="description" content="pretium compiles to WebAssembly and the browser build is bit identical to the native one, so a permalink carrying seed and roster reproduces a market exactly.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/wasm.html">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="pretium docs">
 <meta property="og:title" content="Running in the Browser">
-<meta property="og:description" content="pretium compiles to WebAssembly, and the browser build produces bit-identical results to the native one. So you can put a market in a web page and every...">
+<meta property="og:description" content="pretium compiles to WebAssembly and the browser build is bit identical to the native one, so a permalink carrying seed and roster reproduces a market exactly.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/wasm.html">
+<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
+<meta property="article:modified_time" content="2026-08-27T11:30:25-04:00">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Running in the Browser">
-<meta name="twitter:description" content="pretium compiles to WebAssembly, and the browser build produces bit-identical results to the native one. So you can put a market in a web page and every...">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Running in the Browser","description":"pretium compiles to WebAssembly, and the browser build produces bit-identical results to the native one. So you can put a market in a web page and every...","url":"https://simoncoombes.github.io/pretium/wasm.html","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","applicationCategory":"DeveloperApplication","operatingSystem":"Linux, macOS, Windows","codeRepository":"https://github.com/simoncoombes/pretium"}}</script>
+<meta name="twitter:description" content="pretium compiles to WebAssembly and the browser build is bit identical to the native one, so a permalink carrying seed and roster reproduces a market exactly.">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Running in the Browser","description":"pretium compiles to WebAssembly and the browser build is bit identical to the native one, so a permalink carrying seed and roster reproduces a market exactly.","url":"https://simoncoombes.github.io/pretium/wasm.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-27T11:30:25-04:00"}</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -128,7 +130,7 @@ gtag('config', 'G-1LBM3239ZF');
 <a href="https://github.com/simoncoombes/pretium">GitHub</a>
 </div></header>
 <div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><span aria-current="page">Running in the browser</span></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
+<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><span aria-current="page">Running in the browser</span></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li><li><a href="two-loops.html">The Two Loops</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="principles.html">The Principles</a></li></ul></nav>
 <main>
 <p class="appnote">This is the plain version of the page. The
 <a href="./#/wasm">full documentation app</a> adds search, dark mode
@@ -169,12 +171,12 @@ const digest = pt.priceDigest(12, 7, 3, 5, 65, 'pt-v3');</code></pre>
         <h2 style="font-size:21px;margin:46px 0 10px">Size</h2>
         <div class="tablewrap"><table style="max-width:420px">
           <tbody style="font-size:13.5px">
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">raw</td><td style="font-family:var(--font-mono);font-size:12.5px">182 KB</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">gzipped</td><td style="font-family:var(--font-mono);font-size:12.5px">68 KB</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">brotli</td><td style="font-family:var(--font-mono);font-size:12.5px">56 KB</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">raw</td><td style="font-family:var(--font-mono);font-size:12.5px">204,290 bytes</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">gzipped</td><td style="font-family:var(--font-mono);font-size:12.5px">72,981 bytes</td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:12.5px">brotli</td><td style="font-family:var(--font-mono);font-size:12.5px">60,285 bytes</td></tr>
           </tbody>
         </table></div>
-        <p>Smaller than most JavaScript charting libraries, for a whole market simulator with an order book in it.</p>
+        <p>About 200 KiB raw and 71 KiB gzipped, for a whole market simulator with an order book in it. Measured on the 0.3.0 artefact <code style="font-size:13px">tools/wasm/build.sh</code> produces: the script prints the raw and gzip figures itself, and the brotli line is <code style="font-size:13px">brotli -q 11</code> over the same file.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">Building It</h2>
         <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">

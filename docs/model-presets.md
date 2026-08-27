@@ -8,16 +8,17 @@ rack: experiment
 
 The model's coefficients ship as a named, versioned preset. A preset names
 the complete set, frozen and documented: the variance processes, the factor
-structure, the mispricing dynamics and the guards. **`"pt-v10"` is the
-current default**; most users never touch it. `"pt-v1"` and `"pt-v2"` remain
-selectable and bit-reproducing forever.
+structure, the mispricing dynamics and the guards. **`"pt-v12"` is the
+current default**; most users never touch it. Every earlier preset, `"pt-v1"`
+through `"pt-v11"`, remains selectable and bit-reproducing forever.
 
 ```python
-eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the default, spelled out
+eng = pt.Engine(seed=42, universe=u, model="pt-v12")  # the default, spelled out
+eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the previous default, still exact
 eng = pt.Engine(seed=42, universe=u, model="pt-v1")   # an earlier era, still exact
 ```
 
-The reason is comparability. `(package version, model="pt-v10", universe
+The reason is comparability. `(package version, model="pt-v12", universe
 fingerprint, seed)` is a complete, minimal, citable specification of a
 market. If every user ran a bespoke coefficient set, no two published
 results would be comparable, and "tested on the pretium simulator" would
@@ -25,28 +26,56 @@ mean nothing.
 
 ## Which preset to use
 
-Ten presets ship. Four are recommendations; the rest exist so that
+Twelve presets ship. Two are recommendations; the rest exist so that
 results already published on them keep reproducing bit for bit, and a
 new preset never moves an old one.
 
 | preset | use it for | status |
 |---|---|---|
-| `pt-v10` | anything: the default, the one the realism envelope certifies, and the only preset with all fourteen statistics in band at 252 days, on thirty training seeds and on a held-out universe | recommended |
-| `pt-v3` | reproducing work published before the 2026-08-26 era boundary, when it was the default | reproduction only |
-| `pt-v7` | studies whose thesis is a sector, or a crisis: the first preset with industries that survive a crisis, twelve of thirteen realism statistics in band at both horizons | recommended, opt in by name |
-| `pt-v8` | crisis studies and anything that measures how correlation moves through time: the factor's variance has a memory, the crisis lever is 4.34x, thirteen of fourteen in band at 504 days | recommended, opt in by name |
-| `pt-v9` | anything measuring volatility regimes, clustering or crises the market makes itself: thirteen of fourteen statistics in band at both horizons, and the first preset whose VIX responds to the day's move rather than to the closing minute | recommended, opt in by name |
+| `pt-v12` | anything: the default, the one the realism envelope certifies, with all fourteen statistics in band at 252 days *and* all fourteen again at 504, on thirty training seeds, on a held-out sixty-name universe, and thirteen of fourteen on held-out seeds | recommended |
+| `pt-v10` | reproducing work published before the 2026-08-26 era boundary, when it was the default: all fourteen statistics in band at 252 days, on thirty training seeds and on a held-out universe | reproduction only |
+| `pt-v11` | reproducing a run that names it: `pt-v10` plus the crisis work (`crisis_blend_gain`, `sector_vix_coupling`, endogenous news and peer transfer) that `pt-v12` inherits unchanged | reproduction only |
+| `pt-v3` | reproducing work published when it was the default, the era before `pt-v10` | reproduction only |
+| `pt-v7` | reproducing a sector or crisis study that names it: the first preset with industries that survive a crisis, thirteen of fourteen realism statistics in band at both horizons, the miss being `volume_change_acf1`. It is no longer the preset to opt into for that thesis: at a held VIX 45 `pt-v12` reads a crisis sector excess of +0.109 against a real +0.103 | reproduction only |
+| `pt-v8` | anything that measures how correlation moves through time: the factor's variance has a memory, thirteen of fourteen in band at 504 days. Its crisis lever of 4.34x is no longer a reason to prefer it, because `pt-v12`'s steady-state crisis lever is 6.04 against a real 6.16 | recommended, opt in by name |
+| `pt-v9` | reproducing a run that names it: thirteen of fourteen statistics in band at both horizons, and the first preset whose VIX responds to the day's move rather than to the closing minute, which `pt-v12` inherits while holding fourteen of fourteen at both horizons | reproduction only |
 | `pt-v1`, `pt-v2`, `pt-v4`, `pt-v5`, `pt-v6` | reproducing a run that names them | reproduction only |
 
-The three opt-in recommendations are the steps between `pt-v3` and
-`pt-v10`, kept selectable because each one is the best preset for a
-narrower question and because a run that named one must keep reproducing.
-`pt-v7` is the one to reach for when the thesis is a sector, `pt-v8` when
-it is how correlation moves through time, `pt-v9` when it is the volatility
-regime itself. If the question is none of those, the default already
-carries their gains.
+`pt-v7`, `pt-v8` and `pt-v9` are steps on the way from `pt-v3` to `pt-v12`,
+and all three stay selectable because a run that named one must keep
+reproducing. Only `pt-v8` is still worth opting into, when the thesis is how
+correlation moves through time. `pt-v7` and `pt-v9` were recommendations
+while the default was weaker than they were on a sector thesis, a crisis or
+a volatility regime, and `pt-v12` is not weaker: it holds all fourteen
+statistics in band at both horizons, its crisis sector excess at a held VIX
+45 reads +0.109 against a real +0.103, its steady-state crisis lever 6.04
+against a real 6.16, and its crisis co-movement 0.696 against a real 0.664
+to 0.727. The narrower question each was better at is one the default now
+answers at least as well.
 
-The default moved from `pt-v3` to `pt-v10` on 2026-08-26. Re-certifying
+<!-- STATUS CHECK (pt-v12 boundary): `pt-v7` and `pt-v9` were moved from
+     "recommended, opt in by name" to "reproduction only" because the
+     pt-v12 measurements cited here dominate the axes they were
+     recommended for. No supplied list of recommended presets states that
+     directly, so the demotion is an inference from the measurements. -->
+
+`pt-v12` is `pt-v11` plus one number. `volume_move_cap` was a hard-coded
+literal 4.0 in `tick.rs`, which saturated a name's volume response at a
+4 percent daily move: past that the tape stopped reacting, so every crisis
+day traded like a bad Tuesday. Raising it to 12.0 is what brings
+`volume_change_acf1` inside its band at both horizons, -0.2656 against
+(-0.32, -0.20) at 252 days and -0.2572 against (-0.29, -0.21) at 504, and
+retires the volume-change gap [the realism envelope](realism-envelope.md)
+used to carry. `pt-v11` in turn is `pt-v10` plus the crisis work, so the
+default carries both steps. The certified horizon is still 252 days: the
+504-day panel is measured, not certified, and the envelope says why.
+
+<!-- ERA CHECK (pt-v12 boundary): the paragraph below, and the pt-v3 row
+     above, used to date pt-v3's handover to the 2026-08-26 era boundary.
+     That boundary now names the pt-v10 -> pt-v12 move. No date for the
+     pt-v3 -> pt-v10 move was supplied, so neither place states one. -->
+
+The default moved from `pt-v10` to `pt-v12` on 2026-08-26. Re-certifying
 moves every published number at once, which is why it happens rarely and
 why the old default stays selectable by name. The per-preset record of
 what moved and what it measured is in the
@@ -60,7 +89,7 @@ The escape hatch exists and is deliberately ceremonial:
 ```python
 custom = pt.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
 eng = pt.Engine(seed=42, universe=u, model=custom)
-eng.model_fingerprint        # "custom-0c04c4ba", never "pt-v1"
+eng.model_fingerprint        # "custom-7f290e34", never "pt-v1"
 ```
 
 `ModelParams` is immutable once built. The fingerprint is the first 8 hex
@@ -84,25 +113,51 @@ The fingerprint travels everywhere a result does:
 
 ## What is settable, and what is not
 
-`pt.ModelParams.settable()` lists the runtime-settable surface: the two
-variance processes (per-name GJR-GARCH and the market factor's), the factor
-sigmas and the idiosyncratic scale, the mispricing dynamics, the news and
-flow coefficients, and the guards that live in the tick chain (the
-mispricing cap, the crowd lean cap, the session breaker, the price cap).
-Guards are settable but are worst-case guarantees rather than tuning knobs,
-and a calibration search excludes them.
+`pt.ModelParams.settable()` lists the runtime-settable surface, 87 names at
+0.3.0. Read the list rather than a summary of it, but the shape is: the two
+variance processes (per-name GJR-GARCH and the market factor's, cascade
+components and slow term included), the factor sigmas, the sector loadings
+and the idiosyncratic scale, the size and spread effects, the mispricing and
+crowd dynamics, the news and flow coefficients (endogenous and peer news
+among them), the jump sizes and intensities, the VIX channel, the crisis
+blend and the stress terms, the volume expression's coefficients
+(`volume_move_cap` among them, the one `pt-v12` moved off its compiled
+literal), and the guards that live in the tick chain (the mispricing cap,
+the crowd lean cap, the session breaker, the price cap).
+Those four guards are settable but are worst-case guarantees rather than
+tuning knobs, and a calibration search excludes them; `daily_shock_cap` is a
+guard too and is not settable at all.
 
 Two coefficients are *derived*: `mispricing_phi` and `s_phi_tick` are
 carried as recorded bit patterns and cannot be set directly. Overriding
 `mispricing_half_life_days` recomputes both, deterministically on a given
 build but not bit-identically to any recorded constant.
 
-The rest of the preset surface, meaning the fair-value coefficients, the
-macro chain's constants, the book geometry and the sector sigma table, is *visible* in
-`ModelParams.to_dict()` and covered by the fingerprint, but overriding it
-is refused by name: those constants are compile-time in this build, and
-accepting an override the engine would ignore would make the fingerprint a
-lie.
+The rest of the preset surface is *visible* in `ModelParams.to_dict()` and
+covered by the fingerprint, but overriding it is refused by name: those
+constants are compile-time in this build, and accepting an override the
+engine would ignore would make the fingerprint a lie. The two counts are the
+size of that gap: `to_dict()` carries 118 entries against `settable()`'s 87,
+which was 70 at 0.2.0. The 31 that differ are the preset `name`, the two
+derived coefficients above, and 28 compile-time constants: the sector
+daily-sigma table (twelve entries), the book geometry (`book_levels`,
+`inventory_limit_levels`), the `daily_shock_cap` guard, most of the
+fair-value chain (`fair_value_floor`,
+`default_sector_anchor_pe`, `neutral_discount_rate`, `rate_pe_sensitivity`,
+`growth_duration_scale`, `loss_making_price_to_book`) and most of the macro
+chain (`inflation_target`, `phillips_curve_coeff`, `fiscal_multiplier`,
+`oil_baseline`, `gold_equilibrium_base`, `gold_mean_reversion`,
+`rate_adjustment_floor`).
+
+"Most" and not "all" in both of those, because the line moves every time a
+parameter is promoted off its literal, the way `volume_move_cap` was for
+`pt-v12`. `fair_value_book_floor` is a settable fair-value coefficient, and
+`inflation_reversion`, `inflation_ceiling` and `inflation_floor` are
+settable macro-chain constants -- the three dials
+[the realism envelope](realism-envelope.md) points at its macro-range gap,
+shipped at the values every preset ran on. So read `settable()` rather than
+a category: the refusal names the key and prints the whole settable surface
+beside it, which is the answer that cannot go stale.
 
 One rule governs membership: **nothing settable may change how many draws
 are taken or in what order.** Market hours, the 390-tick day, the calendar,
@@ -136,14 +191,21 @@ A calibrated preset arrives as a new named entry in the shipped table,
 produced by the calibration tooling with its provenance committed; every
 earlier preset stays selectable and bit-reproducing forever. That has now
 happened several times. `"pt-v2"`, `"pt-v3"` and everything through
-`"pt-v10"` were produced this way, and `"pt-v10"` is the current default. The library consumes presets; it does not
-ship an optimiser.
+`"pt-v12"` were produced this way, and `"pt-v12"` is the current default.
+The library consumes presets; it does not ship an optimiser.
 
 What the shipped default is certified to reproduce, and where it is not, is
 [the realism envelope](realism-envelope.md).
 
 For the compact coefficient table the known-answer test hashes, see
-`pt.model_preset()`, which returns the mispricing coefficient dictionary and
-keeps its exact historical shape, because the cross-platform determinism
-gate digests every value in it. The full surface lives on
+`pt.model_preset()`, which returns the nine-key mispricing and crowd
+dictionary and keeps its exact historical shape. It has to:
+`metadata_buffer()` in `tests/known_answer.py` packs every value in it bar
+`name` as a canonical f64, sorted by key so the bytes cannot depend on dict
+ordering, and the committed `sha256` the cross-platform gate compares is
+taken over that buffer appended to the simulation's own, 64 bytes onto
+16,856. Adding a key, renaming one or moving a value moves the baseline.
+It moves only what should move: those 64 bytes are also hashed on their own
+as `metadataSha256`, so a fix to what the library *reports* can be re-based
+without asserting that any trajectory changed. The full surface lives on
 `ModelParams.to_dict()`.

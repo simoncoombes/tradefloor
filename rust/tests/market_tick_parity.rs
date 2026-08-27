@@ -99,7 +99,7 @@ impl ScriptedRng {
         if self.at >= self.tape.len() {
             self.problems.push(format!(
                 "{}: asked for draw #{} ({want_kind}) but the tape holds only {} — \
-                 the port takes MORE draws than the TypeScript",
+                 the port takes MORE draws than the reference implementation",
                 self.label,
                 self.at + 1,
                 self.tape.len()
@@ -110,7 +110,8 @@ impl ScriptedRng {
         let d = &self.tape[self.at];
         if d.kind != want_kind {
             self.problems.push(format!(
-                "{}: draw #{} is a '{}' in the TypeScript but the port asked for a '{want_kind}' \
+                "{}: draw #{} is a '{}' in the reference implementation but the port \
+                asked for a '{want_kind}' \
                  — same count, different schedule",
                 self.label,
                 self.at + 1,
@@ -125,7 +126,7 @@ impl ScriptedRng {
         if self.at < self.tape.len() {
             self.problems.push(format!(
                 "{}: {} draws left unconsumed ({} of {} taken) — the port takes FEWER draws \
-                 than the TypeScript",
+                 than the reference implementation",
                 self.label,
                 self.tape.len() - self.at,
                 self.at,
@@ -163,7 +164,7 @@ fn load(name: &str) -> Json {
         .join(name);
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
         panic!(
-            "{}: {e}\nRun: npx tsx scripts/rust-port/market-tick-vectors.ts",
+            "{}: {e}\nRegenerate from the reference implementation's market-tick generator",
             path.display()
         )
     });
@@ -204,6 +205,7 @@ fn build_company(c: &Json) -> TickCompany {
             mispricing_momentum: maybe(&s["mispricingMomentum"]),
             maker_inventory: maybe(&s["makerInventory"]),
             garch_variance: bits(s["garchVariance"].as_str().unwrap()),
+            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
             last_daily_return: maybe(&s["lastDailyReturn"]),
             beta: maybe(&s["beta"]),
             short_interest: bits(s["shortInterest"].as_str().unwrap()),
@@ -493,7 +495,7 @@ fn tick_squeeze_and_cascade() {
 
 /// The draw schedule, asserted from the vectors themselves.
 ///
-/// Separate from the replay tests because it checks the TypeScript's own
+/// Separate from the replay tests because it checks the reference implementation's own
 /// behaviour rather than the port's: if the original ever grows a draw the
 /// schedule does not predict, the arithmetic below stops adding up and the
 /// documented contract has to be revisited rather than quietly widened.

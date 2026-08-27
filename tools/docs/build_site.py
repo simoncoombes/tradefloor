@@ -33,6 +33,11 @@ import pathlib
 import re
 import sys
 
+import newpages
+import presets
+import seo
+import upgrades
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 DESIGN_BUNDLE = ROOT / "tools" / "docs" / "design-bundle.html"
 OUT = ROOT / "docs"
@@ -93,6 +98,17 @@ FONT_LINK = (
 #: a handful in visible text; they are corrected here rather than in the
 #: bundle so a fresh design revision gets the same treatment automatically.
 #: Dashes inside the bundler's own JavaScript comments are left alone.
+#: The bundle's OUTER <head>, which `doc` does not contain: `doc` is the
+#: template payload carried inside a script tag, and this <title> sits above
+#: it at design-bundle.html line 5. The PROSE_FIXES pair below corrects the
+#: in-app helmet title of the same name and never touched this one, so the
+#: published home page kept an em dash in the only title a crawler reads.
+#: Guarded, for the same reason PROSE_FIXES now is.
+BUNDLE_HEAD_FIXES = [
+    ("<title>pretium docs — repeatable market simulation</title>",
+     "<title>pretium docs: repeatable market simulation</title>"),
+]
+
 PROSE_FIXES = [
     ("pretium docs — repeatable market simulation", "pretium docs: repeatable market simulation"),
     ("MIXED — SEE NOTE", "MIXED, SEE NOTE"),
@@ -101,10 +117,12 @@ PROSE_FIXES = [
 #: The bundle was authored in the pt-v3 era, when the panel had ten
 #: statistics and the tick decomposition had seven components. Both grew:
 #: fourteen statistics since 2026-08-25, nine components since the jump and
-#: circuit-breaker columns were added, and the default preset moved to
-#: pt-v10 on 2026-08-26. The published site is generated from this bundle
-#: rather than from the markdown in docs/, so a stale claim here is the
-#: claim users actually read.
+#: circuit-breaker columns were added, and the default preset moved twice on
+#: 2026-08-26: to pt-v10, and then to pt-v12, which is what 0.3.0 ships. The
+#: second of those boundaries also took the gap list from six named gaps to
+#: five, because pt-v12 holds the volume-change row at both horizons. The
+#: published site is generated from this bundle rather than from the markdown
+#: in docs/, so a stale claim here is the claim users actually read.
 #:
 #: These assert. A bundle revision that rewords any of them fails the build
 #: rather than quietly restoring a number that is no longer true.
@@ -115,39 +133,43 @@ ERA_FIXES = [
         "six things it gets wrong and what each one rules out.",
         "It measures fourteen statistics against real markets and gets all "
         "fourteen right over a year. The fourteen results are published, "
-        "along with six things it gets wrong and what each one rules out.",
+        "along with five things it gets wrong and what each one rules out.",
     ),
     (
         "pretium publishes what it gets right and what it gets wrong: ten "
         "statistics measured against real markets, how long those results "
-        "hold for",
+        "hold for, the roster they were measured on, and six known gaps.",
         "pretium publishes what it gets right and what it gets wrong: "
         "fourteen statistics measured against real markets, how long those "
-        "results hold for",
+        "results hold for, the roster they were measured on, and five known "
+        "gaps.",
     ),
     (
         "Ten statistics measured against real markets, nine of them in band "
         "over a year, and six known gaps with what each one rules out.",
         "Fourteen statistics measured against real markets, all fourteen in "
-        "band over a year, and six known gaps with what each one rules out.",
+        "band over a year, and five known gaps with what each one rules out.",
     ),
     (
         "Measured on the shipped preset, eight of the ten statistics have "
         "their 10th-to-90th percentile range across seeds crossing a band "
         "edge.",
-        "Measured on the shipped preset, nine of the fourteen statistics "
-        "have their 10th-to-90th percentile range across seeds crossing a "
-        "band edge.",
+        "Measured on pt-v10 over thirty seeds, nine of the fourteen "
+        "statistics have their 10th-to-90th percentile range across seeds "
+        "crossing a band edge.",
     ),
     (
         '<code style="font-size:13px">abs_return_acf1</code> reads a median '
         "of 0.141 against a ceiling of 0.22, with a p90 of 0.426 and an "
         "across-seed standard deviation of 0.170, larger than the median "
         "itself.",
-        '<code style="font-size:13px">abs_return_acf1</code> reads a median '
+        '<code style="font-size:13px">abs_return_acf1</code> read a median '
         "of 0.0994 against a ceiling of 0.22, with a p90 of 0.4063 and an "
         "across-seed standard deviation of 0.1467, larger than the median "
-        "itself.",
+        "itself. The shipped pt-v12 moves that median to 0.1107 and the "
+        "spread has not been re-measured, so read the dispersion figures as "
+        "the previous era's: the shape of the warning is what carries over, "
+        "not the third decimal.",
     ),
     (
         'So "9/10 in band" describes the middle of thirty runs. Your one run '
@@ -160,23 +182,35 @@ ERA_FIXES = [
     (
         "eight of the ten statistics have their middle-eighty-percent range "
         "crossing a band edge",
-        "nine of the fourteen statistics have their middle-eighty-percent "
-        "range crossing a band edge",
+        "nine of the fourteen statistics had their middle-eighty-percent "
+        "range crossing a band edge when that spread was last measured, on "
+        "pt-v10",
     ),
     (
         'is a preset name or a ModelParams; the default is pt-v3.',
-        'is a preset name or a ModelParams; the default is pt-v10.',
+        'is a preset name or a ModelParams; the default is pt-v12.',
     ),
+    # The same correction as the one below, on the Changing the Model page's
+    # copy of the pt-v3 row. "The 2026-08-26 era boundary" is not usable as a
+    # marker here at all: 0.2.0 (pt-v3 -> pt-v10) and 0.3.0 (pt-v10 -> pt-v12)
+    # were both cut that day, so naming the release is the only unambiguous
+    # form.
     (
         "The current default, and the one the realism numbers describe.",
-        "The default until the 2026-08-26 era boundary, kept selectable so "
+        "The default until pt-v10 replaced it at 0.2.0, kept selectable so "
         "work published against it keeps reproducing.",
     ),
+    # pt-v3 did NOT hand the default over at the 2026-08-26 boundary. That
+    # boundary names the pt-v10 -> pt-v12 move; pt-v3 was replaced by pt-v10
+    # an era earlier, at 0.2.0 (CHANGELOG.md, "the default moved from
+    # `pt-v3` to `pt-v10`"). No date for that move is recorded, so this
+    # names the release rather than inventing one, matching the wording
+    # docs/model-presets.md settled on.
     (
         "The current default, produced the same way. This is the preset the "
         "realism numbers describe: nine of ten statistics in band at 252 "
         "days. Herding is turned well down (momentum_theta 0.0742).",
-        "The default until the 2026-08-26 era boundary, produced the same "
+        "The default until pt-v10 replaced it at 0.2.0, produced the same "
         "way, and the preset the realism numbers described then: nine of the "
         "ten statistics measured at the time were in band at 252 days. "
         "Herding is turned well down (momentum_theta 0.0742).",
@@ -189,9 +223,9 @@ ERA_FIXES = [
         '<code style="font-size:13px">pt-v1</code> and '
         '<code style="font-size:13px">pt-v2</code> stay selectable and '
         "bit-reproducing forever.",
-        '<code style="font-size:13px">pt-v10</code> is the current default, '
+        '<code style="font-size:13px">pt-v12</code> is the current default, '
         'and every earlier preset from <code style="font-size:13px">pt-v1'
-        '</code> to <code style="font-size:13px">pt-v9</code> stays '
+        '</code> to <code style="font-size:13px">pt-v11</code> stays '
         "selectable and reproduces bit for bit. What that guarantee covers is "
         "the PRESET: naming one pins the coefficient set and the market it "
         "produces on a given package version, and a run is only fully "
@@ -202,7 +236,7 @@ ERA_FIXES = [
     (
         "Three presets ship. All three stay selectable and bit-reproducing "
         "forever.",
-        "Ten presets ship. pt-v10 is the default; the other nine are "
+        "Twelve presets ship. pt-v12 is the default; the other eleven are "
         "selectable by name and none of them has ever been un-shipped.",
     ),
     (
@@ -225,17 +259,18 @@ ERA_FIXES = [
         "optimiser is only allowed to chase what the project decided it may "
         "chase. That is a policy about the search, not a claim that the rows "
         "are unreachable: the volume-change row was called unreachable until "
-        "0.2.0, and pt-v10 holds it at one year.",
+        "0.2.0, pt-v10 held it at one year, and pt-v12 holds it at two -- the "
+        "gap that named it is retired.",
     ),
     (
         'eng = pt.Engine(seed=42, universe=u, model="pt-v3")  # the default, spelled out',
-        'eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the default, spelled out',
+        'eng = pt.Engine(seed=42, universe=u, model="pt-v12")  # the default, spelled out',
     ),
     (
         'eng = pt.Engine(seed=42, universe=u)                  # pt-v3, the default\n'
         'eng = pt.Engine(seed=42, universe=u, model="pt-v3")   # the same, spelled out',
-        'eng = pt.Engine(seed=42, universe=u)                  # pt-v10, the default\n'
-        'eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the same, spelled out',
+        'eng = pt.Engine(seed=42, universe=u)                  # pt-v12, the default\n'
+        'eng = pt.Engine(seed=42, universe=u, model="pt-v12")  # the same, spelled out',
     ),
     (
         '<h2 style="font-size:21px;margin:46px 0 10px">Build Targets</h2>',
@@ -280,7 +315,14 @@ ERA_FIXES = [
     ),
     # The snapshot's RNG block grew with the engine's stream count and this
     # row did not. A reader counting the numbers in a real snapshot found
-    # eighteen under a sentence promising nine.
+    # twenty-one under a sentence promising nine.
+    #
+    # The enumeration has to end where the engine ends, because this row's
+    # whole job is teaching a reader to read the era off the length: stopping
+    # at eighteen tells them eighteen is current. It is twenty-one.
+    # `rust/src/python_engine.rs:1818` accepts `9 | 12 | 15 | 18 | 21` and
+    # line 1850 reads `volume_idio` from offset 18, and a live
+    # `Engine.state_snapshot()["rng"]` on 0.3.0 is 21 long.
     (
         "Nine numbers: state, increment and Box-Muller spare for each of the "
         "three streams. A pre-split snapshot carrying three is refused on "
@@ -290,7 +332,9 @@ ERA_FIXES = [
         "spare. The count grows as the engine gains streams, and restore "
         "reads the era off the LENGTH rather than a version field: nine for "
         "the original market, economy and external split, then twelve, "
-        "fifteen and eighteen as jumps, volume and news arrived. A shorter "
+        "fifteen, eighteen and twenty-one as jumps, common volume, news and "
+        "per-name volume arrived. Twenty-one is where it stands on 0.3.0, "
+        "seven streams of three. A shorter "
         "snapshot restores the streams it carries and leaves the rest where "
         "the fresh engine put them, so a checkpoint written before a "
         "mechanism existed replays as it did then. A pre-split snapshot "
@@ -370,9 +414,9 @@ ERA_FIXES = [
         "Strategies were evaluated on pretium 0.1.0 (commit "
         '<code style="font-size:12px">&lt;sha&gt;</code>), model preset '
         '<code style="font-size:12px">pt-v3</code>,',
-        "Strategies were evaluated on pretium 0.2.0 (commit "
+        "Strategies were evaluated on pretium 0.3.0 (commit "
         '<code style="font-size:12px">&lt;sha&gt;</code>), model preset '
-        '<code style="font-size:12px">pt-v10</code>,',
+        '<code style="font-size:12px">pt-v12</code>,',
     ),
     (
         "Realism of the shipped preset at this horizon is as published in "
@@ -405,11 +449,11 @@ ERA_FIXES = [
         '<code style="font-size:13px">992ef95d…dc185e3</code>; if that does '
         "not match your installed wheel, the published page describes a "
         "different model than the one you are running.",
-        "The determinism baseline for the current era is known-answer v10, "
-        'digest <code style="font-size:13px">4e22d5a6…e860378</code>, which '
+        "The determinism baseline for the current era is known-answer v11, "
+        'digest <code style="font-size:13px">60d47572…0de590</code>, which '
         "the release workflow checks inside every wheel before it uploads; "
-        "the pre-2026-08-26 era carried a different one, so a digest is an "
-        "era marker rather than a version number. For the check that matters "
+        "every era boundary carries a different one, so a digest is an era "
+        "marker rather than a version number. For the check that matters "
         "to a citation, compare "
         '<code style="font-size:13px">pretium.model_preset()["name"]</code> '
         "against the preset named in envelope.json: if they differ, the "
@@ -432,10 +476,10 @@ ERA_FIXES = [
         '<h2 style="font-size:19px;margin:42px 0 8px">Choosing Between '
         "pt-v3 and pt-v4</h2>\n        <p>A historical choice, kept because "
         "work published against either preset still reproduces. Neither is "
-        "the default: <code style=\"font-size:13px\">pt-v10</code> has been "
+        "the default: <code style=\"font-size:13px\">pt-v12</code> has been "
         "since 2026-08-26, and it holds all fourteen statistics at 252 days "
-        "and thirteen at 504, so it dominates both rows below. The full "
-        "table of the ten shipped presets is on "
+        "AND all fourteen at 504, so it dominates both rows below. The full "
+        "table of the twelve shipped presets is on "
         '<a href="#/change">Presets and Custom Models</a>.</p>\n        '
         "<p>The two counts below are out of the ten-statistic panel of the "
         "pt-v3 era, and the two horizons disagree.</p>",
@@ -446,7 +490,32 @@ ERA_FIXES = [
         "<strong>Between these two, and only these two: pt-v3 at or under a "
         "year, pt-v4 for INVESTIGATING longer horizons.</strong> Neither "
         "licenses a multi-year backtest, which the realism page forbids on "
-        "every preset, and pt-v10 beats both at both horizons.",
+        "every preset, and pt-v12 beats both at both horizons.",
+    ),
+    # The landing page's two preset cards still carried the 0.1.x count of
+    # three. Twelve ship: rust/src/params.rs preset_names() returns pt-v1
+    # through pt-v12 and every one of them builds and fingerprints as itself.
+    (
+        "Three shipped coefficient sets, how to change one, and the "
+        "fingerprint that stops a modified model passing as the shipped one.",
+        "Twelve shipped coefficient sets, how to change one, and the "
+        "fingerprint that stops a modified model passing as the shipped one.",
+    ),
+    (
+        "The three shipped coefficient sets, what each one does differently, "
+        "and how to read a preset at runtime.",
+        "The twelve shipped coefficient sets, what each one does "
+        "differently, and how to read a preset at runtime.",
+    ),
+    # The worked fingerprint of the one mechanism that section is about. The
+    # bundle's digest was never the digest this call produces, and a reader
+    # checking their own build against it concludes their build differs.
+    # Run in the repo venv on 0.3.0:
+    #   pt.ModelParams.from_preset("pt-v1", garch_alpha=0.12).fingerprint
+    #   -> 'custom-7f290e34'
+    (
+        'eng.model_fingerprint     # "custom-0c04c4ba" -- never "pt-v1"',
+        'eng.model_fingerprint     # "custom-7f290e34" -- never "pt-v1"',
     ),
     ("The Seven Components", "The Nine Components"),
     ("seven components", "nine components"),
@@ -462,21 +531,6 @@ ERA_FIXES = [
 #: PROSE_FIXES: a fresh design revision gets the treatment automatically. The
 #: replacements assert, so if a later bundle rewords this section the build
 #: fails loudly instead of quietly shipping a stale claim.
-#: The bundle's preset table stops at pt-v4. pt-v5 and pt-v6 exist and are
-#: selectable, and a preset a reader cannot find out about is half shipped.
-#: The rows live in their own file rather than escaped into a Python literal,
-#: because the markup carries the quoting the design uses and fighting that
-#: through two layers of escaping is how a build script grows a syntax error.
-PRESET_ROWS_FILE = ROOT / "tools" / "docs" / "preset-rows.html"
-
-#: The pt-v4 row's closing markup, which the new rows are inserted after.
-#: Asserted at build time so a reworded table fails loudly rather than
-#: silently dropping two presets.
-PRESET_ROWS_ANCHOR = (
-    'having surrendered <code style="font-size:12px">return_acf1</code>.'
-    "</sc-raw-td>\n            </sc-raw-tr>"
-)
-
 RELEASE_STATUS_FIXES = [
     (
         '<h2 style="font-size:19px;margin:40px 0 4px">0.1.0 '
@@ -660,6 +714,11 @@ def read_bundle() -> str:
     doc = json.loads(payload)
 
     for old, new in PROSE_FIXES:
+        if old not in doc:
+            sys.exit(
+                "the design bundle no longer contains a phrase PROSE_FIXES "
+                f"corrects, so the correction would be silently skipped: {old[:60]!r}"
+            )
         doc = doc.replace(old, new)
     for old, new in ERA_FIXES:
         if old not in doc:
@@ -668,22 +727,19 @@ def read_bundle() -> str:
                 f"corrects, so the correction would be silently skipped: {old[:60]!r}"
             )
         doc = doc.replace(old, new)
+    doc = newpages.inject(doc)
+    doc = upgrades.apply(doc)
+    doc = presets.replace_table(doc, presets.load())
     doc = apply_trust_fixes(doc)
     doc = apply_scenarios_fixes(doc)
     doc = apply_internals_fixes(doc)
     doc = apply_factors_fixes(doc)
+    doc = apply_guide_fixes(doc)
+    doc = apply_api_fixes(doc)
+    doc = apply_reference_fixes(doc)
     # Two spots track the package version; the rest are history. See VERSION.
     doc = doc.replace(">v0.1.0<", f">v{VERSION}<")
     doc = doc.replace("version = {0.1.0}", "version = {%s}" % VERSION)
-    if PRESET_ROWS_ANCHOR not in doc:
-        sys.exit("the pt-v4 row was reworded; PRESET_ROWS_ANCHOR needs "
-                 "updating rather than silently dropping pt-v5 and pt-v6")
-    doc = doc.replace(
-        PRESET_ROWS_ANCHOR,
-        PRESET_ROWS_ANCHOR + "\n            "
-        + PRESET_ROWS_FILE.read_text(encoding="utf-8").strip(),
-        1,
-    )
     if CHANGELOG_ANCHOR not in doc:
         sys.exit("the release-notes era-boundary heading was reworded; "
                  "CHANGELOG_ANCHOR needs updating rather than silently "
@@ -709,6 +765,16 @@ def read_bundle() -> str:
     # tag early and the page would never boot.
     encoded = json.dumps(doc).replace("/", "\\u002F")
     out = raw.replace(payload, encoded, 1)
+    # The outer head, which is not part of the payload just re-encoded above.
+    # json.dumps escapes non-ASCII, so a literal em dash exists in `out` only
+    # outside the payload and this cannot reach into the document.
+    for old, new in BUNDLE_HEAD_FIXES:
+        if old not in out:
+            sys.exit(
+                "the design bundle's outer head no longer contains a phrase "
+                f"BUNDLE_HEAD_FIXES corrects: {old[:60]!r}"
+            )
+        out = out.replace(old, new)
     json.loads(script_payload(out, "template"))  # prove it still parses
     return out
 
@@ -742,6 +808,36 @@ def design_css(doc: str) -> str:
     return re.sub(r"@font-face\s*\{.*?\}", "", system, flags=re.S).strip()
 
 
+#: A trailing `</div>` or `</main>`, with the whitespace around it.
+_TRAILING_CLOSER = re.compile(r"\s*</(?:div|main)>\s*$")
+
+
+def trim_app_shell(raw: str) -> str:
+    """Drop closing tags a page fragment never opened.
+
+    Every page but the last is bounded by the next page's opening div, so
+    what it carries is exactly its own markup. The last one runs to the end
+    of the document instead, and so picks up the app shell that wraps every
+    route: a `</div>` and a `</main>` that belong to the bundle, not to the
+    page. Published, those became a second `</main>` and two stray `</div>`
+    at the foot of api-presets.html, the only static page on the site whose
+    tags did not balance.
+
+    Counting is enough because neither `div` nor `main` can self-close, and
+    the surplus is always a run of closers at the very end, so removing the
+    last closing tag is removing a surplus one. Fragments that already
+    balance leave the loop on the first test and are returned untouched.
+    """
+    while len(re.findall(r"</(?:div|main)>", raw)) > len(
+        re.findall(r"<(?:div|main)\b", raw)
+    ):
+        trimmed = _TRAILING_CLOSER.sub("", raw, count=1)
+        if trimmed == raw:
+            return raw
+        raw = trimmed
+    return raw
+
+
 def split_pages(doc: str) -> list[dict]:
     """Every `data-page` div, in document order, with its label and title."""
     marks = list(re.finditer(r'<div([^>]*?)data-page="([^"]+)"([^>]*)>', doc))
@@ -753,6 +849,7 @@ def split_pages(doc: str) -> list[dict]:
         raw = doc[m.end() : end]
         # Each page div is closed by the </div> that precedes the next one.
         raw = raw[: raw.rindex("</div>")] if "</div>" in raw else raw
+        raw = trim_app_shell(raw)
         attrs = m.group(1) + m.group(3)
         label = re.search(r'data-screen-label="([^"]*)"', attrs)
         h1 = re.search(r"<h1[^>]*>(.*?)</h1>", raw, re.S)
@@ -805,7 +902,16 @@ def clean_content(fragment: str) -> str:
 
 
 def description_for(page: dict) -> str:
-    """First real sentence of the page, trimmed to a sensible meta length."""
+    """The page's hand-written description.
+
+    Falls back to the first real sentence, trimmed, which is what every page
+    used to get. That heuristic produced thirteen descriptions ending
+    mid-clause and eight under 120 characters, so `seo.check_descriptions`
+    now fails the build before this fallback can be reached.
+    """
+    written = seo.DESCRIPTIONS.get(page["slug"])
+    if written:
+        return written
     body = re.sub(r"<h1[^>]*>.*?</h1>", " ", page["html"], flags=re.S)
     for para in re.findall(r"<p[^>]*>(.*?)</p>", body, re.S):
         text = strip_tags(para)
@@ -859,30 +965,50 @@ pretiumPageview();
 
 
 def json_ld(page: dict, desc: str) -> str:
+    """Structured data for one page.
+
+    Three things were missing and each cost the same kind of ambiguity. The
+    article had no dates, so nothing could tell a two-day-old page from a
+    two-month-old one. The software node had no `sameAs`, so the PyPI
+    package, the crate and this site were four unrelated entities rather
+    than one. And "pretium" is Latin for price, which is a crowded name to
+    have no disambiguation at all.
+    """
+    published, modified = seo.page_dates(page["slug"])
     data = {
         "@context": "https://schema.org",
         "@type": "TechArticle",
-        "headline": page["h1"],
+        "headline": seo.title(page["slug"], page["h1"]),
         "description": desc,
         "url": absolute(page["slug"]),
+        "inLanguage": "en",
         "isPartOf": {
             "@type": "WebSite",
             "name": SITE_NAME,
             "url": f"{BASE_URL}/",
         },
-        "about": {
-            "@type": "SoftwareApplication",
-            "name": "pretium",
-            "applicationCategory": "DeveloperApplication",
-            "operatingSystem": "Linux, macOS, Windows",
-            "codeRepository": REPO_URL,
-        },
+        "about": seo.software_node(BASE_URL, REPO_URL, VERSION),
     }
-    return (
-        '<script type="application/ld+json">'
-        + json.dumps(data, separators=(",", ":"))
-        + "</script>"
+    if published:
+        data["datePublished"] = published
+    if modified:
+        data["dateModified"] = modified
+
+    blocks = [json.dumps(data, separators=(",", ":"))]
+    faq = seo.faq_node(page["slug"])
+    if faq:
+        blocks.append(json.dumps(faq, separators=(",", ":")))
+    if page["slug"] == "trust":
+        blocks.append(
+            json.dumps(dataset_node_for_page(), separators=(",", ":"))
+        )
+    return "".join(
+        '<script type="application/ld+json">' + b + "</script>" for b in blocks
     )
+
+
+def dataset_node_for_page() -> dict:
+    return seo.dataset_node(BASE_URL, REPO_URL)
 
 
 
@@ -952,10 +1078,19 @@ def horizon_rows() -> str:
     return "\n            ".join(rows)
 
 
-#: The held-out axes, re-measured on pt-v10 for 0.2.0 at the same thirty-seed
+#: The held-out axes, re-measured on pt-v12 at the same thirty-seed
 #: resolution as the certification itself (`docs/realism-envelope.md`, "The
 #: claim survives the axes it was not fitted to"). The bundle carries the
 #: pt-v3-era 9/10 version of this table.
+#:
+#: The held-out-seed row is 13/14 and says which row it misses. It read
+#: 14/14 here while `docs/realism-envelope.md` read 13/14, which is the
+#: contradiction this entry exists to end: `corr_persistence_acf1` is in
+#: band on the certification's own seeds and out of band on thirty seeds
+#: the calibration never drew. An L_real of 0.0000 follows from every row
+#: being in band, so the two clean axes can carry one; the held-out-seed
+#: axis cannot, and no run in the repository records its loss, so the cell
+#: says so rather than carrying a number nobody measured.
 #:
 #: Not generated from `pretium.envelope` like the two tables above it,
 #: because the module carries the certified panel and not the held-out runs.
@@ -967,9 +1102,10 @@ HELD_OUT_ROWS = (
     '</sc-raw-td><sc-raw-td style="text-align:right">0.0000</sc-raw-td>'
     "</sc-raw-tr>\n"
     "            <sc-raw-tr><sc-raw-td>held-out seeds (1-30), 40 names"
-    '</sc-raw-td><sc-raw-td style="text-align:right">14/14 in band'
-    '</sc-raw-td><sc-raw-td style="text-align:right">0.0000</sc-raw-td>'
-    "</sc-raw-tr>\n"
+    '</sc-raw-td><sc-raw-td style="text-align:right">13/14 in band, '
+    "corr_persistence_acf1 out"
+    '</sc-raw-td><sc-raw-td style="text-align:right">not recorded'
+    "</sc-raw-td></sc-raw-tr>\n"
     "            <sc-raw-tr><sc-raw-td>held-out universe (60 names, seed 909)"
     '</sc-raw-td><sc-raw-td style="text-align:right">14/14 in band'
     '</sc-raw-td><sc-raw-td style="text-align:right">0.0000</sc-raw-td>'
@@ -996,6 +1132,38 @@ def apply_trust_fixes(doc: str) -> str:
         e = doc.index(end_tag, s) + len(end_tag)
         doc = doc[:s] + replacement + doc[e:]
 
+    def _block(marker: str) -> tuple[int, int]:
+        """The <details> element whose summary contains `marker`."""
+        if marker not in doc:
+            sys.exit(f"the design bundle no longer contains {marker[:60]!r}; "
+                     "apply_trust_fixes needs updating rather than silently "
+                     "shipping a stale gap list")
+        i = doc.index(marker)
+        s = doc.rindex("<details", 0, i)
+        e = doc.index("</details>", i) + len("</details>")
+        return s, e
+
+    def drop(marker: str) -> None:
+        """Remove one gap's <details> block, and the blank line before it."""
+        nonlocal doc
+        s, e = _block(marker)
+        while s > 0 and doc[s - 1] in " \t":
+            s -= 1
+        if s > 0 and doc[s - 1] == "\n":
+            s -= 1
+        doc = doc[:s] + doc[e:]
+
+    def reorder(first: str, second: str) -> None:
+        """Put the `second` gap block ahead of the `first` one."""
+        nonlocal doc
+        s1, e1 = _block(first)
+        s2, e2 = _block(second)
+        if not s1 < e1 <= s2 < e2 or doc[e1:s2].strip():
+            sys.exit("the two gap blocks apply_trust_fixes reorders are no "
+                     "longer adjacent in that order; the numbering would "
+                     "ship out of sequence")
+        doc = (doc[:s1] + doc[s2:e2] + doc[e1:s2] + doc[s1:e1] + doc[e2:])
+
     swaps = [
         # Provenance. The three method rows at the top of the page name the
         # preset each figure came from, and two of them still said pt-v3
@@ -1005,7 +1173,7 @@ def apply_trust_fixes(doc: str) -> str:
             "certification panel</sc-raw-td><sc-raw-td>pt-v3, 30 seeds, 40 "
             "instruments, 252 days. The figures in the table below, and the "
             'only ones the word "certified" applies to.</sc-raw-td>',
-            "certification panel</sc-raw-td><sc-raw-td>pt-v10, 30 seeds, 40 "
+            "certification panel</sc-raw-td><sc-raw-td>pt-v12, 30 seeds, 40 "
             "instruments, 252 days, every figure the MEDIAN across those "
             "seeds. The figures in the table below, and the only ones the "
             'word "certified" applies to. A median is not a typical run: '
@@ -1013,7 +1181,7 @@ def apply_trust_fixes(doc: str) -> str:
         ),
         (
             "six-seed panel</sc-raw-td><sc-raw-td>pt-v3, sim seeds 1 to 6,",
-            "six-seed panel</sc-raw-td><sc-raw-td>pt-v10, sim seeds 1 to 6,",
+            "six-seed panel</sc-raw-td><sc-raw-td>pt-v12, sim seeds 1 to 6,",
         ),
         (
             "One seed, a smaller roster, 120 days, a macro field held fixed. "
@@ -1025,7 +1193,7 @@ def apply_trust_fixes(doc: str) -> str:
             "Good for comparing one pin against another, and not comparable "
             "to either panel. In particular, the calm-to-crisis volatility "
             "ratio a pair of pinned runs implies is NOT the crisis lever in "
-            "gap 5: that one is measured on the certified 40-name roster "
+            "gap 3: that one is measured on the certified 40-name roster "
             "over 252 days at thirty seeds, from VIX 5 to VIX 65. Three "
             "numbers on this site describe how violent a crisis is, and they "
             "are three different measurements.",
@@ -1036,10 +1204,12 @@ def apply_trust_fixes(doc: str) -> str:
             "band. The tenth fails structurally and is named, in every result "
             "the library produces.</p>",
             "<p>At a 252-day horizon the shipped <code style=\"font-size:13px\">"
-            "pt-v10</code> preset puts all fourteen measured statistics in "
+            "pt-v12</code> preset puts all fourteen measured statistics in "
             "band, on thirty calibration seeds and on a held-out 60-name "
-            "universe measured at the same resolution. It is the first preset "
-            "in the project with no miss at this horizon. Every figure below "
+            "universe measured at the same resolution. It also puts all "
+            "fourteen in band at 504 days against bands re-derived at that "
+            "window, which is the first two-year clean sheet in the project: "
+            "pt-v3 held seven there and pt-v10 held thirteen. Every figure below "
             "is the median of those thirty seeds, and that median is what the "
             "word certified describes: it is not a promise about your one "
             "run, which the spread further down prices.</p>",
@@ -1047,51 +1217,57 @@ def apply_trust_fixes(doc: str) -> str:
         (
             "Measured: preset pt-v3 · 30 seeds · 40 instruments · 252 trading "
             "days · band-distance loss L_real = 0.0000.",
-            "Measured: preset pt-v10 · 30 seeds · 40 instruments · 252 trading "
+            "Measured: preset pt-v12 · 30 seeds · 40 instruments · 252 trading "
             "days · band-distance loss L_real = 0.0000.",
         ),
+        # The volume-change gap is RETIRED at pt-v12, which holds
+        # `volume_change_acf1` at -0.2656 over 252 days and -0.2572 over 504,
+        # inside both bands. Its block is dropped rather than reworded (see
+        # `drop` below), because a retired gap left in slot 1 forbids what the
+        # envelope now permits and pushes every later gap number out by one.
+        # The retirement itself is recorded in the paragraph that introduces
+        # the list, so the count changing is explained rather than silent.
         (
-            "1 · The tenth statistic is structurally unreachable",
-            "1 · Volume-change autocorrelation leaves its band past a year",
-        ),
-        (
-            "<p><code style=\"font-size:12.5px\">volume_change_acf1</code> reads "
-            "−0.46 against a real band of −0.32 to −0.20: 13.7 "
-            "seed-standard-deviations out. A held volume level plus "
-            "independent per-tick noise sits near −0.5 at any coefficients, "
-            "which means no parameter setting can reach it. It is excluded "
-            "from the calibration objective deliberately, because an optimiser "
-            "pointed at an unreachable target distorts every other parameter "
-            "chasing it. It stays in every report as a standing falsification "
-            "verdict.</p>",
-            "<p><code style=\"font-size:12.5px\">volume_change_acf1</code> reads "
-            "−0.3130 at 252 days against a real band of −0.32 to −0.20, inside "
-            "it but only 0.7 seed-sd clear of the floor, and −0.3156 at 504 "
-            "days against a tighter −0.29 to −0.21, about 2.2 seed-sd out. "
-            "This page called the row structurally unreachable until 0.2.0, "
-            "because every way of reaching it cost "
-            "<code style=\"font-size:12.5px\">volume_abs_return_corr</code> its "
-            "own band. That is withdrawn: pt-v10 holds both at one year. It "
-            "stays outside the calibration objective, which is a statement "
-            "about what an optimiser may chase, not about reachability.</p>",
+            "<p>Each of these was measured, and each one says what it rules "
+            "out. Note that the horizon gaps only bite past a year.</p>",
+            "<p>Each of these was measured, and each one says what it rules "
+            "out. Note that the horizon gaps only bite past a year. There "
+            "were six until the pt-v12 boundary on 2026-08-26: the "
+            "volume-change gap retired when "
+            "<code style=\"font-size:12.5px\">volume_change_acf1</code> came "
+            "inside its band at one year, \u22120.2656 against \u22120.32 to "
+            "\u22120.20, and at two, \u22120.2572 against \u22120.29 to \u22120.21. A "
+            "retired gap is recorded in the release notes rather than kept as "
+            "a numbered slot, so the five below are numbered as "
+            "<code style=\"font-size:12.5px\">pretium.envelope.GAPS</code> "
+            "lists them.</p>",
         ),
         (
             "Measured against bands re-derived at the matching 504-day window, "
             "the model holds 5 of 10.",
             "Measured against bands re-derived at the matching 504-day window, "
-            "the model holds 13 of 14, missing only the volume-change row.",
+            "the model holds all fourteen.",
         ),
         (
             "Volatility clustering roughly doubles from 252 to 504 days where "
             "real markets move about 14%. The price level stays plausible, so "
             "long runs look fine and are not. The dynamics leave the envelope "
             "while the chart still looks like a market.",
-            "That is the best two-year reading this project has measured, and "
-            "it is still not a certification: CERTIFIED is measured at 252 "
-            "days, the 504-day table is measured but not certified, and "
-            "beyond 504 days nothing has been measured at all. Excess "
-            "kurtosis deserves a reader's caution at this horizon, inside its "
-            "band at 8.26 but only about 0.3 seed-sd above a floor of 7.1.",
+            "That is the first two-year clean sheet in the project, pt-v3 "
+            "having held seven there and pt-v10 thirteen, and it is still not "
+            "a certification: CERTIFIED is measured at 252 days, and the "
+            "504-day table is measured but not certified. Two rows deserve a "
+            "reader's caution at this horizon. Annualised volatility reads "
+            "33.89 against a ceiling of 34.0, which is a tenth of a point of "
+            "room on a statistic whose seed spread is many times that, and "
+            "excess kurtosis reads 7.75, 0.17 seed-sd above a floor of 7.1. "
+            "Past 504 days the panel is measured and has no ruler of its own: "
+            "at 2520 days it holds 10 of 14 against the 504-day bands, which "
+            "are the wrong bands for a ten-year window and are quoted only "
+            "because none have been derived at one, and annualised volatility "
+            "is flat year by year across those ten years, so a long run does "
+            "not drift or blow up. The missing bands are what keeps the "
+            "certification at 252 days.",
         ),
     ]
     swaps.extend([
@@ -1119,7 +1295,8 @@ def apply_trust_fixes(doc: str) -> str:
             "inflation rate the economy never gets to. The cause is "
             "dispersion rather than persistence. This slot used to carry a "
             "thin-tails gap, retired at 0.2.0: two-year excess kurtosis "
-            "moved from 5.23, under its band, to 8.26, inside it.</p>",
+            "moved from 5.23, under its band, to 8.26 under pt-v10 and "
+            "7.75 under pt-v12, inside it both times.</p>",
         ),
         (
             "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> tail-risk or "
@@ -1149,13 +1326,26 @@ def apply_trust_fixes(doc: str) -> str:
             "split behind them. The held-out universe is another "
             "<code style=\"font-size:12.5px\">Universe.random()</code> draw "
             "from the same generator, so it varies the names and not the "
-            "shape of the roster. Gap 6 varies the shape, and the count "
-            "drops.</p>",
+            "shape of the roster. Gap 5 varies the shape, and on pt-v12 that "
+            "costs the second year rather than the first.</p>\n        "
+            '<p style="margin:14px 0 0">The held-out-seed row is the one to '
+            "read twice. "
+            "<code style=\"font-size:12.5px\">corr_persistence_acf1</code> is "
+            "in band at +0.1525 on the thirty seeds the certification was "
+            "taken on and out of it on thirty seeds the calibration never "
+            "used, which is a statistic being hard to estimate over a "
+            "one-year window rather than a model changing. Its 504-day band "
+            "of 0.19 to 0.49 is the ruler that can settle it, and the row "
+            "reads +0.2077 there. The band-distance loss for that axis was "
+            "not recorded, so the table says so rather than carrying a "
+            "number.</p>",
         ),
         # The two worked examples' output blocks. Both were captured before
         # the era boundary and both carry a badge saying they were measured,
         # which makes a stale block worse than an unlabelled one. Their text
-        # is what the installed 0.2.0 package prints.
+        # is what the installed package prints: `envelope.check` reads the
+        # shipped module rather than running a simulation, so these two blocks
+        # can be re-captured on any machine in a second and were, on 0.3.0.
         (
             "OUTSIDE the envelope\n  - horizon 504d exceeds the certified "
             "252d. At 504 days the model holds\n    5 of 10 against "
@@ -1168,16 +1358,22 @@ def apply_trust_fixes(doc: str) -> str:
             "markets' -0.436, and the curve is\n    negative by lag 30 where "
             "real markets stay positive to lag 60",
             "OUTSIDE the envelope\n  - horizon 504d exceeds the certified "
-            "252d. At 504 days the model holds\n    13 of 14 against "
-            "horizon-matched bands, missing only\n    volume_change_acf1 at "
-            "-0.3156 against (-0.29, -0.21). Beyond 504\n    days nothing "
-            "has been measured at all\n  - abs_return_acf20 depends on the "
+            "252d. At 504 days the model holds\n    all 14 against "
+            "horizon-matched bands. The thin one is\n    annualised_vol_pct "
+            "at 33.89 against (16.0, 34.0). Beyond 504 days the\n    panel is "
+            "measured but has no ruler of its own: at 2520 days it holds\n"
+            "    10 of 14 against the 504-day bands\n"
+            "    (tools/calibration/long_horizon.py), and annualised "
+            "volatility is flat\n    year by year across those ten years\n"
+            "    (tools/calibration/memory_vs_drift.py). No bands have been "
+            "derived at\n    a five-year window, which is why the "
+            "certification stops here\n  - abs_return_acf20 depends on the "
             "decay shape, which is a mechanism gap:\n    log-log slope -0.953 "
             "against real markets' -0.436, and the curve is\n    negative by "
             "lag 30 where real markets stay positive to lag 60\n  ? "
-            "excess_kurtosis reads 8.26 at 504 days against (7.1, 22.0): "
-            "inside\n    it, but about 0.3 seed-sd above the floor, so a tail "
-            "study at this\n    horizon is reading the low edge of the band",
+            "excess_kurtosis reads 7.75 at 504 days against (7.1, 22.0): "
+            "inside it,\n    but 0.17 seed-sd above the floor, so a tail "
+            "study at this horizon is\n    reading the low edge of the band",
         ),
         # The six-month worked example. Every figure in it is now a real
         # measurement, so the block's badge stops saying MIXED: the spread
@@ -1212,13 +1408,13 @@ def apply_trust_fixes(doc: str) -> str:
             "(0.1413 in\n    (0.02, 0.22)) -- but that is a median across 30 "
             "seeds; check\n    `intervals` for the spread before relying on "
             "one seed",
-            "# 1.\nTrue\ninside the envelope\n"
+            "# 1.\nTrue\ninside the envelope for the statistics you named\n"
             "  - horizon 126d is within the certified 252d, and no named "
             "statistic\n    meets a measured gap\n  ? return_acf1 is in band "
-            "at the certified horizon (0.0195 in\n    (-0.08, 0.06)) -- but "
+            "at the certified horizon (0.0239 in\n    (-0.08, 0.06)) -- but "
             "that is a median across 30 seeds; check\n    `intervals` for the "
             "spread before relying on one seed\n  ? abs_return_acf1 is in "
-            "band at the certified horizon (0.0994 in\n    (0.02, 0.22)) -- "
+            "band at the certified horizon (0.1107 in\n    (0.02, 0.22)) -- "
             "but that is a median across 30 seeds; check\n    `intervals` for "
             "the spread before relying on one seed",
         ),
@@ -1251,10 +1447,18 @@ def apply_trust_fixes(doc: str) -> str:
             "In that block the medians, bands, verdicts and the check reasons "
             "come from the shipped envelope. The p10, p90 and sd columns and "
             "the step 3 numbers are composed to show the shape of the report.",
-            "Every figure in that block is a measurement: pretium 0.2.0, "
-            "pt-v10, the code above it verbatim, sim seeds 1 to 30 over "
-            "Universe.random(40, seed=111) at 126 days. Rows between "
-            "abs_return_acf5 and volume_change_acf1 are elided for width.",
+            "Every figure in that block is a measurement, and the block "
+            "spans two presets because its parts cost different amounts to "
+            "re-run. Step 1 is envelope.check reading the shipped module "
+            "rather than simulating anything, so it is captured on 0.3.0 "
+            "under pt-v12 and is what the code above prints today. Steps 2 "
+            "and 3 are a thirty-seed measurement: pretium 0.2.0, pt-v10, the "
+            "code above verbatim, sim seeds 1 to 30 over "
+            "Universe.random(40, seed=111) at 126 days, left as measured "
+            "rather than relabelled. Rows between abs_return_acf5 and "
+            "volume_change_acf1 are elided for width. Run steps 2 and 3 again "
+            "under pt-v12 and the numbers move, which is what naming a preset "
+            "is for.",
         ),
         (
             "Step 1 says yes, with two warnings. Step 2 shows why they were "
@@ -1292,7 +1496,7 @@ def apply_trust_fixes(doc: str) -> str:
             "Machine-readable companion: envelope.json carries the "
             "per-statistic detail, the gap list and the preset the figures "
             "describe. The cross-platform determinism baseline for this era "
-            "is known-answer v10, digest 4e22d5a6…860378, which the release "
+            "is known-answer v11, digest 60d47572…0de590, which the release "
             "workflow checks inside every wheel before it uploads. If "
             "pretium.model_preset()[\"name\"] is not the preset named in "
             "envelope.json, this page describes a different model than the "
@@ -1359,15 +1563,49 @@ def apply_trust_fixes(doc: str) -> str:
             "run elsewhere on this site, which is one seed on a smaller "
             "roster over a shorter window.",
             "measured from VIX 5 to VIX 65 on the 40-name reference roster "
-            "over 252 days at thirty seeds: 5.05 times here against real "
+            "over 252 days at thirty seeds: 6.04 times here against real "
             "markets' 6.16 (17.2% annualised below VIX 12 against 106.1% "
-            "above VIX 45). About four fifths, up from 3.07 times at the "
-            "previous default. That is not the same quantity as the pair of "
+            "above VIX 45). Within about two percent, up from 5.05 times at "
+            "pt-v10 and 3.07 at the default before that. That is not the "
+            "same quantity as the pair of "
             "pinned 120-day runs elsewhere on this site, which is one seed "
             "on a smaller roster over a shorter window and reads about 2.8 "
             "times from VIX 15 to VIX 45. Three numbers on this site "
             "describe how violent a crisis is; check which one you are "
             "reading before quoting it.",
+        ),
+        (
+            "<p>Two quantities, failing differently. The steady state is the "
+            "ratio",
+            "<p>Two quantities, and only one of them still fails. The steady "
+            "state is the ratio",
+        ),
+        (
+            "The transient: the shipped preset retains 27.6% of the previous "
+            "preset's shock response, because it raised factor-variance "
+            "persistence to 0.989 to buy volatility clustering, and a 63-day "
+            "half-life cannot track a twenty-day spike.</p>",
+            "This gap opened by calling that lever materially weak, when it "
+            "read 3.07 times; pt-v10 took it to 5.05 and pt-v12 to 6.04, so "
+            "what the gap is ABOUT has changed. The magnitude is no longer "
+            "the defect. "
+            "The dispersion around it is. Over a window driven by the real "
+            "2020-21 macro path, the model's residual standard deviation is "
+            "1.565 times real, down from 1.76 at pt-v10 and barely moved from "
+            "1.555 at pt-v11, and that is the worst axis in this model. So "
+            "the expected size of a scenario's response is calibrated and the "
+            "spread around it is too wide: one run understates how much of "
+            "its own move was the scenario.</p>",
+        ),
+        (
+            "This was attacked directly and the attack failed, which is why "
+            "it is a gap and no longer a task. A two-timescale variance "
+            "mixture restored the transient",
+            "The transient was attacked directly in the pt-v10 era and the "
+            "attack failed, which is why it was left where it was; what "
+            "eventually moved the lever was pt-v11's crisis work rather than "
+            "a variance mixture. A two-timescale variance mixture restored "
+            "the transient",
         ),
         (
             "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> sizing a "
@@ -1377,13 +1615,16 @@ def apply_trust_fixes(doc: str) -> str:
             "is a weaker test than the label suggests.</p>",
             "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> sizing a "
             "scenario's impact rather than detecting it. Use scenarios to ask "
-            "whether a strategy breaks. A crisis here is about four fifths as "
-            "violent as a real one and arrives more slowly, so surviving one "
-            "is a weaker test than the label suggests.</p>",
+            "whether a strategy breaks. On average a crisis here is about as "
+            "violent as a real one, within two percent on the steady-state "
+            "lever, and the spread around that average is 1.565 times real, "
+            "so one run is a weak reading of how hard the scenario hit.</p>",
         ),
-        # Gap 3. "No parameter setting turns one slope into the other" is a
-        # statement about this model class. Gap 1 made the stronger claim and
-        # had to withdraw it, so the weaker one says out loud which it is.
+        # The decay-shape gap. "No parameter setting turns one slope into
+        # the other" is a statement about this model class. The volume-change
+        # gap made the stronger claim and had to withdraw it, so the weaker
+        # one says out loud which it is. That gap is named rather than
+        # numbered, because it retired at pt-v12 and has no number now.
         (
             "The model fits −0.953, about 2.2 times steeper. This is a "
             "mechanism gap: no parameter setting turns one slope into the "
@@ -1396,9 +1637,10 @@ def apply_trust_fixes(doc: str) -> str:
             "was tried, and a two-component variance mixture lands lag 20 "
             "while getting lag 60 wrong in both directions at once. Read "
             "that as a limit of this model class rather than of the project: "
-            "gap 1 carried the stronger claim, that its row was structurally "
-            "unreachable, and a new mechanism reached it. A gap is closed by "
-            "adding mechanism, not by tuning what is already here.",
+            "the retired volume-change gap carried the stronger claim, that "
+            "its row was structurally unreachable, and a new mechanism "
+            "reached it. A gap is closed by adding mechanism, not by tuning "
+            "what is already here.",
         ),
         # Gap 6. Round-robin over twelve sectors is not five names each, and
         # the three counts below it are a pt-v3-era ten-statistic panel.
@@ -1414,10 +1656,70 @@ def apply_trust_fixes(doc: str) -> str:
             "40 names put four in each of four sectors and three in each of "
             "the other eight. No real index is balanced that way. The "
             "S&amp;P is roughly a third technology, and the Nasdaq more so. "
-            "Varying only sector composition, and measured on pt-v3 against "
-            "the TEN-statistic panel of the time rather than re-measured on "
-            "pt-v10, because what this establishes is a property of the "
-            "roster rather than of a preset:</p>",
+            "Varying only sector composition. Re-measured on pt-v12 across "
+            "thirty seeds and the full fourteen-statistic panel: at the "
+            "certified 252-day horizon EVERY mix tested holds all fourteen -- "
+            "balanced, S&amp;P-like, technology-heavy and defensive, with an "
+            "all-technology roster holding 13 of 13 because "
+            "sector_excess_corr is undefined when there is only one sector. "
+            "Concentration costs the SECOND year rather than the first, "
+            "through cross-sectional correlation rising past its 504-day "
+            "band as the roster narrows:</p>",
+        ),
+        # The roster table itself. The bundle carries the pt-v3-era counts,
+        # 9/10, 8/10 and 7/10 out of the ten-statistic panel at six seeds,
+        # under a paragraph that now says they were superseded -- so the
+        # header changes with the rows: the interesting axis is no longer a
+        # single in-band count but the two horizons side by side. Figures
+        # from `pretium.envelope.GAPS["roster-concentration"]`, measured by
+        # tools/calibration/roster_shapes.py.
+        (
+            '<sc-raw-thead><sc-raw-tr><sc-raw-th>Roster</sc-raw-th>'
+            '<sc-raw-th style="text-align:right">In band</sc-raw-th>'
+            '<sc-raw-th style="text-align:right">L_real</sc-raw-th>'
+            '<sc-raw-th style="text-align:right">Vol %</sc-raw-th>'
+            "</sc-raw-tr></sc-raw-thead>",
+            '<sc-raw-thead><sc-raw-tr><sc-raw-th>Roster</sc-raw-th>'
+            '<sc-raw-th style="text-align:right">252d</sc-raw-th>'
+            '<sc-raw-th style="text-align:right">504d</sc-raw-th>'
+            "<sc-raw-th>Out at 504d</sc-raw-th>"
+            "</sc-raw-tr></sc-raw-thead>",
+        ),
+        (
+            "<sc-raw-tr><sc-raw-td>balanced (the certified one)</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">9/10</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">0.0000</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">27.9</sc-raw-td></sc-raw-tr>'
+            "\n                <sc-raw-tr><sc-raw-td>S&amp;P-like mix"
+            '</sc-raw-td><sc-raw-td style="text-align:right">8/10</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">0.0176</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">27.4</sc-raw-td></sc-raw-tr>'
+            "\n                <sc-raw-tr><sc-raw-td>all technology"
+            '</sc-raw-td><sc-raw-td style="text-align:right">7/10</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">0.0043</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">32.8</sc-raw-td></sc-raw-tr>',
+            "<sc-raw-tr><sc-raw-td>balanced (the certified one)</sc-raw-td>"
+            '<sc-raw-td style="text-align:right">14/14</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">14/14</sc-raw-td>'
+            "<sc-raw-td>none</sc-raw-td></sc-raw-tr>"
+            "\n                <sc-raw-tr><sc-raw-td>S&amp;P-like mix"
+            '</sc-raw-td><sc-raw-td style="text-align:right">14/14</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">13/14</sc-raw-td>'
+            "<sc-raw-td>annualised_vol_pct</sc-raw-td></sc-raw-tr>"
+            "\n                <sc-raw-tr><sc-raw-td>technology-heavy"
+            '</sc-raw-td><sc-raw-td style="text-align:right">14/14</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">11/14</sc-raw-td>'
+            "<sc-raw-td>vol, corr_persistence_acf1, cross_sectional_corr"
+            "</sc-raw-td></sc-raw-tr>"
+            "\n                <sc-raw-tr><sc-raw-td>all technology"
+            '</sc-raw-td><sc-raw-td style="text-align:right">13/13</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">10/13</sc-raw-td>'
+            "<sc-raw-td>vol, corr_persistence_acf1, cross_sectional_corr"
+            "</sc-raw-td></sc-raw-tr>"
+            "\n                <sc-raw-tr><sc-raw-td>defensive"
+            '</sc-raw-td><sc-raw-td style="text-align:right">14/14</sc-raw-td>'
+            '<sc-raw-td style="text-align:right">14/14</sc-raw-td>'
+            "<sc-raw-td>none</sc-raw-td></sc-raw-tr>",
         ),
         (
             "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> inheriting "
@@ -1426,16 +1728,67 @@ def apply_trust_fixes(doc: str) -> str:
             "facts.measure()</code> takes it directly, and "
             "<code style=\"font-size:12.5px\">envelope.intervals()</code> "
             "reports the spread.</p>",
+            '<p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);'
+            'margin:10px 0 14px">Measured: preset pt-v12 \u00b7 30 seeds \u00b7 40 '
+            "instruments \u00b7 252 and 504 trading days \u00b7 "
+            "tools/calibration/roster_shapes.py. The all-technology row "
+            "counts thirteen because sector_excess_corr is undefined with one "
+            "sector, not because it failed.</p>\n            "
             "<p>This is also the limit of the held-out universe above. That "
             "roster is another draw from the same generator, so it varies the "
-            "names and not the shape; this table varies the shape, and the "
-            "count drops.</p>\n            "
+            "names and not the shape. This table varies the shape, and on "
+            "pt-v12 the count holds at the certified horizon and drops at "
+            "504 days.</p>\n            "
             "<p style=\"color:var(--fg)\"><strong>Forbids:</strong> inheriting "
-            "these numbers for a sector-concentrated roster. Re-measure the "
-            "panel on your own universe: <code style=\"font-size:12.5px\">"
+            "this envelope for a sector-concentrated roster BEYOND one year. "
+            "At the certified horizon it now transfers, which it did not "
+            "before pt-v12. Past that, re-measure the panel on your own "
+            "universe: <code style=\"font-size:12.5px\">"
             "facts.measure()</code> takes it directly, and "
             "<code style=\"font-size:12.5px\">envelope.intervals()</code> "
             "reports the spread.</p>",
+        ),
+    ])
+
+    # The gap list is renumbered to match `pretium.envelope.GAPS`, which is
+    # the only list of gaps this project actually maintains. The bundle
+    # numbers six in a different order; these run last so that no earlier
+    # swap has to know which number a gap currently carries.
+    swaps.extend([
+        ("2 · The certified horizon is 252 days",
+         "1 · The certified horizon is 252 days"),
+        ("3 · Volatility memory has the wrong shape",
+         "2 · Volatility memory has the wrong shape"),
+        ("5 · Scenario response is directional, not calibrated",
+         "3 · Scenario response is directional, not calibrated"),
+        ("6 · Certification used a sector-balanced roster",
+         "5 · Certification used a sector-balanced roster"),
+        # The closing list names gaps by number, so it moves with them. The
+        # volume-change entry goes rather than shifting: pt-v12 holds that
+        # row at 252 days and at 504, so the site was forbidding a strategy
+        # the envelope now permits.
+        (
+            "<li>Multi-year backtests (gap 2)</li>\n              "
+            "<li>Sizing how badly a crisis hurts, as opposed to detecting "
+            "that it does (gap 5)</li>\n              "
+            "<li>Inheriting these numbers on a sector-concentrated roster "
+            "(gap 6)</li>",
+            "<li>Multi-year backtests (gap 1)</li>\n              "
+            "<li>Sizing how badly a crisis hurts, as opposed to detecting "
+            "that it does (gap 3)</li>\n              "
+            "<li>Inheriting these numbers on a sector-concentrated roster "
+            "beyond one year (gap 5)</li>",
+        ),
+        (
+            "<li>Long-horizon volatility memory (gap 3), or VaR at "
+            "multi-year horizons (gap 2)</li>\n              "
+            "<li>Studying an inflation regime or a policy crisis the "
+            "economy is left to reach on its own (gap 4)</li>\n              "
+            "<li>Strategies trading the change in volume (gap 1)</li>",
+            "<li>Long-horizon volatility memory (gap 2), or VaR at "
+            "multi-year horizons (gap 1)</li>\n              "
+            "<li>Studying an inflation regime or a policy crisis the "
+            "economy is left to reach on its own (gap 4)</li>",
         ),
     ])
 
@@ -1445,9 +1798,21 @@ def apply_trust_fixes(doc: str) -> str:
                      f"apply_trust_fixes corrects: {old[:70]!r}")
         doc = doc.replace(old, new, 1)
 
+    # The volume-change gap retired at pt-v12, which reads -0.2656 at 252
+    # days and -0.2572 at 504, inside both bands. Dropping the block is the
+    # point: reworded, it would still forbid a strategy the envelope permits,
+    # and it would still hold slot 1 and push every later number out by one.
+    drop("1 · The tenth statistic is structurally unreachable")
+    # `GAPS` lists scenario-magnitude before macro-range and the bundle has
+    # them the other way round, so the numbers above would count 1, 2, 4, 3,
+    # 5 down the page. Move the block rather than the numbers: the numbering
+    # a reader can check against the library is the one that has to win.
+    reorder("4 · The endogenous economy cannot reach its own MACRO crisis "
+            "regimes", "3 · Scenario response is directional, not calibrated")
+
     cut("At a 252-day horizon the shipped", "<sc-raw-tbody", "</sc-raw-tbody>",
         certified_rows())
-    cut("2 · The certified horizon is 252 days", "<sc-raw-tbody",
+    cut("1 · The certified horizon is 252 days", "<sc-raw-tbody",
         "</sc-raw-tbody>",
         '<sc-raw-tbody style="font-family:var(--font-mono);font-size:12px">\n'
         f"                {horizon_rows()}\n              </sc-raw-tbody>")
@@ -1468,7 +1833,9 @@ def apply_scenarios_fixes(doc: str) -> str:
     The page also carried a third crisis-intensity number, so a reader met
     a pinned 59%-to-107% ratio here, a 3.1x steady-state lever on the
     realism page and a 5.05x lever in the release notes, with nothing saying
-    they are three different measurements.
+    they are three different measurements. The lever has since moved again,
+    to 6.04x on pt-v12, which is why the replacements below name the preset
+    beside the figure instead of leaving it to be inferred.
 
     Re-measured on the installed 0.2.0 package by the recipes the page
     states: volatility and the crisis pair over `Universe.random(20,
@@ -1558,9 +1925,10 @@ def apply_scenarios_fixes(doc: str) -> str:
             "boundary VIX also moves a name's own variance, through "
             "<code style=\"font-size:12px\">garch_vix_coupling</code>; before "
             "it, VIX sized only the shared factor. These figures straddle "
-            'the 31.5% on <a href="#/trust">Realism and Limits</a> rather '
-            "than sitting near it, a calm pin landing about there and a "
-            "crisis pin running three times higher, because a pinned VIX is "
+            'the 32.76% on <a href="#/trust">Realism and Limits</a> rather '
+            "than sitting near it, the calm pins bracketing it and the "
+            "crisis pins running three to four times higher, because a "
+            "pinned VIX is "
             "not a normal market: the pin drives the factor "
             "variance directly, and these runs use a smaller roster over 120 "
             "days rather than the certified 40 names over 252. Compare pins "
@@ -1568,7 +1936,7 @@ def apply_scenarios_fixes(doc: str) -> str:
             "unpinned run. The ratio between two pins is NOT the crisis "
             "lever the realism page and the release notes quote: that one "
             "runs VIX 5 to VIX 65 on the certified roster over 252 days at "
-            "thirty seeds and reads 5.05x. Three numbers, three "
+            "thirty seeds and reads 6.04x on pt-v12. Three numbers, three "
             "measurements.",
         ),
         # The liquidity-crisis pair, in the comment the example prints.
@@ -1637,7 +2005,8 @@ def apply_scenarios_fixes(doc: str) -> str:
             "rows and the two strategy lines are composed to show the shape "
             "of the output.",
             "Every line in that block is a measurement on pretium 0.2.0 "
-            "under pt-v10, from the code above it. The scenario rows are "
+            "under pt-v10, the default before 0.3.0, from the code above it "
+            "and left as measured rather than relabelled. The scenario rows are "
             "elided in the middle and rounded to two decimals; nothing else "
             "is edited. Note what the path actually does: "
             "<code style=\"font-size:12.5px\">vix_shock</code> puts the peak "
@@ -1650,25 +2019,48 @@ def apply_scenarios_fixes(doc: str) -> str:
             "Volatility goes from 40% to 68%, and correlation climbs with "
             "it, 0.49 to 0.62.",
         ),
-        # The two "half as violent" lines, both quoting the pt-v3-era lever.
+        # The two "half as violent" lines. Both quoted the pt-v3-era lever
+        # and both indexed into a six-gap list that no longer exists.
+        #
+        # Two corrections, not one. The NUMBER: the steady-state crisis
+        # lever reads 6.04x on pt-v12 against real markets' 6.16x
+        # (docs/realism-envelope.md:245-251, and the same pair in
+        # `pretium.envelope.GAPS` under `scenario-magnitude`), so "four
+        # fifths" -- itself the pt-v10 5.05x -- understates the shipped
+        # preset by a factor a reader would act on. The INDEX: there are
+        # five gaps now, `[g.id for g in envelope.GAPS]` gives horizon,
+        # decay-shape, scenario-magnitude, macro-range,
+        # roster-concentration, so this one is gap 3. trust.html's own list
+        # is renumbered to match in apply_trust_fixes.
+        #
+        # What the gap is ABOUT changed with the number, so the prose has to
+        # change with it rather than just the digits: the expected size of a
+        # scenario's response is calibrated now and the dispersion around it
+        # is not. "Never size losses" becomes "never size them from one run".
         (
             "And gap 5 on the realism page: scenario response is "
             "directional, not sized. A crisis here is about half as violent "
             "as a real one. Use scenarios to detect breakage, never to size "
             "losses.",
-            "And gap 5 on the realism page: scenario response is "
-            "directional, not sized. A crisis here is about four fifths as "
-            "violent as a real one, 5.05x against 6.16x on the certified "
-            "roster. Use scenarios to detect breakage, never to size losses.",
+            "And gap 3 on the realism page: a scenario's size is right on "
+            "average and unreliable in one run. The steady-state lever, a "
+            "sustained crisis against a calm market, reads 6.04x here "
+            "against 6.16x for real markets on the certified roster, which "
+            "is within two percent; what is not calibrated is the spread "
+            "around it, so a single run understates how much of its own "
+            "move was the scenario. Use scenarios to detect breakage, and "
+            "size a loss across many seeds or not at all.",
         ),
         (
             "Do not quote the sizes as real. A crisis here is roughly half "
             "as violent as a real one (gap 5). Read the direction and the "
             "ordering; leave the magnitudes alone.",
-            "Do not quote the sizes as real. A crisis here is about four "
-            "fifths as violent as a real one (gap 5), and the pinned pair "
+            "Do not quote one run's sizes as real. The steady-state crisis "
+            "lever is calibrated on average, 6.04x against a real 6.16x, "
+            "and the dispersion around it is not (gap 3); the pinned pair "
             "above is a different measurement again. Read the direction and "
-            "the ordering; leave the magnitudes alone.",
+            "the ordering, and take a magnitude from many seeds rather than "
+            "from this one.",
         ),
     ]
     for old, new in swaps:
@@ -1694,13 +2086,30 @@ def apply_internals_fixes(doc: str) -> str:
     `Universe.random(20, seed=11)`, correlation over
     `Universe.random(25, seed=11)`, 120 days, sim seed 3, VIX pinned through
     the scenario API. Each replacement asserts.
+
+    Two coefficients in those replacements were themselves an era behind, and
+    are corrected here rather than left to a reader to trip over. The shipped
+    `sector_vix_coupling` is 1.0, not the 0.25 pt-v7 and pt-v10 carried:
+    pt-v11's crisis work quadrupled it (`rust/src/params.rs:1663`), and
+    `ModelParams.from_preset("pt-v12").to_dict()["sector_vix_coupling"]` reads
+    1.0. And the certified annualised volatility is 32.7604, not 31.5:
+    `pretium.envelope.CERTIFIED["annualised_vol_pct"]` gives 32.7604, which is
+    what the trust page's certified table publishes as 32.76, so quoting 31.5
+    here left two pages of one site disagreeing about one measurement.
+
+    The RNG-streams section is the third correction. The engine has seven
+    generator streams, not three (`rust/src/rng.rs` `mod stream`, ids 0 to 6),
+    and a live `Engine.state_snapshot()["rng"]` is 21 numbers, three per
+    stream. `Engine.draws_by_stream()` still reports only the first three, so
+    the sentence that cites it says so rather than implying seven counts come
+    back.
     """
     swaps = [
         (
             "the shipped <code style=\"font-size:13px\">pt-v3</code> turns the "
             "term down to 0.0742 and measures +0.0375, inside the band.",
-            "the shipped <code style=\"font-size:13px\">pt-v10</code> turns the "
-            "term down to 0.0186 and measures +0.0195, inside the band.",
+            "the shipped <code style=\"font-size:13px\">pt-v12</code> turns the "
+            "term down to 0.0186 and measures +0.0239, inside the band.",
         ),
         (
             "On top sits a shared market factor with its own conditional "
@@ -1721,9 +2130,11 @@ def apply_internals_fixes(doc: str) -> str:
             "stress the way real crises make it fail. Since the 2026-08-26 "
             "era boundary the coupling is not the factor's alone: a name's "
             "own GJR-GARCH variance follows the VIX too "
-            "(<code style=\"font-size:13px\">garch_vix_coupling</code> 0.3), a "
-            "quarter of sector variance follows it "
-            "(<code style=\"font-size:13px\">sector_vix_coupling</code> 0.25), "
+            "(<code style=\"font-size:13px\">garch_vix_coupling</code> 0.3), "
+            "the sector draw's variance follows the regime in full "
+            "(<code style=\"font-size:13px\">sector_vix_coupling</code> 1.0, "
+            "which was a quarter under pt-v10 and was quadrupled by pt-v11's "
+            "crisis work), "
             "the VIX's own fear channel reads the day's index return rather "
             "than the closing minute, the volatility regimes come off the "
             "market instead of the business cycle, and the factor's variance "
@@ -1735,9 +2146,10 @@ def apply_internals_fixes(doc: str) -> str:
             "pinned VIX is not a normal market: the pin drives the factor "
             "variance directly, and these runs use a smaller roster over 120 "
             "days rather than the certified 40 names over 252.",
-            "Those levels straddle the certified panel's 31.5% rather than "
-            "sitting near it, a calm pin landing about there and a crisis "
-            "pin running three times higher, because a pinned VIX is not a "
+            "Those levels straddle the certified panel's 32.76% rather than "
+            "sitting near it, the two calm pins bracketing it and the two "
+            "crisis pins running three to four times higher, because a "
+            "pinned VIX is not a "
             "normal market: the pin drives the factor "
             "variance directly, and these runs use a smaller roster over 120 "
             "days rather than the certified 40 names over 252. The ratio "
@@ -1764,6 +2176,45 @@ def apply_internals_fixes(doc: str) -> str:
             "impact decay, resiliency or order-sign autocorrelation against "
             "real market data. The book is real and it is not certified.",
         ),
+        # RNG streams. The page was authored against the original three-way
+        # split and the engine has had seven streams since the volume and
+        # news mechanisms landed. Ids and duties are read straight off
+        # `rust/src/rng.rs` `mod stream`: MARKET 0, ECONOMY 1, EXTERNAL 2,
+        # JUMPS 3, VOLUME 4, NEWS 5, VOLUME_IDIO 6. Three numbers per stream
+        # is why a live snapshot's `rng` array is 21 long.
+        (
+            "One seed drives the whole simulation, through three independent "
+            "substreams, so changing what one consumer draws cannot shift "
+            "any other consumer's sequence.",
+            "One seed drives the whole simulation, through seven independent "
+            "substreams, so changing what one consumer draws cannot shift "
+            "any other consumer's sequence. Four of the seven exist because "
+            "of that rule rather than in spite of it: a mechanism that "
+            "consumes draws could not have been added to a shared stream at "
+            "all without shifting every later draw and moving every shipped "
+            "preset's trajectory, so jumps, volume, news and per-name volume "
+            "each got a stream of their own and each arrived inert.",
+        ),
+        (
+            '<sc-raw-tr><sc-raw-td style="font-family:var(--font-mono);font-size:12.5px">external</sc-raw-td><sc-raw-td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">2</sc-raw-td><sc-raw-td>the embedder, through Engine.draw_uniform() / draw_normal()</sc-raw-td></sc-raw-tr>',
+            '<sc-raw-tr><sc-raw-td style="font-family:var(--font-mono);font-size:12.5px">external</sc-raw-td><sc-raw-td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">2</sc-raw-td><sc-raw-td>the embedder, through Engine.draw_uniform() / draw_normal()</sc-raw-td></sc-raw-tr>\n            <sc-raw-tr><sc-raw-td style="font-family:var(--font-mono);font-size:12.5px">jumps</sc-raw-td><sc-raw-td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">3</sc-raw-td><sc-raw-td>endogenous jumps, drawn once per name per day at the close</sc-raw-td></sc-raw-tr>\n            <sc-raw-tr><sc-raw-td style="font-family:var(--font-mono);font-size:12.5px">volume</sc-raw-td><sc-raw-td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">4</sc-raw-td><sc-raw-td>the common persistent volume component, drawn once per day at the close</sc-raw-td></sc-raw-tr>\n            <sc-raw-tr><sc-raw-td style="font-family:var(--font-mono);font-size:12.5px">news</sc-raw-td><sc-raw-td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">5</sc-raw-td><sc-raw-td>endogenous company news, drawn once per name per day at the open</sc-raw-td></sc-raw-tr>\n            <sc-raw-tr><sc-raw-td style="font-family:var(--font-mono);font-size:12.5px">volume_idio</sc-raw-td><sc-raw-td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">6</sc-raw-td><sc-raw-td>per-name volume persistence, drawn once per name per day</sc-raw-td></sc-raw-tr>',
+        ),
+        (
+            "The market stream's schedule is a pure function of market "
+            "status, active roster and sector count, so no price, no macro "
+            "value and no order flow can move its position. "
+            "<code style=\"font-size:13px\">Engine.draws_by_stream()</code> "
+            "reports the counts.",
+            "The market stream's schedule is a pure function of market "
+            "status, active roster and sector count, so no price, no macro "
+            "value and no order flow can move its position. "
+            "<code style=\"font-size:13px\">Engine.draws_by_stream()</code> "
+            "reports the counts for the first three, which are the ones a "
+            "TCA subtraction compares; the four later streams are diagnosed "
+            "through the snapshot instead, where each occupies three of the "
+            "21 numbers in "
+            "<code style=\"font-size:13px\">state_snapshot()[\"rng\"]</code>.",
+        ),
     ]
     for old, new in swaps:
         if old not in doc:
@@ -1785,8 +2236,15 @@ def apply_factors_fixes(doc: str) -> str:
     a FIVE-day run and asserted a residual around 1e-16, which held only
     because five days is too short for a jump to fire. Measured on the same
     seed over 120 days, with 8 jump ticks, the seven-column sum is off by
-    0.128 while the nine-column sum reads 5.0e-17. A check that passes by
+    0.128 while the nine-column sum reads 6.75e-17. A check that passes by
     being too short to exercise the thing it checks is worse than no check.
+
+    Both residuals are re-measured on 0.3.0 by running the page's own snippet
+    verbatim -- `Engine(seed=42, universe=Universe.random(20, seed=11))`,
+    `run_days(120)`, instrument_id 0, summed in the page's own FACTORS order.
+    It prints 8 jump ticks, 0.12799165416224142 across seven columns and
+    6.754579534584693e-17 across nine. The nine-column figure had been
+    published as 5.0e-17, which is not what the snippet beside it produces.
     """
     swaps = [
         (
@@ -1821,7 +2279,7 @@ def apply_factors_fixes(doc: str) -> str:
             "Run it over five days instead of 120 and the seven-column version "
             "of this check also passes, because five days is too short for a "
             "jump to fire. On this seed over 120 days, with 8 jump ticks, "
-            "seven columns are off by 0.128 and nine by 5.0e-17. Where a "
+            "seven columns are off by 0.128 and nine by 6.75e-17. Where a "
             "residual does remain, the mispricing clamp bound; the circuit "
             "breaker has had its own column since 2026-08-26 and is no longer "
             "part of it.</p>\n        <p>Which is also a caveat on the older "
@@ -1835,6 +2293,18 @@ def apply_factors_fixes(doc: str) -> str:
             "exact except on those days, and the columns were never wrong, "
             "only incomplete. Both are columns now and the identity holds "
             "through a crisis.",
+        ),
+        # The last count of seven left on the page, in the Scope section, one
+        # paragraph below a table this function has just made nine rows long
+        # and under a heading ERA_FIXES retitles "The Nine Components".
+        # `len(pretium.Engine.FACTORS)` is 9 and `truth()` carries nine
+        # component columns (`rust/src/python_arrow.rs`), so a name that did
+        # not tick has nine zeros, not seven.
+        (
+            "A name that did not tick has zeros across all seven, because "
+            "nothing contributed to a move it did not make.",
+            "A name that did not tick has zeros across all nine, because "
+            "nothing contributed to a move it did not make.",
         ),
     ]
     for old, new in swaps:
@@ -1869,6 +2339,609 @@ def apply_factors_fixes(doc: str) -> str:
     cut = doc.index("</sc-raw-tr>", doc.index(probe)) + len("</sc-raw-tr>")
     return doc[:cut] + "\n            " + rows + doc[cut:]
 
+def apply_guide_fixes(doc: str) -> str:
+    """Correct the three guide pages the bundle left an era behind.
+
+    Grouped because they share one cause with the reference pages: the bundle
+    was authored when pt-v3 was the default and `examples/` had different
+    filenames, and the three pages each invite a reader to run something and
+    compare. A guide page is the worst place for a stale identity, because
+    the reader has the real answer on their own screen.
+
+    RUNNING A MARKET. Two spots named pt-v3 as the shipped preset. The
+    "limits" box quoted pt-v3's return autocorrelation, +0.0375, with a
+    provenance line attaching the certification method to that preset, and
+    the worked year's OUTPUT block printed `pt-v3` from an
+    `Engine(seed=42, universe=universe)` that passes no `model=` and
+    therefore runs the default. On 0.3.0 that engine's `model_fingerprint`
+    is `pt-v12`, `ModelParams.from_preset("pt-v12").to_dict()`
+    ["momentum_theta"] is 0.0185515625 against pt-v3's 0.0742062, and
+    `pretium.envelope.CERTIFIED["return_acf1"]` is 0.0239. The OUTPUT block
+    keeps its ILLUSTRATIVE badge, which covers composed numbers; it does not
+    cover a preset name, which is an identity and the one thing the
+    fingerprint mechanism exists to make checkable.
+
+    THE AGENT HARNESS. Two corrections. The `explain()` sentence said the
+    answer is one of SEVEN names while linking to a page ERA_FIXES retitles
+    "The Nine Components" in the same clause, and `len(Engine.FACTORS)` is 9.
+
+    The bigger one is the worked agent's OUTPUT block, which was composed and
+    composed WRONG in shape rather than in value. The code splats
+    `pt.reference_agents(seed=3)`, which is five agents --
+    `['buy_and_hold', 'random', 'momentum', 'mean_reversion', 'oracle']` --
+    so the loop prints six rows and the block showed five, with `random`
+    missing. And it showed `errors=0` on every row directly above a paragraph
+    telling the reader to read `errors` first. Run verbatim on 0.3.0 the
+    ValueAgent breaches the default `max_leverage=2.0` from its first sizing
+    decision: sizing at 2% of average volume across five names is far more
+    than a $1,000,000 account carries, so 56 orders are rejected and 5 fill.
+    The composed block was showing a healthy run of an agent that does not
+    have one. Replaced with the real output, badge moved to MEASURED, and the
+    paragraph beneath now teaches both failure shapes rather than one.
+
+    AN LLM AGENT. `examples/claude_agent.py` does not exist and never did on
+    any tag; the file is `examples/08-claude-agent.py`, and its own header
+    documents that invocation. The path appeared twice in the bundle, in the
+    subtitle and in the shell block, and the subtitle is what
+    `description_for()` turns into the meta description, the Open Graph and
+    Twitter descriptions and the JSON-LD, so the broken path was also what a
+    search result showed. Fixing the subtitle fixes all four.
+    """
+    swaps = [
+        # -- Running a market --------------------------------------------
+        (
+            "The shipped <code style=\"font-size:12px\">pt-v3</code> preset "
+            "turns that dial well down: return autocorrelation at lag one "
+            "reads +0.0375 against a real band of −0.08 to 0.06, so it "
+            "is in band. Earlier presets did not. "
+            "<code style=\"font-size:12px\">pt-v1</code> ships the same knob "
+            "at 0.25 and measures +0.249, roughly a fifth of it.",
+            "The shipped <code style=\"font-size:12px\">pt-v12</code> preset "
+            "turns that dial well down: "
+            "<code style=\"font-size:12px\">momentum_theta</code> sits at "
+            "0.0186 and return autocorrelation at lag one "
+            "reads +0.0239 against a real band of −0.08 to 0.06, so it "
+            "is in band. Earlier presets did not. "
+            "<code style=\"font-size:12px\">pt-v1</code> ships the same knob "
+            "at 0.25, thirteen times higher, and measures +0.249, which is "
+            "ten times the shipped figure and outside the band rather than "
+            "inside it.",
+        ),
+        (
+            "<span style=\"font:400 11px/1.5 var(--font-mono);color:var("
+            "--faint)\">pt-v3: 30 seeds, 40 instruments, 252 days. pt-v1: "
+            "median of six seeds, Universe.random(40, seed=111), 252 days, "
+            "sim seeds 1-6.</span>",
+            "<span style=\"font:400 11px/1.5 var(--font-mono);color:var("
+            "--faint)\">pt-v12: the certified panel, 30 seeds, 40 "
+            "instruments, 252 days. pt-v1: median of six seeds, "
+            "Universe.random(40, seed=111), 252 days, sim seeds 1-6.</span>",
+        ),
+        (
+            "# 1.\n30 4c1e9f77a3b8d502\npt-v3\n\n# 2.",
+            "# 1.\n30 4c1e9f77a3b8d502\npt-v12\n\n# 2.",
+        ),
+        # -- The agent harness -------------------------------------------
+        (
+            "as one of the seven names in",
+            "as one of the nine names in",
+        ),
+        (
+            "<span title=\"Shapes and field names are real; the numeric "
+            "values were composed for the example.\" style=\"font:500 "
+            "9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:"
+            "5px;padding:3px 6px;margin-left:8px;color:var(--codemut);"
+            "border:1px solid var(--codeline)\">ILLUSTRATIVE</span></div>\n"
+            "          <pre style=\"padding:13px 16px;overflow-x:auto\">"
+            "<code data-lang=\"txt\" style=\"font:400 12.5px/1.75 "
+            "var(--font-mono);color:var(--codemut)\">"
+            "value              +3.14%  trades=  75 errors=0 why=0.35\n"
+            "buy_and_hold       +1.02%  trades=  30 errors=0 why=None\n"
+            "momentum           +8.77%  trades= 240 errors=0 why=None\n"
+            "mean_reversion     -1.44%  trades= 240 errors=0 why=None\n"
+            "oracle            +42.10%  trades= 240 errors=0 why=1.0"
+            "</code></pre>",
+            "<span title=\"Captured from the run named beside this block.\" "
+            "style=\"font:500 "
+            "9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:"
+            "5px;padding:3px 6px;margin-left:8px;color:var(--tks);"
+            "border:1px solid var(--tks)\">MEASURED</span></div>\n"
+            "          <pre style=\"padding:13px 16px;overflow-x:auto\">"
+            "<code data-lang=\"txt\" style=\"font:400 12.5px/1.75 "
+            "var(--font-mono);color:var(--codemut)\">"
+            "value             -19.99%  trades=   5 errors=56 why=0.0\n"
+            "buy_and_hold       -5.01%  trades=  30 errors=0 why=None\n"
+            "random             -2.70%  trades=3583 errors=0 why=None\n"
+            "momentum           +0.26%  trades=1485 errors=0 why=None\n"
+            "mean_reversion    +13.44%  trades=1606 errors=0 why=None\n"
+            "oracle            +15.68%  trades=1124 errors=0 why=1.0"
+            "</code></pre>",
+        ),
+        (
+            "<p>Read <code style=\"font-size:13px\">errors</code> first. A "
+            "silent guard bug shows up as a suspiciously low "
+            "<code style=\"font-size:13px\">trades</code> count with an "
+            "empty error list, which is the trap at the top of this page. "
+            "Then remember the oracle reads the true mispricing, so it is a "
+            "reference rather than a competitor, and one seed ranks the seed "
+            "as much as the agents. Take it to "
+            "<a href=\"#/simulate\">many markets</a> before you believe an "
+            "ordering.</p>",
+            "<p style=\"font:400 12px/1.6 var(--font-mono);color:var(--faint)"
+            ";margin:10px 0 14px\">Measured: pretium 0.3.0, pt-v12, the code "
+            "above it run verbatim. Nothing is edited, which is the point of "
+            "the block.</p>\n        "
+            "<p>Read <code style=\"font-size:13px\">errors</code> first, and "
+            "both failure shapes are in front of you. The QUIET one is a "
+            "guard bug: a suspiciously low "
+            "<code style=\"font-size:13px\">trades</code> count with an "
+            "EMPTY error list, which is the trap at the top of this page. "
+            "The LOUD one is the <code style=\"font-size:13px\">value</code> "
+            "row here, 5 trades against 56 errors, every one of them "
+            "<code style=\"font-size:12.5px\">trade would take leverage to "
+            "N above the 2.00x limit</code>. Sizing at 2% of average volume "
+            "across five names asks for far more than a $1,000,000 account "
+            "can carry, so the harness rejects the order instead of filling "
+            "it. That agent is not a bad strategy, it is an unsized one, and "
+            "its <code style=\"font-size:13px\">why=0.0</code> is the same "
+            "story: it answers "
+            "<code style=\"font-size:12.5px\">\"reversion\"</code> every day "
+            "whatever moved. "
+            "Then remember the oracle reads the true mispricing, so it is a "
+            "reference rather than a competitor, and one seed ranks the seed "
+            "as much as the agents. Take it to "
+            "<a href=\"#/simulate\">many markets</a> before you believe an "
+            "ordering.</p>",
+        ),
+    ]
+    for old, new in swaps:
+        if old not in doc:
+            sys.exit("the design bundle reworded a guide-page passage "
+                     f"that apply_guide_fixes corrects: {old[:70]!r}")
+        doc = doc.replace(old, new, 1)
+
+    # -- An LLM agent ----------------------------------------------------
+    # Twice in the bundle, and the subtitle occurrence is also the source of
+    # four head-tag descriptions, so this one replaces every occurrence
+    # rather than the first.
+    if "examples/claude_agent.py" not in doc:
+        sys.exit("the design bundle no longer names examples/claude_agent.py; "
+                 "apply_guide_fixes would silently skip the path correction")
+    doc = doc.replace("examples/claude_agent.py", "examples/08-claude-agent.py")
+    return doc
+
+
+def apply_api_fixes(doc: str) -> str:
+    """Bring the four API reference pages onto the shipped surface.
+
+    These pages are the ones a reader consults to decide what a call
+    returns, so a stale figure here is not a stale anecdote: it is a wrong
+    answer about the installed wheel. The bundle was authored in the pt-v3
+    era and the four pages still described that era's panel size, gap
+    count, default preset, variance clamp and volume verdict.
+
+    Every replacement below is checked against the installed package rather
+    than against another page, and every one asserts: a bundle revision that
+    reworded any of them fails the build instead of silently restoring the
+    pt-v3 reading.
+    """
+    swaps = [
+        # ── api-core ────────────────────────────────────────────────────
+        # bars() has two grains, not four. `minutes=` is the third spelling
+        # and it is an aggregation of tick grain rather than a grain of its
+        # own, which is why the two cannot be passed together. Measured:
+        # grain="hour"/"minute"/"5min"/"week" each raise `unknown grain
+        # "...". Valid: "tick", "day", or minutes=N`, and grain= with
+        # minutes= raises `pass either minutes or grain, not both`.
+        # docs/schemas.html already said this; the API page did not.
+        (
+            'bars(grain="day")</sc-raw-td><sc-raw-td>OHLCV as Arrow. '
+            "Four granularities.</sc-raw-td>",
+            'bars(grain="day")</sc-raw-td><sc-raw-td>OHLCV as Arrow. Two '
+            'grains, <code style="font-size:12px">"tick"</code> and '
+            '<code style="font-size:12px">"day"</code>, plus '
+            '<code style="font-size:12px">minutes=N</code> to bucket ticks '
+            "into bars of that many minutes. Any other grain raises, and "
+            "grain and minutes cannot both be passed.</sc-raw-td>",
+        ),
+        # Sectors are assigned round-robin over the twelve, so the per-sector
+        # count is n/12 and only n=60 divides evenly. Measured:
+        # Counter(i.sector for i in Universe.random(40, seed=111)) is four
+        # sectors of 4 and eight of 3; at n=60 it is twelve of 5. The
+        # certified roster is the 40-name one, so the wrong version of this
+        # sentence described a roster nobody runs.
+        (
+            "Generated roster, five names per sector, plausible "
+            "fundamentals. The universe seed is a separate input domain "
+            "from the simulation seed.",
+            "Generated roster, plausible fundamentals. Sectors are handed "
+            "out round-robin over the twelve, so each holds n/12 names give "
+            "or take one: the certified 40-name roster puts four in four "
+            "sectors and three in the other eight, and only n=60 gives five "
+            "each. The universe seed is a separate input domain from the "
+            "simulation seed.",
+        ),
+        # ── api-realism ─────────────────────────────────────────────────
+        # The panel grew to fourteen on 2026-08-25. This row is the
+        # reference for the function that returns it.
+        (
+            "Run a market and report the ten-statistic panel. Carries model "
+            "and universe fingerprints.",
+            "Run a market and report the fourteen-statistic panel. Carries "
+            "model and universe fingerprints.",
+        ),
+        # STRUCTURAL is five statistics, not one, and "unreachable" is a
+        # withdrawn claim. `pretium/loss.py` states the rule the row was
+        # getting backwards: membership is about the OBJECTIVE, not about
+        # reachability, and two of the five are now held in band by the
+        # shipped preset (volume_change_acf1 -0.2656 against -0.32 to
+        # -0.20, sector_excess_corr 0.2079 against 0.11 to 0.23).
+        (
+            "Loss membership as data: five targets, four constraints, and "
+            "the unreachable statistic reported in every result and "
+            "excluded from the objective.",
+            "Loss membership as data: five targets, four constraints, and "
+            "the five STRUCTURAL statistics reported in every result and "
+            "excluded from the objective. Membership is about the "
+            "objective, not about reachability: two of those five, "
+            "volume_change_acf1 and sector_excess_corr, were called "
+            "structurally unreachable until 0.2.0 and the shipped preset "
+            "holds both in band at the certified horizon.",
+        ),
+        # Five gaps since the volume-change gap retired at 0.3.0.
+        (
+            "The six measured gaps with what each forbids, and the whole "
+            "list as a plain mapping for a manifest.",
+            "The five measured gaps with what each forbids, and the whole "
+            "list as a plain mapping for a manifest.",
+        ),
+        # envelope.PRESET is pt-v12. The row's own advice is to compare your
+        # install against this value, so naming a two-boundary-old preset
+        # told every correct install that it disagreed with the docs.
+        (
+            "252, and pt-v3. If your installed preset differs, check() says "
+            "so rather than answering.",
+            "252, and pt-v12. If your installed preset differs, check() "
+            "says so rather than answering.",
+        ),
+        # ── api-params ──────────────────────────────────────────────────
+        # The ceiling is 32x, not 8x. The clamp binds where the coupled
+        # target reaches it: target = base * (1 - c + c*(vix/anchor)^2), so
+        # with the shipped c = 0.9540 and anchor 15 it binds at VIX 86.8 on
+        # pt-v12 and bound at VIX 43.3 on pt-v3's 8x. "Above about 42" was
+        # the 8x number, which is why the guidance had to move with it.
+        (
+            "Clamps on the factor variance. The 8x ceiling is why pinning "
+            "VIX above about 42 buys almost no extra volatility.",
+            "Clamps on the factor variance. pt-v12 ships the ceiling at 32x "
+            "baseline where pt-v3 had 8x, which is a physical number rather "
+            "than a fitted one: a real record VIX of 82.7 against this "
+            "model's anchor of 15 is a variance ratio of 30, and anything "
+            "lower stops the market reaching the variance a real record "
+            "implies. With the shipped VIX coupling the clamp binds around "
+            "VIX 87, where on pt-v3's 8x it bound around 43.",
+        ),
+        # 5.2 at 504 days is the pt-v3 reading, and pt-v3 is the last preset
+        # with both jump intensities at 0.0, so no jump fires on it.
+        # (`jump_momentum_share` is 1.0 there, which is why the claim is
+        # about the intensities and not about every jump coefficient.) The
+        # shipped pt-v12 reads 7.7528 against the same 7.1 to 22 band, which
+        # is in band -- `envelope.MEASURED_504["excess_kurtosis"]` and
+        # `BANDS_504`. Stated in the present tense, the sentence claimed the
+        # shipped model still fails the statistic jumps were added to fix.
+        (
+            "Without jumps, prices only diffuse, and nothing ever gaps. "
+            "That is why 504-day kurtosis reads 5.2 against a real 7.1 to "
+            "22: fat tails at that scale need surprises.",
+            "Without jumps, prices only diffuse, and nothing ever gaps. "
+            "That is why 504-day kurtosis read 5.2 against a real 7.1 to 22 "
+            "on pt-v3, the last preset with both jump intensities at zero, "
+            "so no jump ever fired: fat tails at that scale need surprises. "
+            "With them live the shipped pt-v12 reads 7.7528 there, inside "
+            "the band.",
+        ),
+        # No statistic fails structurally now. volume_change_acf1 reads
+        # -0.2656 at 252 days against -0.32 to -0.20 and -0.2572 at 504
+        # against -0.29 to -0.21, and the gap that named it is retired, so
+        # the machinery is described by what it achieved rather than by a
+        # failure the project withdrew two releases ago.
+        (
+            "A shared day-to-day volume process, so a busy day is followed "
+            "by a busy day. This is the machinery aimed at the one "
+            "structurally failed statistic: without a volume process, "
+            "day-to-day volume changes are pure noise and their "
+            "autocorrelation sits near −0.5 at any coefficients."
+            "</sc-raw-td></sc-raw-tr>",
+            "A shared day-to-day volume process, so a busy day is followed "
+            "by a busy day. This is the machinery that made "
+            "volume_change_acf1 reachable: without a volume process, "
+            "day-to-day volume changes are pure noise and their "
+            "autocorrelation sits near −0.5 at any coefficients. It was "
+            "called structurally unreachable until 0.2.0 and it is not. "
+            "pt-v12 reads −0.2656 at 252 days against a band of "
+            "−0.32 to −0.20 and −0.2572 at 504 against "
+            "−0.29 to −0.21, and the gap that named it is "
+            "retired.</sc-raw-td></sc-raw-tr>\n            "
+            '<sc-raw-tr><sc-raw-td style="font-family:var(--font-mono);'
+            "font-size:12.5px\">volume_move_response · volume_move_cap "
+            "· volume_move_floor · volume_move_noise"
+            "</sc-raw-td><sc-raw-td>How much more a name trades per one "
+            "percent it has moved today, where that response saturates, the "
+            "baseline it sits on, and the return-unrelated noise around it. "
+            "The cap is the whole of pt-v12: at the 4.0 every preset from "
+            "pt-v1 to pt-v11 shipped, a name that fell twelve percent "
+            "traded exactly as much as one that fell four, so every crisis "
+            "session was pinned to one value and contributed no covariance "
+            "at all. Raising it to 12.0, roughly where a real exchange "
+            "starts halting, took the 504-day panel from 13/14 in band to "
+            "14/14 and the held-out universe from 13/14 to 14/14, and cost "
+            "nothing else measured.</sc-raw-td></sc-raw-tr>",
+        ),
+    ]
+    for old, new in swaps:
+        if old not in doc:
+            sys.exit("the design bundle reworded an API-page passage that "
+                     f"apply_api_fixes corrects: {old[:70]!r}")
+        doc = doc.replace(old, new, 1)
+    return api_params_subtitle(doc)
+
+
+def api_params_subtitle(doc: str) -> str:
+    """Stop the model-parameters page promising a completeness it lacks.
+
+    The page's subtitle said "Every runtime-settable coefficient". It was
+    true when the bundle was authored and the surface has grown past it
+    twice since: `ModelParams.settable()` returns 87 names at 0.3.0, up
+    from 70 at 0.2.0, and the page carries rows for a little over half of
+    them. The single most conspicuous absence was `volume_move_cap`, which
+    is the entire subject of the 0.3.0 release; the row above adds it, and
+    this counts what is actually there afterwards rather than asserting a
+    number that drifts the next time the surface moves.
+    """
+    from pretium import ModelParams
+
+    start = doc.index('data-page="api-params"')
+    end = doc.index('data-page="', start + 1)
+    page = doc[start:end]
+    names = sorted(ModelParams.settable())
+    shown = sum(1 for n in names if re.search(r"\b" + re.escape(n) + r"\b", page))
+
+    old = (
+        "Every runtime-settable coefficient and what it controls. "
+        '<code style="font-size:14px">pt.ModelParams.settable()</code> lists '
+        "this surface from your installed wheel; this page explains it."
+    )
+    if old not in doc:
+        sys.exit("the model-parameters subtitle was reworded; "
+                 "api_params_subtitle would ship a false completeness claim")
+    # Scope first, pointer second: `description_for` cuts the meta
+    # description at 155 characters, and the half a reader sees in a search
+    # result should be the honest one.
+    new = (
+        f"What each model coefficient controls. This page explains the "
+        f"{shown} coefficients that most often get changed; "
+        '<code style="font-size:14px">pt.ModelParams.settable()</code> is '
+        f"the complete list and returns all {len(names)} from your installed "
+        "wheel, up from 70 at 0.2.0."
+    )
+    return doc.replace(old, new, 1)
+
+
+def apply_reference_fixes(doc: str) -> str:
+    """Correct the four reference pages: MCP, install, schemas and wasm.
+
+    They are grouped because they share one cause. The bundle was authored
+    against three RNG streams, seven attribution columns, six named gaps,
+    54 settable coefficients and a smaller wasm binary, and every one of
+    those moved without the pages moving with them. Each is also a number a
+    reader is invited to check against their own install, which is the kind
+    that costs something when it is wrong.
+
+    The MCP entries are the sharpest, because that page's own argument is
+    that "a hardcoded caveat is how a caveat becomes false" and the box
+    making the argument carried a hardcoded pt-v3 figure two eras old. The
+    server composes that sentence at call time from `envelope.CERTIFIED`
+    and `facts.REAL_MARKETS` (`_statistic_line` in `python/pretium/mcp.py`),
+    so the sample output now carries what that expression yields on 0.3.0
+    rather than a paraphrase naming a preset the tool never emits.
+
+    The wasm sizes are measured rather than converted: `tools/wasm/build.sh`
+    prints the raw and gzip figures itself, and the 0.3.0 artefact is
+    204,290 bytes raw and 72,981 gzipped, with brotli -q 11 at 60,285. No
+    unit convention recovers the bundle's 182 / 68 / 56 KB.
+    """
+    swaps = [
+        # -- MCP ---------------------------------------------------------
+        # `pt.model_preset()["name"]` -> pt-v12, and evaluating mcp.py's own
+        # `_statistic_line("return_acf1")` against the live envelope gives
+        # "return_acf1 measures 0.0239 against a real-market band of -0.08
+        # to 0.06 (in band) at the certified 252-day horizon".
+        #
+        # The re-measured median the box also quoted, 0.0485, has no
+        # recorded provenance anywhere in the repository, so it is dropped
+        # rather than restated under a new preset. The box is about the
+        # mechanism, and the last sentence now names the mechanism.
+        (
+            "The shipped <code style=\"font-size:12px\">pt-v3</code> certifies "
+            "0.0375, and re-measuring across the README's own published "
+            "method gives a median of 0.0485. Both sit comfortably inside "
+            "the real-market band of −0.08 to 0.06, and both are about a "
+            "fifth of the quoted figure.",
+            "The default has moved twice since that was written, from "
+            "<code style=\"font-size:12px\">pt-v3</code> to "
+            "<code style=\"font-size:12px\">pt-v10</code> at 0.2.0 and on to "
+            "<code style=\"font-size:12px\">pt-v12</code> at 0.3.0, which "
+            "certifies 0.0239: comfortably inside the real-market band of "
+            "−0.08 to 0.06, and about a tenth of either quoted figure. This "
+            "server never types that number. It reads it out of "
+            "<code style=\"font-size:12px\">envelope.CERTIFIED</code> on every "
+            "call, so the sentence moves when the preset moves.",
+        ),
+        # The badge over this block warrants that "shapes and field names
+        # are real". This caveat's shape was not: the server builds it from
+        # `_statistic_line`, which names no preset and quotes no band edge
+        # of its own. Replaced with what that expression yields on 0.3.0,
+        # verbatim.
+        (
+            "    \"MOMENTUM SIGNAL: returns here autocorrelate at +0.0375 at "
+            "lag\n     one (pt-v3, band -0.08 to 0.06) and real equities sit "
+            "near\n     zero. A momentum edge measured here is partly an "
+            "artefact of\n     the mispricing process and will not "
+            "transfer.\",",
+            "    \"This strategy trades a return-continuation or reversal "
+            "signal,\n     so its edge depends on the simulator's return "
+            "autocorrelation:\n     return_acf1 measures 0.0239 against a "
+            "real-market band of\n     -0.08 to 0.06 (in band) at the "
+            "certified 252-day horizon.\",",
+        ),
+        # len(pt.ModelParams.settable()) -> 87 at 0.3.0. 54 predates the
+        # 0.1.4, 0.2.0 and 0.3.0 additions; CHANGELOG.md records the last
+        # leg of that, 70 -> 87.
+        (
+            "<strong style=\"color:var(--fg)\">The 54 model coefficients."
+            "</strong>",
+            "<strong style=\"color:var(--fg)\">The 87 model coefficients."
+            "</strong>",
+        ),
+        # len(pretium.envelope.GAPS) -> 5. The volume-change gap retired at
+        # 0.3.0 because pt-v12 holds that row at both horizons.
+        (
+            "A sector-concentrated roster is one of the six named envelope "
+            "gaps, and this is what makes it askable.",
+            "A sector-concentrated roster is one of the five named envelope "
+            "gaps, and this is what makes it askable.",
+        ),
+        # -- schemas -----------------------------------------------------
+        # The `truth()` table promised nine factors and listed seven. The
+        # live Arrow schema on 0.3.0 ends random_noise, circuit_breaker,
+        # jump, and `Engine.FACTORS` is the same nine in the same order.
+        # Without the last two the columns do not sum to the change in
+        # mispricing_s on any day a jump lands or the breaker binds, which
+        # is exactly the day a reader is checking.
+        (
+            "reversion · momentum · crowd_lean · company_news "
+            "· order_flow_impact · short_squeeze_effect · "
+            "random_noise",
+            "reversion · momentum · crowd_lean · company_news "
+            "· order_flow_impact · short_squeeze_effect · "
+            "random_noise · circuit_breaker · jump",
+        ),
+        (
+            "A name that did not tick has zeros across the seven and keeps "
+            "its last two level values",
+            "A name that did not tick has zeros across the nine and keeps "
+            "its last two level values",
+        ),
+        # -- install -----------------------------------------------------
+        # The sentence says three; the table under it has five rows:
+        # package version, model preset, known-answer baseline,
+        # SPEC_VERSION and RNG derivation.
+        (
+            "What has a stated policy is the simulated output, and it has "
+            "three independent version numbers:",
+            "What has a stated policy is the simulated output, and it has "
+            "five independent version numbers:",
+        ),
+        # len(engine.state_snapshot()["rng"]) -> 21 on 0.3.0: three words
+        # for each of the seven streams `set_rng_state` restores in
+        # rust/src/python_engine.rs -- market, economy, external, jumps,
+        # volume, news, volume_idio. The accepted lengths there are
+        # 9 | 12 | 15 | 18 | 21, and only a 3 is refused.
+        (
+            "A checkpoint carries nine RNG numbers: state, increment and "
+            "Box-Muller spare for each of the three streams. A pre-split "
+            "snapshot with three numbers is refused on restore with its era "
+            "named, because it froze a single-stream market this version "
+            "cannot continue bit-exactly.",
+            "A checkpoint carries twenty-one RNG numbers: state, increment "
+            "and Box-Muller spare for each of the seven streams, which are "
+            "market, economy, external, jumps, volume, news and per-name "
+            "volume. It carried nine when there were three streams and grew "
+            "by three each time a mechanism got its own, so restore reads "
+            "the era off the length: nine, twelve, fifteen and eighteen all "
+            "still restore, keeping this engine's seed-derived position for "
+            "the streams the snapshot predates, which is what lets a "
+            "checkpoint written before a mechanism existed replay as it did "
+            "then. Only a pre-split snapshot with three numbers is refused, "
+            "with its era named, because it froze a single-stream market "
+            "this version cannot continue bit-exactly.",
+        ),
+        # pyproject.toml:14 and rust/Cargo.toml:11 both read
+        # `license = "MIT OR Apache-2.0"`, and LICENSE-APACHE and
+        # LICENSE-MIT both sit at the repository root. Naming one of them
+        # takes away an option the reader is entitled to.
+        (
+            "Issues and pull requests go there. Licensed Apache-2.0.",
+            "Issues and pull requests go there. Licensed MIT OR Apache-2.0, "
+            "at your option.",
+        ),
+        (
+            "<span style=\"font-size:12.5px;color:var(--faint)\">Apache-2.0"
+            "</span>",
+            "<span style=\"font-size:12.5px;color:var(--faint)\">MIT OR "
+            "Apache-2.0</span>",
+        ),
+        # -- wasm size ---------------------------------------------------
+        # Measured on the committed 0.3.0 artefact,
+        # rust/target/wasm32-unknown-unknown/release/pretium.wasm, which
+        # `strings` confirms carries 0.3.0:
+        #   wc -c              -> 204290
+        #   gzip -9 -c | wc -c ->  72981
+        #   brotli -q 11 -c    ->  60285
+        # Byte counts rather than rounded KB, because the bundle's KB
+        # figures are unrecoverable under either convention and the raw and
+        # gzip lines are exactly what tools/wasm/build.sh prints.
+        (
+            "<sc-raw-td style=\"font-family:var(--font-mono);font-size:12.5px\""
+            ">182 KB</sc-raw-td>",
+            "<sc-raw-td style=\"font-family:var(--font-mono);font-size:12.5px\""
+            ">204,290 bytes</sc-raw-td>",
+        ),
+        (
+            "<sc-raw-td style=\"font-family:var(--font-mono);font-size:12.5px\""
+            ">68 KB</sc-raw-td>",
+            "<sc-raw-td style=\"font-family:var(--font-mono);font-size:12.5px\""
+            ">72,981 bytes</sc-raw-td>",
+        ),
+        (
+            "<sc-raw-td style=\"font-family:var(--font-mono);font-size:12.5px\""
+            ">56 KB</sc-raw-td>",
+            "<sc-raw-td style=\"font-family:var(--font-mono);font-size:12.5px\""
+            ">60,285 bytes</sc-raw-td>",
+        ),
+        (
+            "Smaller than most JavaScript charting libraries, for a whole "
+            "market simulator with an order book in it.",
+            "About 200 KiB raw and 71 KiB gzipped, for a whole market "
+            "simulator with an order book in it. Measured on the 0.3.0 "
+            "artefact <code style=\"font-size:13px\">tools/wasm/build.sh</code> "
+            "produces: the script prints the raw and gzip figures itself, "
+            "and the brotli line is "
+            "<code style=\"font-size:13px\">brotli -q 11</code> over the same "
+            "file.",
+        ),
+        (
+            "that build produces a digest identical to the native one: 182 "
+            "KB raw, 68 KB gzipped.",
+            "that build produces a digest identical to the native one, and "
+            "at 0.3.0 it is 204,290 bytes raw and 72,981 gzipped.",
+        ),
+        (
+            "A 68 KB WebAssembly build whose digest matches the native one "
+            "exactly, so a permalink gives every viewer the same market.",
+            "A 73 KB gzipped WebAssembly build whose digest matches the "
+            "native one exactly, so a permalink gives every viewer the same "
+            "market.",
+        ),
+    ]
+    for old, new in swaps:
+        if old not in doc:
+            sys.exit("the design bundle reworded a reference-page passage "
+                     f"that apply_reference_fixes corrects: {old[:70]!r}")
+        doc = doc.replace(old, new, 1)
+    return doc
+
+
 def nav_html(pages: list[dict], current: str) -> str:
     items = []
     for p in pages:
@@ -1879,6 +2952,16 @@ def nav_html(pages: list[dict], current: str) -> str:
                 f'<li><a href="{page_url(p["slug"])}">{html.escape(p["label"])}</a></li>'
             )
     return "<ul>" + "".join(items) + "</ul>"
+
+
+def _og_dates(page: dict) -> str:
+    published, modified = seo.page_dates(page["slug"])
+    out = []
+    if published:
+        out.append(f'<meta property="article:published_time" content="{published}">')
+    if modified:
+        out.append(f'<meta property="article:modified_time" content="{modified}">')
+    return "\n".join(out)
 
 
 STATIC_CSS = """
@@ -1915,12 +2998,16 @@ footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
 
 def build_static_page(page: dict, pages: list[dict], css: str) -> str:
     desc = description_for(page)
-    title = f"{page['h1']} · {SITE_NAME}"
+    title = f"{seo.title(page['slug'], page['h1'])} · {SITE_NAME}"
     content = clean_content(page["html"])
     # Give wide tables their own scroll container so the page body never
     # scrolls sideways on a phone.
     content = re.sub(r"<table", '<div class="tablewrap"><table', content)
     content = re.sub(r"</table>", "</table></div>", content)
+    # Visible questions, and the matching FAQPage markup in the head. Marked-up
+    # questions that do not appear on the page are a structured data
+    # violation, so these are rendered as well as declared.
+    content += seo.faq_html(page["slug"])
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1931,11 +3018,12 @@ def build_static_page(page: dict, pages: list[dict], css: str) -> str:
 <link rel="canonical" href="{absolute(page['slug'])}">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="{SITE_NAME}">
-<meta property="og:title" content="{html.escape(page['h1'], quote=True)}">
+<meta property="og:title" content="{html.escape(seo.title(page['slug'], page['h1']), quote=True)}">
 <meta property="og:description" content="{html.escape(desc, quote=True)}">
 <meta property="og:url" content="{absolute(page['slug'])}">
+{_og_dates(page)}
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="{html.escape(page['h1'], quote=True)}">
+<meta name="twitter:title" content="{html.escape(seo.title(page['slug'], page['h1']), quote=True)}">
 <meta name="twitter:description" content="{html.escape(desc, quote=True)}">
 {json_ld(page, desc)}
 {FAVICON_LINKS}
@@ -2021,43 +3109,12 @@ def build_index(bundle: str, pages: list[dict]) -> str:
     return out.replace("<body>", "<body>\n" + noscript, 1)
 
 
-def _last_content_change() -> str:
-    """The date the published content last moved, as W3C YYYY-MM-DD.
-
-    Taken from the last commit touching docs/ or this script rather than from
-    the clock, so rebuilding without changing anything does not churn every
-    lastmod and tell Google 24 pages changed when none did. Falls back to
-    omitting the field, which is valid, if git is unavailable.
-    """
-    import subprocess
-
-    try:
-        out = subprocess.run(
-            ["git", "log", "-1", "--format=%cs", "--", "docs", __file__],
-            cwd=ROOT, capture_output=True, text=True, timeout=10, check=True,
-        )
-        return out.stdout.strip()
-    except Exception:
-        return ""
-
-
 def build_sitemap(pages: list[dict]) -> str:
-    lastmod = _last_content_change()
-    stamp = f"<lastmod>{lastmod}</lastmod>" if lastmod else ""
-    urls = "".join(
-        f"<url><loc>{absolute(p['slug'])}</loc>{stamp}"
-        f"<priority>{'1.0' if p['slug'] == 'home' else '0.8'}</priority></url>"
-        for p in pages
-    )
-    return (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
-        f"{urls}</urlset>\n"
-    )
+    return seo.build_sitemap(pages, absolute, BASE_URL)
 
 
 def build_robots() -> str:
-    return f"User-agent: *\nAllow: /\n\nSitemap: {BASE_URL}/sitemap.xml\n"
+    return seo.build_robots(BASE_URL)
 
 
 def main() -> None:
@@ -2065,12 +3122,23 @@ def main() -> None:
     doc = inner_document(bundle)
     css = design_css(doc)
     pages = split_pages(doc)
+    seo.check_descriptions(pages)
 
     OUT.mkdir(exist_ok=True)
     (OUT / ".nojekyll").write_text("", encoding="utf-8")
     (OUT / "index.html").write_text(build_index(bundle, pages), encoding="utf-8")
     (OUT / "sitemap.xml").write_text(build_sitemap(pages), encoding="utf-8")
     (OUT / "robots.txt").write_text(build_robots(), encoding="utf-8")
+    (OUT / "envelope.html").write_text(
+        seo.envelope_page(BASE_URL, REPO_URL, VERSION), encoding="utf-8"
+    )
+    (OUT / "llms.txt").write_text(
+        seo.build_llms(pages, VERSION, BASE_URL, absolute), encoding="utf-8"
+    )
+    (OUT / "llms-full.txt").write_text(
+        seo.build_llms_full(pages, VERSION, BASE_URL, absolute, seo.plain_text),
+        encoding="utf-8",
+    )
 
     written = 0
     for page in pages:
@@ -2083,8 +3151,17 @@ def main() -> None:
 
     print(f"index.html          {len((OUT / 'index.html').read_bytes()):>9,} bytes")
     print(f"static pages        {written}")
-    print(f"sitemap entries     {len(pages)}")
+    # len(pages) is 24 and the sitemap now carries 50: the pages, the
+    # envelope landing page, and the 25 markdown docs that Pages was already
+    # serving unlisted. Counting the pages here reported a number that was
+    # true before this build and misleading after it.
+    _urls = (OUT / "sitemap.xml").read_text(encoding="utf-8").count("<url>")
+    print(f"sitemap entries     {_urls}  ({len(pages)} pages + envelope + "
+          f"{len(seo.markdown_docs())} markdown)")
     print(f"analytics           {GA_MEASUREMENT_ID or 'not configured'}")
+    print(f"markdown docs       {len(seo.markdown_docs())} listed")
+    print(f"llms.txt            {len((OUT / 'llms.txt').read_bytes()):>9,} bytes")
+    print(f"llms-full.txt       {len((OUT / 'llms-full.txt').read_bytes()):>9,} bytes")
 
 
 if __name__ == "__main__":

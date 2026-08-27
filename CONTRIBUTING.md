@@ -39,15 +39,38 @@ unusable.
 ## Tests
 
 ```bash
-pytest tests/                                   # Python, ~1000 tests
+pytest tests/                                   # Python, ~1350 tests
 cargo test --manifest-path rust/Cargo.toml      # Rust, including parity
 python tests/known_answer.py                    # the determinism digest
 ```
 
-Some suites are opt-in because they need something the default install does
-not have, such as `pyarrow`, `gymnasium` or the `mcp` package. They skip
-cleanly rather than failing. `PRETIUM_SLOW_TESTS=1` enables a handful that run a
-full 252-day evaluation.
+The count is there so you can tell a finished run from one that quietly
+collected half of itself. At `ca4fa6a` the suite collected 1,358 tests and a
+full run was 1321 passed and 37 skipped in 204s. Two things move that number
+without anything being wrong. `tests/test_tool_help.py` parametrises over
+`tools/calibration/*.py`, so adding a tool adds a test: one landed after
+`ca4fa6a` and the tree now collects 1,359. And `tests/test_mcp.py` and
+`tests/test_mcp_integration.py` call `pytest.importorskip("mcp")` at module
+level, so without the `mcp` extra their 93 tests never enter the count at all
+and collection reports 1,266 -- a missing extra shows up as a smaller total,
+not as a column of skips.
+
+Some suites are opt-in and skip cleanly rather than failing. Three different
+reasons put a test in the skip column and it is worth knowing which you are
+looking at: an optional import the default install does not have (`pyarrow`,
+`gymnasium`, `numpy`, `nbformat` and `nbclient`, the `mcp` extra), an
+artifact that is not in your tree (the Rust golden corpus, stored sweep
+results), or `PRETIUM_SLOW_TESTS` being unset. Only the last is a choice you
+made.
+
+`PRETIUM_SLOW_TESTS=1` adds two things: the example notebooks, which are
+executed rather than read (`tests/test_examples.py` holds 21 tests over eight
+notebooks and two scripts, 19 of them behind the flag -- the two script
+syntax checks run on every pass, because a rename that missed a reference
+should fail whether or not you remembered the flag), and the one MCP test
+that runs a full 252-day evaluation. That test costs what it costs because
+the only way to show a result AT the certified horizon is not a slice of a
+shorter one is to reach the horizon.
 
 The Rust parity suites compare against golden vectors generated from the
 reference implementation. They are the evidence for the port being
@@ -77,8 +100,16 @@ it was tried. If you remove a guard that looks redundant, check whether its comm
 says what happened last time.
 
 Numbers in prose carry their measurement. "Roughly a quarter" is a
-convention; "0.0375 against a band of −0.08 to 0.06, thirty seeds at 252
-days" is a measurement. Only the second kind belongs in a docstring.
+convention; "0.0239 against a band of -0.08 to 0.06, thirty seeds at 252
+days" is a measurement. Only the second kind belongs in a docstring. That
+one is `return_acf1` on the shipped preset, and you can read both halves of
+it back out of `pretium.envelope.CERTIFIED` and `pretium.facts.REAL_MARKETS`
+rather than taking this file's word for it.
+
+Punctuation is ASCII. No em dashes, en dashes, typographic minus signs or
+arrows, in prose or in a docstring: use ` -- ` and `-`. The minus sign is the
+one that bites, because it looks right and is a different character from the
+one in the number beside it.
 
 ## Reporting a determinism failure
 

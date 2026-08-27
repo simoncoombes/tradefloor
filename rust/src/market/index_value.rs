@@ -1,4 +1,4 @@
-//! Market-index arithmetic, ported from `src/lib/engine/market.ts:750`.
+//! Market-index arithmetic, ported from the reference implementation.
 //!
 //! **Tier 1: division and comparison only.**
 //!

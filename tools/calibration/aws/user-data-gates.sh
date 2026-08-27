@@ -12,8 +12,13 @@ shutdown -h +60
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates19
-BRANCH=main
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/gates21
+# `dev`, not `main`. Experimental model work lives on `dev` and is merged to
+# `main` in reviewed units; a calibration box should run what is being
+# EXPERIMENTED on. Pointing this at `main` is what forced a merge to main
+# before every launch, which is exactly the drip of half-measured commits
+# onto the release line that the dev branch exists to prevent.
+BRANCH=dev
 # 4000 is the tool default and what the 2026-08-25 survey actually ran:
 # 192000 tasks, about 2.4 hours on 94 workers at ~1385 tasks/min.
 SAMPLES=3000
@@ -106,11 +111,12 @@ setsid nohup /home/ec2-user/stream.sh "$BUCKET" >/var/log/pretium-stream.log 2>&
 cat > /home/ec2-user/candidates.json <<'CANDS'
 [
   {"label": "v12-control", "base": "pt-v12", "overrides": {}},
-  {"label": "pers0.90", "base": "pt-v12", "overrides": {"garch_beta": 0.7489001070794509, "garch_omega": 1.2226057932292347e-06}},
-  {"label": "pers0.93", "base": "pt-v12", "overrides": {"garch_beta": 0.7789001070794509, "garch_omega": 8.558240552604639e-07}},
-  {"label": "pers0.95", "base": "pt-v12", "overrides": {"garch_beta": 0.7989001070794508, "garch_omega": 6.113028966146181e-07}},
-  {"label": "pers0.96", "base": "pt-v12", "overrides": {"garch_beta": 0.8089001070794508, "garch_omega": 4.890423172916945e-07}},
-  {"label": "pers0.95 no-omega", "base": "pt-v12", "overrides": {"garch_beta": 0.7989001070794508}}
+  {"label": "w0.5 hl60", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.5, "market_vol_slow_persistence": 0.988514, "market_vol_slow_gain": 0.1}},
+  {"label": "w0.7 hl60", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.7, "market_vol_slow_persistence": 0.988514, "market_vol_slow_gain": 0.1}},
+  {"label": "w0.9 hl60", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.9, "market_vol_slow_persistence": 0.988514, "market_vol_slow_gain": 0.1}},
+  {"label": "w0.7 hl120", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.7, "market_vol_slow_persistence": 0.99424, "market_vol_slow_gain": 0.1}},
+  {"label": "w0.7 hl250", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.7, "market_vol_slow_persistence": 0.997231, "market_vol_slow_gain": 0.1}},
+  {"label": "w0.7 hl60 damp0.5", "base": "pt-v12", "overrides": {"market_vol_slow_weight": 0.7, "market_vol_slow_persistence": 0.988514, "market_vol_slow_gain": 0.1, "market_vol_slow_vix_damp": 0.5}}
 ]
 CANDS
 chown ec2-user:ec2-user /home/ec2-user/candidates.json

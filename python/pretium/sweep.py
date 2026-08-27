@@ -4,13 +4,15 @@
 returns TABLES, which are not small, and the whole point is that you never
 hold more than a few at once.
 
-The arithmetic that motivates it. One recorded engine keeps twelve f64 buffers
-of `days x ticks x instruments`; at 252 days, 390 ticks and 100 instruments
-that is 9.8 million elements per buffer, about 940 MB retained, and the `truth`
-table it materialises is 9.8 million rows of thirteen columns. A hundred seeds
-held at once is roughly ninety gigabytes. Streamed one at a time it is under a
-gigabyte, and the analysis is usually a reduction anyway (a mean, a
-regression, a count) that never needed the whole thing resident.
+The arithmetic that motivates it. One recorded engine keeps fourteen f64
+buffers of `days x ticks x instruments` -- price, volume, mispricing,
+fundamental and anchor, plus one per attribution component, and there are nine
+of those. At 252 days, 390 ticks and 100 instruments that is 9.8 million
+elements per buffer, about 1.10 GB retained, and the `truth` table it
+materialises is 9.8 million rows of fifteen columns. A hundred seeds held at
+once is roughly 110 gigabytes. Streamed one at a time it is a little over one,
+and the analysis is usually a reduction anyway (a mean, a regression, a count)
+that never needed the whole thing resident.
 
 ```python
 for seed, table in pt.sweep(range(100), universe=u, days=252, collect="truth"):
