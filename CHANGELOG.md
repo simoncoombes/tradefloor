@@ -47,6 +47,55 @@ never reached you, and a batched tick loop rolled that news afresh every
 minute. Both are fixed, and both paths now print identical prices. This only
 ever affected `pt-v11`, which was never the default.
 
+### What the envelope now permits, which is more than before
+
+The realism envelope states what this market is measured to do and what it
+is not. Three of its answers changed, and each one changes what you are
+entitled to conclude from a run.
+
+**A restriction is lifted.** There were six named gaps; there are now five.
+The `volume-change` gap forbade "strategies trading the day-to-day change in
+volume beyond one year", because that statistic sat outside its band at two
+years. `pt-v12` holds it inside at both horizons, so the gap is retired
+rather than reworded.
+
+**Two-year and five-year runs are now measured.** The envelope used to say
+that nothing beyond 504 days had been measured at all, so a five-year study
+was reading numbers nobody had checked. `pt-v12` is now measured at 756,
+1260 and 2520 days on thirty seeds. Nothing runs away and nothing drifts:
+annualised volatility year by year across ten years reads 31.5, 35.6, 30.2,
+33.5, 33.0, 33.1, 31.3, 32.4, 32.4 and 31.6 percent. The certified horizon is
+still 252 days, because that is where the certification is measured; what has
+changed is that the longer horizons are now numbers rather than silence.
+
+**The envelope transfers to a realistic roster.** It used to warn that
+certification was measured on a sector-balanced roster, which no real index
+is, and told you to re-measure on your own universe. Re-measured on `pt-v12`
+across thirty seeds and the full panel, every sector mix tested holds all
+fourteen statistics at one year: balanced, S&P-like, technology-heavy and
+defensive. Concentration costs the second year instead, through names in one
+industry correctly moving together more than a broad-market band expects.
+
+### Seventeen new settings
+
+`ModelParams` goes from 70 settable coefficients to 87. Nothing was removed
+and no default changed for an existing preset, so this is additive: every
+number below was a hard-coded constant before, and each one is now something
+you can vary and measure.
+
+The volume expression's four coefficients (`volume_move_cap`,
+`volume_move_response`, `volume_move_floor`, `volume_move_noise`) are the
+literals `pt-v12` came from. `crisis_blend_gain`, `sector_loading`,
+`sector_loading_beta_slope`, `news_peer_vix_coupling`, `jump_vix_coupling`
+and the two `endogenous_news_*` coefficients are what `pt-v11`'s crisis work
+came from. `volume_idio_*` and `garch_cascade_*` ship switched off: they are
+measured mechanisms that did not earn a place in the default, kept because a
+refuted mechanism with a measurement attached is worth more than a deleted
+one.
+
+`pt.ModelParams.settable()` lists them all, and every one has a docstring
+saying what it does and what measurement set it where.
+
 ### `pt-v11`: a crisis that behaves like one
 
 A selectable preset, and the base `pt-v12` is built on. It was not the
