@@ -140,9 +140,10 @@ days because that is where the certification is measured.
 
 Beyond two years the model has now been measured rather than assumed. At
 2520 days it holds ten of the fourteen against the (horizon-mismatched)
-two-year bands, and nothing runs away: volatility rises from 32.8% to 36.5%
-across a tenfold horizon extension. What it does do is drift slowly upward,
-which is written up as part of the horizon gap.
+two-year bands, and nothing runs away or drifts: measured year by year over
+ten years, annualised volatility reads 31.5, 35.6, 30.2, 33.5, 33.0, 33.1,
+31.3, 32.4, 32.4, 31.6 percent -- flat, with the year-to-year variation a
+real market has.
 
 **Five gaps are measured and named rather than assumed.** The certified
 horizon is 252 days; two and five-year panels are measured but not
