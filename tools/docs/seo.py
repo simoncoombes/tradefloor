@@ -274,26 +274,47 @@ def _git(args: list[str]) -> str:
         return ""
 
 
-def _page_source(slug: str) -> str:
-    """The published file whose history dates the page."""
-    return "docs/index.html" if slug == "home" else f"docs/{slug}.html"
+#: What a page is generated FROM. Every static page comes out of the design
+#: bundle through the builder, so these are the files whose history says when
+#: the page's content actually moved.
+PAGE_SOURCES = (
+    "tools/docs/design-bundle.html",
+    "tools/docs/build_site.py",
+    "tools/docs/seo.py",
+    "tools/docs/presets.py",
+    "tools/docs/preset-panel.json",
+)
+
+#: The release-notes page also renders CHANGELOG.md, so it moves when that
+#: moves even if nothing else did.
+EXTRA_SOURCES = {"releases": ("CHANGELOG.md",)}
 
 
 def page_dates(slug: str) -> tuple[str, str]:
     """(datePublished, dateModified) for one page, from git.
 
-    Taken from the history of the generated page rather than the clock, so a
-    rebuild that changes nothing does not tell a crawler that twenty four
-    pages changed today. The generated file is the right subject: it is what
-    is published, and it moves exactly when what a reader sees moves.
+    `dateModified` comes from the page's SOURCES, never from the generated
+    file. Reading it from the generated file does not converge: the build
+    writes today's date, committing that makes today the file's last commit,
+    and the next build writes a later date again. Every build-and-commit
+    cycle then produces a spurious diff across all 24 pages and tells a
+    crawler they all changed when none did, which is the exact failure the
+    single shared lastmod this replaced was written to avoid. It was
+    reintroduced here on 2026-08-27 and caught by rebuilding after a commit.
+
+    `datePublished` is safe to read from the generated file, because a first
+    commit does not move.
 
     Both are empty when git is unavailable, and the caller omits the fields.
-    An absent date is valid; a wrong one is not.
+    An absent date is valid; a churning one is worse than none.
     """
-    path = _page_source(slug)
-    modified = _git(["log", "-1", "--format=%cI", "--", path])
-    published = _git(["log", "--reverse", "--format=%cI", "--", path])
+    generated = "docs/index.html" if slug == "home" else f"docs/{slug}.html"
+    published = _git(["log", "--reverse", "--format=%cI", "--", generated])
     published = published.splitlines()[0] if published else ""
+
+    sources = list(PAGE_SOURCES) + list(EXTRA_SOURCES.get(slug, ()))
+    modified = _git(["log", "-1", "--format=%cI", "--"] + sources)
+
     return published or modified, modified
 
 
