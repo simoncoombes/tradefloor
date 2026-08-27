@@ -130,7 +130,7 @@ gtag('config', 'G-1LBM3239ZF');
 <a href="https://github.com/simoncoombes/pretium">GitHub</a>
 </div></header>
 <div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><span aria-current="page">Atlas reference</span></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li></ul></nav>
+<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><span aria-current="page">Atlas reference</span></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li><li><a href="two-loops.html">The Two Loops</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="principles.html">The Principles</a></li></ul></nav>
 <main>
 <p class="appnote">This is the plain version of the page. The
 <a href="./#/atlas">full documentation app</a> adds search, dark mode
@@ -138,6 +138,7 @@ and copy buttons.</p>
 <div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">REFERENCE</div>
         <h1 style="font-size:30px">Atlas</h1>
         <p style="font-size:16px;color:var(--mut);margin:14px 0 0">Atlas runs your measurement in hundreds of slightly different markets and builds a table of what came out. You then ask the table which model settings your result actually depends on.</p>
+        <p style="color:var(--mut);font-size:13.5px;margin:10px 0 0">This page is <strong>Loop A</strong>, calibrating the market model. You do not need this to test a strategy. <a href="two-loops.html" style="color:var(--accent)">The two loops</a> says which is which.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">What It Does, Step by Step</h2>
         <ol style="color:var(--mut);font-size:14px;padding-left:22px">
           <li style="margin:0 0 7px">You name some model settings and a range for each. Say herding between 0 and 0.4.</li>
@@ -153,6 +154,36 @@ and copy buttons.</p>
         <p>If you already know which settings matter, run a search. If you do not, a search fails expensively: the optimiser will happily wreck anything your objective does not measure, and you find out afterwards. Six calibration searches on this simulator were rejected in two days, each one revealing a trade the objective had made behind everyone’s back. Anything outside the objective is free for the optimiser to spend.</p>
         <p>The other half of the problem was that nobody had measured how the settings move the outputs. Every search was a walk across a room no one had mapped, in a direction someone had guessed at. A survey maps it first. A Pareto front then puts every available trade side by side so a person picks, rather than an optimiser picking quietly.</p>
         <h2 style="font-size:21px;margin:46px 0 10px">The Methods</h2>
+        <figure style="margin:22px 0">
+        <svg viewBox="0 0 740 268" role="img" width="100%"
+             aria-label="Loop A runs in two rows. The top row maps the parameter space at screening resolution and ends with a human choosing a vector. The bottom row proves that vector at full resolution, and the connector between them carries the requirement that the seeds are disjoint."
+             style="max-width:740px;color:currentColor">
+          <defs><marker id="atlas-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker></defs>
+          <g fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.85"><rect x="20" y="40" width="150" height="46" rx="6"/><rect x="200" y="40" width="150" height="46" rx="6"/><rect x="380" y="40" width="150" height="46" rx="6"/><rect x="560" y="40" width="150" height="46" rx="6"/><rect x="20" y="190" width="150" height="46" rx="6"/><rect x="200" y="190" width="150" height="46" rx="6"/><rect x="380" y="190" width="150" height="46" rx="6"/><rect x="560" y="190" width="150" height="46" rx="6"/></g>
+          <g fill="none" stroke="currentColor" stroke-width="1.2"
+             marker-end="url(#atlas-arrow)"><path d="M 170 63 L 214 63"/><path d="M 350 63 L 394 63"/><path d="M 530 63 L 574 63"/><path d="M 170 213 L 214 213"/><path d="M 350 213 L 394 213"/><path d="M 530 213 L 574 213"/></g>
+          <g font-size="12.5" fill="currentColor" text-anchor="middle" font-family="var(--font-ui, sans-serif)"><text x="95" y="61">axes_for</text><text x="95" y="77" opacity="0.6" font-size="11">name the box</text><text x="275" y="61">survey</text><text x="275" y="77" opacity="0.6" font-size="11">sample it</text><text x="455" y="61">sensitivity</text><text x="455" y="77" opacity="0.6" font-size="11">profile, pareto</text><text x="635" y="61">a human picks</text><text x="635" y="77" opacity="0.6" font-size="11">a vector</text><text x="95" y="211">confirm</text><text x="95" y="227" opacity="0.6" font-size="11">disjoint seeds</text><text x="275" y="211">gates</text><text x="275" y="227" opacity="0.6" font-size="11">thirty seeds</text><text x="455" y="211">control</text><text x="455" y="227" opacity="0.6" font-size="11">overfitting</text><text x="635" y="211">emit_preset</text><text x="635" y="227" opacity="0.6" font-size="11">a new name</text></g>
+          <path d="M 635 86 C 635 130, 95 130, 95 186" fill="none"
+                stroke="var(--accent, currentColor)" stroke-width="1.6"
+                marker-end="url(#atlas-arrow)"/>
+          <text x="370" y="126" font-size="12" text-anchor="middle"
+                fill="var(--accent, currentColor)" font-family="var(--font-ui, sans-serif)">on seeds disjoint from the survey's, or confirm refuses to run</text>
+          <text x="20" y="26" font-size="11" fill="currentColor" opacity="0.6" font-family="var(--font-mono, monospace)">MAP -- screening resolution</text>
+          <text x="20" y="176" font-size="11" fill="currentColor" opacity="0.6" font-family="var(--font-mono, monospace)">PROVE -- full resolution</text>
+          <g font-size="10.5" fill="currentColor" opacity="0.72" font-family="var(--font-ui, sans-serif)">
+            <text x="178" y="58">then</text><text x="358" y="58">then</text>
+            <text x="538" y="58">then</text>
+            <text x="178" y="208">then</text><text x="358" y="208">then</text>
+            <text x="538" y="208">then</text>
+          </g>
+        </svg>
+        <figcaption style="color:var(--mut);font-size:13px;margin-top:8px">A survey runs at screening resolution, which is enough
+        to rank and describe and not enough to believe. Everything on the second
+        row re-measures at full resolution, and the connector is the requirement
+        <code style="font-size:12.5px">confirm</code> enforces: the seed blocks
+        it is handed must be disjoint from the ones the survey recorded.</figcaption>
+        </figure>
+
         <div class="tablewrap"><table>
           <thead><tr><th>Method</th><th>Question it answers</th></tr></thead>
           <tbody style="font-size:13.5px">

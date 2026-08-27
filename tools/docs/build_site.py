@@ -33,8 +33,10 @@ import pathlib
 import re
 import sys
 
+import newpages
 import presets
 import seo
+import upgrades
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 DESIGN_BUNDLE = ROOT / "tools" / "docs" / "design-bundle.html"
@@ -725,6 +727,8 @@ def read_bundle() -> str:
                 f"corrects, so the correction would be silently skipped: {old[:60]!r}"
             )
         doc = doc.replace(old, new)
+    doc = newpages.inject(doc)
+    doc = upgrades.apply(doc)
     doc = presets.replace_table(doc, presets.load())
     doc = apply_trust_fixes(doc)
     doc = apply_scenarios_fixes(doc)

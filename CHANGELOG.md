@@ -220,6 +220,36 @@ The parity contract is untouched, including the rule in
 `rust/goldens/README.md` that the vectors must never be regenerated from the
 Rust, which survives word for word apart from the paths inside it.
 
+### Three new pages, and four that show their material instead of describing it
+
+A glossary, a page on the two loops, and the twelve principles this project
+works under. All three are authored as markdown in `docs/` and rendered into
+the built site from that one source, so they cannot drift from it the way the
+two existing doc sets have.
+
+The glossary is the entry point the docs did not have. `band`, `era boundary`,
+`capture ratio`, `structural`, `screening resolution` and `draw schedule` each
+mean something specific here and something else elsewhere, and a reader who met
+one mid-page had no exit. Each term gets a one-line gloss and a link to the page
+that owns it, sourced from that page rather than rewritten, and terms no page
+owns say so.
+
+The two loops page separates calibrating the market model from evaluating a
+strategy against it. Both were called "training" and nothing on the site said
+they were different jobs with different seeds. `atlas`, `trust`, `change` and
+`agents` now each say in one line which loop they belong to.
+
+Four existing pages gained a shape for material they were assembling sentence
+by sentence: the four tick phases with the uniform that is drawn in phase 1 and
+spent in phase 3 and the circuit breaker that runs twice, the Loop A pipeline
+with the disjoint-seed requirement marked on the connector between mapping and
+proving, the three roles in `pretium.loss` with membership read from the module
+at build time, and a list on the realism page of what a run never licenses you
+to claim.
+
+No engine behaviour changed, no coefficient moved, and no existing published
+figure was edited.
+
 ### The brand commitments are now enforced by a test
 
 `PRODUCT.md` has said since the project began that the repository must not

@@ -163,6 +163,21 @@ DESCRIPTIONS = {
         "across the shared factors, order flow, GJR-GARCH volatility, crisis "
         "behaviour and jumps."
     ),
+    "glossary": (
+        "The terms this project uses in a specific sense: band, era boundary, "
+        "capture ratio, structural. A one-line gloss each, and the page that "
+        "owns it."
+    ),
+    "two-loops": (
+        "Calibrating the market model and evaluating a strategy against it are "
+        "different jobs with different seeds. Which loop you are in decides "
+        "what you need to read."
+    ),
+    "principles": (
+        "Twelve rules this project works under, each with the failure that "
+        "produced it: determinism, disjoint seeds, matched rulers, and naming "
+        "a changed model."
+    ),
     "api-presets": (
         "A preset is a complete, named, frozen set of model coefficients. The "
         "twelve shipped presets, why they exist, and how to choose between "

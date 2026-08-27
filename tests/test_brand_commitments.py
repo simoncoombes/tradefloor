@@ -87,6 +87,13 @@ ASCII_PROSE = (
     "RELEASING.md",
     "rust/README.md",
     "rust/goldens/README.md",
+    # The three pages added for 0.3.0. `docs/` as a whole is not on this list
+    # -- the older markdown carries em dashes that predate the commitment --
+    # but a page written after it should hold to it, and widening the list is
+    # how the commitment widens.
+    "docs/glossary.md",
+    "docs/two-loops.md",
+    "docs/principles.md",
 )
 
 NON_ASCII_PUNCTUATION = {
