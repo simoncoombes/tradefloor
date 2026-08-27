@@ -43,9 +43,10 @@ yet, because every run costs money and one seed would not be worth quoting
 anyway. Run it and you get your own numbers.
 
 Momentum's row is negative, and that is not a bad seed. Across seeds
-2020-2031 at this configuration the momentum reference agent finishes ahead in
-3 of 12. It is a baseline, not a strategy that works here; see the last
-section for why the market stopped rewarding it.
+2020-2031 at this configuration the momentum reference agent ends in profit in
+3 of 12, and beats buy-and-hold in 6 of 12. It is a baseline, not a strategy
+that works here; see the last section for why the market stopped rewarding
+it.
 
 The oracle scores 100% on `why-right` because it reads the true mispricing,
 which is the same reason it is a reference rather than a competitor.
@@ -62,10 +63,11 @@ twenty. The span goes the same way. Over two days the oracle runs +2.4 to
 trading. Over twenty the oracle runs -451.1 to +418.4, a spread thirteen times
 wider than its two-day one, and momentum -2.8 to +91.0. Momentum does keep its
 sign at twenty days, 11 of 12, but that is the seed being kind rather than the
-number being stable: at ten days it is positive in only 9 of 12, and its
-positive readings alone span 20.7 to 91.0 bps. A twenty-day impact figure has
-whatever sign the seed hands it, so this page stops publishing one. Read
-`impact_bps` over a day or two, not weeks, and across seeds.
+number being stable: its eleven positive twenty-day readings already span 20.7
+to 91.0 bps among themselves, and at ten days it is positive in only 9 of 12.
+A twenty-day impact figure has whatever sign the seed hands it, so this page
+stops publishing one. Read `impact_bps` over a day or two, not weeks, and
+across seeds.
 
 A model can earn the first score by accident. The second is the one no real
 market can produce, because attributing a real price move to mean reversion
@@ -84,9 +86,9 @@ attribution in absolute value across the whole roster. That sum is almost
 always won by `random_noise`. Over seeds 2020-2031 at this configuration it is
 the dominant factor on 240 of 240 scored days; on a 40-name, 60-day run over
 three seeds it takes 179 days of 180, losing one to `company_news`; and
-driving a VIX shock through the run does not disturb it, 120 of 120 across six
-seeds. An agent that trades nothing and answers `random_noise` every single
-day scores 100% on all twelve seeds.
+driving the default `Scenario.vix_shock()` through the run does not disturb
+it, 120 of 120 over seeds 2020-2025. An agent that trades nothing and answers
+`random_noise` every single day scores 100% on all twelve seeds.
 
 So the oracle's 100% is not evidence that the oracle understands anything, and
 a model's would not be either. Read a low score as informative -- the model
@@ -198,13 +200,12 @@ trades the reversion is exploiting the simulator, not demonstrating skill that
 transfers.
 
 Until this release the warning named a different quirk, and what became of it
-is worth stating, because the reasoning outlived the correction. pt-v1 really
-did hand momentum close to free money: re-measured here on three seeds, 40
-names over 252 days, its `return_acf1` reads +0.2397, +0.2451 and +0.2848
-against a real band of -0.08 to +0.06, and
-[the realism metrics](realism-metrics.md) call that the single most misleading
+is worth stating, because the reasoning outlived the correction. An earlier
+preset really did hand momentum close to free money: its `return_acf1` read
++0.243 against a real band of -0.08 to +0.06, which
+[the realism metrics](realism-metrics.md) record as the single most misleading
 defect this project has had. pt-v12's certified `return_acf1` is +0.0239,
-inside the band, and momentum now finishes ahead in 3 of the 12 seeds swept
+inside the band, and momentum now ends in profit in 3 of the 12 seeds swept
 above. The quirk moved; the warning did not.
 [The realism envelope](realism-envelope.md) lists the five gaps still open.
 

@@ -4,7 +4,7 @@
   "katVersion": 11,
   "kind": "pretium.known-answer",
   "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
-  "note": "Cross-platform determinism baseline. Regenerated 2026-08-26 for the era boundary that made pt-v10 the default preset: every seeded trajectory changed, deliberately. Runs from before this baseline are not comparable to runs after it unless they name their preset.",
+  "note": "Cross-platform determinism baseline. Regenerated 2026-08-26 for the era boundary that made pt-v12 the default preset: every seeded trajectory changed, deliberately. Runs from before this baseline are not comparable to runs after it unless they name their preset.",
   "seed": 20260820,
   "sha256": "60d475726c8b270df0894da7577523e98d044dd09afc6b536377eaf4b40de590",
   "simulationSha256": "7c63282b57955400bad4c61ca7c24c9f6bb0b94b9486870f491eac00cf157a20"

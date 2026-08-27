@@ -64,8 +64,9 @@ first. Both are transmission; only one is a re-rating.
 Measured on `pt-v12` by holding `Universe.random(20, seed=4)` fixed at sim
 seed 5, introducing each shock on **day 5** with `compare()`, and reading the
 median instrument at day 25, which is deliberately before the first
-*scheduled* meeting at day 45. The fair-value column is the median
-`fundamental_value` from `truth()` in the same pair of runs:
+*scheduled* meeting at day 45. The fair-value column is the same median taken
+over each name's own change in `fundamental_value` from `truth()`, so the two
+columns are the same statistic on price and on worth:
 
 | field | median price move by day 25 | fair value | route |
 |---|---|---|---|

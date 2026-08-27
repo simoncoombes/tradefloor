@@ -31,16 +31,24 @@ much as the one measurement that reads the panel's clustering lags as a
 ## The fourteen panel statistics
 
 `pretium.facts.measure()` returns these. Every band in
-`facts.REAL_MARKETS` comes from **ten consecutive 252-day windows of 40 US
-large caps, 2015-2025**, measured with this module's own estimators. Ten
-were measured and **nine** derive the band: the window straddling the COVID
-crash is held out and reported separately as each band's `crisis_window`,
-because the panel is a claim about a typical year and crisis behaviour is
-measured under pinned scenarios instead. A band is not a textbook figure,
-it is what this measurement returns on real data. Each band's empirical
-claim ships as data in `facts.REAL_MARKETS_PROVENANCE`, quoted below, where
-`windows` is (min, median, max) over those nine and `crisis_window` is the
-tenth on its own.
+`facts.REAL_MARKETS` was derived from **ten consecutive 252-day windows of
+40 US large caps, 2015-2025**, measured with this module's own estimators,
+with one of the ten held out: **nine** windows set the band, because the
+window straddling the COVID crash is reported separately as each band's
+`crisis_window`. The panel is a claim about a typical year, and crisis
+behaviour is measured under pinned scenarios instead.
+
+A band is not a textbook figure, it is what this measurement returns on
+real data. Three edges are the documented exception, and each names itself
+on its own provenance row: `annualised_vol_pct`'s ceiling is extended
+outward from the windows' 34 to 36, while the mechanical edges of
+`abs_return_acf1` and `leverage_effect` are clamped **inward**, to +0.02
+and 0.00, because zero volatility clustering appears in no retrieved source
+and no observed window, and a top above zero on `leverage_effect` would
+certify a reversed leverage effect as real-market behaviour. Each band's
+empirical claim ships as data in `facts.REAL_MARKETS_PROVENANCE`, quoted
+below, where `windows` is (min, median, max) over those nine and
+`crisis_window` is the tenth on its own.
 
 ### Marginal properties: one price series on its own
 
@@ -286,18 +294,26 @@ print(envelope.check(horizon_days=756, statistics=["abs_return_acf20"]))
 # OUTSIDE the envelope
 #   - horizon 756d exceeds the certified 252d. At 504 days the model holds
 #     all 14 against horizon-matched bands. The thin one is
-#     annualised_vol_pct at 33.89 against (16.0, 34.0). Beyond 504 days
-#     nothing has been measured at all
+#     annualised_vol_pct at 33.89 against (16.0, 34.0). Beyond 504 days the
+#     panel is measured but has no ruler of its own: at 2520 days it holds
+#     10 of 14 against the 504-day bands, and annualised volatility is flat
+#     year by year across those ten years
+#     (tools/calibration/long_horizon.py). No bands have been derived at a
+#     five-year window, which is why the certification stops here
 #   - abs_return_acf20 depends on the decay shape, which is a mechanism
 #     gap: log-log slope -0.953 against real markets' -0.436, and the curve
 #     is negative by lag 30 where real markets stay positive to lag 60
 ```
 
 (The two reason lines are one line each in the real output; they are wrapped
-here to fit the page.) Note what the first reason does **not** say. Holding
-all fourteen at 504 days is not a certification at 504 days, because the
-certification is the whole apparatus of validation axes below, not a band
-count. The refusal is about the horizon, and it stands.
+here to fit the page.) Note what neither reason claims. Holding all fourteen
+at 504 days is not a certification at 504 days, because the certification is
+the whole apparatus of validation axes below, not a band count; and the ten
+of fourteen at 2520 days is scored against the 504-day bands, which are the
+wrong ruler for a ten-year window and are quoted only because no ten-year
+bands have been derived. Both are measurements, and the horizon gap in
+`envelope.GAPS` says so in those words. The refusal is about the horizon,
+and it stands.
 
 Unknown statistic names raise rather than being ignored, because a silently
 dropped name is a silently granted certification.
@@ -306,19 +322,30 @@ dropped name is a silently granted certification.
 
 Not part of any panel, and it ships as data rather than as a script.
 `envelope.DECAY_252` carries the model's |return| autocorrelation at ten
-lags out to 60 and `envelope.REAL_DECAY` carries real markets' at the lags a
-real window can resolve; `envelope.DECAY_SLOPE` and
+lags out to 60, measured at the certified horizon, and `envelope.REAL_DECAY`
+carries real markets' at seven lags out to 60, which is as far as the real
+estimate keeps a sign: the survey behind it reads -0.017 at lag 90 and
++0.004 at lag 120, noise around zero. `envelope.DECAY_SLOPE` and
 `envelope.REAL_DECAY_SLOPE` carry the exponents fitted through lags 1 to 20.
-The thirty-seed 504-day survey behind them is committed at the repo root as
-`decay-curve-504.json`, so the fit is reproducible from the tree: a
-least-squares line on log-log axes through that file's
-`real_median_noncrisis` over lags 1 to 20 returns -0.4364, which is the
-shipped -0.436, and the same fit over `envelope.DECAY_252` returns -0.9522,
-which is the shipped -0.953. The atlas survey records a cheaper three-lag
-proxy for the same shape, `decay_slope()` in
-`tools/calibration/atlas_survey.py`, which is a pure function of the panel's
-own lag-1, lag-5 and lag-20 medians and so costs no extra simulation;
-`tools/calibration/read_decay_survey.py` reads it back out of a survey.
+
+The real side is reproducible from the tree. `REAL_DECAY` is the
+`real_median_noncrisis` block of `decay-curve-504.json`, committed at the
+repo root, which is the median |return| autocorrelation across 40 names over
+five non-crisis 505-bar windows, rounded to four places. A least-squares
+line on log-log axes through that block over lags 1 to 20 -- seven of them,
+at 1, 2, 3, 5, 8, 12 and 20 -- returns -0.4364, which is the shipped -0.436.
+Fit the rounded `REAL_DECAY` instead and you get -0.4615, because the
+constant carries only five of those seven lags: the exponent is fitted on
+the survey, not on the constant. The same seven-lag fit over
+`envelope.DECAY_252` returns -0.9522, which is the shipped -0.953. That
+file's *model* curves are `pt-v6`'s at 504 days and are not where
+`DECAY_252` comes from; `DECAY_252` is the shipped preset at 252 days.
+
+The atlas survey records a cheaper three-lag proxy for the same shape,
+`decay_slope()` in `tools/calibration/atlas_survey.py`, which is a pure
+function of the panel's own lag-1, lag-5 and lag-20 medians and so costs no
+extra simulation; `tools/calibration/read_decay_survey.py` reads it back out
+of a survey.
 
 The panel reads lags 1, 5 and 20 as three unrelated levels. The decay curve
 reads the **slope through the whole range**, seven lags from 1 to 20, which

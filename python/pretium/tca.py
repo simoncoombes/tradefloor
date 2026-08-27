@@ -242,13 +242,24 @@ class Execution:
         target, and the nudge reaches every name's volatility two closes
         later. Measured on this build, with ``analyse(Momentum(), seed=7,
         universe=Universe.random(60, seed=11), days=10)``, defaults
-        otherwise: 46 names traded, two of the fourteen untouched moved, by
-        -6.6 and +3.2 bps, against a 13.0 bps median ``|impact_bps|``
-        across the traded names that moved. Three bounds keep the channel
-        readable: it is small next to direct impact; it is intermittent,
-        because the VIX reaction clamps the market return at +/-0.03%
-        (``rust/src/economy/daily.rs``), so a day whose close saturates the
-        clamp in both worlds passes nothing; and a one-day analysis is
+        otherwise: 57 names traded, and all three it never touched moved,
+        by -10.72, +2.00 and +1.97 bps, against a 9.71 bps median
+        ``|impact_bps|`` across the traded names that moved. Read that
+        ordering carefully. The largest ripple is bigger than the median
+        direct impact, so this is not a rounding-error channel: on pt-v12
+        ``vix_return_source`` is 1.0, so the fear gauge reads the whole
+        day's cap-weighted index return rather than the closing minute
+        alone, and flow big enough to move the index reaches names it never
+        touched at the same order of cost the book charges directly.
+        What bounds the channel is the horizon, not the clamp. The reaction
+        has to cross two closes, so on the same configuration one and two
+        days leak nothing, three days leak nine untouched names and four
+        leak eighteen; by ten days it is back to three only because the
+        agent has traded 57 of the 60 and there is almost nothing left
+        untouched. ``vix_return_clamp`` is 15.0 on pt-v12, in percent
+        (``rust/src/economy/daily.rs``), which no ordinary close comes
+        near, and the +/-0.03% clamp that once made the channel
+        intermittent was a pt-v1..pt-v8 value. A one-day analysis stays
         structurally immune, its final prices predating the first repriced
         variance target, which is why ``test_tca.py`` can still assert
         emptiness there. When the untouched names must be byte-exact, pin

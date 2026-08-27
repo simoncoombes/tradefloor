@@ -48,10 +48,21 @@ stale vector set is detectable rather than merely suspected.
 
 ## Regenerating and verifying
 
+Two commands, and both of them run in the reference TypeScript checkout,
+which is where the generator lives and where `scripts/rust-port/` and
+`src/lib/engine/prng.ts` are real paths:
+
 ```bash
 npx tsx scripts/rust-port/generate-goldens.ts            # write the vectors
 npx tsx scripts/rust-port/generate-goldens.ts --check    # verify them
 ```
+
+Neither runs here. This repository carries the corpus and a checker, not the
+generator, so what runs here is `python rust/sync-goldens.py --verify`, which
+re-hashes every committed vector against the SHA-256 recorded in `index.json`
+and prints `46/46 golden files verified against index.json.` That catches a
+missing, corrupted or edited vector; it cannot catch a vector that was
+generated wrongly, which is what `--check` above is for.
 
 `--check` re-reads every file from disk, decodes the recorded **inputs** from
 their IEEE-754 bit patterns, re-runs the TypeScript, and compares every recorded

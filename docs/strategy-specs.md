@@ -202,8 +202,9 @@ is reproducible only by citing code at a commit.
 A spec naming `oracle` declares privileged access to state no real trader
 has, which is exactly what a reviewer needs to see. Leaving it out would push
 the one strategy most in need of disclosure into the uncitable escape hatch.
-Spec-built oracles, and any blend containing one, carry `privileged = True`,
-so a results table can label the row.
+The agent built from a spec naming `oracle`, and from any blend containing
+one, carries `privileged = True` -- the flag is on the built agent, not on the
+spec -- so a results table can label the row.
 
 Its `top_k` matters more than any other parameter in the library: capture
 ratios are quoted against the Oracle, and its configuration moves the

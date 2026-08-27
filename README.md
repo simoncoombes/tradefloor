@@ -67,9 +67,10 @@ digests. A disagreement fails the release.
 
 The WebAssembly build is checked by hand rather than by that gate, because it
 needs a toolchain CI does not carry: on 2026-08-24 the native and
-`wasm32-unknown-unknown` builds hashed the same fixed simulation to
-`2b2f3141...`, and `tests/test_wasm_parity.py` pins the Python half of that
-pair so the two cannot drift apart unnoticed.
+`wasm32-unknown-unknown` builds hashed the same fixed simulation -- twelve
+instruments, five days, `pt-v3` -- to `2b2f3141...`, and
+`tests/test_wasm_parity.py` pins the Python half of that pair so the two
+cannot drift apart unnoticed.
 
 **Ground truth you can read.** The simulator computed every price, so it can
 tell you why. One row per instrument per tick, with nine factor
@@ -118,11 +119,13 @@ costs.
 fourteen statistics against real-market bands. At 252 days the shipped `pt-v12`
 preset holds **all fourteen in band** on thirty calibration seeds, all
 fourteen again at 504 days against bands re-derived at that window, and all
-fourteen again on a 60-name universe it never saw. Read that as fourteen
-in-band verdicts rather than fourteen independent validations: five of the
-fourteen were live calibration targets, the bands were used both to tune
-against and to grade against, and "held out" means unseen simulation seeds
-and another roster from the same generator rather than withheld market data.
+fourteen again on a 60-name universe it never saw. On thirty seeds it never
+used it holds thirteen, the single miss being `corr_persistence_acf1`. Read
+that as fourteen in-band verdicts rather than fourteen independent
+validations: five of the fourteen were live calibration targets, the bands
+were used both to tune against and to grade against, and "held out" means
+unseen simulation seeds and another roster from the same generator rather
+than withheld market data.
 That is a market with the right volatility, the right tails, the right
 co-movement, industries that co-move more than strangers, correlation that
 stays elevated after a panic, volume that behaves, and volatility episodes it
@@ -154,13 +157,14 @@ real market has.
 **Five gaps are measured and named rather than assumed.** The certified
 horizon is 252 days; two and five-year panels are measured but not
 certified. Volatility memory decays exponentially where real markets decay
-hyperbolically. Scenario response has the right size, measured as a regression gain, but too
-much noise around it for one run to size a scenario from -- the driven-window
-noise ratio is 1.57x real. The endogenous
-MACRO economy cannot reach its own crisis regimes, so an inflation regime or
-a policy crisis has to be driven through a scenario; a volatility crisis does
-not, since the default reaches its own crisis threshold on 10.2% of days
-against a real 12.5%. And certification was measured on a sector-balanced
+hyperbolically. Scenario response has the right size, measured as a
+regression gain, but too much noise around it for one run to size a scenario
+from -- the driven-window noise ratio is 1.57x real. The endogenous MACRO
+economy cannot reach its own crisis regimes, so an inflation regime or a
+policy crisis has to be driven through a scenario; a volatility crisis does
+not: measured on `pt-v10`, the preset's own VIX crossed its crisis threshold
+on 10.2% of days against a real 12.5%, and that figure has not been
+re-measured on `pt-v12`. And certification was measured on a sector-balanced
 roster, which no real index is: re-measured on pt-v12, an S&P-like or
 technology-heavy roster holds all fourteen at one year, so the envelope
 transfers at the certified horizon, and the cost of concentration shows up

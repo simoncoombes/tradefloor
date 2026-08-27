@@ -76,12 +76,13 @@ s.save("survey.json")           # measure once, ask many questions later
 ```
 
 Pass `preset=` rather than taking the default. `axes_for` still defaults to
-`preset="pt-v3"`, three eras behind the shipped `pt-v12`, and every box is a
-multiple of whatever preset it reads: `market_factor_sigma` ships at 0.016 on
-pt-v3 and 0.0088291 on pt-v12, so the default box runs 0.004 to 0.064 where
-the pt-v12 box runs 0.0022073 to 0.035316. The pt-v3 ceiling is 7.2 times the
-value the shipped model actually uses. Surveying a pt-v12 model through pt-v3
-boxes is a map of the wrong room.
+`preset="pt-v3"`, two era boundaries behind the shipped `pt-v12` -- pt-v3
+handed over to `pt-v10`, and `pt-v10` to `pt-v12` on 2026-08-26 -- and every
+box is a multiple of whatever preset it reads: `market_factor_sigma` ships at
+0.016 on pt-v3 and 0.0088291 on pt-v12, so the default box runs 0.004 to 0.064
+where the pt-v12 box runs 0.0022073 to 0.035316. The pt-v3 ceiling is 7.2
+times the value the shipped model actually uses. Surveying a pt-v12 model
+through pt-v3 boxes is a map of the wrong room.
 
 `measure` is yours, and that is the point: Atlas has no opinion about
 whether the outputs are realism statistics, a Sharpe ratio, a fill rate or

@@ -61,12 +61,18 @@ surfaced from the packaged-crate check in the crate section below.
 The second executes all eight notebooks and the research workflow end to end
 (`tests/test_examples.py` globs `0*.ipynb`, which matches 00 through 06 and
 09), 21 tests in all. It is skipped by default because it runs for a minute
-or more on an idle machine, with the largest single share in
-`09-a-pandemic-shaped-market.ipynb`, which runs about twice as long as the
-next slowest notebook, and because it needs `nbclient`, which the library
-does not depend on. Both are exactly why it goes stale. Time it on a quiet
-machine or not at all: the figure is machine-bound, and this tree has
-measured at both 83s and 96s.
+or more, and because it needs `nbformat` and `nbclient`, which the library
+does not depend on. Check the summary line rather than the exit code: the
+eight tests that actually EXECUTE a notebook are the ones that need
+`nbclient`, so with `nbformat` alone those eight skip, the other thirteen
+report, and the step is green having executed no notebook at all. Both are
+exactly why it goes stale.
+
+The last timed run of the whole file was 96s (`--durations=15` on an idle
+machine), with `09-a-pandemic-shaped-market.ipynb` alone at 40s against 21s
+for the next slowest. That figure is machine-bound: the same file under load
+has measured more than twice that, so read it as an order of magnitude
+rather than a budget. Time it on a quiet machine or not at all.
 
 ### 4. Re-measure the published figures
 
@@ -129,16 +135,17 @@ gh workflow run determinism.yml --ref <branch> -f targets=all
 
 `targets=all` is spelled out because the dispatch default is `unverified`,
 which runs only `macos-x86_64` and `windows-x86_64`. Those two are the
-default because nothing else in the project touches them: every AWS
-calibration run builds the crate and executes `tests/known_answer.py` before
-its own work, which covers `linux-aarch64`, `macos-arm64` and `linux-x86_64`
-between them. The default is the narrow path to the gap, not the cheap one.
-Money is not the reason for it -- the repository is public, so standard
-runners are free, and the workflow's own note records the five-target run of
-2026-08-27 (run 33028345268) at 3m35s of wall clock and about ten minutes of
-runner time across all seven jobs. Ask for `all` here anyway, because the
-point of a release gate is that the whole artifact set was checked in one
-place, together, on the commit being shipped.
+default because nothing else in the project touches them: `macos-arm64` is
+the machine the work is done on, and every AWS calibration run builds the
+crate and executes `tests/known_answer.py` before its own work, which has
+covered `linux-aarch64` repeatedly and `linux-x86_64` once, on 2026-08-24.
+So the default is the narrow path to the gap, not the cheap one. Money is
+not the reason for it: the repository is public, so standard runners are
+free, and the workflow's own note records the five-target run of 2026-08-27
+(run 33028345268) at 3m35s of wall clock and about ten minutes of runner
+time across all seven jobs. Ask for `all` here anyway, because the point of
+a release gate is that the whole artifact set was checked in one place,
+together, on the commit being shipped.
 
 It also runs on pushes to `main` touching `rust/**`, `python/**`,
 `pyproject.toml` or the workflow itself, so on a release from `main` it has

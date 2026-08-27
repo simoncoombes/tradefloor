@@ -17,11 +17,10 @@ changes.
 This page is the narrative behind it: what the model could not do, what
 fixing each thing took, and what is left. It measures nothing of its own on
 purpose: every figure here is quoted from the envelope, from the calibration
-record behind it, or from a preset's own coefficients, and the only numbers
-computed on this page are the printed output of code you can run yourself.
-Two realism pages each taking their own measurement is how a project ends up
-contradicting itself, and this one did exactly that for a while, describing
-a model two presets old.
+record behind it, or from a preset's own coefficients. Two realism pages
+each taking their own measurement is how a project ends up contradicting
+itself, and this one did exactly that for a while, describing a model two
+presets old.
 
 The short version: at a 252-day horizon the shipped preset matches **all
 fourteen** statistics pretium measures and holds that on a universe the
@@ -126,11 +125,11 @@ roster. That is the pattern worth carrying forward.
   run can put the size almost anywhere. And the speed: the shock arrives
   more slowly than a real one, because the factor-variance persistence that
   buys volatility clustering carries a half-life too long to track a
-  twenty-day spike. A two-timescale variance
-  mixture was built to separate those two jobs and made the horizon
-  monotonically worse, so this is a structural limit rather than a
-  calibration nobody has run. Ask a scenario whether a strategy breaks, and
-  size the break across seeds rather than from one run.
+  twenty-day spike. A two-timescale variance mixture was built to separate
+  those two jobs and made the horizon monotonically worse, so this is a
+  structural limit rather than a calibration nobody has run. Ask a scenario
+  whether a strategy breaks, and size the break across seeds rather than
+  from one run.
 - **The endogenous economy cannot reach its own macro crisis regimes.** A
   volatility crisis is endogenous, the model's own VIX crossing its crisis
   threshold at roughly the rate a real one does, on a measurement taken in
@@ -191,11 +190,13 @@ print(pt.facts.report(pt.facts.measure(seed=3, universe=universe)))
 ```
 
 That is one seed, and every figure in the envelope is a median across
-thirty. A single run misses rows the median holds, and this one does: it
-reports return acf(1) above its band, on a preset whose median for that row
-is inside it. `envelope.intervals()` takes the panels you measured and
-reports the across-seed spread beside each median, which is what a claim
-should be read against:
+thirty. A single set of seeds can miss a row the median holds, and the
+envelope publishes an instance of exactly that: `corr_persistence_acf1`
+reads 0.1525 on the certification's seeds, inside its band, and lands
+outside it on thirty seeds the calibration never used.
+`envelope.intervals()` takes the panels you measured and reports the
+across-seed spread beside each median, which is what a claim should be read
+against:
 
 ```python
 import pretium as pt
@@ -207,14 +208,14 @@ row = envelope.intervals(panels)["return_acf1"]
 print(row["median"], row["band"], row["typical_straddles"])
 ```
 
-```
-0.0017059960621254296 (-0.08, 0.06) True
-```
-
-The median sits near zero, inside the band, and `typical_straddles` says the
-10th-to-90th-percentile range crosses a band edge, so a single seed landing
-outside is the expected behaviour of the statistic rather than a defect in
-your universe.
+`typical_straddles` is the field to read. It is true when the
+10th-to-90th-percentile range across your seeds crosses a band edge, which
+means a single seed landing outside is the expected behaviour of the
+statistic rather than a defect in your universe. Measured on `pt-v10` over
+thirty seeds, nine of the fourteen statistics straddled a band edge by that
+test. That spread has not been re-measured on `pt-v12`, which is why the
+honest move is to run this on your own seeds rather than inherit either
+era's.
 
 `envelope.json` records the preset its figures describe rather than a
 digest, so the check that the envelope is describing the model you are

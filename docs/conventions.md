@@ -11,7 +11,7 @@ error that says so.
 
 **Absence differs from zero.** `corporate_bond_yield=None` falls through to the
 policy rate; `0.0` is a real observation used as given. In columnar reads, where
-a column cannot carry `None`, absence is `NaN`, never zero - zero is a real
+a column cannot carry `None`, absence is `NaN`, never zero -- zero is a real
 maker inventory, a real mispricing and a real return.
 
 **Invalid input raises.** `ValidationError` for a malformed scenario,
@@ -25,14 +25,15 @@ without them is not realistic.
 by the float, so 3% of a hundred million shares is `short_interest=3_000_000`.
 Passing `0.03` does not quietly mean three hundredths of a share: values
 strictly between 0 and 1 raise `ValidationError` for a company with a real
-share count, because three hundredths of one share is a squeeze ratio of 3e-11
-and a squeeze that can never fire, and that mistake would otherwise be silent.
+share count, because three hundredths of one share against that float is a
+squeeze ratio of 3e-10 and a squeeze that can never fire, and that mistake
+would otherwise be silent.
 `Universe.random` generates a realistic spread: the draw is log-uniform between
 0.4% and 30% of shares outstanding, so the median is the geometric mean of
 those bounds, 3.46%, and about one name in eleven clears the 20% squeeze
 threshold. Measured across the whole three-letter ticker space, 17,576 names
 at seed 7: median 3.45%, 9.54% of names above 0.20. A roster the size these
-docs use runs lower and noisier - 2.53% on `Universe.random(108, seed=7)` -
+docs use runs lower and noisier -- 2.53% on `Universe.random(108, seed=7)` --
 because a hundred names is a small sample of a draw whose top and bottom
 differ by a factor of seventy-five.
 
@@ -64,5 +65,5 @@ runs the 4.0, which is why they replay unchanged. It is a real parameter now,
 one of the 87 `ModelParams.settable()` lists, and readable as
 `ModelParams.from_preset("pt-v12").volume_move_cap`. `model_preset()` still
 shows neither number. So quote the preset name AND `pt.version()` when you
-publish - the version is what actually pins the build. See
+publish -- the version is what actually pins the build. See
 [Reproducing a run](reproducing-a-run.md).

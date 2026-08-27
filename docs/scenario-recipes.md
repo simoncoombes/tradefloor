@@ -60,7 +60,7 @@ worthless. `compare()` refuses a shock that begins *after* the horizon ends
 horizon by every test the library can apply. It simply has nothing to transmit
 through yet.
 
-This is documented in full on [Scenarios](scenarios.html), with the
+This is documented in full on [Scenarios](scenarios.md), with the
 measurement on the shipped `pt-v12`: a policy-rate `ramp` from 2.5% to 5% over
 thirty days moves every price by exactly 0.00% over 40 days, and a median
 −4.00% once the run is long enough to cross day 45. It is not restated here;
@@ -75,7 +75,7 @@ move it: `qe_pe_boost` and `corporate_bond_yield` both reach fair value
 immediately, and a VIX shock moves prices immediately without touching fair
 value at all. Only `federal_funds_rate` and `inflation_rate` work by steering
 the corporate bond yield, and only they can be made to wait. The per-field
-table is on [Scenarios](scenarios.html).
+table is on [Scenarios](scenarios.md).
 
 Only one of the two always waits, and the exception is worth knowing before it
 surprises you. `federal_funds_rate` waits for the calendar every time.
@@ -91,8 +91,8 @@ recipes for at least 90 days.** A 30-day study of a hiking cycle measures
 nothing and says so silently. The emergency meeting does not weaken the rule,
 it sharpens it: what trips the emergency is the *gap*, and a gradual path
 opens a gap slowly. Recipe 2 is exactly that case. Its hundred-day ramp is at
-4.10% on day 40 against a policy rate still sitting at 2.500%, a gap of
-1.59pp and nowhere near the trigger, so it waits for the day-45 calendar like
+4.095% on day 40 against a policy rate still sitting at 2.500%, a gap of
+1.595pp and nowhere near the trigger, so it waits for the day-45 calendar like
 a policy-only path would. It does reach the emergency eventually, just not
 soon: the rate moves 2.500% to 3.101% at that day-45 scheduled meeting,
 inflation keeps climbing faster than the rate does, the gap crosses 4pp on
@@ -347,7 +347,7 @@ are this build's answer, and a calibration change moves all of them. If you
 are reading a number below and the harness reports it `MOVED`, trust the
 harness.
 
-Two conventions, both borrowed from [Scenarios](scenarios.html) so that one
+Two conventions, both borrowed from [Scenarios](scenarios.md) so that one
 set of habits covers both pages:
 
 - **price effects** use `Universe.random(20, seed=4)` at sim seed 5, via
@@ -597,7 +597,7 @@ implies. The same 80-to-120 change measured there runs 74.78% to 96.83%, a
 22.1-point rise against `pt-v1`'s 10.0, which is what a raised ceiling buys:
 not a new response where there was none, but a band that keeps responding
 across the plausible range instead of flattening inside it.
-[Scenarios](scenarios.html) carries the current multiple and the reasoning
+[Scenarios](scenarios.md) carries the current multiple and the reasoning
 behind it.
 
 <!-- ERA CHECK (pt-v12 boundary): corrected. The clamp is the preset

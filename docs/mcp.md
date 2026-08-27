@@ -192,8 +192,9 @@ not.
 
 A direct tool call is capped at 60 days, because a tool call has to answer
 inside a conversation and the certified 252-day horizon cannot be promised
-inside one. Forty names there measured 22.1s on the machine this page was
-written on, and the server, planning against a deliberately pessimistic
+inside one. Forty names over the full 252 days works out at roughly 22s on
+the machine this page was written on, projected from the per-name rate
+measured below, and the server, planning against a deliberately pessimistic
 rate, budgets 95.8s; the largest roster it accepts, 120 names, triples that
 budget to 287.3s.
 
@@ -221,9 +222,9 @@ it is no longer a slice. This is the point of having jobs at all; the
 convenience of not blocking is secondary.
 
 Jobs run inside the server process. Two run at once (a third would slow both
-without finishing sooner), finished results are kept for later collection,
-and **nothing survives a server restart**. There is no queue and no
-database, and `check_job` says so rather than leaving you to infer it. The
+without finishing sooner), the last 32 finished results are kept for later
+collection, and **nothing survives a server restart**. There is no queue and
+no database, and `check_job` says so rather than leaving you to infer it. The
 `estimated_seconds` figure comes from measured cost and is an estimate, not
 a promise: a long overrun usually means the machine is loaded, not that the
 job has hung.
@@ -266,19 +267,19 @@ always says the same thing stops being read.
 
 **They are computed, not typed.** Every number in them is read from the
 realism envelope at call time. This rule paid for itself immediately: while
-this server was being written, `PRODUCT.md` and `README.md` were both found
-still asserting a return autocorrelation of `+0.219` and `+0.249` from a
-preset that had already been superseded. It has kept paying since. The
-server shipped when `pt-v3` was the default; the default is now `pt-v12`,
-nine preset boundaries later, and every caveat the server emits moved with
-them without an edit. Today `return_acf1` certifies at `0.0239`, and
-re-measuring it across the README's own published method (40 names,
-universe seed 111, 252 days, sim seeds 1 to 6) gives a median of `0.0322`.
-Both are comfortably *inside* the real-market band of -0.08 to 0.06. The
-`+0.219` the stale prose was quoting is 6.8 times that re-measured median,
-9.2 times the certified figure, and unlike either of them it sits outside
-the band. A hardcoded caveat is how a caveat becomes false, and a false
-caveat told to a model is worse than none.
+this server was being written, `PRODUCT.md` was still asserting a return
+autocorrelation of `+0.219` and `README.md` `+0.249` -- the second a median
+of six seeds at that README's own published method, `Universe.random(40,
+seed=111)` over 252 days -- both from a preset that had already been
+superseded. It has kept paying since. The server shipped when `pt-v3` was
+the default; the default is now `pt-v12`, nine preset boundaries later, and
+every caveat the server emits moved with them without an edit. Today
+`return_acf1` certifies at `0.0239`, on the panel the envelope publishes
+(thirty seeds, forty names, 252 days), comfortably *inside* the real-market
+band of -0.08 to 0.06. The `+0.219` the stale prose was quoting is 9.2 times
+that, and it sits outside the band rather than inside it. A hardcoded caveat
+is how a caveat becomes false, and a false caveat told to a model is worse
+than none.
 
 A summary of a pretium result that drops the caveats is a misreport.
 
@@ -303,11 +304,13 @@ strategy.
 `paired_sign_tests`: both entrants traded the **same** market on each seed,
 so pairing removes the market from the question.
 
-Read `pooled_capture`, which is total P&L over the reference's total, rather than
-`seeds_first`, which counts league positions among all entrants and splits
-arbitrarily on a tie. A submitted momentum spec compared against the
-momentum baseline comes back as all ties and zero paired seeds, which is the
-correct answer for two identical strategies rather than a coin-flip winner.
+Both per-entrant figures live in `records`. Read `pooled_capture`, which is
+total P&L over the reference's total, rather than `seeds_first`, which
+counts the seeds an entrant ranked first on among *all* entrants, baselines
+included, and so splits arbitrarily between two entrants that behave
+identically. A submitted momentum spec compared against the momentum
+baseline comes back as all ties and zero paired seeds, which is the correct
+answer for two identical strategies rather than a coin-flip winner.
 
 ## Limits, and why they exist
 
@@ -322,14 +325,18 @@ correct answer for two identical strategies rather than a coin-flip winner.
 
 These are wall-clock decisions rather than modelling ones, and the library
 imposes none of them. Cost is flat per simulated day, so the horizon is
-almost the whole of it: forty names against the five reference baselines
-measured 0.47s at 5 days, 5.6s at 60 and 22.1s at 252 on the machine this
-page was written on, which is 0.09 s/day steady across a 50x span in
-horizon. `estimated_seconds` does not use that rate. It assumes 0.38 s/day
-scaled by roster size, which overshoots four-fold here, and overshooting is
-the safe direction: a model deciding whether to wait or poll needs an order
-of magnitude, and a job that beats its estimate costs nothing while one that
-looks hung gets abandoned.
+almost the whole of it: ten names against the five reference baselines
+measured 0.104s at 5 days and 1.30s at 60 on the machine this page was
+written on, which is 0.021 and 0.022 s/day across a 12x span in horizon.
+Roster size is the other multiplier, and it is close to linear: 0.0021 s per
+name per day, fitted over rosters of two to ten. So the certified forty
+names come out at 0.086 s/day, about 5.2s at 60 days and 22s at 252 --
+projections from the small-roster rate rather than timings, which is why
+they are quoted to two figures. `estimated_seconds` does not use that rate.
+It assumes 0.38 s/day scaled by roster size, four times the projection, and
+overshooting is the safe direction: a model deciding whether to wait or poll
+needs an order of magnitude, and a job that beats its estimate costs nothing
+while one that looks hung gets abandoned.
 
 Flat per day is why the cap is on days rather than on anything else, why a
 direct call is capped below the certified 252-day horizon, and why every

@@ -39,12 +39,13 @@ The universe seed is separate from the simulation seed. Holding the universe
 fixed while varying the simulation seed is the standard setup for variance
 estimation.
 
-Three constructors:
+Four constructors:
 
 ```python
 pt.Universe.random(108, seed=7)                  # generated, plausible per sector
 pt.Universe([pt.Instrument(...), ...])           # explicit roster
 pt.Universe.from_edgar(snapshot)                 # real SEC fundamentals
+pt.Universe.from_json(saved)                     # one saved with to_json
 ```
 
 ### Macro
@@ -87,21 +88,23 @@ engine.pin_macro(corporate_bond_yield=0.09)   # from a default of 0.0456
 A pin overrides the endogenous step for that field: a day-by-day pinned
 series stays fully exogenous, and a single pin moves the field once, after
 which the chain evolves onward from the pinned value rather than freezing it.
-Pin `vix=30.0` once, after day 3 of the run above, and the four days that
-follow read 22.75, 23.62, 23.89, 19.30: the chain carried on from 30 and pulled
-back toward its mean rather than holding. Measured on twenty
-instruments, the `corporate_bond_yield` pin repriced nineteen of them. The
-twentieth is the loss-maker above. Pinning `federal_funds_rate` alone
-repriced none of the twenty, for the reason set out under
-[Scenarios](scenarios.html).
+Pin `vix=30.0` once, after day 3 of the run above, and day 3 reads the pinned
+30.0 while the four days that follow read 22.75, 23.62, 23.89, 19.30: the chain
+carried on from 30 and pulled back toward its mean rather than holding.
+Measured on twenty instruments, the `corporate_bond_yield` pin repriced
+nineteen of them. The twentieth is the loss-maker above. Pinning
+`federal_funds_rate` alone repriced none of the twenty, for the reason set out
+under [Scenarios](scenarios.html).
 
 Read the macro back for the current day from `engine.macro_state`, which is a
 `Macro`, or over a whole run from the `macro` table, `engine.macro_table()`.
 That is an Arrow stream keyed by `day` alongside `bars` and `truth`, carrying
 `vix`, `federal_funds_rate`, `corporate_bond_yield`, `inflation_rate`,
 `unemployment_rate`, `gdp_growth`, `qe_pe_boost`, `fear_greed_index` and
-`universe_stress`. The macro row for a day carries the values the day traded
-under; the close then advances the chain into the next day. That is why
-`run_days` records a day before closing it, and why a hand-driven loop should
-call `record(day)` before `close_market()` -- see
-[Running a simulation](running-a-simulation.md).
+`universe_stress`. The two are not the same field set, which is worth knowing
+before you reach for the wrong one: `unemployment_rate`, `gdp_growth` and
+`universe_stress` live only in the table, and `cycle` lives only on `Macro`.
+The macro row for a day carries the values the day traded under; the close
+then advances the chain into the next day. That is why `run_days` records a
+day before closing it, and why a hand-driven loop should call `record(day)`
+before `close_market()` -- see [Running a simulation](running-a-simulation.md).

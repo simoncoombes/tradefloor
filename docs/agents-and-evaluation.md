@@ -48,8 +48,9 @@ The Oracle measures what knowing fair value earns under these constraints, a
 question a real market cannot be asked, because answering it means observing
 fair value.
 
-Treat it as a reference point rather than a ceiling. It gets the same gross
-exposure and participation cap as everything else and spends them on a naive
+Treat it as a reference point rather than a ceiling. It gets no extra
+capital: gross exposure and the 2%-of-ADV participation cap are the same ones
+the momentum and mean-reversion baselines get, and it spends them on a naive
 rule - equal weight, long the five most underpriced names and short the five
 most overpriced (`top_k=5` per side). Perfect knowledge of the mispricing
 does not make that the best portfolio the same gross can buy, and agents do
@@ -71,11 +72,15 @@ of the same signal the Oracle gets exactly - which is why its capture climbs
 with the horizon, as the Horizon bullet below measures. With no privileged
 read of `mispricing_s` at all it still out-earns the revealed version on five
 of twelve markets, the largest at capture 1.520. What it has that the Oracle
-does not is a ranking that moves: `Oracle.act` sorts on the *level* of
+does not is a ranking that turns over: `Oracle.act` sorts on the *level* of
 `mispricing_s` and puts the whole book on the two extremes of it, equal
-weight, every step. Knowing the level exactly is not the same as knowing
-which of those names will converge inside a ten-day window, and the fixed
-rule has no way to express the difference.
+weight, every step - and a level on a 60-day half-life barely moves inside a
+ten-day window, so it holds the same names rather than trading them. On seed
+0 of the grid its selected ten change on eleven of the run's fifty-nine step
+transitions, and it turns over $5.4M against mean-reversion's $52.4M on the
+same market. Knowing the level exactly is not the same as knowing which of
+those names will converge inside the window, and the fixed rule has no way
+to express the difference.
 
 Buy-and-hold's single win is capture 1.016, a market that happened to drift
 far enough that holding it beat trading the true mispricing through a fixed

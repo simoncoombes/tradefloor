@@ -130,8 +130,10 @@ supported.
 Real, measured, and already in the docs: the five matching cross-platform
 digests, one per wheel target, compared inside the release workflow; the
 rebalance-cadence measurement, which on `pt-v12` swings one signal from
-+37.5% at three decisions a day to +9.8% at six and -27.5% at twelve
-(`tools/remeasure/remeasure.py --only rebalance`, 2026-08-27); the
++37.55% at three decisions a day to +9.79% at six and -27.46% at twelve
+(seed 2026, `Universe.random(40, seed=7)`, 30 days; the method is written
+out in `docs/strategy-specs.md` and re-runs under
+`tools/remeasure/remeasure.py --only rebalance`); the
 agent-versus-Oracle table over the twelve-market grid; the paired sign tests
 beside it; the fourteen realism statistics against real-equity ranges; the
 performance timings; the round-trip shortfall range, -17.72 to +2.03 bps over

@@ -182,14 +182,16 @@ the four has room to spare, and a single seed can sit on the wrong side of
 any of them.
 
 **Beyond 504 days is now measured, and that sentence used to say
-otherwise.** `pt-v12` has been run to 756, 1260 and 2520 days on thirty
-seeds. At 2520 days it holds 10 of 14, but against the 504-day bands, which
-are the wrong ruler for a ten-year window and are quoted here only because
-no ten-year bands have been derived. The one thing that ruler does settle is
-that nothing runs away: annualised volatility year by year over the ten
-years reads 31.5, 35.6, 30.2, 33.5, 33.0, 33.1, 31.3, 32.4, 32.4 and 31.6
-percent, which is flat. A long run drifts out of the panel because the
-statistics move with the window, not because the market it describes decays.
+otherwise.** `tools/calibration/long_horizon.py` has run `pt-v12` to 756,
+1260 and 2520 days on thirty seeds. At 2520 days it holds 10 of 14, but
+against the 504-day bands, which are the wrong ruler for a ten-year window
+and are quoted here only because no ten-year bands have been derived. That
+nothing runs away is settled by a second measurement that needs no band at
+all: `tools/calibration/memory_vs_drift.py` reads annualised volatility year
+by year over ten years on twenty seeds, and it gives 31.5, 35.6, 30.2, 33.5,
+33.0, 33.1, 31.3, 32.4, 32.4 and 31.6 percent, which is flat. A long run
+drifts out of the panel because the statistics move with the window, not
+because the market it describes decays.
 
 ### Gap 2: volatility memory has the wrong *shape* rather than the wrong length
 
@@ -322,14 +324,31 @@ QE. Worked through in `examples/09-a-pandemic-shaped-market.ipynb`, which
 prints the table and the count.
 
 **The transient**, how fast the market *reacts* to a shock as distinct from
-where it settles, is the half of this gap that did not close. Measured on
-`pt-v10`, the preset retained **27.6%** of its predecessor's shock response,
-because it raised factor-variance persistence to 0.989 to buy volatility
-clustering, and a 63-day half-life cannot track a twenty-day spike. Nothing
-in `pt-v11` or `pt-v12` touched that persistence, so the ceiling it imposes
-is unchanged.
-<!-- FLAG: 27.6% is the pt-v10 measurement and has not been re-measured on
-     pt-v12; the claim carried forward is the unchanged persistence. -->
+where it settles, is the half of this gap that narrowed rather than closed.
+The quantity is the ratio of pooled volatility in a shocked window to a flat
+one, so 1.00 would be a market that does not react at all. Re-measured on
+five seeds at the `pt-v12` boundary:
+
+| preset | shock/flat volatility ratio |
+|---|---|
+| `pt-v1` | 1.23, 1.25, 1.17 |
+| `pt-v3` | 1.064, 1.062, 1.037 |
+| **`pt-v12`** | 1.192, 1.094, 1.124, 1.094, 1.141, **median 1.124** |
+
+`pt-v3` raised factor-variance persistence to 0.989 to buy volatility
+clustering, and a 63-day half-life cannot track a twenty-day spike, which is
+what flattened the response. That persistence is untouched since, but the
+crisis work in `pt-v11` carried into `pt-v12` -- crisis blend gain, sector
+VIX coupling, peer news transfer -- roughly doubled the transient anyway,
+without being aimed at it. It is still short of `pt-v1` and it is no longer a
+known failure: `test_a_vix_shock_raises_realised_volatility` was
+`xfail(strict=True)` from the `pt-v3` boundary and passes on `pt-v12`.
+Calibration record §118.
+
+Quote the ratios above and not a "shock response retained" percentage. That
+percentage is what the harness prints and it is a ratio of two small excesses
+over 1.0, so a move of 0.005 becomes a double-digit headline; §39 records the
+same trap producing a spurious "112.1% retained".
 
 **This has been attacked directly and the attack failed, which is why it is
 a gap rather than a task.** A two-timescale variance mixture was built to
@@ -382,12 +401,18 @@ a clamp of 6.0%, with sd 1.2 around a mean of 2.0%. US CPI year-on-year over
 the endogenous series is short of is spread, sd 1.2 against 2.18, rather than
 memory: the monthly series has AR(1) +0.958 against real CPI's +0.978, so the
 model is slightly the *less* persistent of the two rather than the more. An
-earlier five-seed reading of the same measurement is still quoted in two
-places and should not be mistaken for this one: the `macro_regime` reason
-string in `envelope.check` gives the peaks as 4.06% to 4.11% against a real
-9.1%, and the 0.1.4 changelog entry adds sd 1.23 around a mean of 1.99%. The
-thirty-seed figures here are the ones `envelope.json` publishes and are the
-ones to cite.
+earlier reading of the same measurement, on a handful of seeds rather than
+thirty, is kept on purpose in the 0.1.4 changelog entry and in the docstring
+of the test that pins this gap, and any other copy of it still in circulation
+is that same earlier reading rather than a competing one: peaks of 4.06% to
+4.11% against a real 9.1%, sd 1.23 around a mean of 1.99%, and AR(1) +0.936
+against +0.894 for real CPI across 2020 and 2021, which is a different window
+as well as a different seed count. Its two homes do not agree on that count
+either: the changelog says five seeds throughout, the test docstring five for
+the peaks and eight for the AR(1) pair. `envelope.check`'s `macro_regime`
+reason carried the earlier reading until 2026-08-27 and now quotes the
+thirty-seed figures above, which are the ones `envelope.json` publishes and
+the ones to cite.
 
 The central bank's crisis cadence depends on it, so it is unreachable too.
 That path pulls the next meeting in to 21 to 30 days when a decision leaves

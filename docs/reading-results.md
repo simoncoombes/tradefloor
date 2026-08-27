@@ -20,9 +20,15 @@ and duckdb all read them zero-copy, and the package depends on none of them.
 
 ```python
 import polars as pl
+import pretium as pt
+
+engine = pt.Engine(seed=42, universe=pt.Universe.random(10, seed=3))
+engine.run_days(5)
 
 bars = pl.DataFrame(engine.bars(grain="day"))
 truth = pl.DataFrame(engine.truth())
+print(bars.shape, truth.shape)
+# (50, 8) (19500, 15)
 ```
 
 Every measurement column is `f64`. There is no `f32` option, because the

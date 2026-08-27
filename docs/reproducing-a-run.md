@@ -112,10 +112,11 @@ same = pt.replay(log, seed=42, universe=universe, macro=macro)
 ```
 
 The log holds every input the engine consumed: `open_market`, `run_session`
-with its hour, minute, day of week, tick count, news and order flow,
-`close_market`, `record`, `pin_macro`, listings and delistings, and any
-explicit RNG draws. `pin_macro` is logged, so a scenario run replays from its
-own log with no special handling.
+with its hour, minute, day of week, tick count, volatility, news, order flow
+and whether it closes the market at the end, `tick` for a session driven one
+tick at a time, `close_market`, `record`, `pin_macro`, listings and
+delistings, and any explicit RNG draws. `pin_macro` is logged, so a scenario
+run replays from its own log with no special handling.
 
 An unknown operation raises on replay rather than being skipped, because a
 replay that silently ignored an entry would produce a market that is not the
