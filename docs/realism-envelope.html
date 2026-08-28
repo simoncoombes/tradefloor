@@ -49,37 +49,34 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div style="min-height:100vh;padding:0 0 5rem">
 <div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
 <header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu pt-here"><summary>Trust it<span class="pt-caret">▼</span></summary><div><span class="pt-current">Realism envelope</span><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main class="pt-s18">
+<div id="pt-root"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">THE REALISM ENVELOPE</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE REALISM ENVELOPE</span>
 </div>
 
-<section class="pt-s33">
-<h1 class="pt-s30">The realism envelope</h1>
-<p class="pt-s24">There is no realism score. There is a panel of fourteen measurements, a horizon they hold to, and five named gaps.</p>
+<section class="pt-s32">
+<h1 class="pt-s29">The realism envelope</h1>
+<p class="pt-s23">There is no realism score. There is a panel of fourteen measurements, a horizon they hold to, and five named gaps.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1rem">
 
-<div class="pt-s83">
+<div class="pt-s81">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent);font-variant-numeric:tabular-nums">14</span>
 <span class="pt-s2">statistics in band at one year</span>
 </div>
 
-
-<div class="pt-s83">
+<div class="pt-s81">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent);font-variant-numeric:tabular-nums">252</span>
 <span class="pt-s2">trading days certified</span>
 </div>
 
-
-<div class="pt-s83">
+<div class="pt-s81">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink);font-variant-numeric:tabular-nums">30</span>
 <span class="pt-s2">seeds behind the panel</span>
 </div>
 
-
-<div class="pt-s83">
+<div class="pt-s81">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--amber);font-variant-numeric:tabular-nums">5</span>
 <span class="pt-s2">named gaps</span>
 </div>
@@ -87,232 +84,167 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </section>
 
-<section id="panel" class="pt-s34">
+<section id="panel" class="pt-s33">
 <h2 class="pt-s7">What the fourteen measure</h2>
 <p class="pt-s13">Each row is one habit of a real market. The bar is the range that real equities hold. The dot is what the shipped preset measured at 252 days. A dot inside the bar means the model got that habit correct.</p>
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.55rem">
 
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">annualised_vol_pct</span>
-<span class="pt-s159">how much prices move in a year</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">annualised_vol_pct</span>
+<span class="pt-s149">how much prices move in a year</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(84.6% - 9.3px)"></span>
 </span>
-<span class="pt-s135">32.7604</span>
+<span class="pt-s129">32.7604</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">excess_kurtosis</span>
-<span class="pt-s159">how fat the tails are</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">excess_kurtosis</span>
+<span class="pt-s149">how fat the tails are</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(12.9% - 1.4px)"></span>
 </span>
-<span class="pt-s135">6.7001</span>
+<span class="pt-s129">6.7001</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">return_acf1</span>
-<span class="pt-s159">does yesterday predict today</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">return_acf1</span>
+<span class="pt-s149">does yesterday predict today</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(74.2% - 8.2px)"></span>
 </span>
-<span class="pt-s135">0.0239</span>
+<span class="pt-s129">0.0239</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">abs_return_acf1</span>
-<span class="pt-s159">does a wild day follow a wild day</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">abs_return_acf1</span>
+<span class="pt-s149">does a wild day follow a wild day</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(45.4% - 5.0px)"></span>
 </span>
-<span class="pt-s135">0.1107</span>
+<span class="pt-s129">0.1107</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">abs_return_acf5</span>
-<span class="pt-s159">the same, one week apart</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">abs_return_acf5</span>
+<span class="pt-s149">the same, one week apart</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(32.6% - 3.6px)"></span>
 </span>
-<span class="pt-s135">0.0428</span>
+<span class="pt-s129">0.0428</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">abs_return_acf20</span>
-<span class="pt-s159">the same, one month apart</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">abs_return_acf20</span>
+<span class="pt-s149">the same, one month apart</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(36.7% - 4.0px)"></span>
 </span>
-<span class="pt-s135">0.0040</span>
+<span class="pt-s129">0.0040</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">cross_sectional_corr</span>
-<span class="pt-s159">how much names move together</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">cross_sectional_corr</span>
+<span class="pt-s149">how much names move together</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(49.5% - 5.4px)"></span>
 </span>
-<span class="pt-s135">0.3177</span>
+<span class="pt-s129">0.3177</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">volume_abs_return_corr</span>
-<span class="pt-s159">do big moves come with volume</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">volume_abs_return_corr</span>
+<span class="pt-s149">do big moves come with volume</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(49.9% - 5.5px)"></span>
 </span>
-<span class="pt-s135">0.5599</span>
+<span class="pt-s129">0.5599</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">leverage_effect</span>
-<span class="pt-s159">do falls raise volatility</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">leverage_effect</span>
+<span class="pt-s149">do falls raise volatility</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(74.9% - 8.2px)"></span>
 </span>
-<span class="pt-s135">-0.0401</span>
+<span class="pt-s129">-0.0401</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">volume_change_acf1</span>
-<span class="pt-s159">does volume mean-revert</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">volume_change_acf1</span>
+<span class="pt-s149">does volume mean-revert</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(45.3% - 5.0px)"></span>
 </span>
-<span class="pt-s135">-0.2656</span>
+<span class="pt-s129">-0.2656</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">corr_asymmetry</span>
-<span class="pt-s159">do names couple more when falling</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">corr_asymmetry</span>
+<span class="pt-s149">do names couple more when falling</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(33.6% - 3.7px)"></span>
 </span>
-<span class="pt-s135">-0.0147</span>
+<span class="pt-s129">-0.0147</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">corr_asymmetry_lagged</span>
-<span class="pt-s159">the same, one day later</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">corr_asymmetry_lagged</span>
+<span class="pt-s149">the same, one day later</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(29.1% - 3.2px)"></span>
 </span>
-<span class="pt-s135">0.0181</span>
+<span class="pt-s129">0.0181</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">sector_excess_corr</span>
-<span class="pt-s159">do industries move together</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">sector_excess_corr</span>
+<span class="pt-s149">do industries move together</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(81.6% - 9.0px)"></span>
 </span>
-<span class="pt-s135">0.2079</span>
+<span class="pt-s129">0.2079</span>
 </div>
 
-<div class="pt-s102">
-<span>band floor</span>
-<span>band ceiling</span>
-</div>
-
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">corr_persistence_acf1</span>
-<span class="pt-s159">does correlation stay high after a panic</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">corr_persistence_acf1</span>
+<span class="pt-s149">does correlation stay high after a panic</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(46.9% - 5.2px)"></span>
 </span>
-<span class="pt-s135">0.1525</span>
+<span class="pt-s129">0.1525</span>
 </div>
 
-<div class="pt-s102">
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
 <span>band floor</span>
 <span>band ceiling</span>
 </div>
@@ -320,76 +252,67 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p style="color:var(--ink-2);margin:0.2rem 0 0">All fourteen dots sit inside their bands. That is a market with the correct volatility, the correct tails and the correct co-movement. Industries move together more than strangers do. Correlation stays high after a panic, volume behaves, and the model produces its own volatility episodes.</p>
 </section>
 
-<section class="pt-s34">
+<section class="pt-s33">
 <h2 class="pt-s7">Why the horizon stops at 252 days</h2>
-<div class="pt-s29">
-<div class="pt-s191">
+<div class="pt-s28">
+<div class="pt-s177">
 <h3 class="pt-s4">The count is not the reason</h3>
 <p class="pt-s1">At 504 days pt-v12 also holds all fourteen, against bands that were re-derived for that window. pt-v3 held seven there. pt-v10 held thirteen.</p>
 <p class="pt-s1">Two things keep the certification at one year. Annualised volatility reads 33.89 against a band that ends at 34.0, which is thin headroom. And certified means measured at 252 days on thirty seeds, which is what this module measures.</p>
 </div>
-<div class="pt-s191">
+<div class="pt-s177">
 <h3 class="pt-s4">Nothing runs away</h3>
 <p class="pt-s1">Annualised volatility, measured year by year over ten years on twenty seeds:</p>
 <div style="display:flex;gap:3px;align-items:flex-end;height:74px">
 
-<span class="pt-s115">
+<span class="pt-s110">
 <span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:38px"></span>
-<span class="pt-s127">31.5</span>
+<span class="pt-s121">31.5</span>
 </span>
 
-
-<span class="pt-s115">
+<span class="pt-s110">
 <span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:66px"></span>
-<span class="pt-s127">35.6</span>
+<span class="pt-s121">35.6</span>
 </span>
 
-
-<span class="pt-s115">
+<span class="pt-s110">
 <span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:28px"></span>
-<span class="pt-s127">30.2</span>
+<span class="pt-s121">30.2</span>
 </span>
 
-
-<span class="pt-s115">
+<span class="pt-s110">
 <span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:52px"></span>
-<span class="pt-s127">33.5</span>
+<span class="pt-s121">33.5</span>
 </span>
 
-
-<span class="pt-s115">
+<span class="pt-s110">
 <span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:48px"></span>
-<span class="pt-s127">33.0</span>
+<span class="pt-s121">33.0</span>
 </span>
 
-
-<span class="pt-s115">
+<span class="pt-s110">
 <span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:49px"></span>
-<span class="pt-s127">33.1</span>
+<span class="pt-s121">33.1</span>
 </span>
 
-
-<span class="pt-s115">
+<span class="pt-s110">
 <span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:36px"></span>
-<span class="pt-s127">31.3</span>
+<span class="pt-s121">31.3</span>
 </span>
 
-
-<span class="pt-s115">
+<span class="pt-s110">
 <span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:44px"></span>
-<span class="pt-s127">32.4</span>
+<span class="pt-s121">32.4</span>
 </span>
 
-
-<span class="pt-s115">
+<span class="pt-s110">
 <span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:44px"></span>
-<span class="pt-s127">32.4</span>
+<span class="pt-s121">32.4</span>
 </span>
 
-
-<span class="pt-s115">
+<span class="pt-s110">
 <span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:38px"></span>
-<span class="pt-s127">31.6</span>
+<span class="pt-s121">31.6</span>
 </span>
 
 </div>
@@ -398,134 +321,125 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </section>
 
-<section id="gaps" class="pt-s19">
+<section id="gaps" class="pt-s18">
 <h2 class="pt-s7">The five gaps</h2>
-<p class="pt-s13">Each gap names what it forbids. <span class="pt-s27">pt.envelope.check()</span> refuses a question that falls outside one, so this is a function rather than a paragraph.</p>
+<p class="pt-s13">Each gap names what it forbids. <span class="pt-s26">pt.envelope.check()</span> refuses a question that falls outside one, so this is a function rather than a paragraph.</p>
 
 <details class="pt-s12">
-<summary class="pt-s90">
-<span class="pt-s133">horizon</span>
-<span class="pt-s51">the certified horizon is 252 days</span>
+<summary class="pt-s88">
+<span class="pt-s127">horizon</span>
+<span class="pt-s49">the certified horizon is 252 days</span>
 </summary>
-<div class="pt-s78">
-<div class="pt-s41">
-<span class="pt-s131">FORBIDS</span>
+<div class="pt-s76">
+<div class="pt-s39">
+<span class="pt-s125">FORBIDS</span>
 <span class="pt-s0">multi-year backtests, and anything keyed on volatility dynamics beyond one year</span>
 </div>
-<div class="pt-s41">
-<span class="pt-s48">MEASURED</span>
+<div class="pt-s39">
+<span class="pt-s46">MEASURED</span>
 <span class="pt-s0">At 504 days pt-v12 holds all fourteen against re-derived bands. At 2520 days it holds ten of fourteen against the 504-day bands.</span>
 </div>
-<div class="pt-s98">
+<div class="pt-s95">
 
-<span class="pt-s132">abs_return_acf1</span>
+<span class="pt-s126">abs_return_acf1</span>
 
+<span class="pt-s126">abs_return_acf5</span>
 
-<span class="pt-s132">abs_return_acf5</span>
+<span class="pt-s126">return_acf1</span>
 
-
-<span class="pt-s132">return_acf1</span>
-
-
-<span class="pt-s132">excess_kurtosis</span>
+<span class="pt-s126">excess_kurtosis</span>
 
 </div>
 </div>
 </details>
 
-
 <details class="pt-s12">
-<summary class="pt-s90">
-<span class="pt-s133">decay-shape</span>
-<span class="pt-s51">volatility memory decays exponentially, not hyperbolically</span>
+<summary class="pt-s88">
+<span class="pt-s127">decay-shape</span>
+<span class="pt-s49">volatility memory decays exponentially, not hyperbolically</span>
 </summary>
-<div class="pt-s78">
-<div class="pt-s41">
-<span class="pt-s131">FORBIDS</span>
+<div class="pt-s76">
+<div class="pt-s39">
+<span class="pt-s125">FORBIDS</span>
 <span class="pt-s0">strategies whose edge depends on volatility memory beyond about lag 20 -- vol targeting and risk parity on a one-month or longer estimate</span>
 </div>
-<div class="pt-s41">
-<span class="pt-s48">MEASURED</span>
+<div class="pt-s39">
+<span class="pt-s46">MEASURED</span>
 <span class="pt-s0">The log-log slope over lags 1 to 20 reads -0.953 against a real -0.436. The curve turns negative by lag 30, where real markets stay weakly positive to lag 60.</span>
 </div>
-<div class="pt-s98">
+<div class="pt-s95">
 
-<span class="pt-s132">abs_return_acf20</span>
+<span class="pt-s126">abs_return_acf20</span>
 
 </div>
 </div>
 </details>
 
-
 <details class="pt-s12">
-<summary class="pt-s90">
-<span class="pt-s133">scenario-magnitude</span>
-<span class="pt-s51">a scenario's size is right on average and unreliable in one run</span>
+<summary class="pt-s88">
+<span class="pt-s127">scenario-magnitude</span>
+<span class="pt-s49">a scenario's size is right on average and unreliable in one run</span>
 </summary>
-<div class="pt-s78">
-<div class="pt-s41">
-<span class="pt-s131">FORBIDS</span>
+<div class="pt-s76">
+<div class="pt-s39">
+<span class="pt-s125">FORBIDS</span>
 <span class="pt-s0">sizing a scenario's impact rather than detecting it</span>
 </div>
-<div class="pt-s41">
-<span class="pt-s48">MEASURED</span>
+<div class="pt-s39">
+<span class="pt-s46">MEASURED</span>
 <span class="pt-s0">The steady-state lever reads 6.04x against a real 6.16x. Residual dispersion over the driven window runs 1.565 times real, which is the defect.</span>
 </div>
-<div class="pt-s98">
+<div class="pt-s95">
 
-<span class="pt-s132">no single statistic carries this one</span>
+<span class="pt-s126">no single statistic carries this one</span>
 
 </div>
 </div>
 </details>
 
-
 <details class="pt-s12">
-<summary class="pt-s90">
-<span class="pt-s133">macro-range</span>
-<span class="pt-s51">the endogenous macro state cannot reach its own crisis regimes</span>
+<summary class="pt-s88">
+<span class="pt-s127">macro-range</span>
+<span class="pt-s49">the endogenous macro state cannot reach its own crisis regimes</span>
 </summary>
-<div class="pt-s78">
-<div class="pt-s41">
-<span class="pt-s131">FORBIDS</span>
+<div class="pt-s76">
+<div class="pt-s39">
+<span class="pt-s125">FORBIDS</span>
 <span class="pt-s0">studying inflation regimes or policy crises from the endogenous economy alone</span>
 </div>
-<div class="pt-s41">
-<span class="pt-s48">MEASURED</span>
+<div class="pt-s39">
+<span class="pt-s46">MEASURED</span>
 <span class="pt-s0">Endogenous inflation peaks at 4.0% on every seed over five years. Real US CPI peaked at 9.0% in June 2022.</span>
 </div>
-<div class="pt-s98">
+<div class="pt-s95">
 
-<span class="pt-s132">no single statistic carries this one</span>
+<span class="pt-s126">no single statistic carries this one</span>
 
 </div>
 </div>
 </details>
 
-
 <details class="pt-s12">
-<summary class="pt-s90">
-<span class="pt-s133">roster-concentration</span>
-<span class="pt-s51">a concentrated roster holds at one year and comes apart at two</span>
+<summary class="pt-s88">
+<span class="pt-s127">roster-concentration</span>
+<span class="pt-s49">a concentrated roster holds at one year and comes apart at two</span>
 </summary>
-<div class="pt-s78">
-<div class="pt-s41">
-<span class="pt-s131">FORBIDS</span>
+<div class="pt-s76">
+<div class="pt-s39">
+<span class="pt-s125">FORBIDS</span>
 <span class="pt-s0">inheriting this envelope for a sector-concentrated roster BEYOND one year -- at the certified horizon it now transfers</span>
 </div>
-<div class="pt-s41">
-<span class="pt-s48">MEASURED</span>
+<div class="pt-s39">
+<span class="pt-s46">MEASURED</span>
 <span class="pt-s0">At 252 days every roster shape holds all fourteen. At 504 days an S&amp;P-like roster holds thirteen and a technology-heavy roster holds eleven.</span>
 </div>
-<div class="pt-s98">
+<div class="pt-s95">
 
-<span class="pt-s132">cross_sectional_corr</span>
+<span class="pt-s126">cross_sectional_corr</span>
 
+<span class="pt-s126">annualised_vol_pct</span>
 
-<span class="pt-s132">annualised_vol_pct</span>
-
-
-<span class="pt-s132">corr_persistence_acf1</span>
+<span class="pt-s126">corr_persistence_acf1</span>
 
 </div>
 </div>
@@ -533,14 +447,14 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">What a result may claim</h2>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
-<h3 class="pt-s67">You can say this</h3>
-<p class="pt-s56">The strategy behaved this way in a market that reproduces the fourteen habits of real equities over a trading year. Here is the manifest, so you can run it again.</p>
+<h3 class="pt-s65">You can say this</h3>
+<p class="pt-s53">The strategy behaved this way in a market that reproduces the fourteen habits of real equities over a trading year. Here is the manifest, so you can run it again.</p>
 </div>
-<div class="pt-s9">
+<div class="pt-s8">
 <h3 class="pt-s4">You can not say this</h3>
 <p class="pt-s1">The strategy will earn this in a real market. The price process comes from a known model, so a strategy that fits the structure of that model looks excellent and teaches you nothing.</p>
 </div>
@@ -564,111 +478,111 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">THE REALISM ENVELOPE</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE REALISM ENVELOPE</span>
 </div>
 
-<section class="pt-s33">
-<h1 class="pt-s30">The realism envelope</h1>
-<p class="pt-s24">There is no realism score. There is a panel of fourteen measurements, a horizon they hold to, and five named gaps.</p>
+<section class="pt-s32">
+<h1 class="pt-s29">The realism envelope</h1>
+<p class="pt-s23">There is no realism score. There is a panel of fourteen measurements, a horizon they hold to, and five named gaps.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1rem">
 <sc-for list="{{ headline }}" as="h">
-<div class="pt-s83">
+<div class="pt-s81">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:{{ h.col }};font-variant-numeric:tabular-nums">{{ h.n }}</span>
 <span class="pt-s2">{{ h.label }}</span>
 </div>
-
-</sc-for></div>
+</sc-for>
+</div>
 </section>
 
-<section id="panel" class="pt-s34">
+<section id="panel" class="pt-s33">
 <h2 class="pt-s7">What the fourteen measure</h2>
 <p class="pt-s13">Each row is one habit of a real market. The bar is the range that real equities hold. The dot is what the shipped preset measured at 252 days. A dot inside the bar means the model got that habit correct.</p>
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.55rem">
 <sc-for list="{{ panel }}" as="p">
-<div class="pt-s108">
-<span class="pt-s39">
-<span class="pt-s138">{{ p.k }}</span>
-<span class="pt-s159">{{ p.plain }}</span>
+<div class="pt-s104">
+<span class="pt-s37">
+<span class="pt-s131">{{ p.k }}</span>
+<span class="pt-s149">{{ p.plain }}</span>
 </span>
-<span class="pt-s26">
+<span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:{{ p.left }}"></span>
 </span>
-<span class="pt-s135">{{ p.m }}</span>
+<span class="pt-s129">{{ p.m }}</span>
 </div>
-
-<div class="pt-s102">
+</sc-for>
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
 <span>band floor</span>
 <span>band ceiling</span>
 </div>
-</sc-for></div>
+</div>
 <p style="color:var(--ink-2);margin:0.2rem 0 0">All fourteen dots sit inside their bands. That is a market with the correct volatility, the correct tails and the correct co-movement. Industries move together more than strangers do. Correlation stays high after a panic, volume behaves, and the model produces its own volatility episodes.</p>
 </section>
 
-<section class="pt-s34">
+<section class="pt-s33">
 <h2 class="pt-s7">Why the horizon stops at 252 days</h2>
-<div class="pt-s29">
-<div class="pt-s191">
+<div class="pt-s28">
+<div class="pt-s177">
 <h3 class="pt-s4">The count is not the reason</h3>
 <p class="pt-s1">At 504 days pt-v12 also holds all fourteen, against bands that were re-derived for that window. pt-v3 held seven there. pt-v10 held thirteen.</p>
 <p class="pt-s1">Two things keep the certification at one year. Annualised volatility reads 33.89 against a band that ends at 34.0, which is thin headroom. And certified means measured at 252 days on thirty seeds, which is what this module measures.</p>
 </div>
-<div class="pt-s191">
+<div class="pt-s177">
 <h3 class="pt-s4">Nothing runs away</h3>
 <p class="pt-s1">Annualised volatility, measured year by year over ten years on twenty seeds:</p>
 <div style="display:flex;gap:3px;align-items:flex-end;height:74px">
 <sc-for list="{{ decade }}" as="y">
-<span class="pt-s115">
+<span class="pt-s110">
 <span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:{{ y.h }}"></span>
-<span class="pt-s127">{{ y.v }}</span>
+<span class="pt-s121">{{ y.v }}</span>
 </span>
-
-</sc-for></div>
+</sc-for>
+</div>
 <p class="pt-s1">Flat, with the year-to-year variation that a real market has. At 2520 days the panel holds ten of the fourteen, graded against the 504-day bands, which are the wrong ruler for a ten-year window.</p>
 </div>
 </div>
 </section>
 
-<section id="gaps" class="pt-s19">
+<section id="gaps" class="pt-s18">
 <h2 class="pt-s7">The five gaps</h2>
-<p class="pt-s13">Each gap names what it forbids. <span class="pt-s27">pt.envelope.check()</span> refuses a question that falls outside one, so this is a function rather than a paragraph.</p>
+<p class="pt-s13">Each gap names what it forbids. <span class="pt-s26">pt.envelope.check()</span> refuses a question that falls outside one, so this is a function rather than a paragraph.</p>
 <sc-for list="{{ gaps }}" as="g">
 <details class="pt-s12">
-<summary class="pt-s90">
-<span class="pt-s133">{{ g.id }}</span>
-<span class="pt-s51">{{ g.summary }}</span>
+<summary class="pt-s88">
+<span class="pt-s127">{{ g.id }}</span>
+<span class="pt-s49">{{ g.summary }}</span>
 </summary>
-<div class="pt-s78">
-<div class="pt-s41">
-<span class="pt-s131">FORBIDS</span>
+<div class="pt-s76">
+<div class="pt-s39">
+<span class="pt-s125">FORBIDS</span>
 <span class="pt-s0">{{ g.forbids }}</span>
 </div>
-<div class="pt-s41">
-<span class="pt-s48">MEASURED</span>
+<div class="pt-s39">
+<span class="pt-s46">MEASURED</span>
 <span class="pt-s0">{{ g.note }}</span>
 </div>
-<div class="pt-s98">
+<div class="pt-s95">
 <sc-for list="{{ g.stats }}" as="s">
-<span class="pt-s132">{{ s }}</span>
-
-</sc-for></div>
+<span class="pt-s126">{{ s }}</span>
+</sc-for>
+</div>
 </div>
 </details>
+</sc-for>
+</section>
 
-</sc-for></section>
-
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">What a result may claim</h2>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
-<h3 class="pt-s67">You can say this</h3>
-<p class="pt-s56">The strategy behaved this way in a market that reproduces the fourteen habits of real equities over a trading year. Here is the manifest, so you can run it again.</p>
+<h3 class="pt-s65">You can say this</h3>
+<p class="pt-s53">The strategy behaved this way in a market that reproduces the fourteen habits of real equities over a trading year. Here is the manifest, so you can run it again.</p>
 </div>
-<div class="pt-s9">
+<div class="pt-s8">
 <h3 class="pt-s4">You can not say this</h3>
 <p class="pt-s1">The strategy will earn this in a real market. The price process comes from a known model, so a strategy that fits the structure of that model looks excellent and teaches you nothing.</p>
 </div>

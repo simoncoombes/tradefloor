@@ -48,15 +48,15 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div style="min-height:100vh;padding:0 0 5rem">
 <div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
 <header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu pt-here"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><span class="pt-current">Parameters</span></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main class="pt-s18">
+<div id="pt-root"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">PARAMETERS</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">PARAMETERS</span>
 </div>
 
-<section class="pt-s33">
-<h1 class="pt-s30">Parameters</h1>
-<p class="pt-s24">Most people never touch these. Read this page if you are calibrating the model rather than running one.</p>
+<section class="pt-s32">
+<h1 class="pt-s29">Parameters</h1>
+<p class="pt-s23">Most people never touch these. Read this page if you are calibrating the model rather than running one.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1rem">
 
@@ -66,20 +66,17 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <span style="font-size:0.8125rem;color:var(--accent-deep)">Names you can override at runtime.</span>
 </div>
 
-
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:2px">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink-2);font-variant-numeric:tabular-nums">118</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.06em;color:var(--ink-2)">TO_DICT()</span>
 <span style="font-size:0.8125rem;color:var(--ink-2)">Entries visible in the preset and covered by the fingerprint.</span>
 </div>
 
-
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:2px">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink-2);font-variant-numeric:tabular-nums">31</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.06em;color:var(--ink-2)">THE GAP</span>
 <span style="font-size:0.8125rem;color:var(--ink-2)">Visible, fingerprinted, and refused as an override.</span>
 </div>
-
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:2px">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink-2);font-variant-numeric:tabular-nums">8</span>
@@ -90,119 +87,107 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </section>
 
-<section class="pt-s34">
+<section class="pt-s33">
 <h2 class="pt-s7">Four kinds of coefficient</h2>
 <p class="pt-s13">The difference matters, because a change you make in one category renames the preset and a change in another is refused outright.</p>
 
-<div class="pt-s87">
-<div class="pt-s40">
+<div class="pt-s85">
+<div class="pt-s38">
 <h3 class="pt-s4">Settable</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--accent)">RENAMES THE PRESET</span>
 </div>
-<div class="pt-s59">
+<div class="pt-s56">
 <p class="pt-s1">87 names. Override one and the fingerprint becomes custom-, followed by 8 hex characters, so the changed model can not present as the shipped one.</p>
-<span class="pt-s147">momentum_theta, garch_alpha, market_factor_sigma</span>
+<span class="pt-s139">momentum_theta, garch_alpha, market_factor_sigma</span>
 </div>
 </div>
 
-
-<div class="pt-s87">
-<div class="pt-s40">
+<div class="pt-s85">
+<div class="pt-s38">
 <h3 class="pt-s4">Derived</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--amber)">RECOMPUTED, NOT SET</span>
 </div>
-<div class="pt-s59">
+<div class="pt-s56">
 <p class="pt-s1">Two coefficients are carried as recorded bit patterns and can not be set directly. Overriding the half-life recomputes both, deterministically on a given build but not bit-identically to any recorded constant.</p>
-<span class="pt-s147">mispricing_phi, s_phi_tick</span>
+<span class="pt-s139">mispricing_phi, s_phi_tick</span>
 </div>
 </div>
 
-
-<div class="pt-s87">
-<div class="pt-s40">
+<div class="pt-s85">
+<div class="pt-s38">
 <h3 class="pt-s4">Guards</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--amber)">SETTABLE, EXCLUDED FROM SEARCH</span>
 </div>
-<div class="pt-s59">
+<div class="pt-s56">
 <p class="pt-s1">Four guards live in the tick chain and are settable, but a calibration search excludes them, because they are worst-case guarantees rather than tuning knobs. One more is not settable at all.</p>
-<span class="pt-s147">the mispricing cap, the crowd lean cap, the session breaker, the price cap. daily_shock_cap is fixed</span>
+<span class="pt-s139">the mispricing cap, the crowd lean cap, the session breaker, the price cap. daily_shock_cap is fixed</span>
 </div>
 </div>
 
-
-<div class="pt-s87">
-<div class="pt-s40">
+<div class="pt-s85">
+<div class="pt-s38">
 <h3 class="pt-s4">Compile-time</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--red)">REFUSED BY NAME</span>
 </div>
-<div class="pt-s59">
+<div class="pt-s56">
 <p class="pt-s1">28 constants are visible in to_dict() and covered by the fingerprint, and an override is refused. The engine would ignore it, and accepting it would make the fingerprint a lie.</p>
-<span class="pt-s147">the sector table among them</span>
+<span class="pt-s139">the sector table among them</span>
 </div>
 </div>
 
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">What the settable surface covers</h2>
-<p class="pt-s13">Read the list rather than a summary of it, with <span class="pt-s27">pt.ModelParams.settable()</span>. The shape of it:</p>
+<p class="pt-s13">Read the list rather than a summary of it, with <span class="pt-s26">pt.ModelParams.settable()</span>. The shape of it:</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.7rem">
 
-<div class="pt-s81">
+<div class="pt-s79">
 <span class="pt-s5">The two variance processes</span>
 <span class="pt-s2">Per-name GJR-GARCH and the market factor's, cascade components and the slow term included.</span>
 </div>
 
-
-<div class="pt-s81">
+<div class="pt-s79">
 <span class="pt-s5">The factor sigmas</span>
 <span class="pt-s2">Market and sector, plus the sector loadings and the idiosyncratic scale.</span>
 </div>
 
-
-<div class="pt-s81">
+<div class="pt-s79">
 <span class="pt-s5">Size and spread effects</span>
 <span class="pt-s2">What a large order pays, and how wide the maker quotes.</span>
 </div>
 
-
-<div class="pt-s81">
+<div class="pt-s79">
 <span class="pt-s5">Mispricing and crowd dynamics</span>
 <span class="pt-s2">The half-life, the herding term and the three crowd coefficients.</span>
 </div>
 
-
-<div class="pt-s81">
+<div class="pt-s79">
 <span class="pt-s5">News and flow coefficients</span>
 <span class="pt-s2">Endogenous news and peer news among them.</span>
 </div>
 
-
-<div class="pt-s81">
+<div class="pt-s79">
 <span class="pt-s5">Jump sizes and intensities</span>
 <span class="pt-s2">How often a jump fires and how large it is.</span>
 </div>
 
-
-<div class="pt-s81">
+<div class="pt-s79">
 <span class="pt-s5">The VIX channel</span>
 <span class="pt-s2">How the fear gauge reaches the market factor's variance.</span>
 </div>
 
-
-<div class="pt-s81">
+<div class="pt-s79">
 <span class="pt-s5">Crisis blend and stress</span>
 <span class="pt-s2">The crisis lever, the sector coupling and the remembered stress terms.</span>
 </div>
 
-
-<div class="pt-s81">
+<div class="pt-s79">
 <span class="pt-s5">The volume expression</span>
 <span class="pt-s2">volume_move_cap among them, the one pt-v12 moved off its compiled literal.</span>
 </div>
 
-
-<div class="pt-s81">
+<div class="pt-s79">
 <span class="pt-s5">The guards</span>
 <span class="pt-s2">Settable, and excluded from every calibration search.</span>
 </div>
@@ -210,10 +195,10 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">Change one, and the name changes</h2>
-<div class="pt-s29">
-<pre class="pt-s31">params = pt.ModelParams.from_preset(
+<div class="pt-s28">
+<pre class="pt-s30">params = pt.ModelParams.from_preset(
     "pt-v12",
     momentum_theta=0.05)
 
@@ -223,9 +208,9 @@ e = pt.Engine(seed=42, universe=u,
 e.model_fingerprint
 # "custom-7f290e34"</pre>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
-<h3 class="pt-s67">Why it renames rather than warns</h3>
-<p class="pt-s56">A changed preset that still called itself pt-v12 would let two different markets share one citation. The fingerprint is the first 8 hex characters of a sha256 over the canonical serialisation, so any settable change produces a new name.</p>
-<p class="pt-s56">An override of a compile-time constant is refused by name. Accepting one the engine would ignore would make the fingerprint a lie.</p>
+<h3 class="pt-s65">Why it renames rather than warns</h3>
+<p class="pt-s53">A changed preset that still called itself pt-v12 would let two different markets share one citation. The fingerprint is the first 8 hex characters of a sha256 over the canonical serialisation, so any settable change produces a new name.</p>
+<p class="pt-s53">An override of a compile-time constant is refused by name. Accepting one the engine would ignore would make the fingerprint a lie.</p>
 </div>
 </div>
 </section>
@@ -247,15 +232,15 @@ e.model_fingerprint
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">PARAMETERS</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">PARAMETERS</span>
 </div>
 
-<section class="pt-s33">
-<h1 class="pt-s30">Parameters</h1>
-<p class="pt-s24">Most people never touch these. Read this page if you are calibrating the model rather than running one.</p>
+<section class="pt-s32">
+<h1 class="pt-s29">Parameters</h1>
+<p class="pt-s23">Most people never touch these. Read this page if you are calibrating the model rather than running one.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1rem">
 <sc-for list="{{ counts }}" as="c">
@@ -264,44 +249,44 @@ e.model_fingerprint
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.06em;color:{{ c.fg }}">{{ c.k }}</span>
 <span style="font-size:0.8125rem;color:{{ c.fg }}">{{ c.v }}</span>
 </div>
-
-</sc-for></div>
+</sc-for>
+</div>
 </section>
 
-<section class="pt-s34">
+<section class="pt-s33">
 <h2 class="pt-s7">Four kinds of coefficient</h2>
 <p class="pt-s13">The difference matters, because a change you make in one category renames the preset and a change in another is refused outright.</p>
 <sc-for list="{{ kinds }}" as="k">
-<div class="pt-s87">
-<div class="pt-s40">
+<div class="pt-s85">
+<div class="pt-s38">
 <h3 class="pt-s4">{{ k.head }}</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:{{ k.tagCol }}">{{ k.tag }}</span>
 </div>
-<div class="pt-s59">
+<div class="pt-s56">
 <p class="pt-s1">{{ k.body }}</p>
-<span class="pt-s147">{{ k.eg }}</span>
+<span class="pt-s139">{{ k.eg }}</span>
 </div>
 </div>
+</sc-for>
+</section>
 
-</sc-for></section>
-
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">What the settable surface covers</h2>
-<p class="pt-s13">Read the list rather than a summary of it, with <span class="pt-s27">pt.ModelParams.settable()</span>. The shape of it:</p>
+<p class="pt-s13">Read the list rather than a summary of it, with <span class="pt-s26">pt.ModelParams.settable()</span>. The shape of it:</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.7rem">
 <sc-for list="{{ surface }}" as="s">
-<div class="pt-s81">
+<div class="pt-s79">
 <span class="pt-s5">{{ s.k }}</span>
 <span class="pt-s2">{{ s.v }}</span>
 </div>
-
-</sc-for></div>
+</sc-for>
+</div>
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">Change one, and the name changes</h2>
-<div class="pt-s29">
-<pre class="pt-s31">params = pt.ModelParams.from_preset(
+<div class="pt-s28">
+<pre class="pt-s30">params = pt.ModelParams.from_preset(
     "pt-v12",
     momentum_theta=0.05)
 
@@ -311,9 +296,9 @@ e = pt.Engine(seed=42, universe=u,
 e.model_fingerprint
 # "custom-7f290e34"</pre>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
-<h3 class="pt-s67">Why it renames rather than warns</h3>
-<p class="pt-s56">A changed preset that still called itself pt-v12 would let two different markets share one citation. The fingerprint is the first 8 hex characters of a sha256 over the canonical serialisation, so any settable change produces a new name.</p>
-<p class="pt-s56">An override of a compile-time constant is refused by name. Accepting one the engine would ignore would make the fingerprint a lie.</p>
+<h3 class="pt-s65">Why it renames rather than warns</h3>
+<p class="pt-s53">A changed preset that still called itself pt-v12 would let two different markets share one citation. The fingerprint is the first 8 hex characters of a sha256 over the canonical serialisation, so any settable change produces a new name.</p>
+<p class="pt-s53">An override of a compile-time constant is refused by name. Accepting one the engine would ignore would make the fingerprint a lie.</p>
 </div>
 </div>
 </section>

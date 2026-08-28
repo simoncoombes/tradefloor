@@ -48,19 +48,19 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div style="min-height:100vh;padding:0 0 5rem">
 <div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
 <header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu pt-here"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><span class="pt-current">Checkpoints and forking</span><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main class="pt-s18">
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">USE IT</a><span>/</span><span class="pt-s10">CHECKPOINTS AND FORKING</span>
+<div id="pt-root"><main class="pt-s17">
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">USE IT</a><span>/</span><span class="pt-s10">CHECKPOINTS AND FORKING</span>
 </div>
 <section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Checkpoints and forking</h1>
-<p class="pt-s24">Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.</p>
+<p class="pt-s23">Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.</p>
 <pre style="margin:0.4rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">mark = pt.Checkpoint.of(engine, universe=universe, seed=42)
 calm, hiked = mark.branch(2)   # two engines, identical up to day 60
 hiked.pin_macro(corporate_bond_yield=0.09)
 # calm and hiked now diverge only from here</pre>
 </section>
-<section class="pt-s194">
+<section class="pt-s179">
 <h2 class="pt-s7">Two mechanisms for different jobs</h2>
 <div class="pt-s11">
 <div class="pt-scroll"><table style="font-size:0.8125rem"><thead><tr>
@@ -80,14 +80,14 @@ hiked.pin_macro(corporate_bond_yield=0.09)
 </tr>
 </tbody></table></div>
 </div>
-<p class="pt-s188"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
+<p class="pt-s174"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
 </section>
-<section class="pt-s194">
+<section class="pt-s179">
 <h2 class="pt-s7">Why it refuses instead of loading wrong</h2>
-<p class="pt-s188">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
+<p class="pt-s174">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
 <details class="pt-s12">
-<summary class="pt-s28">What restore_state cannot catch</summary>
-<div class="pt-s63">
+<summary class="pt-s27">What restore_state cannot catch</summary>
+<div class="pt-s61">
 <p class="pt-s1">The low-level <code>restore_state</code> holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a <code>ValidationError</code> naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not - prefer <code>branch</code> and <code>Checkpoint</code>, which check that.</p>
 </div>
 </details>
@@ -107,19 +107,19 @@ hiked.pin_macro(corporate_bond_yield=0.09)
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">USE IT</a><span>/</span><span class="pt-s10">CHECKPOINTS AND FORKING</span>
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">USE IT</a><span>/</span><span class="pt-s10">CHECKPOINTS AND FORKING</span>
 </div>
 <section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Checkpoints and forking</h1>
-<p class="pt-s24">Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.</p>
+<p class="pt-s23">Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.</p>
 <pre style="margin:0.4rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">mark = pt.Checkpoint.of(engine, universe=universe, seed=42)
 calm, hiked = mark.branch(2)   # two engines, identical up to day 60
 hiked.pin_macro(corporate_bond_yield=0.09)
 # calm and hiked now diverge only from here</pre>
 </section>
-<section class="pt-s194">
+<section class="pt-s179">
 <h2 class="pt-s7">Two mechanisms for different jobs</h2>
 <div class="pt-s11">
 <div class="pt-scroll"><table style="font-size:0.8125rem"><thead><tr>
@@ -139,14 +139,14 @@ hiked.pin_macro(corporate_bond_yield=0.09)
 </tr>
 </tbody></table></div>
 </div>
-<p class="pt-s188"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
+<p class="pt-s174"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
 </section>
-<section class="pt-s194">
+<section class="pt-s179">
 <h2 class="pt-s7">Why it refuses instead of loading wrong</h2>
-<p class="pt-s188">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
+<p class="pt-s174">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
 <details class="pt-s12">
-<summary class="pt-s28">What restore_state cannot catch</summary>
-<div class="pt-s63">
+<summary class="pt-s27">What restore_state cannot catch</summary>
+<div class="pt-s61">
 <p class="pt-s1">The low-level <code>restore_state</code> holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a <code>ValidationError</code> naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not - prefer <code>branch</code> and <code>Checkpoint</code>, which check that.</p>
 </div>
 </details>

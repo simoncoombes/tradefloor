@@ -126,10 +126,14 @@
       var attrs = parseAttrs(rest);
       var node;
       if (tag === 'sc-for') {
-        node = { kind: 'for', list: (attr(attrs, 'list') || { raw: '' }).raw,
+        /* `tag` is what the closing-tag search below matches on. Without it
+         * `</sc-for>` never pops the stack, so everything after a loop is
+         * parsed as being inside it and renders once per item. */
+        node = { kind: 'for', tag: tag, list: (attr(attrs, 'list') || { raw: '' }).raw,
                  as: (attr(attrs, 'as') || { raw: 'item' }).raw, children: [] };
       } else if (tag === 'sc-if') {
-        node = { kind: 'if', value: (attr(attrs, 'value') || { raw: '' }).raw, children: [] };
+        node = { kind: 'if', tag: tag,
+                 value: (attr(attrs, 'value') || { raw: '' }).raw, children: [] };
       } else {
         node = { kind: 'el', tag: tag, attrs: attrs.filter(function (a) { return !isHint(a.name); }), children: [] };
       }

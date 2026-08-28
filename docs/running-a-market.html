@@ -48,18 +48,18 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div style="min-height:100vh;padding:0 0 5rem">
 <div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
 <header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu pt-here"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><span class="pt-current">Running a market</span></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main class="pt-s18">
+<div id="pt-root"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">RUNNING A MARKET</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">RUNNING A MARKET</span>
 </div>
 
 <section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.3rem">
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Running a market</h1>
-<p class="pt-s24">Build a universe, run a market, and do a test of a strategy. For most people this page is the whole library.</p>
+<p class="pt-s23">Build a universe, run a market, and do a test of a strategy. For most people this page is the whole library.</p>
 
-<div class="pt-s29">
-<pre class="pt-s31">import pretium as pt
+<div class="pt-s28">
+<pre class="pt-s30">import pretium as pt
 
 universe = pt.Universe.random(108, seed=7)
 macro = pt.Macro(federal_funds_rate=0.025,
@@ -77,12 +77,10 @@ engine.run_days(252)</pre>
 <span class="pt-s0">Which companies exist and what they are worth. Order matters, so keep it fixed.</span>
 </div>
 
-
 <div class="pt-s3">
 <span class="pt-s5">A macro state</span>
 <span class="pt-s0">Rates, inflation and the cycle on day zero only. Every close advances the economy from there.</span>
 </div>
-
 
 <div class="pt-s3">
 <span class="pt-s5">A seed</span>
@@ -114,31 +112,27 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <p style="color:var(--ink-2);margin:0;max-width:none">A run gives you five Arrow tables. polars, pandas, pyarrow and duckdb read them zero-copy, and the package needs none of them.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.7rem">
 
-<div class="pt-s79">
+<div class="pt-s77">
 <span class="pt-s5">Bars</span>
 <span class="pt-s0">OHLCV per name, at the grain you ask for</span>
 </div>
 
-
-<div class="pt-s79">
+<div class="pt-s77">
 <span class="pt-s5">Truth</span>
 <span class="pt-s0">The true value, and what drove every move</span>
 </div>
 
-
-<div class="pt-s79">
+<div class="pt-s77">
 <span class="pt-s5">Macro</span>
 <span class="pt-s0">The economy, day by day</span>
 </div>
 
-
-<div class="pt-s79">
+<div class="pt-s77">
 <span class="pt-s5">Fills</span>
 <span class="pt-s0">What you asked for against what you got</span>
 </div>
 
-
-<div class="pt-s79">
+<div class="pt-s77">
 <span class="pt-s5">Book</span>
 <span class="pt-s0">The order book, level by level</span>
 </div>
@@ -149,28 +143,16 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)">Bars</button>
 
-<span class="pt-s17"></span>
-<span class="pt-s70">AAPL, first five days</span>
-
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">Truth</button>
-
-<span class="pt-s17"></span>
-<span class="pt-s70">AAPL, first five days</span>
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">Macro</button>
 
-<span class="pt-s17"></span>
-<span class="pt-s70">AAPL, first five days</span>
-
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">Fills</button>
-
-<span class="pt-s17"></span>
-<span class="pt-s70">AAPL, first five days</span>
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">Book</button>
 
-<span class="pt-s17"></span>
-<span class="pt-s70">AAPL, first five days</span>
+<span class="pt-s58"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:var(--ink-3)">AAPL, first five days</span>
 </div>
 <div style="overflow-x:auto;transition:opacity 0.13s ease;opacity:1">
 <table style="width:100%;border-collapse:collapse;font-size:0.8125rem"><thead>
@@ -178,12 +160,9 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 
 <th style="text-align:left;font:500 0.625rem/1.3 'Spline Sans Mono',monospace;letter-spacing:0.06em;color:var(--ink-3);padding:0.5rem 0.9rem;border-bottom:1px solid var(--line);border-right:1px solid var(--line-soft);white-space:nowrap">ticker</th>
 
-
 <th style="text-align:left;font:500 0.625rem/1.3 'Spline Sans Mono',monospace;letter-spacing:0.06em;color:var(--ink-3);padding:0.5rem 0.9rem;border-bottom:1px solid var(--line);border-right:1px solid var(--line-soft);white-space:nowrap">day</th>
 
-
 <th style="text-align:right;font:500 0.625rem/1.3 'Spline Sans Mono',monospace;letter-spacing:0.06em;color:var(--ink-3);padding:0.5rem 0.9rem;border-bottom:1px solid var(--line);border-right:1px solid var(--line-soft);white-space:nowrap">close</th>
-
 
 <th style="text-align:right;font:500 0.625rem/1.3 'Spline Sans Mono',monospace;letter-spacing:0.06em;color:var(--ink-3);padding:0.5rem 0.9rem;border-bottom:1px solid var(--line);border-right:1px solid var(--line-soft);white-space:nowrap">daily_return</th>
 
@@ -194,76 +173,57 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 
 <td style="text-align:left;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">AAPL</td>
 
-
 <td style="text-align:left;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">1</td>
 
-
 <td style="text-align:right;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">544.10</td>
-
 
 <td style="text-align:right;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">-3.31%</td>
 
 </tr>
 
-
 <tr>
 
 <td style="text-align:left;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">AAPL</td>
 
-
 <td style="text-align:left;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">2</td>
 
-
 <td style="text-align:right;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">528.03</td>
-
 
 <td style="text-align:right;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">-2.95%</td>
 
 </tr>
 
-
 <tr>
 
 <td style="text-align:left;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">AAPL</td>
 
-
 <td style="text-align:left;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">3</td>
 
-
 <td style="text-align:right;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">524.05</td>
-
 
 <td style="text-align:right;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">-0.75%</td>
 
 </tr>
 
-
 <tr>
 
 <td style="text-align:left;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">AAPL</td>
 
-
 <td style="text-align:left;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">4</td>
 
-
 <td style="text-align:right;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">522.97</td>
-
 
 <td style="text-align:right;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">-0.21%</td>
 
 </tr>
 
-
 <tr>
 
 <td style="text-align:left;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">AAPL</td>
 
-
 <td style="text-align:left;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">5</td>
 
-
 <td style="text-align:right;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">507.80</td>
-
 
 <td style="text-align:right;padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">-2.90%</td>
 
@@ -281,38 +241,34 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <p class="pt-s13">Orders match against a simulated limit order book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.</p>
 <figure style="margin:0;display:flex;flex-direction:column;gap:0.5rem">
 
-<div class="pt-s94">
-<span class="pt-s148">3 a day</span>
-<span class="pt-s181">
+<div class="pt-s91">
+<span class="pt-s140">3 a day</span>
+<span class="pt-s169">
 <span style="position:absolute;left:50.0%;width:46.9%;height:22px;border-radius:3px;background:var(--accent)"></span>
-<span class="pt-s179"></span>
+<span class="pt-s167"></span>
 </span>
-<span class="pt-s145">+37.55%</span>
+<span class="pt-s137">+37.55%</span>
 </div>
 
-<figcaption class="pt-s137">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
-
-<div class="pt-s94">
-<span class="pt-s148">6 a day</span>
-<span class="pt-s181">
+<div class="pt-s91">
+<span class="pt-s140">6 a day</span>
+<span class="pt-s169">
 <span style="position:absolute;left:50.0%;width:12.2%;height:22px;border-radius:3px;background:var(--accent)"></span>
-<span class="pt-s179"></span>
+<span class="pt-s167"></span>
 </span>
-<span class="pt-s145">+9.79%</span>
+<span class="pt-s137">+9.79%</span>
 </div>
 
-<figcaption class="pt-s137">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
-
-<div class="pt-s94">
-<span class="pt-s148">12 a day</span>
-<span class="pt-s181">
+<div class="pt-s91">
+<span class="pt-s140">12 a day</span>
+<span class="pt-s169">
 <span style="position:absolute;left:15.7%;width:34.3%;height:22px;border-radius:3px;background:var(--red)"></span>
-<span class="pt-s179"></span>
+<span class="pt-s167"></span>
 </span>
-<span class="pt-s145">-27.46%</span>
+<span class="pt-s137">-27.46%</span>
 </div>
 
-<figcaption class="pt-s137">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
+<figcaption style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);line-height:1.55">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
 </figure>
 </div>
 </section>
@@ -321,7 +277,7 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <h2 class="pt-s7">One market is one sample</h2>
 <p style="color:var(--ink-2);margin:0;max-width:none">Before you call a winner, run the comparison across twelve seeded markets. Then do a check of how often the lead holds.</p>
 <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<pre class="pt-s31">ranking = pt.rank(
+<pre class="pt-s30">ranking = pt.rank(
     lambda: pt.reference_agents(seed=3),
     seeds=range(12), universe=universe,
     days=10, workers=4)
@@ -379,28 +335,26 @@ print(ranking.separation("momentum", "mean_reversion"))</pre>
 <h2 style="font-size:1.25rem">Read this before you conclude</h2>
 
 <details class="pt-s12">
-<summary class="pt-s28">Good results here do not predict real returns</summary>
-<div class="pt-s63">
+<summary class="pt-s27">Good results here do not predict real returns</summary>
+<div class="pt-s61">
 <p class="pt-s1">The price process comes from a known model, so a strategy that fits that model's structure will look excellent and teach you nothing. A strategy that fails here is the informative case, because it broke against a live order book under honest impact costs.</p>
-<p class="pt-s161"></p>
+<p class="pt-s150"></p>
 </div>
 </details>
 
-
 <details class="pt-s12">
-<summary class="pt-s28">Momentum can work here for a reason real markets do not supply</summary>
-<div class="pt-s63">
+<summary class="pt-s27">Momentum can work here for a reason real markets do not supply</summary>
+<div class="pt-s61">
 <p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. The shipped pt-v12 turns that dial well down: momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0239 against a real band of -0.08 to 0.06, so it is in band. pt-v1 ships the same knob at 0.25 and measures +0.249. Either way the dial exists and real markets have no equivalent.</p>
-<p class="pt-s161">pt-v12: the certified panel, 30 seeds, 40 instruments, 252 days.</p>
+<p class="pt-s150">pt-v12: the certified panel, 30 seeds, 40 instruments, 252 days.</p>
 </div>
 </details>
 
-
 <details class="pt-s12">
-<summary class="pt-s28">One venue, no latency, no strategic counterparties</summary>
-<div class="pt-s63">
+<summary class="pt-s27">One venue, no latency, no strategic counterparties</summary>
+<div class="pt-s61">
 <p class="pt-s1">Orders arrive instantly, there is one book per name, and you trade against a market maker and aggregate flow, never against agents that adapt to you.</p>
-<p class="pt-s161"></p>
+<p class="pt-s150"></p>
 </div>
 </details>
 
@@ -423,18 +377,18 @@ print(ranking.separation("momentum", "mean_reversion"))</pre>
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">RUNNING A MARKET</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">RUNNING A MARKET</span>
 </div>
 
 <section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.3rem">
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Running a market</h1>
-<p class="pt-s24">Build a universe, run a market, and do a test of a strategy. For most people this page is the whole library.</p>
+<p class="pt-s23">Build a universe, run a market, and do a test of a strategy. For most people this page is the whole library.</p>
 
-<div class="pt-s29">
-<pre class="pt-s31">import pretium as pt
+<div class="pt-s28">
+<pre class="pt-s30">import pretium as pt
 
 universe = pt.Universe.random(108, seed=7)
 macro = pt.Macro(federal_funds_rate=0.025,
@@ -451,8 +405,8 @@ engine.run_days(252)</pre>
 <span class="pt-s5">{{ i.k }}</span>
 <span class="pt-s0">{{ i.v }}</span>
 </div>
-
-</sc-for></div>
+</sc-for>
+</div>
 </div>
 </section>
 
@@ -477,36 +431,36 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <p style="color:var(--ink-2);margin:0;max-width:none">A run gives you five Arrow tables. polars, pandas, pyarrow and duckdb read them zero-copy, and the package needs none of them.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.7rem">
 <sc-for list="{{ tables }}" as="t">
-<div class="pt-s79">
+<div class="pt-s77">
 <span class="pt-s5">{{ t.n }}</span>
 <span class="pt-s0">{{ t.d }}</span>
 </div>
-
-</sc-for></div>
+</sc-for>
+</div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden;margin-top:0.5rem">
 <div style="display:flex;gap:0.4rem;padding:0.6rem 0.9rem;border-bottom:1px solid var(--line-soft);background:var(--surface);align-items:center">
 <sc-for list="{{ tabs }}" as="tb">
 <button onClick="{{ tb.pick }}" style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid {{ tb.border }};background:{{ tb.bg }};color:{{ tb.fg }}">{{ tb.label }}</button>
-
-<span class="pt-s17"></span>
-<span class="pt-s70">{{ preview.note }}</span>
-</sc-for></div>
+</sc-for>
+<span class="pt-s58"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:var(--ink-3)">{{ preview.note }}</span>
+</div>
 <div style="overflow-x:auto;transition:opacity 0.13s ease;opacity:{{ tabOp }}">
 <table style="width:100%;border-collapse:collapse;font-size:0.8125rem"><thead>
 <tr>
 <sc-for list="{{ preview.cols }}" as="c">
 <th style="text-align:{{ c.align }};font:500 0.625rem/1.3 'Spline Sans Mono',monospace;letter-spacing:0.06em;color:var(--ink-3);padding:0.5rem 0.9rem;border-bottom:1px solid var(--line);border-right:1px solid var(--line-soft);white-space:nowrap">{{ c.n }}</th>
-
-</sc-for></tr>
+</sc-for>
+</tr>
 </thead><tbody>
 <sc-for list="{{ preview.rows }}" as="r">
 <tr>
 <sc-for list="{{ r.cells }}" as="v">
 <td style="text-align:{{ v.align }};padding:0.4rem 0.9rem;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap">{{ v.v }}</td>
-
-</sc-for></tr>
-
-</sc-for></tbody></table>
+</sc-for>
+</tr>
+</sc-for>
+</tbody></table>
 </div>
 <div style="padding:0.6rem 0.9rem;border-top:1px solid var(--line-soft);font-size:0.8125rem;color:var(--ink-2)">{{ preview.blurb }}</div>
 </div>
@@ -518,17 +472,17 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <p class="pt-s13">Orders match against a simulated limit order book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.</p>
 <figure style="margin:0;display:flex;flex-direction:column;gap:0.5rem">
 <sc-for list="{{ cadence }}" as="c">
-<div class="pt-s94">
-<span class="pt-s148">{{ c.label }}</span>
-<span class="pt-s181">
+<div class="pt-s91">
+<span class="pt-s140">{{ c.label }}</span>
+<span class="pt-s169">
 <span style="position:absolute;left:{{ c.x }};width:{{ c.w }};height:22px;border-radius:3px;background:{{ c.col }}"></span>
-<span class="pt-s179"></span>
+<span class="pt-s167"></span>
 </span>
-<span class="pt-s145">{{ c.v }}</span>
+<span class="pt-s137">{{ c.v }}</span>
 </div>
-
-<figcaption class="pt-s137">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
-</sc-for></figure>
+</sc-for>
+<figcaption style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);line-height:1.55">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
+</figure>
 </div>
 </section>
 
@@ -536,7 +490,7 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <h2 class="pt-s7">One market is one sample</h2>
 <p style="color:var(--ink-2);margin:0;max-width:none">Before you call a winner, run the comparison across twelve seeded markets. Then do a check of how often the lead holds.</p>
 <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<pre class="pt-s31">ranking = pt.rank(
+<pre class="pt-s30">ranking = pt.rank(
     lambda: pt.reference_agents(seed=3),
     seeds=range(12), universe=universe,
     days=10, workers=4)
@@ -594,14 +548,14 @@ print(ranking.separation("momentum", "mean_reversion"))</pre>
 <h2 style="font-size:1.25rem">Read this before you conclude</h2>
 <sc-for list="{{ caveats }}" as="c">
 <details class="pt-s12">
-<summary class="pt-s28">{{ c.head }}</summary>
-<div class="pt-s63">
+<summary class="pt-s27">{{ c.head }}</summary>
+<div class="pt-s61">
 <p class="pt-s1">{{ c.body }}</p>
-<p class="pt-s161">{{ c.src }}</p>
+<p class="pt-s150">{{ c.src }}</p>
 </div>
 </details>
-
-</sc-for></section>
+</sc-for>
+</section>
 
 
 

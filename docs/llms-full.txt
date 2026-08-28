@@ -43,19 +43,11 @@ index, 100 = day 0 close
 
 AMZN 99.1 
 
-VIX 14.89 
-
 GOOGL 99.6 
-
-VIX 14.89 
 
 MSFT 100.4 
 
-VIX 14.89 
-
 AAPL 96.7 
-
-VIX 14.89 
 
 NVDA 101.5 
 
@@ -106,16 +98,7 @@ What a RunManifest pins
 
 seed The integer the whole market unrolls from. universe Every instrument, in roster order. The order is contractual. macro Day-zero rates, inflation and the cycle. scenario The macro path driven through it, if there was one. strategy The StrategySpec, carried in full and cited by fingerprint. model The preset that priced it, by name, or custom-XXXXXXXX if modified. fingerprints.inputs One digest over the seed and all of the above. This is the experiment's identity. result.digest What the market did. Re-running the inputs has to reproduce it. 
 
-run 
-→ 
-record 
-→ 
-reproduce 
-→ 
-compare 
-→ 
-fork 
-
+run → record → reproduce → compare → fork 
 reproduce() refuses on a mismatch rather than returning a number that looks fine. A checkpoint branches a run at a decision point, so two hypotheses share one past instead of being statistically similar.
 
 Same world. Same conditions. Different agent. Two agents run against the identical market path, so a difference between them is the agent and not a different roll of the market.
@@ -309,156 +292,8 @@ Price-time priority, one book per name, no slippage formula anywhere. Step throu
 submit buy 175 market 
 step 15 of 21 
 
-spread 4.00 · mid 101.00 · last 103.00 
-
-mm 
-99.00 
-
-100 
-
-alice 
-99.00 
-
-50 
-
-carol 
-99.00 
-
-25 
-
-mm 
-98.00 
-
-110 
-
-mm 
-97.00 
-
-120 
-
-mm 
-96.00 
-
-130 
-
-mm 
-95.00 
-
-140 
-
-spread 4.00 · mid 101.00 · last 103.00 
-
-mm 
-99.00 
-
-100 
-
-alice 
-99.00 
-
-50 
-
-carol 
-99.00 
-
-25 
-
-mm 
-98.00 
-
-110 
-
-mm 
-97.00 
-
-120 
-
-mm 
-96.00 
-
-130 
-
-mm 
-95.00 
-
-140 
-
-spread 4.00 · mid 101.00 · last 103.00 
-
-mm 
-99.00 
-
-100 
-
-alice 
-99.00 
-
-50 
-
-carol 
-99.00 
-
-25 
-
-mm 
-98.00 
-
-110 
-
-mm 
-97.00 
-
-120 
-
-mm 
-96.00 
-
-130 
-
-mm 
-95.00 
-
-140 
-
 mm 
 105.00 
-
-140 
-
-spread 4.00 · mid 101.00 · last 103.00 
-
-mm 
-99.00 
-
-100 
-
-alice 
-99.00 
-
-50 
-
-carol 
-99.00 
-
-25 
-
-mm 
-98.00 
-
-110 
-
-mm 
-97.00 
-
-120 
-
-mm 
-96.00 
-
-130 
-
-mm 
-95.00 
 
 140 
 
@@ -466,43 +301,6 @@ mm
 104.00 
 
 130 
-
-spread 4.00 · mid 101.00 · last 103.00 
-
-mm 
-99.00 
-
-100 
-
-alice 
-99.00 
-
-50 
-
-carol 
-99.00 
-
-25 
-
-mm 
-98.00 
-
-110 
-
-mm 
-97.00 
-
-120 
-
-mm 
-96.00 
-
-130 
-
-mm 
-95.00 
-
-140 
 
 mm 
 103.00 
@@ -1335,19 +1133,11 @@ The order book, level by level
 
 Bars
 
-AAPL, first five days 
-
 Truth
-
-AAPL, first five days 
 
 Macro
 
-AAPL, first five days 
-
 Fills
-
-AAPL, first five days 
 
 Book
 
@@ -1363,13 +1153,9 @@ Orders match against a simulated limit order book with price-time priority. A bi
 
 +37.55% 
 
-pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.
-
 6 a day 
 
 +9.79% 
-
-pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.
 
 12 a day 
 
@@ -1689,12 +1475,8 @@ The size is right
 VIX 
 -0.00461 vs -0.00500 
 
-OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.
-
 Credit yield 
 -8.106 vs -7.445 
-
-OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.
 
 Valuation 
 +1.226 vs +1.272 
@@ -1799,14 +1581,8 @@ What 175 shares cost
 50 @ 101.00 
 from bob 
 
-101.8000 
-Average fill, against 101.00 on screen when the order arrived. That is 79 basis points, paid to depth. 
-
 110 @ 102.00 
 from mm 
-
-101.8000 
-Average fill, against 101.00 on screen when the order arrived. That is 79 basis points, paid to depth. 
 
 15 @ 103.00 
 from mm 
@@ -2068,17 +1844,11 @@ The model studies the market
 It writes no code 
 Strategies, universes and scenarios arrive as data. There is no path from a tool argument to code execution. 
 
-this page 
-
 It can not move a price 
 No orders reach the book, so nothing the model asks changes the market it is asking about. 
 
-this page 
-
 It gets the caveats 
 Each result carries computed caveats and provenance, so a summary can not lose them. 
-
-this page 
 
 It is cheap to be wrong 
 check_envelope answers before you spend anything, and refuses a question the model can not support. 
@@ -2091,17 +1861,11 @@ The model trades the market
 It sends orders 
 The model reads an observation and answers with target weights at each step. 
 
-the agents page
-
 It pays for size 
 Orders match against the engine's own depth, so the reward already carries the cost of the footprint. 
 
-the agents page
-
 It needs a harness 
 Any object with an act method works. The model call sits inside that method. 
-
-the agents page
 
 It is slower and it costs 
 One model call per decision. A 20-day run at three decisions a day is 60 calls. 
@@ -2290,104 +2054,65 @@ how much prices move in a year
 
 32.7604 
 
-band floor 
-band ceiling 
-
 excess_kurtosis 
 how fat the tails are 
 
 6.7001 
-
-band floor 
-band ceiling 
 
 return_acf1 
 does yesterday predict today 
 
 0.0239 
 
-band floor 
-band ceiling 
-
 abs_return_acf1 
 does a wild day follow a wild day 
 
 0.1107 
-
-band floor 
-band ceiling 
 
 abs_return_acf5 
 the same, one week apart 
 
 0.0428 
 
-band floor 
-band ceiling 
-
 abs_return_acf20 
 the same, one month apart 
 
 0.0040 
-
-band floor 
-band ceiling 
 
 cross_sectional_corr 
 how much names move together 
 
 0.3177 
 
-band floor 
-band ceiling 
-
 volume_abs_return_corr 
 do big moves come with volume 
 
 0.5599 
-
-band floor 
-band ceiling 
 
 leverage_effect 
 do falls raise volatility 
 
 -0.0401 
 
-band floor 
-band ceiling 
-
 volume_change_acf1 
 does volume mean-revert 
 
 -0.2656 
-
-band floor 
-band ceiling 
 
 corr_asymmetry 
 do names couple more when falling 
 
 -0.0147 
 
-band floor 
-band ceiling 
-
 corr_asymmetry_lagged 
 the same, one day later 
 
 0.0181 
 
-band floor 
-band ceiling 
-
 sector_excess_corr 
 do industries move together 
 
 0.2079 
-
-band floor 
-band ceiling 
 
 corr_persistence_acf1 
 does correlation stay high after a panic 

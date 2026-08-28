@@ -48,18 +48,18 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div style="min-height:100vh;padding:0 0 5rem">
 <div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
 <header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu pt-here"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><span class="pt-current">Scenarios</span><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main class="pt-s18">
+<div id="pt-root"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">SCENARIOS</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">SCENARIOS</span>
 </div>
 
-<section class="pt-s33">
-<h1 class="pt-s30">Scenarios</h1>
-<p class="pt-s24">A scenario drives the macro path. Without one, the economy finds its own path from day zero.</p>
+<section class="pt-s32">
+<h1 class="pt-s29">Scenarios</h1>
+<p class="pt-s23">A scenario drives the macro path. Without one, the economy finds its own path from day zero.</p>
 
-<div class="pt-s29">
-<pre class="pt-s31">shock = pt.Scenario.rate_shock(
+<div class="pt-s28">
+<pre class="pt-s30">shock = pt.Scenario.rate_shock(
     start=0.025, end=0.05, over=15)
 
 pt.evaluate(agents, seed=7,
@@ -69,7 +69,7 @@ pt.evaluate(agents, seed=7,
 # or move one field yourself
 engine.pin_macro(
     corporate_bond_yield=0.09)</pre>
-<div class="pt-s186">
+<div class="pt-s172">
 <h3 class="pt-s4">Two ways to move the economy</h3>
 <div class="pt-s3">
 <span class="pt-s5">A scenario</span>
@@ -83,116 +83,109 @@ engine.pin_macro(
 </div>
 </section>
 
-<section id="drive" class="pt-s34">
+<section id="drive" class="pt-s33">
 <h2 class="pt-s7">Which field you drive decides the answer</h2>
 <p class="pt-s13">Measured on real 2022 data over six seeds, against a real S&amp;P 500 that fell 20.0%. The lever is inflation, not the policy rate.</p>
 
-<div class="pt-s191">
+<div class="pt-s177">
 
-<div class="pt-s110">
-<span class="pt-s39">
-<span class="pt-s51">Real S&amp;P 500, 2022</span>
-<span class="pt-s23">what actually happened</span>
+<div class="pt-s106">
+<span class="pt-s37">
+<span class="pt-s49">Real S&amp;P 500, 2022</span>
+<span class="pt-s22">what actually happened</span>
 </span>
-<span class="pt-s182">
+<span class="pt-s170">
 <span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--ink);width:38.5%"></span>
-<span class="pt-s178"></span>
+<span class="pt-s166"></span>
 </span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums">-20.0%</span>
 </div>
 
-
-<div class="pt-s110">
-<span class="pt-s39">
-<span class="pt-s51">Drive inflation_rate</span>
-<span class="pt-s23">the published CPI path</span>
+<div class="pt-s106">
+<span class="pt-s37">
+<span class="pt-s49">Drive inflation_rate</span>
+<span class="pt-s22">the published CPI path</span>
 </span>
-<span class="pt-s182">
+<span class="pt-s170">
 <span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--accent);width:44.8%"></span>
-<span class="pt-s178"></span>
+<span class="pt-s166"></span>
 </span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--accent);text-align:right;font-variant-numeric:tabular-nums">-23.3%</span>
 </div>
 
-
-<div class="pt-s110">
-<span class="pt-s39">
-<span class="pt-s51">Drive federal_funds_rate</span>
-<span class="pt-s23">the real seven-hike path</span>
+<div class="pt-s106">
+<span class="pt-s37">
+<span class="pt-s49">Drive federal_funds_rate</span>
+<span class="pt-s22">the real seven-hike path</span>
 </span>
-<span class="pt-s182">
+<span class="pt-s170">
 <span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--amber);width:25.2%"></span>
-<span class="pt-s178"></span>
+<span class="pt-s166"></span>
 </span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--amber);text-align:right;font-variant-numeric:tabular-nums">-13.1%</span>
 </div>
 
-
-<div class="pt-s110">
-<span class="pt-s39">
-<span class="pt-s51">No scenario at all</span>
-<span class="pt-s23">drift and nothing more</span>
+<div class="pt-s106">
+<span class="pt-s37">
+<span class="pt-s49">No scenario at all</span>
+<span class="pt-s22">drift and nothing more</span>
 </span>
-<span class="pt-s182">
+<span class="pt-s170">
 <span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--amber);width:24.2%"></span>
-<span class="pt-s178"></span>
+<span class="pt-s166"></span>
 </span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--amber);text-align:right;font-variant-numeric:tabular-nums">-12.6%</span>
 </div>
 
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
-<p class="pt-s56">Inflation works because it steers the central bank's own reaction into the corporate bond yield. Do not pin <span class="pt-s189">corporate_bond_yield</span> when you do this. If you pin it, you cut the channel that the inflation path is using.</p>
+<p class="pt-s53">Inflation works because it steers the central bank's own reaction into the corporate bond yield. Do not pin <span class="pt-s175">corporate_bond_yield</span> when you do this. If you pin it, you cut the channel that the inflation path is using.</p>
 </div>
 </section>
 
-<section id="claim" class="pt-s34">
+<section id="claim" class="pt-s33">
 <h2 class="pt-s7">Detect a scenario, do not size one</h2>
 <p class="pt-s13">The expected response is calibrated. The spread around it is not, and that is the whole gap.</p>
 
-<div class="pt-s69">
+<div class="pt-s67">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s4">The size is right</h3>
 
-<div class="pt-s42">
-<span class="pt-s36">VIX</span>
-<span class="pt-s47">-0.00461 vs -0.00500</span>
+<div class="pt-s40">
+<span class="pt-s35">VIX</span>
+<span class="pt-s45">-0.00461 vs -0.00500</span>
 </div>
 
-<p class="pt-s160">OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.</p>
-
-<div class="pt-s42">
-<span class="pt-s36">Credit yield</span>
-<span class="pt-s47">-8.106 vs -7.445</span>
+<div class="pt-s40">
+<span class="pt-s35">Credit yield</span>
+<span class="pt-s45">-8.106 vs -7.445</span>
 </div>
 
-<p class="pt-s160">OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.</p>
-
-<div class="pt-s42">
-<span class="pt-s36">Valuation</span>
-<span class="pt-s47">+1.226 vs +1.272</span>
+<div class="pt-s40">
+<span class="pt-s35">Valuation</span>
+<span class="pt-s45">+1.226 vs +1.272</span>
 </div>
 
-<p class="pt-s160">OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.</p>
+<p style="margin:0.2rem 0 0;font-size:0.8125rem;color:var(--ink-3)">OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.</p>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s4">The spread is too wide</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.75rem;color:var(--red);font-variant-numeric:tabular-nums">1.565x</span>
 <p class="pt-s1">Residual dispersion over the driven window, against real. One run therefore understates how much of its own move came from the scenario.</p>
-<p class="pt-s190">So the envelope lets you detect a scenario's effect. It forbids you to size one from a single run.</p>
+<p class="pt-s176">So the envelope lets you detect a scenario's effect. It forbids you to size one from a single run.</p>
 </div>
 </div>
 
 <details class="pt-s12">
-<summary class="pt-s28">An event study agrees on sign two times out of six</summary>
-<div class="pt-s177">
+<summary class="pt-s27">An event study agrees on sign two times out of six</summary>
+<div class="pt-s165">
 <p class="pt-s1">Over the five sessions after each of six dated 2020-21 events, the model agrees with real Apple on direction twice. The two that agree are the two the macro path carries. The Fed's intermeeting cut of 3 March 2020 goes the wrong way, +9.9% against a real -1.4%, because an announcement channel is absent. The vaccine result and Omicron are single-name news, which a macro path can not know.</p>
 </div>
 </details>
 
 <details class="pt-s12">
-<summary class="pt-s28">The endogenous economy can not reach its own crisis regimes</summary>
-<div class="pt-s177">
+<summary class="pt-s27">The endogenous economy can not reach its own crisis regimes</summary>
+<div class="pt-s165">
 <p class="pt-s1">Left alone, inflation peaks at 4.0% on every seed over five years. Real US CPI peaked at 9.0% in June 2022. The central bank has a crisis cadence that pulls its next meeting in, and a default run can not reach it. So an inflation regime or a policy crisis must come from a scenario. A volatility crisis does not: on pt-v10 the preset's own VIX crossed its crisis threshold on 10.2% of days against a real 12.5%.</p>
 </div>
 </details>
@@ -215,18 +208,18 @@ engine.pin_macro(
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">SCENARIOS</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">SCENARIOS</span>
 </div>
 
-<section class="pt-s33">
-<h1 class="pt-s30">Scenarios</h1>
-<p class="pt-s24">A scenario drives the macro path. Without one, the economy finds its own path from day zero.</p>
+<section class="pt-s32">
+<h1 class="pt-s29">Scenarios</h1>
+<p class="pt-s23">A scenario drives the macro path. Without one, the economy finds its own path from day zero.</p>
 
-<div class="pt-s29">
-<pre class="pt-s31">shock = pt.Scenario.rate_shock(
+<div class="pt-s28">
+<pre class="pt-s30">shock = pt.Scenario.rate_shock(
     start=0.025, end=0.05, over=15)
 
 pt.evaluate(agents, seed=7,
@@ -236,7 +229,7 @@ pt.evaluate(agents, seed=7,
 # or move one field yourself
 engine.pin_macro(
     corporate_bond_yield=0.09)</pre>
-<div class="pt-s186">
+<div class="pt-s172">
 <h3 class="pt-s4">Two ways to move the economy</h3>
 <div class="pt-s3">
 <span class="pt-s5">A scenario</span>
@@ -250,63 +243,63 @@ engine.pin_macro(
 </div>
 </section>
 
-<section id="drive" class="pt-s34">
+<section id="drive" class="pt-s33">
 <h2 class="pt-s7">Which field you drive decides the answer</h2>
 <p class="pt-s13">Measured on real 2022 data over six seeds, against a real S&amp;P 500 that fell 20.0%. The lever is inflation, not the policy rate.</p>
 
-<div class="pt-s191">
+<div class="pt-s177">
 <sc-for list="{{ levers }}" as="l">
-<div class="pt-s110">
-<span class="pt-s39">
-<span class="pt-s51">{{ l.k }}</span>
-<span class="pt-s23">{{ l.note }}</span>
+<div class="pt-s106">
+<span class="pt-s37">
+<span class="pt-s49">{{ l.k }}</span>
+<span class="pt-s22">{{ l.note }}</span>
 </span>
-<span class="pt-s182">
+<span class="pt-s170">
 <span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:{{ l.col }};width:{{ l.w }}"></span>
-<span class="pt-s178"></span>
+<span class="pt-s166"></span>
 </span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:{{ l.col }};text-align:right;font-variant-numeric:tabular-nums">{{ l.v }}</span>
 </div>
-
-</sc-for></div>
+</sc-for>
+</div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
-<p class="pt-s56">Inflation works because it steers the central bank's own reaction into the corporate bond yield. Do not pin <span class="pt-s189">corporate_bond_yield</span> when you do this. If you pin it, you cut the channel that the inflation path is using.</p>
+<p class="pt-s53">Inflation works because it steers the central bank's own reaction into the corporate bond yield. Do not pin <span class="pt-s175">corporate_bond_yield</span> when you do this. If you pin it, you cut the channel that the inflation path is using.</p>
 </div>
 </section>
 
-<section id="claim" class="pt-s34">
+<section id="claim" class="pt-s33">
 <h2 class="pt-s7">Detect a scenario, do not size one</h2>
 <p class="pt-s13">The expected response is calibrated. The spread around it is not, and that is the whole gap.</p>
 
-<div class="pt-s69">
+<div class="pt-s67">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s4">The size is right</h3>
 <sc-for list="{{ gains }}" as="g">
-<div class="pt-s42">
-<span class="pt-s36">{{ g.k }}</span>
-<span class="pt-s47">{{ g.v }}</span>
+<div class="pt-s40">
+<span class="pt-s35">{{ g.k }}</span>
+<span class="pt-s45">{{ g.v }}</span>
 </div>
-
-<p class="pt-s160">OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.</p>
-</sc-for></div>
+</sc-for>
+<p style="margin:0.2rem 0 0;font-size:0.8125rem;color:var(--ink-3)">OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.</p>
+</div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s4">The spread is too wide</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.75rem;color:var(--red);font-variant-numeric:tabular-nums">1.565x</span>
 <p class="pt-s1">Residual dispersion over the driven window, against real. One run therefore understates how much of its own move came from the scenario.</p>
-<p class="pt-s190">So the envelope lets you detect a scenario's effect. It forbids you to size one from a single run.</p>
+<p class="pt-s176">So the envelope lets you detect a scenario's effect. It forbids you to size one from a single run.</p>
 </div>
 </div>
 
 <details class="pt-s12">
-<summary class="pt-s28">An event study agrees on sign two times out of six</summary>
-<div class="pt-s177">
+<summary class="pt-s27">An event study agrees on sign two times out of six</summary>
+<div class="pt-s165">
 <p class="pt-s1">Over the five sessions after each of six dated 2020-21 events, the model agrees with real Apple on direction twice. The two that agree are the two the macro path carries. The Fed's intermeeting cut of 3 March 2020 goes the wrong way, +9.9% against a real -1.4%, because an announcement channel is absent. The vaccine result and Omicron are single-name news, which a macro path can not know.</p>
 </div>
 </details>
 
 <details class="pt-s12">
-<summary class="pt-s28">The endogenous economy can not reach its own crisis regimes</summary>
-<div class="pt-s177">
+<summary class="pt-s27">The endogenous economy can not reach its own crisis regimes</summary>
+<div class="pt-s165">
 <p class="pt-s1">Left alone, inflation peaks at 4.0% on every seed over five years. Real US CPI peaked at 9.0% in June 2022. The central bank has a crisis cadence that pulls its next meeting in, and a default run can not reach it. So an inflation regime or a policy crisis must come from a scenario. A volatility crisis does not: on pt-v10 the preset's own VIX crossed its crisis threshold on 10.2% of days against a real 12.5%.</p>
 </div>
 </details>

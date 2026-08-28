@@ -48,62 +48,59 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div style="min-height:100vh;padding:0 0 5rem">
 <div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
 <header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu pt-here"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><span class="pt-current">The two loops</span><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main class="pt-s18">
+<div id="pt-root"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">THE TWO LOOPS</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE TWO LOOPS</span>
 </div>
 
-<section class="pt-s33">
-<h1 class="pt-s30">The two loops</h1>
-<p class="pt-s24">The word training means two different things here. One kind trains the market model. The other kind trains a strategy against a market that exists. Most people need only the second kind.</p>
+<section class="pt-s32">
+<h1 class="pt-s29">The two loops</h1>
+<p class="pt-s23">The word training means two different things here. One kind trains the market model. The other kind trains a strategy against a market that exists. Most people need only the second kind.</p>
 
 <div style="border:1px solid var(--line);border-radius:8px;background:var(--card);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:0.9rem">
 <div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP A</span>
 <h3 class="pt-s4">Calibrate the market model</h3>
 </div>
-<div class="pt-s65">
+<div class="pt-s63">
 
-<span class="pt-s20">
-<span class="pt-s35">
-<span class="pt-s50">map the space</span>
-<span class="pt-s23">Atlas survey</span>
+<span class="pt-s19">
+<span class="pt-s34">
+<span class="pt-s48">map the space</span>
+<span class="pt-s22">Atlas survey</span>
 </span>
-<span class="pt-s32">then</span>
-</span>
-
-
-<span class="pt-s20">
-<span class="pt-s35">
-<span class="pt-s50">confirm</span>
-<span class="pt-s23">disjoint seeds</span>
-</span>
-<span class="pt-s32">then</span>
+<span class="pt-s31">then</span>
 </span>
 
-
-<span class="pt-s20">
-<span class="pt-s35">
-<span class="pt-s50">gates</span>
-<span class="pt-s23">thirty seeds</span>
+<span class="pt-s19">
+<span class="pt-s34">
+<span class="pt-s48">confirm</span>
+<span class="pt-s22">disjoint seeds</span>
 </span>
-<span class="pt-s32">then</span>
+<span class="pt-s31">then</span>
 </span>
 
-
-<span class="pt-s20">
-<span class="pt-s35">
-<span class="pt-s50">overfitting</span>
-<span class="pt-s23">control</span>
+<span class="pt-s19">
+<span class="pt-s34">
+<span class="pt-s48">gates</span>
+<span class="pt-s22">thirty seeds</span>
 </span>
-<span class="pt-s32"></span>
+<span class="pt-s31">then</span>
+</span>
+
+<span class="pt-s19">
+<span class="pt-s34">
+<span class="pt-s48">overfitting</span>
+<span class="pt-s22">control</span>
+</span>
+<span class="pt-s31"></span>
 </span>
 
 </div>
 
 <div style="display:flex;justify-content:center;padding:0.2rem 0">
-<span class="pt-s32">emits</span>
+<span class="pt-s31">emits</span>
 </div>
 
 <div style="display:flex;gap:0.7rem;align-items:stretch;flex-wrap:wrap">
@@ -112,45 +109,43 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <span style="font-size:0.75rem;color:var(--accent-deep)">A complete set of coefficients with one name. Change any of them and the set gets a new name.</span>
 </div>
 <div style="flex:1;min-width:14rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.7rem 0.9rem;display:flex;flex-direction:column;gap:1px">
-<span class="pt-s58">the realism envelope</span>
-<span class="pt-s73">Attached to the preset. Bounds what a result may claim.</span>
+<span class="pt-s55">the realism envelope</span>
+<span class="pt-s70">Attached to the preset. Bounds what a result may claim.</span>
 </div>
 </div>
 
 <div style="display:flex;justify-content:center;padding:0.2rem 0">
-<span class="pt-s32">cited by, and bounds</span>
+<span class="pt-s31">cited by, and bounds</span>
 </div>
 
 <div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP B</span>
 <h3 class="pt-s4">Evaluate a strategy or agent</h3>
 </div>
-<div class="pt-s65">
+<div class="pt-s63">
 
-<span class="pt-s20">
-<span class="pt-s35">
-<span class="pt-s50">write a strategy</span>
-<span class="pt-s23">or train a policy</span>
+<span class="pt-s19">
+<span class="pt-s34">
+<span class="pt-s48">write a strategy</span>
+<span class="pt-s22">or train a policy</span>
 </span>
-<span class="pt-s32">then</span>
-</span>
-
-
-<span class="pt-s20">
-<span class="pt-s35">
-<span class="pt-s50">evaluate</span>
-<span class="pt-s23">many seeds</span>
-</span>
-<span class="pt-s32">then</span>
+<span class="pt-s31">then</span>
 </span>
 
-
-<span class="pt-s20">
-<span class="pt-s35">
-<span class="pt-s50">paired sign test</span>
-<span class="pt-s23">across seeds</span>
+<span class="pt-s19">
+<span class="pt-s34">
+<span class="pt-s48">evaluate</span>
+<span class="pt-s22">many seeds</span>
 </span>
-<span class="pt-s32"></span>
+<span class="pt-s31">then</span>
+</span>
+
+<span class="pt-s19">
+<span class="pt-s34">
+<span class="pt-s48">paired sign test</span>
+<span class="pt-s22">across seeds</span>
+</span>
+<span class="pt-s31"></span>
 </span>
 
 </div>
@@ -158,48 +153,44 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">Which loop you are in decides what you read</h2>
 <div class="pt-s11">
 
-<div class="pt-s104">
+<div class="pt-s100">
 <span class="pt-s0">Test a trading strategy</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">B</span>
-<a href="running-a-market.html" class="pt-s74">Running a market</a>
+<a href="running-a-market.html" class="pt-s71">Running a market</a>
 </div>
 
-
-<div class="pt-s104">
+<div class="pt-s100">
 <span class="pt-s0">Train a reinforcement-learning policy</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">B</span>
-<a href="https://github.com/simoncoombes/pretium/blob/main/docs/reinforcement-learning.md" class="pt-s74">The RL environment</a>
+<a href="https://github.com/simoncoombes/pretium/blob/main/docs/reinforcement-learning.md" class="pt-s71">The RL environment</a>
 </div>
 
-
-<div class="pt-s104">
+<div class="pt-s100">
 <span class="pt-s0">Know what your result depends on</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--amber)">A</span>
-<a href="https://simoncoombes.github.io/pretium/atlas.html" class="pt-s74">Atlas</a>
+<a href="https://simoncoombes.github.io/pretium/atlas.html" class="pt-s71">Atlas</a>
 </div>
 
-
-<div class="pt-s104">
+<div class="pt-s100">
 <span class="pt-s0">Fit coefficients to your own data</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--amber)">A</span>
-<a href="https://simoncoombes.github.io/pretium/atlas.html" class="pt-s74">Atlas</a>
+<a href="https://simoncoombes.github.io/pretium/atlas.html" class="pt-s71">Atlas</a>
 </div>
 
-
-<div class="pt-s104">
+<div class="pt-s100">
 <span class="pt-s0">Know what the market reproduces</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-3)">neither</span>
-<a href="https://simoncoombes.github.io/pretium/trust.html" class="pt-s74">The realism envelope</a>
+<a href="https://simoncoombes.github.io/pretium/trust.html" class="pt-s71">The realism envelope</a>
 </div>
 
 </div>
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">What the envelope adds</h2>
 <p class="pt-s13">The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say that the market behaved as a real one. The gaps stop you before you say more than that.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap">
@@ -225,35 +216,35 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">THE TWO LOOPS</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE TWO LOOPS</span>
 </div>
 
-<section class="pt-s33">
-<h1 class="pt-s30">The two loops</h1>
-<p class="pt-s24">The word training means two different things here. One kind trains the market model. The other kind trains a strategy against a market that exists. Most people need only the second kind.</p>
+<section class="pt-s32">
+<h1 class="pt-s29">The two loops</h1>
+<p class="pt-s23">The word training means two different things here. One kind trains the market model. The other kind trains a strategy against a market that exists. Most people need only the second kind.</p>
 
 <div style="border:1px solid var(--line);border-radius:8px;background:var(--card);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:0.9rem">
 <div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP A</span>
 <h3 class="pt-s4">Calibrate the market model</h3>
 </div>
-<div class="pt-s65">
+<div class="pt-s63">
 <sc-for list="{{ loopA }}" as="s">
-<span class="pt-s20">
-<span class="pt-s35">
-<span class="pt-s50">{{ s.k }}</span>
-<span class="pt-s23">{{ s.v }}</span>
+<span class="pt-s19">
+<span class="pt-s34">
+<span class="pt-s48">{{ s.k }}</span>
+<span class="pt-s22">{{ s.v }}</span>
 </span>
-<span class="pt-s32">{{ s.arrow }}</span>
+<span class="pt-s31">{{ s.arrow }}</span>
 </span>
-
-</sc-for></div>
+</sc-for>
+</div>
 
 <div style="display:flex;justify-content:center;padding:0.2rem 0">
-<span class="pt-s32">emits</span>
+<span class="pt-s31">emits</span>
 </div>
 
 <div style="display:flex;gap:0.7rem;align-items:stretch;flex-wrap:wrap">
@@ -262,48 +253,48 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <span style="font-size:0.75rem;color:var(--accent-deep)">A complete set of coefficients with one name. Change any of them and the set gets a new name.</span>
 </div>
 <div style="flex:1;min-width:14rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.7rem 0.9rem;display:flex;flex-direction:column;gap:1px">
-<span class="pt-s58">the realism envelope</span>
-<span class="pt-s73">Attached to the preset. Bounds what a result may claim.</span>
+<span class="pt-s55">the realism envelope</span>
+<span class="pt-s70">Attached to the preset. Bounds what a result may claim.</span>
 </div>
 </div>
 
 <div style="display:flex;justify-content:center;padding:0.2rem 0">
-<span class="pt-s32">cited by, and bounds</span>
+<span class="pt-s31">cited by, and bounds</span>
 </div>
 
 <div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP B</span>
 <h3 class="pt-s4">Evaluate a strategy or agent</h3>
 </div>
-<div class="pt-s65">
+<div class="pt-s63">
 <sc-for list="{{ loopB }}" as="s">
-<span class="pt-s20">
-<span class="pt-s35">
-<span class="pt-s50">{{ s.k }}</span>
-<span class="pt-s23">{{ s.v }}</span>
+<span class="pt-s19">
+<span class="pt-s34">
+<span class="pt-s48">{{ s.k }}</span>
+<span class="pt-s22">{{ s.v }}</span>
 </span>
-<span class="pt-s32">{{ s.arrow }}</span>
+<span class="pt-s31">{{ s.arrow }}</span>
 </span>
-
-</sc-for></div>
+</sc-for>
+</div>
 <p style="margin:0.3rem 0 0;font-size:0.875rem;color:var(--ink-2)">Nothing travels back. If you tune the market on the results of a strategy, you put the edge of that strategy into the world that then measures it.</p>
 </div>
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">Which loop you are in decides what you read</h2>
 <div class="pt-s11">
 <sc-for list="{{ routes }}" as="r">
-<div class="pt-s104">
+<div class="pt-s100">
 <span class="pt-s0">{{ r.want }}</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:{{ r.col }}">{{ r.loop }}</span>
-<a href="{{ r.href }}" class="pt-s74">{{ r.start }}</a>
+<a href="{{ r.href }}" class="pt-s71">{{ r.start }}</a>
 </div>
-
-</sc-for></div>
+</sc-for>
+</div>
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">What the envelope adds</h2>
 <p class="pt-s13">The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say that the market behaved as a real one. The gaps stop you before you say more than that.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap">

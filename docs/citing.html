@@ -48,71 +48,65 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div style="min-height:100vh;padding:0 0 5rem">
 <div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
 <header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu pt-here"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><span class="pt-current">Citing a run</span></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main class="pt-s18">
+<div id="pt-root"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">CITING A RUN</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">CITING A RUN</span>
 </div>
 
-<section class="pt-s33">
-<h1 class="pt-s30">Citing a run</h1>
-<p class="pt-s24">A citation identifies software. It does not identify a run. A manifest does.</p>
+<section class="pt-s32">
+<h1 class="pt-s29">Citing a run</h1>
+<p class="pt-s23">A citation identifies software. It does not identify a run. A manifest does.</p>
 
-<div class="pt-s29">
+<div class="pt-s28">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s4">Not enough on its own</h3>
 <p class="pt-s1">"We used pretium." That names the software and says nothing of the market you ran. Two people can obey it, get different numbers, and both be correct.</p>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-3);margin-top:auto;padding-top:0.6rem;border-top:1px solid var(--line-soft)">CITATION.cff covers this half</span>
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 class="pt-s67">Enough to reproduce</h3>
-<p class="pt-s56">A <span class="pt-s189">RunManifest</span> carries the seven things that fix a trajectory, plus the digest it should produce.</p>
+<h3 class="pt-s65">Enough to reproduce</h3>
+<p class="pt-s53">A <span class="pt-s175">RunManifest</span> carries the seven things that fix a trajectory, plus the digest it should produce.</p>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-deep);margin-top:auto;padding-top:0.6rem;border-top:1px solid var(--accent-line)">reproduce() refuses on a mismatch</span>
 </div>
 </div>
 </section>
 
-<section class="pt-s34">
+<section class="pt-s33">
 <h2 class="pt-s7">The seven things that fix a trajectory</h2>
 <div class="pt-s11">
 
-<div class="pt-s107">
+<div class="pt-s103">
 <span class="pt-s6">package version</span>
 <span class="pt-s0">Pins the implementation. 0.3.0 and 0.2.0 can differ even on the same preset.</span>
 </div>
 
-
-<div class="pt-s107">
+<div class="pt-s103">
 <span class="pt-s6">model preset</span>
 <span class="pt-s0">Pins the coefficients. Name it, because the default moves between releases.</span>
 </div>
 
-
-<div class="pt-s107">
+<div class="pt-s103">
 <span class="pt-s6">seed</span>
 <span class="pt-s0">Pins every random number the run draws.</span>
 </div>
 
-
-<div class="pt-s107">
+<div class="pt-s103">
 <span class="pt-s6">universe fingerprint</span>
 <span class="pt-s0">A sha256 over the roster in order, so a re-sorted roster fails the check instead of passing quietly.</span>
 </div>
 
-
-<div class="pt-s107">
+<div class="pt-s103">
 <span class="pt-s6">macro conditions</span>
 <span class="pt-s0">The state on day zero, before the economy starts advancing itself.</span>
 </div>
 
-
-<div class="pt-s107">
+<div class="pt-s103">
 <span class="pt-s6">scenario</span>
 <span class="pt-s0">The driven macro path, if you drove one.</span>
 </div>
 
-
-<div class="pt-s107">
+<div class="pt-s103">
 <span class="pt-s6">strategy fingerprint</span>
 <span class="pt-s0">A sha256 over the spec. This is the one to quote in a sentence.</span>
 </div>
@@ -121,10 +115,10 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p style="color:var(--ink-2);margin:0.2rem 0 0">Leave one out and the run is not reproducible. Record all seven and someone with the package and nothing else of yours can replay it.</p>
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">Write it down, then check it</h2>
-<div class="pt-s29">
-<pre class="pt-s31">manifest = pt.RunManifest.of(
+<div class="pt-s28">
+<pre class="pt-s30">manifest = pt.RunManifest.of(
     engine, spec, seed=7)
 
 manifest.to_json("study.json")
@@ -134,27 +128,26 @@ saved = pt.RunManifest.from_json(
     open("study.json").read())
 
 pt.reproduce(saved)   # or it raises</pre>
-<div class="pt-s186">
+<div class="pt-s172">
 <h3 class="pt-s4">Why it raises instead of a warning</h3>
-<p class="pt-s1">A manifest that quietly reproduced a different market would be worse than no manifest. So <span class="pt-s27">reproduce()</span> compares the digest it got against the digest the manifest expected, and names the field that differs.</p>
+<p class="pt-s1">A manifest that quietly reproduced a different market would be worse than no manifest. So <span class="pt-s26">reproduce()</span> compares the digest it got against the digest the manifest expected, and names the field that differs.</p>
 <p class="pt-s1">In most cases it is the preset. pt-v12 became the default on 2026-08-26, so a manifest written before that date and replayed after it fails unless it named its preset.</p>
 </div>
 </div>
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">What to put in a paper</h2>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
 <p style="margin:0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.8;color:var(--ink-2)">Momentum, top_k 5, one-day lookback, scored on pretium 0.3.0 under preset pt-v12, universe fingerprint 4c1e9f77a3b8d502, seeds 0 to 11, 252 days. Strategy fingerprint 9f2c8d41e7b6a530. Manifest and order log attached.</p>
-<p class="pt-s190">Illustrative. The fingerprints in that sentence are placeholders, and yours will differ.</p>
+<p class="pt-s176">Illustrative. The fingerprints in that sentence are placeholders, and yours will differ.</p>
 </div>
-<div class="pt-s69">
+<div class="pt-s67">
 
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
 <h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">Say this</h3>
 <p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">The strategy behaved this way on this preset, at this horizon, in a market that holds the fourteen realism statistics. Here is the manifest.</p>
 </div>
-
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
 <h3 style="font-size:1.0625rem;margin:0;color:var(--ink-2)">Not this</h3>
@@ -181,47 +174,47 @@ pt.reproduce(saved)   # or it raises</pre>
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
 
-<div class="pt-s21">
-<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">CITING A RUN</span>
+<div class="pt-s20">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">CITING A RUN</span>
 </div>
 
-<section class="pt-s33">
-<h1 class="pt-s30">Citing a run</h1>
-<p class="pt-s24">A citation identifies software. It does not identify a run. A manifest does.</p>
+<section class="pt-s32">
+<h1 class="pt-s29">Citing a run</h1>
+<p class="pt-s23">A citation identifies software. It does not identify a run. A manifest does.</p>
 
-<div class="pt-s29">
+<div class="pt-s28">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s4">Not enough on its own</h3>
 <p class="pt-s1">"We used pretium." That names the software and says nothing of the market you ran. Two people can obey it, get different numbers, and both be correct.</p>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-3);margin-top:auto;padding-top:0.6rem;border-top:1px solid var(--line-soft)">CITATION.cff covers this half</span>
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 class="pt-s67">Enough to reproduce</h3>
-<p class="pt-s56">A <span class="pt-s189">RunManifest</span> carries the seven things that fix a trajectory, plus the digest it should produce.</p>
+<h3 class="pt-s65">Enough to reproduce</h3>
+<p class="pt-s53">A <span class="pt-s175">RunManifest</span> carries the seven things that fix a trajectory, plus the digest it should produce.</p>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-deep);margin-top:auto;padding-top:0.6rem;border-top:1px solid var(--accent-line)">reproduce() refuses on a mismatch</span>
 </div>
 </div>
 </section>
 
-<section class="pt-s34">
+<section class="pt-s33">
 <h2 class="pt-s7">The seven things that fix a trajectory</h2>
 <div class="pt-s11">
 <sc-for list="{{ fields }}" as="f">
-<div class="pt-s107">
+<div class="pt-s103">
 <span class="pt-s6">{{ f.k }}</span>
 <span class="pt-s0">{{ f.v }}</span>
 </div>
-
-</sc-for></div>
+</sc-for>
+</div>
 <p style="color:var(--ink-2);margin:0.2rem 0 0">Leave one out and the run is not reproducible. Record all seven and someone with the package and nothing else of yours can replay it.</p>
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">Write it down, then check it</h2>
-<div class="pt-s29">
-<pre class="pt-s31">manifest = pt.RunManifest.of(
+<div class="pt-s28">
+<pre class="pt-s30">manifest = pt.RunManifest.of(
     engine, spec, seed=7)
 
 manifest.to_json("study.json")
@@ -231,28 +224,28 @@ saved = pt.RunManifest.from_json(
     open("study.json").read())
 
 pt.reproduce(saved)   # or it raises</pre>
-<div class="pt-s186">
+<div class="pt-s172">
 <h3 class="pt-s4">Why it raises instead of a warning</h3>
-<p class="pt-s1">A manifest that quietly reproduced a different market would be worse than no manifest. So <span class="pt-s27">reproduce()</span> compares the digest it got against the digest the manifest expected, and names the field that differs.</p>
+<p class="pt-s1">A manifest that quietly reproduced a different market would be worse than no manifest. So <span class="pt-s26">reproduce()</span> compares the digest it got against the digest the manifest expected, and names the field that differs.</p>
 <p class="pt-s1">In most cases it is the preset. pt-v12 became the default on 2026-08-26, so a manifest written before that date and replayed after it fails unless it named its preset.</p>
 </div>
 </div>
 </section>
 
-<section class="pt-s19">
+<section class="pt-s18">
 <h2 class="pt-s7">What to put in a paper</h2>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
 <p style="margin:0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.8;color:var(--ink-2)">Momentum, top_k 5, one-day lookback, scored on pretium 0.3.0 under preset pt-v12, universe fingerprint 4c1e9f77a3b8d502, seeds 0 to 11, 252 days. Strategy fingerprint 9f2c8d41e7b6a530. Manifest and order log attached.</p>
-<p class="pt-s190">Illustrative. The fingerprints in that sentence are placeholders, and yours will differ.</p>
+<p class="pt-s176">Illustrative. The fingerprints in that sentence are placeholders, and yours will differ.</p>
 </div>
-<div class="pt-s69">
+<div class="pt-s67">
 <sc-for list="{{ claims }}" as="c">
 <div style="border:1px solid {{ c.border }};border-radius:6px;background:{{ c.bg }};padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
 <h3 style="font-size:1.0625rem;margin:0;color:{{ c.fg }}">{{ c.head }}</h3>
 <p style="margin:0;font-size:0.875rem;color:{{ c.fg }}">{{ c.body }}</p>
 </div>
-
-</sc-for></div>
+</sc-for>
+</div>
 </section>
 
 
