@@ -31,7 +31,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Full history, not a shallow clone. The sitemap's lastmod and the
+      # datePublished on every page come from when each page's source was
+      # last committed, so a checkout with one commit in it builds a
+      # different site and the staleness check fails on all twenty-five.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
 
       - uses: actions/setup-python@v5
         with:
