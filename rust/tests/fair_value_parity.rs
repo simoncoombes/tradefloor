@@ -192,7 +192,11 @@ fn matches_the_reference_bit_for_bit() {
         // computeTargetPE is exported and called directly by the market module, so it
         // is part of the contract in its own right — including on the book
         // path, where compute_fair_value discards it but callers may not.
-        let pe = compute_target_pe(&company, &economy);
+        // 1.0 is the parity value, not an arbitrary one: qe_adjustment is
+        // 1 + qe_gain * qe_pe_boost, so a gain of one reproduces the formula the
+        // TypeScript reference implements. Any other value would be testing the
+        // dial rather than the contract.
+        let pe = compute_target_pe(&company, &economy, 1.0);
         let t = &case.target_pe;
         for problem in [
             same(

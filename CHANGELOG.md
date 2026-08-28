@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 `pt-v14` is the default. On the panel this project certifies it is better
 than the preset before it by a wider margin than any previous change, and it
@@ -13,7 +13,7 @@ statistic loses margin; it is described below rather than left out.
 | crisis correlation outside its real range | 4 of 13 | **2 of 13** |
 | how far the crisis volatility jump misses real markets | 3.7% | **2.0%** |
 | roster shapes in band | 131 of 138 | **137 of 138** |
-| rosters it does better on, out of six it never saw | — | **all six** |
+| rosters it does better on, out of six it never saw | -- | **all six** |
 
 It is never worse than `pt-v12` on any block measured: better on eight,
 level on five, worse on none.
@@ -34,17 +34,36 @@ and what the old default got wrong at exactly the wrong moment.
 **One thing got slightly worse.** Volume and volatility still arrive
 together, but less tightly: the measure falls from 0.56 to 0.52 in a band
 that runs 0.46 to 0.66. It never leaves the band at the resolution this
-project certifies — 30 seeds, one year, on any of 13 blocks — but it sits
+project certifies -- 30 seeds, one year, on any of 13 blocks -- but it sits
 nearer the edge than it did.
 
 **Two new dials ship switched off**, so nothing changes unless you set them:
 `crisis_blend_variance_damp` and `qe_pe_gain`. Both are measured and
 documented; neither is used by any preset.
 
+<!-- release-note-ends -->
+
+### the detail, and how it was measured
+
 **A band was too narrow and is now correct.** `abs_return_acf5` ran 0.02 to
 0.09. Real markets leave that band on five of eight non-crisis reference
 windows, which means it was rejecting reality. Re-derived from eight windows
 instead of three, it is 0.01 to 0.12. No preset's score changes.
+
+**How the table was measured.** Every row is 13 seed blocks of 30 seeds each,
+at block starts 101 through 1401. The panel row counts blocks whose whole
+two-year panel sits in band; 11 of 13 against 3 of 13 gives Wilson intervals
+of 58 to 96 percent and 8 to 50 percent, which do not overlap. The paired
+rows compare the two presets on the same block, so the block itself cancels:
+that matters because a block's panel score is 44 percent seed block and 56
+percent parameter vector, and an unpaired comparison at this margin reads
+mostly as luck. The six rosters are drawn from the universe generator with
+seeds the search never saw.
+
+**What the search was.** `pt-v14` differs from `pt-v12` in 15 of 90
+parameters. They were found by CMA-ES on a Wilson lower bound of the block
+pass rate, seeded from a Bayesian-optimisation front, and confirmed against
+held out blocks with zero loss.
 
 
 ## 0.3.0
