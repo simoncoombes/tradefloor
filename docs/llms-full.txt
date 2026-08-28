@@ -13,7 +13,7 @@ A market simulator you can run a strategy against. Beginner to expert in one pag
 
 A reproducible financial market built for AI agents
 
-Give it a universe, a macro state and a seed. Pretium runs the economy, the prices, the order books and the fills forward deterministically — so an agent can be evaluated under execution costs and market impact.
+Give it a universe, a macro state and a seed. Pretium runs the economy, the prices, the order books and the fills forward deterministically - so an agent can be evaluated under execution costs and market impact.
 
 pip install pretium
 cargo add pretium
@@ -91,7 +91,7 @@ Every close advances it. The economy updates, the cycle can turn, and the centra
 
 Every move is labelled
 
-The simulator computed each price, so it can say why. The nine factor contributions sum to the move — an identity, not a fitted explanation. The residual is near 1e-16.
+The simulator computed each price, so it can say why. The nine factor contributions sum to the move - an identity, not a fitted explanation. The residual is near 1e-16.
 
 STEP 01 - SEE IT 
 The seed fixes every random number
@@ -660,7 +660,7 @@ for day in range(days):
 
 What the arena would give you
 
-Agents that pay for each other's size. In a shared book agents do not only compete on returns, they compete for liquidity: one agent's sweep consumes the depth another expected to trade against, and every fill is priced by whoever else was in the book that tick. The counterfactual still works — same seed, no flow — so you can price the whole cohort's footprint.
+Agents that pay for each other's size. In a shared book agents do not only compete on returns, they compete for liquidity: one agent's sweep consumes the depth another expected to trade against, and every fill is priced by whoever else was in the book that tick. The counterfactual still works - same seed, no flow - so you can price the whole cohort's footprint.
 
 What it would not give you
 
@@ -853,7 +853,7 @@ NEXT Install
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -972,7 +972,7 @@ BACK Learn pretium NEXT Core concepts
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1089,7 +1089,7 @@ BACK Install NEXT The two loops
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1193,7 +1193,7 @@ BACK Core concepts NEXT Running a market
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1389,7 +1389,7 @@ BACK The two loops NEXT Agents
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1549,7 +1549,7 @@ BACK Running a market NEXT Scenarios
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1656,7 +1656,7 @@ BACK Agents NEXT Execution cost
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1768,7 +1768,7 @@ BACK Scenarios NEXT Checkpoints and forking
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1812,7 +1812,7 @@ A Checkpoint records the universe fingerprint and refuses to load against a rost
 
 What restore_state cannot catch
 
-The low-level restore_state holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a ValidationError naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not — prefer branch and Checkpoint, which check that.
+The low-level restore_state holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a ValidationError naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not - prefer branch and Checkpoint, which check that.
 
 All pages
 
@@ -1822,7 +1822,7 @@ BACK Execution cost NEXT Real companies from EDGAR
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1846,7 +1846,7 @@ snap.save("edgar-2024h1.json") # the artifact, hashed and citable
 
 universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)
 
-user_agent must carry a contact address — the SEC's fair-access policy asks for one, and this library will not send a fabricated one for you.
+user_agent must carry a contact address - the SEC's fair-access policy asks for one, and this library will not send a fabricated one for you.
 
 Save the snapshot, cite that
 
@@ -1870,7 +1870,7 @@ BACK Checkpoints and forking NEXT RL environment
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1958,7 +1958,7 @@ BACK Real companies from EDGAR NEXT The MCP server
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -2183,7 +2183,7 @@ BACK RL environment NEXT Realism envelope
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -2452,7 +2452,7 @@ BACK The MCP server NEXT The metrics
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -2714,7 +2714,7 @@ BACK Realism envelope NEXT Principles
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -2893,7 +2893,7 @@ BACK The metrics NEXT Citing a run
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -2989,7 +2989,7 @@ BACK Principles NEXT Glossary
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3240,7 +3240,7 @@ BACK Citing a run NEXT The nine factors
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3318,7 +3318,7 @@ BACK Glossary NEXT Conventions
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3441,7 +3441,7 @@ BACK The nine factors NEXT Schemas
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3561,7 +3561,7 @@ BACK Conventions NEXT Presets
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3703,7 +3703,7 @@ BACK Schemas NEXT Release notes
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3759,7 +3759,7 @@ BACK Presets NEXT Core types
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3946,7 +3946,7 @@ BACK Release notes NEXT Evaluate
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -4098,7 +4098,7 @@ BACK Core types NEXT Parameters
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -4228,7 +4228,7 @@ BACK Evaluate
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->

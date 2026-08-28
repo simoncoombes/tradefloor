@@ -7,7 +7,7 @@ to the previous identity: the learning path's mark is a stylised P and its
 accent is a desaturated teal, so the tab icon and the page it opens were
 showing two different products.
 
-This traces `mark-pretium.png` — the mark as the design ships it — into a
+This traces `mark-pretium.png` - the mark as the design ships it - into a
 vector outline, sets it on the brand's accent the way the old icon set its
 glyph, and writes the four files a browser asks for:
 
@@ -46,7 +46,7 @@ ROOT = HERE.parents[2]
 MARK = HERE / "handoff" / "mark-pretium.png"
 
 #: The accent and the ground, from the design's token set. The icon is the
-#: mark knocked out of a rounded square in the accent — the shape the old
+#: mark knocked out of a rounded square in the accent - the shape the old
 #: favicon used, which is what keeps a tab strip legible at 16 pixels.
 ACCENT = "#0E6B65"
 GROUND = "#FAFBFA"
@@ -119,7 +119,7 @@ def alpha_channel(width, height, channels, pixels) -> list[float]:
 
     The mark ships hard-edged: two alpha values, 0 and 255, and nothing in
     between. Interpolating a crossing against those gives back the pixel
-    midpoint, which is a staircase — invisible at the 15 by 22 the design
+    midpoint, which is a staircase - invisible at the 15 by 22 the design
     draws it at, and plainly wrong on a 512-pixel app icon.
 
     A small blur puts the edge back. Where the source steps by one pixel, the
@@ -168,7 +168,7 @@ def _blur(values, width, height):
 #: The cell's four corners are bits: 8 top-left, 4 top-right, 2 bottom-right,
 #: 1 bottom-left. Its four edges are 0 top, 1 right, 2 bottom, 3 left. An
 #: edge is crossed when the two corners it joins disagree, and the crossings
-#: are joined in pairs — so the table is derived rather than remembered, and
+#: are joined in pairs - so the table is derived rather than remembered, and
 #: is built here rather than written out, because writing it out by hand is
 #: how it comes to have seven of its fifteen cases wrong.
 _CORNERS = {0: (8, 4), 1: (4, 2), 2: (2, 1), 3: (1, 8)}
@@ -307,7 +307,7 @@ def simplify(loop, tolerance):
 
     A closed loop cannot be simplified in one pass: its first and last
     points are the same, the line between them has no direction, and every
-    point measures zero distance from it — so the whole outline collapses to
+    point measures zero distance from it - so the whole outline collapses to
     its start. Splitting at the point furthest from the start gives two open
     chains, each of which has a direction.
     """

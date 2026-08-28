@@ -79,7 +79,7 @@ hiked.pin_macro(corporate_bond_yield=0.09)
 <details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
 <summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--ink)">What restore_state cannot catch</summary>
 <div style="padding:0 0.9rem 0.9rem;border-top:1px solid var(--line-soft);padding-top:0.7rem">
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The low-level <code>restore_state</code> holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a <code>ValidationError</code> naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not — prefer <code>branch</code> and <code>Checkpoint</code>, which check that.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The low-level <code>restore_state</code> holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a <code>ValidationError</code> naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not - prefer <code>branch</code> and <code>Checkpoint</code>, which check that.</p>
 </div>
 </details>
 </section>

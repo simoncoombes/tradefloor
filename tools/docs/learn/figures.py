@@ -1,7 +1,7 @@
 """Inventory the numbers the learning site states in prose.
 
-The handoff asked for two provenance fixes. The first — generating the
-chart data from the goldens — is done, in `data.py`. This is groundwork for
+The handoff asked for two provenance fixes. The first - generating the
+chart data from the goldens - is done, in `data.py`. This is groundwork for
 the second: "add every prose figure on these pages to `tools/remeasure`'s
 inventory, so `remeasure.py` can check them the way it already checks the
 rebalance measurement".
@@ -26,7 +26,7 @@ It reports two things worth acting on immediately:
               measures, and states a different number
 
 Numbers inside code blocks, tables and data readouts are skipped. Those are
-either generated from the goldens — where `data.py` is the guarantee — or
+either generated from the goldens - where `data.py` is the guarantee - or
 they are code, where the example either runs or does not.
 """
 
@@ -46,7 +46,7 @@ INVENTORY = ROOT / "tools" / "remeasure" / "inventory.json"
 
 #: A stated quantity. A number carrying a unit is always a claim; so is a
 #: decimal, because prose does not use decimals for anything else. A bare
-#: integer is not — it is usually a count of columns or a step number — and
+#: integer is not - it is usually a count of columns or a step number - and
 #: is only taken when a unit follows it.
 NUMBER = re.compile(
     r"(?<![\w.\-])(-?\d[\d,]*\.\d+|-?\d[\d,]*)"
@@ -112,7 +112,7 @@ def inventory() -> list[dict]:
 
     `tools/remeasure/inventory.json` is the claim inventory. `docs/envelope.json`
     is the envelope the package itself publishes, and it carries each of the
-    fourteen statistics' measured value and the two edges of its band — all
+    fourteen statistics' measured value and the two edges of its band - all
     of which the Trust it pages quote. Reading both is what stops a figure
     being reported as unbacked when the package regenerates it on every
     release.

@@ -2,7 +2,7 @@
  *
  * None of this is part of a page's component. The shell is the same static
  * markup on all twenty-five pages, so it is driven by ordinary DOM code that
- * runs once, rather than by a template that re-renders — which is also why
+ * runs once, rather than by a template that re-renders - which is also why
  * the search overlay no longer redraws every time a page's own state moves.
  *
  * Everything here degrades. With the script blocked the menus still open,
@@ -77,9 +77,9 @@
 
   function index() { return window.PT_SEARCH || []; }
 
-  /* The index is the largest thing the site ships — it holds the text of
+  /* The index is the largest thing the site ships - it holds the text of
    * all twenty-five pages so that a search finds passages rather than page
-   * names — and most readers never open search. So it is fetched the first
+   * names - and most readers never open search. So it is fetched the first
    * time they do, rather than on every page load by everyone. */
   var indexState = 'idle';
   function loadIndex(then) {

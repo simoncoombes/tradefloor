@@ -171,8 +171,8 @@ def door_index(doors, current_slug: str) -> str:
     """The "All pages" grid that closes every page.
 
     Page names are kept on one line, as the design draws them, except on a
-    narrow screen where the longest of them — "Real companies from EDGAR",
-    a page added after the design was drawn — is wider than the column it is
+    narrow screen where the longest of them - "Real companies from EDGAR",
+    a page added after the design was drawn - is wider than the column it is
     given and pushes the whole page sideways. `.pt-door-name` is where the
     stylesheet lets it wrap.
     """

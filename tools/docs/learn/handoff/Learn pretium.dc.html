@@ -163,7 +163,7 @@ input[type=range]{accent-color:var(--accent)}
 <section style="padding:3.5rem 0 0;display:flex;flex-direction:column;gap:1.5rem">
 <div style="display:flex;flex-direction:column;gap:1.1rem">
 <h1 style="font-size:clamp(1.85rem,4vw,2.7rem);max-width:none;text-wrap:balance">A reproducible financial market built for AI agents</h1>
-<p style="font-size:1.1875rem;color:var(--ink-2);max-width:none;margin:0">Give it a universe, a macro state and a seed. Pretium runs the economy, the prices, the order books and the fills forward deterministically — so an agent can be evaluated under execution costs and market impact.</p>
+<p style="font-size:1.1875rem;color:var(--ink-2);max-width:none;margin:0">Give it a universe, a macro state and a seed. Pretium runs the economy, the prices, the order books and the fills forward deterministically - so an agent can be evaluated under execution costs and market impact.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
 <a href="https://pypi.org/project/pretium/" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--accent-deep);text-decoration:none"><img src="./logo-python.png" alt="" width="16" height="16" style="display:{{ showLight }};flex:none"></img><img src="./logo-python-dark.png" alt="" width="16" height="16" style="display:{{ showDark }};flex:none"></img>pip install pretium</a>
 <a href="https://crates.io/crates/pretium" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;border:1px solid var(--line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--ink-2);text-decoration:none"><img src="./logo-rust.png" alt="" width="16" height="16" style="display:{{ showLight }};flex:none"></img><img src="./logo-rust-dark.png" alt="" width="16" height="16" style="display:{{ showDark }};flex:none"></img>cargo add pretium</a>
@@ -256,7 +256,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 </div>
 <div>
 <h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Every move is labelled</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The simulator computed each price, so it can say why. The nine factor contributions sum to the move — an identity, not a fitted explanation. The residual is near 1e-16.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The simulator computed each price, so it can say why. The nine factor contributions sum to the move - an identity, not a fitted explanation. The residual is near 1e-16.</p>
 </div>
 </div>
 </section>
@@ -603,7 +603,7 @@ for day in range(days):
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
 <h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">What the arena would give you</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">Agents that pay for each other's size. In a shared book agents do not only compete on returns, they compete for liquidity: one agent's sweep consumes the depth another expected to trade against, and every fill is priced by whoever else was in the book that tick. The counterfactual still works — same seed, no flow — so you can price the whole cohort's footprint.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">Agents that pay for each other's size. In a shared book agents do not only compete on returns, they compete for liquidity: one agent's sweep consumes the depth another expected to trade against, and every fill is priced by whoever else was in the book that tick. The counterfactual still works - same seed, no flow - so you can price the whole cohort's footprint.</p>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
 <h3 style="font-size:1.0625rem;margin:0">What it would not give you</h3>
@@ -1032,7 +1032,7 @@ class Component extends DCLogic {
       bookPlayLabel: this.state.bookPlaying ? 'Pause' : 'Play',
       // One table rather than two lists. Both said useful things and both
       // were read as a wall of repeated cards; the distinction that matters
-      // — what the library provides against what the reader writes — is
+      // - what the library provides against what the reader writes - is
       // clearer as two columns than as two headings.
       arenaTable: [
         { k: 'agent', have: 'act(obs). The harness never asks what is inside an agent.',
@@ -1234,7 +1234,7 @@ class Component extends DCLogic {
       opText: op.kind === 'postLimit'
         ? 'postLimit ' + op.side + ' ' + op.qty + ' @ ' + op.price
         : 'submit ' + op.side + ' ' + op.qty + (op.price ? ' limit ' + op.price : ' market'),
-      note: st.note.replace(/\u2014|\u2013/g, '-'),
+      note: st.note.replace(/-|\u2013/g, '-'),
       asks: padSide(st.asks.slice().sort((a, b) => b.p - a.p || b.seq - a.seq).map(bar), 6, true),
       bids: padSide(st.bids.slice().sort((a, b) => b.p - a.p || a.seq - b.seq).map(bar), 7, false),
       spread: st.spr == null ? '--' : st.spr.toFixed(2),
