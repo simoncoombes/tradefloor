@@ -54,7 +54,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE MCP SERVER</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">The MCP server</h1>
 <p class="pt-s23">Eleven tools over the simulator. A coding agent can ask whether momentum beats buy-and-hold here, and whether the difference is real.</p>
 
@@ -64,13 +64,13 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 claude mcp add pretium -- pretium-mcp
 
 # then ask it a question in plain words</pre>
-<div class="pt-s172">
+<div class="pt-s173">
 <h3 class="pt-s4">Inside the market, or outside it</h3>
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">An LLM agent trades</span>
 <span class="pt-s0">The model is inside the market. It sends orders and the book answers.</span>
 </div>
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">An MCP client studies</span>
 <span class="pt-s0">The model is outside the market. It composes a question, reads the answer, and writes no code.</span>
 </div>
@@ -78,7 +78,7 @@ claude mcp add pretium -- pretium-mcp
 </div>
 </section>
 
-<section class="pt-s33">
+<section class="pt-s34">
 <h2 class="pt-s7">Two places a model can sit</h2>
 <p class="pt-s13">Both are supported and they answer different questions. Pick by what you want out.</p>
 
@@ -89,23 +89,23 @@ claude mcp add pretium -- pretium-mcp
 <h3 class="pt-s65">The model studies the market</h3>
 </div>
 
-<div class="pt-s3">
-<span class="pt-s111">It writes no code</span>
+<div class="pt-s2">
+<span class="pt-s112">It writes no code</span>
 <span class="pt-s72">Strategies, universes and scenarios arrive as data. There is no path from a tool argument to code execution.</span>
 </div>
 
-<div class="pt-s3">
-<span class="pt-s111">It can not move a price</span>
+<div class="pt-s2">
+<span class="pt-s112">It can not move a price</span>
 <span class="pt-s72">No orders reach the book, so nothing the model asks changes the market it is asking about.</span>
 </div>
 
-<div class="pt-s3">
-<span class="pt-s111">It gets the caveats</span>
+<div class="pt-s2">
+<span class="pt-s112">It gets the caveats</span>
 <span class="pt-s72">Each result carries computed caveats and provenance, so a summary can not lose them.</span>
 </div>
 
-<div class="pt-s3">
-<span class="pt-s111">It is cheap to be wrong</span>
+<div class="pt-s2">
+<span class="pt-s112">It is cheap to be wrong</span>
 <span class="pt-s72">check_envelope answers before you spend anything, and refuses a question the model can not support.</span>
 </div>
 
@@ -118,22 +118,22 @@ claude mcp add pretium -- pretium-mcp
 <h3 class="pt-s4">The model trades the market</h3>
 </div>
 
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">It sends orders</span>
 <span class="pt-s0">The model reads an observation and answers with target weights at each step.</span>
 </div>
 
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">It pays for size</span>
 <span class="pt-s0">Orders match against the engine's own depth, so the reward already carries the cost of the footprint.</span>
 </div>
 
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">It needs a harness</span>
 <span class="pt-s0">Any object with an act method works. The model call sits inside that method.</span>
 </div>
 
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">It is slower and it costs</span>
 <span class="pt-s0">One model call per decision. A 20-day run at three decisions a day is 60 calls.</span>
 </div>
@@ -163,57 +163,57 @@ class LLMTrader:
 <h2 class="pt-s7">The eleven tools</h2>
 <div class="pt-s11">
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">describe_simulator</span>
 <span class="pt-s0">What is this, what is it certified to reproduce, what can it not do</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">check_envelope</span>
 <span class="pt-s0">Is my question inside the certified envelope, before I spend anything</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">validate_strategy</span>
 <span class="pt-s0">Is this spec well-formed, and what is its fingerprint</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">build_universe</span>
 <span class="pt-s0">What roster shall I run against: generated, concentrated, or hand-authored</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">build_scenario</span>
 <span class="pt-s0">What macro path shall I run through, and what does it look like day by day</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">evaluate_strategies</span>
 <span class="pt-s0">How do these strategies do on one identical market</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">rank_strategies</span>
 <span class="pt-s0">Which is really better, across seeds, with a paired sign test</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">run_stress_scenario</span>
 <span class="pt-s0">What a shock does, always against the same market unshocked</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">explain_price_move</span>
 <span class="pt-s0">Why did this price move, via the nine factors that sum to it</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">start_job</span>
 <span class="pt-s0">Run something too slow to answer inline, including a full certified year</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">check_job</span>
 <span class="pt-s0">Is it done, and what did it find</span>
 </div>
@@ -238,33 +238,33 @@ class LLMTrader:
 <h2 class="pt-s7">The limits, and why they exist</h2>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.7rem">
 
-<div class="pt-s78">
-<span class="pt-s145">60</span>
-<span class="pt-s122">max_days, direct</span>
+<div class="pt-s79">
+<span class="pt-s146">60</span>
+<span class="pt-s123">max_days, direct</span>
 <span class="pt-s70">An inline call must answer while the client waits.</span>
 </div>
 
-<div class="pt-s78">
-<span class="pt-s145">252</span>
-<span class="pt-s122">max_days, job</span>
+<div class="pt-s79">
+<span class="pt-s146">252</span>
+<span class="pt-s123">max_days, job</span>
 <span class="pt-s70">The certified horizon, and no further.</span>
 </div>
 
-<div class="pt-s78">
-<span class="pt-s145">120</span>
-<span class="pt-s122">max_universe</span>
+<div class="pt-s79">
+<span class="pt-s146">120</span>
+<span class="pt-s123">max_universe</span>
 <span class="pt-s70">Keeps one question inside one machine.</span>
 </div>
 
-<div class="pt-s78">
-<span class="pt-s145">8</span>
-<span class="pt-s122">max_strategies</span>
+<div class="pt-s79">
+<span class="pt-s146">8</span>
+<span class="pt-s123">max_strategies</span>
 <span class="pt-s70">Enough to compare, few enough to read.</span>
 </div>
 
-<div class="pt-s78">
-<span class="pt-s145">12</span>
-<span class="pt-s122">max_seeds</span>
+<div class="pt-s79">
+<span class="pt-s146">12</span>
+<span class="pt-s123">max_seeds</span>
 <span class="pt-s70">Enough for a paired sign test to mean something.</span>
 </div>
 
@@ -275,11 +275,11 @@ class LLMTrader:
 <section class="pt-s18">
 <h2 class="pt-s7">Every result carries its own caveats</h2>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem">
-<p class="pt-s53">A model that summarises a result has the tool output and nothing else. Without the caveats in the payload it will report <span class="pt-s175">return_pct: 88.7</span> as "the strategy made 88.7%". So each result ships with computed caveats and full provenance: package version, preset, seed, universe fingerprint, and the strategy fingerprint.</p>
+<p class="pt-s53">A model that summarises a result has the tool output and nothing else. Without the caveats in the payload it will report <span class="pt-s176">return_pct: 88.7</span> as "the strategy made 88.7%". So each result ships with computed caveats and full provenance: package version, preset, seed, universe fingerprint, and the strategy fingerprint.</p>
 </div>
 <details class="pt-s12">
 <summary class="pt-s27">One seed is not an answer</summary>
-<div class="pt-s165">
+<div class="pt-s166">
 <p class="pt-s1">A single market is one sample. <span class="pt-s26">rank_strategies</span> runs many seeds and compares them with a paired sign test. On the twelve-market grid the docs measure, mean-reversion wins 9 to 3 at p = 0.15. One seed picks the pooled leader eight times in twelve.</p>
 </div>
 </details>
@@ -360,7 +360,7 @@ class LLMTrader:
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE MCP SERVER</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">The MCP server</h1>
 <p class="pt-s23">Eleven tools over the simulator. A coding agent can ask whether momentum beats buy-and-hold here, and whether the difference is real.</p>
 
@@ -370,13 +370,13 @@ class LLMTrader:
 claude mcp add pretium -- pretium-mcp
 
 # then ask it a question in plain words</pre>
-<div class="pt-s172">
+<div class="pt-s173">
 <h3 class="pt-s4">Inside the market, or outside it</h3>
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">An LLM agent trades</span>
 <span class="pt-s0">The model is inside the market. It sends orders and the book answers.</span>
 </div>
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">An MCP client studies</span>
 <span class="pt-s0">The model is outside the market. It composes a question, reads the answer, and writes no code.</span>
 </div>
@@ -384,7 +384,7 @@ claude mcp add pretium -- pretium-mcp
 </div>
 </section>
 
-<section class="pt-s33">
+<section class="pt-s34">
 <h2 class="pt-s7">Two places a model can sit</h2>
 <p class="pt-s13">Both are supported and they answer different questions. Pick by what you want out.</p>
 
@@ -395,8 +395,8 @@ claude mcp add pretium -- pretium-mcp
 <h3 class="pt-s65">The model studies the market</h3>
 </div>
 <sc-for list="{{ outside }}" as="o">
-<div class="pt-s3">
-<span class="pt-s111">{{ o.k }}</span>
+<div class="pt-s2">
+<span class="pt-s112">{{ o.k }}</span>
 <span class="pt-s72">{{ o.v }}</span>
 </div>
 </sc-for>
@@ -409,7 +409,7 @@ claude mcp add pretium -- pretium-mcp
 <h3 class="pt-s4">The model trades the market</h3>
 </div>
 <sc-for list="{{ inside }}" as="i">
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">{{ i.k }}</span>
 <span class="pt-s0">{{ i.v }}</span>
 </div>
@@ -439,7 +439,7 @@ class LLMTrader:
 <h2 class="pt-s7">The eleven tools</h2>
 <div class="pt-s11">
 <sc-for list="{{ tools }}" as="t">
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">{{ t.n }}</span>
 <span class="pt-s0">{{ t.d }}</span>
 </div>
@@ -464,9 +464,9 @@ class LLMTrader:
 <h2 class="pt-s7">The limits, and why they exist</h2>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.7rem">
 <sc-for list="{{ limits }}" as="l">
-<div class="pt-s78">
-<span class="pt-s145">{{ l.v }}</span>
-<span class="pt-s122">{{ l.k }}</span>
+<div class="pt-s79">
+<span class="pt-s146">{{ l.v }}</span>
+<span class="pt-s123">{{ l.k }}</span>
 <span class="pt-s70">{{ l.why }}</span>
 </div>
 </sc-for>
@@ -477,11 +477,11 @@ class LLMTrader:
 <section class="pt-s18">
 <h2 class="pt-s7">Every result carries its own caveats</h2>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem">
-<p class="pt-s53">A model that summarises a result has the tool output and nothing else. Without the caveats in the payload it will report <span class="pt-s175">return_pct: 88.7</span> as "the strategy made 88.7%". So each result ships with computed caveats and full provenance: package version, preset, seed, universe fingerprint, and the strategy fingerprint.</p>
+<p class="pt-s53">A model that summarises a result has the tool output and nothing else. Without the caveats in the payload it will report <span class="pt-s176">return_pct: 88.7</span> as "the strategy made 88.7%". So each result ships with computed caveats and full provenance: package version, preset, seed, universe fingerprint, and the strategy fingerprint.</p>
 </div>
 <details class="pt-s12">
 <summary class="pt-s27">One seed is not an answer</summary>
-<div class="pt-s165">
+<div class="pt-s166">
 <p class="pt-s1">A single market is one sample. <span class="pt-s26">rank_strategies</span> runs many seeds and compares them with a paired sign test. On the twelve-market grid the docs measure, mean-reversion wins 9 to 3 at p = 0.15. One seed picks the pooled leader eight times in twelve.</p>
 </div>
 </details>

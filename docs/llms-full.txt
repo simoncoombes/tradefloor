@@ -1,6 +1,8 @@
 # pretium
 
-> A deterministic market simulator with a real limit order book.
+> A reproducible evaluation environment for financial AI agents: a
+> deterministic market simulator with order-book execution, macro dynamics
+> and causal ground truth.
 > Version 0.3.0. Every page of the learning path, in reading order.
 
 
@@ -8,7 +10,7 @@
 # Learn pretium
 https://simoncoombes.github.io/pretium/
 
-A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.
+Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.
 ======================================================================
 
 A reproducible evaluation environment for financial AI agents
@@ -79,7 +81,7 @@ A universe of companies, a macro state for day zero, and a seed. The same three 
 
 Execution-aware
 
-Agents trade through an order book and pay the spread, the queue and their own impact. Run the same seed without the orders and the difference is what the trading cost.
+Agents trade through an order book and pay the spread, the queue and their own impact. Run the same seed without the orders and the difference is the cost of trading.
 
 Inspectable
 
@@ -92,7 +94,7 @@ A Python object with an act method, a Gymnasium environment, or a model calling 
 REPRODUCIBILITY 
 Git for market experiments
 
-Not literally - there is no repository and no history. What carries over is the working practice. The market is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. Share the configuration, share the seed, re-run the experiment.
+A market here is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. It is the working practice of version control applied to an experiment rather than to code: share the configuration, share the seed, re-run the experiment and get the same market back.
 
 What a RunManifest pins
 
@@ -104,6 +106,10 @@ reproduce() refuses on a mismatch rather than returning a number that looks fine
 Same world. Same conditions. Different agent. Two agents run against the identical market path, so a difference between them is the agent and not a different roll of the market.
 
 Same experiment. Different hypothesis. Change one component, re-run, and attribute the difference to the change. Determinism is what makes the attribution mean anything.
+
+Fork an experiment without changing its past
+
+checkpoint · day 100 IDENTICAL MARKET HISTORY UP TO HERE CHANGE ONE INPUT, HERE fork A policy A future A fork B policy B future B compare 1 Run once, then mark the state A checkpoint captures the engine at a chosen day: every column, the order book, and the position of the generator that draws the next random number. 2 Branch it mark.branch(2) returns two engines identical to that state, in under a millisecond. Checkpoint.resume() is the slower form that replays the order log and outlives the process. 3 Change exactly one input The agent, the policy, an order size, a pinned macro field. Everything else on both branches is already identical, so there is nothing else it could be. 4 Let both run on Each branch carries its own copy of the generator, so the futures are independent from the fork onward and neither disturbs the other. 5 Compare The two runs shared one past exactly, not approximately. What differs between them is the input you changed. This is a fork of an experiment, not of a repository. Both branches carry the same past bit for bit, so they do not start from similar conditions - they start from the same one, and the difference between the futures is attributable to the input you changed rather than to a different roll of the market.
 
 GROUND TRUTH 
 The simulator knows why the price moved
@@ -372,7 +378,7 @@ Fills
 STEP 04 - DRIVE IT 
 Three ways to use it
 
-Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote. Cheapest first.
+Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote.
 
 Agents over MCP
 
@@ -398,7 +404,7 @@ obs, r, done, trunc, i = env.step(a)
 
 Your own trade logic
 
-A TWAP, a VWAP, an iceberg, or your own logic. Any object with an act method will do. The observation is narrow on purpose. It shows only what a real trader can see.
+A TWAP, a VWAP, an iceberg, or your own logic. Any object with an act method will do. The observation is narrow on purpose. It exposes only information available to a trader inside the simulated market.
 
 class Mine:
  def act(self, obs):
@@ -1042,7 +1048,7 @@ The realism envelope
 
 What the envelope adds
 
-The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say that the market behaved as a real one. The gaps stop you before you say more than that.
+The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say the market reproduced those fourteen habits of real equities. The gaps stop you before you say more than that.
 
 Check a question against the envelope
 Start Loop B
@@ -1295,7 +1301,7 @@ Give the same agent the same seed and universe, and you get the same run.
 
 The observation is narrow on purpose
 
-Everything in it is something a real trader can see. Nothing in it is something only the simulator knows.
+Everything in it is information available to a trader inside the simulated market. Nothing in it is something only the simulator knows.
 
 The agent sees
 
@@ -1598,7 +1604,7 @@ The range crosses zero, so a round trip can end up ahead. This happens when the 
 
 One known boundary: the fear gauge leaks
 
-VIX drives the market factor's variance, so the market prices fear of your flow. Names that you never touched can move a few basis points through that channel. That is impact, and it is real. If you need the subtraction to be exact, pin VIX in both worlds and the two runs match byte for byte.
+VIX drives the market factor's variance, so the market prices fear of your flow. Names that you never touched can move a few basis points through that channel. That is impact, not an artefact of the measurement. If you need the subtraction to be exact, pin VIX in both worlds and the two runs match byte for byte.
 
 All pages
 

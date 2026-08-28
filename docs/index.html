@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>pretium: learn it in one page</title>
-<meta name="description" content="A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.">
+<title>pretium: a reproducible market for evaluating AI agents</title>
+<meta name="description" content="Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="pretium">
-<meta property="og:title" content="pretium: learn it in one page">
-<meta property="og:description" content="A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.">
+<meta property="og:title" content="pretium: a reproducible market for evaluating AI agents">
+<meta property="og:description" content="Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/">
 <meta property="og:image" content="https://simoncoombes.github.io/pretium/og-card.png">
 <meta property="og:image:width" content="1200">
@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="learn.css">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Learn pretium","description":"A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.","url":"https://simoncoombes.github.io/pretium/","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Learn pretium","description":"Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.","url":"https://simoncoombes.github.io/pretium/","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/","inLanguage":"en","publisher":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"potentialAction":{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://simoncoombes.github.io/pretium/index.html?q={search_term_string}"},"query-input":"required name=search_term_string"}}</script>
 <script>
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
@@ -52,7 +52,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <section style="padding:3.5rem 0 0;display:flex;flex-direction:column;gap:1.5rem">
 <div style="display:flex;flex-direction:column;gap:1.1rem">
-<h1 style="font-size:clamp(1.85rem,4vw,2.7rem);max-width:none;text-wrap:balance">A reproducible evaluation environment for financial AI agents</h1>
+<h1 style="font-size:clamp(1.85rem,3.4vw,2.25rem);max-width:none;text-wrap:balance">A reproducible evaluation environment for financial AI agents</h1>
 <p style="font-size:1.1875rem;color:var(--ink-2);max-width:none;margin:0">Run controlled, reproducible experiments on trading agents in a market with realistic execution - not a backtest over historical prices. A deterministic market simulator with order-book execution, macro dynamics, causal ground truth and agent-native interfaces.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
 <a href="https://pypi.org/project/pretium/" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--accent-deep);text-decoration:none"><img src="./logo-python.png" alt="" width="16" height="16" style="flex:none" class="pt-light"><img src="./logo-python-dark.png" alt="" width="16" height="16" style="flex:none" class="pt-dark">pip install pretium</a>
@@ -199,7 +199,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 </div>
 <div>
 <h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Execution-aware</h3>
-<p class="pt-s1">Agents trade through an order book and pay the spread, the queue and their own impact. Run the same seed without the orders and the difference is what the trading cost.</p>
+<p class="pt-s1">Agents trade through an order book and pay the spread, the queue and their own impact. Run the same seed without the orders and the difference is the cost of trading.</p>
 </div>
 <div>
 <h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Inspectable</h3>
@@ -220,13 +220,13 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s62">
 <span class="pt-s69">REPRODUCIBILITY</span>
 <h2 class="pt-s73">Git for market experiments</h2>
-<p style="margin:0;color:var(--ink-2);max-width:none">Not literally - there is no repository and no history. What carries over is the working practice. The market is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. Share the configuration, share the seed, re-run the experiment.</p>
+<p style="margin:0;color:var(--ink-2);max-width:none">A market here is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. It is the working practice of version control applied to an experiment rather than to code: share the configuration, share the seed, re-run the experiment and get the same market back.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.2rem">
 <h3 style="font-size:1.0625rem;margin:0 0 0.5rem">What a RunManifest pins</h3>
-<div class="pt-s97"><span class="pt-s136">seed</span><span class="pt-s2">The integer the whole market unrolls from.</span></div><div class="pt-s97"><span class="pt-s136">universe</span><span class="pt-s2">Every instrument, in roster order. The order is contractual.</span></div><div class="pt-s97"><span class="pt-s136">macro</span><span class="pt-s2">Day-zero rates, inflation and the cycle.</span></div><div class="pt-s97"><span class="pt-s136">scenario</span><span class="pt-s2">The macro path driven through it, if there was one.</span></div><div class="pt-s97"><span class="pt-s136">strategy</span><span class="pt-s2">The StrategySpec, carried in full and cited by fingerprint.</span></div><div class="pt-s97"><span class="pt-s136">model</span><span class="pt-s2">The preset that priced it, by name, or custom-XXXXXXXX if modified.</span></div><div class="pt-s97"><span class="pt-s136">fingerprints.inputs</span><span class="pt-s2">One digest over the seed and all of the above. This is the experiment's identity.</span></div><div class="pt-s97"><span class="pt-s136">result.digest</span><span class="pt-s2">What the market did. Re-running the inputs has to reproduce it.</span></div>
+<div class="pt-s98"><span class="pt-s137">seed</span><span class="pt-s3">The integer the whole market unrolls from.</span></div><div class="pt-s98"><span class="pt-s137">universe</span><span class="pt-s3">Every instrument, in roster order. The order is contractual.</span></div><div class="pt-s98"><span class="pt-s137">macro</span><span class="pt-s3">Day-zero rates, inflation and the cycle.</span></div><div class="pt-s98"><span class="pt-s137">scenario</span><span class="pt-s3">The macro path driven through it, if there was one.</span></div><div class="pt-s98"><span class="pt-s137">strategy</span><span class="pt-s3">The StrategySpec, carried in full and cited by fingerprint.</span></div><div class="pt-s98"><span class="pt-s137">model</span><span class="pt-s3">The preset that priced it, by name, or custom-XXXXXXXX if modified.</span></div><div class="pt-s98"><span class="pt-s137">fingerprints.inputs</span><span class="pt-s3">One digest over the seed and all of the above. This is the experiment's identity.</span></div><div class="pt-s98"><span class="pt-s137">result.digest</span><span class="pt-s3">What the market did. Re-running the inputs has to reproduce it.</span></div>
 </div>
 <div style="display:flex;flex-direction:column;gap:0.9rem;justify-content:space-between">
 <div style="display:flex;gap:0.3rem;flex-wrap:wrap;align-items:center"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">run</span><span style="color:var(--ink-3);font-size:0.75rem">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">record</span><span style="color:var(--ink-3);font-size:0.75rem">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">reproduce</span><span style="color:var(--ink-3);font-size:0.75rem">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">compare</span><span style="color:var(--ink-3);font-size:0.75rem">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">fork</span></div>
@@ -239,6 +239,8 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 </div>
 </div>
 </div>
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem 1.3rem;display:flex;flex-direction:column;gap:1.1rem"><h3 class="pt-s4">Fork an experiment without changing its past</h3><div style="display:grid;grid-template-columns:minmax(0,0.85fr) minmax(0,1.15fr);gap:1.6rem;align-items:center"><div class="pt-scroll"><div style="min-width:19rem;display:flex;flex-direction:column;align-items:center;gap:0;padding:0.2rem 0 0"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.25rem 0.6rem;white-space:nowrap">checkpoint · day 100</span><span class="pt-s76"></span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:var(--ink-3);text-align:center">IDENTICAL MARKET HISTORY UP TO HERE</span><span class="pt-s76"></span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:var(--accent);text-align:center">CHANGE ONE INPUT, HERE</span><div style="width:50%;height:15px;border-top:1px solid var(--line);border-left:1px solid var(--line);border-right:1px solid var(--line);flex:none"></div><div style="display:flex;flex-wrap:nowrap;width:100%;gap:0"><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0"><span class="pt-s76"></span><div style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.55rem 0.7rem;display:flex;flex-direction:column;align-items:center;gap:0.25rem;min-width:7rem"><span class="pt-s6">fork A</span><span class="pt-s32">policy A</span></div><span class="pt-s76"></span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem;white-space:nowrap">future A</span><span class="pt-s76"></span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0"><span class="pt-s76"></span><div style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.55rem 0.7rem;display:flex;flex-direction:column;align-items:center;gap:0.25rem;min-width:7rem"><span class="pt-s6">fork B</span><span class="pt-s32">policy B</span></div><span class="pt-s76"></span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem;white-space:nowrap">future B</span><span class="pt-s76"></span></div></div><div style="width:50%;height:15px;border-bottom:1px solid var(--line);border-left:1px solid var(--line);border-right:1px solid var(--line);flex:none"></div><span class="pt-s76"></span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem;white-space:nowrap">compare</span></div></div><div style="display:flex;flex-direction:column;gap:0.85rem"><div style="display:flex;gap:0.7rem;align-items:flex-start"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent);border:1px solid var(--accent-line);border-radius:99px;width:1.4rem;height:1.4rem;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px">1</span><span class="pt-s2"><span style="font-size:0.875rem;font-weight:600;color:var(--ink)">Run once, then mark the state</span><span class="pt-s0">A checkpoint captures the engine at a chosen day: every column, the order book, and the position of the generator that draws the next random number.</span></span></div><div style="display:flex;gap:0.7rem;align-items:flex-start"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent);border:1px solid var(--accent-line);border-radius:99px;width:1.4rem;height:1.4rem;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px">2</span><span class="pt-s2"><span style="font-size:0.875rem;font-weight:600;color:var(--ink)">Branch it</span><span class="pt-s0"><code style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem">mark.branch(2)</code> returns two engines identical to that state, in under a millisecond. <code style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem">Checkpoint.resume()</code> is the slower form that replays the order log and outlives the process.</span></span></div><div style="display:flex;gap:0.7rem;align-items:flex-start"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent);border:1px solid var(--accent-line);border-radius:99px;width:1.4rem;height:1.4rem;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px">3</span><span class="pt-s2"><span style="font-size:0.875rem;font-weight:600;color:var(--ink)">Change exactly one input</span><span class="pt-s0">The agent, the policy, an order size, a pinned macro field. Everything else on both branches is already identical, so there is nothing else it could be.</span></span></div><div style="display:flex;gap:0.7rem;align-items:flex-start"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent);border:1px solid var(--accent-line);border-radius:99px;width:1.4rem;height:1.4rem;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px">4</span><span class="pt-s2"><span style="font-size:0.875rem;font-weight:600;color:var(--ink)">Let both run on</span><span class="pt-s0">Each branch carries its own copy of the generator, so the futures are independent from the fork onward and neither disturbs the other.</span></span></div><div style="display:flex;gap:0.7rem;align-items:flex-start"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent);border:1px solid var(--accent-line);border-radius:99px;width:1.4rem;height:1.4rem;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px">5</span><span class="pt-s2"><span style="font-size:0.875rem;font-weight:600;color:var(--ink)">Compare</span><span class="pt-s0">The two runs shared one past exactly, not approximately. What differs between them is the input you changed.</span></span></div></div></div><p class="pt-s1">This is a fork of an experiment, not of a repository. Both branches carry the same past bit for bit, so they do not start from similar conditions - they start from the same one, and the difference between the futures is attributable to the input you changed rather than to a different roll of the market.</p></div>
 </section>
 
 
@@ -278,7 +280,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s62">
 <span class="pt-s69">STEP 01 - SEE IT</span>
 <h2 class="pt-s73">The seed fixes every random number</h2>
-<p class="pt-s178">The same universe, macro state and seed give the same market on Linux, macOS and Windows, digit for digit. Every release does a check of this. It builds five wheel targets, runs one fixed simulation in each, and compares the digests. A disagreement stops the release. Determinism also makes a fork possible: checkpoint at day 100, then branch, and the two branches share one past. The two runs below are the repository's reference runs, and they have a different seed and a different roster.</p>
+<p class="pt-s179">The same universe, macro state and seed give the same market on Linux, macOS and Windows, digit for digit. Every release does a check of this. It builds five wheel targets, runs one fixed simulation in each, and compares the digests. A disagreement stops the release. Determinism also makes a fork possible: checkpoint at day 100, then branch, and the two branches share one past. The two runs below are the repository's reference runs, and they have a different seed and a different roster.</p>
 </div>
 
 <div style="display:flex;gap:0.5rem">
@@ -303,42 +305,42 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 
 <tr>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;color:var(--accent)">AMZN</td>
-<td class="pt-s156">technology</td>
-<td class="pt-s157">393.46</td>
+<td class="pt-s157">technology</td>
+<td class="pt-s158">393.46</td>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);text-align:right;font-family:'Spline Sans Mono',monospace;color:var(--red)">-0.93%</td>
-<td class="pt-s158">-0.0086</td>
+<td class="pt-s159">-0.0086</td>
 </tr>
 
 <tr>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;color:var(--amber)">GOOGL</td>
-<td class="pt-s156">technology</td>
-<td class="pt-s157">123.40</td>
+<td class="pt-s157">technology</td>
+<td class="pt-s158">123.40</td>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);text-align:right;font-family:'Spline Sans Mono',monospace;color:var(--red)">-0.40%</td>
-<td class="pt-s158">+0.0015</td>
+<td class="pt-s159">+0.0015</td>
 </tr>
 
 <tr>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;color:var(--series3)">MSFT</td>
-<td class="pt-s156">technology</td>
-<td class="pt-s157">407.63</td>
+<td class="pt-s157">technology</td>
+<td class="pt-s158">407.63</td>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);text-align:right;font-family:'Spline Sans Mono',monospace;color:var(--green)">+0.39%</td>
-<td class="pt-s158">+0.0028</td>
+<td class="pt-s159">+0.0028</td>
 </tr>
 
 <tr>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;color:var(--series4)">AAPL</td>
-<td class="pt-s156">technology</td>
-<td class="pt-s157">544.10</td>
+<td class="pt-s157">technology</td>
+<td class="pt-s158">544.10</td>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);text-align:right;font-family:'Spline Sans Mono',monospace;color:var(--red)">-3.31%</td>
-<td class="pt-s158">-0.0372</td>
+<td class="pt-s159">-0.0372</td>
 </tr>
 
 <tr>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;color:var(--series5)">NVDA</td>
-<td class="pt-s156">technology</td>
-<td class="pt-s157">161.47</td>
+<td class="pt-s157">technology</td>
+<td class="pt-s158">161.47</td>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);text-align:right;font-family:'Spline Sans Mono',monospace;color:var(--green)">+1.52%</td>
-<td class="pt-s158">+0.0167</td>
+<td class="pt-s159">+0.0167</td>
 </tr>
 
 </tbody></table></div>
@@ -350,23 +352,23 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <p style="font-size:0.875rem;color:var(--ink-2);margin:0 0 0.7rem">One row per instrument per tick. The nine contributions sum to the total log move. The residual is near 1e-16. An explanation here is therefore an identity, not a model that fits after the fact.</p>
 <div style="display:flex;flex-wrap:wrap;gap:0.35rem">
 
-<span class="pt-s115">reversion</span>
+<span class="pt-s116">reversion</span>
 
-<span class="pt-s115">momentum</span>
+<span class="pt-s116">momentum</span>
 
-<span class="pt-s115">crowd_lean</span>
+<span class="pt-s116">crowd_lean</span>
 
-<span class="pt-s115">company_news</span>
+<span class="pt-s116">company_news</span>
 
-<span class="pt-s115">order_flow_impact</span>
+<span class="pt-s116">order_flow_impact</span>
 
-<span class="pt-s115">short_squeeze_effect</span>
+<span class="pt-s116">short_squeeze_effect</span>
 
-<span class="pt-s115">random_noise</span>
+<span class="pt-s116">random_noise</span>
 
-<span class="pt-s115">circuit_breaker</span>
+<span class="pt-s116">circuit_breaker</span>
 
-<span class="pt-s115">jump</span>
+<span class="pt-s116">jump</span>
 
 </div>
 <p style="font-size:0.8125rem;color:var(--ink-3);margin:0.7rem 0 0">Three of them are the model's own dynamics, not shocks. The answer can therefore be "nothing happened, the price drifted back toward fair value". That is the correct answer most of the time.</p>
@@ -378,7 +380,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s62">
 <span class="pt-s69">STEP 02 - BUILD A UNIVERSE</span>
 <h2 class="pt-s73">Choose who exists</h2>
-<p class="pt-s178">A universe is the roster and its fundamentals. The generator fills twelve sectors round-robin, so a generated roster is more balanced than any real index. Set one up here and take the code.</p>
+<p class="pt-s179">A universe is the roster and its fundamentals. The generator fills twelve sectors round-robin, so a generated roster is more balanced than any real index. Set one up here and take the code.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:1.6rem;align-items:stretch">
@@ -392,7 +394,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <input type="range" min="1" max="200" step="1" value="7" aria-label="Universe seed">
 </div>
 <div class="pt-s60">
-<span class="pt-s2">Roster shape</span>
+<span class="pt-s3">Roster shape</span>
 <div style="display:flex;flex-wrap:wrap;gap:0.35rem">
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)">balanced</button>
@@ -409,45 +411,45 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;letter-spacing:-0.015em;color:var(--ink)">Sector mix</span>
 
 <div class="pt-s19">
-<span class="pt-s148">technology</span>
+<span class="pt-s149">technology</span>
 <span style="height:8px;border-radius:2px;background:var(--accent);width:164px"></span>
-<span class="pt-s147">4</span>
+<span class="pt-s148">4</span>
 </div>
 
 <div class="pt-s19">
-<span class="pt-s148">financial services</span>
+<span class="pt-s149">financial services</span>
 <span style="height:8px;border-radius:2px;background:var(--accent);width:164px"></span>
-<span class="pt-s147">4</span>
+<span class="pt-s148">4</span>
 </div>
 
 <div class="pt-s19">
-<span class="pt-s148">healthcare</span>
+<span class="pt-s149">healthcare</span>
 <span style="height:8px;border-radius:2px;background:var(--accent);width:164px"></span>
-<span class="pt-s147">4</span>
+<span class="pt-s148">4</span>
 </div>
 
 <div class="pt-s19">
-<span class="pt-s148">energy</span>
+<span class="pt-s149">energy</span>
 <span style="height:8px;border-radius:2px;background:var(--accent);width:164px"></span>
-<span class="pt-s147">4</span>
+<span class="pt-s148">4</span>
 </div>
 
 <div class="pt-s19">
-<span class="pt-s148">consumer discretionary</span>
+<span class="pt-s149">consumer discretionary</span>
 <span style="height:8px;border-radius:2px;background:var(--accent);width:127px"></span>
-<span class="pt-s147">3</span>
+<span class="pt-s148">3</span>
 </div>
 
 <div class="pt-s19">
-<span class="pt-s148">consumer staples</span>
+<span class="pt-s149">consumer staples</span>
 <span style="height:8px;border-radius:2px;background:var(--accent);width:127px"></span>
-<span class="pt-s147">3</span>
+<span class="pt-s148">3</span>
 </div>
 
 <div class="pt-s19">
-<span class="pt-s148">industrials</span>
+<span class="pt-s149">industrials</span>
 <span style="height:8px;border-radius:2px;background:var(--accent);width:127px"></span>
-<span class="pt-s147">3</span>
+<span class="pt-s148">3</span>
 </div>
 
 </div>
@@ -480,13 +482,13 @@ e.run_days(252)   # one trading year</pre>
 <div class="pt-s62">
 <span class="pt-s69">STEP 03 - RUN YOUR STRATEGY</span>
 <h2 class="pt-s73">Write the strategy down</h2>
-<p class="pt-s178">A <span class="pt-s26">StrategySpec</span> is JSON with a <span class="pt-s26">sha256</span>, so someone else can check your result with the package and nothing else of yours. Compose one here and take it.</p>
+<p class="pt-s179">A <span class="pt-s26">StrategySpec</span> is JSON with a <span class="pt-s26">sha256</span>, so someone else can check your result with the package and nothing else of yours. Compose one here and take it.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,15rem) minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
 <div style="display:flex;flex-direction:column;gap:1rem">
 <div class="pt-s60">
-<span class="pt-s2">Signal</span>
+<span class="pt-s3">Signal</span>
 <div style="display:flex;flex-wrap:wrap;gap:0.35rem">
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">hold</button>
@@ -510,7 +512,7 @@ e.run_days(252)   # one trading year</pre>
 <input type="range" min="1" max="20" step="1" value="2" aria-label="participation cap">
 </div>
 <div class="pt-s60">
-<span class="pt-s2">Cadence</span>
+<span class="pt-s3">Cadence</span>
 <div style="display:flex;gap:0.35rem">
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)">step</button>
@@ -568,99 +570,99 @@ scores["mine"].strategy_fingerprint
 <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:0;min-height:17.5rem">
 <div style="padding:0.7rem 0.9rem;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--line-soft)">
 
-<div class="pt-s36">
-<span class="pt-s44"></span>
-<span class="pt-s120"></span>
+<div class="pt-s37">
+<span class="pt-s45"></span>
+<span class="pt-s121"></span>
 <span style="height:11px;border-radius:2px;background:var(--red-soft);width:0px"></span>
-<span class="pt-s43"></span>
+<span class="pt-s44"></span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44"></span>
-<span class="pt-s120"></span>
+<div class="pt-s37">
+<span class="pt-s45"></span>
+<span class="pt-s121"></span>
 <span style="height:11px;border-radius:2px;background:var(--red-soft);width:0px"></span>
-<span class="pt-s43"></span>
+<span class="pt-s44"></span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44"></span>
-<span class="pt-s120"></span>
+<div class="pt-s37">
+<span class="pt-s45"></span>
+<span class="pt-s121"></span>
 <span style="height:11px;border-radius:2px;background:var(--red-soft);width:0px"></span>
-<span class="pt-s43"></span>
+<span class="pt-s44"></span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44">mm</span>
-<span class="pt-s120">105.00</span>
+<div class="pt-s37">
+<span class="pt-s45">mm</span>
+<span class="pt-s121">105.00</span>
 <span style="height:11px;border-radius:2px;background:var(--red-soft);width:128px"></span>
-<span class="pt-s43">140</span>
+<span class="pt-s44">140</span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44">mm</span>
-<span class="pt-s120">104.00</span>
+<div class="pt-s37">
+<span class="pt-s45">mm</span>
+<span class="pt-s121">104.00</span>
 <span style="height:11px;border-radius:2px;background:var(--red-soft);width:119px"></span>
-<span class="pt-s43">130</span>
+<span class="pt-s44">130</span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44">mm</span>
-<span class="pt-s120">103.00</span>
+<div class="pt-s37">
+<span class="pt-s45">mm</span>
+<span class="pt-s121">103.00</span>
 <span style="height:11px;border-radius:2px;background:var(--red-soft);width:98px"></span>
-<span class="pt-s43">105</span>
+<span class="pt-s44">105</span>
 </div>
 
 <div style="display:flex;align-items:center;gap:0.5rem;margin:4px 0;padding:3px 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)">
 <span style="font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums">spread 4.00 · mid 101.00 · last 103.00</span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44">mm</span>
-<span class="pt-s116">99.00</span>
+<div class="pt-s37">
+<span class="pt-s45">mm</span>
+<span class="pt-s117">99.00</span>
 <span style="height:11px;border-radius:2px;background:var(--green-soft);width:94px"></span>
-<span class="pt-s43">100</span>
+<span class="pt-s44">100</span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44">alice</span>
-<span class="pt-s116">99.00</span>
+<div class="pt-s37">
+<span class="pt-s45">alice</span>
+<span class="pt-s117">99.00</span>
 <span style="height:11px;border-radius:2px;background:var(--green-soft);width:51px"></span>
-<span class="pt-s43">50</span>
+<span class="pt-s44">50</span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44">carol</span>
-<span class="pt-s116">99.00</span>
+<div class="pt-s37">
+<span class="pt-s45">carol</span>
+<span class="pt-s117">99.00</span>
 <span style="height:11px;border-radius:2px;background:var(--green-soft);width:29px"></span>
-<span class="pt-s43">25</span>
+<span class="pt-s44">25</span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44">mm</span>
-<span class="pt-s116">98.00</span>
+<div class="pt-s37">
+<span class="pt-s45">mm</span>
+<span class="pt-s117">98.00</span>
 <span style="height:11px;border-radius:2px;background:var(--green-soft);width:102px"></span>
-<span class="pt-s43">110</span>
+<span class="pt-s44">110</span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44">mm</span>
-<span class="pt-s116">97.00</span>
+<div class="pt-s37">
+<span class="pt-s45">mm</span>
+<span class="pt-s117">97.00</span>
 <span style="height:11px;border-radius:2px;background:var(--green-soft);width:111px"></span>
-<span class="pt-s43">120</span>
+<span class="pt-s44">120</span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44">mm</span>
-<span class="pt-s116">96.00</span>
+<div class="pt-s37">
+<span class="pt-s45">mm</span>
+<span class="pt-s117">96.00</span>
 <span style="height:11px;border-radius:2px;background:var(--green-soft);width:119px"></span>
-<span class="pt-s43">130</span>
+<span class="pt-s44">130</span>
 </div>
 
-<div class="pt-s36">
-<span class="pt-s44">mm</span>
-<span class="pt-s116">95.00</span>
+<div class="pt-s37">
+<span class="pt-s45">mm</span>
+<span class="pt-s117">95.00</span>
 <span style="height:11px;border-radius:2px;background:var(--green-soft);width:128px"></span>
-<span class="pt-s43">140</span>
+<span class="pt-s44">140</span>
 </div>
 
 </div>
@@ -671,28 +673,28 @@ scores["mine"].strategy_fingerprint
 </div>
 <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0.5rem;padding:0.6rem 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)">
 
-<div class="pt-s94">
-<span class="pt-s113">BEST BID</span>
+<div class="pt-s95">
+<span class="pt-s114">BEST BID</span>
 <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;font-variant-numeric:tabular-nums;color:var(--ink)">99.00</span>
-<span class="pt-s114">held</span>
+<span class="pt-s115">held</span>
 </div>
 
-<div class="pt-s94">
-<span class="pt-s113">BEST ASK</span>
+<div class="pt-s95">
+<span class="pt-s114">BEST ASK</span>
 <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;font-variant-numeric:tabular-nums;color:var(--accent)">103.00</span>
-<span class="pt-s114">moved</span>
+<span class="pt-s115">moved</span>
 </div>
 
-<div class="pt-s94">
-<span class="pt-s113">SPREAD</span>
+<div class="pt-s95">
+<span class="pt-s114">SPREAD</span>
 <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;font-variant-numeric:tabular-nums;color:var(--accent)">4.00</span>
-<span class="pt-s114">moved</span>
+<span class="pt-s115">moved</span>
 </div>
 
-<div class="pt-s94">
-<span class="pt-s113">RESTING</span>
+<div class="pt-s95">
+<span class="pt-s114">RESTING</span>
 <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;font-variant-numeric:tabular-nums;color:var(--accent)">7 / 3</span>
-<span class="pt-s114">moved</span>
+<span class="pt-s115">moved</span>
 </div>
 
 </div>
@@ -715,7 +717,7 @@ scores["mine"].strategy_fingerprint
 <div class="pt-s62">
 <span class="pt-s69">STEP 04 - DRIVE IT</span>
 <h2 class="pt-s73">Three ways to use it</h2>
-<p class="pt-s178">Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote. Cheapest first.</p>
+<p class="pt-s179">Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1.1rem">
@@ -741,7 +743,7 @@ obs, r, done, trunc, i = env.step(a)</pre>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;padding:0.9rem;background:var(--card);display:flex;flex-direction:column;gap:0.6rem">
 <h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0">Your own trade logic</h3>
-<p style="margin:0;font-size:0.8125rem;color:var(--ink-2)">A TWAP, a VWAP, an iceberg, or your own logic. Any object with an act method will do. The observation is narrow on purpose. It shows only what a real trader can see.</p>
+<p style="margin:0;font-size:0.8125rem;color:var(--ink-2)">A TWAP, a VWAP, an iceberg, or your own logic. Any object with an act method will do. The observation is narrow on purpose. It exposes only information available to a trader inside the simulated market.</p>
 <pre style="margin:0.2rem 0 0;margin-top:auto;background:var(--surface);border:1px solid var(--line-soft);border-radius:5px;padding:0.7rem;font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;line-height:1.65;color:var(--ink-2);overflow-x:auto">class Mine:
     def act(self, obs):
         return {"AAA": 0.2}
@@ -780,7 +782,7 @@ ranking = pt.rank(
 <span class="pt-s69">COMING UP</span>
 <h2 class="pt-s73">Coming next: competitive multi-agent markets</h2>
 <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;margin:0.2rem 0 0"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.25rem 0.6rem">single-agent evaluation</span><span class="pt-s9">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">competitive agents</span><span class="pt-s9">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">emergent market behaviour</span></div>
-<p class="pt-s178">The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. <strong>It is not shipped.</strong> The primitives are public and composable in the meantime, and this is what building one takes.</p>
+<p class="pt-s179">The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. <strong>It is not shipped.</strong> The primitives are public and composable in the meantime, and this is what building one takes.</p>
 </div>
 
 <div class="pt-s28">
@@ -795,45 +797,45 @@ ranking = pt.rank(
 </tr>
 </thead><tbody>
 <tr>
-<td class="pt-s162">agent</td>
-<td class="pt-s161">act(obs). The harness never asks what is inside an agent.</td>
-<td class="pt-s160">The model call behind it.</td>
+<td class="pt-s163">agent</td>
+<td class="pt-s162">act(obs). The harness never asks what is inside an agent.</td>
+<td class="pt-s161">The model call behind it.</td>
 </tr>
 
 <tr>
-<td class="pt-s162">merge</td>
-<td class="pt-s161">engine.run_session takes an order_flow dict, so many agents can push orders into the same tick.</td>
-<td class="pt-s160">Combining every agent's pending flow into one dict per tick.</td>
+<td class="pt-s163">merge</td>
+<td class="pt-s162">engine.run_session takes an order_flow dict, so many agents can push orders into the same tick.</td>
+<td class="pt-s161">Combining every agent's pending flow into one dict per tick.</td>
 </tr>
 
 <tr>
-<td class="pt-s162">observation</td>
-<td class="pt-s161">The book, the position and the truth table, every tick.</td>
-<td class="pt-s160">What each agent sees, and how you serialise it into a prompt a model can answer.</td>
+<td class="pt-s163">observation</td>
+<td class="pt-s162">The book, the position and the truth table, every tick.</td>
+<td class="pt-s161">What each agent sees, and how you serialise it into a prompt a model can answer.</td>
 </tr>
 
 <tr>
-<td class="pt-s162">model budget</td>
-<td class="pt-s161">Nothing: this one is entirely yours.</td>
-<td class="pt-s160">One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls.</td>
+<td class="pt-s163">model budget</td>
+<td class="pt-s162">Nothing: this one is entirely yours.</td>
+<td class="pt-s161">One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls.</td>
 </tr>
 
 <tr>
-<td class="pt-s162">execution</td>
-<td class="pt-s161">Portfolio turns target weights into orders and reports pending_flow(). One book per name, price-time priority, so the agent that arrives first fills first.</td>
-<td class="pt-s160">The participation cap and the order sizing.</td>
+<td class="pt-s163">execution</td>
+<td class="pt-s162">Portfolio turns target weights into orders and reports pending_flow(). One book per name, price-time priority, so the agent that arrives first fills first.</td>
+<td class="pt-s161">The participation cap and the order sizing.</td>
 </tr>
 
 <tr>
-<td class="pt-s162">scoreboard</td>
-<td class="pt-s161">pt.rank compares agents across seeds, not against each other in one book.</td>
-<td class="pt-s160">Ranking the cohort within the shared book.</td>
+<td class="pt-s163">scoreboard</td>
+<td class="pt-s162">pt.rank compares agents across seeds, not against each other in one book.</td>
+<td class="pt-s161">Ranking the cohort within the shared book.</td>
 </tr>
 
 <tr>
-<td class="pt-s162">counterfactual</td>
-<td class="pt-s161">The same seed with no flow at all.</td>
-<td class="pt-s160">The comparison that prices the whole cohort's footprint.</td>
+<td class="pt-s163">counterfactual</td>
+<td class="pt-s162">The same seed with no flow at all.</td>
+<td class="pt-s161">The comparison that prices the whole cohort's footprint.</td>
 </tr>
 </tbody></table>
 </div>
@@ -893,7 +895,7 @@ for day in range(days):
 <div class="pt-s62">
 <span class="pt-s69">STEP 05 - TRUST THE RESULT</span>
 <h2 class="pt-s73">How closely it reproduces measured behaviour</h2>
-<p class="pt-s178">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.</p>
+<p class="pt-s179">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:1.6rem;align-items:stretch">
@@ -901,116 +903,116 @@ for day in range(days):
 <div style="background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:0.85rem 0.95rem 0.7rem">
 <div style="display:flex;flex-direction:column;gap:4px">
 
-<div class="pt-s102">
-<span class="pt-s130">annualised_vol_pct</span>
+<div class="pt-s103">
+<span class="pt-s131">annualised_vol_pct</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(84.6% - 9.3px)"></span>
 </span>
-<span class="pt-s132">32.7604</span>
+<span class="pt-s133">32.7604</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">excess_kurtosis</span>
+<div class="pt-s103">
+<span class="pt-s131">excess_kurtosis</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(12.9% - 1.4px)"></span>
 </span>
-<span class="pt-s132">6.7001</span>
+<span class="pt-s133">6.7001</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">return_acf1</span>
+<div class="pt-s103">
+<span class="pt-s131">return_acf1</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(74.2% - 8.2px)"></span>
 </span>
-<span class="pt-s132">0.0239</span>
+<span class="pt-s133">0.0239</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">abs_return_acf1</span>
+<div class="pt-s103">
+<span class="pt-s131">abs_return_acf1</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(45.4% - 5.0px)"></span>
 </span>
-<span class="pt-s132">0.1107</span>
+<span class="pt-s133">0.1107</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">abs_return_acf5</span>
+<div class="pt-s103">
+<span class="pt-s131">abs_return_acf5</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(32.6% - 3.6px)"></span>
 </span>
-<span class="pt-s132">0.0428</span>
+<span class="pt-s133">0.0428</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">abs_return_acf20</span>
+<div class="pt-s103">
+<span class="pt-s131">abs_return_acf20</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(36.7% - 4.0px)"></span>
 </span>
-<span class="pt-s132">0.0040</span>
+<span class="pt-s133">0.0040</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">cross_sectional_corr</span>
+<div class="pt-s103">
+<span class="pt-s131">cross_sectional_corr</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(49.5% - 5.4px)"></span>
 </span>
-<span class="pt-s132">0.3177</span>
+<span class="pt-s133">0.3177</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">volume_abs_return_corr</span>
+<div class="pt-s103">
+<span class="pt-s131">volume_abs_return_corr</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(49.9% - 5.5px)"></span>
 </span>
-<span class="pt-s132">0.5599</span>
+<span class="pt-s133">0.5599</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">leverage_effect</span>
+<div class="pt-s103">
+<span class="pt-s131">leverage_effect</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(74.9% - 8.2px)"></span>
 </span>
-<span class="pt-s132">-0.0401</span>
+<span class="pt-s133">-0.0401</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">volume_change_acf1</span>
+<div class="pt-s103">
+<span class="pt-s131">volume_change_acf1</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(45.3% - 5.0px)"></span>
 </span>
-<span class="pt-s132">-0.2656</span>
+<span class="pt-s133">-0.2656</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">corr_asymmetry</span>
+<div class="pt-s103">
+<span class="pt-s131">corr_asymmetry</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(33.6% - 3.7px)"></span>
 </span>
-<span class="pt-s132">-0.0147</span>
+<span class="pt-s133">-0.0147</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">corr_asymmetry_lagged</span>
+<div class="pt-s103">
+<span class="pt-s131">corr_asymmetry_lagged</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(29.1% - 3.2px)"></span>
 </span>
-<span class="pt-s132">0.0181</span>
+<span class="pt-s133">0.0181</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">sector_excess_corr</span>
+<div class="pt-s103">
+<span class="pt-s131">sector_excess_corr</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(81.6% - 9.0px)"></span>
 </span>
-<span class="pt-s132">0.2079</span>
+<span class="pt-s133">0.2079</span>
 </div>
 
-<div class="pt-s102">
-<span class="pt-s130">corr_persistence_acf1</span>
+<div class="pt-s103">
+<span class="pt-s131">corr_persistence_acf1</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(46.9% - 5.2px)"></span>
 </span>
-<span class="pt-s132">0.1525</span>
+<span class="pt-s133">0.1525</span>
 </div>
 
 </div>
@@ -1137,8 +1139,8 @@ pt.evaluate(agents, seed=7,
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem">
 
-<div class="pt-s87">
-<h3 class="pt-s152">Start</h3>
+<div class="pt-s88">
+<h3 class="pt-s153">Start</h3>
 <div class="pt-s54">
 
 <a href="install.html" class="pt-s15"><span class="pt-s16">&gt;</span><span class="pt-s14">Install</span></a>
@@ -1152,8 +1154,8 @@ pt.evaluate(agents, seed=7,
 </div>
 </div>
 
-<div class="pt-s87">
-<h3 class="pt-s152">Use it</h3>
+<div class="pt-s88">
+<h3 class="pt-s153">Use it</h3>
 <div class="pt-s54">
 
 <a href="agents.html" class="pt-s15"><span class="pt-s16">&gt;</span><span class="pt-s14">Agents</span></a>
@@ -1173,8 +1175,8 @@ pt.evaluate(agents, seed=7,
 </div>
 </div>
 
-<div class="pt-s87">
-<h3 class="pt-s152">Trust it</h3>
+<div class="pt-s88">
+<h3 class="pt-s153">Trust it</h3>
 <div class="pt-s54">
 
 <a href="realism-envelope.html" class="pt-s15"><span class="pt-s16">&gt;</span><span class="pt-s14">Realism envelope</span></a>
@@ -1188,8 +1190,8 @@ pt.evaluate(agents, seed=7,
 </div>
 </div>
 
-<div class="pt-s87">
-<h3 class="pt-s152">Reference</h3>
+<div class="pt-s88">
+<h3 class="pt-s153">Reference</h3>
 <div class="pt-s54">
 
 <a href="glossary.html" class="pt-s15"><span class="pt-s16">&gt;</span><span class="pt-s14">Glossary</span></a>
@@ -1207,8 +1209,8 @@ pt.evaluate(agents, seed=7,
 </div>
 </div>
 
-<div class="pt-s87">
-<h3 class="pt-s152">API</h3>
+<div class="pt-s88">
+<h3 class="pt-s153">API</h3>
 <div class="pt-s54">
 
 <a href="core-types.html" class="pt-s15"><span class="pt-s16">&gt;</span><span class="pt-s14">Core types</span></a>
@@ -1242,7 +1244,7 @@ pt.evaluate(agents, seed=7,
 
 <section style="padding:3.5rem 0 0;display:flex;flex-direction:column;gap:1.5rem">
 <div style="display:flex;flex-direction:column;gap:1.1rem">
-<h1 style="font-size:clamp(1.85rem,4vw,2.7rem);max-width:none;text-wrap:balance">A reproducible evaluation environment for financial AI agents</h1>
+<h1 style="font-size:clamp(1.85rem,3.4vw,2.25rem);max-width:none;text-wrap:balance">A reproducible evaluation environment for financial AI agents</h1>
 <p style="font-size:1.1875rem;color:var(--ink-2);max-width:none;margin:0">Run controlled, reproducible experiments on trading agents in a market with realistic execution - not a backtest over historical prices. A deterministic market simulator with order-book execution, macro dynamics, causal ground truth and agent-native interfaces.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
 <a href="https://pypi.org/project/pretium/" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--accent-deep);text-decoration:none"><img src="./logo-python.png" alt="" width="16" height="16" style="flex:none" class="pt-light"><img src="./logo-python-dark.png" alt="" width="16" height="16" style="flex:none" class="pt-dark">pip install pretium</a>
@@ -1332,7 +1334,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 </div>
 <div>
 <h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Execution-aware</h3>
-<p class="pt-s1">Agents trade through an order book and pay the spread, the queue and their own impact. Run the same seed without the orders and the difference is what the trading cost.</p>
+<p class="pt-s1">Agents trade through an order book and pay the spread, the queue and their own impact. Run the same seed without the orders and the difference is the cost of trading.</p>
 </div>
 <div>
 <h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Inspectable</h3>
@@ -1353,13 +1355,13 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s62">
 <span class="pt-s69">REPRODUCIBILITY</span>
 <h2 class="pt-s73">Git for market experiments</h2>
-<p style="margin:0;color:var(--ink-2);max-width:none">Not literally - there is no repository and no history. What carries over is the working practice. The market is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. Share the configuration, share the seed, re-run the experiment.</p>
+<p style="margin:0;color:var(--ink-2);max-width:none">A market here is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. It is the working practice of version control applied to an experiment rather than to code: share the configuration, share the seed, re-run the experiment and get the same market back.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.2rem">
 <h3 style="font-size:1.0625rem;margin:0 0 0.5rem">What a RunManifest pins</h3>
-<div class="pt-s97"><span class="pt-s136">seed</span><span class="pt-s2">The integer the whole market unrolls from.</span></div><div class="pt-s97"><span class="pt-s136">universe</span><span class="pt-s2">Every instrument, in roster order. The order is contractual.</span></div><div class="pt-s97"><span class="pt-s136">macro</span><span class="pt-s2">Day-zero rates, inflation and the cycle.</span></div><div class="pt-s97"><span class="pt-s136">scenario</span><span class="pt-s2">The macro path driven through it, if there was one.</span></div><div class="pt-s97"><span class="pt-s136">strategy</span><span class="pt-s2">The StrategySpec, carried in full and cited by fingerprint.</span></div><div class="pt-s97"><span class="pt-s136">model</span><span class="pt-s2">The preset that priced it, by name, or custom-XXXXXXXX if modified.</span></div><div class="pt-s97"><span class="pt-s136">fingerprints.inputs</span><span class="pt-s2">One digest over the seed and all of the above. This is the experiment's identity.</span></div><div class="pt-s97"><span class="pt-s136">result.digest</span><span class="pt-s2">What the market did. Re-running the inputs has to reproduce it.</span></div>
+<div class="pt-s98"><span class="pt-s137">seed</span><span class="pt-s3">The integer the whole market unrolls from.</span></div><div class="pt-s98"><span class="pt-s137">universe</span><span class="pt-s3">Every instrument, in roster order. The order is contractual.</span></div><div class="pt-s98"><span class="pt-s137">macro</span><span class="pt-s3">Day-zero rates, inflation and the cycle.</span></div><div class="pt-s98"><span class="pt-s137">scenario</span><span class="pt-s3">The macro path driven through it, if there was one.</span></div><div class="pt-s98"><span class="pt-s137">strategy</span><span class="pt-s3">The StrategySpec, carried in full and cited by fingerprint.</span></div><div class="pt-s98"><span class="pt-s137">model</span><span class="pt-s3">The preset that priced it, by name, or custom-XXXXXXXX if modified.</span></div><div class="pt-s98"><span class="pt-s137">fingerprints.inputs</span><span class="pt-s3">One digest over the seed and all of the above. This is the experiment's identity.</span></div><div class="pt-s98"><span class="pt-s137">result.digest</span><span class="pt-s3">What the market did. Re-running the inputs has to reproduce it.</span></div>
 </div>
 <div style="display:flex;flex-direction:column;gap:0.9rem;justify-content:space-between">
 <div style="display:flex;gap:0.3rem;flex-wrap:wrap;align-items:center"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">run</span><span style="color:var(--ink-3);font-size:0.75rem">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">record</span><span style="color:var(--ink-3);font-size:0.75rem">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">reproduce</span><span style="color:var(--ink-3);font-size:0.75rem">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">compare</span><span style="color:var(--ink-3);font-size:0.75rem">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">fork</span></div>
@@ -1372,6 +1374,8 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 </div>
 </div>
 </div>
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem 1.3rem;display:flex;flex-direction:column;gap:1.1rem"><h3 class="pt-s4">Fork an experiment without changing its past</h3><div style="display:grid;grid-template-columns:minmax(0,0.85fr) minmax(0,1.15fr);gap:1.6rem;align-items:center"><div class="pt-scroll"><div style="min-width:19rem;display:flex;flex-direction:column;align-items:center;gap:0;padding:0.2rem 0 0"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.25rem 0.6rem;white-space:nowrap">checkpoint · day 100</span><span class="pt-s76"></span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:var(--ink-3);text-align:center">IDENTICAL MARKET HISTORY UP TO HERE</span><span class="pt-s76"></span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:var(--accent);text-align:center">CHANGE ONE INPUT, HERE</span><div style="width:50%;height:15px;border-top:1px solid var(--line);border-left:1px solid var(--line);border-right:1px solid var(--line);flex:none"></div><div style="display:flex;flex-wrap:nowrap;width:100%;gap:0"><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0"><span class="pt-s76"></span><div style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.55rem 0.7rem;display:flex;flex-direction:column;align-items:center;gap:0.25rem;min-width:7rem"><span class="pt-s6">fork A</span><span class="pt-s32">policy A</span></div><span class="pt-s76"></span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem;white-space:nowrap">future A</span><span class="pt-s76"></span></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0"><span class="pt-s76"></span><div style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.55rem 0.7rem;display:flex;flex-direction:column;align-items:center;gap:0.25rem;min-width:7rem"><span class="pt-s6">fork B</span><span class="pt-s32">policy B</span></div><span class="pt-s76"></span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem;white-space:nowrap">future B</span><span class="pt-s76"></span></div></div><div style="width:50%;height:15px;border-bottom:1px solid var(--line);border-left:1px solid var(--line);border-right:1px solid var(--line);flex:none"></div><span class="pt-s76"></span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem;white-space:nowrap">compare</span></div></div><div style="display:flex;flex-direction:column;gap:0.85rem"><div style="display:flex;gap:0.7rem;align-items:flex-start"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent);border:1px solid var(--accent-line);border-radius:99px;width:1.4rem;height:1.4rem;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px">1</span><span class="pt-s2"><span style="font-size:0.875rem;font-weight:600;color:var(--ink)">Run once, then mark the state</span><span class="pt-s0">A checkpoint captures the engine at a chosen day: every column, the order book, and the position of the generator that draws the next random number.</span></span></div><div style="display:flex;gap:0.7rem;align-items:flex-start"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent);border:1px solid var(--accent-line);border-radius:99px;width:1.4rem;height:1.4rem;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px">2</span><span class="pt-s2"><span style="font-size:0.875rem;font-weight:600;color:var(--ink)">Branch it</span><span class="pt-s0"><code style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem">mark.branch(2)</code> returns two engines identical to that state, in under a millisecond. <code style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem">Checkpoint.resume()</code> is the slower form that replays the order log and outlives the process.</span></span></div><div style="display:flex;gap:0.7rem;align-items:flex-start"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent);border:1px solid var(--accent-line);border-radius:99px;width:1.4rem;height:1.4rem;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px">3</span><span class="pt-s2"><span style="font-size:0.875rem;font-weight:600;color:var(--ink)">Change exactly one input</span><span class="pt-s0">The agent, the policy, an order size, a pinned macro field. Everything else on both branches is already identical, so there is nothing else it could be.</span></span></div><div style="display:flex;gap:0.7rem;align-items:flex-start"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent);border:1px solid var(--accent-line);border-radius:99px;width:1.4rem;height:1.4rem;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px">4</span><span class="pt-s2"><span style="font-size:0.875rem;font-weight:600;color:var(--ink)">Let both run on</span><span class="pt-s0">Each branch carries its own copy of the generator, so the futures are independent from the fork onward and neither disturbs the other.</span></span></div><div style="display:flex;gap:0.7rem;align-items:flex-start"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent);border:1px solid var(--accent-line);border-radius:99px;width:1.4rem;height:1.4rem;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px">5</span><span class="pt-s2"><span style="font-size:0.875rem;font-weight:600;color:var(--ink)">Compare</span><span class="pt-s0">The two runs shared one past exactly, not approximately. What differs between them is the input you changed.</span></span></div></div></div><p class="pt-s1">This is a fork of an experiment, not of a repository. Both branches carry the same past bit for bit, so they do not start from similar conditions - they start from the same one, and the difference between the futures is attributable to the input you changed rather than to a different roll of the market.</p></div>
 </section>
 
 
@@ -1411,7 +1415,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s62">
 <span class="pt-s69">STEP 01 - SEE IT</span>
 <h2 class="pt-s73">The seed fixes every random number</h2>
-<p class="pt-s178">The same universe, macro state and seed give the same market on Linux, macOS and Windows, digit for digit. Every release does a check of this. It builds five wheel targets, runs one fixed simulation in each, and compares the digests. A disagreement stops the release. Determinism also makes a fork possible: checkpoint at day 100, then branch, and the two branches share one past. The two runs below are the repository's reference runs, and they have a different seed and a different roster.</p>
+<p class="pt-s179">The same universe, macro state and seed give the same market on Linux, macOS and Windows, digit for digit. Every release does a check of this. It builds five wheel targets, runs one fixed simulation in each, and compares the digests. A disagreement stops the release. Determinism also makes a fork possible: checkpoint at day 100, then branch, and the two branches share one past. The two runs below are the repository's reference runs, and they have a different seed and a different roster.</p>
 </div>
 
 <div style="display:flex;gap:0.5rem">
@@ -1436,10 +1440,10 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <sc-for list="{{ rows }}" as="r">
 <tr>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;color:{{ r.c }}">{{ r.t }}</td>
-<td class="pt-s156">{{ r.s }}</td>
-<td class="pt-s157">{{ r.px }}</td>
+<td class="pt-s157">{{ r.s }}</td>
+<td class="pt-s158">{{ r.px }}</td>
 <td style="padding:0.45rem 0.9rem;border-bottom:1px solid var(--line-soft);text-align:right;font-family:'Spline Sans Mono',monospace;color:{{ r.retC }}">{{ r.ret }}</td>
-<td class="pt-s158">{{ r.mis }}</td>
+<td class="pt-s159">{{ r.mis }}</td>
 </tr>
 </sc-for>
 </tbody></table></div>
@@ -1451,7 +1455,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <p style="font-size:0.875rem;color:var(--ink-2);margin:0 0 0.7rem">One row per instrument per tick. The nine contributions sum to the total log move. The residual is near 1e-16. An explanation here is therefore an identity, not a model that fits after the fact.</p>
 <div style="display:flex;flex-wrap:wrap;gap:0.35rem">
 <sc-for list="{{ factors }}" as="f">
-<span class="pt-s115">{{ f }}</span>
+<span class="pt-s116">{{ f }}</span>
 </sc-for>
 </div>
 <p style="font-size:0.8125rem;color:var(--ink-3);margin:0.7rem 0 0">Three of them are the model's own dynamics, not shocks. The answer can therefore be "nothing happened, the price drifted back toward fair value". That is the correct answer most of the time.</p>
@@ -1463,7 +1467,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s62">
 <span class="pt-s69">STEP 02 - BUILD A UNIVERSE</span>
 <h2 class="pt-s73">Choose who exists</h2>
-<p class="pt-s178">A universe is the roster and its fundamentals. The generator fills twelve sectors round-robin, so a generated roster is more balanced than any real index. Set one up here and take the code.</p>
+<p class="pt-s179">A universe is the roster and its fundamentals. The generator fills twelve sectors round-robin, so a generated roster is more balanced than any real index. Set one up here and take the code.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:1.6rem;align-items:stretch">
@@ -1477,7 +1481,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <input type="range" min="1" max="200" step="1" value="{{ uSeed }}" onInput="{{ setUSeed }}" aria-label="Universe seed">
 </div>
 <div class="pt-s60">
-<span class="pt-s2">Roster shape</span>
+<span class="pt-s3">Roster shape</span>
 <div style="display:flex;flex-wrap:wrap;gap:0.35rem">
 <sc-for list="{{ shapes }}" as="s">
 <button onClick="{{ s.pick }}" style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid {{ s.border }};background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</button>
@@ -1488,9 +1492,9 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;letter-spacing:-0.015em;color:var(--ink)">Sector mix</span>
 <sc-for list="{{ mix }}" as="m">
 <div class="pt-s19">
-<span class="pt-s148">{{ m.name }}</span>
+<span class="pt-s149">{{ m.name }}</span>
 <span style="height:8px;border-radius:2px;background:var(--accent);width:{{ m.w }}"></span>
-<span class="pt-s147">{{ m.n }}</span>
+<span class="pt-s148">{{ m.n }}</span>
 </div>
 </sc-for>
 </div>
@@ -1510,13 +1514,13 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s62">
 <span class="pt-s69">STEP 03 - RUN YOUR STRATEGY</span>
 <h2 class="pt-s73">Write the strategy down</h2>
-<p class="pt-s178">A <span class="pt-s26">StrategySpec</span> is JSON with a <span class="pt-s26">sha256</span>, so someone else can check your result with the package and nothing else of yours. Compose one here and take it.</p>
+<p class="pt-s179">A <span class="pt-s26">StrategySpec</span> is JSON with a <span class="pt-s26">sha256</span>, so someone else can check your result with the package and nothing else of yours. Compose one here and take it.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,15rem) minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
 <div style="display:flex;flex-direction:column;gap:1rem">
 <div class="pt-s60">
-<span class="pt-s2">Signal</span>
+<span class="pt-s3">Signal</span>
 <div style="display:flex;flex-wrap:wrap;gap:0.35rem">
 <sc-for list="{{ signals }}" as="s">
 <button onClick="{{ s.pick }}" style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid {{ s.border }};background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</button>
@@ -1532,7 +1536,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <input type="range" min="1" max="20" step="1" value="{{ partRaw }}" onInput="{{ setPart }}" aria-label="participation cap">
 </div>
 <div class="pt-s60">
-<span class="pt-s2">Cadence</span>
+<span class="pt-s3">Cadence</span>
 <div style="display:flex;gap:0.35rem">
 <sc-for list="{{ cadences }}" as="c">
 <button onClick="{{ c.pick }}" style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button>
@@ -1560,22 +1564,22 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:0;min-height:17.5rem">
 <div style="padding:0.7rem 0.9rem;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--line-soft)">
 <sc-for list="{{ book.asks }}" as="a">
-<div class="pt-s36">
-<span class="pt-s44">{{ a.o }}</span>
-<span class="pt-s120">{{ a.p }}</span>
+<div class="pt-s37">
+<span class="pt-s45">{{ a.o }}</span>
+<span class="pt-s121">{{ a.p }}</span>
 <span style="height:11px;border-radius:2px;background:var(--red-soft);width:{{ a.w }}"></span>
-<span class="pt-s43">{{ a.rem }}</span>
+<span class="pt-s44">{{ a.rem }}</span>
 </div>
 </sc-for>
 <div style="display:flex;align-items:center;gap:0.5rem;margin:4px 0;padding:3px 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)">
 <span style="font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums">spread {{ book.spread }} · mid {{ book.mid }} · last {{ book.last }}</span>
 </div>
 <sc-for list="{{ book.bids }}" as="b">
-<div class="pt-s36">
-<span class="pt-s44">{{ b.o }}</span>
-<span class="pt-s116">{{ b.p }}</span>
+<div class="pt-s37">
+<span class="pt-s45">{{ b.o }}</span>
+<span class="pt-s117">{{ b.p }}</span>
 <span style="height:11px;border-radius:2px;background:var(--green-soft);width:{{ b.w }}"></span>
-<span class="pt-s43">{{ b.rem }}</span>
+<span class="pt-s44">{{ b.rem }}</span>
 </div>
 </sc-for>
 </div>
@@ -1586,10 +1590,10 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 </div>
 <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0.5rem;padding:0.6rem 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)">
 <sc-for list="{{ book.stats }}" as="st">
-<div class="pt-s94">
-<span class="pt-s113">{{ st.k }}</span>
+<div class="pt-s95">
+<span class="pt-s114">{{ st.k }}</span>
 <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;font-variant-numeric:tabular-nums;color:{{ st.col }}">{{ st.v }}</span>
-<span class="pt-s114">{{ st.note }}</span>
+<span class="pt-s115">{{ st.note }}</span>
 </div>
 </sc-for>
 </div>
@@ -1612,7 +1616,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s62">
 <span class="pt-s69">STEP 04 - DRIVE IT</span>
 <h2 class="pt-s73">Three ways to use it</h2>
-<p class="pt-s178">Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote. Cheapest first.</p>
+<p class="pt-s179">Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1.1rem">
@@ -1638,7 +1642,7 @@ obs, r, done, trunc, i = env.step(a)</pre>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;padding:0.9rem;background:var(--card);display:flex;flex-direction:column;gap:0.6rem">
 <h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0">Your own trade logic</h3>
-<p style="margin:0;font-size:0.8125rem;color:var(--ink-2)">A TWAP, a VWAP, an iceberg, or your own logic. Any object with an act method will do. The observation is narrow on purpose. It shows only what a real trader can see.</p>
+<p style="margin:0;font-size:0.8125rem;color:var(--ink-2)">A TWAP, a VWAP, an iceberg, or your own logic. Any object with an act method will do. The observation is narrow on purpose. It exposes only information available to a trader inside the simulated market.</p>
 <pre style="margin:0.2rem 0 0;margin-top:auto;background:var(--surface);border:1px solid var(--line-soft);border-radius:5px;padding:0.7rem;font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;line-height:1.65;color:var(--ink-2);overflow-x:auto">class Mine:
     def act(self, obs):
         return {"AAA": 0.2}
@@ -1677,7 +1681,7 @@ ranking = pt.rank(
 <span class="pt-s69">COMING UP</span>
 <h2 class="pt-s73">Coming next: competitive multi-agent markets</h2>
 <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;margin:0.2rem 0 0"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.25rem 0.6rem">single-agent evaluation</span><span class="pt-s9">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">competitive agents</span><span class="pt-s9">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">emergent market behaviour</span></div>
-<p class="pt-s178">The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. <strong>It is not shipped.</strong> The primitives are public and composable in the meantime, and this is what building one takes.</p>
+<p class="pt-s179">The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. <strong>It is not shipped.</strong> The primitives are public and composable in the meantime, and this is what building one takes.</p>
 </div>
 
 <div class="pt-s28">
@@ -1692,9 +1696,9 @@ ranking = pt.rank(
 </tr>
 </thead><tbody><sc-for list="{{ arenaTable }}" as="a">
 <tr>
-<td class="pt-s162">{{ a.k }}</td>
-<td class="pt-s161">{{ a.have }}</td>
-<td class="pt-s160">{{ a.build }}</td>
+<td class="pt-s163">{{ a.k }}</td>
+<td class="pt-s162">{{ a.have }}</td>
+<td class="pt-s161">{{ a.build }}</td>
 </tr>
 </sc-for></tbody></table>
 </div>
@@ -1754,7 +1758,7 @@ for day in range(days):
 <div class="pt-s62">
 <span class="pt-s69">STEP 05 - TRUST THE RESULT</span>
 <h2 class="pt-s73">How closely it reproduces measured behaviour</h2>
-<p class="pt-s178">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.</p>
+<p class="pt-s179">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:1.6rem;align-items:stretch">
@@ -1762,12 +1766,12 @@ for day in range(days):
 <div style="background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:0.85rem 0.95rem 0.7rem">
 <div style="display:flex;flex-direction:column;gap:4px">
 <sc-for list="{{ panel }}" as="p">
-<div class="pt-s102">
-<span class="pt-s130">{{ p.k }}</span>
+<div class="pt-s103">
+<span class="pt-s131">{{ p.k }}</span>
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:{{ p.left }}"></span>
 </span>
-<span class="pt-s132">{{ p.m }}</span>
+<span class="pt-s133">{{ p.m }}</span>
 </div>
 </sc-for>
 </div>
@@ -1877,8 +1881,8 @@ for day in range(days):
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem">
 <sc-for list="{{ doors }}" as="d">
-<div class="pt-s87">
-<h3 class="pt-s152">{{ d.title }}</h3>
+<div class="pt-s88">
+<h3 class="pt-s153">{{ d.title }}</h3>
 <div class="pt-s54">
 <sc-for list="{{ d.links }}" as="l">
 <a href="{{ l.href }}" class="pt-s15"><span class="pt-s16">&gt;</span><span class="pt-s14">{{ l.label }}</span></a>

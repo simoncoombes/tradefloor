@@ -54,7 +54,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">RL ENVIRONMENT</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">RL environment</h1>
 <p class="pt-s23">A Gymnasium environment where the market answers back. Every seed is a fresh independent episode.</p>
 
@@ -67,20 +67,20 @@ env = TradingEnv(
 obs, info = env.reset(seed=42)
 obs, reward, terminated, truncated, info = \
     env.step(action)</pre>
-<div class="pt-s172">
+<div class="pt-s173">
 <h3 class="pt-s4">Three things to know</h3>
 
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">It passes env_checker</span>
 <span class="pt-s0">Gymnasium's own conformance check, so your existing training code works without a wrapper.</span>
 </div>
 
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">Actions are target weights</span>
 <span class="pt-s0">One weight per name, in [-1, 1]. The harness turns them into orders against the book.</span>
 </div>
 
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">Reward includes your footprint</span>
 <span class="pt-s0">It is measured after the market moves, so the cost of your own size is already in it.</span>
 </div>
@@ -89,10 +89,10 @@ obs, reward, terminated, truncated, info = \
 </div>
 </section>
 
-<section id="why" class="pt-s33">
+<section id="why" class="pt-s34">
 <h2 class="pt-s7">Why a tape can not teach size</h2>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
-<div class="pt-s173">
+<div class="pt-s174">
 <h3 class="pt-s4">On historical data</h3>
 <p class="pt-s1">A policy can buy a million shares of a name that trades ten thousand a day. The tape carries on exactly as it did in 2019. What the policy learns about size is then fiction.</p>
 </div>
@@ -104,7 +104,7 @@ obs, reward, terminated, truncated, info = \
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;font-size:0.875rem;color:var(--ink-2)">Actions are target weights in [-1, 1]. A policy does not spend its first million steps to learn that one name trades at 40 and another at 400.</div>
 </section>
 
-<section class="pt-s33">
+<section class="pt-s34">
 <h2 class="pt-s7">One seed, one episode</h2>
 <p class="pt-s13">Training needs one independent episode per seed. A seed gives you one, and there is no limit on how many you draw. Two things follow.</p>
 <div class="pt-s67">
@@ -133,13 +133,13 @@ obs, reward, terminated, truncated, info = \
 <h2 style="font-size:1.25rem">Read this before you trust a policy</h2>
 <details class="pt-s12">
 <summary class="pt-s27">A policy can learn the model instead of the market</summary>
-<div class="pt-s165">
+<div class="pt-s166">
 <p class="pt-s1">The price process comes from a known model. A policy is very good at finding the structure of that model. A high score can mean it found the herding term rather than a real edge. Test the trained policy against the checks on <a href="agents.html">the agents page</a>, and read the <a href="realism-envelope.html">envelope</a> before you make a claim about a real market.</p>
 </div>
 </details>
 <details class="pt-s12">
 <summary class="pt-s27">Volatility memory does not transfer past a month</summary>
-<div class="pt-s165">
+<div class="pt-s166">
 <p class="pt-s1">The model forgets a volatile period faster than a real market. The log-log slope over lags 1 to 20 reads -0.953 against a real -0.436. A policy that sizes on a one-month volatility estimate is learning a decay shape that real markets do not have.</p>
 </div>
 </details>
@@ -168,7 +168,7 @@ obs, reward, terminated, truncated, info = \
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">RL ENVIRONMENT</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">RL environment</h1>
 <p class="pt-s23">A Gymnasium environment where the market answers back. Every seed is a fresh independent episode.</p>
 
@@ -181,10 +181,10 @@ env = TradingEnv(
 obs, info = env.reset(seed=42)
 obs, reward, terminated, truncated, info = \
     env.step(action)</pre>
-<div class="pt-s172">
+<div class="pt-s173">
 <h3 class="pt-s4">Three things to know</h3>
 <sc-for list="{{ facts }}" as="f">
-<div class="pt-s3">
+<div class="pt-s2">
 <span class="pt-s5">{{ f.k }}</span>
 <span class="pt-s0">{{ f.v }}</span>
 </div>
@@ -193,10 +193,10 @@ obs, reward, terminated, truncated, info = \
 </div>
 </section>
 
-<section id="why" class="pt-s33">
+<section id="why" class="pt-s34">
 <h2 class="pt-s7">Why a tape can not teach size</h2>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
-<div class="pt-s173">
+<div class="pt-s174">
 <h3 class="pt-s4">On historical data</h3>
 <p class="pt-s1">A policy can buy a million shares of a name that trades ten thousand a day. The tape carries on exactly as it did in 2019. What the policy learns about size is then fiction.</p>
 </div>
@@ -208,7 +208,7 @@ obs, reward, terminated, truncated, info = \
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;font-size:0.875rem;color:var(--ink-2)">Actions are target weights in [-1, 1]. A policy does not spend its first million steps to learn that one name trades at 40 and another at 400.</div>
 </section>
 
-<section class="pt-s33">
+<section class="pt-s34">
 <h2 class="pt-s7">One seed, one episode</h2>
 <p class="pt-s13">Training needs one independent episode per seed. A seed gives you one, and there is no limit on how many you draw. Two things follow.</p>
 <div class="pt-s67">
@@ -232,13 +232,13 @@ obs, reward, terminated, truncated, info = \
 <h2 style="font-size:1.25rem">Read this before you trust a policy</h2>
 <details class="pt-s12">
 <summary class="pt-s27">A policy can learn the model instead of the market</summary>
-<div class="pt-s165">
+<div class="pt-s166">
 <p class="pt-s1">The price process comes from a known model. A policy is very good at finding the structure of that model. A high score can mean it found the herding term rather than a real edge. Test the trained policy against the checks on <a href="agents.html">the agents page</a>, and read the <a href="realism-envelope.html">envelope</a> before you make a claim about a real market.</p>
 </div>
 </details>
 <details class="pt-s12">
 <summary class="pt-s27">Volatility memory does not transfer past a month</summary>
-<div class="pt-s165">
+<div class="pt-s166">
 <p class="pt-s1">The model forgets a volatile period faster than a real market. The log-log slope over lags 1 to 20 reads -0.953 against a real -0.436. A policy that sizes on a one-month volatility estimate is learning a decay shape that real markets do not have.</p>
 </div>
 </details>

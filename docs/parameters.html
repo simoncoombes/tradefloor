@@ -54,7 +54,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">PARAMETERS</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">Parameters</h1>
 <p class="pt-s23">Most people never touch these. Read this page if you are calibrating the model rather than running one.</p>
 
@@ -87,51 +87,51 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </section>
 
-<section class="pt-s33">
+<section class="pt-s34">
 <h2 class="pt-s7">Four kinds of coefficient</h2>
 <p class="pt-s13">The difference matters, because a change you make in one category renames the preset and a change in another is refused outright.</p>
 
-<div class="pt-s85">
-<div class="pt-s38">
+<div class="pt-s86">
+<div class="pt-s39">
 <h3 class="pt-s4">Settable</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--accent)">RENAMES THE PRESET</span>
 </div>
 <div class="pt-s56">
 <p class="pt-s1">87 names. Override one and the fingerprint becomes custom-, followed by 8 hex characters, so the changed model can not present as the shipped one.</p>
-<span class="pt-s139">momentum_theta, garch_alpha, market_factor_sigma</span>
+<span class="pt-s140">momentum_theta, garch_alpha, market_factor_sigma</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s38">
+<div class="pt-s86">
+<div class="pt-s39">
 <h3 class="pt-s4">Derived</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--amber)">RECOMPUTED, NOT SET</span>
 </div>
 <div class="pt-s56">
 <p class="pt-s1">Two coefficients are carried as recorded bit patterns and can not be set directly. Overriding the half-life recomputes both, deterministically on a given build but not bit-identically to any recorded constant.</p>
-<span class="pt-s139">mispricing_phi, s_phi_tick</span>
+<span class="pt-s140">mispricing_phi, s_phi_tick</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s38">
+<div class="pt-s86">
+<div class="pt-s39">
 <h3 class="pt-s4">Guards</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--amber)">SETTABLE, EXCLUDED FROM SEARCH</span>
 </div>
 <div class="pt-s56">
 <p class="pt-s1">Four guards live in the tick chain and are settable, but a calibration search excludes them, because they are worst-case guarantees rather than tuning knobs. One more is not settable at all.</p>
-<span class="pt-s139">the mispricing cap, the crowd lean cap, the session breaker, the price cap. daily_shock_cap is fixed</span>
+<span class="pt-s140">the mispricing cap, the crowd lean cap, the session breaker, the price cap. daily_shock_cap is fixed</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s38">
+<div class="pt-s86">
+<div class="pt-s39">
 <h3 class="pt-s4">Compile-time</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--red)">REFUSED BY NAME</span>
 </div>
 <div class="pt-s56">
 <p class="pt-s1">28 constants are visible in to_dict() and covered by the fingerprint, and an override is refused. The engine would ignore it, and accepting it would make the fingerprint a lie.</p>
-<span class="pt-s139">the sector table among them</span>
+<span class="pt-s140">the sector table among them</span>
 </div>
 </div>
 
@@ -142,54 +142,54 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p class="pt-s13">Read the list rather than a summary of it, with <span class="pt-s26">pt.ModelParams.settable()</span>. The shape of it:</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.7rem">
 
-<div class="pt-s79">
+<div class="pt-s80">
 <span class="pt-s5">The two variance processes</span>
-<span class="pt-s2">Per-name GJR-GARCH and the market factor's, cascade components and the slow term included.</span>
+<span class="pt-s3">Per-name GJR-GARCH and the market factor's, cascade components and the slow term included.</span>
 </div>
 
-<div class="pt-s79">
+<div class="pt-s80">
 <span class="pt-s5">The factor sigmas</span>
-<span class="pt-s2">Market and sector, plus the sector loadings and the idiosyncratic scale.</span>
+<span class="pt-s3">Market and sector, plus the sector loadings and the idiosyncratic scale.</span>
 </div>
 
-<div class="pt-s79">
+<div class="pt-s80">
 <span class="pt-s5">Size and spread effects</span>
-<span class="pt-s2">What a large order pays, and how wide the maker quotes.</span>
+<span class="pt-s3">What a large order pays, and how wide the maker quotes.</span>
 </div>
 
-<div class="pt-s79">
+<div class="pt-s80">
 <span class="pt-s5">Mispricing and crowd dynamics</span>
-<span class="pt-s2">The half-life, the herding term and the three crowd coefficients.</span>
+<span class="pt-s3">The half-life, the herding term and the three crowd coefficients.</span>
 </div>
 
-<div class="pt-s79">
+<div class="pt-s80">
 <span class="pt-s5">News and flow coefficients</span>
-<span class="pt-s2">Endogenous news and peer news among them.</span>
+<span class="pt-s3">Endogenous news and peer news among them.</span>
 </div>
 
-<div class="pt-s79">
+<div class="pt-s80">
 <span class="pt-s5">Jump sizes and intensities</span>
-<span class="pt-s2">How often a jump fires and how large it is.</span>
+<span class="pt-s3">How often a jump fires and how large it is.</span>
 </div>
 
-<div class="pt-s79">
+<div class="pt-s80">
 <span class="pt-s5">The VIX channel</span>
-<span class="pt-s2">How the fear gauge reaches the market factor's variance.</span>
+<span class="pt-s3">How the fear gauge reaches the market factor's variance.</span>
 </div>
 
-<div class="pt-s79">
+<div class="pt-s80">
 <span class="pt-s5">Crisis blend and stress</span>
-<span class="pt-s2">The crisis lever, the sector coupling and the remembered stress terms.</span>
+<span class="pt-s3">The crisis lever, the sector coupling and the remembered stress terms.</span>
 </div>
 
-<div class="pt-s79">
+<div class="pt-s80">
 <span class="pt-s5">The volume expression</span>
-<span class="pt-s2">volume_move_cap among them, the one pt-v12 moved off its compiled literal.</span>
+<span class="pt-s3">volume_move_cap among them, the one pt-v12 moved off its compiled literal.</span>
 </div>
 
-<div class="pt-s79">
+<div class="pt-s80">
 <span class="pt-s5">The guards</span>
-<span class="pt-s2">Settable, and excluded from every calibration search.</span>
+<span class="pt-s3">Settable, and excluded from every calibration search.</span>
 </div>
 
 </div>
@@ -238,7 +238,7 @@ e.model_fingerprint
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">PARAMETERS</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">Parameters</h1>
 <p class="pt-s23">Most people never touch these. Read this page if you are calibrating the model rather than running one.</p>
 
@@ -253,18 +253,18 @@ e.model_fingerprint
 </div>
 </section>
 
-<section class="pt-s33">
+<section class="pt-s34">
 <h2 class="pt-s7">Four kinds of coefficient</h2>
 <p class="pt-s13">The difference matters, because a change you make in one category renames the preset and a change in another is refused outright.</p>
 <sc-for list="{{ kinds }}" as="k">
-<div class="pt-s85">
-<div class="pt-s38">
+<div class="pt-s86">
+<div class="pt-s39">
 <h3 class="pt-s4">{{ k.head }}</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:{{ k.tagCol }}">{{ k.tag }}</span>
 </div>
 <div class="pt-s56">
 <p class="pt-s1">{{ k.body }}</p>
-<span class="pt-s139">{{ k.eg }}</span>
+<span class="pt-s140">{{ k.eg }}</span>
 </div>
 </div>
 </sc-for>
@@ -275,9 +275,9 @@ e.model_fingerprint
 <p class="pt-s13">Read the list rather than a summary of it, with <span class="pt-s26">pt.ModelParams.settable()</span>. The shape of it:</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.7rem">
 <sc-for list="{{ surface }}" as="s">
-<div class="pt-s79">
+<div class="pt-s80">
 <span class="pt-s5">{{ s.k }}</span>
-<span class="pt-s2">{{ s.v }}</span>
+<span class="pt-s3">{{ s.v }}</span>
 </div>
 </sc-for>
 </div>
