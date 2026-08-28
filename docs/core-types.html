@@ -51,7 +51,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div id="pt-root"><main class="pt-s18">
 
 <div class="pt-s21">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">CORE TYPES</span>
+<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">CORE TYPES</span>
 </div>
 
 <section class="pt-s33">
@@ -70,7 +70,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
        universe: Sequence[Instrument],
        macro_state: Macro | None = None,
        model: str | ModelParams | None = None)</pre>
-<div class="pt-s166">
+<div class="pt-s171">
 
 <div class="pt-s44">
 <span class="pt-s6">run_days(n)</span>
@@ -164,7 +164,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 Universe.random(n: int, *, seed: int)
 Universe.from_edgar(snapshot)
 Universe.from_json(text)</pre>
-<div class="pt-s166">
+<div class="pt-s171">
 
 <div class="pt-s44">
 <span class="pt-s6">fingerprint</span>
@@ -208,7 +208,7 @@ Universe.from_json(text)</pre>
            avg_volume: float = ...,
            beta: float = ...,
            short_interest: float = ...)</pre>
-<div class="pt-s166">
+<div class="pt-s171">
 
 <div class="pt-s44">
 <span class="pt-s6">short_interest</span>
@@ -256,7 +256,7 @@ Universe.from_json(text)</pre>
       qe_pe_boost: float = ...,
       fear_greed_index: float = ...,
       cycle: CycleName = ...)</pre>
-<div class="pt-s166">
+<div class="pt-s171">
 
 <div class="pt-s44">
 <span class="pt-s6">Rates are fractional</span>
@@ -291,7 +291,7 @@ book.best_bid / book.best_ask
 book.mid_price / book.spread
 book.depth_buy / book.depth_sell
 book.bids / book.asks</pre>
-<div class="pt-s166">
+<div class="pt-s171">
 
 <div class="pt-s44">
 <span class="pt-s6">bids / asks</span>
@@ -324,12 +324,12 @@ book.bids / book.asks</pre>
 
 <section class="pt-s19">
 <h2 class="pt-s7">Two errors, and what each one means</h2>
-<div class="pt-s68">
-<div class="pt-s8">
+<div class="pt-s69">
+<div class="pt-s9">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.9375rem;color:var(--red)">ValidationError</span>
 <p class="pt-s1">A malformed input: a rate passed as a percentage, a short interest between 0 and 1 on a real share count, an unknown sector key, a scenario that chains a shape onto a built scenario.</p>
 </div>
-<div class="pt-s8">
+<div class="pt-s9">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.9375rem;color:var(--red)">OrderError</span>
 <p class="pt-s1">A rejected order: a zero, negative or NaN quantity, or a NaN price on a limit. Nothing is clamped, because a simulator that repairs your order gives you a fill you did not ask for.</p>
 </div>
@@ -356,7 +356,7 @@ book.bids / book.asks</pre>
 <script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
 
 <div class="pt-s21">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">CORE TYPES</span>
+<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">CORE TYPES</span>
 </div>
 
 <section class="pt-s33">
@@ -372,7 +372,7 @@ book.bids / book.asks</pre>
 <span class="pt-s0">{{ ty.lede }}</span>
 </div>
 <pre class="pt-s53">{{ ty.sig }}</pre>
-<div class="pt-s166">
+<div class="pt-s171">
 <sc-for list="{{ ty.members }}" as="m">
 <div class="pt-s44">
 <span class="pt-s6">{{ m.k }}</span>
@@ -387,12 +387,12 @@ book.bids / book.asks</pre>
 
 <section class="pt-s19">
 <h2 class="pt-s7">Two errors, and what each one means</h2>
-<div class="pt-s68">
-<div class="pt-s8">
+<div class="pt-s69">
+<div class="pt-s9">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.9375rem;color:var(--red)">ValidationError</span>
 <p class="pt-s1">A malformed input: a rate passed as a percentage, a short interest between 0 and 1 on a real share count, an unknown sector key, a scenario that chains a shape onto a built scenario.</p>
 </div>
-<div class="pt-s8">
+<div class="pt-s9">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.9375rem;color:var(--red)">OrderError</span>
 <p class="pt-s1">A rejected order: a zero, negative or NaN quantity, or a NaN price on a limit. Nothing is clamped, because a simulator that repairs your order gives you a fill you did not ask for.</p>
 </div>

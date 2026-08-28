@@ -51,7 +51,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div id="pt-root"><main class="pt-s18">
 
 <div class="pt-s21">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">EVALUATE</span>
+<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">EVALUATE</span>
 </div>
 
 <section class="pt-s33">
@@ -231,50 +231,50 @@ pt.reproduce(manifest)</pre>
 <h2 class="pt-s7">What a Scorecard carries</h2>
 <div class="pt-s11">
 
-<div class="pt-s105">
+<div class="pt-s109">
 <span class="pt-s6">return_pct</span>
 <span class="pt-s2">What it made, as a percentage.</span>
 </div>
 
 
-<div class="pt-s105">
+<div class="pt-s109">
 <span class="pt-s6">pnl</span>
 <span class="pt-s2">What it made, in currency.</span>
 </div>
 
 
-<div class="pt-s105">
+<div class="pt-s109">
 <span class="pt-s6">impact_bps</span>
 <span class="pt-s2">What its own footprint cost, in basis points.</span>
 </div>
 
 
-<div class="pt-s105">
+<div class="pt-s109">
 <span class="pt-s6">trades</span>
 <span class="pt-s2">How many fills it took.</span>
 </div>
 
 
-<div class="pt-s105">
+<div class="pt-s109">
 <span class="pt-s6">strategy_fingerprint</span>
 <span class="pt-s2">A sha256 over the spec. This is the one to cite.</span>
 </div>
 
 
-<div class="pt-s105">
+<div class="pt-s109">
 <span class="pt-s6">universe_fingerprint</span>
 <span class="pt-s2">A sha256 over the roster, order included.</span>
 </div>
 
 
-<div class="pt-s105">
+<div class="pt-s109">
 <span class="pt-s6">model</span>
 <span class="pt-s2">The preset the run used, so a result names its own coefficients.</span>
 </div>
 
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
-<p class="pt-s58"><span class="pt-s185">strategy_fingerprint</span> is empty for a hand-built agent, because that result is reproducible only by citing code at a commit. A <span class="pt-s185">StrategySpec</span> gives you one, which is why the spec grammar exists.</p>
+<p class="pt-s56"><span class="pt-s189">strategy_fingerprint</span> is empty for a hand-built agent, because that result is reproducible only by citing code at a commit. A <span class="pt-s189">StrategySpec</span> gives you one, which is why the spec grammar exists.</p>
 </div>
 </section>
 
@@ -298,7 +298,7 @@ pt.reproduce(manifest)</pre>
 <script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
 
 <div class="pt-s21">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">EVALUATE</span>
+<a href="index.html" class="pt-s8">LEARN</a><span>/</span><span class="pt-s10">EVALUATE</span>
 </div>
 
 <section class="pt-s33">
@@ -331,14 +331,14 @@ pt.reproduce(manifest)</pre>
 <h2 class="pt-s7">What a Scorecard carries</h2>
 <div class="pt-s11">
 <sc-for list="{{ scorecard }}" as="s">
-<div class="pt-s105">
+<div class="pt-s109">
 <span class="pt-s6">{{ s.k }}</span>
 <span class="pt-s2">{{ s.v }}</span>
 </div>
 
 </sc-for></div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
-<p class="pt-s58"><span class="pt-s185">strategy_fingerprint</span> is empty for a hand-built agent, because that result is reproducible only by citing code at a commit. A <span class="pt-s185">StrategySpec</span> gives you one, which is why the spec grammar exists.</p>
+<p class="pt-s56"><span class="pt-s189">strategy_fingerprint</span> is empty for a hand-built agent, because that result is reproducible only by citing code at a commit. A <span class="pt-s189">StrategySpec</span> gives you one, which is why the spec grammar exists.</p>
 </div>
 </section>
 

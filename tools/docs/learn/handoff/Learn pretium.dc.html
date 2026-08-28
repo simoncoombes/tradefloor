@@ -162,8 +162,8 @@ input[type=range]{accent-color:var(--accent)}
 
 <section style="padding:3.5rem 0 0;display:flex;flex-direction:column;gap:1.5rem">
 <div style="display:flex;flex-direction:column;gap:1.1rem">
-<h1 style="font-size:clamp(1.85rem,4vw,2.7rem);max-width:none;text-wrap:balance">A reproducible financial market built for AI agents</h1>
-<p style="font-size:1.1875rem;color:var(--ink-2);max-width:none;margin:0">Give it a universe, a macro state and a seed. Pretium runs the economy, the prices, the order books and the fills forward deterministically - so an agent can be evaluated under execution costs and market impact.</p>
+<h1 style="font-size:clamp(1.85rem,4vw,2.7rem);max-width:none;text-wrap:balance">A reproducible evaluation environment for financial AI agents</h1>
+<p style="font-size:1.1875rem;color:var(--ink-2);max-width:none;margin:0">Run controlled, reproducible experiments on trading agents in a market with realistic execution - not a backtest over historical prices. A deterministic market simulator with order-book execution, macro dynamics, causal ground truth and agent-native interfaces.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
 <a href="https://pypi.org/project/pretium/" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--accent-deep);text-decoration:none"><img src="./logo-python.png" alt="" width="16" height="16" style="display:{{ showLight }};flex:none"></img><img src="./logo-python-dark.png" alt="" width="16" height="16" style="display:{{ showDark }};flex:none"></img>pip install pretium</a>
 <a href="https://crates.io/crates/pretium" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;border:1px solid var(--line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--ink-2);text-decoration:none"><img src="./logo-rust.png" alt="" width="16" height="16" style="display:{{ showLight }};flex:none"></img><img src="./logo-rust-dark.png" alt="" width="16" height="16" style="display:{{ showDark }};flex:none"></img>cargo add pretium</a>
@@ -245,21 +245,94 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 </section>
 
 <section style="padding:3rem 0 0">
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1.6rem">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:1.6rem">
 <div>
-<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Three inputs define a market</h3>
+<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Reproducible</h3>
 <p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A universe of companies, a macro state for day zero, and a seed. The same three inputs produce the same market on every supported platform, so a run is reproducible by anyone who has them.</p>
 </div>
 <div>
-<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">The economy runs itself</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Every close advances it. The economy updates, the cycle can turn, and the central bank acts. VIX moves most days. The policy fields step on the meeting calendar.</p>
+<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Execution-aware</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Agents trade through an order book and pay the spread, the queue and their own impact. Run the same seed without the orders and the difference is what the trading cost.</p>
 </div>
 <div>
-<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Every move is labelled</h3>
+<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Inspectable</h3>
 <p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The simulator computed each price, so it can say why. The nine factor contributions sum to the move - an identity, not a fitted explanation. The residual is near 1e-16.</p>
+</div>
+<div>
+<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Agent-native</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A Python object with an act method, a Gymnasium environment, or a model calling the simulator as a tool over MCP. The harness never asks what is inside.</p>
 </div>
 </div>
 </section>
+
+
+
+<hr style="border:0;border-top:1px solid var(--line);margin:3rem 0 0"></hr>
+
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1.4rem">
+<div style="display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">REPRODUCIBILITY</span>
+<h2 style="font-size:1.75rem">Git for market experiments</h2>
+<p style="margin:0;color:var(--ink-2);max-width:72ch">Not literally - there is no repository and no history. What carries over is the working practice. The market is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. Share the configuration, share the seed, re-run the experiment.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.3rem;align-items:start">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.2rem">
+<h3 style="font-size:1.0625rem;margin:0 0 0.5rem">What a RunManifest pins</h3>
+<div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">seed</span><span style="font-size:0.8125rem;color:var(--ink-2)">The integer the whole market unrolls from.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">universe</span><span style="font-size:0.8125rem;color:var(--ink-2)">Every instrument, in roster order. The order is contractual.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">macro</span><span style="font-size:0.8125rem;color:var(--ink-2)">Day-zero rates, inflation and the cycle.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">scenario</span><span style="font-size:0.8125rem;color:var(--ink-2)">The macro path driven through it, if there was one.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">strategy</span><span style="font-size:0.8125rem;color:var(--ink-2)">The StrategySpec, carried in full and cited by fingerprint.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">model</span><span style="font-size:0.8125rem;color:var(--ink-2)">The preset that priced it, by name, or custom-XXXXXXXX if modified.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">fingerprints.inputs</span><span style="font-size:0.8125rem;color:var(--ink-2)">One digest over the seed and all of the above. This is the experiment's identity.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">result.digest</span><span style="font-size:0.8125rem;color:var(--ink-2)">What the market did. Re-running the inputs has to reproduce it.</span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:0.9rem">
+<div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.25rem 0.6rem">run</span>
+<span style="color:var(--ink-3)">&#8594;</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">record</span>
+<span style="color:var(--ink-3)">&#8594;</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">reproduce</span>
+<span style="color:var(--ink-3)">&#8594;</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">compare</span>
+<span style="color:var(--ink-3)">&#8594;</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">fork</span>
+</div>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)"><code style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0 0.25rem">reproduce()</code> refuses on a mismatch rather than returning a number that looks fine. A checkpoint branches a run at a decision point, so two hypotheses share one past instead of being statistically similar.</p>
+<div style="border:1px solid var(--accent-line);background:var(--accent-soft);border-radius:6px;padding:0.9rem 1.1rem">
+<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)"><strong>Same world. Same conditions. Different agent.</strong> Two agents run against the identical market path, so a difference between them is the agent and not a different roll of the market.</p>
+</div>
+<div style="border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:0.9rem 1.1rem">
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)"><strong>Same experiment. Different hypothesis.</strong> Change one component, re-run, and attribute the difference to the change. Determinism is what makes the attribution mean anything.</p>
+</div>
+</div>
+</div>
+</section>
+
+
+<hr style="border:0;border-top:1px solid var(--line);margin:3rem 0 0"></hr>
+
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1.4rem">
+<div style="display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">GROUND TRUTH</span>
+<h2 style="font-size:1.75rem">The simulator knows why the price moved</h2>
+<p style="margin:0;color:var(--ink-2);max-width:72ch">Every price came out of a computation, so the move decomposes into the nine contributions that produced it and the accounting closes on the realised move. A backtest cannot do this: nobody recorded why the market did what it did, so an attribution over historical prices is a model fitted after the fact.</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1.3rem">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem">
+<h3 style="font-size:1.0625rem;margin:0 0 0.5rem">Questions it makes answerable</h3>
+<ul style="margin:0;padding-left:1.1rem;font-size:0.875rem">
+<li style="margin:0 0 0.35rem;color:var(--ink-2)">Did the agent trade on momentum, the macro state, liquidity, or noise?</li>
+<li style="margin:0 0 0.35rem;color:var(--ink-2)">Did its stated reason match the state the market was actually in?</li>
+<li style="margin:0 0 0.35rem;color:var(--ink-2)">What happens to the result when one causal channel is removed?</li>
+<li style="margin:0 0 0.35rem;color:var(--ink-2)">Did two agents reach the same P&amp;L for different reasons?</li>
+</ul>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem">
+<h3 style="font-size:1.0625rem;margin:0 0 0.5rem">What it is not</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Ground truth about this market, not about any real one. The decomposition is exact because the simulator did the arithmetic, which is also the reason it says nothing about why a real price moved.</p>
+</div>
+</div>
+</section>
+
+
+
+
 
 
 <hr style="border:0;border-top:1px solid var(--line);margin:3rem 0 0"></hr>
@@ -534,9 +607,10 @@ ranking = pt.rank(
 
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
 <div style="display:flex;flex-direction:column;gap:0.5rem">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">EXTENSION YOU CAN BUILD</span>
-<h2 style="font-size:1.75rem">An agent arena</h2>
-<p style="color:var(--ink-2);max-width:none;margin:0">Ten model-driven agents in one order book, trading against each other, with the market maker as the house. A shared-book multi-agent arena is not a shipped Pretium feature. The primitives needed to build one are public and composable, and this is what building it takes.</p>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">COMING NEXT &#183; NOT SHIPPED</span>
+<h2 style="font-size:1.75rem">Coming next: competitive multi-agent markets</h2>
+<div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;margin:0.2rem 0 0"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.25rem 0.6rem">single-agent evaluation</span><span style="color:var(--ink-3)">&#8594;</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">competitive agents</span><span style="color:var(--ink-3)">&#8594;</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">emergent market behaviour</span></div>
+<p style="color:var(--ink-2);max-width:none;margin:0">The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. <strong>It is not shipped.</strong> The primitives are public and composable in the meantime, and this is what building one takes.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
@@ -714,6 +788,21 @@ for day in range(days):
 <h3 style="font-size:1.0625rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.4rem">One market is one sample</h3>
 <p style="margin:0;font-size:0.875rem;color:var(--ink-2)">On the twelve-market grid the docs measure, mean-reversion pools at +0.783 capture and momentum at +0.259, so mean-reversion leads by three times. Paired across the same twelve markets it wins 9 to 3, at p = 0.15. One seed picks the pooled leader eight times in twelve, and what a seed says momentum is worth runs from -0.503 to +0.909.</p>
 </div>
+</div>
+</section>
+
+<hr style="border:0;border-top:1px solid var(--line);margin:3rem 0 0"></hr>
+
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1.4rem">
+<div style="display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">WHO IT IS FOR</span>
+<h2 style="font-size:1.75rem">Built for financial AI research</h2>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:0.7rem">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.35rem"><h3 style="font-size:1.0625rem;margin:0">LLM and agent researchers</h3><p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Evaluate agents that reason, call tools, read state and make a sequence of trading decisions. The MCP server exposes the simulator as eleven tools.</p></div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.35rem"><h3 style="font-size:1.0625rem;margin:0">Reinforcement learning</h3><p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A Gymnasium environment with explicit rewards, execution costs and market state, and as many independent episodes as you want.</p></div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.35rem"><h3 style="font-size:1.0625rem;margin:0">Quant and execution</h3><p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Queue position, partial fills, honest impact, and macro scenarios to run a strategy through. Test under controlled dynamics rather than one historical path.</p></div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.35rem"><h3 style="font-size:1.0625rem;margin:0">Benchmark builders</h3><p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A manifest that names the package version, preset, seed, universe, macro, scenario and strategy, and a reproduce() that refuses on mismatch.</p></div>
 </div>
 </section>
 
