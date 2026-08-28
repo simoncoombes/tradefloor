@@ -75,9 +75,8 @@ code. Each result carries its own caveats. See
 default preset, `pt-v12`, holds all fourteen at one year and at two years. It
 holds all fourteen on a roster it never saw, and thirteen on new seeds.
 
-Five of the fourteen were calibration targets, and the bands both tuned the
-model and graded it. So this is a stated envelope, not a test against market
-data that was held back.
+Five of the fourteen were calibration targets, and the same bands tuned the
+model and graded it. No market data was held back.
 
 Five limits are measured and written down:
 
