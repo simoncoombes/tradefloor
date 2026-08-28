@@ -40,6 +40,42 @@ run it by hand when the work warrants it.
 `build.py` needs only Python 3.9+ and `node`. `verify.cjs` needs Chrome; set
 `CHROME` if it is not in the usual place.
 
+## The staging copy
+
+```
+tools/docs/learn/publish-dev.sh
+```
+
+builds with `--target dev` and pushes to `simoncoombes/pretium-dev`, served
+at <https://simoncoombes.github.io/pretium-dev/>. Use it to look at a change
+at a real URL — on a phone, through a link unfurl, against a structured-data
+validator — before it is the documentation.
+
+Four things differ, and all four are decided by `TARGETS` in `build.py`
+rather than by the script, so none of them can be left behind on the way to
+production:
+
+| | live | dev |
+|---|---|---|
+| address | `/pretium` | `/pretium-dev` |
+| `robots` meta | absent | `noindex, nofollow` |
+| `robots.txt` | allows everything | `Disallow: /` |
+| sitemap | written | not written |
+| analytics | on | off |
+
+The `noindex` is the part that works: a page a crawler is forbidden to fetch
+can still be indexed as a bare URL from a link somewhere, whereas one it
+fetches and finds `noindex` on is dropped. The `robots.txt` is there so a
+well-behaved crawler spends nothing on the site at all.
+
+**A staging copy of a documentation site must never be indexable.** The same
+words at two addresses, with no way to tell a search engine afterwards which
+one was real, is worse than having no staging copy.
+
+The staging repository holds built output and nothing else. Each publish
+replaces its tree wholesale, which is also what stops a file deleted from
+the build lingering on the site.
+
 ## How it fits together
 
 ```
@@ -100,7 +136,8 @@ what the repository measures.
 | a colour, type scale or breakpoint | the `<style>` block in the design files; it is merged across pages |
 | a rule that no design file carries (print, narrow, theme) | the CSS constants in `build.py` |
 | a correction to a component's behaviour | `SCRIPT_FIXES` in `build.py` |
-| whether this site is the published one | `AT_SITE_ROOT` and `BASE_URL` in `build.py` |
+| whether this site is the published one | `AT_SITE_ROOT` in `build.py` |
+| what a build target implies | `TARGETS` in `build.py` |
 | what the charts plot | nothing here — change the golden |
 
 Every seam that patches a design asserts. A redrawn page that no longer
