@@ -6,13 +6,12 @@
 
 A market simulator you can run a strategy against. Rust core, Python API.
 
-Give it a seed and a set of companies and it runs a market forward: prices, a
-limit order book, fills, and an economy that advances itself daily. Your
-orders match against real depth, so trading moves the price the way it would
-anywhere else.
+Give it a seed and a list of companies. It runs a market forward: prices, a
+limit order book, fills, and an economy that moves each day. Your orders match
+against real depth, so your trades move the price.
 
-It exists because historical data can't answer two questions. What would have
-happened if I'd traded differently, and what actually caused this price move.
+Real market data cannot tell you what happens if you trade differently, or what
+caused a move. This can, because it computed every price.
 
 ## Install
 
@@ -20,25 +19,14 @@ happened if I'd traded differently, and what actually caused this price move.
 pip install pretium
 ```
 
-Wheels are prebuilt for Linux, macOS and Windows on CPython 3.11+, and the
-core package has no dependencies.
+Wheels for Linux, macOS and Windows on CPython 3.11+. No dependencies. The same
+engine is a Rust crate: `cargo add pretium`.
 
-The engine is also published as a Rust crate, so you can use it without
-Python at all:
+The API can still change before 1.0. A published result cannot: new
+coefficients ship as a new preset, so a run you cited last month replays this
+month.
 
-```
-cargo add pretium
-```
-
-Both are built from the same source at the same version, and run the same
-market: <https://crates.io/crates/pretium>.
-
-The API may still move before 1.0. What will not move is a published
-result: anything that changes the simulated trajectory arrives as a new
-model preset rather than an edit to an existing one, so a run you cited last
-month reproduces this month.
-
-## In thirty seconds
+## First run
 
 ```python
 import pretium as pt
@@ -53,182 +41,102 @@ scores["mine"].impact_bps            # what its own footprint cost
 scores["mine"].strategy_fingerprint  # sha256, cite this
 ```
 
-That's one market draw, which tells you as much about the seed as about the
-strategy. `pt.rank` runs many seeds and compares them with a paired sign
-test.
+That is one market draw. It tells you as much about the seed as about the
+strategy. `pt.rank` runs many seeds and compares them with a paired sign test.
 
-## What makes it different
+## What you get
 
-**Determinism that's checked.** The crate ships its own `exp`, `log`, `sin`
-and `cos` instead of calling the platform libm. Every release builds five
-targets -- linux-x86_64, linux-aarch64, macos-arm64, macos-x86_64 and
-windows-x86_64 -- runs one fixed simulation inside each, and compares
-digests. A disagreement fails the release.
+| | |
+|---|---|
+| `engine.truth()` | why each price moved: nine factors that sum to the move, to 1e-16 |
+| counterfactual TCA | the same seed with your orders and without them |
+| `pt.rank` | many seeds, paired sign tests |
+| `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
+| MCP server | eleven read-only tools for a coding agent |
+| more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, a browser build |
 
-The WebAssembly build is checked by hand rather than by that gate, because it
-needs a toolchain CI does not carry: on 2026-08-24 the native and
-`wasm32-unknown-unknown` builds hashed the same fixed simulation -- twelve
-instruments, five days, `pt-v3` -- to `2b2f3141...`, and
-`tests/test_wasm_parity.py` pins the Python half of that pair so the two
-cannot drift apart unnoticed.
+No historical dataset carries the labels `truth()` gives you. Real data shows
+you that a stock fell. It never shows you that 60% of the fall was order flow.
 
-**Ground truth you can read.** The simulator computed every price, so it can
-tell you why. One row per instrument per tick, with nine factor
-contributions that sum to the move and a residual around 1e-16. No historical
-dataset carries those labels. You can see that a stock fell, never that 60%
-of the fall was order-flow pressure.
-
-**Counterfactuals you can run.** The same seed runs with and without your
-orders, so every fill is priced against the market where you never traded.
-That's the number TCA vendors approximate.
-
-**Results someone else can check.** A `StrategySpec` is a declarative,
-hashable document rather than an arbitrary callable. A `RunManifest` carries
-the seed, universe, macro conditions, scenario, model and strategy together
-with the expected digest. `reproduce()` refuses on a mismatch and names the
-culprit, because a manifest that quietly reproduced a different market would
-be worse than no manifest.
-
-## Driving it from an agent
+To drive it from an agent:
 
 ```
 pip install "pretium[mcp]"
 claude mcp add pretium -- pretium-mcp
 ```
 
-Eleven read-only tools over the simulator, so a coding agent can ask whether
-a momentum strategy beats buy-and-hold here, and whether the difference is
-real. Strategies, universes and scenarios are composed as data. There's no
-path from a tool argument to code execution.
+Strategies, universes and scenarios are data, so a tool argument cannot reach
+code. Each result carries its own caveats. See
+[the MCP page](https://simoncoombes.github.io/pretium/mcp.html).
 
-Every result carries computed caveats and full provenance. A model
-summarising a result has the tool output and nothing else, and will otherwise
-report `return_pct: 88.7` as "the strategy made 88.7%".
-[The MCP server](https://simoncoombes.github.io/pretium/mcp.html) has the
-tool list and the client configuration.
+## How real it is
 
-## What it's bad at
+`pt.facts.measure()` scores fourteen statistics against real-market bands. The
+default preset, `pt-v12`, holds all fourteen at one year and at two years. It
+holds all fourteen on a roster it never saw, and thirteen on new seeds.
 
-**Good results here don't predict real returns.** The price process comes
-from a known model, so a strategy that fits that model's structure will look
-excellent and teach you nothing. A strategy that fails here is more
-informative, because it broke against a live order book under honest impact
-costs.
+Five of the fourteen were calibration targets, and the bands both tuned the
+model and graded it. So this is a stated envelope, not a test against market
+data that was held back.
 
-**Realism is a stated envelope, not a score.** `pt.facts.measure()` reports
-fourteen statistics against real-market bands. At 252 days the shipped `pt-v12`
-preset holds **all fourteen in band** on thirty calibration seeds, all
-fourteen again at 504 days against bands re-derived at that window, and all
-fourteen again on a 60-name universe it never saw. On thirty seeds it never
-used it holds thirteen, the single miss being `corr_persistence_acf1`. Read
-that as fourteen in-band verdicts rather than fourteen independent
-validations: five of the fourteen were live calibration targets, the bands
-were used both to tune against and to grade against, and "held out" means
-unseen simulation seeds and another roster from the same generator rather
-than withheld market data.
-That is a market with the right volatility, the right tails, the right
-co-movement, industries that co-move more than strangers, correlation that
-stays elevated after a panic, volume that behaves, and volatility episodes it
-produces itself.
+Five limits are measured and written down:
 
-pt-v12 became the default on 2026-08-26, an era boundary: every trajectory
-that came from the default changed. Runs recorded before it are not
-comparable to runs after it unless they name their preset, and every earlier
-preset from `pt-v1` onward stays selectable and reproduces bit for bit.
-Checked rather than asserted: `pt-v1`, `pt-v2` and `pt-v3` give identical
-market digests under 0.1.4 and 0.2.0. A fully specified run is still
-(package version, model, universe fingerprint, seed), since the preset pins
-the coefficients and the package version pins the implementation.
+| limit | what it means |
+|---|---|
+| horizon | one year is certified. Two and five years are measured, not certified |
+| volatility memory | it decays too fast |
+| scenario size | the response has the right sign, but one run cannot size it |
+| macro crises | an inflation crisis or a policy crisis needs a scenario to drive it |
+| roster | certification used a sector-balanced roster, which no real index is |
 
-At 504 days pt-v12 holds all fourteen, which is the first two-year clean
-sheet this project has measured -- pt-v3 held seven there and pt-v10 held
-thirteen, missing volume-change autocorrelation. Read the headroom rather
-than the count: annualised volatility reads 33.89 against a band ending at
-34.0, so that row is genuine but thin, and the certified horizon stays 252
-days because that is where the certification is measured.
+`pt.envelope.check()` refuses a question that falls outside a limit, and
+[the realism envelope](https://simoncoombes.github.io/pretium/trust.html) says
+what each one forbids.
 
-Beyond two years the model has now been measured rather than assumed. At
-2520 days it holds ten of the fourteen against the (horizon-mismatched)
-two-year bands, and nothing runs away or drifts: measured year by year over
-ten years, annualised volatility reads 31.5, 35.6, 30.2, 33.5, 33.0, 33.1,
-31.3, 32.4, 32.4, 31.6 percent -- flat, with the year-to-year variation a
-real market has.
+Good results here do not predict real returns. The prices come from a known
+model, so a strategy shaped like that model looks excellent and teaches you
+nothing. A strategy that fails here tells you more. There is one venue, no
+latency, and no counterparty that adapts to you.
 
-**Five gaps are measured and named rather than assumed.** The certified
-horizon is 252 days; two and five-year panels are measured but not
-certified. Volatility memory decays exponentially where real markets decay
-hyperbolically. Scenario response has the right size, measured as a
-regression gain, but too much noise around it for one run to size a scenario
-from -- the driven-window noise ratio is 1.57x real. The endogenous MACRO
-economy cannot reach its own crisis regimes, so an inflation regime or a
-policy crisis has to be driven through a scenario; a volatility crisis does
-not: measured on `pt-v10`, the preset's own VIX crossed its crisis threshold
-on 10.2% of days against a real 12.5%, and that figure has not been
-re-measured on `pt-v12`. And certification was measured on a sector-balanced
-roster, which no real index is: re-measured on pt-v12, an S&P-like or
-technology-heavy roster holds all fourteen at one year, so the envelope
-transfers at the certified horizon, and the cost of concentration shows up
-in the second year instead.
-[The realism envelope](https://simoncoombes.github.io/pretium/trust.html)
-states each gap and what it forbids. `pt.envelope.check()` refuses to certify
-a question that falls outside one.
+## Same seed, same market
 
-**Single venue, no latency, no strategic counterparties.** Orders arrive
-instantly, there's one book per name, and you trade against a market maker
-and aggregate flow rather than agents that adapt to you.
+Each release builds five targets, runs one fixed simulation in each, and
+compares digests. A disagreement stops the release. The crate ships its own
+`exp`, `log`, `sin` and `cos`, so the platform libm cannot change a result.
 
-## Worked examples
+`pt-v12` became the default on 2026-08-26. Name your preset and your run
+replays exactly. Every preset from `pt-v1` on is still selectable.
 
-Eight notebooks and two scripts in [`examples/`](https://github.com/simoncoombes/pretium/tree/main/examples), numbered in
-reading order and executed as part of the test suite:
+```python
+eng = pt.Engine(seed=42, universe=u, model="pt-v10")
+```
 
-| | what it covers |
+## Examples
+
+Ten [`examples/`](https://github.com/simoncoombes/pretium/tree/main/examples) in reading order, run by the test suite:
+
+| | |
 |---|---|
 | [`00-a-year-in-one-market`](https://github.com/simoncoombes/pretium/blob/main/examples/00-a-year-in-one-market.ipynb) | Start here: one company, one year, two crises, one chart |
 | [`01-first-simulation`](https://github.com/simoncoombes/pretium/blob/main/examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
 | [`02-evaluating-a-strategy`](https://github.com/simoncoombes/pretium/blob/main/examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
 | [`03-why-did-the-price-move`](https://github.com/simoncoombes/pretium/blob/main/examples/03-why-did-the-price-move.ipynb) | The nine factors that sum to every move |
-| [`04-how-realistic-is-this`](https://github.com/simoncoombes/pretium/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the gaps |
+| [`04-how-realistic-is-this`](https://github.com/simoncoombes/pretium/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the limits |
 | [`05-training-an-agent`](https://github.com/simoncoombes/pretium/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
 | [`06-execution-and-impact`](https://github.com/simoncoombes/pretium/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
-| [`07-research-workflow.py`](https://github.com/simoncoombes/pretium/blob/main/examples/07-research-workflow.py) | A whole study in one file: sweep, evaluation, TCA and replay |
+| [`07-research-workflow.py`](https://github.com/simoncoombes/pretium/blob/main/examples/07-research-workflow.py) | A whole study in one file. It runs in about five seconds |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/pretium/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
-| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/pretium/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields actually transmit |
+| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/pretium/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit |
 
-The two scripts run from the command line rather than a notebook. The whole
-study takes about five seconds:
+## More
 
-```
-python examples/07-research-workflow.py
-```
+Full docs: [**simoncoombes.github.io/pretium**](https://simoncoombes.github.io/pretium/).
 
-## Documentation
+To contribute, see [CONTRIBUTING.md](https://github.com/simoncoombes/pretium/blob/main/CONTRIBUTING.md) and [RELEASING.md](https://github.com/simoncoombes/pretium/blob/main/RELEASING.md). One rule shapes the
+rest: a change to the simulated trajectory is a breaking change, whatever its
+size.
 
-Full docs: [**simoncoombes.github.io/pretium**](https://simoncoombes.github.io/pretium/)
+To cite the software, see [CITATION.cff](https://github.com/simoncoombes/pretium/blob/main/CITATION.cff). To cite a result, use its
+`RunManifest`.
 
-Getting started and core concepts. Agents, evaluation and the RL environment.
-Scenarios and macro paths, strategy specs, model presets, checkpointing and
-forking, sharing a run, Arrow output and streaming sweeps, SEC EDGAR loading,
-transaction cost analysis, the MCP server, running in the browser, the
-realism envelope and metrics, and the conventions worth reading before you
-hit them.
-
-## Contributing
-
-See [CONTRIBUTING.md](https://github.com/simoncoombes/pretium/blob/main/CONTRIBUTING.md), and [RELEASING.md](https://github.com/simoncoombes/pretium/blob/main/RELEASING.md) for how a version reaches PyPI and crates.io. One rule shapes the rest: a change to
-the simulated trajectory is a breaking change, whatever its size. A market
-that runs differently from the same seed invalidates every published result
-that cited it.
-
-## Citing this
-
-See [CITATION.cff](https://github.com/simoncoombes/pretium/blob/main/CITATION.cff), or cite a specific result by its manifest.
-A citation identifies the software; it does not identify a run. A
-`RunManifest` does: it carries the package version and preset it was written
-by, the seed, the universe fingerprint, the macro conditions, the scenario
-and the strategy fingerprint.
-
-## Licence
-
-MIT OR Apache-2.0, at your option. See [LICENSE-MIT](https://github.com/simoncoombes/pretium/blob/main/LICENSE-MIT) and
-[LICENSE-APACHE](https://github.com/simoncoombes/pretium/blob/main/LICENSE-APACHE).
+Licence: MIT OR Apache-2.0, at your option. See [LICENSE-MIT](https://github.com/simoncoombes/pretium/blob/main/LICENSE-MIT) and [LICENSE-APACHE](https://github.com/simoncoombes/pretium/blob/main/LICENSE-APACHE).
