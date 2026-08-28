@@ -26,7 +26,7 @@ libm.
   fingerprints as `custom-XXXXXXXX` and can never present as a shipped one.
 - **A published realism envelope.** Fourteen statistics measured against
   real-market bands, with the misses named as gaps rather than omitted.
-  See <https://simoncoombes.github.io/pretium/trust.html>.
+  See <https://simoncoombes.github.io/pretium/realism-envelope.html>.
 
 ## Using it
 
