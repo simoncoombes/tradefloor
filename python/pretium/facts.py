@@ -313,7 +313,7 @@ REAL_MARKETS = {
     "excess_kurtosis": (1.6, 41.0),
     "return_acf1": (-0.08, 0.06),
     "abs_return_acf1": (0.02, 0.22),
-    "abs_return_acf5": (0.02, 0.09),
+    "abs_return_acf5": (0.01, 0.12),
     "abs_return_acf20": (-0.04, 0.08),
     "cross_sectional_corr": (0.08, 0.56),
     "volume_abs_return_corr": (0.46, 0.66),
@@ -443,7 +443,7 @@ REAL_MARKETS_PROVENANCE = {
     "abs_return_acf5": {
         "claim": "median across names of the lag-5 autocorrelation of "
                  "daily |log return| within one 252-day window",
-        "windows": (0.034, 0.046, 0.073),
+        "windows": (0.011, 0.015, 0.016, 0.018, 0.021, 0.040, 0.047, 0.099),
         "crisis_window": 0.343,
         "sources": (
             "own reference panel (primary)",
@@ -451,13 +451,32 @@ REAL_MARKETS_PROVENANCE = {
             "puts lag 5 at 0.52-0.72 of lag 1, consistent with the "
             "windows' observed ratio ~0.45",
         ),
-        "derivation": "mechanical from the windows",
+        "derivation": "mechanical from the windows, upper edge; lower edge "
+                      "held above zero on purpose -- see below",
         "comparability": "argued as for lag 1; banded because phase 2's "
                          "instrument found a parameter corner with lag-1 "
                          "clustering in band and lag-5 at -0.001 -- lag-1 "
                          "strength with no memory behind it -- so an "
                          "unbanded lag 5 was a hole a search walks through",
-        "supersedes": None,
+        "supersedes": (
+            "(0.02, 0.09), derived 2026-08-22 from THREE non-crisis windows "
+            "reading 0.034, 0.046, 0.073. Re-derived 2026-08-28 from EIGHT "
+            "non-crisis windows of the same forty-name panel, which span "
+            "0.011 to 0.099 -- a wider spread than three windows showed, and "
+            "the old band excluded five of the eight. Scoring real markets "
+            "against this envelope for the first time, abs_return_acf5 was "
+            "the ONLY statistic of thirteen that real non-crisis windows "
+            "failed, and it failed on five of eight. A band real markets "
+            "step outside of five times in eight is not measuring realism. "
+            "The upper edge 0.12 is the rule applied to the larger evidence "
+            "base. The lower edge is NOT: the rule gives -0.01, and a "
+            "negative floor would re-open the exact hole this band exists to "
+            "close, admitting lag-1 clustering with no lag-5 memory behind "
+            "it. 0.01 sits below every observed window and above zero, which "
+            "keeps both jobs. Correcting this band changes ZERO blocks for "
+            "pt-v12 or pt-v14: every block that missed it also missed "
+            "something else."
+        ),
     },
     "abs_return_acf20": {
         "claim": "median across names of the lag-20 autocorrelation of "

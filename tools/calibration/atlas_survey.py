@@ -165,6 +165,21 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the implied VIX is the forward coupling's own inverse, so the top of
     # the box is a boundary worth sampling rather than an arbitrary cap.
     "vix_realised_vol_weight": (0.0, 1.0),
+    # Per-name idiosyncratic volatility as beta^k (§47). Measured 0 to 3 on
+    # pt-v12 and pt-v14: the interquartile volatility ratio runs 1.205 to
+    # 1.290 across that span and the curve is still rising at 3, but the
+    # 504-day panel starts losing blocks past 2 and collapses at 3 (§71). The
+    # box reaches 3 so the map spans in-band to broken rather than stopping
+    # where the answer is already known.
+    "idio_sigma_beta_exponent": (0.0, 3.0),
+    # How far the crisis injection is decoupled from the market factor's
+    # magnitude (§80). A share of an exponent, so the unit interval is its
+    # natural box. Measured across it on four blocks: crisis co-movement's
+    # level falls monotonically from +0.002 off centre to -0.139 and the
+    # lever goes from 0.020 to 0.208, so the whole box is surveyed with the
+    # far end known to be broken -- which is what makes an interior optimum,
+    # if there is one, worth finding.
+    "crisis_blend_variance_damp": (0.0, 1.0),
     # A name's own variance following the VIX (§78).
     "garch_vix_coupling": (0.0, 1.0),
     # A jump's arrival RATE following the VIX (§84). A share, so the unit

@@ -20,7 +20,10 @@ import statistics
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "python"))
+# append, not insert(0): inserting puts the SOURCE tree ahead of the
+# installed wheel, and the source has no compiled `_core`, so --help
+# died on a circular import. gate_pick.py has always appended.
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "python"))
 from pretium import envelope, facts  # noqa: E402
 
 STRUCTURAL_MISS = {"volume_change_acf1"}

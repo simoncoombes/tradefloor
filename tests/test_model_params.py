@@ -112,6 +112,17 @@ PERTURBATIONS = [
     # so the ratio is never exactly 1.0 and the sigma moves. A first draft
     # marked it False on the anchor argument and the probe disagreed.
     ("crisis_blend_source", 0.0, False),     # perturbed away from the default (1.0 since pt-v7); still needs VIX > the crisis threshold, which three sessions do not reach
+    # The crisis blend's variance damp (§80). Like `crisis_blend_source`
+    # above it needs the crisis spike, which needs VIX past the threshold --
+    # three sessions do not get there, so the probe sees nothing.
+    ("crisis_blend_variance_damp", 0.5, False),
+    # Per-name idio volatility as beta^k (§47). Every name has a beta and
+    # the exponent bites on the first tick, so the probe sees it at once.
+    ("idio_sigma_beta_exponent", 1.5, True),
+    # Gain on the QE valuation channel (§76). qe_pe_boost is supplied only
+    # by a driven scenario and the probe runs none, so the multiplier has
+    # nothing to scale.
+    ("qe_pe_gain", 0.5, False),
     # 0.25, not 1.0: the default carries 1.0 since pt-v11, so perturbing TO
     # it is a no-op and the test read "not wired through". The value has to
     # differ from whatever the default holds, which is what an era boundary

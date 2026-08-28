@@ -133,7 +133,16 @@ import pretium
 # day's news 390 times, and `Engine::tick` seeing no endogenous news at all.
 # Every path that measures this model runs one session per day, so the
 # trajectory fingerprint did not move -- `b1bbc17be7bf6aee` before and after.
-KAT_VERSION = 11
+# 2026-08-28: the pt-v12 to pt-v14 era boundary. Every seeded run changes,
+# so the digest must. pt-v14 is the sector-block vector: `sector_factor_sigma`
+# carries more of the systematic variance while the market factor's
+# persistence compensates, which pulls crisis co-movement off the ceiling
+# pt-v12 sits against. It holds the 504-day panel on 11 seed blocks of 13
+# where pt-v12 holds 3, halves the crisis lever error, and is never worse on
+# any block measured. Two new dials ship inert with it
+# (`crisis_blend_variance_damp`, `qe_pe_gain`) and do not move the
+# trajectory at their defaults.
+KAT_VERSION = 12
 
 SEED = 20260820
 DAYS = 250

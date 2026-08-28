@@ -76,7 +76,7 @@ s.save("survey.json")           # measure once, ask many questions later
 ```
 
 Pass `preset=` rather than taking the default. `axes_for` still defaults to
-`preset="pt-v3"`, two era boundaries behind the shipped `pt-v12` -- pt-v3
+`preset="pt-v3"`, three era boundaries behind the shipped `pt-v14` -- pt-v3
 handed over to `pt-v10`, and `pt-v10` to `pt-v12` on 2026-08-26 -- and every
 box is a multiple of whatever preset it reads: `market_factor_sigma` ships at
 0.016 on pt-v3 and 0.0088291 on pt-v12, so the default box runs 0.004 to 0.064

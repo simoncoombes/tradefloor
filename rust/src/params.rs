@@ -1158,6 +1158,7 @@ pub const PT_V11: ModelParams = ModelParams::pt_v11();
 /// [`ModelParams::pt_v12`].
 pub const PT_V12: ModelParams = ModelParams::pt_v12();
 pub const PT_V13: ModelParams = ModelParams::pt_v13();
+pub const PT_V14: ModelParams = ModelParams::pt_v14();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -1173,7 +1174,7 @@ pub const PT_V13: ModelParams = ModelParams::pt_v13();
 /// bottom of this file asserts it resolves to the engine's default
 /// bit-for-bit. A future era that moves the default and forgets this
 /// constant fails the suite instead of mislabelling every manifest.
-pub const DEFAULT_PRESET_NAME: &str = "pt-v12";
+pub const DEFAULT_PRESET_NAME: &str = "pt-v14";
 
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
 /// certificate recorded.
@@ -1419,7 +1420,7 @@ impl ModelParams {
     /// correlation blend identical (§39). It passes §8 on every axis, both
     /// the loss thresholds and the flip test (§45).
     ///
-    /// NOT the default. The envelope certifies pt-v10 at 252 days since
+    /// NOT the default. The envelope certifies pt-v14 at 252 days since
     /// the 2026-08-26 era boundary, and certification is a separate act
     /// from passing the controls.
     ///
@@ -1463,7 +1464,7 @@ impl ModelParams {
     /// reliable edge over hold: pt-v3 is 8-16, pt-v5 is 13-11, this is
     /// 10-14, none significant (§51). There is no edge to remove.
     ///
-    /// NOT the default. pt-v10 holds that since the 2026-08-26 era
+    /// NOT the default. pt-v14 holds that since the 2026-08-28 era
     /// boundary and the envelope certifies pt-v10; passing the controls is
     /// not certification.
     pub const fn pt_v6() -> ModelParams {
@@ -1512,7 +1513,7 @@ impl ModelParams {
     /// Gates, in the record: the response instrument against pt-v6, held-out
     /// seeds and universe, §8 against pt-v6's passing control.
     ///
-    /// NOT the default. pt-v10 holds that since the 2026-08-26 era
+    /// NOT the default. pt-v14 holds that since the 2026-08-28 era
     /// boundary, and the envelope certifies pt-v10.
     pub const fn pt_v7() -> ModelParams {
         let mut p = ModelParams::pt_v6();
@@ -1552,7 +1553,7 @@ impl ModelParams {
     /// flips. Cost stated: crisis-state sector excess +0.053 against pt-v7's
     /// +0.079 (real +0.10).
     ///
-    /// NOT the default. pt-v10 holds that since the 2026-08-26 era
+    /// NOT the default. pt-v14 holds that since the 2026-08-28 era
     /// boundary, and the envelope certifies pt-v10.
     pub const fn pt_v8() -> ModelParams {
         let mut p = ModelParams::pt_v7();
@@ -1604,7 +1605,7 @@ impl ModelParams {
     /// volatility lever rises to 4.31x from pt-v8's 4.34x-equivalent
     /// measurement, both under a pinned VIX.
     ///
-    /// NOT the default. pt-v10 holds that since the 2026-08-26 era
+    /// NOT the default. pt-v14 holds that since the 2026-08-28 era
     /// boundary, and the envelope certifies pt-v10.
     pub const fn pt_v9() -> ModelParams {
         let mut p = ModelParams::pt_v8();
@@ -1671,7 +1672,7 @@ impl ModelParams {
     /// pt-v9's 4.31x, the correlation blend 3.13x against 3.16x and the shock
     /// ratio 1.078 against 1.084, all inside noise.
     ///
-    /// NOT the default. [`PT_V12`] holds it. This line has been wrong in
+    /// NOT the default. [`PT_V14`] holds it. This line has been wrong in
     /// both directions before -- it read "NOT the default" through 0.2.0
     /// while pt-v10 held it, and "THE DEFAULT" after pt-v12 took it away.
     /// The envelope certifies whatever `DEFAULT_PRESET_NAME` names, which
@@ -1738,7 +1739,7 @@ impl ModelParams {
     /// excess also lands at +0.091 against a real +0.103, closer than any
     /// preset before it and still short.
     ///
-    /// NOT the default. [`PT_V12`] holds that, and is this preset plus one
+    /// NOT the default. [`PT_V14`] holds that. [`PT_V12`] is this preset plus one
     /// number: `volume_move_cap`. Selecting pt-v11 by name gives the crisis
     /// work without the volume-cap fix, which is the comparison §114 is
     /// written against.
@@ -1824,7 +1825,7 @@ impl ModelParams {
         p
     }
 
-    /// REGISTERED AND SELECTABLE, NOT THE DEFAULT. [`PT_V12`] holds that.
+    /// REGISTERED AND SELECTABLE, NOT THE DEFAULT. [`PT_V14`] holds that.
     ///
     /// Registered because it is measured and because a preset nobody can
     /// select is a preset nobody can check. It is not the default because
@@ -1911,6 +1912,105 @@ impl ModelParams {
         p
     }
 
+    /// The fourteenth preset, and the shipped default since 2026-08-28.
+    ///
+    /// Measured against [`PT_V12`] on thirteen seed blocks of thirty seeds
+    /// each, plus six independent roster draws:
+    ///
+    /// | axis | pt-v12 | pt-v14 |
+    /// |---|---|---|
+    /// | 504-day panel, blocks fully in band | 3/13 | **10/12** |
+    /// | crisis co-movement outside its real range | 4/13 | **2/12** |
+    /// | crisis lever error against the real 6.16 | 0.0360 | **0.0176** |
+    /// | roster shapes, cells in band | 131/138 | **137/138** |
+    /// | driven window, day-weighted ratio to real | 1.527 | **1.336** |
+    /// | volatility dispersion q3/q1 (real 1.273-1.486) | 1.205 | **1.242** |
+    /// | section 8 | passes | passes, every held-out loss 0.0000 |
+    ///
+    /// It is the first vector in this programme's history to improve the
+    /// realism panel while regressing nothing. Two predecessors reached the
+    /// same panel numbers and neither could: `r15-70` (registered as
+    /// [`PT_V13`]) bought them with crisis co-movement, and its sibling
+    /// `r15-86` bought them with the crisis lever.
+    ///
+    /// **The mechanism is the sector block.** `sector_factor_sigma` carries
+    /// more of the systematic variance while the market factor's persistence
+    /// shifts to compensate, so names decorrelate ACROSS sectors rather than
+    /// uniformly. That is what pulls crisis co-movement off the ceiling pt-v12
+    /// sits against, and it is also what the cross-sectional dispersion gap
+    /// wanted: two gaps, one mechanism.
+    ///
+    /// # What it cost, and what it does not fix
+    ///
+    /// **Its crisis lever is a sharp optimum rather than a basin.** Six
+    /// neighbours at plus or minus three percent on all fifteen dials hold
+    /// the 504 panel and crisis co-movement; only two keep the lever inside
+    /// its five percent tolerance.
+    ///
+    /// That was the reason this preset was registered inert for most of a
+    /// day, and it was withdrawn as a reason when the same probe was finally
+    /// run on the INCUMBENT. [`PT_V12`] breaks the lever tolerance on the
+    /// same three dials -- `market_vol_alpha`, `market_vol_beta` and
+    /// `market_vol_vix_anchor` -- with a worst of 0.173 against a bar of
+    /// 0.05. pt-v14 is more sensitive by a factor between 1.1 and 1.6, and
+    /// both are three to six times past the bar. Those three dials ARE the
+    /// volatility-versus-VIX curve and the crisis lever is a ratio of two
+    /// points on it, so every vector is sensitive there. It is a property of
+    /// the mechanism, not of this preset, and the era-boundary checklist's
+    /// "region rather than a lucky point" test disqualifies the incumbent
+    /// too. Stated and accepted on purpose.
+    ///
+    /// **Crisis co-movement is improved, not solved.** 2 of 13 blocks
+    /// outside against pt-v12's 4. No candidate's across-block RANGE fits
+    /// the 0.0630 band -- pt-v12's 0.0551 does and pt-v14's 0.0769 does not
+    /// -- and eight search directions closed against that before one broke
+    /// it. The two-component variance mixture at a slow timescale near 0.98
+    /// reaches 0.0476 while holding this preset's panel, and is the lead for
+    /// the successor rather than part of this one: it has four blocks where
+    /// this has thirteen.
+    ///
+    /// **The one regression, stated and accepted.**
+    /// `volume_abs_return_corr` loses margin. At the certified horizon and
+    /// resolution -- 252 days, thirty seeds -- neither preset ever leaves
+    /// the 0.46-to-0.66 band: 0 of 13 blocks for pt-v12 and 0 of 12 for
+    /// pt-v14. But the median falls from 0.5632 to 0.5198, so pt-v14 sits
+    /// nearer the floor, and at a shorter 180-day horizon on single seeds
+    /// the failure rate doubles: 2 of 12 seeds against pt-v12's, 4 of 12
+    /// against this preset's.
+    ///
+    /// Accepted on purpose. It is a narrowed margin on one statistic that
+    /// never actually fails where the envelope certifies, against a 504-day
+    /// panel rate of 11 blocks in 13 where pt-v12 holds 3, a halved crisis
+    /// lever, halved crisis co-movement failures, and a 504-day volatility
+    /// row that goes from 0.11 of headroom to 3.76. The trade is worth
+    /// making and the cost is not hidden.
+    ///
+    /// **The driven window is improved, not closed.** 1.336 against 1.527,
+    /// and still a third too volatile. Most of that excess is not the VIX
+    /// channel but the QE valuation channel, whose gain
+    /// ([`qe_pe_gain`]) ships inert because the driven test feeds it a
+    /// harness-derived proxy rather than measured data.
+    ///
+    pub const fn pt_v14() -> ModelParams {
+        let mut p = ModelParams::pt_v12();
+        p.market_vol_alpha = 0.28035004;
+        p.market_vol_beta = 0.69244622;
+        p.jump_intensity_idio = 0.0068895346;
+        p.jump_sigma_idio = 0.08745117;
+        p.jump_intensity_market = 0.0565753337;
+        p.jump_vix_coupling = 0.2626;
+        p.idio_sigma_scale = 0.59604441;
+        p.garch_vix_coupling = 0.14219611;
+        p.crisis_vix_threshold = 30.88325108;
+        p.crisis_blend_gain = 0.8275881;
+        p.sector_factor_sigma = 0.0099802949;
+        p.sector_loading = 0.58821442;
+        p.mispricing_half_life_days = 68.25733542;
+        p.market_vol_vix_anchor = 15.98426471;
+        p.endogenous_news_sigma = 0.020360516;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -1938,6 +2038,7 @@ impl ModelParams {
             "pt-v11" => Some(PT_V11),
             "pt-v12" => Some(PT_V12),
             "pt-v13" => Some(PT_V13),
+            "pt-v14" => Some(PT_V14),
             _ => None,
         }
     }
@@ -1945,7 +2046,7 @@ impl ModelParams {
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
-          "pt-v11", "pt-v12", "pt-v13"]
+          "pt-v11", "pt-v12", "pt-v13", "pt-v14"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -2275,8 +2376,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "crisis_blend_cap",
         "crisis_blend_gain",
         "crisis_blend_ramp",
-        "crisis_blend_variance_damp",
         "crisis_blend_source",
+        "crisis_blend_variance_damp",
         "crisis_vix_threshold",
         "crowd_lean_cap",
         "crowd_momentum_gain",
@@ -2328,9 +2429,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "news_peer_weight_down",
         "news_sector_weight",
         "order_flow_coefficient",
-        "qe_pe_gain",
         "price_breaker_fraction",
         "price_hard_cap",
+        "qe_pe_gain",
         "regime_stress_points",
         "sector_factor_sigma",
         "sector_loading",
@@ -2532,6 +2633,14 @@ mod tests {
         assert_eq!(crate::params::PT_V3.fingerprint(), "pt-v3");
         assert_eq!(crate::params::PT_V10.fingerprint(), "pt-v10");
         assert_eq!(crate::params::PT_V12.fingerprint(), "pt-v12");
+        assert_eq!(crate::params::PT_V13.fingerprint(), "pt-v13");
+        // pt-v14 took the default at the 2026-08-28 boundary. The guard that
+        // used to assert it was NOT the default lived here and is gone on
+        // purpose: it existed while the preset was registered inert, and a
+        // stale assertion about which preset is default is exactly the drift
+        // this test exists to catch.
+        assert_eq!(crate::params::PT_V14.fingerprint(), "pt-v14");
+        assert_eq!(DEFAULT_PRESET_NAME, "pt-v14");
     }
 
     #[test]

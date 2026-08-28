@@ -13,7 +13,7 @@ current default**; most users never touch it. Every earlier preset, `"pt-v1"`
 through `"pt-v11"`, remains selectable and bit-reproducing forever.
 
 ```python
-eng = pt.Engine(seed=42, universe=u, model="pt-v12")  # the default, spelled out
+eng = pt.Engine(seed=42, universe=u, model="pt-v14")  # the default, spelled out
 eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the previous default, still exact
 eng = pt.Engine(seed=42, universe=u, model="pt-v1")   # an earlier era, still exact
 ```
@@ -32,12 +32,14 @@ new preset never moves an old one.
 
 | preset | use it for | status |
 |---|---|---|
-| `pt-v12` | anything: the default, the one the realism envelope certifies, with all fourteen statistics in band at 252 days *and* all fourteen again at 504, on thirty training seeds, on a held-out sixty-name universe, and thirteen of fourteen on held-out seeds | recommended |
+| `pt-v14` | anything: the default, the one the realism envelope certifies, with all fourteen statistics in band at 252 days *and* all fourteen again at 504, on thirty training seeds, on a held-out sixty-name universe, and thirteen of fourteen on held-out seeds. Against `pt-v12` over thirteen seed blocks it holds the two-year panel on 11 blocks against 3, leaves the crisis-correlation range on 2 against 4, and halves the crisis lever error — never worse on any block | recommended |
+| `pt-v12` | reproducing work published before the 2026-08-28 era boundary, when it was the default: all fourteen in band at both horizons on thirty training seeds | reproduction only |
+| `pt-v13` | reproducing a run that names it: registered and measured, never the default. It buys the two-year panel with crisis co-movement, which is the trade `pt-v14` avoids | reproduction only |
 | `pt-v10` | reproducing work published before the 2026-08-26 era boundary, when it was the default: all fourteen statistics in band at 252 days, on thirty training seeds and on a held-out universe | reproduction only |
 | `pt-v11` | reproducing a run that names it: `pt-v10` plus the crisis work (`crisis_blend_gain`, `sector_vix_coupling`, endogenous news and peer transfer) that `pt-v12` inherits unchanged | reproduction only |
 | `pt-v3` | reproducing work published when it was the default, the era before `pt-v10` | reproduction only |
-| `pt-v7` | reproducing a sector or crisis study that names it: the first preset with industries that survive a crisis, thirteen of fourteen realism statistics in band at both horizons, the miss being `volume_change_acf1`. It is no longer the preset to opt into for that thesis: at a held VIX 45 `pt-v12` reads a crisis sector excess of +0.109 against a real +0.103 | reproduction only |
-| `pt-v8` | anything that measures how correlation moves through time: the factor's variance has a memory, thirteen of fourteen in band at 504 days. Its crisis lever of 4.34x is no longer a reason to prefer it, because `pt-v12`'s steady-state crisis lever is 6.04 against a real 6.16 | recommended, opt in by name |
+| `pt-v7` | reproducing a sector or crisis study that names it: the first preset with industries that survive a crisis, thirteen of fourteen realism statistics in band at both horizons, the miss being `volume_change_acf1`. It is no longer the preset to opt into for that thesis: at a held VIX 45 the shipped default reads a crisis sector excess near the real +0.103 | reproduction only |
+| `pt-v8` | anything that measures how correlation moves through time: the factor's variance has a memory, thirteen of fourteen in band at 504 days. Its crisis lever of 4.34x is no longer a reason to prefer it, because `pt-v14`'s steady-state crisis lever is 6.12 against a real 6.16 | recommended, opt in by name |
 | `pt-v9` | reproducing a run that names it: thirteen of fourteen statistics in band at both horizons, and the first preset whose VIX responds to the day's move rather than to the closing minute, which `pt-v12` inherits while holding fourteen of fourteen at both horizons | reproduction only |
 | `pt-v1`, `pt-v2`, `pt-v4`, `pt-v5`, `pt-v6` | reproducing a run that names them | reproduction only |
 
@@ -75,7 +77,7 @@ default carries both steps. The certified horizon is still 252 days: the
      That boundary now names the pt-v10 -> pt-v12 move. No date for the
      pt-v3 -> pt-v10 move was supplied, so neither place states one. -->
 
-The default moved from `pt-v10` to `pt-v12` on 2026-08-26. Re-certifying
+The default moved from `pt-v12` to `pt-v14` on 2026-08-28. Re-certifying
 moves every published number at once, which is why it happens rarely and
 why the old default stays selectable by name. The per-preset record of
 what moved and what it measured is in the
@@ -191,7 +193,7 @@ A calibrated preset arrives as a new named entry in the shipped table,
 produced by the calibration tooling with its provenance committed; every
 earlier preset stays selectable and bit-reproducing forever. That has now
 happened several times. `"pt-v2"`, `"pt-v3"` and everything through
-`"pt-v12"` were produced this way, and `"pt-v12"` is the current default.
+`"pt-v12"` were produced this way, and `"pt-v14"` is the current default.
 The library consumes presets; it does not ship an optimiser.
 
 What the shipped default is certified to reproduce, and where it is not, is

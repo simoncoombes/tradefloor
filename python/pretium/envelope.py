@@ -9,7 +9,7 @@ Two things live here, and neither is a score.
 **Per-statistic intervals** (`intervals`). Every panel statistic is reported
 with the spread it actually has across seeds, not as a bare median. A point
 estimate from a stochastic simulator invites a precision it does not have:
-`abs_return_acf20` reads +0.004 at the shipped preset, and the across-seed
+`abs_return_acf20` reads +0.0096 at the shipped preset, and the across-seed
 range is wide enough that a single seed can read either side of zero. The
 band distance is reported in units of that spread, which is the same
 weighting `pretium.loss` uses -- so "how far out" is denominated in the
@@ -61,14 +61,20 @@ from ._core import ValidationError
 from .facts import REAL_MARKETS, SEED_SD, SEED_SD_504, band_distance
 
 #: The preset these measurements describe.
-PRESET = "pt-v12"
+PRESET = "pt-v14"
 
 #: The measurement horizon the envelope certifies, in trading days.
 #: Not a soft preference, though the reason is no longer a band count: since
-#: pt-v12 all fourteen are in band at 504 days as well (`MEASURED_504`). What
-#: holds the horizon here is that `CERTIFIED` was MEASURED here, on thirty
-#: seeds and two held-out axes, and that the thinnest 504-day row clears its
-#: ceiling by 0.11 on a statistic whose seed spread is many times that.
+#: pt-v12 all fourteen are in band at 504 days as well (`MEASURED_504`), and
+#: pt-v14 holds them there with far more room. What holds the horizon here is
+#: that `CERTIFIED` was MEASURED here, on thirty seeds and two held-out axes.
+#:
+#: The old reason -- that the thinnest 504-day row cleared its ceiling by
+#: only 0.11 -- no longer applies: `annualised_vol_pct` moved from 33.89 to
+#: 30.24 against the same 34.0 ceiling at the 2026-08-28 boundary. The
+#: horizon stays 252 because that is where the certification was measured,
+#: not because 504 is fragile.
+#:
 #: This comment read "three statistics that are in band here leave it by 504
 #: days" until 2026-08-27, which described pt-v3. `check` refuses to certify
 #: beyond this horizon.
@@ -100,20 +106,20 @@ CERTIFIED_HORIZON_DAYS = 252
 #: "roster-concentration" measures what changes when the roster's SHAPE
 #: changes, and it changes the count.
 CERTIFIED: dict[str, float] = {
-    "annualised_vol_pct": 32.7604,
-    "excess_kurtosis": 6.7001,
-    "return_acf1": 0.0239,
-    "abs_return_acf1": 0.1107,
-    "abs_return_acf5": 0.0428,
-    "abs_return_acf20": 0.004,
-    "cross_sectional_corr": 0.3177,
-    "volume_abs_return_corr": 0.5599,
-    "leverage_effect": -0.0401,
-    "volume_change_acf1": -0.2656,
-    "corr_asymmetry": -0.0147,
-    "corr_asymmetry_lagged": 0.0181,
-    "sector_excess_corr": 0.2079,
-    "corr_persistence_acf1": 0.1525,
+    "annualised_vol_pct": 28.3103,
+    "excess_kurtosis": 10.0043,
+    "return_acf1": 0.0114,
+    "abs_return_acf1": 0.0769,
+    "abs_return_acf5": 0.0305,
+    "abs_return_acf20": 0.0096,
+    "cross_sectional_corr": 0.2616,
+    "volume_abs_return_corr": 0.5108,
+    "leverage_effect": -0.0258,
+    "volume_change_acf1": -0.2794,
+    "corr_asymmetry": -0.0018,
+    "corr_asymmetry_lagged": -0.0327,
+    "sector_excess_corr": 0.2081,
+    "corr_persistence_acf1": 0.1771,
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -138,31 +144,35 @@ BANDS_504: dict[str, tuple[float, float]] = {
 }
 
 #: The same panel at 504 days. ALL FOURTEEN in band against `BANDS_504`,
-#: which pt-v12 is the first preset to manage. This comment read "five of
+#: which pt-v12 was the first preset to manage. This comment read "five of
 #: ten" until 2026-08-26 (pt-v3, against the ten-statistic panel of the
 #: time), then "thirteen of fourteen, missing only volume_change_acf1"
 #: (pt-v10 and pt-v11). `volume_move_cap` closed that row.
 #:
-#: Read the headroom, not just the count. `annualised_vol_pct` is 33.89
-#: against a band ending at 34.0, which is 0.11 of room on a statistic whose
-#: seed spread is far wider than that; the 504-day count is genuine but this
-#: row would flip on a change that barely moves the model. That is why the
-#: certified horizon stays 252: this table is MEASURED, not certified.
+#: Read the headroom, not just the count. Under pt-v12 this table's thinnest
+#: row was `annualised_vol_pct` at 33.89 against a ceiling of 34.0 -- 0.11 of
+#: room on a statistic whose seed spread is far wider, so the count was
+#: genuine but would have flipped on a change that barely moved the model.
+#: pt-v14 reads 30.24 there, which is 3.76 of room, and that is the single
+#: largest robustness gain of the 2026-08-28 boundary.
+#:
+#: The count is still MEASURED rather than certified: the certified horizon
+#: is 252 because that is where `CERTIFIED` was measured.
 MEASURED_504: dict[str, float] = {
-    "annualised_vol_pct": 33.8939,
-    "excess_kurtosis": 7.7528,
-    "return_acf1": 0.025,
-    "abs_return_acf1": 0.2084,
-    "abs_return_acf5": 0.0864,
-    "abs_return_acf20": 0.0052,
-    "cross_sectional_corr": 0.3797,
-    "volume_abs_return_corr": 0.6088,
-    "leverage_effect": -0.0543,
-    "volume_change_acf1": -0.2572,
-    "corr_asymmetry": -0.0049,
-    "corr_asymmetry_lagged": -0.0017,
-    "sector_excess_corr": 0.1761,
-    "corr_persistence_acf1": 0.2077,
+    "annualised_vol_pct": 30.2351,
+    "excess_kurtosis": 10.5914,
+    "return_acf1": 0.0163,
+    "abs_return_acf1": 0.1445,
+    "abs_return_acf5": 0.0737,
+    "abs_return_acf20": 0.0131,
+    "cross_sectional_corr": 0.3267,
+    "volume_abs_return_corr": 0.5806,
+    "leverage_effect": -0.0363,
+    "volume_change_acf1": -0.2604,
+    "corr_asymmetry": 0.0151,
+    "corr_asymmetry_lagged": -0.0468,
+    "sector_excess_corr": 0.1817,
+    "corr_persistence_acf1": 0.2482,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
@@ -235,14 +245,16 @@ GAPS: tuple[Gap, ...] = (
         summary="the certified horizon is 252 days",
         detail=(
             "Against bands re-derived at the matching window, the shipped "
-            "pt-v12 holds ALL FOURTEEN at 504 days. That is the first time "
-            "this project has measured it: pt-v3 held 7 there and pt-v10 "
-            "held 13.\n\n"
+            "pt-v14 holds ALL FOURTEEN at 504 days, as pt-v12 did before it. "
+            "pt-v12 was the first to manage it: pt-v3 held 7 there and "
+            "pt-v10 held 13.\n\n"
             "So why is the horizon still 252? Two reasons, and the band "
-            "count is neither. First, headroom: annualised_vol_pct reads "
-            "33.89 against a band ending at 34.0, which is 0.11 of room on "
-            "a statistic whose seed spread is many times that, so the "
-            "fourteenth row is real but thin. Second and decisive, "
+            "count is neither. First, headroom -- though this reason has "
+            "weakened: under pt-v12 annualised_vol_pct read 33.89 against a "
+            "band ending at 34.0, only 0.11 of room on a statistic whose "
+            "seed spread is many times that. pt-v14 reads 30.24 there, "
+            "which is 3.76 of room, so the fourteenth row is no longer "
+            "thin. Second and now decisive on its own, "
             "CERTIFIED is what this module certifies and it is measured at "
             "252 days on thirty seeds. The 504-day table is measured, not "
             "certified.\n\n"
@@ -344,12 +356,12 @@ GAPS: tuple[Gap, ...] = (
             "the dispersion around it is not, and that is the whole gap "
             "now.\n\n"
             "The steady-state lever -- how much more violent a sustained "
-            "crisis is than a calm market -- reads 6.04x on pt-v12 against "
+            "crisis is than a calm market -- reads 6.12x on pt-v14 against "
             "real markets\' 6.16x, measured from a held VIX 5 to a held VIX "
             "65 on the certified 40-name roster over 252 days at thirty "
             "seeds. pt-v10 read 5.05x there and the default before it 3.07x. "
             "This gap opened by saying the VIX shock response was materially "
-            "weaker than the previous preset\'s; on pt-v12 it is stronger "
+            "weaker than the previous preset\'s; on pt-v14 it is stronger "
             "than any preset before it and within two percent of real, so "
             "that sentence is WITHDRAWN.\n\n"
             "'Direction is right' is measured rather than asserted. Driving "
@@ -398,7 +410,8 @@ GAPS: tuple[Gap, ...] = (
             "examples/09-a-pandemic-shaped-market.ipynb.\n\n"
             "Sector structure was the same shortfall measured a second "
             "way, and it is now CLOSED. In calm markets it is in band on "
-            "the shipped preset, 0.2079 at 252 days and 0.1761 at 504 "
+            "the shipped preset, 0.2081 at 252 days "
+            "and 0.1817 at 504 "
             "against bands starting at 0.11, which is why the separate "
             "sector-structure gap was retired at 0.2.0. Under a held VIX "
             "45 pt-v12 reads +0.109 against a real +0.103, and crisis "
@@ -764,7 +777,8 @@ def check(
             # This read "about 0.3 seed-sd above the floor" until 2026-08-27,
             # which was right for the 8.26 pt-v10 measured at 504 days and
             # wrong for the 7.75 pt-v12 reads there: the room halved and the
-            # sentence did not move.
+            # sentence did not move. Computed since, so pt-v14 moving it
+            # to 10.94 needed no edit here.
             room_sd = ((MEASURED_504["excess_kurtosis"]
                         - BANDS_504["excess_kurtosis"][0])
                        / SEED_SD_504["excess_kurtosis"])
@@ -825,7 +839,7 @@ def check(
             "EXPECTED size is calibrated: measured as a regression gain "
             "rather than a correlation, the three driver channels run within "
             "ten percent of real AAPL (§81), and the steady-state volatility "
-            "lever from VIX 5 to VIX 65 reads 6.04x on the shipped pt-v12 "
+            "lever from VIX 5 to VIX 65 reads 6.12x on the shipped pt-v14 "
             "against real markets' 6.16x, where pt-v10 read 5.05x. What is "
             "not calibrated is the DISPERSION around that response: over the "
             "driven 2020-21 window the model's residual sd is 1.565x real, "

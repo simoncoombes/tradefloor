@@ -42,7 +42,7 @@ differ by a factor of seventy-five.
 
 **Coefficients ship as a preset.** They are named and versioned rather than
 passed as constructor keywords, so two published results can be compared.
-`pt-v12` is the current default, as of the 2026-08-26 era boundary; `pt-v10`
+`pt-v14` is the current default, as of the 2026-08-28 era boundary; `pt-v12`
 was the default before it, and every earlier name from `pt-v1` on is still
 selectable and still reproduces bit for bit.
 `model_preset()` returns the set in force, and the returned values are folded

@@ -334,6 +334,27 @@ PARAM_SPECS: dict[str, dict] = {
     # above the old ceiling of 0.5 x 0.98.
     "crisis_blend_gain": {"kind": "abs", "step_unit": 0.05,
                           "hard_range": (0.0, 2.0)},
+    # How far the crisis injection is decoupled from the market factor's
+    # magnitude (§80). A damping exponent applied as |factor/base|^-d, so its
+    # hard range is the unit interval: 0 is the shipped behaviour and 1
+    # removes the dependence entirely. Measured across that span, crisis
+    # co-movement's level falls from +0.002 off centre to -0.139, so the far
+    # end is known to be broken and the step is small enough to find an
+    # interior optimum if one exists.
+    "crisis_blend_variance_damp": {"kind": "abs", "step_unit": 0.05,
+                                   "hard_range": (0.0, 1.0)},
+    # Per-name idiosyncratic volatility as beta^k (§47). Zero is the shipped
+    # behaviour; 3 is where the 504-day panel collapses (§71), and the
+    # interquartile volatility ratio is still rising there, so the hard range
+    # spans in-band to broken rather than stopping at the useful part.
+    "idio_sigma_beta_exponent": {"kind": "abs", "step_unit": 0.1,
+                                 "hard_range": (0.0, 3.0)},
+    # Gain on the QE valuation channel (§76). 1.0 is the shipped behaviour --
+    # this is the only macro channel that had no gain -- and 0 disables it.
+    # The upper edge is 2.0 for symmetry about the shipped value, not because
+    # anything has measured there.
+    "qe_pe_gain": {"kind": "abs", "step_unit": 0.05,
+                   "hard_range": (0.0, 2.0)},
     # Endogenous company news (§101). Intensity is a per-day probability, so
     # 0.25 is roughly one event a week per name, already a chatty market.
     "endogenous_news_intensity": {"kind": "abs", "step_unit": 0.01,
