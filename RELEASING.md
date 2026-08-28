@@ -293,7 +293,8 @@ gate has to be green BEFORE the merge, because it is what admits the merge.
    the tag must point at what is on `main`.
 7. **Tag `origin/main` and push the tag.** That is the irreversible step: a
    PyPI version number cannot be reused.
-8. **Publish the crate.** Separate registry, separate command, below.
+8. **Watch both registries publish.** The tag drives PyPI and crates.io in
+   parallel, and the GitHub release waits for both. Nothing to run by hand.
 9. **Check docs.rs.** A 404 in the first minutes is the build queue, not a
    failure. Compare against an earlier version: if `0.2.0` returns 200 and the
    new one still 404s after ten minutes, the build failed and the crate page
@@ -336,8 +337,38 @@ publishes, because that is the direction a mistake is recoverable in.
 
 ## Publishing the crate
 
-Not automated. crates.io is a separate registry with its own auth, and the
-Rust crate does not have to move on the same cadence as the Python package.
+Automated, from 0.4.3. The tag drives both registries: `publish to PyPI` and
+`publish to crates.io` run in parallel off the same verified artefacts, and
+the GitHub release waits for both, so a half-published version fails the run
+rather than passing quietly.
+
+It was manual until 0.4.2, and the cost of that showed: PyPI reached 0.4.2
+while crates.io sat at 0.3.0, three releases behind, because publishing the
+crate was a step someone had to remember rather than something the tag did.
+0.4.2 was pushed to crates.io by hand to close the gap.
+
+Both use Trusted Publishing, so no token exists in either registry's path.
+crates.io mints one through `rust-lang/crates-io-auth-action` against the
+`crates-io` environment, the same shape as PyPI's `pypi` environment. **Both
+environments must be constrained to a single environment name on the registry
+side**, or any workflow in the repository with `id-token: write` can publish.
+
+The crate job packages and runs the packaged crate's own tests before
+uploading. That check matters more than it sounds: sixteen of nineteen
+integration tests read the 140 MB parity corpus that `exclude` deliberately
+keeps out, and they panic when it is absent. What remains is `circuit_breaker`,
+`roster_mutation` and `stream_alignment` plus the unit tests. They are excluded
+**by name**, so a new test is not silently dropped: add one that reads
+`goldens/` and it must go in `exclude` too, or a consumer running `cargo test`
+concludes the crate is broken.
+
+Unlike PyPI, the crate upload is not idempotent. PyPI's `skip-existing` lets a
+re-run finish a partial upload; crates.io refuses a version that already
+exists, and that refusal is the right outcome for a re-run rather than
+something to swallow. **crates.io versions are permanent and can only be
+yanked, never replaced.**
+
+To publish by hand, which should now only happen to close a gap:
 
 ```
 cd rust
@@ -346,23 +377,9 @@ cargo package --list             # what would actually ship
 cargo publish
 ```
 
-Before the first publish, or after adding an integration test, check what
-the packaged crate does on its own:
-
-```
-cargo package
-cd target/package/pretium-X.Y.Z && cargo test --offline
-```
-
-This matters more than it sounds. Sixteen of the nineteen integration tests
-read the 140 MB parity corpus in `rust/goldens/`, which `exclude` deliberately
-keeps out, and they panic when it is absent. What is left to run on its own is
-`circuit_breaker`, `roster_mutation` and `stream_alignment`, plus the unit
-tests. They are excluded **by name**, so a new test is not silently dropped:
-add one that reads `goldens/` and you must add it to `exclude` too, or a
-consumer running `cargo test` concludes the crate is broken.
-
-crates.io versions are permanent and cannot be replaced, only yanked.
+**Check docs.rs after.** A 404 in the first minutes is the build queue, not a
+failure. Compare against an earlier version: if `0.3.0` returns 200 and the new
+one still 404s after ten minutes, the build failed and the crate page says why.
 
 ## After
 
