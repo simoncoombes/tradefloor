@@ -1273,14 +1273,14 @@ class Component extends DCLogic {
     ];
     if (avg != null && arrival) {
       const bps = (op.side === 'buy' ? (avg - arrival) / arrival : (arrival - avg) / arrival) * 10000;
-      out.book.paid = qty + ' filled at a VWAP of ' + avg.toFixed(4)
+      out.book.paid = qty + ' filled at a VWAP of ' + avg.toFixed(2)
         + ' against the ' + arrival.toFixed(2)
         + (op.side === 'buy' ? ' best offer' : ' best bid')
         + ' resting when the order arrived: '
         + (bps >= 0 ? '+' : '') + bps.toFixed(0) + ' bps';
       out.book.paidCol = bps > 0 ? 'var(--red)' : 'var(--accent-deep)';
     } else {
-      out.book.paid = avg != null ? 'filled ' + qty + ' at ' + avg.toFixed(4) : 'nothing traded';
+      out.book.paid = avg != null ? qty + ' filled at a VWAP of ' + avg.toFixed(2) : 'nothing traded';
       out.book.paidCol = 'var(--ink-3)';
     }
 

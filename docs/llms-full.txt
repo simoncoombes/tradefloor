@@ -519,7 +519,7 @@ moved
 
 Fills 
 50 @ 101.00 110 @ 102.00 15 @ 103.00
-175 filled at a VWAP of 101.8000 against the 101.00 best offer resting when the order arrived: +79 bps
+175 filled at a VWAP of 101.80 against the 101.00 best offer resting when the order arrived: +79 bps
 
 >
 
