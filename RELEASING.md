@@ -181,29 +181,36 @@ figures, 199 reproduced, zero MOVED.
 ### 5. Rebuild the documentation site
 
 ```
-python tools/docs/build_site.py
+python tools/docs/learn/build.py
+python tools/docs/learn/build.py --check
+python tools/docs/learn/data.py  --check
+node   tools/docs/learn/verify.cjs docs
 ```
 
-Build it, commit, then build again. Each page's `dateModified` comes from the
-last commit touching its sources, which include `CHANGELOG.md` and the files
-under `tools/docs/`, so committing those moves the date the next build writes.
-The second build is the no-op that proves it settled. A build that still
-dirties the tree on the third run is a bug rather than churn.
+`docs/` is the learning path, and `tools/docs/learn/build.py` is what writes
+it. **`tools/docs/build_site.py` is not the site any more.** It built the
+previous one from `design-bundle.html`, it is kept because that bundle is the
+only copy of that design, and it now exits unless given
+`--i-know-this-is-retired` and refuses `--out docs/` outright. This step told
+you to run it for three releases after that stopped being true, which is how
+a release nearly put the old site back over the new one.
 
-Adding a page needs three things and asserts on all of them: a markdown file
-in `docs/`, an entry in `newpages.NEW_PAGES`, and a description in
-`seo.DESCRIPTIONS` of 120 to 165 characters. The build fails naming the
-missing one.
+Build it, commit, then `--check`. Each page's `dateModified` comes from the
+last commit touching its sources, which include `CHANGELOG.md`, so committing
+moves the date the next build writes. `--check` is the no-op that proves it
+settled; a tree still dirty on the third run is a bug rather than churn.
+
+`data.py --check` proves the charts still match `rust/goldens`, which is the
+step that catches a new default preset moving a drawn line. Run
+`tools/docs/learn/figures.py` after step 4 as well: it grades the prose
+figures against the fresh `tools/remeasure/out/figures.json`.
+
+Adding a page needs a `.dc.html` in `tools/docs/learn/handoff/` and an entry
+in `build.py`; a page that is neither built nor redirected fails the build,
+so one cannot be dropped by forgetting it. Old URLs answer from `REDIRECTS`.
 
 It reads the version from `pyproject.toml`, so the nav badge and the BibTeX
-block follow automatically. Two version strings in the bundle are HISTORY
-and must not move: the release-notes headings and the "measured on pretium
-0.1.0" provenance line. The build matches them by surrounding markup and
-leaves them alone.
-
-If a new design bundle has landed, drop it at `tools/docs/design-bundle.html`
-first. The build asserts on the release-status text it expects to find, so a
-reworded bundle fails loudly rather than shipping a stale claim.
+block follow automatically.
 
 ### 6. Check the README survives PyPI
 

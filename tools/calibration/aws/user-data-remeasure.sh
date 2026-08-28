@@ -9,7 +9,7 @@ shutdown -h +90
 exec > >(tee /var/log/pretium-run.log) 2>&1
 set -x
 
-BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/remeasure-0.3.0
+BUCKET=s3://dia-test-101631415962-us-east-2-an/pretium-calib/out/remeasure-0.4.0
 # `dev`, and the run needs cf9d91f or later: the inventory was repaired there
 # (72 broken locators fixed, 308 figures, zero pointing past end of file) and
 # remeasure.py learned to label a --only run as PARTIAL. Verified with

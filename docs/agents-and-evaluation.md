@@ -55,7 +55,7 @@ rule - equal weight, long the five most underpriced names and short the five
 most overpriced (`top_k=5` per side). Perfect knowledge of the mispricing
 does not make that the best portfolio the same gross can buy, and agents do
 out-earn it. Counted on the twelve-market grid of the next section, under
-the shipped default model `pt-v12`:
+the shipped default model `pt-v14`:
 
 | agent | beats the Oracle |
 |---|---|

@@ -33,7 +33,7 @@ recorded under a custom coefficient set has to name it back.
 ### 1. Version and preset
 
 ```python
-pt.version()                      # '0.3.0'
+pt.version()                      # '0.4.0'
 pt.model_preset()["name"]         # 'pt-v12', the shipped default
 ```
 

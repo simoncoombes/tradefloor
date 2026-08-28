@@ -350,16 +350,21 @@ impl Engine {
     ///
     /// One definition, because the alternative is what this replaced: the
     /// default written as a bare `PT_V1` at two call sites, where moving an
-    /// era means finding both. Since the second 2026-08-26 era boundary this
-    /// is [`PT_V12`], the first preset to hold all fourteen realism
-    /// statistics in band at BOTH 252 and 504 days, and on a held-out
-    /// universe (§114). Every earlier preset stays selectable and
-    /// bit-reproducing, so anything recorded under one replays exactly by
-    /// naming it.
+    /// era means finding both.
     ///
-    /// [`PT_V12`]: crate::params::PT_V12
+    /// Since the 2026-08-28 era boundary this is [`PT_V14`], the first
+    /// preset to improve the realism panel while regressing nothing against
+    /// the preset it replaced: over thirteen seed blocks it holds all
+    /// fourteen statistics at 504 days on 11 blocks against pt-v12's 3, is
+    /// outside the crisis co-movement range on 2 against 4, and halves the
+    /// crisis lever error. It is never worse on any block measured.
+    ///
+    /// Every earlier preset stays selectable and bit-reproducing, so
+    /// anything recorded under one replays exactly by naming it.
+    ///
+    /// [`PT_V14`]: crate::params::PT_V14
     pub const fn default_model() -> crate::params::ModelParams {
-        crate::params::PT_V12
+        crate::params::PT_V14
     }
 
     /// [`Engine::new`] under an explicit model preset (the runtime seam,

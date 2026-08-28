@@ -145,6 +145,7 @@ fn discount_rate(economy: &EconomyValuationInputs) -> f64 {
 pub fn compute_target_pe(
     company: &CompanyValuationInputs,
     economy: &EconomyValuationInputs,
+    qe_gain: f64,
 ) -> TargetPe {
     let sector_anchor_pe = sector_anchor_pe(company.sector_avg_pe);
     let discount = discount_rate(economy);
@@ -159,7 +160,11 @@ pub fn compute_target_pe(
         1.0 - (discount - NEUTRAL_DISCOUNT_RATE) * RATE_PE_SENSITIVITY * duration_multiplier,
     );
 
-    let qe_adjustment = 1.0 + economy.qe_pe_boost.unwrap_or(0.0);
+    // `qe_pe_gain` is 1.0 on every preset before it, so this is bit-inert
+    // there. It exists because this is the only macro channel in the model
+    // with no gain between input and response, and round 76 measured it
+    // carrying more of the driven-window excess than the VIX channel does.
+    let qe_adjustment = 1.0 + qe_gain * economy.qe_pe_boost.unwrap_or(0.0);
 
     TargetPe {
         target_pe: sector_anchor_pe * rate_adjustment * qe_adjustment,
@@ -179,7 +184,7 @@ pub fn compute_fair_value(
     company: &CompanyValuationInputs,
     economy: &EconomyValuationInputs,
 ) -> FairValueBreakdown {
-    compute_fair_value_with(company, economy, 0.0)
+    compute_fair_value_with(company, economy, 0.0, 1.0)
 }
 
 /// [`compute_fair_value`] with the book floor extended to profitable companies.
@@ -222,11 +227,12 @@ pub fn compute_fair_value_with(
     company: &CompanyValuationInputs,
     economy: &EconomyValuationInputs,
     book_floor: f64,
+    qe_gain: f64,
 ) -> FairValueBreakdown {
     let eps = company.eps.unwrap_or(0.0);
 
     if eps > 0.0 {
-        let pe = compute_target_pe(company, economy);
+        let pe = compute_target_pe(company, economy, qe_gain);
         // The floor is a BRANCH at zero, not arithmetic, for the same reason
         // `market_vol_slow_weight` is: every preset before this parameter
         // existed must reproduce bit for bit, and that is the only spelling
@@ -316,14 +322,37 @@ mod tests {
 
     /// TRAP 3: negative growth clamps, so duration stays at 1.
     #[test]
+    fn the_qe_gain_is_inert_at_one_and_scales_the_channel() {
+        let c = co(Some(20.0), Some(1.0), None, Some(0.1));
+        let mut e = econ(Some(10.0), 3.5, None);
+        e.qe_pe_boost = Some(0.20);
+
+        // 1.0 is what every preset before the dial carried, and the whole
+        // channel is `1 + gain * boost`, so this must be bit-identical to
+        // the arithmetic it replaced.
+        let shipped = compute_target_pe(&c, &e, 1.0);
+        assert_eq!(shipped.qe_adjustment.to_bits(), (1.20f64).to_bits());
+
+        // Half the gain is half the boost.
+        assert_eq!(compute_target_pe(&c, &e, 0.5).qe_adjustment.to_bits(),
+                   (1.10f64).to_bits());
+        // Zero removes the channel without removing the valuation.
+        let off = compute_target_pe(&c, &e, 0.0);
+        assert_eq!(off.qe_adjustment.to_bits(), (1.0f64).to_bits());
+        assert!(off.target_pe > 0.0);
+    }
+
+    #[test]
     fn negative_growth_does_not_shrink_duration() {
         let shrinking = compute_target_pe(
             &co(Some(20.0), Some(1.0), None, Some(-0.9)),
             &econ(Some(10.0), 3.5, None),
+            1.0,
         );
         let flat = compute_target_pe(
             &co(Some(20.0), Some(1.0), None, Some(0.0)),
             &econ(Some(10.0), 3.5, None),
+            1.0,
         );
         assert_eq!(
             shrinking.rate_adjustment.to_bits(),
@@ -336,6 +365,7 @@ mod tests {
         let extreme = compute_target_pe(
             &co(Some(32.0), Some(4.0), None, Some(0.5)),
             &econ(Some(40.0), 3.5, None),
+            1.0,
         );
         assert_eq!(extreme.rate_adjustment, RATE_ADJUSTMENT_FLOOR);
     }

@@ -167,6 +167,14 @@ pub struct LiveFactors {
 /// smooth curve pivots where the discrete one already read 1.0.
 pub const SIZE_EFFECT_REFERENCE_B: f64 = 25.0;
 
+/// Bounds on the beta-driven idiosyncratic-volatility multiplier.
+///
+/// Wide enough not to bind on an ordinary roster -- the certified forty span
+/// beta 0.384 to 1.580, which at exponent 2 gives 0.15 to 2.50 -- and there
+/// only so that a degenerate beta cannot silence a name or hand one name the
+/// roster's entire variance budget.
+pub const IDIO_BETA_BOUNDS: (f64, f64) = (0.1, 4.0);
+
 /// Bounds on the continuous size multiplier.
 ///
 /// Wider than the step function's own [0.8, 1.6] on purpose -- the extra
@@ -344,9 +352,33 @@ pub fn calculate_live_factors(
     let market_component = if params.crisis_blend_source == 0.0 {
         beta * shared.market_factor
     } else {
-        beta * shared.market_factor
-            + params.crisis_blend_source * params.crisis_blend_gain
-                * shared.crisis_spike * shared.market_factor
+        // At a held VIX the crisis spike is pinned at `crisis_blend_cap`, so
+        // the only thing varying block to block in this injection is
+        // `market_factor`'s magnitude -- the market variance level, which
+        // GARCH persistence governs. That is why crisis co-movement's
+        // across-block RANGE tracks persistence at rho +0.85 and why
+        // tightening the range has always cost 504-day panel blocks.
+        //
+        // `crisis_blend_variance_damp` breaks that link: at `d` the
+        // injection is scaled by |market_factor / baseline|^-d, so at 1.0 its
+        // magnitude stops depending on how large the factor happens to be.
+        // At 0.0 the branch is not taken and the tape is bit-identical.
+        let injection = params.crisis_blend_source * params.crisis_blend_gain
+            * shared.crisis_spike * shared.market_factor;
+        let injection = if params.crisis_blend_variance_damp == 0.0 {
+            injection
+        } else {
+            // The same normaliser `crash_amplifier` uses below, so
+            // "ordinary" means one thing in both places. Guarded at both
+            // ends: a near-zero factor would otherwise send the scale to
+            // infinity, and the cap keeps a quiet tick from being amplified
+            // into a loud one.
+            let base = params.market_factor_sigma / mathx::sqrt(390.0);
+            let rel = mathx::max(shared.market_factor.abs() / base, 1e-6);
+            injection * mathx::clamp(
+                mathx::pow(rel, -params.crisis_blend_variance_damp), 0.1, 10.0)
+        };
+        beta * shared.market_factor + injection
     };
     // The sector loading (§108). It was the literal 0.5 for every member of
     // every sector: a name's exposure to its own industry was the one
@@ -373,7 +405,38 @@ pub fn calculate_live_factors(
     // term's budget, so total volatility holds still. At 1.0 the multiply
     // is bit-inert.
     let daily_sigma = mathx::sqrt(mathx::max(company.garch_variance, 0.0001));
-    let idiosyncratic_sigma = daily_sigma * params.idio_sigma_scale / mathx::sqrt(390.0);
+    // The idiosyncratic scale was one number for every name in the roster:
+    // cap size varies a name's noise through `cap_mult` and GARCH varies it
+    // through the name's own conditional variance, but the SCALE itself did
+    // not vary at all. Real rosters disperse well past that -- interquartile
+    // volatility ratio 1.273..1.486 over ten reference windows against
+    // pt-v12's 1.205 -- and no dial that moves every name together closes a
+    // dispersion gap.
+    //
+    // At exponent zero the branch is not taken and the scale is exactly
+    // `idio_sigma_scale`, so a preset that leaves it unset is bit-identical.
+    let idio_scale = if params.idio_sigma_beta_exponent == 0.0 {
+        params.idio_sigma_scale
+    } else if beta <= 0.0 {
+        // A non-positive beta has no exposure to raise to a power, and
+        // `pow` of a negative base with a fractional exponent is NaN. The
+        // homogeneous scale is the honest answer, following
+        // `cap_size_multiplier_with`'s treatment of a non-positive cap.
+        params.idio_sigma_scale
+    } else {
+        // Same choice as `sector_loading_beta_slope`: tied to beta, which
+        // the universe already carries, so it costs no RNG stream and
+        // cannot move the draw schedule.
+        //
+        // Bounded for the same reason the size effect is: a power law is
+        // unbounded as its base leaves the ordinary range, and a degenerate
+        // beta must not be able to silence a name or let one dominate the
+        // roster's whole variance budget.
+        let (lo, hi) = IDIO_BETA_BOUNDS;
+        params.idio_sigma_scale
+            * mathx::clamp(mathx::pow(beta, params.idio_sigma_beta_exponent), lo, hi)
+    };
+    let idiosyncratic_sigma = daily_sigma * idio_scale / mathx::sqrt(390.0);
 
     // DRAW SITE — here, before `crash_amplifier` is computed. The order is
     // contractual for the tape even though the two are independent.
@@ -939,6 +1002,88 @@ mod tests {
         let mut rng = Fixed(1.0);
         let m = calculate_live_factors(&mega, &[], 0.0, 1.0, &shared(), &crate::params::PT_V1, &mut rng).random_noise;
         assert!(s > m, "small-cap noise {s} should exceed mega-cap {m}");
+    }
+
+    #[test]
+    fn the_idio_beta_exponent_is_inert_at_zero_and_disperses_when_it_is_not() {
+        // With every shared factor at zero, `random_noise` IS the
+        // idiosyncratic term -- beta reaches it only through the new dial,
+        // so this isolates the mechanism rather than the factor structure.
+        let noise = |p: &crate::params::ModelParams, beta: f64| {
+            let mut c = company();
+            c.beta = Some(beta);
+            let mut rng = Fixed(1.0);
+            calculate_live_factors(&c, &[], 0.0, 1.0, &shared(), p, &mut rng).random_noise
+        };
+
+        // Inert: the shipped preset leaves the exponent at zero, so a
+        // defensive name and an aggressive one carry identical idiosyncratic
+        // noise and every preset's tape is bit-unchanged.
+        let off = crate::params::PT_V1;
+        assert_eq!(off.idio_sigma_beta_exponent, 0.0);
+        assert_eq!(noise(&off, 0.6), noise(&off, 1.8));
+
+        // Engaged: the same two names now differ, and in the right order.
+        let mut on = crate::params::PT_V1;
+        on.idio_sigma_beta_exponent = 2.0;
+        let (lo, hi) = (noise(&on, 0.6), noise(&on, 1.8));
+        assert!(hi > lo, "beta 1.8 noise {hi} should exceed beta 0.6 noise {lo}");
+        // Beta 1.0 is the pivot: 1^k is 1 for every k, so it cannot move.
+        assert_eq!(noise(&on, 1.0), noise(&off, 1.0));
+
+        // The exponent form exists because the linear one it replaced drove
+        // low-beta names to EXACTLY zero. Every positive beta must stay
+        // audible however steep the exponent gets.
+        let mut steep = crate::params::PT_V1;
+        steep.idio_sigma_beta_exponent = 8.0;
+        let quiet = noise(&steep, 0.3);
+        assert!(quiet > 0.0, "a defensive name went silent at {quiet}");
+
+        // A non-positive beta would be NaN under `pow` with a fractional
+        // exponent. It falls back to the homogeneous scale instead.
+        assert_eq!(noise(&on, -0.5), noise(&off, -0.5));
+        assert!(noise(&on, -0.5).is_finite());
+    }
+
+    #[test]
+    fn the_crisis_variance_damp_is_inert_at_zero_and_flattens_when_it_is_not() {
+        // With a crisis spike present, the injection scales with the market
+        // factor's magnitude. The damp is meant to remove that dependence,
+        // so the test is whether DOUBLING the factor still doubles the
+        // injection's share of the result.
+        let injected = |p: &crate::params::ModelParams, mf: f64| {
+            let mut sh = shared();
+            sh.market_factor = mf;
+            sh.crisis_spike = 0.8;
+            let mut rng = Fixed(0.0);           // no idiosyncratic noise
+            calculate_live_factors(&company(), &[], 0.0, 1.0, &sh, p, &mut rng)
+                .random_noise
+        };
+
+        let off = crate::params::PT_V12;
+        assert_eq!(off.crisis_blend_variance_damp, 0.0);
+
+        // NOT a linearity test. `crash_amplifier` is itself non-linear in
+        // the market factor, so doubling the factor already more than
+        // doubles the shipped response -- 2.85x, not 2x. The claim is only
+        // that damping makes the response LESS sensitive to the factor's
+        // size, so the two ratios are compared against each other rather
+        // than against an assumed slope.
+        let shipped = injected(&off, 0.002) / injected(&off, 0.001);
+        assert!(shipped > 1.0, "shipped response does not rise: {shipped}");
+
+        let mut on = crate::params::PT_V12;
+        on.crisis_blend_variance_damp = 1.0;
+        let damped = injected(&on, 0.002) / injected(&on, 0.001);
+        assert!(damped < shipped,
+                "damp did not flatten the response: {damped} against {shipped}");
+        assert!(damped > 1.0, "damp inverted the response: {damped}");
+
+        // And it is bit-inert at zero: the same preset, spelled explicitly.
+        let mut zero = crate::params::PT_V12;
+        zero.crisis_blend_variance_damp = 0.0;
+        assert_eq!(injected(&zero, 0.0015).to_bits(),
+                   injected(&off, 0.0015).to_bits());
     }
 
     #[test]

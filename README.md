@@ -72,11 +72,12 @@ code. Each result carries its own caveats. See
 ## How real it is
 
 `pt.facts.measure()` scores fourteen statistics against real-market bands. The
-default preset, `pt-v12`, holds all fourteen at one year and at two years. It
+default preset, `pt-v14`, holds all fourteen at one year and at two years. It
 holds all fourteen on a roster it never saw, and thirteen on new seeds.
 
-Five of the fourteen were calibration targets, and the same bands tuned the
-model and graded it. No market data was held back.
+Five of the fourteen were calibration targets, and the bands both tuned the
+model and graded it. So this is a stated envelope, not a test against market
+data that was held back.
 
 Five limits are measured and written down:
 
@@ -103,7 +104,7 @@ Each release builds five targets, runs one fixed simulation in each, and
 compares digests. A disagreement stops the release. The crate ships its own
 `exp`, `log`, `sin` and `cos`, so the platform libm cannot change a result.
 
-`pt-v12` became the default on 2026-08-26. Name your preset and your run
+`pt-v14` became the default on 2026-08-28. Name your preset and your run
 replays exactly. Every preset from `pt-v1` on is still selectable.
 
 ```python
