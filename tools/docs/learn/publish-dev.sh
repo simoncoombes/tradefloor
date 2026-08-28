@@ -13,7 +13,7 @@
 # can be left behind on the way to production.
 #
 # The repository holds only built output. It is not a fork and it has no
-# history worth keeping, so each publish replaces the tree wholesale — which
+# history worth keeping, so each publish replaces the tree wholesale - which
 # is also what stops a file deleted from the build lingering on the site.
 
 set -euo pipefail
@@ -26,7 +26,7 @@ cd "$ROOT"
 python3 tools/docs/learn/build.py --target dev --out "$OUT"
 
 cat > "$OUT/README.md" <<'MD'
-# pretium documentation — staging
+# pretium documentation - staging
 
 Built output only. The source is in
 [simoncoombes/pretium](https://github.com/simoncoombes/pretium) under

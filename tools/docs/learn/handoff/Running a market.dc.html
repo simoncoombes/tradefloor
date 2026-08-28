@@ -248,7 +248,7 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <section id="compare" style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
 <h2 style="font-size:1.5rem">Orders move the price</h2>
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:1.5rem;align-items:center">
-<p style="color:var(--ink-2);margin:0">Orders match against a real book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.</p>
+<p style="color:var(--ink-2);margin:0">Orders match against a simulated limit order book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.</p>
 <figure style="margin:0;display:flex;flex-direction:column;gap:0.5rem">
 <sc-for list="{{ cadence }}" as="c" hint-placeholder-count="3">
 <div style="display:flex;align-items:center;gap:0.6rem">

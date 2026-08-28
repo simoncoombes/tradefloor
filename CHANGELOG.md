@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+**Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
+give each agent its own copy of the market, which is what makes the
+comparison clean. The next step is one book with several agents in it,
+competing for the same liquidity and scored under identical conditions.
+Not shipped, and the realism envelope does not cover it: certification was
+measured on a single agent.
+
 The documentation is rebuilt as a learning path. Twenty-five pages take you
 from what a limit order book is to the API reference. Every page carries one
 chart drawn from the repository's own reference data, and the caveats sit in

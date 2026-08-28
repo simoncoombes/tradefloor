@@ -8,7 +8,17 @@ web
 
 ## Users
 
-Two audiences of equal weight, confirmed by the plan owner.
+Four audiences. The first two carry equal weight and were confirmed by the
+plan owner; the third and fourth were added on 2026-08-28 when the docs
+site began naming them, so that this document and the front door agree
+about who the product is for.
+
+**LLM and tool-using agent researchers** evaluating agents that reason, call
+tools, read state and make a sequence of trading decisions. The MCP server
+is the interface they use.
+
+**Benchmark builders** who need another researcher to recreate the exact
+environment: the `RunManifest` and a `reproduce()` that refuses on mismatch.
 
 **RL and ML researchers** training agents to trade. They need an environment
 that reacts to the agent's own orders, unlimited independent episodes, and

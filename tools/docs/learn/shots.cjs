@@ -7,7 +7,7 @@
  * looks the same, because a change to the stylesheet moves both the built
  * page and the mounted page together and the comparison stays happy. This
  * is the check for work that changes how things are drawn rather than what
- * is drawn — extracting inline styles into classes, most of all, where the
+ * is drawn - extracting inline styles into classes, most of all, where the
  * whole risk is that one of several thousand declarations goes missing and
  * nothing else notices.
  *
@@ -77,7 +77,7 @@ async function shoot(port, fileUrl, view) {
     width: view.width, height: 900, deviceScaleFactor: 1, mobile: view.mobile,
   });
   /* The theme is stored per origin, and every file:// page shares one, so it
-   * is set on the document instead — the same attribute the toggle sets. */
+   * is set on the document instead - the same attribute the toggle sets. */
   await send('Page.addScriptToEvaluateOnNewDocument', {
     source: `try{localStorage.setItem('pt-learn-theme','${view.dark ? 'dark' : 'light'}')}catch(e){}`,
   });

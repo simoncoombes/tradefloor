@@ -6,7 +6,7 @@ a limit order book" to the API reference.
 **It is not the published site.** `docs/*.html` still is, and that is built by
 `tools/docs/build_site.py` from `tools/docs/design-bundle.html`. The two
 pipelines are independent and neither reads the other's files. Flipping the
-published site over to this one is an open decision — see §3.1 of
+published site over to this one is an open decision - see §3.1 of
 [ISSUES.md](ISSUES.md).
 
 ## Building it
@@ -32,7 +32,7 @@ node tools/docs/learn/shots.cjs compare /tmp/before /tmp/after
 `verify.cjs` proves the markup is the same. It cannot prove the page still
 looks the same, because a stylesheet change moves the built page and the
 mounted page together and the comparison stays happy. `shots.cjs` is the
-check for anything that changes drawing rather than content — it is what
+check for anything that changes drawing rather than content - it is what
 made extracting a thousand inline styles into classes a safe thing to try.
 It is not in CI, which would mean committing 75 screenshots as a baseline;
 run it by hand when the work warrants it.
@@ -48,8 +48,8 @@ tools/docs/learn/publish-dev.sh
 
 builds with `--target dev` and pushes to `simoncoombes/pretium-dev`, served
 at <https://simoncoombes.github.io/pretium-dev/>. Use it to look at a change
-at a real URL — on a phone, through a link unfurl, against a structured-data
-validator — before it is the documentation.
+at a real URL - on a phone, through a link unfurl, against a structured-data
+validator - before it is the documentation.
 
 Four things differ, and all four are decided by `TARGETS` in `build.py`
 rather than by the script, so none of them can be left behind on the way to
@@ -88,13 +88,13 @@ shell.py ──> masthead, search, door index, prev/next ───────�
 ```
 
 **`handoff/`** is the design handoff, vendored unchanged. Each `.dc.html` is a
-template in a small declarative dialect — dotted-path interpolation, one loop
-form, one conditional, three event attributes — plus a component class holding
+template in a small declarative dialect - dotted-path interpolation, one loop
+form, one conditional, three event attributes - plus a component class holding
 the page's data and interaction. The copy in them is final.
 
 **`site/learn-runtime.js`** implements that dialect. One parser feeds two back
 ends: an HTML string at build time, and a DOM diff in the browser. That is why
-25 pages of final copy were not transcribed into another framework's syntax —
+25 pages of final copy were not transcribed into another framework's syntax -
 the templates stay the source, and what a crawler is served and what a reader
 ends up with are produced from the same tree.
 
@@ -105,7 +105,7 @@ image pairs to CSS classes, and gives every table a scroll box.
 
 **`shell.py`** generates the masthead, the search overlay, the "All pages"
 index and the prev/next pair from the site's page order. Those are *not* taken
-from the design files, because the 25 copies in them disagree — see §1.1–1.4 of
+from the design files, because the 25 copies in them disagree - see §1.1–1.4 of
 ISSUES.md.
 
 **`data.py`** generates `pt-data.js` from `rust/goldens/*.json`,
@@ -113,8 +113,8 @@ ISSUES.md.
 vendored snapshot.
 
 **`seo.py`** writes `sitemap.xml`, `llms.txt` and `llms-full.txt`. The full
-text drops the charts and any table whose body is mostly numbers — those are
-generated from the goldens and read as a wall of digits — and keeps the
+text drops the charts and any table whose body is mostly numbers - those are
+generated from the goldens and read as a wall of digits - and keeps the
 reference tables, which are prose in a grid.
 
 **`verify.cjs`** loads every page in headless Chrome and fails on a thrown
@@ -138,7 +138,7 @@ what the repository measures.
 | a correction to a component's behaviour | `SCRIPT_FIXES` in `build.py` |
 | whether this site is the published one | `AT_SITE_ROOT` in `build.py` |
 | what a build target implies | `TARGETS` in `build.py` |
-| what the charts plot | nothing here — change the golden |
+| what the charts plot | nothing here - change the golden |
 
 Every seam that patches a design asserts. A redrawn page that no longer
 contains the text being replaced fails the build instead of silently dropping

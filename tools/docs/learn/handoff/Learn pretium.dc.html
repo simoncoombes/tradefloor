@@ -162,8 +162,8 @@ input[type=range]{accent-color:var(--accent)}
 
 <section style="padding:3.5rem 0 0;display:flex;flex-direction:column;gap:1.5rem">
 <div style="display:flex;flex-direction:column;gap:1.1rem">
-<h1 style="font-size:clamp(1.85rem,4vw,2.7rem);max-width:none;text-wrap:balance">A simulated market you and your agents can trade with</h1>
-<p style="font-size:1.1875rem;color:var(--ink-2);max-width:none;margin:0">Give it a seed and a roster of companies. It runs prices, a limit order book, fills and an economy forward, day by day. The same three inputs give the same market on every platform. Your orders match against real depth, so your trades move the price.</p>
+<h1 style="font-size:clamp(1.85rem,4vw,2.7rem);max-width:none;text-wrap:balance">A reproducible evaluation environment for financial AI agents</h1>
+<p style="font-size:1.1875rem;color:var(--ink-2);max-width:none;margin:0">Run controlled, reproducible experiments on trading agents in a market with realistic execution - not a backtest over historical prices. A deterministic market simulator with order-book execution, macro dynamics, causal ground truth and agent-native interfaces.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
 <a href="https://pypi.org/project/pretium/" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--accent-deep);text-decoration:none"><img src="./logo-python.png" alt="" width="16" height="16" style="display:{{ showLight }};flex:none"></img><img src="./logo-python-dark.png" alt="" width="16" height="16" style="display:{{ showDark }};flex:none"></img>pip install pretium</a>
 <a href="https://crates.io/crates/pretium" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;border:1px solid var(--line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--ink-2);text-decoration:none"><img src="./logo-rust.png" alt="" width="16" height="16" style="display:{{ showLight }};flex:none"></img><img src="./logo-rust-dark.png" alt="" width="16" height="16" style="display:{{ showDark }};flex:none"></img>cargo add pretium</a>
@@ -245,21 +245,85 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 </section>
 
 <section style="padding:3rem 0 0">
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1.6rem">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:1.6rem">
 <div>
-<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Three inputs define a market</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A universe of companies, a macro state for day zero, and a seed. Same three, same market, on every platform.</p>
+<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Reproducible</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A universe of companies, a macro state for day zero, and a seed. The same three inputs produce the same market on every supported platform, so a run is reproducible by anyone who has them.</p>
 </div>
 <div>
-<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">The economy runs itself</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Every close advances it. The economy updates, the cycle can turn, and the central bank acts. VIX moves most days. The policy fields step on the meeting calendar.</p>
+<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Execution-aware</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Agents trade through an order book and pay the spread, the queue and their own impact. Run the same seed without the orders and the difference is what the trading cost.</p>
 </div>
 <div>
-<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Every move is labelled</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The simulator computed each price, so it can say why. Nine factor contributions sum to the move. The residual is near 1e-16.</p>
+<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Inspectable</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The simulator computed each price, so it can say why. The nine factor contributions sum to the move - an identity, not a fitted explanation. The residual is near 1e-16.</p>
+</div>
+<div>
+<h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.25rem">Agent-native</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A Python object with an act method, a Gymnasium environment, or a model calling the simulator as a tool over MCP. The harness never asks what is inside.</p>
 </div>
 </div>
 </section>
+
+
+
+<hr style="border:0;border-top:1px solid var(--line);margin:3rem 0 0"></hr>
+
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1.4rem">
+<div style="display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">REPRODUCIBILITY</span>
+<h2 style="font-size:1.75rem">Git for market experiments</h2>
+<p style="margin:0;color:var(--ink-2);max-width:none">Not literally - there is no repository and no history. What carries over is the working practice. The market is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. Share the configuration, share the seed, re-run the experiment.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.2rem">
+<h3 style="font-size:1.0625rem;margin:0 0 0.5rem">What a RunManifest pins</h3>
+<div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">seed</span><span style="font-size:0.8125rem;color:var(--ink-2)">The integer the whole market unrolls from.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">universe</span><span style="font-size:0.8125rem;color:var(--ink-2)">Every instrument, in roster order. The order is contractual.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">macro</span><span style="font-size:0.8125rem;color:var(--ink-2)">Day-zero rates, inflation and the cycle.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">scenario</span><span style="font-size:0.8125rem;color:var(--ink-2)">The macro path driven through it, if there was one.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">strategy</span><span style="font-size:0.8125rem;color:var(--ink-2)">The StrategySpec, carried in full and cited by fingerprint.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">model</span><span style="font-size:0.8125rem;color:var(--ink-2)">The preset that priced it, by name, or custom-XXXXXXXX if modified.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">fingerprints.inputs</span><span style="font-size:0.8125rem;color:var(--ink-2)">One digest over the seed and all of the above. This is the experiment's identity.</span></div><div style="display:flex;gap:0.7rem;align-items:baseline;padding:0.35rem 0;border-top:1px solid var(--line-soft)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);flex:none;min-width:8.5rem">result.digest</span><span style="font-size:0.8125rem;color:var(--ink-2)">What the market did. Re-running the inputs has to reproduce it.</span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:0.9rem;justify-content:space-between">
+<div style="display:flex;gap:0.3rem;flex-wrap:wrap;align-items:center"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">run</span><span style="color:var(--ink-3);font-size:0.75rem">&#8594;</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">record</span><span style="color:var(--ink-3);font-size:0.75rem">&#8594;</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">reproduce</span><span style="color:var(--ink-3);font-size:0.75rem">&#8594;</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">compare</span><span style="color:var(--ink-3);font-size:0.75rem">&#8594;</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.2rem 0.45rem;white-space:nowrap">fork</span></div>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)"><code style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0 0.25rem">reproduce()</code> refuses on a mismatch rather than returning a number that looks fine. A checkpoint branches a run at a decision point, so two hypotheses share one past instead of being statistically similar.</p>
+<div style="border:1px solid var(--accent-line);background:var(--accent-soft);border-radius:6px;padding:0.9rem 1.1rem">
+<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)"><strong>Same world. Same conditions. Different agent.</strong> Two agents run against the identical market path, so a difference between them is the agent and not a different roll of the market.</p>
+</div>
+<div style="border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:0.9rem 1.1rem">
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)"><strong>Same experiment. Different hypothesis.</strong> Change one component, re-run, and attribute the difference to the change. Determinism is what makes the attribution mean anything.</p>
+</div>
+</div>
+</div>
+</section>
+
+
+<hr style="border:0;border-top:1px solid var(--line);margin:3rem 0 0"></hr>
+
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1.4rem">
+<div style="display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">GROUND TRUTH</span>
+<h2 style="font-size:1.75rem">The simulator knows why the price moved</h2>
+<p style="margin:0;color:var(--ink-2);max-width:none">Every price came out of a computation, so the move decomposes into the nine contributions that produced it and the accounting closes on the realised move. A backtest cannot do this: nobody recorded why the market did what it did, so an attribution over historical prices is a model fitted after the fact.</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1.3rem">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem">
+<h3 style="font-size:1.0625rem;margin:0 0 0.5rem">Questions it makes answerable</h3>
+<ul style="margin:0;padding-left:1.1rem;font-size:0.875rem">
+<li style="margin:0 0 0.35rem;color:var(--ink-2)">Did the agent trade on momentum, the macro state, liquidity, or noise?</li>
+<li style="margin:0 0 0.35rem;color:var(--ink-2)">Did its stated reason match the state the market was actually in?</li>
+<li style="margin:0 0 0.35rem;color:var(--ink-2)">What happens to the result when one causal channel is removed?</li>
+<li style="margin:0 0 0.35rem;color:var(--ink-2)">Did two agents reach the same P&amp;L for different reasons?</li>
+</ul>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem">
+<h3 style="font-size:1.0625rem;margin:0 0 0.5rem">What it is not</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Ground truth about this market, not about any real one. The decomposition is exact because the simulator did the arithmetic, which is also the reason it says nothing about why a real price moved.</p>
+</div>
+</div>
+</section>
+
+
+
+
+
 
 <hr style="border:0;border-top:1px solid var(--line);margin:3rem 0 0"></hr>
 
@@ -470,14 +534,14 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <section style="padding:3rem 0 0;display:flex;flex-direction:column;gap:1.4rem">
 <div style="display:flex;flex-direction:column;gap:0.5rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">STEP 04 - DRIVE IT</span>
-<h2 style="font-size:1.75rem">Three ways to drive it</h2>
-<p style="color:var(--ink-2);max-width:none;margin:0">A model can study the market from outside, or trade inside it. A policy can train against it. An algorithm you wrote can be scored on it. Cheapest first.</p>
+<h2 style="font-size:1.75rem">Three ways to use it</h2>
+<p style="color:var(--ink-2);max-width:none;margin:0">Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote. Cheapest first.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1.1rem">
 <div style="border:1px solid var(--line);border-radius:6px;padding:0.9rem;background:var(--card);display:flex;flex-direction:column;gap:0.6rem">
 <h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0">Agents over MCP</h3>
-<p style="margin:0;font-size:0.8125rem;color:var(--ink-2)">Nothing you write. Claude or another model calls the simulator as a tool and reads the answers. Eleven tools, everything composed as data.</p>
+<p style="margin:0;font-size:0.8125rem;color:var(--ink-2)">No simulator integration code. Claude or another model calls pretium through MCP, observes the market and submits trades as tool calls. Eleven tools, everything composed as data.</p>
 <pre style="margin:0.2rem 0 0;margin-top:auto;background:var(--surface);border:1px solid var(--line-soft);border-radius:5px;padding:0.7rem;font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;line-height:1.65;color:var(--ink-2);overflow-x:auto">pip install "pretium[mcp]"
 
 claude mcp add pretium \
@@ -513,8 +577,8 @@ pt.tca.analyse(Mine(), seed=42,
 <p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Hand <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">evaluate</span> a dict of ten agents and each one runs in its own copy of an identical world: same seed, same roster, same macro path. Your algorithm, a trained policy, an LLM agent and the five baselines land in one table.</p>
 <p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Then <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">rank</span> repeats that across seeds and separates them with a paired sign test. The Oracle reads the true mispricing and says so. Read it as a reference point, not a ceiling: it spends the same gross on a naive rule, and mean-reversion beats it on 5 of the 12 markets.</p>
 <div style="margin-top:0.2rem;padding-top:0.7rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3)">EACH IN ITS OWN COPY</span>
-<p style="margin:0.3rem 0 0;font-size:0.8125rem;color:var(--ink-2)">Ten agents means ten private engines, so nobody eats another agent's depth. That keeps the comparison clean. To put them in one book, build an arena.</p>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3)">SHIPPED &#183; EACH IN ITS OWN COPY</span>
+<p style="margin:0.3rem 0 0;font-size:0.8125rem;color:var(--ink-2)">Ten agents, ten identical markets. Each agent runs in its own copy of the same deterministic market, so nobody eats another agent's depth and the comparison stays clean and reproducible. A single shared market with many agents is the extension described below.</p>
 </div>
 </div>
 <pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">agents = pt.reference_agents(seed=3)
@@ -533,27 +597,33 @@ ranking = pt.rank(
 
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
 <div style="display:flex;flex-direction:column;gap:0.5rem">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">BUILD ON IT</span>
-<h2 style="font-size:1.75rem">An agent arena</h2>
-<p style="color:var(--ink-2);max-width:none;margin:0">Ten LLM agents in one order book, trading against each other, with the market maker as the house. Nothing ships that does this. Every part it needs is public, so you can build it.</p>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">COMING UP</span>
+<h2 style="font-size:1.75rem">Coming next: competitive multi-agent markets</h2>
+<div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;margin:0.2rem 0 0"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.25rem 0.6rem">single-agent evaluation</span><span style="color:var(--ink-3)">&#8594;</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">competitive agents</span><span style="color:var(--ink-3)">&#8594;</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">emergent market behaviour</span></div>
+<p style="color:var(--ink-2);max-width:none;margin:0">The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. <strong>It is not shipped.</strong> The primitives are public and composable in the meantime, and this is what building one takes.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.9rem">
-<h3 style="font-size:1.0625rem;margin:0">What you already have</h3>
-<sc-for list="{{ arenaHave }}" as="a" hint-placeholder-count="4">
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">{{ a.k }}</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">{{ a.v }}</span>
-</div>
+<h3 style="font-size:1.0625rem;margin:0">What an arena takes</h3>
+<div class="pt-scroll">
+<table style="width:100%;border-collapse:collapse;font-size:0.8125rem">
+<thead>
+<tr>
+<th style="text-align:left;font:500 0.625rem/1.3 'Spline Sans Mono',ui-monospace,monospace;letter-spacing:0.07em;color:var(--ink-3);padding:0 0.6rem 0.5rem 0;white-space:nowrap">COMPONENT</th>
+<th style="text-align:left;font:500 0.625rem/1.3 'Spline Sans Mono',ui-monospace,monospace;letter-spacing:0.07em;color:var(--ink-3);padding:0 0.6rem 0.5rem 0">PRETIUM GIVES YOU</th>
+<th style="text-align:left;font:500 0.625rem/1.3 'Spline Sans Mono',ui-monospace,monospace;letter-spacing:0.07em;color:var(--ink-3);padding:0 0 0.5rem 0">YOU WRITE</th>
+</tr>
+</thead>
+<sc-for list="{{ arenaTable }}" as="a" hint-placeholder-count="7">
+<tr>
+<td style="padding:0.5rem 0.6rem 0.5rem 0;border-top:1px solid var(--line-soft);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent);vertical-align:top;white-space:nowrap">{{ a.k }}</td>
+<td style="padding:0.5rem 0.6rem 0.5rem 0;border-top:1px solid var(--line-soft);color:var(--ink-2);vertical-align:top">{{ a.have }}</td>
+<td style="padding:0.5rem 0 0.5rem 0;border-top:1px solid var(--line-soft);color:var(--ink-2);vertical-align:top">{{ a.build }}</td>
+</tr>
 </sc-for>
-<h3 style="font-size:1.0625rem;margin:0.3rem 0 0;padding-top:0.8rem;border-top:1px solid var(--line-soft)">What you would write</h3>
-<sc-for list="{{ arenaBuild }}" as="a" hint-placeholder-count="3">
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--amber)">{{ a.k }}</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">{{ a.v }}</span>
+</table>
 </div>
-</sc-for>
 </div>
 <pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;line-height:1.75;color:var(--ink-2)"># 1. an agent is a model behind act()
 class LLMTrader:
@@ -597,7 +667,7 @@ for day in range(days):
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
 <h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">What the arena would give you</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">Agents that pay for each other's size. One agent's sweep takes the depth the next one wanted, and every fill is priced by whoever else was in the book that tick. That is a genuine multi-agent market, and the counterfactual run still works: same seed, no flow, and you can price the whole cohort's footprint.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">Agents that pay for each other's size. In a shared book agents do not only compete on returns, they compete for liquidity: one agent's sweep consumes the depth another expected to trade against, and every fill is priced by whoever else was in the book that tick. The counterfactual still works - same seed, no flow - so you can price the whole cohort's footprint.</p>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
 <h3 style="font-size:1.0625rem;margin:0">What it would not give you</h3>
@@ -609,8 +679,8 @@ for day in range(days):
 <section id="trust" style="padding:3rem 0 0;display:flex;flex-direction:column;gap:1.4rem">
 <div style="display:flex;flex-direction:column;gap:0.5rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">STEP 05 - TRUST THE RESULT</span>
-<h2 style="font-size:1.75rem">How real is it</h2>
-<p style="color:var(--ink-2);max-width:none;margin:0">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. The shipped preset lands inside all fourteen over a trading year, and there is no single score, because one number travels further than its caveats.</p>
+<h2 style="font-size:1.75rem">How closely it reproduces measured behaviour</h2>
+<p style="color:var(--ink-2);max-width:none;margin:0">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:1.6rem;align-items:stretch">
@@ -708,6 +778,21 @@ for day in range(days):
 <h3 style="font-size:1.0625rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0 0 0.4rem">One market is one sample</h3>
 <p style="margin:0;font-size:0.875rem;color:var(--ink-2)">On the twelve-market grid the docs measure, mean-reversion pools at +0.783 capture and momentum at +0.259, so mean-reversion leads by three times. Paired across the same twelve markets it wins 9 to 3, at p = 0.15. One seed picks the pooled leader eight times in twelve, and what a seed says momentum is worth runs from -0.503 to +0.909.</p>
 </div>
+</div>
+</section>
+
+<hr style="border:0;border-top:1px solid var(--line);margin:3rem 0 0"></hr>
+
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1.4rem">
+<div style="display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">WHO IT IS FOR</span>
+<h2 style="font-size:1.75rem">Built for financial AI research</h2>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:0.7rem">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.35rem"><h3 style="font-size:1.0625rem;margin:0">LLM agents</h3><p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Evaluate agents that reason, call tools, read state and make a sequence of trading decisions. The MCP server exposes the simulator as eleven tools.</p></div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.35rem"><h3 style="font-size:1.0625rem;margin:0">Reinforcement learning</h3><p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A Gymnasium environment with explicit rewards, execution costs and market state, and as many independent episodes as you want.</p></div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.35rem"><h3 style="font-size:1.0625rem;margin:0">Quant and execution</h3><p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Queue position, partial fills, honest impact, and macro scenarios to run a strategy through. Test under controlled dynamics rather than one historical path.</p></div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.35rem"><h3 style="font-size:1.0625rem;margin:0">Benchmark builders</h3><p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A manifest that names the package version, preset, seed, universe, macro, scenario and strategy, and a reproduce() that refuses on mismatch.</p></div>
 </div>
 </section>
 
@@ -817,7 +902,7 @@ class Component extends DCLogic {
 
   verdictFor(days, shape) {
     const bodies = {
-      'a|balanced': 'This is the exact roster the certification was measured on: twelve sectors, filled round-robin, forty names. All fourteen habits landed in range on thirty seeds.',
+      'a|balanced': 'This is the exact roster the certification was measured on: twelve sectors, filled round-robin, forty names. The thirty-seed median of all fourteen landed in range on it.',
       'a|sp-like': 'About a third technology, as the real index is. That shape was re-measured on the shipped preset and it keeps all fourteen over a year, so the certification is not an artifact of a tidy roster.',
       'a|tech-heavy': 'Sixty percent in one industry, and it still keeps all fourteen over a year. Concentration costs nothing at this length, which is the surprising half of the finding.',
       'b|balanced': 'Two years on an evenly spread roster keeps all fourteen, and it is the only shape that does. But the ranges it was graded against were rebuilt for that window rather than the published ones, so it is measured, not certified.',
@@ -1024,18 +1109,25 @@ class Component extends DCLogic {
       toggleBookPlay: () => this.setState(st => ({ bookPlaying: !st.bookPlaying })),
       bookPlayGlyph: this.state.bookPlaying ? '||' : '>',
       bookPlayLabel: this.state.bookPlaying ? 'Pause' : 'Play',
-      arenaHave: [
-        { k: 'act(obs) is the bridge', v: 'The harness never asks what is inside an agent. Put a model call in act and the model is a trader.' },
-        { k: 'engine.run_session', v: 'Takes an order_flow dict, so many agents can push orders into the same tick.' },
-        { k: 'Portfolio', v: 'Turns target weights into orders and reports pending_flow() for the next tick.' },
-        { k: 'one book per name', v: 'Price-time priority, so the agent that arrives first fills first.' },
-        { k: 'the counterfactual', v: 'Run the same seed with no flow at all and price what the whole cohort cost.' }
-      ],
-      arenaBuild: [
-        { k: 'the merge', v: 'Combine every agent\u0027s pending flow into one dict per tick.' },
-        { k: 'the observation', v: 'Decide what each agent sees, and how you serialise it into a prompt the model can answer.' },
-        { k: 'the model budget', v: 'One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls.' },
-        { k: 'the scoreboard', v: 'Rank the cohort yourself. pt.rank compares agents across seeds, not against each other in one book.' }
+      // One table rather than two lists. Both said useful things and both
+      // were read as a wall of repeated cards; the distinction that matters
+      // - what the library provides against what the reader writes - is
+      // clearer as two columns than as two headings.
+      arenaTable: [
+        { k: 'agent', have: 'act(obs). The harness never asks what is inside an agent.',
+          build: 'The model call behind it.' },
+        { k: 'merge', have: 'engine.run_session takes an order_flow dict, so many agents can push orders into the same tick.',
+          build: "Combining every agent's pending flow into one dict per tick." },
+        { k: 'observation', have: 'The book, the position and the truth table, every tick.',
+          build: 'What each agent sees, and how you serialise it into a prompt a model can answer.' },
+        { k: 'model budget', have: 'Nothing: this one is entirely yours.',
+          build: 'One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls.' },
+        { k: 'execution', have: 'Portfolio turns target weights into orders and reports pending_flow(). One book per name, price-time priority, so the agent that arrives first fills first.',
+          build: 'The participation cap and the order sizing.' },
+        { k: 'scoreboard', have: 'pt.rank compares agents across seeds, not against each other in one book.',
+          build: 'Ranking the cohort within the shared book.' },
+        { k: 'counterfactual', have: 'The same seed with no flow at all.',
+          build: "The comparison that prices the whole cohort's footprint." }
       ],
       factors: ['reversion', 'momentum', 'crowd_lean', 'company_news',
         'order_flow_impact', 'short_squeeze_effect', 'random_noise',
@@ -1221,7 +1313,7 @@ class Component extends DCLogic {
       opText: op.kind === 'postLimit'
         ? 'postLimit ' + op.side + ' ' + op.qty + ' @ ' + op.price
         : 'submit ' + op.side + ' ' + op.qty + (op.price ? ' limit ' + op.price : ' market'),
-      note: st.note.replace(/\u2014|\u2013/g, '-'),
+      note: st.note.replace(/-|\u2013/g, '-'),
       asks: padSide(st.asks.slice().sort((a, b) => b.p - a.p || b.seq - a.seq).map(bar), 6, true),
       bids: padSide(st.bids.slice().sort((a, b) => b.p - a.p || a.seq - b.seq).map(bar), 7, false),
       spread: st.spr == null ? '--' : st.spr.toFixed(2),
@@ -1232,9 +1324,10 @@ class Component extends DCLogic {
         : 'no fills'
     };
 
-    // Levels shown, and what the taker actually paid against the price that
-    // was on screen before the order arrived. Arithmetic on the golden's own
-    // fills, which is the honest version of a slippage number.
+    // What the taker actually paid, against the resting quote on its own side
+    // before the order arrived -- the arrival price, not the mid. Naming it
+    // matters: a slippage number means nothing without its benchmark.
+    // Arithmetic on the golden's own fills.
     const prevSt = s.bookStep > 0 ? D.book[s.bookStep - 1] : null;
     const qty = st.fills.reduce((a, f) => a + f.qty, 0);
     const avg = qty ? st.fills.reduce((a, f) => a + f.price * f.qty, 0) / qty : null;
@@ -1259,11 +1352,14 @@ class Component extends DCLogic {
     ];
     if (avg != null && arrival) {
       const bps = (op.side === 'buy' ? (avg - arrival) / arrival : (arrival - avg) / arrival) * 10000;
-      out.book.paid = 'filled ' + qty + ' at ' + avg.toFixed(4) + ' against ' + arrival.toFixed(2)
-        + ' on screen: ' + (bps >= 0 ? '+' : '') + bps.toFixed(0) + ' bps';
+      out.book.paid = qty + ' filled at a VWAP of ' + avg.toFixed(2)
+        + ' against the ' + arrival.toFixed(2)
+        + (op.side === 'buy' ? ' best offer' : ' best bid')
+        + ' resting when the order arrived: '
+        + (bps >= 0 ? '+' : '') + bps.toFixed(0) + ' bps';
       out.book.paidCol = bps > 0 ? 'var(--red)' : 'var(--accent-deep)';
     } else {
-      out.book.paid = avg != null ? 'filled ' + qty + ' at ' + avg.toFixed(4) : 'nothing traded';
+      out.book.paid = avg != null ? qty + ' filled at a VWAP of ' + avg.toFixed(2) : 'nothing traded';
       out.book.paidCol = 'var(--ink-3)';
     }
 

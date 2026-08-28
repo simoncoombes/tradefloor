@@ -11,9 +11,9 @@ https://simoncoombes.github.io/pretium/
 A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.
 ======================================================================
 
-A simulated market you and your agents can trade with
+A reproducible evaluation environment for financial AI agents
 
-Give it a seed and a roster of companies. It runs prices, a limit order book, fills and an economy forward, day by day. The same three inputs give the same market on every platform. Your orders match against real depth, so your trades move the price.
+Run controlled, reproducible experiments on trading agents in a market with realistic execution - not a backtest over historical prices. A deterministic market simulator with order-book execution, macro dynamics, causal ground truth and agent-native interfaces.
 
 pip install pretium
 cargo add pretium
@@ -43,19 +43,11 @@ index, 100 = day 0 close
 
 AMZN 99.1 
 
-VIX 14.89 
-
 GOOGL 99.6 
-
-VIX 14.89 
 
 MSFT 100.4 
 
-VIX 14.89 
-
 AAPL 96.7 
-
-VIX 14.89 
 
 NVDA 101.5 
 
@@ -81,17 +73,56 @@ MEAN MISPRICING
 RETURN SPREAD 
 4.83 pts 
 
-Three inputs define a market
+Reproducible
 
-A universe of companies, a macro state for day zero, and a seed. Same three, same market, on every platform.
+A universe of companies, a macro state for day zero, and a seed. The same three inputs produce the same market on every supported platform, so a run is reproducible by anyone who has them.
 
-The economy runs itself
+Execution-aware
 
-Every close advances it. The economy updates, the cycle can turn, and the central bank acts. VIX moves most days. The policy fields step on the meeting calendar.
+Agents trade through an order book and pay the spread, the queue and their own impact. Run the same seed without the orders and the difference is what the trading cost.
 
-Every move is labelled
+Inspectable
 
-The simulator computed each price, so it can say why. Nine factor contributions sum to the move. The residual is near 1e-16.
+The simulator computed each price, so it can say why. The nine factor contributions sum to the move - an identity, not a fitted explanation. The residual is near 1e-16.
+
+Agent-native
+
+A Python object with an act method, a Gymnasium environment, or a model calling the simulator as a tool over MCP. The harness never asks what is inside.
+
+REPRODUCIBILITY 
+Git for market experiments
+
+Not literally - there is no repository and no history. What carries over is the working practice. The market is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. Share the configuration, share the seed, re-run the experiment.
+
+What a RunManifest pins
+
+seed The integer the whole market unrolls from. universe Every instrument, in roster order. The order is contractual. macro Day-zero rates, inflation and the cycle. scenario The macro path driven through it, if there was one. strategy The StrategySpec, carried in full and cited by fingerprint. model The preset that priced it, by name, or custom-XXXXXXXX if modified. fingerprints.inputs One digest over the seed and all of the above. This is the experiment's identity. result.digest What the market did. Re-running the inputs has to reproduce it. 
+
+run → record → reproduce → compare → fork 
+reproduce() refuses on a mismatch rather than returning a number that looks fine. A checkpoint branches a run at a decision point, so two hypotheses share one past instead of being statistically similar.
+
+Same world. Same conditions. Different agent. Two agents run against the identical market path, so a difference between them is the agent and not a different roll of the market.
+
+Same experiment. Different hypothesis. Change one component, re-run, and attribute the difference to the change. Determinism is what makes the attribution mean anything.
+
+GROUND TRUTH 
+The simulator knows why the price moved
+
+Every price came out of a computation, so the move decomposes into the nine contributions that produced it and the accounting closes on the realised move. A backtest cannot do this: nobody recorded why the market did what it did, so an attribution over historical prices is a model fitted after the fact.
+
+Questions it makes answerable
+
+Did the agent trade on momentum, the macro state, liquidity, or noise?
+
+Did its stated reason match the state the market was actually in?
+
+What happens to the result when one causal channel is removed?
+
+Did two agents reach the same P&L for different reasons?
+
+What it is not
+
+Ground truth about this market, not about any real one. The decomposition is exact because the simulator did the arithmetic, which is also the reason it says nothing about why a real price moved.
 
 STEP 01 - SEE IT 
 The seed fixes every random number
@@ -261,156 +292,8 @@ Price-time priority, one book per name, no slippage formula anywhere. Step throu
 submit buy 175 market 
 step 15 of 21 
 
-spread 4.00 · mid 101.00 · last 103.00 
-
-mm 
-99.00 
-
-100 
-
-alice 
-99.00 
-
-50 
-
-carol 
-99.00 
-
-25 
-
-mm 
-98.00 
-
-110 
-
-mm 
-97.00 
-
-120 
-
-mm 
-96.00 
-
-130 
-
-mm 
-95.00 
-
-140 
-
-spread 4.00 · mid 101.00 · last 103.00 
-
-mm 
-99.00 
-
-100 
-
-alice 
-99.00 
-
-50 
-
-carol 
-99.00 
-
-25 
-
-mm 
-98.00 
-
-110 
-
-mm 
-97.00 
-
-120 
-
-mm 
-96.00 
-
-130 
-
-mm 
-95.00 
-
-140 
-
-spread 4.00 · mid 101.00 · last 103.00 
-
-mm 
-99.00 
-
-100 
-
-alice 
-99.00 
-
-50 
-
-carol 
-99.00 
-
-25 
-
-mm 
-98.00 
-
-110 
-
-mm 
-97.00 
-
-120 
-
-mm 
-96.00 
-
-130 
-
-mm 
-95.00 
-
-140 
-
 mm 
 105.00 
-
-140 
-
-spread 4.00 · mid 101.00 · last 103.00 
-
-mm 
-99.00 
-
-100 
-
-alice 
-99.00 
-
-50 
-
-carol 
-99.00 
-
-25 
-
-mm 
-98.00 
-
-110 
-
-mm 
-97.00 
-
-120 
-
-mm 
-96.00 
-
-130 
-
-mm 
-95.00 
 
 140 
 
@@ -418,43 +301,6 @@ mm
 104.00 
 
 130 
-
-spread 4.00 · mid 101.00 · last 103.00 
-
-mm 
-99.00 
-
-100 
-
-alice 
-99.00 
-
-50 
-
-carol 
-99.00 
-
-25 
-
-mm 
-98.00 
-
-110 
-
-mm 
-97.00 
-
-120 
-
-mm 
-96.00 
-
-130 
-
-mm 
-95.00 
-
-140 
 
 mm 
 103.00 
@@ -519,18 +365,18 @@ moved
 
 Fills 
 50 @ 101.00 110 @ 102.00 15 @ 103.00
-filled 175 at 101.8000 against 101.00 on screen: +79 bps
+175 filled at a VWAP of 101.80 against the 101.00 best offer resting when the order arrived: +79 bps
 
 >
 
 STEP 04 - DRIVE IT 
-Three ways to drive it
+Three ways to use it
 
-A model can study the market from outside, or trade inside it. A policy can train against it. An algorithm you wrote can be scored on it. Cheapest first.
+Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote. Cheapest first.
 
 Agents over MCP
 
-Nothing you write. Claude or another model calls the simulator as a tool and reads the answers. Eleven tools, everything composed as data.
+No simulator integration code. Claude or another model calls pretium through MCP, observes the market and submits trades as tool calls. Eleven tools, everything composed as data.
 
 pip install "pretium[mcp]"
 
@@ -567,8 +413,8 @@ Hand evaluate a dict of ten agents and each one runs in its own copy of an ident
 
 Then rank repeats that across seeds and separates them with a paired sign test. The Oracle reads the true mispricing and says so. Read it as a reference point, not a ceiling: it spends the same gross on a naive rule, and mean-reversion beats it on 5 of the 12 markets.
 
-EACH IN ITS OWN COPY 
-Ten agents means ten private engines, so nobody eats another agent's depth. That keeps the comparison clean. To put them in one book, build an arena.
+SHIPPED · EACH IN ITS OWN COPY 
+Ten agents, ten identical markets. Each agent runs in its own copy of the same deterministic market, so nobody eats another agent's depth and the comparison stays clean and reproducible. A single shared market with many agents is the extension described below.
 
 agents = pt.reference_agents(seed=3)
 agents["mine"] = Mine()
@@ -581,97 +427,45 @@ ranking = pt.rank(
  lambda: dict(agents), seeds=range(12),
  universe=u, days=10, workers=4)
 
-BUILD ON IT 
-An agent arena
+COMING UP 
+Coming next: competitive multi-agent markets
 
-Ten LLM agents in one order book, trading against each other, with the market maker as the house. Nothing ships that does this. Every part it needs is public, so you can build it.
+single-agent evaluation → competitive agents → emergent market behaviour 
+The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. It is not shipped. The primitives are public and composable in the meantime, and this is what building one takes.
 
-What you already have
+What an arena takes
 
-act(obs) is the bridge 
-The harness never asks what is inside an agent. Put a model call in act and the model is a trader. 
+COMPONENT 
+PRETIUM GIVES YOU 
+YOU WRITE 
 
-What you would write
+agent 
+act(obs). The harness never asks what is inside an agent. 
+The model call behind it. 
 
-the merge 
-Combine every agent's pending flow into one dict per tick. 
+merge 
+engine.run_session takes an order_flow dict, so many agents can push orders into the same tick. 
+Combining every agent's pending flow into one dict per tick. 
 
-the observation 
-Decide what each agent sees, and how you serialise it into a prompt the model can answer. 
+observation 
+The book, the position and the truth table, every tick. 
+What each agent sees, and how you serialise it into a prompt a model can answer. 
 
-the model budget 
+model budget 
+Nothing: this one is entirely yours. 
 One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls. 
 
-the scoreboard 
-Rank the cohort yourself. pt.rank compares agents across seeds, not against each other in one book. 
+execution 
+Portfolio turns target weights into orders and reports pending_flow(). One book per name, price-time priority, so the agent that arrives first fills first. 
+The participation cap and the order sizing. 
 
-engine.run_session 
-Takes an order_flow dict, so many agents can push orders into the same tick. 
+scoreboard 
+pt.rank compares agents across seeds, not against each other in one book. 
+Ranking the cohort within the shared book. 
 
-What you would write
-
-the merge 
-Combine every agent's pending flow into one dict per tick. 
-
-the observation 
-Decide what each agent sees, and how you serialise it into a prompt the model can answer. 
-
-the model budget 
-One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls. 
-
-the scoreboard 
-Rank the cohort yourself. pt.rank compares agents across seeds, not against each other in one book. 
-
-Portfolio 
-Turns target weights into orders and reports pending_flow() for the next tick. 
-
-What you would write
-
-the merge 
-Combine every agent's pending flow into one dict per tick. 
-
-the observation 
-Decide what each agent sees, and how you serialise it into a prompt the model can answer. 
-
-the model budget 
-One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls. 
-
-the scoreboard 
-Rank the cohort yourself. pt.rank compares agents across seeds, not against each other in one book. 
-
-one book per name 
-Price-time priority, so the agent that arrives first fills first. 
-
-What you would write
-
-the merge 
-Combine every agent's pending flow into one dict per tick. 
-
-the observation 
-Decide what each agent sees, and how you serialise it into a prompt the model can answer. 
-
-the model budget 
-One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls. 
-
-the scoreboard 
-Rank the cohort yourself. pt.rank compares agents across seeds, not against each other in one book. 
-
-the counterfactual 
-Run the same seed with no flow at all and price what the whole cohort cost. 
-
-What you would write
-
-the merge 
-Combine every agent's pending flow into one dict per tick. 
-
-the observation 
-Decide what each agent sees, and how you serialise it into a prompt the model can answer. 
-
-the model budget 
-One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls. 
-
-the scoreboard 
-Rank the cohort yourself. pt.rank compares agents across seeds, not against each other in one book. 
+counterfactual 
+The same seed with no flow at all. 
+The comparison that prices the whole cohort's footprint. 
 
 # 1. an agent is a model behind act()
 class LLMTrader:
@@ -713,16 +507,16 @@ for day in range(days):
 
 What the arena would give you
 
-Agents that pay for each other's size. One agent's sweep takes the depth the next one wanted, and every fill is priced by whoever else was in the book that tick. That is a genuine multi-agent market, and the counterfactual run still works: same seed, no flow, and you can price the whole cohort's footprint.
+Agents that pay for each other's size. In a shared book agents do not only compete on returns, they compete for liquidity: one agent's sweep consumes the depth another expected to trade against, and every fill is priced by whoever else was in the book that tick. The counterfactual still works - same seed, no flow - so you can price the whole cohort's footprint.
 
 What it would not give you
 
 A market maker that learns the cohort. The maker and the aggregate flow do not adapt, so the only strategic behaviour in the arena is the behaviour you brought. The realism envelope is also silent here: it was measured on one agent, so a cohort result sits outside what has been certified.
 
 STEP 05 - TRUST THE RESULT 
-How real is it
+How closely it reproduces measured behaviour
 
-Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. The shipped preset lands inside all fourteen over a trading year, and there is no single score, because one number travels further than its caveats.
+Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.
 
 annualised_vol_pct 
 
@@ -796,7 +590,7 @@ Shaped as the S&P
 Mostly Technology
 
 Yes. 
-This is the exact roster the certification was measured on: twelve sectors, filled round-robin, forty names. All fourteen habits landed in range on thirty seeds. 
+This is the exact roster the certification was measured on: twelve sectors, filled round-robin, forty names. The thirty-seed median of all fourteen landed in range on it. 
 
 Run a crisis through it
 
@@ -838,6 +632,25 @@ One market is one sample
 
 On the twelve-market grid the docs measure, mean-reversion pools at +0.783 capture and momentum at +0.259, so mean-reversion leads by three times. Paired across the same twelve markets it wins 9 to 3, at p = 0.15. One seed picks the pooled leader eight times in twelve, and what a seed says momentum is worth runs from -0.503 to +0.909.
 
+WHO IT IS FOR 
+Built for financial AI research
+
+LLM agents
+
+Evaluate agents that reason, call tools, read state and make a sequence of trading decisions. The MCP server exposes the simulator as eleven tools.
+
+Reinforcement learning
+
+A Gymnasium environment with explicit rewards, execution costs and market state, and as many independent episodes as you want.
+
+Quant and execution
+
+Queue position, partial fills, honest impact, and macro scenarios to run a strategy through. Test under controlled dynamics rather than one historical path.
+
+Benchmark builders
+
+A manifest that names the package version, preset, seed, universe, macro, scenario and strategy, and a reproduce() that refuses on mismatch.
+
 Start here
 
 Start
@@ -860,7 +673,7 @@ Use it
 
 > Checkpoints and forking 
 
-> Real companies from EDGAR 
+> EDGAR companies 
 
 > RL environment 
 
@@ -898,15 +711,11 @@ API
 
 > Parameters 
 
-All pages
-
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
-
 NEXT Install 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1019,13 +828,13 @@ Package version, model preset, universe fingerprint, and seed. The preset pins t
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Learn pretium NEXT Core concepts 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1136,13 +945,13 @@ The generator fills twelve sectors round-robin, so a generated roster is more ba
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Install NEXT The two loops 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1240,13 +1049,13 @@ Start Loop B
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Core concepts NEXT Running a market 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1320,19 +1129,11 @@ The order book, level by level
 
 Bars
 
-AAPL, first five days 
-
 Truth
-
-AAPL, first five days 
 
 Macro
 
-AAPL, first five days 
-
 Fills
-
-AAPL, first five days 
 
 Book
 
@@ -1342,19 +1143,15 @@ One row per name per bar. This is the table a backtest would give you, and the o
 
 Orders move the price
 
-Orders match against a real book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.
+Orders match against a simulated limit order book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.
 
 3 a day 
 
 +37.55% 
 
-pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.
-
 6 a day 
 
 +9.79% 
-
-pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.
 
 12 a day 
 
@@ -1436,13 +1233,13 @@ Orders arrive instantly, there is one book per name, and you trade against a mar
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK The two loops NEXT Agents 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1491,7 +1288,7 @@ You return target weights
 Weights in [-1, 1], one per name. The harness turns them into orders, so a policy does not learn each price range first. 
 
 The market answers back 
-Orders match against real depth. Reward is measured after the market moves, so it already carries the cost of your own footprint. 
+Orders match against the engine's own depth. Reward is measured after the market moves, so it already carries the cost of your own footprint. 
 
 The seed owns the randomness 
 Give the same agent the same seed and universe, and you get the same run. 
@@ -1596,13 +1393,13 @@ You trade against a market maker and aggregate flow. Orders arrive instantly and
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Running a market NEXT Scenarios 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1674,12 +1471,8 @@ The size is right
 VIX 
 -0.00461 vs -0.00500 
 
-OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.
-
 Credit yield 
 -8.106 vs -7.445 
-
-OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.
 
 Valuation 
 +1.226 vs +1.272 
@@ -1703,13 +1496,13 @@ Left alone, inflation peaks at 4.0% on every seed over five years. Real US CPI p
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Agents NEXT Execution cost 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1784,14 +1577,8 @@ What 175 shares cost
 50 @ 101.00 
 from bob 
 
-101.8000 
-Average fill, against 101.00 on screen when the order arrived. That is 79 basis points, paid to depth. 
-
 110 @ 102.00 
 from mm 
-
-101.8000 
-Average fill, against 101.00 on screen when the order arrived. That is 79 basis points, paid to depth. 
 
 15 @ 103.00 
 from mm 
@@ -1815,13 +1602,13 @@ VIX drives the market factor's variance, so the market prices fear of your flow.
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Scenarios NEXT Checkpoints and forking 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1865,17 +1652,17 @@ A Checkpoint records the universe fingerprint and refuses to load against a rost
 
 What restore_state cannot catch
 
-The low-level restore_state holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a ValidationError naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not — prefer branch and Checkpoint, which check that.
+The low-level restore_state holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a ValidationError naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not - prefer branch and Checkpoint, which check that.
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Execution cost NEXT Real companies from EDGAR 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -1899,7 +1686,7 @@ snap.save("edgar-2024h1.json") # the artifact, hashed and citable
 
 universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)
 
-user_agent must carry a contact address — the SEC's fair-access policy asks for one, and this library will not send a fabricated one for you.
+user_agent must carry a contact address - the SEC's fair-access policy asks for one, and this library will not send a fabricated one for you.
 
 Save the snapshot, cite that
 
@@ -1917,13 +1704,13 @@ Neither is a market-cap ranking, because EDGAR has no prices. For that, set init
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Checkpoints and forking NEXT RL environment 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -2005,13 +1792,13 @@ The model forgets a volatile period faster than a real market. The log-log slope
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Real companies from EDGAR NEXT The MCP server 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -2053,17 +1840,11 @@ The model studies the market
 It writes no code 
 Strategies, universes and scenarios arrive as data. There is no path from a tool argument to code execution. 
 
-this page 
-
 It can not move a price 
 No orders reach the book, so nothing the model asks changes the market it is asking about. 
 
-this page 
-
 It gets the caveats 
 Each result carries computed caveats and provenance, so a summary can not lose them. 
-
-this page 
 
 It is cheap to be wrong 
 check_envelope answers before you spend anything, and refuses a question the model can not support. 
@@ -2076,17 +1857,11 @@ The model trades the market
 It sends orders 
 The model reads an observation and answers with target weights at each step. 
 
-the agents page
-
 It pays for size 
-Orders match against real depth, so the reward already carries the cost of the footprint. 
-
-the agents page
+Orders match against the engine's own depth, so the reward already carries the cost of the footprint. 
 
 It needs a harness 
 Any object with an act method works. The model call sits inside that method. 
-
-the agents page
 
 It is slower and it costs 
 One model call per decision. A 20-day run at three decisions a day is 60 calls. 
@@ -2230,13 +2005,13 @@ API
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK RL environment NEXT Realism envelope 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -2275,104 +2050,65 @@ how much prices move in a year
 
 32.7604 
 
-band floor 
-band ceiling 
-
 excess_kurtosis 
 how fat the tails are 
 
 6.7001 
-
-band floor 
-band ceiling 
 
 return_acf1 
 does yesterday predict today 
 
 0.0239 
 
-band floor 
-band ceiling 
-
 abs_return_acf1 
 does a wild day follow a wild day 
 
 0.1107 
-
-band floor 
-band ceiling 
 
 abs_return_acf5 
 the same, one week apart 
 
 0.0428 
 
-band floor 
-band ceiling 
-
 abs_return_acf20 
 the same, one month apart 
 
 0.0040 
-
-band floor 
-band ceiling 
 
 cross_sectional_corr 
 how much names move together 
 
 0.3177 
 
-band floor 
-band ceiling 
-
 volume_abs_return_corr 
 do big moves come with volume 
 
 0.5599 
-
-band floor 
-band ceiling 
 
 leverage_effect 
 do falls raise volatility 
 
 -0.0401 
 
-band floor 
-band ceiling 
-
 volume_change_acf1 
 does volume mean-revert 
 
 -0.2656 
-
-band floor 
-band ceiling 
 
 corr_asymmetry 
 do names couple more when falling 
 
 -0.0147 
 
-band floor 
-band ceiling 
-
 corr_asymmetry_lagged 
 the same, one day later 
 
 0.0181 
 
-band floor 
-band ceiling 
-
 sector_excess_corr 
 do industries move together 
 
 0.2079 
-
-band floor 
-band ceiling 
 
 corr_persistence_acf1 
 does correlation stay high after a panic 
@@ -2499,13 +2235,13 @@ The strategy will earn this in a real market. The price process comes from a kno
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK The MCP server NEXT The metrics 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -2761,13 +2497,13 @@ The ceiling is held at 0.00. A top above zero would certify a reversed leverage 
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Realism envelope NEXT Principles 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -2940,13 +2676,13 @@ Every number in both claims was right. The mechanism each asserted was wrong, an
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK The metrics NEXT Citing a run 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3036,13 +2772,13 @@ The strategy earns this. A result here is a statement about a model market, and 
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Principles NEXT Glossary 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3218,7 +2954,7 @@ engine.book(ticker) returns a detached snapshot. Filling against it prices your 
 order flow impact 
 price formation 
 
-The permanent, information share of order flow into mispricing_s: 0.35 of the total impact coefficient of 50.0. The book already charges the temporary component when orders walk real depth. 
+The permanent, information share of order flow into mispricing_s: 0.35 of the total impact coefficient of 50.0. The book already charges the temporary component when orders walk the book's depth. 
 
 order log 
 the run 
@@ -3287,13 +3023,13 @@ The roster of instruments. Its order is contractual: the engine walks it in inde
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Citing a run NEXT The nine factors 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3365,13 +3101,13 @@ It decomposes the mispricing, the gap between price and fair value, not the pric
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Glossary NEXT Conventions 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3488,13 +3224,13 @@ So the preset name is necessary and not sufficient. A fully specified run also n
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK The nine factors NEXT Schemas 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3608,13 +3344,13 @@ A missing or zero noise scale. An unweighted sum is a choice, and it will not ha
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Conventions NEXT Presets 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3750,13 +3486,13 @@ The guards are settable but excluded from every calibration search, because they
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Schemas NEXT Release notes 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3806,13 +3542,13 @@ One thing got worse: driven by a real macro path, daily swings now run 1.57x as 
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Presets NEXT Core types 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -3993,13 +3729,13 @@ A rejected order: a zero, negative or NaN quantity, or a NaN price on a limit. N
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Release notes NEXT Evaluate 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -4145,13 +3881,13 @@ strategy_fingerprint is empty for a hand-built agent, because that result is rep
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Core types NEXT Parameters 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->
@@ -4275,13 +4011,13 @@ An override of a compile-time constant is refused by name. Accepting one the eng
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Evaluate 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
- anything it parses, and `` is not in it — so a loop written
+ anything it parses, and `` is not in it - so a loop written
  inside a table is foster-parented out of the table and its rows are
  left behind ungrouped. The template survives a intact because
  a script's contents are never parsed as markup. -->

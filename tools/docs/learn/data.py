@@ -3,7 +3,7 @@
 The handoff shipped `pt-data.js` as a hand-decoded snapshot and named it the
 one thing to fix in implementation: "if the goldens change, the charts
 silently lie". This is that fix. Every number the pages plot is read here
-from the file that owns it —
+from the file that owns it -
 
     rust/goldens/thirty-day-calm.json      the market player, the table
     rust/goldens/thirty-day-eventful.json  previews, the truth columns
@@ -13,7 +13,7 @@ from the file that owns it —
     docs/envelope.json                     the five gaps, the horizon
     examples/data/covid-2020-2021.json     the real 2020 macro path
 
-— so a golden that moves either moves the chart with it or fails the build.
+- so a golden that moves either moves the chart with it or fails the build.
 
 The goldens hold their floats as big-endian IEEE-754 in sixteen hex digits,
 which is what makes them exact across the TypeScript, Rust and wasm builds
@@ -50,12 +50,25 @@ def f64(hex_or_none):
     return struct.unpack(">d", bytes.fromhex(hex_or_none))[0]
 
 
+def plain(text):
+    """Typography the site does not use.
+
+    The goldens carry a step note or two written with an em dash. They are
+    parity fixtures — the same bytes have to decode identically in
+    TypeScript, Rust and wasm — so the fix belongs on the way out, next to
+    the rounding, rather than in a file whose job is to not change.
+    """
+    if text is None:
+        return None
+    return text.replace(" \u2014 ", " - ").replace("\u2014", "-")
+
+
 def r(value, places):
     """Round for display, the way the browser would have.
 
     Half-up, away from zero, because that is what `Number.prototype.toFixed`
     does and the snapshot this replaces was produced with it. Python's built
-    in `round` is half-to-even, which disagrees on an exact half — three of
+    in `round` is half-to-even, which disagrees on an exact half - three of
     the five hundred S&P closes, as it happens, which is exactly the kind of
     difference that is invisible until someone diffs two files and cannot
     explain it.
@@ -144,7 +157,7 @@ def order_book(steps: int = 22) -> list[dict]:
         result = step.get("result") or {}
         out.append({
             "i": step["step"],
-            "note": step["note"],
+            "note": plain(step["note"]),
             "op": _op(step["op"]),
             "fills": [_fill(x) for x in (result.get("fills") or [])],
             "bids": [_level(x) for x in (state.get("bids") or [])],
@@ -200,8 +213,8 @@ def envelope() -> dict:
     One source, `docs/envelope.json`, which is what `pretium.envelope`
     publishes: it already carries each statistic's measured value, the band
     it was graded against and the verdict, so reading the bands from
-    `measurements/real-panel.json` separately — as the handoff's provenance
-    table suggested — would be a second copy that could disagree with the
+    `measurements/real-panel.json` separately - as the handoff's provenance
+    table suggested - would be a second copy that could disagree with the
     first. The measurement files remain the source *of* envelope.json; this
     page quotes the published envelope, which is what a reader can check.
     """

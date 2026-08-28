@@ -15,7 +15,7 @@ Four files:
 `llms-full.txt` matters more here than it did for the old docs. The pages
 are a learning path with the caveats folded into `<details>` elements, and a
 model reading rendered HTML gets those collapsed sections as text either
-way — but it also gets the charts, the sliders and the tables, none of which
+way - but it also gets the charts, the sliders and the tables, none of which
 mean anything without the pictures. The plain-text form is the prose alone,
 in the order a reader meets it.
 """
@@ -40,7 +40,7 @@ def software_node(version: str) -> dict:
     """The package itself, described once and referred to from every page.
 
     Without it the PyPI package, the crate, the repository and this site are
-    four unrelated things to a search engine rather than one — and "pretium"
+    four unrelated things to a search engine rather than one - and "pretium"
     is Latin for price, which is a crowded name to have no disambiguation.
     """
     return {
@@ -85,7 +85,7 @@ def breadcrumb_node(page, base_url) -> dict | None:
     """Where the page sits, which is also what the masthead says.
 
     Answer engines use this to say "in Trust it" rather than guessing from
-    the URL, which carries no hierarchy here — every page is one level down.
+    the URL, which carries no hierarchy here - every page is one level down.
     """
     if not page.get("door"):
         return None
@@ -126,8 +126,8 @@ def dataset_node(envelope: dict, base_url: str) -> dict:
     It is the project's central claim and it is already published as JSON,
     so it should be findable as data rather than only as prose. Each of the
     fourteen statistics becomes a measured variable with the band it was
-    scored against, which is the part a reader — or a model answering a
-    question about it — actually needs.
+    scored against, which is the part a reader - or a model answering a
+    question about it - actually needs.
     """
     measured = []
     for key, stat in envelope["statistics"].items():
@@ -303,9 +303,11 @@ def llms(pages, doors, base_url: str, version: str, summaries: dict[str, str]) -
     for name, _short, _slug, entries in doors:
         lines.append(f"## {name}")
         lines.append("")
-        for page_name, slug in entries:
+        for entry in entries:
+            # llms.txt names the page, not the short label a nav link uses.
+            page_name, slug = entry[0], entry[1]
             summary = summaries.get(slug, "")
-            lines.append(f"- [{page_name}]({base_url}/{slug}.html): {summary}")
+            lines.append(f"- [{page_name}]({canonical(base_url, slug)}): {summary}")
         lines.append("")
     return "\n".join(lines)
 
@@ -327,8 +329,8 @@ def _table_is_data(table_html: str) -> bool:
     """Is this a preview of numbers, or a reference table?
 
     Both are tables and only one is worth reading as text. The schema,
-    parameter and glossary tables are prose in a grid — a column name and a
-    sentence saying what it holds — and a model should have them. The market
+    parameter and glossary tables are prose in a grid - a column name and a
+    sentence saying what it holds - and a model should have them. The market
     previews are thirty rows of prices generated from a golden, and as text
     they are a wall of digits that says nothing the chart around them does
     not. Counting how many cells are bare numbers separates the two without

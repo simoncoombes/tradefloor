@@ -33,7 +33,7 @@ sits in the Reference door and appears in every menu and index.
 ### 1.3 The four late pages had no navigation
 
 `The nine factors`, `Checkpoints and forking`, `Real companies from EDGAR` and
-`Release notes` shipped with a lighter header — no door menus, no search — and
+`Release notes` shipped with a lighter header - no door menus, no search - and
 were linked only by their own prev/next chain. A reader who arrived on one had
 no way to reach the other 21 except the back button. **Fixed**: all 25 pages
 now carry the same generated shell.
@@ -42,8 +42,8 @@ now carry the same generated shell.
 
 The masthead menus filed `The MCP server` under **API**. The "All pages" index
 filed it under **API** too, but the handoff's own door table and its front-door
-copy — "three ways to drive it: a model over MCP, a policy training, an
-algorithm being scored" — put it under **Use it**.
+copy - "three ways to drive it: a model over MCP, a policy training, an
+algorithm being scored" - put it under **Use it**.
 
 **Resolved as Use it**, on the handoff's reasoning rather than its markup.
 Reversing it is a one-line change in `DOORS` in `build.py`. Flagged here
@@ -51,13 +51,13 @@ because it is a judgement, not a bug fix.
 
 ### 1.5 The print stylesheet does not exist
 
-The handoff specifies it precisely — `0.5cm` page margin, `break-inside: avoid`
-on figures and tables, `print-color-adjust: exact`, `backdrop-filter: none` —
+The handoff specifies it precisely - `0.5cm` page margin, `break-inside: avoid`
+on figures and tables, `print-color-adjust: exact`, `backdrop-filter: none` -
 and **not one of the 25 design files contains an `@media print` block**. The
 spec describes a stylesheet nobody wrote.
 
 **Fixed**: written to the spec in `PRINT_CSS`, plus the two things the spec
-does not mention and printing needs — the sticky masthead unstuck, and the
+does not mention and printing needs - the sticky masthead unstuck, and the
 search and theme controls dropped, because neither works on paper.
 
 ### 1.6 A dark-system reader got the light site
@@ -85,8 +85,8 @@ choice; the per-page `applyTheme` is neutralised at build time.
 
 The mark and the Python and Rust logos ship as light/dark pairs whose
 visibility was bound to a `dark` flag inside each page's component. Two
-consequences: the wrong image is on screen until the script runs, and — once
-the shell owns the toggle — the flag never hears about a change, so the logos
+consequences: the wrong image is on screen until the script runs, and - once
+the shell owns the toggle - the flag never hears about a change, so the logos
 stop agreeing with the page around them. **Fixed**: `themeImages()` in
 `prerender.cjs` converts the pairs to `pt-light`/`pt-dark` classes, and two
 stylesheet rules do the work before the first paint.
@@ -98,7 +98,7 @@ The same page's three other players check `prefers-reduced-motion` and stay
 still; this one, written later, does not. A reader who has asked the platform
 to stop moving things gets text that types itself anyway.
 
-**Fixed** through `SCRIPT_FIXES` in `build.py`, which asserts on its anchor —
+**Fixed** through `SCRIPT_FIXES` in `build.py`, which asserts on its anchor -
 a redrawn design that no longer contains the code being patched fails the build
 rather than quietly dropping the fix.
 
@@ -111,7 +111,7 @@ Checked now, at 360, 414, 620 and 900px. **Every page scrolled sideways at
 
 - Each door's dropdown panel is positioned against its own `<details>`, so the
   panels belonging to the menus on the right of the bar started far enough
-  across that a 14rem panel ran past the screen — and it counted toward page
+  across that a 14rem panel ran past the screen - and it counted toward page
   width even closed.
 - The control rows above the charts are flex rows that never wrap. A label, a
   number and a slider is wider than a phone.
@@ -154,7 +154,7 @@ only by `verify.cjs`, which is the argument for keeping that harness.
 
 `document.createElement('polyline')` produces an `HTMLUnknownElement`. It
 accepts every attribute, reports no error and draws nothing. Any chart that was
-rebuilt rather than patched would simply have vanished — on a site whose
+rebuilt rather than patched would simply have vanished - on a site whose
 premise is that every page carries one real picture. **Fixed**: the namespace
 is threaded through `build()` and `patch()`.
 
@@ -168,7 +168,7 @@ implicit `tbody` at parse time, so both back ends and the browser agree.
 ### 2.3 The HTML parser destroyed the client-side template
 
 The template was shipped in a `<template>` element. An HTML parser applies the
-table content model to anything it parses, and `<sc-for>` is not in it — so a
+table content model to anything it parses, and `<sc-for>` is not in it - so a
 loop written inside a table was foster-parented out of the table and its rows
 left behind ungrouped. Three pages' tables were mangled. **Fixed**: the
 template ships in a raw-text `<script type="text/x-pt-template">`, whose
@@ -187,25 +187,25 @@ it, and the reveal is what the live page adds.
 
 ---
 
-## 3. Open — a decision, not a defect
+## 3. Open - a decision, not a defect
 
-### 3.1 The old site is still the published one — CLOSED
+### 3.1 The old site is still the published one - CLOSED
 
 `docs/` now holds the learning path. `tools/docs/build_site.py`, which
 produced the pages that used to live there, refuses to run without a flag
-and refuses to write to `docs/` at all — it is kept rather than deleted
+and refuses to write to `docs/` at all - it is kept rather than deleted
 because it is the record of how the previous site was made, and
 `design-bundle.html` is still the only copy of that design.
 
 Every URL the old site published still answers. Twelve redirect to the page
-that replaced them; four — `atlas`, `internals`, `interrogate`, `wasm` —
+that replaced them; four - `atlas`, `internals`, `interrogate`, `wasm` -
 were cut in the design review, say so, and send the reader to the front
 door. A page that is neither built nor redirected fails the build, so one
 cannot be dropped by forgetting it.
 
 The site also gained what the old one had and this one lacked: JSON-LD on
 every page, a social card, a web manifest, `theme-color`, and its own icons
-— traced from the design's mark, replacing the rust bar-chart glyph of the
+- traced from the design's mark, replacing the rust bar-chart glyph of the
 previous identity. The front door's canonical is the directory rather than
 `index.html`, so the two forms are not indexed as separate pages.
 
@@ -214,7 +214,7 @@ values and nothing between them. `make_icons.py` blurs it before tracing,
 which is what turns a staircase back into an edge. If the mark is ever
 redrawn at a decent resolution, that step can go.
 
-### 3.2 Nine components carried their own list of the pages — CLOSED
+### 3.2 Nine components carried their own list of the pages - CLOSED
 
 Eight built the "All pages" section from a list of page names and links held
 in the component. The builder generates that section, so those were dead.
@@ -234,7 +234,7 @@ in step by hand.
 ### 3.3 The prose figures are inventoried and sorted, not measured
 
 `python tools/docs/learn/figures.py` finds 52 figures stated in prose across
-the 25 pages. Twenty-six repeat a value that is already measured — by
+the 25 pages. Twenty-six repeat a value that is already measured - by
 `tools/remeasure/inventory.json`, or by `docs/envelope.json`, which the
 package regenerates on every release and which carries each statistic's
 measured value and both edges of its band. None contradict one.
@@ -246,18 +246,18 @@ work each needs:
 |---|---|---|
 | `measured` | 14 | a measurement group and key in `tools/remeasure` |
 | `unsorted` | 6 | reading, then one of the other three |
-| `contract` | 3 | a test, not a measurement — "passing 5.2 raises" |
+| `contract` | 3 | a test, not a measurement - "passing 5.2 raises" |
 | `example` | 3 | nothing; a value chosen to illustrate, not measured |
 
 Assigning a measurement to a claim is a judgement about which computation
 reproduces it, which is why it stops here. Two are worth reading first:
 
-- **`edgar.html`** quotes a sector mix — 27% financial services, 17%, 13%,
-  30% — as "measured on the live SEC for CY2025". Nothing re-measures it,
+- **`edgar.html`** quotes a sector mix - 27% financial services, 17%, 13%,
+  30% - as "measured on the live SEC for CY2025". Nothing re-measures it,
   and unlike the rest it depends on an external service that moves.
 - **`realism-envelope.html`** quotes the 504-day panel: annualised
   volatility at 33.89 against a band ending at 34.0. That is not the
-  certified 252-day envelope, so `docs/envelope.json` does not cover it —
+  certified 252-day envelope, so `docs/envelope.json` does not cover it -
   the 504-day panel and its re-derived bands have no published artifact at
   all, and the page's argument for stopping the horizon at one year rests
   on them.
@@ -266,28 +266,28 @@ reproduces it, which is why it stops here. Two are worth reading first:
 
 ## 4. Deliberately left
 
-### 4.1 Layout is still inline-styled — CLOSED
+### 4.1 Layout is still inline-styled - CLOSED
 
 Done in two halves, both checked by screenshotting all 25 pages at three
 viewports in both themes and comparing pixel by pixel
 (`tools/docs/learn/shots.cjs`). **75 of 75 views identical, for each half.**
 
-The shell — masthead, search overlay, door index, prev/next, repeated on
-every page — was rewritten by hand against the design, into `SHELL_CSS`.
+The shell - masthead, search overlay, door index, prev/next, repeated on
+every page - was rewritten by hand against the design, into `SHELL_CSS`.
 Every declaration is the design's, written once.
 
 The page templates were done mechanically, because rewriting the 3,729 style
 attributes in the design files by hand is a large chance to change one of
 them by accident. `prerender.cjs` counts every literal style across the
-whole site, weights the ones inside loops by eight — one attribute in a
-template is many in a rendered page — and lifts anything at or above a
+whole site, weights the ones inside loops by eight - one attribute in a
+template is many in a rendered page - and lifts anything at or above a
 weight of six into a class. 191 classes now cover 1,006 attributes.
 
 The rules are written `#pt-root .pt-sN`, not `.pt-sN`. The declarations
 being moved were inline, and an inline style outranks every selector that is
 not `!important`; the id prefix preserves that ranking, so a rule that used
-to win still wins. The blocks that are *meant* to override — print, theme,
-the narrow-screen rules — say `!important`, which also fixed a print
+to win still wins. The blocks that are *meant* to override - print, theme,
+the narrow-screen rules - say `!important`, which also fixed a print
 stylesheet that would otherwise have lost to the shell's new classes.
 
 What is left inline is a style used once or twice, which is where a class
@@ -303,27 +303,27 @@ Extracting the styles took the site's HTML from 1,679KB to 1,062KB for 27KB
 more CSS. Typical page: 48KB raw, 8KB gzipped. The front door is the outlier
 at 320KB raw, 37KB gzipped, most of it inline SVG for four charts.
 
-First load costs the shared CSS, runtime and chart data. The search index —
-the largest single file, because it holds the text of all 25 pages — is
+First load costs the shared CSS, runtime and chart data. The search index -
+the largest single file, because it holds the text of all 25 pages - is
 fetched only when someone opens search.
 
 ### 4.3 `measurements/real-panel.json` and `seed-sd-504.json` are not read
 
 The handoff's provenance table lists them as the source for the realism panel.
 `docs/envelope.json` already carries each statistic's measured value, its band
-and the verdict, and it is what `pretium.envelope` publishes — so reading the
+and the verdict, and it is what `pretium.envelope` publishes - so reading the
 measurement files separately would be a second copy that could disagree with
 the first. The measurement files remain the source *of* envelope.json.
 
 ### 4.4 Eleven pages have an h3 before their first h2
 
 The design uses `h3` for card titles, and on those pages the cards come
-before the first `h2` section heading — so the outline skips a level. It is
+before the first `h2` section heading - so the outline skips a level. It is
 a best-practice miss rather than a failure: no guideline forbids it and
 search engines parse it, but a screen reader's heading list reads oddly.
 
 Left alone deliberately. Promoting those headings changes their size, and
-the fidelity of these pages is established by comparing screenshots — the
+the fidelity of these pages is established by comparing screenshots - the
 one thing worth not spending that on is a heading level. Fixing it properly
 means deciding whether a card title is a section heading at all, which is a
 question for the design rather than the build.

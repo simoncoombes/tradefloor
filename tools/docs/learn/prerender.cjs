@@ -2,7 +2,7 @@
  *
  * Each handoff page is a template plus a component class. The class is
  * ordinary JavaScript written against a browser, so this evaluates it in a
- * vm context with just enough of a browser to get through `render()` — and
+ * vm context with just enough of a browser to get through `render()` - and
  * deliberately no further. `componentDidMount` is never called here: it
  * reads localStorage, installs document listeners and picks a theme, all of
  * which are the reader's business and none of which belong in a file served
@@ -88,7 +88,7 @@ function decode(s) {
  * Nine of the components carry their own list of every page and which door
  * it is in. Eight build the footer index from it, which the builder
  * generates now, so those copies are dead. The ninth is the front door,
- * whose "Start here" cards are *live* — and it was listing twenty-one pages
+ * whose "Start here" cards are *live* - and it was listing twenty-one pages
  * of twenty-five, and filing the MCP page under a door the handoff's own
  * copy puts it elsewhere.
  *
@@ -221,8 +221,8 @@ function applyClasses(ast, map) {
  * way the set can be consistent, so they are stripped here and the builder
  * generates them.
  *
- * What stays is the page's own matter — the breadcrumb and the content
- * sections — which is the part the design actually specifies per page.
+ * What stays is the page's own matter - the breadcrumb and the content
+ * sections - which is the part the design actually specifies per page.
  */
 function stripShell(ast) {
   const wrap = ast.find((n) => n.kind === 'el');
@@ -256,7 +256,7 @@ function stripShell(ast) {
 
   /* What comes back is the <main> alone. The wrapper the design put around
    * it only ever held the overlay, the header and main itself, and the
-   * builder now supplies the first two — so returning the wrapper as well
+   * builder now supplies the first two - so returning the wrapper as well
    * would nest one page-height container inside another. */
   return { ast: [main], removed, wrapStyle: attrRaw(wrap, 'style') };
 }
@@ -296,7 +296,7 @@ function themeImages(ast) {
  *
  * The front door prints a five-column truth table at its natural width. On
  * a 360px screen that is 366px of table in 325px of column, and because
- * nothing around it scrolls, the whole page scrolls instead — so a reader
+ * nothing around it scrolls, the whole page scrolls instead - so a reader
  * on a phone drags the masthead and the prose sideways to read one row.
  * The wrapper goes in before either back end runs, so the built markup and
  * the runtime's tree agree about it.
@@ -346,7 +346,7 @@ function headingText(section) {
 /* Enough of a browser to evaluate a render(), and no more. Every method that
  * would touch a document is a no-op returning an empty result, so a
  * component that reaches for the DOM during render gets a defined answer
- * instead of a crash — and a component that only reaches for it in a
+ * instead of a crash - and a component that only reaches for it in a
  * lifecycle hook never notices. */
 function browser(shared) {
   const noop = () => {};
@@ -363,7 +363,7 @@ function browser(shared) {
     document: doc,
     localStorage: { getItem: () => null, setItem: noop, removeItem: noop },
     /* A page served without JavaScript cannot animate, so the static
-     * markup should be the still frame — which is what the pages already
+     * markup should be the still frame - which is what the pages already
      * draw when the reader has asked for reduced motion. Answering `true`
      * here is not a lie about the reader's settings; it is the honest
      * description of a document with no script running. */
@@ -409,7 +409,7 @@ const out = { pages: [], styles: [], classes: {} };
 const seenStyle = new Set();
 
 /* Phase one: read every page and get it into the shape it will be rendered
- * in — the door list wired, the theme images classed, the tables wrapped,
+ * in - the door list wired, the theme images classed, the tables wrapped,
  * the shell lifted out. Nothing is rendered yet, because the styles have to
  * be counted across all twenty-five pages before any one of them is
  * written. */
@@ -461,7 +461,7 @@ for (const { page, piece, head, wiredDoors, themed, wrapped, stripped } of prepa
    * the field initialiser. Running it here is safe because the stub browser
    * absorbs the DOM work and returns nothing for localStorage, so the page
    * prerenders in the light theme with no listeners installed and no timers
-   * running — which is exactly the state a reader without JavaScript is in. */
+   * running - which is exactly the state a reader without JavaScript is in. */
   if (inst.componentDidMount) {
     try { inst.componentDidMount(); } catch (err) {
       process.stderr.write(`  note: ${page.src} componentDidMount: ${err.message}\n`);

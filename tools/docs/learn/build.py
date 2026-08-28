@@ -9,7 +9,7 @@ runtime, and two generated data modules.
 
 What it owns, and therefore overwrites, is everything under the output
 directory. What it reads is the handoff in `handoff/` plus the repository's
-own measurement files — never a hand-maintained copy of them.
+own measurement files - never a hand-maintained copy of them.
 
 Three things the handoff asked for happen here rather than being deferred:
 
@@ -93,8 +93,8 @@ AT_SITE_ROOT = True
 #: fetch can still be indexed as a bare URL from a link elsewhere, whereas
 #: one it fetches and finds `noindex` on is dropped. The robots.txt is there
 #: to stop well-behaved crawlers spending anything on the site at all.
-#: Carries its own leading newline, so that a live build — where it is the
-#: empty string — is byte-identical to one made before staging existed. A
+#: Carries its own leading newline, so that a live build - where it is the
+#: empty string - is byte-identical to one made before staging existed. A
 #: blank line in the head is harmless and a spurious diff across 25 pages is
 #: not: it would make the staleness check fail for a change to nothing.
 NOINDEX = ('\n<meta name="robots" content="noindex, nofollow">'
@@ -163,7 +163,7 @@ DOORS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         ("Scenarios", "scenarios"),
         ("Execution cost", "execution-cost"),
         ("Checkpoints and forking", "checkpoints"),
-        ("Real companies from EDGAR", "edgar"),
+        ("Real companies from EDGAR", "edgar", "EDGAR companies"),
         ("RL environment", "rl-environment"),
         ("The MCP server", "mcp"),
     ]),
@@ -242,8 +242,8 @@ ASSETS = [
 
 #: The front door is set a shade tighter than the rest of the site: 1.6 line
 #: height against 1.65, a 0.85rem paragraph margin against 0.9rem, 1.12
-#: heading leading against 1.15. That is deliberate — it is a long page and
-#: it is the only one a reader meets cold — so it survives the stylesheet
+#: heading leading against 1.15. That is deliberate - it is a long page and
+#: it is the only one a reader meets cold - so it survives the stylesheet
 #: merge as a body-scoped override rather than being flattened away.
 FRONT_OVERRIDES = """
 body.pt-front{line-height:1.6}
@@ -256,7 +256,7 @@ REDIRECT_PAGE = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Moved — pretium</title>
+<title>Moved - pretium</title>
 <link rel="canonical" href="{base}/{target}.html">
 <meta http-equiv="refresh" content="0; url={target}.html">
 <meta name="robots" content="noindex, follow">
@@ -322,13 +322,24 @@ def check_nothing_orphaned(out_dir: pathlib.Path, all_pages) -> None:
 
     Run against whatever `docs/` holds after the build, so a file left over
     from the previous site is either a page now, a redirect now, or a build
-    failure — never a stale document quietly still being served.
+    failure - never a stale document quietly still being served.
     """
     expected = {p["slug"] for p in all_pages} | set(REDIRECTS)
     stale = sorted(f.stem for f in out_dir.glob("*.html") if f.stem not in expected)
     if stale:
-        sys.exit("these pages are neither built nor redirected — add them to "
+        sys.exit("these pages are neither built nor redirected - add them to "
                  "REDIRECTS or delete them:\n  " + "\n  ".join(stale))
+
+
+def nav_label(entry) -> str:
+    """What a link to this page says.
+
+    A page title can be a sentence; a link in a five-column index has about
+    fifteen characters before it wraps or pushes the column out. Where the
+    two want different words the entry carries both, and the title is still
+    what the page itself is called.
+    """
+    return entry[2] if len(entry) > 2 else entry[0]
 
 
 def door_list() -> list[dict]:
@@ -340,7 +351,7 @@ def door_list() -> list[dict]:
     """
     return [
         {"title": short,
-         "links": [{"label": name, "href": f"{slug}.html"} for name, slug in entries]}
+         "links": [{"label": nav_label(e), "href": f"{e[1]}.html"} for e in entries]}
         for _name, short, _slug, entries in DOORS
     ]
 
@@ -349,8 +360,9 @@ def pages() -> list[dict]:
     """Every page, in reading order, with its door and its neighbours."""
     out = [{"name": FRONT[0], "slug": FRONT[1], "door": None, "door_slug": None}]
     for door, _short, door_slug, entries in DOORS:
-        for name, slug in entries:
-            out.append({"name": name, "slug": slug, "door": door, "door_slug": door_slug})
+        for entry in entries:
+            out.append({"name": entry[0], "slug": entry[1], "nav": nav_label(entry),
+                        "door": door, "door_slug": door_slug})
     for i, p in enumerate(out):
         p["src"] = f"{p['name']}.dc.html"
         p["prev"] = out[i - 1] if i else None
@@ -382,7 +394,7 @@ def merge_stylesheet(blocks: list[str]) -> str:
 
     The pages carry the same base sheet with per-page additions: the colour
     tokens a page actually uses, mostly. Merging by selector rather than
-    taking the first sheet is what lets every page share one file — and it
+    taking the first sheet is what lets every page share one file - and it
     asserts on a genuine conflict, because two different values for one
     token is a design decision that has to be made deliberately, not
     resolved by file order.
@@ -451,7 +463,7 @@ def _tighter(sel: str, prop: str) -> bool:
 
 #: Bindings the search overlay used to supply. If one survives in a page's
 #: template the shell and the page are both trying to own search, and the
-#: page will render an empty control rather than fail loudly — so fail here.
+#: page will render an empty control rather than fail loudly - so fail here.
 #: Corrections applied to a page's component on the way out.
 #:
 #: Each is asserted, so a redrawn design that no longer contains the text
@@ -539,7 +551,7 @@ def dead_door_table(script: str, slugs: set[str]) -> bool:
 
     Eight pages build the "All pages" section from a list of page names and
     links held in the component. The builder generates that section now, so
-    the list is dead — but it is dead data that still asserts which pages
+    the list is dead - but it is dead data that still asserts which pages
     exist, and dead data that disagrees with the site is how a stale menu
     finds its way back. Its links are rewritten so nothing can 404, and the
     build reports the pages that still need the list deleted at source.
@@ -564,7 +576,7 @@ PAGE = """<!doctype html>
 <meta property="og:image" content="{base}/og-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="pretium — a market you can run a strategy against">
+<meta property="og:image:alt" content="pretium - a market you can run a strategy against">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="{base}/og-card.png">
 <meta name="author" content="Simon Coombes">{robots_meta}
@@ -602,7 +614,7 @@ PAGE = """<!doctype html>
 
      It is a raw-text script block, not a <template> element, and that is
      not a style choice. An HTML parser applies the table content model to
-     anything it parses, and `<sc-for>` is not in it — so a loop written
+     anything it parses, and `<sc-for>` is not in it - so a loop written
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
@@ -667,7 +679,7 @@ html[data-theme="dark"] .pt-light{display:none !important}
 #:
 #: Each door's panel is absolutely positioned against its own <details>, so
 #: the panels belonging to the menus on the right of the bar start far
-#: enough across that a 14rem panel runs past the edge — and it counts
+#: enough across that a 14rem panel runs past the edge - and it counts
 #: toward the page width even closed, so every page scrolled sideways by
 #: 16px at 360px. Taking the positioning off the <details> at that size
 #: lets the panel resolve against the header instead and span it, which is
@@ -696,7 +708,7 @@ NARROW_CSS = """
 """
 
 #: The design's print block, which the handoff specifies page by page and no
-#: design file actually contains — 0.5cm margins, no page-break through a
+#: design file actually contains - 0.5cm margins, no page-break through a
 #: figure or a table, colours printed rather than dropped. The sticky
 #: masthead is unstuck and the controls that only work on screen are
 #: dropped, because a printed page cannot be searched or toggled.
@@ -722,9 +734,9 @@ PRINT_CSS = """
 def build(out_dir: pathlib.Path) -> set[str]:
     """Write the site, and report which files this builder owns.
 
-    `docs/` also holds things it does not write — the published
+    `docs/` also holds things it does not write - the published
     `envelope.json`, the markdown the measurement inventory points at, and
-    `.nojekyll` — so the staleness check has to compare what is generated
+    `.nojekyll` - so the staleness check has to compare what is generated
     rather than the directory.
     """
     owned: set[str] = set()
@@ -774,13 +786,13 @@ def build(out_dir: pathlib.Path) -> set[str]:
     for icon in ICONS:
         if (out_dir / icon).exists():
             continue
-        # Building somewhere other than the site itself — `--check` uses a
+        # Building somewhere other than the site itself - `--check` uses a
         # temporary directory. The icons are generated by a separate tool
         # because tracing the mark needs a browser and a build should not,
         # so take the committed ones; only their absence there is a fault.
         committed = ROOT / "docs" / icon
         if not committed.exists():
-            sys.exit(f"missing {committed} — run tools/docs/learn/make_icons.py")
+            sys.exit(f"missing {committed} - run tools/docs/learn/make_icons.py")
         shutil.copy(committed, out_dir / icon)
 
     by_slug = {p["slug"]: p for p in rendered["pages"]}
@@ -808,7 +820,7 @@ def build(out_dir: pathlib.Path) -> set[str]:
         for before, after in SCRIPT_FIXES.get(page["slug"], ()):
             if before not in script:
                 sys.exit(f"{page['slug']}: a SCRIPT_FIXES anchor no longer matches "
-                         f"the design — re-check the fix against the new page")
+                         f"the design - re-check the fix against the new page")
             script = script.replace(before, after, 1)
         if ".dc.html" in script:
             sys.exit(f"{page['slug']}: a link in the component survived rewriting")
@@ -820,7 +832,7 @@ def build(out_dir: pathlib.Path) -> set[str]:
         stray = SEARCH_BINDING.findall(template)
         if stray:
             sys.exit(f"{page['slug']}: template still binds search values "
-                     f"({', '.join(sorted(set(stray)))}) — the shell owns search now")
+                     f"({', '.join(sorted(set(stray)))}) - the shell owns search now")
         doc = PAGE.format(
             title=esc(r["title"]),
             description=esc(r["description"]),
@@ -835,7 +847,10 @@ def build(out_dir: pathlib.Path) -> set[str]:
             body_class="pt-front" if page["slug"] == "index" else "pt-page",
             overlay=overlay,
             masthead=shell.masthead(DOORS, page["slug"]),
-            door_index=shell.door_index(DOORS, page["slug"]),
+            # The front door carries its own five-door index under "Start
+            # here", so the generated one would be the same twenty-five
+            # links a second time, one screen further down.
+            door_index="" if page["slug"] == "index" else shell.door_index(DOORS, page["slug"]),
             prev_next=shell.prev_next(page["prev"], page["next"]),
             html=html,
             template=template,
@@ -897,7 +912,7 @@ def structured_data(page, rendered_page, version, envelope, emitted) -> str:
     Two pages carry more. The realism envelope is the project's central
     claim and is already published as JSON, so it is declared a Dataset with
     each of the fourteen statistics as a measured variable and its band as
-    the range — which is the shape a question about it actually has. The
+    the range - which is the shape a question about it actually has. The
     glossary becomes a DefinedTermSet, which is the difference between a
     model paraphrasing a definition and citing one.
     """
@@ -919,7 +934,7 @@ def structured_data(page, rendered_page, version, envelope, emitted) -> str:
         if terms:
             blocks.append(terms)
         else:
-            sys.exit("the glossary page no longer exposes its terms — "
+            sys.exit("the glossary page no longer exposes its terms - "
                      "the DefinedTermSet would silently disappear")
 
     return "\n".join(seo.ld_script(b) for b in blocks)
@@ -971,7 +986,7 @@ def write_search_index(out_dir, all_pages, by_slug) -> None:
     The handoff shipped a hand-written keyword list per page and said so:
     it finds pages, not passages. This reads the text the build just
     produced, so a phrase a reader remembers seeing is a phrase that finds
-    the page it was on — and the index cannot fall behind the prose, because
+    the page it was on - and the index cannot fall behind the prose, because
     it is made from it.
     """
     entries = []
@@ -996,7 +1011,7 @@ def system_dark(css: str) -> str:
     """Follow the system when the reader has not chosen.
 
     The design's dark palette hangs off `html[data-theme="dark"]`, and that
-    attribute is only ever set by the theme toggle — so a reader whose
+    attribute is only ever set by the theme toggle - so a reader whose
     system is dark, and who has never touched the toggle, is served the
     light site. Restating the same tokens under `prefers-color-scheme`
     gives the three states a theme needs: system by default, and an explicit
@@ -1022,8 +1037,8 @@ def extracted_classes(classes: dict[str, str]) -> str:
     being moved were inline, and an inline style outranks every selector
     that is not `!important`; the id prefix is what preserves that ranking,
     so a rule that used to win still wins and nothing needs to be re-checked
-    one page at a time. The rules that are *meant* to override — print,
-    theme, the narrow-screen block — say `!important` and are unaffected.
+    one page at a time. The rules that are *meant* to override - print,
+    theme, the narrow-screen block - say `!important` and are unaffected.
     """
     if not classes:
         return ""
@@ -1065,7 +1080,7 @@ def main() -> None:
                     stale.append(f"{name}: differs from what the sources build")
             if stale:
                 print("\n".join("  " + line for line in stale[:40]))
-                sys.exit(f"{args.out} is stale — run tools/docs/learn/build.py")
+                sys.exit(f"{args.out} is stale - run tools/docs/learn/build.py")
             print(f"{args.out} is up to date ({len(owned)} generated files)")
         return
 

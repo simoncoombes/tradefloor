@@ -1,9 +1,9 @@
-/* pretium learn — the production runtime for the documentation site.
+/* pretium learn - the production runtime for the documentation site.
  *
  * The design handoff ships each page as a `.dc.html`: a template in a small
  * declarative dialect, plus a component class holding the page's data and
- * interaction. The dialect is tiny — dotted-path interpolation, one loop
- * form, one conditional, three event attributes — so rather than transcribe
+ * interaction. The dialect is tiny - dotted-path interpolation, one loop
+ * form, one conditional, three event attributes - so rather than transcribe
  * twenty-five pages of final markup into another framework's syntax, this
  * runtime implements the dialect and the templates stay the source.
  *
@@ -102,7 +102,7 @@
 
   /* A tolerant tag-level parser. The input is machine-generated and
    * well-nested apart from the void-element quirk above, so this does not
-   * need the error recovery a general HTML parser needs — but it does need
+   * need the error recovery a general HTML parser needs - but it does need
    * to leave whitespace exactly as it found it, because `<pre>` blocks on
    * the install and API pages carry significant indentation. */
   function parse(src) {
@@ -126,10 +126,14 @@
       var attrs = parseAttrs(rest);
       var node;
       if (tag === 'sc-for') {
-        node = { kind: 'for', list: (attr(attrs, 'list') || { raw: '' }).raw,
+        /* `tag` is what the closing-tag search below matches on. Without it
+         * `</sc-for>` never pops the stack, so everything after a loop is
+         * parsed as being inside it and renders once per item. */
+        node = { kind: 'for', tag: tag, list: (attr(attrs, 'list') || { raw: '' }).raw,
                  as: (attr(attrs, 'as') || { raw: 'item' }).raw, children: [] };
       } else if (tag === 'sc-if') {
-        node = { kind: 'if', value: (attr(attrs, 'value') || { raw: '' }).raw, children: [] };
+        node = { kind: 'if', tag: tag,
+                 value: (attr(attrs, 'value') || { raw: '' }).raw, children: [] };
       } else {
         node = { kind: 'el', tag: tag, attrs: attrs.filter(function (a) { return !isHint(a.name); }), children: [] };
       }
@@ -177,7 +181,7 @@
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  /* The text of an element, bindings skipped — enough to recognise a
+  /* The text of an element, bindings skipped - enough to recognise a
    * heading, and enough to build a search index from a rendered page. */
   function textOf(node) {
     if (node.kind === 'text') {
@@ -199,7 +203,7 @@
    * A browser parsing `<table><tr>` inserts a tbody; the templates do not
    * write one. Left alone that is the difference between the tree the build
    * emits and the tree the browser holds, and the diff then tries to
-   * replace a tbody full of rows with a single row — which is how a table
+   * replace a tbody full of rows with a single row - which is how a table
    * loses most of its contents on the first frame after mount. Inserting it
    * here, once, means both back ends and the parser agree.
    */
@@ -226,8 +230,8 @@
 
   // ------------------------------------------------------------- evaluation
 
-  /* Every binding in the twenty-five pages is a plain dotted path — there is
-   * not one operator among the 386 distinct expressions — so resolution is a
+  /* Every binding in the twenty-five pages is a plain dotted path - there is
+   * not one operator among the 386 distinct expressions - so resolution is a
    * walk, with no expression evaluator to sandbox. */
   function resolve(expr, scope) {
     expr = String(expr).trim();
@@ -309,7 +313,7 @@
 
   /* Every text node is escaped here without exception, because by this point
    * template text and bound values have both been decoded to plain
-   * characters and are indistinguishable — which is the point. */
+   * characters and are indistinguishable - which is the point. */
   function toHTML(vnodes) {
     var out = '';
     for (var i = 0; i < vnodes.length; i++) {
@@ -330,8 +334,8 @@
   // -------------------------------------------------------- DOM reconciling
 
   /* A shape diff, not a keyed one. The templates render the same tree shape
-   * for a given page — a loop's length changes, but the elements around it
-   * do not move — so matching by position is enough and costs nothing. It
+   * for a given page - a loop's length changes, but the elements around it
+   * do not move - so matching by position is enough and costs nothing. It
    * earns its place over replacing the subtree for three reasons: the search
    * input keeps focus and caret while results update beneath it, an open
    * <details> menu stays open, and the market player's 200ms frames do not
@@ -390,7 +394,7 @@
 
   /* Elements inside an <svg> have to be created in the SVG namespace.
    * `document.createElement('polyline')` yields an HTMLUnknownElement, which
-   * accepts every attribute, reports no error and draws nothing — so a
+   * accepts every attribute, reports no error and draws nothing - so a
    * chart rebuilt rather than patched would simply vanish, silently, which
    * on this site means the picture the page exists to show. */
   function build(vnode, ns) {
@@ -462,8 +466,8 @@
     }
     draw();
     if (inst.componentDidMount) inst.componentDidMount();
-    /* The mount hook almost always calls setState — it is where the stored
-     * theme is read — so give the page one synchronous draw before handing
+    /* The mount hook almost always calls setState - it is where the stored
+     * theme is read - so give the page one synchronous draw before handing
      * back, and let componentDidUpdate see it. */
     if (inst.componentDidUpdate) inst.componentDidUpdate();
     return inst;

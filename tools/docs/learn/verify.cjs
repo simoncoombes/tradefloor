@@ -4,7 +4,7 @@
  *
  * A static site generator can only prove that it wrote files. This proves
  * the files work: it drives headless Chrome over the DevTools protocol,
- * opens all twenty-five pages and fails on anything a reader would meet —
+ * opens all twenty-five pages and fails on anything a reader would meet -
  * a thrown exception, a console error, a request that 404s, a binding that
  * reached the page unresolved.
  *
@@ -14,7 +14,7 @@
  * reader gets, and every other guarantee here is worth nothing.
  *
  * Chrome runs with reduced motion forced, which is what makes the check
- * deterministic — the pages honour it by not starting their players — and
+ * deterministic - the pages honour it by not starting their players - and
  * incidentally tests that path.
  */
 'use strict';
@@ -140,7 +140,7 @@ async function visit(port, fileUrl, opts) {
     } else if (m.method === 'Network.loadingFailed') {
       /* Only the site's own files. The analytics tag is fetched from
        * googletagmanager.com and there is no network here, so it fails on
-       * every page — reporting that would train whoever runs this to ignore
+       * every page - reporting that would train whoever runs this to ignore
        * the output, which is the one thing a check must not do. */
       const url = requested.get(m.params.requestId) || '';
       if (url.startsWith(origin)) {
@@ -218,8 +218,8 @@ async function visit(port, fileUrl, opts) {
 
 /* Find anything that pushes the page sideways.
  *
- * The handoff shipped the breakpoints coded but unverified — "not yet
- * checked on a physical device" — so this checks them. A page may scroll
+ * The handoff shipped the breakpoints coded but unverified - "not yet
+ * checked on a physical device" - so this checks them. A page may scroll
  * down; it must not scroll across, because a reader on a phone who has to
  * drag left and right to finish a sentence will not finish it.
  *
@@ -316,7 +316,7 @@ const PROBE = `(() => {
  *
  * Attribute values are checked too but reported rather than failed. One
  * page has a caret that blinks, drawn at `opacity:0` in the still frame the
- * build emits and `opacity:1` once it is animating — a difference between a
+ * build emits and `opacity:1` once it is animating - a difference between a
  * document at rest and the same document in motion, not a defect.
  * Attribute *order* is not compared at all: the diff appends an attribute
  * it has to add, and where an element lands in the tree decides whether it
@@ -364,8 +364,8 @@ function compare(builtHTML, mountedHTML) {
         /* A reveal that is still running has drawn a prefix of the finished
          * text. That direction is fine and is in fact the point: the built
          * page carries the whole sentence, so a crawler and a reader with
-         * no JavaScript get all of it. The other direction — text on the
-         * live page that the built page does not have — is a real fault. */
+         * no JavaScript get all of it. The other direction - text on the
+         * live page that the built page does not have - is a real fault. */
         if (xa.startsWith(xb) && xb.length < xa.length) {
           notes.push(`text still revealing at ${i}: "${xb.slice(-40)}…"`);
         } else {
