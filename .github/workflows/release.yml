@@ -249,6 +249,13 @@ jobs:
           cargo package
           V=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
           cd "target/package/pretium-${V}"
+          # `cargo package`'s verify build fetches the library's
+          # dependencies and nothing else, so the dev-dependencies the test
+          # suite needs are absent here -- the 0.4.3 release failed exactly
+          # there, on `itoa`. Fetch explicitly, then test offline: what is
+          # proven is still the package as shipped, resolved from its own
+          # manifest rather than from whatever the network says today.
+          cargo fetch
           cargo test --offline
       - uses: rust-lang/crates-io-auth-action@v1
         id: auth
