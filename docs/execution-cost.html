@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="learn.css">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Execution cost","description":"Run the same seed with and without your orders, so every fill is priced against the market where you never traded.","url":"https://simoncoombes.github.io/pretium/execution-cost.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-27"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Execution cost","description":"Run the same seed with and without your orders, so every fill is priced against the market where you never traded.","url":"https://simoncoombes.github.io/pretium/execution-cost.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"Use it"},{"@type":"ListItem","position":3,"name":"Execution cost","item":"https://simoncoombes.github.io/pretium/execution-cost.html"}]}</script>
 <script>
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
@@ -67,12 +67,12 @@ ex.shortfall_bps()   # what it cost
 ex.by_step()         # where
 ex.partial_fills()   # asked vs got</pre>
 <div class="pt-s173">
-<h3 class="pt-s3">Two runs, one seed</h3>
-<div class="pt-s4">
+<h3 class="pt-s4">Two runs, one seed</h3>
+<div class="pt-s2">
 <span class="pt-s5">The run with your orders</span>
 <span class="pt-s0">Your fills, at the prices the book gave you.</span>
 </div>
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">The run without them</span>
 <span class="pt-s0">The same seed, the same world, and no trades from you. Subtract one from the other and the difference is your footprint.</span>
 </div>
@@ -86,7 +86,7 @@ ex.partial_fills()   # asked vs got</pre>
 
 <div class="pt-s28">
 <div class="pt-s174">
-<h3 class="pt-s3">The book before the order</h3>
+<h3 class="pt-s4">The book before the order</h3>
 
 <div class="pt-s91">
 <span class="pt-s134">ask</span>
@@ -132,7 +132,7 @@ ex.partial_fills()   # asked vs got</pre>
 
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 class="pt-s3">What 175 shares cost</h3>
+<h3 class="pt-s4">What 175 shares cost</h3>
 
 <div class="pt-s100">
 <span>50 @ 101.00</span>
@@ -151,7 +151,7 @@ ex.partial_fills()   # asked vs got</pre>
 
 <div style="padding-top:0.5rem;border-top:1px solid var(--line-soft);display:flex;flex-direction:column;gap:2px">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.375rem;color:var(--red);font-variant-numeric:tabular-nums">101.8000</span>
-<span class="pt-s2">Average fill, against 101.00 on screen when the order arrived. That is 79 basis points, paid to depth.</span>
+<span class="pt-s3">Average fill, against 101.00 on screen when the order arrived. That is 79 basis points, paid to depth.</span>
 </div>
 </div>
 </div>
@@ -220,12 +220,12 @@ ex.shortfall_bps()   # what it cost
 ex.by_step()         # where
 ex.partial_fills()   # asked vs got</pre>
 <div class="pt-s173">
-<h3 class="pt-s3">Two runs, one seed</h3>
-<div class="pt-s4">
+<h3 class="pt-s4">Two runs, one seed</h3>
+<div class="pt-s2">
 <span class="pt-s5">The run with your orders</span>
 <span class="pt-s0">Your fills, at the prices the book gave you.</span>
 </div>
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">The run without them</span>
 <span class="pt-s0">The same seed, the same world, and no trades from you. Subtract one from the other and the difference is your footprint.</span>
 </div>
@@ -239,7 +239,7 @@ ex.partial_fills()   # asked vs got</pre>
 
 <div class="pt-s28">
 <div class="pt-s174">
-<h3 class="pt-s3">The book before the order</h3>
+<h3 class="pt-s4">The book before the order</h3>
 <sc-for list="{{ book }}" as="b">
 <div class="pt-s91">
 <span class="pt-s134">{{ b.side }}</span>
@@ -250,7 +250,7 @@ ex.partial_fills()   # asked vs got</pre>
 </sc-for>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 class="pt-s3">What 175 shares cost</h3>
+<h3 class="pt-s4">What 175 shares cost</h3>
 <sc-for list="{{ fills }}" as="f">
 <div class="pt-s100">
 <span>{{ f.qty }} @ {{ f.price }}</span>
@@ -259,7 +259,7 @@ ex.partial_fills()   # asked vs got</pre>
 </sc-for>
 <div style="padding-top:0.5rem;border-top:1px solid var(--line-soft);display:flex;flex-direction:column;gap:2px">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.375rem;color:var(--red);font-variant-numeric:tabular-nums">{{ avg }}</span>
-<span class="pt-s2">Average fill, against 101.00 on screen when the order arrived. That is {{ bps }} basis points, paid to depth.</span>
+<span class="pt-s3">Average fill, against 101.00 on screen when the order arrived. That is {{ bps }} basis points, paid to depth.</span>
 </div>
 </div>
 </div>

@@ -93,7 +93,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s86">
 <div class="pt-s39">
-<h3 class="pt-s3">Settable</h3>
+<h3 class="pt-s4">Settable</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--accent)">RENAMES THE PRESET</span>
 </div>
 <div class="pt-s56">
@@ -104,7 +104,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s86">
 <div class="pt-s39">
-<h3 class="pt-s3">Derived</h3>
+<h3 class="pt-s4">Derived</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--amber)">RECOMPUTED, NOT SET</span>
 </div>
 <div class="pt-s56">
@@ -115,7 +115,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s86">
 <div class="pt-s39">
-<h3 class="pt-s3">Guards</h3>
+<h3 class="pt-s4">Guards</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--amber)">SETTABLE, EXCLUDED FROM SEARCH</span>
 </div>
 <div class="pt-s56">
@@ -126,7 +126,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s86">
 <div class="pt-s39">
-<h3 class="pt-s3">Compile-time</h3>
+<h3 class="pt-s4">Compile-time</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--red)">REFUSED BY NAME</span>
 </div>
 <div class="pt-s56">
@@ -144,52 +144,52 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s80">
 <span class="pt-s5">The two variance processes</span>
-<span class="pt-s2">Per-name GJR-GARCH and the market factor's, cascade components and the slow term included.</span>
+<span class="pt-s3">Per-name GJR-GARCH and the market factor's, cascade components and the slow term included.</span>
 </div>
 
 <div class="pt-s80">
 <span class="pt-s5">The factor sigmas</span>
-<span class="pt-s2">Market and sector, plus the sector loadings and the idiosyncratic scale.</span>
+<span class="pt-s3">Market and sector, plus the sector loadings and the idiosyncratic scale.</span>
 </div>
 
 <div class="pt-s80">
 <span class="pt-s5">Size and spread effects</span>
-<span class="pt-s2">What a large order pays, and how wide the maker quotes.</span>
+<span class="pt-s3">What a large order pays, and how wide the maker quotes.</span>
 </div>
 
 <div class="pt-s80">
 <span class="pt-s5">Mispricing and crowd dynamics</span>
-<span class="pt-s2">The half-life, the herding term and the three crowd coefficients.</span>
+<span class="pt-s3">The half-life, the herding term and the three crowd coefficients.</span>
 </div>
 
 <div class="pt-s80">
 <span class="pt-s5">News and flow coefficients</span>
-<span class="pt-s2">Endogenous news and peer news among them.</span>
+<span class="pt-s3">Endogenous news and peer news among them.</span>
 </div>
 
 <div class="pt-s80">
 <span class="pt-s5">Jump sizes and intensities</span>
-<span class="pt-s2">How often a jump fires and how large it is.</span>
+<span class="pt-s3">How often a jump fires and how large it is.</span>
 </div>
 
 <div class="pt-s80">
 <span class="pt-s5">The VIX channel</span>
-<span class="pt-s2">How the fear gauge reaches the market factor's variance.</span>
+<span class="pt-s3">How the fear gauge reaches the market factor's variance.</span>
 </div>
 
 <div class="pt-s80">
 <span class="pt-s5">Crisis blend and stress</span>
-<span class="pt-s2">The crisis lever, the sector coupling and the remembered stress terms.</span>
+<span class="pt-s3">The crisis lever, the sector coupling and the remembered stress terms.</span>
 </div>
 
 <div class="pt-s80">
 <span class="pt-s5">The volume expression</span>
-<span class="pt-s2">volume_move_cap among them, the one pt-v12 moved off its compiled literal.</span>
+<span class="pt-s3">volume_move_cap among them, the one pt-v12 moved off its compiled literal.</span>
 </div>
 
 <div class="pt-s80">
 <span class="pt-s5">The guards</span>
-<span class="pt-s2">Settable, and excluded from every calibration search.</span>
+<span class="pt-s3">Settable, and excluded from every calibration search.</span>
 </div>
 
 </div>
@@ -259,7 +259,7 @@ e.model_fingerprint
 <sc-for list="{{ kinds }}" as="k">
 <div class="pt-s86">
 <div class="pt-s39">
-<h3 class="pt-s3">{{ k.head }}</h3>
+<h3 class="pt-s4">{{ k.head }}</h3>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:{{ k.tagCol }}">{{ k.tag }}</span>
 </div>
 <div class="pt-s56">
@@ -277,7 +277,7 @@ e.model_fingerprint
 <sc-for list="{{ surface }}" as="s">
 <div class="pt-s80">
 <span class="pt-s5">{{ s.k }}</span>
-<span class="pt-s2">{{ s.v }}</span>
+<span class="pt-s3">{{ s.v }}</span>
 </div>
 </sc-for>
 </div>

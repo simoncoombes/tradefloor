@@ -70,19 +70,19 @@ engine = pt.Engine(seed=42, universe=universe,
                    macro_state=macro)
 engine.run_days(252)</pre>
 <div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
-<h3 class="pt-s3">Three things define a run</h3>
+<h3 class="pt-s4">Three things define a run</h3>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">A universe</span>
 <span class="pt-s0">Which companies exist and what they are worth. Order matters, so keep it fixed.</span>
 </div>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">A macro state</span>
 <span class="pt-s0">Rates, inflation and the cycle on day zero only. Every close advances the economy from there.</span>
 </div>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">A seed</span>
 <span class="pt-s0">Every random number, in the order drawn. Same three inputs, same market, digit for digit.</span>
 </div>
@@ -399,9 +399,9 @@ engine = pt.Engine(seed=42, universe=universe,
                    macro_state=macro)
 engine.run_days(252)</pre>
 <div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
-<h3 class="pt-s3">Three things define a run</h3>
+<h3 class="pt-s4">Three things define a run</h3>
 <sc-for list="{{ inputs }}" as="i">
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">{{ i.k }}</span>
 <span class="pt-s0">{{ i.v }}</span>
 </div>

@@ -74,67 +74,67 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s43">
 <span class="pt-s6">run_days(n)</span>
-<span class="pt-s2">Runs n whole trading days: open, the session, then close. It records a day before closing it.</span>
+<span class="pt-s3">Runs n whole trading days: open, the session, then close. It records a day before closing it.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">open_market() / close_market()</span>
-<span class="pt-s2">The day boundary by hand. The close does the momentum roll, GARCH and the macro step, so it advances the chain into the next day.</span>
+<span class="pt-s3">The day boundary by hand. The close does the momentum roll, GARCH and the macro step, so it advances the chain into the next day.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">run_session(hour, minute, day_of_week, ticks, *, order_flow=None)</span>
-<span class="pt-s2">One block of ticks. order_flow is how you tell the market you traded.</span>
+<span class="pt-s3">One block of ticks. order_flow is how you tell the market you traded.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">tick(hour, minute, day_of_week, *, volatility, news, news_impacts, order_flow)</span>
-<span class="pt-s2">A single minute. Everything run_session does, one step at a time.</span>
+<span class="pt-s3">A single minute. Everything run_session does, one step at a time.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">bars(*, grain="day")</span>
-<span class="pt-s2">An Arrow stream of OHLCV. Day or tick grain.</span>
+<span class="pt-s3">An Arrow stream of OHLCV. Day or tick grain.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">truth(*, day=None)</span>
-<span class="pt-s2">An Arrow stream of the ground truth: fair value, mispricing and the nine factors.</span>
+<span class="pt-s3">An Arrow stream of the ground truth: fair value, mispricing and the nine factors.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">macro_table() / book_table()</span>
-<span class="pt-s2">The economy day by day, and the resting book level by level.</span>
+<span class="pt-s3">The economy day by day, and the resting book level by level.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">book(ticker)</span>
-<span class="pt-s2">A detached OrderBook snapshot. Reading it leaves prices() byte-identical.</span>
+<span class="pt-s3">A detached OrderBook snapshot. Reading it leaves prices() byte-identical.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">pin_macro(**fields)</span>
-<span class="pt-s2">Overrides the endogenous step for those fields once. The chain then continues from the pinned value.</span>
+<span class="pt-s3">Overrides the endogenous step for those fields once. The chain then continues from the pinned value.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">model_fingerprint</span>
-<span class="pt-s2">The preset name, or custom-7f290e34 once anything settable moves.</span>
+<span class="pt-s3">The preset name, or custom-7f290e34 once anything settable moves.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">draws_consumed</span>
-<span class="pt-s2">Total draws from the market, economy and external streams. Equal counts between two runs mean an identical noise sequence.</span>
+<span class="pt-s3">Total draws from the market, economy and external streams. Equal counts between two runs mean an identical noise sequence.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">order_log</span>
-<span class="pt-s2">Every input the engine consumed, as JSON-serialisable dicts. An unknown entry raises on replay.</span>
+<span class="pt-s3">Every input the engine consumed, as JSON-serialisable dicts. An unknown entry raises on replay.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">FACTORS</span>
-<span class="pt-s2">The nine factor names, at runtime, in the order the truth table carries them.</span>
+<span class="pt-s3">The nine factor names, at runtime, in the order the truth table carries them.</span>
 </div>
 
 </div>
@@ -155,22 +155,22 @@ Universe.from_json(text)</pre>
 
 <div class="pt-s43">
 <span class="pt-s6">fingerprint</span>
-<span class="pt-s2">A sha256 over the roster in canonical form, order included.</span>
+<span class="pt-s3">A sha256 over the roster in canonical form, order included.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">to_json()</span>
-<span class="pt-s2">Round-trips through from_json.</span>
+<span class="pt-s3">Round-trips through from_json.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">index_of(ticker)</span>
-<span class="pt-s2">The roster index, or None.</span>
+<span class="pt-s3">The roster index, or None.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">tickers</span>
-<span class="pt-s2">The roster order as a list.</span>
+<span class="pt-s3">The roster order as a list.</span>
 </div>
 
 </div>
@@ -195,27 +195,27 @@ Universe.from_json(text)</pre>
 
 <div class="pt-s43">
 <span class="pt-s6">short_interest</span>
-<span class="pt-s2">A share count, not a fraction. A value strictly between 0 and 1 is refused for a company with a real share count.</span>
+<span class="pt-s3">A share count, not a fraction. A value strictly between 0 and 1 is refused for a company with a real share count.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">eps=None</span>
-<span class="pt-s2">Marks a loss-maker. It is valued off book value and never reprices when the discount rate moves.</span>
+<span class="pt-s3">Marks a loss-maker. It is valued off book value and never reprices when the discount rate moves.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">avg_volume</span>
-<span class="pt-s2">Held fixed through a run, and what a participation cap is measured against.</span>
+<span class="pt-s3">Held fixed through a run, and what a participation cap is measured against.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">beta</span>
-<span class="pt-s2">The loading on the shared market factor.</span>
+<span class="pt-s3">The loading on the shared market factor.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">market_cap</span>
-<span class="pt-s2">Derived and read-only: price times shares outstanding.</span>
+<span class="pt-s3">Derived and read-only: price times shares outstanding.</span>
 </div>
 
 </div>
@@ -238,17 +238,17 @@ Universe.from_json(text)</pre>
 
 <div class="pt-s43">
 <span class="pt-s6">Rates are fractional</span>
-<span class="pt-s2">0.052 means 5.2 percent. Passing 5.2 raises.</span>
+<span class="pt-s3">0.052 means 5.2 percent. Passing 5.2 raises.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">corporate_bond_yield=None</span>
-<span class="pt-s2">Falls through to the policy rate plus the spread. 0.0 is a real observation and is used as given.</span>
+<span class="pt-s3">Falls through to the policy rate plus the spread. 0.0 is a real observation and is used as given.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">cycle</span>
-<span class="pt-s2">expansion, peak, contraction, trough or recovery. It lives on Macro only, never in the macro table.</span>
+<span class="pt-s3">expansion, peak, contraction, trough or recovery. It lives on Macro only, never in the macro table.</span>
 </div>
 
 </div>
@@ -270,22 +270,22 @@ book.bids / book.asks</pre>
 
 <div class="pt-s43">
 <span class="pt-s6">bids / asks</span>
-<span class="pt-s2">The resting orders, each carrying price, remaining quantity, owner and sequence.</span>
+<span class="pt-s3">The resting orders, each carrying price, remaining quantity, owner and sequence.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">sequence</span>
-<span class="pt-s2">Arrival order, which is what breaks a tie at the same price. Post behind someone and you fill behind them.</span>
+<span class="pt-s3">Arrival order, which is what breaks a tie at the same price. Post behind someone and you fill behind them.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">best_bid / best_ask</span>
-<span class="pt-s2">The touch, or None when that side is empty.</span>
+<span class="pt-s3">The touch, or None when that side is empty.</span>
 </div>
 
 <div class="pt-s43">
 <span class="pt-s6">depth_buy / depth_sell</span>
-<span class="pt-s2">Total resting size per side.</span>
+<span class="pt-s3">Total resting size per side.</span>
 </div>
 
 </div>
@@ -348,7 +348,7 @@ book.bids / book.asks</pre>
 <sc-for list="{{ ty.members }}" as="m">
 <div class="pt-s43">
 <span class="pt-s6">{{ m.k }}</span>
-<span class="pt-s2">{{ m.v }}</span>
+<span class="pt-s3">{{ m.v }}</span>
 </div>
 </sc-for>
 </div>

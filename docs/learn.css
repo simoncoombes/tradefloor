@@ -107,9 +107,9 @@ input{font-family:inherit}
 /* Lifted out of the markup by prerender.cjs. */
 #pt-root .pt-s0{font-size:0.875rem;color:var(--ink-2)}
 #pt-root .pt-s1{margin:0;font-size:0.875rem;color:var(--ink-2)}
-#pt-root .pt-s2{font-size:0.8125rem;color:var(--ink-2)}
-#pt-root .pt-s3{font-size:1.0625rem;margin:0}
-#pt-root .pt-s4{display:flex;flex-direction:column;gap:1px}
+#pt-root .pt-s2{display:flex;flex-direction:column;gap:1px}
+#pt-root .pt-s3{font-size:0.8125rem;color:var(--ink-2)}
+#pt-root .pt-s4{font-size:1.0625rem;margin:0}
 #pt-root .pt-s5{font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)}
 #pt-root .pt-s6{font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)}
 #pt-root .pt-s7{font-size:1.5rem}

@@ -68,19 +68,19 @@ obs, info = env.reset(seed=42)
 obs, reward, terminated, truncated, info = \
     env.step(action)</pre>
 <div class="pt-s173">
-<h3 class="pt-s3">Three things to know</h3>
+<h3 class="pt-s4">Three things to know</h3>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">It passes env_checker</span>
 <span class="pt-s0">Gymnasium's own conformance check, so your existing training code works without a wrapper.</span>
 </div>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">Actions are target weights</span>
 <span class="pt-s0">One weight per name, in [-1, 1]. The harness turns them into orders against the book.</span>
 </div>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">Reward includes your footprint</span>
 <span class="pt-s0">It is measured after the market moves, so the cost of your own size is already in it.</span>
 </div>
@@ -93,7 +93,7 @@ obs, reward, terminated, truncated, info = \
 <h2 class="pt-s7">Why a tape can not teach size</h2>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
 <div class="pt-s174">
-<h3 class="pt-s3">On historical data</h3>
+<h3 class="pt-s4">On historical data</h3>
 <p class="pt-s1">A policy can buy a million shares of a name that trades ten thousand a day. The tape carries on exactly as it did in 2019. What the policy learns about size is then fiction.</p>
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
@@ -110,12 +110,12 @@ obs, reward, terminated, truncated, info = \
 <div class="pt-s67">
 
 <div class="pt-s8">
-<h3 class="pt-s3">Variance is measurable</h3>
+<h3 class="pt-s4">Variance is measurable</h3>
 <p class="pt-s1">Hold the universe fixed and change the simulation seed. The spread across seeds tells you how much of a score was the market rather than the policy.</p>
 </div>
 
 <div class="pt-s8">
-<h3 class="pt-s3">A result stays checkable</h3>
+<h3 class="pt-s4">A result stays checkable</h3>
 <p class="pt-s1">Each episode is defined by package version, preset, universe fingerprint and seed. Someone else can replay the exact episode your policy trained on.</p>
 </div>
 
@@ -182,9 +182,9 @@ obs, info = env.reset(seed=42)
 obs, reward, terminated, truncated, info = \
     env.step(action)</pre>
 <div class="pt-s173">
-<h3 class="pt-s3">Three things to know</h3>
+<h3 class="pt-s4">Three things to know</h3>
 <sc-for list="{{ facts }}" as="f">
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">{{ f.k }}</span>
 <span class="pt-s0">{{ f.v }}</span>
 </div>
@@ -197,7 +197,7 @@ obs, reward, terminated, truncated, info = \
 <h2 class="pt-s7">Why a tape can not teach size</h2>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
 <div class="pt-s174">
-<h3 class="pt-s3">On historical data</h3>
+<h3 class="pt-s4">On historical data</h3>
 <p class="pt-s1">A policy can buy a million shares of a name that trades ten thousand a day. The tape carries on exactly as it did in 2019. What the policy learns about size is then fiction.</p>
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
@@ -214,7 +214,7 @@ obs, reward, terminated, truncated, info = \
 <div class="pt-s67">
 <sc-for list="{{ episodes }}" as="e">
 <div class="pt-s8">
-<h3 class="pt-s3">{{ e.head }}</h3>
+<h3 class="pt-s4">{{ e.head }}</h3>
 <p class="pt-s1">{{ e.body }}</p>
 </div>
 </sc-for>

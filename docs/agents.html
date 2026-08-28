@@ -58,22 +58,22 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <h1 class="pt-s29">Agents</h1>
 <p class="pt-s23">An agent is any object with an <span style="font-family:'Spline Sans Mono',monospace;font-size:1rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">act</span> method. The harness gives it an observation and takes back target weights.</p>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 class="pt-s3">Three kinds of agent use this page</h3>
+<h3 class="pt-s4">Three kinds of agent use this page</h3>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.9rem">
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">An execution algorithm</span>
-<span class="pt-s2">A TWAP, a VWAP, an iceberg. You write the logic in Python.</span>
+<span class="pt-s3">A TWAP, a VWAP, an iceberg. You write the logic in Python.</span>
 </div>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">A trained policy</span>
-<span class="pt-s2">A reinforcement-learning policy through the Gymnasium environment.</span>
+<span class="pt-s3">A reinforcement-learning policy through the Gymnasium environment.</span>
 </div>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">An LLM agent</span>
-<span class="pt-s2">A model that reads the observation and answers with weights at each step.</span>
+<span class="pt-s3">A model that reads the observation and answers with weights at each step.</span>
 </div>
 
 </div>
@@ -93,19 +93,19 @@ scores = pt.evaluate(
 scores["mine"].return_pct
 scores["mine"].impact_bps</pre>
 <div class="pt-s173">
-<h3 class="pt-s3">Three rules of the harness</h3>
+<h3 class="pt-s4">Three rules of the harness</h3>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">You return target weights</span>
 <span class="pt-s0">Weights in [-1, 1], one per name. The harness turns them into orders, so a policy does not learn each price range first.</span>
 </div>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">The market answers back</span>
 <span class="pt-s0">Orders match against the engine's own depth. Reward is measured after the market moves, so it already carries the cost of your own footprint.</span>
 </div>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">The seed owns the randomness</span>
 <span class="pt-s0">Give the same agent the same seed and universe, and you get the same run.</span>
 </div>
@@ -135,7 +135,7 @@ scores["mine"].impact_bps</pre>
 </div>
 </div>
 <div class="pt-s174">
-<h3 class="pt-s3">The agent never sees</h3>
+<h3 class="pt-s4">The agent never sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 
 <span class="pt-s136">the true mispricing</span>
@@ -175,7 +175,7 @@ ranking.separation("mean_reversion",
 </div>
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.9rem">
-<h3 class="pt-s3">Twelve markets, one square each</h3>
+<h3 class="pt-s4">Twelve markets, one square each</h3>
 <div style="display:flex;gap:4px">
 
 <span style="flex:1;height:34px;border-radius:3px;background:var(--accent)"></span>
@@ -216,19 +216,19 @@ ranking.separation("mean_reversion",
 <div class="pt-s85">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent);font-variant-numeric:tabular-nums">3x</span>
 <span class="pt-s55">pooled capture</span>
-<span class="pt-s2">Mean-reversion at +0.783 against momentum at +0.259, across the grid.</span>
+<span class="pt-s3">Mean-reversion at +0.783 against momentum at +0.259, across the grid.</span>
 </div>
 
 <div class="pt-s85">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--amber);font-variant-numeric:tabular-nums">0.15</span>
 <span class="pt-s55">sign-test p-value</span>
-<span class="pt-s2">A 9 to 3 split on twelve paired markets. The sign test does not call that settled.</span>
+<span class="pt-s3">A 9 to 3 split on twelve paired markets. The sign test does not call that settled.</span>
 </div>
 
 <div class="pt-s85">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--red);font-variant-numeric:tabular-nums">8 / 12</span>
 <span class="pt-s55">single-seed hit rate</span>
-<span class="pt-s2">How often one market picks the pooled leader. The other four crown momentum three times and buy-and-hold once.</span>
+<span class="pt-s3">How often one market picks the pooled leader. The other four crown momentum three times and buy-and-hold once.</span>
 </div>
 
 </div>
@@ -313,12 +313,12 @@ ranking.separation("mean_reversion",
 <h1 class="pt-s29">Agents</h1>
 <p class="pt-s23">An agent is any object with an <span style="font-family:'Spline Sans Mono',monospace;font-size:1rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">act</span> method. The harness gives it an observation and takes back target weights.</p>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 class="pt-s3">Three kinds of agent use this page</h3>
+<h3 class="pt-s4">Three kinds of agent use this page</h3>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.9rem">
 <sc-for list="{{ kinds }}" as="k">
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">{{ k.k }}</span>
-<span class="pt-s2">{{ k.v }}</span>
+<span class="pt-s3">{{ k.v }}</span>
 </div>
 </sc-for>
 </div>
@@ -338,9 +338,9 @@ scores = pt.evaluate(
 scores["mine"].return_pct
 scores["mine"].impact_bps</pre>
 <div class="pt-s173">
-<h3 class="pt-s3">Three rules of the harness</h3>
+<h3 class="pt-s4">Three rules of the harness</h3>
 <sc-for list="{{ rules }}" as="r">
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">{{ r.k }}</span>
 <span class="pt-s0">{{ r.v }}</span>
 </div>
@@ -362,7 +362,7 @@ scores["mine"].impact_bps</pre>
 </div>
 </div>
 <div class="pt-s174">
-<h3 class="pt-s3">The agent never sees</h3>
+<h3 class="pt-s4">The agent never sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 <sc-for list="{{ hidden }}" as="s">
 <span class="pt-s136">{{ s }}</span>
@@ -396,7 +396,7 @@ ranking.separation("mean_reversion",
 </div>
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.9rem">
-<h3 class="pt-s3">Twelve markets, one square each</h3>
+<h3 class="pt-s4">Twelve markets, one square each</h3>
 <div style="display:flex;gap:4px">
 <sc-for list="{{ tally }}" as="t">
 <span style="flex:1;height:34px;border-radius:3px;background:{{ t.col }}"></span>
@@ -415,7 +415,7 @@ ranking.separation("mean_reversion",
 <div class="pt-s85">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:{{ r.col }};font-variant-numeric:tabular-nums">{{ r.n }}</span>
 <span class="pt-s55">{{ r.k }}</span>
-<span class="pt-s2">{{ r.v }}</span>
+<span class="pt-s3">{{ r.v }}</span>
 </div>
 </sc-for>
 </div>

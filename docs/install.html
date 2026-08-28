@@ -80,19 +80,19 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 python -c "import pretium as pt; \
   print(pt.__version__)"</pre>
 <div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
-<h3 class="pt-s3">From PyPI</h3>
+<h3 class="pt-s4">From PyPI</h3>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">No dependencies</span>
 <span class="pt-s0">The core package pulls nothing in. Read results into polars, pandas, pyarrow or duckdb if you want them.</span>
 </div>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">CPython 3.11 and up</span>
 <span class="pt-s0">Prebuilt wheels for Linux x86_64 and aarch64, macOS arm64 and x86_64, and Windows x86_64.</span>
 </div>
 
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">Rust core</span>
 <span class="pt-s0">The engine is compiled. Nothing here is a Python loop over ticks.</span>
 </div>
@@ -108,17 +108,17 @@ python -c "import pretium as pt; \
 <div class="pt-s67">
 
 <div class="pt-s8">
-<h3 class="pt-s3">A trajectory change is a breaking change</h3>
+<h3 class="pt-s4">A trajectory change is a breaking change</h3>
 <p class="pt-s1">Whatever its size. A market that runs differently from the same seed invalidates every published result that cited it.</p>
 </div>
 
 <div class="pt-s8">
-<h3 class="pt-s3">Old presets never move</h3>
+<h3 class="pt-s4">Old presets never move</h3>
 <p class="pt-s1">Every preset from pt-v1 onward stays selectable and reproduces bit for bit, so an old result replays under its own name.</p>
 </div>
 
 <div class="pt-s8">
-<h3 class="pt-s3">A citation names software, not a run</h3>
+<h3 class="pt-s4">A citation names software, not a run</h3>
 <p class="pt-s1">A RunManifest names the run: package version, preset, seed, universe fingerprint, macro conditions, scenario and strategy.</p>
 </div>
 
@@ -276,9 +276,9 @@ python -c "import pretium as pt; \
 <div class="pt-s28">
 <pre class="pt-s30">{{ install.code }}</pre>
 <div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
-<h3 class="pt-s3">{{ install.title }}</h3>
+<h3 class="pt-s4">{{ install.title }}</h3>
 <sc-for list="{{ install.facts }}" as="f">
-<div class="pt-s4">
+<div class="pt-s2">
 <span class="pt-s5">{{ f.k }}</span>
 <span class="pt-s0">{{ f.v }}</span>
 </div>
@@ -294,7 +294,7 @@ python -c "import pretium as pt; \
 <div class="pt-s67">
 <sc-for list="{{ promises }}" as="p">
 <div class="pt-s8">
-<h3 class="pt-s3">{{ p.head }}</h3>
+<h3 class="pt-s4">{{ p.head }}</h3>
 <p class="pt-s1">{{ p.body }}</p>
 </div>
 </sc-for>

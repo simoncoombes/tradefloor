@@ -68,7 +68,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s87">
 <div class="pt-s94">
-<h3 class="pt-s3">Rates are fractional</h3>
+<h3 class="pt-s4">Rates are fractional</h3>
 <div class="pt-s63">
 <span class="pt-s142">0.052</span>
 <span class="pt-s59">not</span>
@@ -80,7 +80,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s87">
 <div class="pt-s94">
-<h3 class="pt-s3">Absence differs from zero</h3>
+<h3 class="pt-s4">Absence differs from zero</h3>
 <div class="pt-s63">
 <span class="pt-s142">None</span>
 <span class="pt-s59">not</span>
@@ -92,7 +92,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s87">
 <div class="pt-s94">
-<h3 class="pt-s3">Negative EPS is legal</h3>
+<h3 class="pt-s4">Negative EPS is legal</h3>
 <div class="pt-s63">
 <span class="pt-s142">eps=-1.20</span>
 <span class="pt-s59">not</span>
@@ -104,7 +104,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s87">
 <div class="pt-s94">
-<h3 class="pt-s3">Short interest is a share count</h3>
+<h3 class="pt-s4">Short interest is a share count</h3>
 <div class="pt-s63">
 <span class="pt-s142">3_000_000</span>
 <span class="pt-s59">not</span>
@@ -116,7 +116,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s87">
 <div class="pt-s94">
-<h3 class="pt-s3">Roster order is contractual</h3>
+<h3 class="pt-s4">Roster order is contractual</h3>
 <div class="pt-s63">
 <span class="pt-s142">universe.fingerprint</span>
 <span class="pt-s59">not</span>
@@ -128,7 +128,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s87">
 <div class="pt-s94">
-<h3 class="pt-s3">Coefficients ship as a preset</h3>
+<h3 class="pt-s4">Coefficients ship as a preset</h3>
 <div class="pt-s63">
 <span class="pt-s142">model="pt-v12"</span>
 <span class="pt-s59">not</span>
@@ -140,7 +140,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s87">
 <div class="pt-s94">
-<h3 class="pt-s3">Every numeric column is f64</h3>
+<h3 class="pt-s4">Every numeric column is f64</h3>
 <div class="pt-s63">
 <span class="pt-s142">float64</span>
 <span class="pt-s59">not</span>
@@ -157,12 +157,12 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p class="pt-s13">This is the convention that bites hardest, because the mistake would otherwise be silent. The squeeze rule divides short interest by the float, so 3% of a hundred million shares is 3,000,000.</p>
 <div class="pt-s28">
 <div class="pt-s178">
-<h3 class="pt-s3">Why 0.03 raises</h3>
+<h3 class="pt-s4">Why 0.03 raises</h3>
 <p class="pt-s1">Three hundredths of one share against a real float is a squeeze ratio of 3e-10, and a squeeze that can never fire. So a value strictly between 0 and 1 raises for a company with a real share count.</p>
 <p class="pt-s1">Zero is legal. It means no short interest, which is a real observation.</p>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 class="pt-s3">What the generator draws</h3>
+<h3 class="pt-s4">What the generator draws</h3>
 <p class="pt-s1">Log-uniform between 0.4% and 30% of shares outstanding, so the median is the geometric mean of those bounds.</p>
 <div class="pt-s56">
 
@@ -195,7 +195,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p class="pt-s53">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms. Eight numbers, and every one of them live.</p>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 class="pt-s3">Live, and absent from it</h3>
+<h3 class="pt-s4">Live, and absent from it</h3>
 <p class="pt-s1">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. None of them appear, and nothing forces a preset name to change when one of them moves.</p>
 <p class="pt-s177">So the preset name is necessary and not sufficient. A fully specified run also names the package version, which pins the implementation.</p>
 </div>
@@ -239,7 +239,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <sc-for list="{{ rules }}" as="r">
 <div class="pt-s87">
 <div class="pt-s94">
-<h3 class="pt-s3">{{ r.head }}</h3>
+<h3 class="pt-s4">{{ r.head }}</h3>
 <div class="pt-s63">
 <span class="pt-s142">{{ r.good }}</span>
 <span class="pt-s59">not</span>
@@ -256,12 +256,12 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p class="pt-s13">This is the convention that bites hardest, because the mistake would otherwise be silent. The squeeze rule divides short interest by the float, so 3% of a hundred million shares is 3,000,000.</p>
 <div class="pt-s28">
 <div class="pt-s178">
-<h3 class="pt-s3">Why 0.03 raises</h3>
+<h3 class="pt-s4">Why 0.03 raises</h3>
 <p class="pt-s1">Three hundredths of one share against a real float is a squeeze ratio of 3e-10, and a squeeze that can never fire. So a value strictly between 0 and 1 raises for a company with a real share count.</p>
 <p class="pt-s1">Zero is legal. It means no short interest, which is a real observation.</p>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 class="pt-s3">What the generator draws</h3>
+<h3 class="pt-s4">What the generator draws</h3>
 <p class="pt-s1">Log-uniform between 0.4% and 30% of shares outstanding, so the median is the geometric mean of those bounds.</p>
 <div class="pt-s56">
 <sc-for list="{{ shortStats }}" as="s">
@@ -284,7 +284,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p class="pt-s53">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms. Eight numbers, and every one of them live.</p>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 class="pt-s3">Live, and absent from it</h3>
+<h3 class="pt-s4">Live, and absent from it</h3>
 <p class="pt-s1">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. None of them appear, and nothing forces a preset name to change when one of them moves.</p>
 <p class="pt-s177">So the preset name is necessary and not sufficient. A fully specified run also names the package version, which pins the implementation.</p>
 </div>
