@@ -115,6 +115,20 @@ body.pt-front h1,body.pt-front h2,body.pt-front h3{line-height:1.12}
 """
 
 
+def door_list() -> list[dict]:
+    """The one door list, in the shape the front door's cards expect.
+
+    Handed to every component as a prop so that no page keeps its own copy
+    of which pages exist. A page added to `DOORS` above appears in the front
+    door's "Start here" cards as well as in the menus and the index.
+    """
+    return [
+        {"title": short,
+         "links": [{"label": name, "href": f"{slug}.html"} for name, slug in entries]}
+        for _name, short, _slug, entries in DOORS
+    ]
+
+
 def pages() -> list[dict]:
     """Every page, in reading order, with its door and its neighbours."""
     out = [{"name": FRONT[0], "slug": FRONT[1], "door": None, "door_slug": None}]
@@ -475,6 +489,7 @@ def build(out_dir: pathlib.Path) -> None:
     manifest = {
         "base": str(HANDOFF),
         "data": ["pt-data.js", "pt-search.js"],
+        "doors": door_list(),
         "pages": [{"src": p["src"], "slug": p["slug"]} for p in all_pages],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
@@ -509,6 +524,8 @@ def build(out_dir: pathlib.Path) -> None:
     carrying: list[str] = []
     emitted: dict[str, str] = {}
 
+
+
     for page in all_pages:
         r = by_slug[page["slug"]]
         html = rewrite_links(r["html"], slug_of)
@@ -525,7 +542,7 @@ def build(out_dir: pathlib.Path) -> None:
             script = script.replace(before, after, 1)
         if ".dc.html" in script:
             sys.exit(f"{page['slug']}: a link in the component survived rewriting")
-        if dead_door_table(script, all_slugs):
+        if r.get("doorsWired"):
             carrying.append(page["slug"])
         # A raw-text script ends at the first `</script`, wherever it is.
         if "</script" in template.lower():
@@ -549,7 +566,7 @@ def build(out_dir: pathlib.Path) -> None:
             html=html,
             template=template,
             script=script,
-            props=json.dumps(r["props"]),
+            props=json.dumps({**r["props"], "doors": door_list()}),
         )
         (out_dir / f"{page['slug']}.html").write_text(doc, encoding="utf-8")
         emitted[page["slug"]] = doc
@@ -560,8 +577,7 @@ def build(out_dir: pathlib.Path) -> None:
 
     print(f"built {len(all_pages)} pages into {out_dir}")
     if carrying:
-        print(f"  note: {len(carrying)} components still carry a dead door table "
-              f"({', '.join(carrying)}) — see ISSUES.md")
+        print(f"  doors: {len(carrying)} components rewired to the site's page list")
 
 
 def write_data(out_dir: pathlib.Path) -> None:

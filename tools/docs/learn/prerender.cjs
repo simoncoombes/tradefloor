@@ -81,6 +81,71 @@ function decode(s) {
           .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d));
 }
 
+// ---------------------------------------------------------------- door list
+
+/* Point a component's door list at the site's, instead of its own copy.
+ *
+ * Nine of the components carry their own list of every page and which door
+ * it is in. Eight build the footer index from it, which the builder
+ * generates now, so those copies are dead. The ninth is the front door,
+ * whose "Start here" cards are *live* — and it was listing twenty-one pages
+ * of twenty-five, and filing the MCP page under a door the handoff's own
+ * copy puts it elsewhere.
+ *
+ * Deleting the dead eight and rewriting the ninth would be two changes with
+ * two failure modes. Handing all nine the same list is one, and leaves
+ * nothing behind that can disagree with the site.
+ *
+ * This runs before the component is evaluated, so the static markup and the
+ * markup the runtime draws come from the same list.
+ */
+function wireDoors(script, slug) {
+  let changed = false;
+
+  const iife = script.indexOf('doors: (function () {');
+  if (iife >= 0) {
+    const open = script.indexOf('(', iife + 'doors:'.length);
+    let end = balanced(script, open, '(', ')');
+    // The function expression is immediately called: skip its `()` too.
+    while (end < script.length && /[\s(]/.test(script[end])) {
+      if (script[end] === '(') end = balanced(script, end, '(', ')');
+      else end++;
+    }
+    script = script.slice(0, iife) + 'doors: this.props.doors' + script.slice(end);
+    changed = true;
+  }
+
+  const field = script.indexOf('DOORS = [');
+  if (field >= 0) {
+    const end = balanced(script, script.indexOf('[', field), '[', ']');
+    script = script.slice(0, field) +
+      'DOORS = (this.props.doors || []).map(' +
+      '(d) => [d.title, d.links.map((l) => [l.label, l.href])])' +
+      script.slice(end);
+    changed = true;
+  }
+
+  if (!changed && /\bDOORS\b|doors:\s*\(/.test(script)) {
+    throw new Error(`${slug}: a door list is present in a shape wireDoors does not know`);
+  }
+  return { script, changed };
+}
+
+/* Index just past the bracketed expression beginning at `start`. A count
+ * rather than a regular expression, because the blocks being replaced hold
+ * both kinds of bracket and a nested function. */
+function balanced(text, start, open, close) {
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === open) depth++;
+    else if (text[i] === close) {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  throw new Error('unbalanced expression');
+}
+
 // ------------------------------------------------------------- shell removal
 
 /* Lift the shell out of a page and return what is left.
@@ -285,6 +350,11 @@ for (const page of manifest.pages) {
   const piece = split(src);
   const head = headBits(piece.helmet);
 
+  const wiredDoors = wireDoors(piece.script, page.src);
+  piece.script = wiredDoors.script;
+  // The door list is a prop now, so the component must be built with it.
+  piece.props = { ...piece.props, doors: manifest.doors || [] };
+
   for (const css of head.styles) {
     if (!seenStyle.has(css)) { seenStyle.add(css); out.styles.push({ slug: page.slug, css }); }
   }
@@ -329,7 +399,8 @@ for (const page of manifest.pages) {
     tablesWrapped: wrapped,
     wrapStyle: stripped.wrapStyle,
     script: piece.script,
-    props: piece.props
+    props: piece.props,
+    doorsWired: wiredDoors.changed
   });
 }
 
