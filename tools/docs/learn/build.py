@@ -526,6 +526,32 @@ def registered_presets() -> tuple[set[str], str]:
     return names, default.group(1)
 
 
+def check_release_notes(pages_html: dict[str, str]) -> None:
+    """Fail if the release-notes page has no section for the shipped version.
+
+    The nav badge and the JSON-LD read `pyproject.toml`, so they move with a
+    release on their own. The release-notes page does not: it is written by
+    hand, one section per version. At 0.4.1 the badge said 0.4.1 and the page
+    stopped at 0.4.0, because the changelog entry was written and the page
+    section was not, and nothing compared them.
+
+    Checked against the built page rather than the source, because that is
+    what a reader gets.
+    """
+    version = project_version()
+    page = pages_html.get("release-notes")
+    if page is None:
+        sys.exit("no release-notes page was built")
+    if not re.search(rf">{re.escape(version)}</h2>", page):
+        found = re.findall(r">(\d+\.\d+\.\d+)</h2>", page)
+        sys.exit(
+            f"release-notes.html has no section for {version}, the version in "
+            f"pyproject.toml.\n  It carries: {', '.join(dict.fromkeys(found)) or 'none'}"
+            f"\n  Add the section to tools/docs/learn/handoff/Release notes.dc.html."
+        )
+    print(f"  release notes: newest section is {version}")
+
+
 def check_presets(pages_html: dict[str, str]) -> None:
     """Fail if the site names a preset the package does not ship.
 
@@ -882,6 +908,7 @@ def build(out_dir: pathlib.Path) -> set[str]:
     write_search_index(out_dir, all_pages, by_slug)
     write_data(out_dir)
     check_presets(emitted)
+    check_release_notes(emitted)
     write_redirects(out_dir, all_pages)
     check_nothing_orphaned(out_dir, all_pages)
     write_seo(out_dir, all_pages, by_slug, emitted, version)

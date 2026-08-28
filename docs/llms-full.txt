@@ -3521,6 +3521,14 @@ Release notes
 
 What changed, what it means for a run you already have, and how to pin the old behaviour if you need it. Full history in CHANGELOG.md.
 
+0.4.1
+
+2026-08-28 
+
+pt-v13 and pt-v14 now report the mispricing half-life they run. Both said 68.26 days and both decayed at 60. Nothing you ran was wrong and no trajectory moves in this release: the number the engine reads is mispricing_phi, which was always the 60-day value.
+
+What was wrong is a published fact. pt.model_preset() reported the 68.26, a manifest records it, and anyone setting a half-life from that number got a different market than the preset runs. If you pinned either preset in 0.4.0, your results are unaffected and need no rerun.
+
 0.4.0
 
 2026-08-28 
