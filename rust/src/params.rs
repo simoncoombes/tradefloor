@@ -1905,7 +1905,17 @@ impl ModelParams {
         p.garch_vix_coupling = 0.0269;
         p.sector_factor_sigma = 0.01006215;
         p.sector_loading = 0.57351027;
-        p.mispricing_half_life_days = 68.25733542;
+        // NOT mispricing_half_life_days. The search chose 68.25733542, but
+        // this is a `const fn` and the half-life is an INPUT: setting it has
+        // to recompute `mispricing_phi` and `s_phi_tick` through `ln`/`exp`,
+        // which const evaluation cannot do. Assigning the field alone left the
+        // preset reporting a 68.26-day half-life while the engine decayed at
+        // the inherited 60, because the engine reads phi. A preset that
+        // misreports its own coefficient is worse than one that does not carry
+        // the search's value, so the field is left inherited and the intended
+        // half-life is recorded in the changelog. To ship it for real, write
+        // the recomputed phi and s_phi_tick bits literally, under a NEW name:
+        // changing them here would move a published preset.
         // The curve's anchor, and the news sigma that pays for it.
         p.market_vol_vix_anchor = 15.98426471;
         p.endogenous_news_sigma = 0.021;
@@ -2005,7 +2015,17 @@ impl ModelParams {
         p.crisis_blend_gain = 0.8275881;
         p.sector_factor_sigma = 0.0099802949;
         p.sector_loading = 0.58821442;
-        p.mispricing_half_life_days = 68.25733542;
+        // NOT mispricing_half_life_days. The search chose 68.25733542, but
+        // this is a `const fn` and the half-life is an INPUT: setting it has
+        // to recompute `mispricing_phi` and `s_phi_tick` through `ln`/`exp`,
+        // which const evaluation cannot do. Assigning the field alone left the
+        // preset reporting a 68.26-day half-life while the engine decayed at
+        // the inherited 60, because the engine reads phi. A preset that
+        // misreports its own coefficient is worse than one that does not carry
+        // the search's value, so the field is left inherited and the intended
+        // half-life is recorded in the changelog. To ship it for real, write
+        // the recomputed phi and s_phi_tick bits literally, under a NEW name:
+        // changing them here would move a published preset.
         p.market_vol_vix_anchor = 15.98426471;
         p.endogenous_news_sigma = 0.020360516;
         p
@@ -2724,6 +2744,29 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn every_preset_runs_the_half_life_it_reports() {
+        // The gap this closes. `with_override` recomputes `mispricing_phi`
+        // from the half-life correctly, and the test below proves it. A
+        // preset CONSTRUCTOR cannot: it is a `const fn`, `ln` and `exp` are
+        // not available there, and assigning the field alone leaves phi at
+        // whatever the base preset had. pt-v13 and pt-v14 shipped in 0.4.0
+        // reporting a 68.26-day half-life while decaying at the inherited
+        // 60, because the engine reads phi and nothing compared the two.
+        for name in ModelParams::preset_names() {
+            let p = ModelParams::preset(name).expect("a listed preset must resolve");
+            let implied = (0.5f64).ln() / p.mispricing_phi.ln();
+            assert!(
+                (implied - p.mispricing_half_life_days).abs() < 1e-6,
+                "{name} reports a half-life of {} days but its mispricing_phi \
+                 decays at {implied}. A const-fn constructor cannot recompute \
+                 phi, so assigning the field alone makes the preset misreport \
+                 its own coefficient.",
+                p.mispricing_half_life_days,
+            );
+        }
+    }
+
     fn the_shipped_half_life_keeps_the_recorded_bits_and_a_new_one_recomputes() {
         let same = PT_V1.with_override("mispricing_half_life_days", 60.0).unwrap();
         assert_eq!(same.mispricing_phi.to_bits(), 0x3FEF_A1E8_27A1_B38C);

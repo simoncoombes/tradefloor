@@ -9,6 +9,43 @@ competing for the same liquidity and scored under identical conditions.
 Not shipped, and the realism envelope does not cover it: certification was
 measured on a single agent.
 
+## 0.4.1
+
+`pt-v13` and `pt-v14` reported a mispricing half-life they did not run. Both
+said 68.26 days; both decayed at 60. Nothing you ran was wrong, and no
+trajectory moves in this release: the number the engine reads is
+`mispricing_phi`, which was always the 60-day value, and the cross-platform
+known-answer test confirms it by leaving its simulation digest untouched.
+What was wrong is a published fact. `pt.model_preset()` reported the 68.26,
+a manifest records it, and anyone who set a half-life from that number got a
+different market than the preset runs.
+
+Both presets now report 60, which is what they do. If you pinned either one
+in 0.4.0, your results are unaffected and need no rerun.
+
+<!-- release-note-ends -->
+
+### the detail, and how it happened
+
+The presets are built by `const fn`. The half-life is an INPUT: assigning it
+has to recompute `mispricing_phi` and `s_phi_tick` through `ln` and `exp`,
+which const evaluation cannot do. The runtime path does this correctly, and
+a test has covered it since 0.1.x. What nothing covered was a preset
+CONSTRUCTOR assigning the field, where the value lands with no recompute and
+no complaint. Twelve of the fourteen presets were unaffected because they
+never set it.
+
+`every_preset_runs_the_half_life_it_reports` now walks every shipped preset
+and compares the reported half-life against the decay its `mispricing_phi`
+implies. It was checked against the defect before being committed: it fails
+naming the preset and the rate it actually runs.
+
+The 68.26 came from the calibration search that produced `pt-v14`, and it is
+kept in this record rather than in a field the engine contradicts. Shipping
+it for real means writing the recomputed bits literally, under a new preset
+name, because changing them under an existing one would move a published
+model.
+
 ## 0.4.0
 
 `pt-v14` is the default. On the panel this project certifies it is better

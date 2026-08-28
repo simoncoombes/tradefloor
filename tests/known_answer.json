@@ -3,9 +3,9 @@
   "days": 250,
   "katVersion": 12,
   "kind": "pretium.known-answer",
-  "metadataSha256": "e3f9590150f6213d736822dce230f902444b16b57f4e5020469085635d8072bb",
-  "note": "Cross-platform determinism baseline. Regenerated 2026-08-26 for the era boundary that made pt-v12 the default preset: every seeded trajectory changed, deliberately. Runs from before this baseline are not comparable to runs after it unless they name their preset.",
+  "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
+  "note": "Cross-platform determinism baseline. Regenerated 2026-08-26 for the era boundary that made pt-v12 the default preset: every seeded trajectory changed, deliberately. Runs from before this baseline are not comparable to runs after it unless they name their preset. Re-based 2026-08-28 for a REPORTING fix only: pt-v13 and pt-v14 reported a 68.26-day mispricing half-life while running the inherited 60, because a const-fn constructor cannot recompute mispricing_phi. simulationSha256 and katVersion are unchanged, which is the proof no trajectory moved.",
   "seed": 20260820,
-  "sha256": "ea48a4174fcf31b2a638139b7ae120b49b06d079b406379572887a2fdd7c7866",
+  "sha256": "64ee47922c680c4be1cd31f67d1ab7f9dd515b9077e1eb07aff96200691504ee",
   "simulationSha256": "63fa05e66084cc070c9ecfb3d7e0d4fb89f457e9048a5772964fc6413d93cc74"
 }
