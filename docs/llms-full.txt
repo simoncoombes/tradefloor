@@ -79,7 +79,7 @@ A universe of companies, a macro state for day zero, and a seed. The same three 
 
 Execution-aware
 
-Agents trade through an order book and pay the spread, the queue and their own impact. Run the same seed without the orders and the difference is what the trading cost.
+Agents trade through an order book and pay the spread, the queue and their own impact. Run the same seed without the orders and the difference is the cost of trading.
 
 Inspectable
 
@@ -104,6 +104,10 @@ reproduce() refuses on a mismatch rather than returning a number that looks fine
 Same world. Same conditions. Different agent. Two agents run against the identical market path, so a difference between them is the agent and not a different roll of the market.
 
 Same experiment. Different hypothesis. Change one component, re-run, and attribute the difference to the change. Determinism is what makes the attribution mean anything.
+
+Fork an experiment without changing its past
+
+checkpoint · day 100 IDENTICAL MARKET HISTORY UP TO HERE CHANGE ONE INPUT, HERE fork A policy A future A fork B policy B future B compare Both branches carry the same past, bit for bit, so they do not merely start from similar conditions - they start from the same one. Change a single input at the checkpoint and the difference between the futures is attributable to that input rather than to a different roll of the market. The changed input can be the agent, the policy, an order size, or a decision taken at the checkpoint itself.
 
 GROUND TRUTH 
 The simulator knows why the price moved
@@ -372,7 +376,7 @@ Fills
 STEP 04 - DRIVE IT 
 Three ways to use it
 
-Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote. Cheapest first.
+Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote.
 
 Agents over MCP
 
@@ -398,7 +402,7 @@ obs, r, done, trunc, i = env.step(a)
 
 Your own trade logic
 
-A TWAP, a VWAP, an iceberg, or your own logic. Any object with an act method will do. The observation is narrow on purpose. It shows only what a real trader can see.
+A TWAP, a VWAP, an iceberg, or your own logic. Any object with an act method will do. The observation is narrow on purpose. It exposes only information available to a trader inside the simulated market.
 
 class Mine:
  def act(self, obs):
@@ -1042,7 +1046,7 @@ The realism envelope
 
 What the envelope adds
 
-The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say that the market behaved as a real one. The gaps stop you before you say more than that.
+The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say the market reproduced those fourteen habits of real equities. The gaps stop you before you say more than that.
 
 Check a question against the envelope
 Start Loop B
@@ -1295,7 +1299,7 @@ Give the same agent the same seed and universe, and you get the same run.
 
 The observation is narrow on purpose
 
-Everything in it is something a real trader can see. Nothing in it is something only the simulator knows.
+Everything in it is information available to a trader inside the simulated market. Nothing in it is something only the simulator knows.
 
 The agent sees
 
@@ -1598,7 +1602,7 @@ The range crosses zero, so a round trip can end up ahead. This happens when the 
 
 One known boundary: the fear gauge leaks
 
-VIX drives the market factor's variance, so the market prices fear of your flow. Names that you never touched can move a few basis points through that channel. That is impact, and it is real. If you need the subtraction to be exact, pin VIX in both worlds and the two runs match byte for byte.
+VIX drives the market factor's variance, so the market prices fear of your flow. Names that you never touched can move a few basis points through that channel. That is impact, not an artefact of the measurement. If you need the subtraction to be exact, pin VIX in both worlds and the two runs match byte for byte.
 
 All pages
 

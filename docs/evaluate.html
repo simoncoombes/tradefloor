@@ -54,7 +54,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">EVALUATE</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">Evaluate</h1>
 <p class="pt-s23">Four calls turn a market into a result: score one, rank twelve, price the execution, replay it later.</p>
 </section>
@@ -63,7 +63,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s11">
 <div class="pt-s52">
-<h2 class="pt-s24"><span class="pt-s47">pt.evaluate</span></h2>
+<h2 class="pt-s24"><span class="pt-s48">pt.evaluate</span></h2>
 <span class="pt-s0">Score agents on one identical market.</span>
 </div>
 <pre class="pt-s50">scores = pt.evaluate(
@@ -73,27 +73,27 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
     model: str | None = None)</pre>
 <div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">agents</span>
 <span class="pt-s2">A dict of name to agent, or name to StrategySpec. A spec carries its own fingerprint into the result.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">one engine each</span>
 <span class="pt-s2">Every agent gets its own Engine built from the same seed and roster, so nobody eats another agent's depth.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">returns</span>
 <span class="pt-s2">A dict of name to Scorecard.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">pt.reference_agents(seed=3)</span>
 <span class="pt-s2">The five shipped baselines as a ready dict: hold, random, momentum, mean_reversion and oracle.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">pt.capture_ratio(scores)</span>
 <span class="pt-s2">Each agent's P&amp;L as a fraction of the Oracle's.</span>
 </div>
@@ -104,7 +104,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s11">
 <div class="pt-s52">
-<h2 class="pt-s24"><span class="pt-s47">pt.rank</span></h2>
+<h2 class="pt-s24"><span class="pt-s48">pt.rank</span></h2>
 <span class="pt-s0">Repeat that across twelve seeds, and separate with a sign test.</span>
 </div>
 <pre class="pt-s50">ranking = pt.rank(
@@ -116,22 +116,22 @@ ranking.report()
 ranking.separation("mean_reversion", "momentum")</pre>
 <div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">factory</span>
 <span class="pt-s2">A callable returning a fresh agent dict per seed, because an agent that carries state across markets is not being measured on either.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">report()</span>
 <span class="pt-s2">Pooled captures, their per-seed ranges, and how many seeds each agent topped.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">separation(a, b)</span>
 <span class="pt-s2">A paired sign test: wins, losses, ties and a p-value.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">workers</span>
 <span class="pt-s2">Processes. Seeds are independent, so this scales linearly.</span>
 </div>
@@ -142,7 +142,7 @@ ranking.separation("mean_reversion", "momentum")</pre>
 
 <div class="pt-s11">
 <div class="pt-s52">
-<h2 class="pt-s24"><span class="pt-s47">pt.tca.analyse</span></h2>
+<h2 class="pt-s24"><span class="pt-s48">pt.tca.analyse</span></h2>
 <span class="pt-s0">Price the execution against the world where you never traded.</span>
 </div>
 <pre class="pt-s50">ex = pt.tca.analyse(
@@ -154,22 +154,22 @@ ex.by_step()
 ex.partial_fills()</pre>
 <div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">algo</span>
 <span class="pt-s2">Any object with an act method.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">shortfall_bps()</span>
 <span class="pt-s2">What the footprint cost, against the same seed run with no orders.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">by_step()</span>
 <span class="pt-s2">Where it was paid, per decision.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">partial_fills()</span>
 <span class="pt-s2">What you asked for against what you got.</span>
 </div>
@@ -180,7 +180,7 @@ ex.partial_fills()</pre>
 
 <div class="pt-s11">
 <div class="pt-s52">
-<h2 class="pt-s24"><span class="pt-s47">pt.RunManifest</span></h2>
+<h2 class="pt-s24"><span class="pt-s48">pt.RunManifest</span></h2>
 <span class="pt-s0">Write the run down so someone else can replay it.</span>
 </div>
 <pre class="pt-s50">manifest = pt.RunManifest.of(
@@ -191,17 +191,17 @@ pt.RunManifest.from_json(text)
 pt.reproduce(manifest)</pre>
 <div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">carries</span>
 <span class="pt-s2">Package version, preset, seed, universe fingerprint, macro conditions, scenario and strategy fingerprint, with the expected digest.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">reproduce()</span>
 <span class="pt-s2">Raises on a mismatch and names the component that disagreed.</span>
 </div>
 
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">era_fingerprint()</span>
 <span class="pt-s2">The digest of a small fixed probe, recomputed before every replay, so two builds that agree on the probe agree on the arithmetic.</span>
 </div>
@@ -216,44 +216,44 @@ pt.reproduce(manifest)</pre>
 <h2 class="pt-s7">What a Scorecard carries</h2>
 <div class="pt-s11">
 
-<div class="pt-s105">
+<div class="pt-s106">
 <span class="pt-s6">return_pct</span>
 <span class="pt-s2">What it made, as a percentage.</span>
 </div>
 
-<div class="pt-s105">
+<div class="pt-s106">
 <span class="pt-s6">pnl</span>
 <span class="pt-s2">What it made, in currency.</span>
 </div>
 
-<div class="pt-s105">
+<div class="pt-s106">
 <span class="pt-s6">impact_bps</span>
 <span class="pt-s2">What its own footprint cost, in basis points.</span>
 </div>
 
-<div class="pt-s105">
+<div class="pt-s106">
 <span class="pt-s6">trades</span>
 <span class="pt-s2">How many fills it took.</span>
 </div>
 
-<div class="pt-s105">
+<div class="pt-s106">
 <span class="pt-s6">strategy_fingerprint</span>
 <span class="pt-s2">A sha256 over the spec. This is the one to cite.</span>
 </div>
 
-<div class="pt-s105">
+<div class="pt-s106">
 <span class="pt-s6">universe_fingerprint</span>
 <span class="pt-s2">A sha256 over the roster, order included.</span>
 </div>
 
-<div class="pt-s105">
+<div class="pt-s106">
 <span class="pt-s6">model</span>
 <span class="pt-s2">The preset the run used, so a result names its own coefficients.</span>
 </div>
 
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
-<p class="pt-s53"><span class="pt-s175">strategy_fingerprint</span> is empty for a hand-built agent, because that result is reproducible only by citing code at a commit. A <span class="pt-s175">StrategySpec</span> gives you one, which is why the spec grammar exists.</p>
+<p class="pt-s53"><span class="pt-s176">strategy_fingerprint</span> is empty for a hand-built agent, because that result is reproducible only by citing code at a commit. A <span class="pt-s176">StrategySpec</span> gives you one, which is why the spec grammar exists.</p>
 </div>
 </section>
 
@@ -280,7 +280,7 @@ pt.reproduce(manifest)</pre>
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">EVALUATE</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">Evaluate</h1>
 <p class="pt-s23">Four calls turn a market into a result: score one, rank twelve, price the execution, replay it later.</p>
 </section>
@@ -289,13 +289,13 @@ pt.reproduce(manifest)</pre>
 <sc-for list="{{ calls }}" as="c">
 <div class="pt-s11">
 <div class="pt-s52">
-<h2 class="pt-s24"><span class="pt-s47">{{ c.name }}</span></h2>
+<h2 class="pt-s24"><span class="pt-s48">{{ c.name }}</span></h2>
 <span class="pt-s0">{{ c.lede }}</span>
 </div>
 <pre class="pt-s50">{{ c.sig }}</pre>
 <div>
 <sc-for list="{{ c.members }}" as="m">
-<div class="pt-s42">
+<div class="pt-s43">
 <span class="pt-s6">{{ m.k }}</span>
 <span class="pt-s2">{{ m.v }}</span>
 </div>
@@ -310,14 +310,14 @@ pt.reproduce(manifest)</pre>
 <h2 class="pt-s7">What a Scorecard carries</h2>
 <div class="pt-s11">
 <sc-for list="{{ scorecard }}" as="s">
-<div class="pt-s105">
+<div class="pt-s106">
 <span class="pt-s6">{{ s.k }}</span>
 <span class="pt-s2">{{ s.v }}</span>
 </div>
 </sc-for>
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
-<p class="pt-s53"><span class="pt-s175">strategy_fingerprint</span> is empty for a hand-built agent, because that result is reproducible only by citing code at a commit. A <span class="pt-s175">StrategySpec</span> gives you one, which is why the spec grammar exists.</p>
+<p class="pt-s53"><span class="pt-s176">strategy_fingerprint</span> is empty for a hand-built agent, because that result is reproducible only by citing code at a commit. A <span class="pt-s176">StrategySpec</span> gives you one, which is why the spec grammar exists.</p>
 </div>
 </section>
 

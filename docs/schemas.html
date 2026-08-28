@@ -54,7 +54,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">SCHEMAS</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">Schemas</h1>
 <p class="pt-s23">Every column of the five tables, and the fields you construct a run from. Every numeric column is float64.</p>
 
@@ -95,45 +95,45 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </thead><tbody>
 
 <tr>
-<td class="pt-s154">day</td>
-<td class="pt-s153">uint32</td>
-<td class="pt-s155">Day index.</td>
+<td class="pt-s155">day</td>
+<td class="pt-s154">uint32</td>
+<td class="pt-s156">Day index.</td>
 </tr>
 
 <tr>
-<td class="pt-s154">tick</td>
-<td class="pt-s153">uint32</td>
-<td class="pt-s155">Tick index. A tick is a minute, and there are 390 in a day. Tick grain only.</td>
+<td class="pt-s155">tick</td>
+<td class="pt-s154">uint32</td>
+<td class="pt-s156">Tick index. A tick is a minute, and there are 390 in a day. Tick grain only.</td>
 </tr>
 
 <tr>
-<td class="pt-s154">bar</td>
-<td class="pt-s153">uint32</td>
-<td class="pt-s155">Bar index within the day. Day grain only.</td>
+<td class="pt-s155">bar</td>
+<td class="pt-s154">uint32</td>
+<td class="pt-s156">Bar index within the day. Day grain only.</td>
 </tr>
 
 <tr>
-<td class="pt-s154">instrument_id</td>
-<td class="pt-s153">uint32</td>
-<td class="pt-s155">Roster index.</td>
+<td class="pt-s155">instrument_id</td>
+<td class="pt-s154">uint32</td>
+<td class="pt-s156">Roster index.</td>
 </tr>
 
 <tr>
-<td class="pt-s154">open · high · low</td>
-<td class="pt-s153">float64</td>
-<td class="pt-s155">Day grain only.</td>
+<td class="pt-s155">open · high · low</td>
+<td class="pt-s154">float64</td>
+<td class="pt-s156">Day grain only.</td>
 </tr>
 
 <tr>
-<td class="pt-s154">close</td>
-<td class="pt-s153">float64</td>
-<td class="pt-s155">What the book actually settled.</td>
+<td class="pt-s155">close</td>
+<td class="pt-s154">float64</td>
+<td class="pt-s156">What the book actually settled.</td>
 </tr>
 
 <tr>
-<td class="pt-s154">volume</td>
-<td class="pt-s153">float64</td>
-<td class="pt-s155">Shares.</td>
+<td class="pt-s155">volume</td>
+<td class="pt-s154">float64</td>
+<td class="pt-s156">Shares.</td>
 </tr>
 
 </tbody></table>
@@ -147,62 +147,62 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p class="pt-s13">Each of these raises rather than returning a number it can not support. The list is the shape of the library's judgment about its own limits.</p>
 <div class="pt-s11">
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">envelope.intervals</span>
 <span class="pt-s2">Fewer than two panels. A spread over one observation is not a spread.</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">atlas.plan</span>
 <span class="pt-s2">Fewer than 8 samples.</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">Survey.sensitivity</span>
 <span class="pt-s2">Fewer than 8 usable rows, or an output no row measured.</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">Survey.profile</span>
 <span class="pt-s2">Fewer than three rows per bin.</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">Survey.attribution</span>
 <span class="pt-s2">A vector value outside the surveyed range, a parameter set on one side only, or a parameter that was not surveyed.</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">Survey.confirm</span>
 <span class="pt-s2">Any seed shared with the survey or between blocks, and a survey with no seed record at all. An empty list is the absence of a record wearing the key.</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">ModelParams.from_preset</span>
 <span class="pt-s2">An override of a compile-time constant, by name. Accepting one the engine would ignore would make the fingerprint a lie.</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">Scenario</span>
 <span class="pt-s2">Chaining a shape constructor onto a built scenario, or a compare() baseline that realises the same path as the scenario.</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">RunManifest.reproduce</span>
 <span class="pt-s2">A build whose arithmetic does not match the manifest's. It names the culprit rather than replaying a different market.</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">Checkpoint restore</span>
 <span class="pt-s2">A pre-split snapshot with three RNG numbers instead of nine, naming the era. It can not be continued bit-exactly.</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">Instrument</span>
 <span class="pt-s2">A short_interest between 0 and 1 on a real share count, and an unknown sector key.</span>
 </div>
 
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">loss.band_distance_loss</span>
 <span class="pt-s2">A missing or zero noise scale. An unweighted sum is a choice, and it will not happen by accident.</span>
 </div>
@@ -233,7 +233,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">SCHEMAS</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">Schemas</h1>
 <p class="pt-s23">Every column of the five tables, and the fields you construct a run from. Every numeric column is float64.</p>
 
@@ -262,9 +262,9 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </thead><tbody>
 <sc-for list="{{ table.rows }}" as="r">
 <tr>
-<td class="pt-s154">{{ r.c }}</td>
-<td class="pt-s153">{{ r.t }}</td>
-<td class="pt-s155">{{ r.d }}</td>
+<td class="pt-s155">{{ r.c }}</td>
+<td class="pt-s154">{{ r.t }}</td>
+<td class="pt-s156">{{ r.d }}</td>
 </tr>
 </sc-for>
 </tbody></table>
@@ -278,7 +278,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p class="pt-s13">Each of these raises rather than returning a number it can not support. The list is the shape of the library's judgment about its own limits.</p>
 <div class="pt-s11">
 <sc-for list="{{ refusals }}" as="r">
-<div class="pt-s41">
+<div class="pt-s42">
 <span class="pt-s6">{{ r.k }}</span>
 <span class="pt-s2">{{ r.v }}</span>
 </div>

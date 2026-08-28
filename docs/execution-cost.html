@@ -54,7 +54,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">EXECUTION COST</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">Execution cost</h1>
 <p class="pt-s23">Every TCA vendor approximates one missing number: what the price would have done if you had never traded. Here you can run that world.</p>
 
@@ -66,13 +66,13 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 ex.shortfall_bps()   # what it cost
 ex.by_step()         # where
 ex.partial_fills()   # asked vs got</pre>
-<div class="pt-s172">
-<h3 class="pt-s4">Two runs, one seed</h3>
-<div class="pt-s3">
+<div class="pt-s173">
+<h3 class="pt-s3">Two runs, one seed</h3>
+<div class="pt-s4">
 <span class="pt-s5">The run with your orders</span>
 <span class="pt-s0">Your fills, at the prices the book gave you.</span>
 </div>
-<div class="pt-s3">
+<div class="pt-s4">
 <span class="pt-s5">The run without them</span>
 <span class="pt-s0">The same seed, the same world, and no trades from you. Subtract one from the other and the difference is your footprint.</span>
 </div>
@@ -80,71 +80,71 @@ ex.partial_fills()   # asked vs got</pre>
 </div>
 </section>
 
-<section id="walk" class="pt-s33">
+<section id="walk" class="pt-s34">
 <h2 class="pt-s7">Where the cost comes from</h2>
 <p class="pt-s13">There is no slippage formula in the code. A big order pays more because it takes the levels that rest above it. Below is one market buy for 175 shares, replayed from the engine's own reference program.</p>
 
 <div class="pt-s28">
-<div class="pt-s173">
-<h3 class="pt-s4">The book before the order</h3>
+<div class="pt-s174">
+<h3 class="pt-s3">The book before the order</h3>
 
-<div class="pt-s90">
-<span class="pt-s133">ask</span>
+<div class="pt-s91">
+<span class="pt-s134">ask</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--red);width:3.4rem;font-variant-numeric:tabular-nums">101.00</span>
 <span style="height:12px;border-radius:2px;background:var(--red-soft);width:54px"></span>
-<span class="pt-s128">50</span>
+<span class="pt-s129">50</span>
 </div>
 
-<div class="pt-s90">
-<span class="pt-s133">ask</span>
+<div class="pt-s91">
+<span class="pt-s134">ask</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--red);width:3.4rem;font-variant-numeric:tabular-nums">102.00</span>
 <span style="height:12px;border-radius:2px;background:var(--red-soft);width:109px"></span>
-<span class="pt-s128">110</span>
+<span class="pt-s129">110</span>
 </div>
 
-<div class="pt-s90">
-<span class="pt-s133">ask</span>
+<div class="pt-s91">
+<span class="pt-s134">ask</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--red);width:3.4rem;font-variant-numeric:tabular-nums">103.00</span>
 <span style="height:12px;border-radius:2px;background:var(--red-soft);width:118px"></span>
-<span class="pt-s128">120</span>
+<span class="pt-s129">120</span>
 </div>
 
-<div class="pt-s90">
-<span class="pt-s133">bid</span>
+<div class="pt-s91">
+<span class="pt-s134">bid</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--green);width:3.4rem;font-variant-numeric:tabular-nums">99.00</span>
 <span style="height:12px;border-radius:2px;background:var(--green-soft);width:100px"></span>
-<span class="pt-s128">100</span>
+<span class="pt-s129">100</span>
 </div>
 
-<div class="pt-s90">
-<span class="pt-s133">bid</span>
+<div class="pt-s91">
+<span class="pt-s134">bid</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--green);width:3.4rem;font-variant-numeric:tabular-nums">99.00</span>
 <span style="height:12px;border-radius:2px;background:var(--green-soft);width:54px"></span>
-<span class="pt-s128">50</span>
+<span class="pt-s129">50</span>
 </div>
 
-<div class="pt-s90">
-<span class="pt-s133">bid</span>
+<div class="pt-s91">
+<span class="pt-s134">bid</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--green);width:3.4rem;font-variant-numeric:tabular-nums">99.00</span>
 <span style="height:12px;border-radius:2px;background:var(--green-soft);width:31px"></span>
-<span class="pt-s128">25</span>
+<span class="pt-s129">25</span>
 </div>
 
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 class="pt-s4">What 175 shares cost</h3>
+<h3 class="pt-s3">What 175 shares cost</h3>
 
-<div class="pt-s99">
+<div class="pt-s100">
 <span>50 @ 101.00</span>
 <span class="pt-s9">from bob</span>
 </div>
 
-<div class="pt-s99">
+<div class="pt-s100">
 <span>110 @ 102.00</span>
 <span class="pt-s9">from mm</span>
 </div>
 
-<div class="pt-s99">
+<div class="pt-s100">
 <span>15 @ 103.00</span>
 <span class="pt-s9">from mm</span>
 </div>
@@ -157,7 +157,7 @@ ex.partial_fills()   # asked vs got</pre>
 </div>
 </section>
 
-<section id="counter" class="pt-s33">
+<section id="counter" class="pt-s34">
 <h2 class="pt-s7">The number nobody else can measure</h2>
 <p class="pt-s13">Arrival price, VWAP and fitted impact models all stand in for a counterfactual that real data can not supply. Round-trip shortfall measured over eight simulation seeds:</p>
 
@@ -178,8 +178,8 @@ ex.partial_fills()   # asked vs got</pre>
 
 <details class="pt-s12">
 <summary class="pt-s27">One known boundary: the fear gauge leaks</summary>
-<div class="pt-s165">
-<p class="pt-s1">VIX drives the market factor's variance, so the market prices fear of your flow. Names that you never touched can move a few basis points through that channel. That is impact, and it is real. If you need the subtraction to be exact, pin VIX in both worlds and the two runs match byte for byte.</p>
+<div class="pt-s166">
+<p class="pt-s1">VIX drives the market factor's variance, so the market prices fear of your flow. Names that you never touched can move a few basis points through that channel. That is impact, not an artefact of the measurement. If you need the subtraction to be exact, pin VIX in both worlds and the two runs match byte for byte.</p>
 </div>
 </details>
 </section>
@@ -207,7 +207,7 @@ ex.partial_fills()   # asked vs got</pre>
 <a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">EXECUTION COST</span>
 </div>
 
-<section class="pt-s32">
+<section class="pt-s33">
 <h1 class="pt-s29">Execution cost</h1>
 <p class="pt-s23">Every TCA vendor approximates one missing number: what the price would have done if you had never traded. Here you can run that world.</p>
 
@@ -219,13 +219,13 @@ ex.partial_fills()   # asked vs got</pre>
 ex.shortfall_bps()   # what it cost
 ex.by_step()         # where
 ex.partial_fills()   # asked vs got</pre>
-<div class="pt-s172">
-<h3 class="pt-s4">Two runs, one seed</h3>
-<div class="pt-s3">
+<div class="pt-s173">
+<h3 class="pt-s3">Two runs, one seed</h3>
+<div class="pt-s4">
 <span class="pt-s5">The run with your orders</span>
 <span class="pt-s0">Your fills, at the prices the book gave you.</span>
 </div>
-<div class="pt-s3">
+<div class="pt-s4">
 <span class="pt-s5">The run without them</span>
 <span class="pt-s0">The same seed, the same world, and no trades from you. Subtract one from the other and the difference is your footprint.</span>
 </div>
@@ -233,26 +233,26 @@ ex.partial_fills()   # asked vs got</pre>
 </div>
 </section>
 
-<section id="walk" class="pt-s33">
+<section id="walk" class="pt-s34">
 <h2 class="pt-s7">Where the cost comes from</h2>
 <p class="pt-s13">There is no slippage formula in the code. A big order pays more because it takes the levels that rest above it. Below is one market buy for 175 shares, replayed from the engine's own reference program.</p>
 
 <div class="pt-s28">
-<div class="pt-s173">
-<h3 class="pt-s4">The book before the order</h3>
+<div class="pt-s174">
+<h3 class="pt-s3">The book before the order</h3>
 <sc-for list="{{ book }}" as="b">
-<div class="pt-s90">
-<span class="pt-s133">{{ b.side }}</span>
+<div class="pt-s91">
+<span class="pt-s134">{{ b.side }}</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:{{ b.col }};width:3.4rem;font-variant-numeric:tabular-nums">{{ b.p }}</span>
 <span style="height:12px;border-radius:2px;background:{{ b.bar }};width:{{ b.w }}"></span>
-<span class="pt-s128">{{ b.rem }}</span>
+<span class="pt-s129">{{ b.rem }}</span>
 </div>
 </sc-for>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 class="pt-s4">What 175 shares cost</h3>
+<h3 class="pt-s3">What 175 shares cost</h3>
 <sc-for list="{{ fills }}" as="f">
-<div class="pt-s99">
+<div class="pt-s100">
 <span>{{ f.qty }} @ {{ f.price }}</span>
 <span class="pt-s9">from {{ f.maker }}</span>
 </div>
@@ -265,7 +265,7 @@ ex.partial_fills()   # asked vs got</pre>
 </div>
 </section>
 
-<section id="counter" class="pt-s33">
+<section id="counter" class="pt-s34">
 <h2 class="pt-s7">The number nobody else can measure</h2>
 <p class="pt-s13">Arrival price, VWAP and fitted impact models all stand in for a counterfactual that real data can not supply. Round-trip shortfall measured over eight simulation seeds:</p>
 
@@ -286,8 +286,8 @@ ex.partial_fills()   # asked vs got</pre>
 
 <details class="pt-s12">
 <summary class="pt-s27">One known boundary: the fear gauge leaks</summary>
-<div class="pt-s165">
-<p class="pt-s1">VIX drives the market factor's variance, so the market prices fear of your flow. Names that you never touched can move a few basis points through that channel. That is impact, and it is real. If you need the subtraction to be exact, pin VIX in both worlds and the two runs match byte for byte.</p>
+<div class="pt-s166">
+<p class="pt-s1">VIX drives the market factor's variance, so the market prices fear of your flow. Names that you never touched can move a few basis points through that channel. That is impact, not an artefact of the measurement. If you need the subtraction to be exact, pin VIX in both worlds and the two runs match byte for byte.</p>
 </div>
 </details>
 </section>
