@@ -154,6 +154,60 @@ pub struct ModelParams {
     /// fixed loading makes every same-sector pair identically exposed; real
     /// industries contain pure plays and conglomerates.
     pub sector_loading_beta_slope: f64,
+    /// How far the crisis blend's market injection is decoupled from the
+    /// market factor's own magnitude. Zero on every preset before this dial
+    /// and bit-identical.
+    ///
+    /// The injection is `source * gain * crisis_spike * market_factor`, and
+    /// at a held VIX the spike is pinned at [`crisis_blend_cap`] (§63), so
+    /// the ONLY thing that varies between seed blocks is `market_factor`'s
+    /// magnitude — which is the market variance level, which is what GARCH
+    /// persistence governs.
+    ///
+    /// That is the mechanical reason crisis co-movement's across-block RANGE
+    /// tracks persistence at rho +0.85, and why every attempt to tighten the
+    /// range has had to lower persistence and pay for it in the 504-day
+    /// panel. Round 79 measured that trade across a 4x4 grid and found no
+    /// cell escaping it: the range is bought with panel blocks.
+    ///
+    /// At `d` the injection is scaled by `|market_factor / baseline|^-d`, so
+    /// at 1.0 its magnitude no longer depends on how large the market factor
+    /// happens to be and the crisis correlation it produces stops inheriting
+    /// the variance level. The baseline is [`market_factor_sigma`] at tick
+    /// scale, the same normaliser `crash_amplifier` already uses, so
+    /// "ordinary" means the same thing in both places.
+    ///
+    /// This is the mechanism round 79 said the next gain on this axis would
+    /// need: one that decouples the co-movement spread from GARCH
+    /// persistence rather than another search over the dials that exist.
+    /// Whether it does so at a price worth paying is a measurement, and it
+    /// ships inert until that measurement exists.
+    pub crisis_blend_variance_damp: f64,
+    /// Gain on the QE valuation channel. 1.0 on every preset before this
+    /// dial and bit-identical.
+    ///
+    /// `qe_pe_boost` reaches the target P/E as `1 + qe_pe_boost`, and alone
+    /// among the model's macro channels it has no gain between the input and
+    /// the response — `garch_vix_coupling`, `jump_vix_coupling`,
+    /// `sector_vix_coupling` and `market_vol_vix_coupling` all exist.
+    ///
+    /// Round 76 measured why that matters. Freezing each macro channel of
+    /// the driven test in turn, the VIX channel alone produces a ratio of
+    /// 1.136 against real AAPL and the full four produce 1.394; `qe_pe_boost`
+    /// carries about 0.25 of that 0.39 excess, more than VIX's own 0.14, and
+    /// the policy channel contributes nothing. The response is convex, so
+    /// halving the amplitude removes 68% of the contribution: a gain near
+    /// 0.5 would move the driven ratio from 1.394 to 1.222.
+    ///
+    /// **A caveat that belongs with the dial, not only in the record.** The
+    /// `qe_pe_boost` series the driven test supplies is not measured
+    /// quantitative easing. `gate_pick._covid_inputs` derives it as the S&P
+    /// against its own 200-day EMA, clamped to +/-0.35. A gain calibrated
+    /// against that proxy encodes the proxy's amplitude as if it were the
+    /// model's physics. The dial is a real gap in the model — every other
+    /// channel has one — but any value fitted to the current driven test
+    /// carries that qualification with it.
+    pub qe_pe_gain: f64,
     /// Scale on the per-name idiosyncratic GARCH sigma — the funding side
     /// of the factor-variance reallocation. Bit-inert at 1.0.
     pub idio_sigma_scale: f64,
@@ -1155,6 +1209,8 @@ impl ModelParams {
             sector_factor_sigma: tick::SECTOR_FACTOR_SIGMA,
             sector_loading: 0.5,
             sector_loading_beta_slope: 0.0,
+            crisis_blend_variance_damp: 0.0,
+            qe_pe_gain: 1.0,
             idio_sigma_scale: factor_vol::IDIO_SIGMA_SCALE,
             idio_sigma_beta_exponent: 0.0,
             order_flow_coefficient: factors::ORDER_FLOW_COEFFICIENT,
@@ -1905,6 +1961,8 @@ impl ModelParams {
             "sector_factor_sigma" => self.sector_factor_sigma,
             "sector_loading" => self.sector_loading,
             "sector_loading_beta_slope" => self.sector_loading_beta_slope,
+            "crisis_blend_variance_damp" => self.crisis_blend_variance_damp,
+            "qe_pe_gain" => self.qe_pe_gain,
             "idio_sigma_scale" => self.idio_sigma_scale,
             "idio_sigma_beta_exponent" => self.idio_sigma_beta_exponent,
             "order_flow_coefficient" => self.order_flow_coefficient,
@@ -2030,6 +2088,8 @@ impl ModelParams {
             "sector_factor_sigma" => out.sector_factor_sigma = value,
             "sector_loading" => out.sector_loading = value,
             "sector_loading_beta_slope" => out.sector_loading_beta_slope = value,
+            "crisis_blend_variance_damp" => out.crisis_blend_variance_damp = value,
+            "qe_pe_gain" => out.qe_pe_gain = value,
             "idio_sigma_scale" => out.idio_sigma_scale = value,
             "idio_sigma_beta_exponent" => out.idio_sigma_beta_exponent = value,
             "order_flow_coefficient" => out.order_flow_coefficient = value,
@@ -2215,6 +2275,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "crisis_blend_cap",
         "crisis_blend_gain",
         "crisis_blend_ramp",
+        "crisis_blend_variance_damp",
         "crisis_blend_source",
         "crisis_vix_threshold",
         "crowd_lean_cap",
@@ -2267,6 +2328,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "news_peer_weight_down",
         "news_sector_weight",
         "order_flow_coefficient",
+        "qe_pe_gain",
         "price_breaker_fraction",
         "price_hard_cap",
         "regime_stress_points",

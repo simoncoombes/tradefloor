@@ -352,9 +352,33 @@ pub fn calculate_live_factors(
     let market_component = if params.crisis_blend_source == 0.0 {
         beta * shared.market_factor
     } else {
-        beta * shared.market_factor
-            + params.crisis_blend_source * params.crisis_blend_gain
-                * shared.crisis_spike * shared.market_factor
+        // At a held VIX the crisis spike is pinned at `crisis_blend_cap`, so
+        // the only thing varying block to block in this injection is
+        // `market_factor`'s magnitude -- the market variance level, which
+        // GARCH persistence governs. That is why crisis co-movement's
+        // across-block RANGE tracks persistence at rho +0.85 and why
+        // tightening the range has always cost 504-day panel blocks.
+        //
+        // `crisis_blend_variance_damp` breaks that link: at `d` the
+        // injection is scaled by |market_factor / baseline|^-d, so at 1.0 its
+        // magnitude stops depending on how large the factor happens to be.
+        // At 0.0 the branch is not taken and the tape is bit-identical.
+        let injection = params.crisis_blend_source * params.crisis_blend_gain
+            * shared.crisis_spike * shared.market_factor;
+        let injection = if params.crisis_blend_variance_damp == 0.0 {
+            injection
+        } else {
+            // The same normaliser `crash_amplifier` uses below, so
+            // "ordinary" means one thing in both places. Guarded at both
+            // ends: a near-zero factor would otherwise send the scale to
+            // infinity, and the cap keeps a quiet tick from being amplified
+            // into a loud one.
+            let base = params.market_factor_sigma / mathx::sqrt(390.0);
+            let rel = mathx::max(shared.market_factor.abs() / base, 1e-6);
+            injection * mathx::clamp(
+                mathx::pow(rel, -params.crisis_blend_variance_damp), 0.1, 10.0)
+        };
+        beta * shared.market_factor + injection
     };
     // The sector loading (§108). It was the literal 0.5 for every member of
     // every sector: a name's exposure to its own industry was the one
@@ -1019,6 +1043,47 @@ mod tests {
         // exponent. It falls back to the homogeneous scale instead.
         assert_eq!(noise(&on, -0.5), noise(&off, -0.5));
         assert!(noise(&on, -0.5).is_finite());
+    }
+
+    #[test]
+    fn the_crisis_variance_damp_is_inert_at_zero_and_flattens_when_it_is_not() {
+        // With a crisis spike present, the injection scales with the market
+        // factor's magnitude. The damp is meant to remove that dependence,
+        // so the test is whether DOUBLING the factor still doubles the
+        // injection's share of the result.
+        let injected = |p: &crate::params::ModelParams, mf: f64| {
+            let mut sh = shared();
+            sh.market_factor = mf;
+            sh.crisis_spike = 0.8;
+            let mut rng = Fixed(0.0);           // no idiosyncratic noise
+            calculate_live_factors(&company(), &[], 0.0, 1.0, &sh, p, &mut rng)
+                .random_noise
+        };
+
+        let off = crate::params::PT_V12;
+        assert_eq!(off.crisis_blend_variance_damp, 0.0);
+
+        // NOT a linearity test. `crash_amplifier` is itself non-linear in
+        // the market factor, so doubling the factor already more than
+        // doubles the shipped response -- 2.85x, not 2x. The claim is only
+        // that damping makes the response LESS sensitive to the factor's
+        // size, so the two ratios are compared against each other rather
+        // than against an assumed slope.
+        let shipped = injected(&off, 0.002) / injected(&off, 0.001);
+        assert!(shipped > 1.0, "shipped response does not rise: {shipped}");
+
+        let mut on = crate::params::PT_V12;
+        on.crisis_blend_variance_damp = 1.0;
+        let damped = injected(&on, 0.002) / injected(&on, 0.001);
+        assert!(damped < shipped,
+                "damp did not flatten the response: {damped} against {shipped}");
+        assert!(damped > 1.0, "damp inverted the response: {damped}");
+
+        // And it is bit-inert at zero: the same preset, spelled explicitly.
+        let mut zero = crate::params::PT_V12;
+        zero.crisis_blend_variance_damp = 0.0;
+        assert_eq!(injected(&zero, 0.0015).to_bits(),
+                   injected(&off, 0.0015).to_bits());
     }
 
     #[test]

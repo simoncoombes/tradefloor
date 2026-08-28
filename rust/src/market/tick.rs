@@ -638,7 +638,8 @@ pub fn simulate_market_tick(
     for i in 0..active_count {
         let idx = active_indices[i];
         let breakdown = compute_fair_value_with(
-            &companies[idx].valuation(), &econ_view, p.fair_value_book_floor);
+            &companies[idx].valuation(), &econ_view, p.fair_value_book_floor,
+            p.qe_pe_gain);
         let fv = breakdown.fair_value;
 
         // Lazy init: adopt the current premium/discount as the starting `s`,
