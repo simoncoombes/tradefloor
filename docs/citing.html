@@ -66,7 +66,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s66">Enough to reproduce</h3>
-<p class="pt-s58">A <span class="pt-s184">RunManifest</span> carries the seven things that fix a trajectory, plus the digest it should produce.</p>
+<p class="pt-s56">A <span class="pt-s186">RunManifest</span> carries the seven things that fix a trajectory, plus the digest it should produce.</p>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-deep);margin-top:auto;padding-top:0.6rem;border-top:1px solid var(--accent-line)">reproduce() refuses on a mismatch</span>
 </div>
 </div>
@@ -76,43 +76,43 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <h2 class="pt-s7">The seven things that fix a trajectory</h2>
 <div class="pt-s11">
 
-<div class="pt-s103">
+<div class="pt-s105">
 <span class="pt-s6">package version</span>
 <span class="pt-s0">Pins the implementation. 0.3.0 and 0.2.0 can differ even on the same preset.</span>
 </div>
 
 
-<div class="pt-s103">
+<div class="pt-s105">
 <span class="pt-s6">model preset</span>
 <span class="pt-s0">Pins the coefficients. Name it, because the default moves between releases.</span>
 </div>
 
 
-<div class="pt-s103">
+<div class="pt-s105">
 <span class="pt-s6">seed</span>
 <span class="pt-s0">Pins every random number the run draws.</span>
 </div>
 
 
-<div class="pt-s103">
+<div class="pt-s105">
 <span class="pt-s6">universe fingerprint</span>
 <span class="pt-s0">A sha256 over the roster in order, so a re-sorted roster fails the check instead of passing quietly.</span>
 </div>
 
 
-<div class="pt-s103">
+<div class="pt-s105">
 <span class="pt-s6">macro conditions</span>
 <span class="pt-s0">The state on day zero, before the economy starts advancing itself.</span>
 </div>
 
 
-<div class="pt-s103">
+<div class="pt-s105">
 <span class="pt-s6">scenario</span>
 <span class="pt-s0">The driven macro path, if you drove one.</span>
 </div>
 
 
-<div class="pt-s103">
+<div class="pt-s105">
 <span class="pt-s6">strategy fingerprint</span>
 <span class="pt-s0">A sha256 over the spec. This is the one to quote in a sentence.</span>
 </div>
@@ -134,7 +134,7 @@ saved = pt.RunManifest.from_json(
     open("study.json").read())
 
 pt.reproduce(saved)   # or it raises</pre>
-<div class="pt-s180">
+<div class="pt-s183">
 <h3 class="pt-s4">Why it raises instead of a warning</h3>
 <p class="pt-s1">A manifest that quietly reproduced a different market would be worse than no manifest. So <span class="pt-s27">reproduce()</span> compares the digest it got against the digest the manifest expected, and names the field that differs.</p>
 <p class="pt-s1">In most cases it is the preset. pt-v12 became the default on 2026-08-26, so a manifest written before that date and replayed after it fails unless it named its preset.</p>
@@ -146,9 +146,9 @@ pt.reproduce(saved)   # or it raises</pre>
 <h2 class="pt-s7">What to put in a paper</h2>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
 <p style="margin:0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.8;color:var(--ink-2)">Momentum, top_k 5, one-day lookback, scored on pretium 0.3.0 under preset pt-v12, universe fingerprint 4c1e9f77a3b8d502, seeds 0 to 11, 252 days. Strategy fingerprint 9f2c8d41e7b6a530. Manifest and order log attached.</p>
-<p class="pt-s185">Illustrative. The fingerprints in that sentence are placeholders, and yours will differ.</p>
+<p class="pt-s187">Illustrative. The fingerprints in that sentence are placeholders, and yours will differ.</p>
 </div>
-<div class="pt-s68">
+<div class="pt-s70">
 
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
 <h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">Say this</h3>
@@ -199,7 +199,7 @@ pt.reproduce(saved)   # or it raises</pre>
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s66">Enough to reproduce</h3>
-<p class="pt-s58">A <span class="pt-s184">RunManifest</span> carries the seven things that fix a trajectory, plus the digest it should produce.</p>
+<p class="pt-s56">A <span class="pt-s186">RunManifest</span> carries the seven things that fix a trajectory, plus the digest it should produce.</p>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-deep);margin-top:auto;padding-top:0.6rem;border-top:1px solid var(--accent-line)">reproduce() refuses on a mismatch</span>
 </div>
 </div>
@@ -209,7 +209,7 @@ pt.reproduce(saved)   # or it raises</pre>
 <h2 class="pt-s7">The seven things that fix a trajectory</h2>
 <div class="pt-s11">
 <sc-for list="{{ fields }}" as="f">
-<div class="pt-s103">
+<div class="pt-s105">
 <span class="pt-s6">{{ f.k }}</span>
 <span class="pt-s0">{{ f.v }}</span>
 </div>
@@ -231,7 +231,7 @@ saved = pt.RunManifest.from_json(
     open("study.json").read())
 
 pt.reproduce(saved)   # or it raises</pre>
-<div class="pt-s180">
+<div class="pt-s183">
 <h3 class="pt-s4">Why it raises instead of a warning</h3>
 <p class="pt-s1">A manifest that quietly reproduced a different market would be worse than no manifest. So <span class="pt-s27">reproduce()</span> compares the digest it got against the digest the manifest expected, and names the field that differs.</p>
 <p class="pt-s1">In most cases it is the preset. pt-v12 became the default on 2026-08-26, so a manifest written before that date and replayed after it fails unless it named its preset.</p>
@@ -243,9 +243,9 @@ pt.reproduce(saved)   # or it raises</pre>
 <h2 class="pt-s7">What to put in a paper</h2>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
 <p style="margin:0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.8;color:var(--ink-2)">Momentum, top_k 5, one-day lookback, scored on pretium 0.3.0 under preset pt-v12, universe fingerprint 4c1e9f77a3b8d502, seeds 0 to 11, 252 days. Strategy fingerprint 9f2c8d41e7b6a530. Manifest and order log attached.</p>
-<p class="pt-s185">Illustrative. The fingerprints in that sentence are placeholders, and yours will differ.</p>
+<p class="pt-s187">Illustrative. The fingerprints in that sentence are placeholders, and yours will differ.</p>
 </div>
-<div class="pt-s68">
+<div class="pt-s70">
 <sc-for list="{{ claims }}" as="c">
 <div style="border:1px solid {{ c.border }};border-radius:6px;background:{{ c.bg }};padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
 <h3 style="font-size:1.0625rem;margin:0;color:{{ c.fg }}">{{ c.head }}</h3>
