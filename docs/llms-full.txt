@@ -427,7 +427,7 @@ ranking = pt.rank(
  lambda: dict(agents), seeds=range(12),
  universe=u, days=10, workers=4)
 
-COMING NEXT · NOT SHIPPED 
+COMING UP 
 Coming next: competitive multi-agent markets
 
 single-agent evaluation → competitive agents → emergent market behaviour 
