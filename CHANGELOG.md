@@ -9,6 +9,56 @@ competing for the same liquidity and scored under identical conditions.
 Not shipped, and the realism envelope does not cover it: certification was
 measured on a single agent.
 
+## 0.4.2
+
+Three reported defects, none of which changes a trajectory. Every preset runs
+exactly as it did in 0.4.1.
+
+**A crisis threshold reached one gate and not the other.** Moving
+`crisis_vix_threshold` gated the gold crisis premium at your chosen level and
+left the dollar's safe-haven drift at the default 25.5, silently. The two
+describe one regime. Anyone who never moved the parameter saw nothing, which
+is what made it worth fixing rather than living with.
+
+**A meeting now reports what it decided.** `advance_day` computed the central
+bank's `Decision` and its announcement variant and then discarded both,
+leaving an embedder with a rate that moved and no way to say why. Both are
+carried on `DayAdvanceOutcome` now. Reconstructing the decision from the rate
+delta was never sound: `StagflationHike` and `LaborEmergencyCut` are separated
+by the context that selected them, not the size of the move. `Decision` also
+gains `as_str` and `Hash`.
+
+**A new dial, off everywhere, for a spread that can invert.** Between central
+bank meetings the corporate bond yield goes stale while the 10y treasury keeps
+moving, so the credit spread drifts below its floor: measured down to 0.42
+against a floor of 0.8, first breaching on day 121. An investment-grade yield
+under the risk-free curve is an impossible quote. `daily_credit_floor_gain`
+re-asserts both credit floors on every daily step, and ships at 0.0, so
+nothing changes until a preset sets it.
+
+<!-- release-note-ends -->
+
+### the detail, and why the third one ships switched off
+
+`update_economy_daily` is preset-independent, so flooring the spread
+unconditionally would move the economy trajectory of every preset, `pt-v1`
+included. The version policy in `RELEASING.md` is explicit that a change to
+the simulated trajectory is breaking however small it looks, and that such
+changes arrive as a new preset rather than an edit to an existing one.
+
+Measured unconditionally, the fix retired both remaining full bit-parity
+economy trajectories, moved the shipped seed standard deviations, and made a
+policy rate transmit before the first meeting -- a boundary the documentation
+and one notebook both describe as sharp. All three are the right consequences
+of the right fix, and all three belong at a preset boundary rather than in a
+patch release. Two tests hold the position: one pins the inversion while the
+dial is off, the other proves both floors hold at 1.0.
+
+The audit the threshold report asked for went across all nine parameters that
+carry a named constant. One more instance turned up, in a test helper that
+took `ModelParams` and then read the constant anyway, so it would have stopped
+mirroring the engine the moment a test moved the threshold.
+
 ## 0.4.1
 
 `pt-v13` and `pt-v14` reported a mispricing half-life they did not run. Both

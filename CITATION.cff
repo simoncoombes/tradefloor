@@ -30,7 +30,7 @@ authors:
   - family-names: Coombes
     given-names: Simon
     email: simon@coombes.io
-version: 0.4.1
+version: 0.4.2
 date-released: "2026-08-28"
 license:
   - MIT
