@@ -77,13 +77,34 @@
 
   function index() { return window.PT_SEARCH || []; }
 
+  /* The index is the largest thing the site ships — it holds the text of
+   * all twenty-five pages so that a search finds passages rather than page
+   * names — and most readers never open search. So it is fetched the first
+   * time they do, rather than on every page load by everyone. */
+  var indexState = 'idle';
+  function loadIndex(then) {
+    if (indexState === 'ready') { then(); return; }
+    if (indexState === 'loading') return;
+    indexState = 'loading';
+    var el = document.createElement('script');
+    el.src = 'pt-search.js';
+    el.onload = function () { indexState = 'ready'; then(); };
+    el.onerror = function () {
+      indexState = 'idle';
+      if (count) count.textContent = 'the search index did not load';
+    };
+    document.head.appendChild(el);
+  }
+
   function open() {
     if (!panel) return;
     panel.hidden = false;
     panel.style.display = 'flex';
     if (input) { input.value = ''; input.focus(); }
     sel = 0;
-    draw('');
+    if (count && indexState !== 'ready') count.textContent = 'loading…';
+    loadIndex(function () { draw(input ? input.value : ''); });
+    if (indexState === 'ready') draw('');
   }
 
   function close() {

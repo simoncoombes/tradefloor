@@ -361,7 +361,6 @@ PAGE = """<!doctype html>
      a script's contents are never parsed as markup. -->
 <script id="pt-template" type="text/x-pt-template">{template}</script>
 <script src="pt-data.js"></script>
-<script src="pt-search.js"></script>
 <script src="learn-runtime.js"></script>
 <script src="learn-shell.js" defer></script>
 <script>

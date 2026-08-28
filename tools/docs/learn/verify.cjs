@@ -135,11 +135,35 @@ async function visit(port, fileUrl, opts) {
     contextId: undefined,
   });
 
+  /* Search fetches its index the first time it is opened, so the only way
+   * to know it works is to open it. */
+  let search = null;
+  if (!opts.noScript && !opts.width) {
+    await send('Runtime.evaluate', {
+      expression: "document.getElementById('pt-search-open').click()",
+    });
+    await sleep(600);
+    const r = await send('Runtime.evaluate', {
+      returnByValue: true,
+      expression: `(() => {
+        const list = document.getElementById('pt-search-results');
+        const panel = document.getElementById('pt-search');
+        return {
+          open: !!panel && panel.style.display === 'flex',
+          results: list ? list.children.length : 0,
+          indexed: (window.PT_SEARCH || []).length,
+          count: (document.getElementById('pt-search-count') || {}).textContent || ''
+        };
+      })()`,
+    });
+    search = r && r.result && r.result.value;
+  }
+
   ws.close();
   await fetch(`http://127.0.0.1:${port}/json/close/${created.id}`).catch(() => {});
 
   const value = probe && probe.result && probe.result.value;
-  return { problems, probe: value, error: probe && probe.exceptionDetails };
+  return { problems, probe: value, search, error: probe && probe.exceptionDetails };
 }
 
 /* Find anything that pushes the page sideways.
@@ -210,7 +234,7 @@ const PROBE = `(() => {
 
   if (!document.getElementById('pt-search-open')) findings.push('no search button');
   if (!document.getElementById('pt-theme')) findings.push('no theme toggle');
-  if (!(window.PT_SEARCH || []).length) findings.push('search index is empty');
+  if (window.PT_SEARCH) findings.push('the search index loaded before it was opened');
 
   const h1 = document.querySelector('#pt-root h1');
   if (!h1 || !h1.textContent.trim()) findings.push('no h1');
@@ -333,6 +357,15 @@ const WIDTHS = [360, 414, 620, 900];
       const findings = [...res.problems, ...((res.probe && res.probe.findings) || [])];
 
       if (res.error) findings.push('probe failed: ' + res.error.text);
+
+      if (res.search) {
+        if (!res.search.open) findings.push('the search panel did not open');
+        else if (res.search.indexed !== 25) {
+          findings.push(`search indexed ${res.search.indexed} pages, expected 25`);
+        } else if (res.search.results !== 25) {
+          findings.push(`search listed ${res.search.results} results, expected 25`);
+        }
+      }
 
       const plain = await visit(port, 'file://' + full, { noScript: true });
       const before = plain.probe ? plain.probe.rootHTML : null;
