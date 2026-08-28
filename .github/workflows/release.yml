@@ -226,9 +226,46 @@ jobs:
           # instead of failing on the files that already exist.
           skip-existing: true
 
+  publish_crate:
+    name: publish to crates.io
+    needs: [setup, wheels, sdist, verify]
+    if: needs.setup.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      id-token: write        # Trusted Publishing, as for PyPI; no token stored
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # The same gate the Python side gets. Sixteen of nineteen integration
+      # tests read the 140 MB goldens corpus that `exclude` keeps out of the
+      # package, so they are absent here by design; what runs is the suite a
+      # consumer can actually run, and a crate whose own tests fail reads as
+      # broken however well it works in this repository.
+      - name: The packaged crate passes its own tests
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo package
+          V=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          cd "target/package/pretium-${V}"
+          cargo test --offline
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: Publish
+        working-directory: rust
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        # `--no-verify` because the package was already built and tested
+        # above; re-verifying compiles the whole crate a second time for no
+        # additional signal. Not idempotent the way PyPI's skip-existing is:
+        # crates.io refuses a version that already exists, and that refusal is
+        # the correct outcome for a re-run rather than something to swallow.
+        run: cargo publish --no-verify
+
   github_release:
     name: GitHub release
-    needs: [setup, verify, publish]
+    needs: [setup, verify, publish, publish_crate]
     if: needs.setup.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
