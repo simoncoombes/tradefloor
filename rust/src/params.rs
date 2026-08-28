@@ -157,6 +157,24 @@ pub struct ModelParams {
     /// Scale on the per-name idiosyncratic GARCH sigma — the funding side
     /// of the factor-variance reallocation. Bit-inert at 1.0.
     pub idio_sigma_scale: f64,
+    /// How much a name's idiosyncratic volatility follows its market beta.
+    /// Zero on every preset before this dial and bit-identical.
+    ///
+    /// At `s` the scale is `idio_sigma_scale * (1 + s * (beta - 1))`. Like
+    /// [`sector_loading_beta_slope`] it reuses a per-name attribute the
+    /// universe already carries rather than drawing a fresh one, so it costs
+    /// no RNG stream and cannot move the draw schedule.
+    ///
+    /// It exists because `idio_sigma_scale` is the last homogeneous term in
+    /// a name's volatility. Cap size already varies it through
+    /// `cap_size_multiplier`, and GARCH varies it through each name's own
+    /// conditional variance, but the SCALE itself is one number for every
+    /// name in the roster. Measured against real markets the model's names
+    /// come out roughly twice as alike as they should: the interquartile
+    /// ratio of annualised name volatility reads 1.184 where the real
+    /// roster reads 1.377. That is a dispersion gap, not a level gap, and
+    /// no dial that moves every name together can close it.
+    pub idio_sigma_beta_slope: f64,
     /// Order-flow impact coefficient, before the informed fraction.
     pub order_flow_coefficient: f64,
     /// Permanent (information) share of order-flow impact.
@@ -505,7 +523,7 @@ pub struct ModelParams {
     pub volume_idio_sigma: f64,
 
     /// How many components a name's variance cascade carries. 0 is OFF and
-    /// is what every preset before pt-v13 ships, so the single-component
+    /// is what every SHIPPED preset uses, so the single-component
     /// GJR recursion runs bit for bit.
     ///
     /// See [`crate::market::garch::update_garch_cascade`] for why more than
@@ -1075,6 +1093,7 @@ pub const PT_V10: ModelParams = ModelParams::pt_v10();
 pub const PT_V11: ModelParams = ModelParams::pt_v11();
 /// [`ModelParams::pt_v12`].
 pub const PT_V12: ModelParams = ModelParams::pt_v12();
+pub const PT_V13: ModelParams = ModelParams::pt_v13();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -1127,6 +1146,7 @@ impl ModelParams {
             sector_loading: 0.5,
             sector_loading_beta_slope: 0.0,
             idio_sigma_scale: factor_vol::IDIO_SIGMA_SCALE,
+            idio_sigma_beta_slope: 0.0,
             order_flow_coefficient: factors::ORDER_FLOW_COEFFICIENT,
             informed_flow_fraction: factors::INFORMED_FLOW_FRACTION,
             inflation_reversion: crate::economy::INFLATION_MEAN_REVERSION,
@@ -1585,11 +1605,11 @@ impl ModelParams {
     /// pt-v9's 4.31x, the correlation blend 3.13x against 3.16x and the shock
     /// ratio 1.078 against 1.084, all inside noise.
     ///
-    /// THE DEFAULT since the 2026-08-26 era boundary, and what the envelope
-    /// certifies: all fourteen realism statistics in band at 252 days on
-    /// thirty training seeds and on a held-out universe, thirteen of
-    /// fourteen at 504 days. This line read "NOT the default" until the
-    /// boundary moved and was corrected after 0.2.0 shipped with it stale.
+    /// NOT the default. [`PT_V12`] holds it. This line has been wrong in
+    /// both directions before -- it read "NOT the default" through 0.2.0
+    /// while pt-v10 held it, and "THE DEFAULT" after pt-v12 took it away.
+    /// The envelope certifies whatever `DEFAULT_PRESET_NAME` names, which
+    /// is the only place worth reading it from.
     pub const fn pt_v10() -> ModelParams {
         let mut p = ModelParams::pt_v9();
         p.vix_cycle_amplitude = 0.0;
@@ -1724,9 +1744,104 @@ impl ModelParams {
     /// the envelope certifies. [`PT_V10`] and [`PT_V3`] stay selectable and
     /// bit-reproducing, so anything recorded under either replays exactly by
     /// naming it.
+    /// THE DEFAULT. [`PT_V13`] is registered beside it and does not replace
+    /// it. What is measured rather than asserted: over thirteen
+    /// thirty-seed blocks this preset holds all fourteen statistics at 504
+    /// days on three of them, because its mean annualised volatility is
+    /// 34.157 against a ceiling of 34.0 and its mean excess kurtosis 7.267
+    /// against a floor of 7.1. It sits on two band rims. Selectable and
+    /// bit-reproducing forever, so anything recorded under it replays by
+    /// naming it.
     pub const fn pt_v12() -> ModelParams {
         let mut p = ModelParams::pt_v11();
         p.volume_move_cap = 12.0;
+        p
+    }
+
+    /// REGISTERED AND SELECTABLE, NOT THE DEFAULT. [`PT_V12`] holds that.
+    ///
+    /// Registered because it is measured and because a preset nobody can
+    /// select is a preset nobody can check. It is not the default because
+    /// it does not clear the era-boundary bar: it regresses crisis
+    /// co-movement, which sits outside its real range on five seed blocks
+    /// of thirteen against pt-v12's four. Its sibling at
+    /// `endogenous_news_sigma` 0.0258 regresses the crisis lever instead.
+    /// Neither is free, and the successor that replaces pt-v12 should be.
+    ///
+    /// Fifteen coefficients, found by
+    /// SURVEYING the settable surface rather than by moving one dial at a
+    /// time, then reduced from thirty-three to fifteen by removing every
+    /// coefficient that carried no information.
+    ///
+    /// What it fixes is a defect in [`PT_V12`] that nobody had measured
+    /// because nobody had measured the mean over enough seeds. Over
+    /// thirteen thirty-seed blocks -- 390 seeds -- `pt-v12` holds all
+    /// fourteen statistics at 504 days on THREE of them. Its mean 504-day
+    /// annualised volatility is 34.157 against a band ceiling of 34.0, and
+    /// its mean excess kurtosis is 7.267 against a floor of 7.1: the preset
+    /// sits on two band rims and passes only when seed noise pulls it back.
+    /// This preset sits 77% and 31% into those bands and holds them on all
+    /// thirteen blocks.
+    ///
+    /// | | pt-v12 | pt-v13 |
+    /// |---|---|---|
+    /// | 504-day panel at 14 of 14 | 3 of 13 blocks | 9 of 13 |
+    /// | 252-day panel at 14 of 14 | 12 of 13 | 13 of 13 |
+    /// | concentrated rosters, 504 | 62 of 69 | 68 of 69 |
+    /// | crisis lever, mean | 5.96 | 6.11 (real 6.16) |
+    /// | driven-window ratio | 1.651 | 1.453 |
+    ///
+    /// The four groups, and why each is here:
+    ///
+    /// **Persistence and funded jump coupling.** Market volatility
+    /// persistence rises, which improves every VIX bucket and costs the
+    /// crisis lever; a funded `jump_vix_coupling` buys the lever back. The
+    /// pair was invisible to a one-dial search because each half fails
+    /// alone. `jump_vix_coupling` starts here: it has shipped inert at 0.0
+    /// in every preset, and §84 designed it to let idiosyncratic news flow
+    /// cluster with the regime.
+    ///
+    /// **The crisis threshold group.** `crisis_vix_threshold` 25.5 to 30.9
+    /// moves the VIX 25-30 bucket of the driven window from 1.62 to 1.34,
+    /// which is the band crisis blending starts in -- the mechanism acting
+    /// exactly where it should. `garch_vix_coupling` falls to near zero to
+    /// pay for it, and that dial is the crisis co-movement lever (§107).
+    ///
+    /// **The VIX anchor.** The market variance target scales with
+    /// `(VIX/anchor)^2`, so moving the anchor rescales the whole
+    /// volatility-versus-VIX curve rather than a point on it. §17 split the
+    /// driven-window defect into a flat gain error and a VIX 30-45 spike;
+    /// this addresses the flat half and nothing else found does.
+    ///
+    /// **`endogenous_news_sigma`.** Pays the anchor's lever cost and lowers
+    /// the driven ratio at the same time -- one of two dials found in
+    /// forty-six rounds that improve two things at once.
+    ///
+    /// Measured beside `pt-v12` throughout: thirty-seed gate on every axis,
+    /// §8 with `pt-v12` as its control, thirteen seed blocks, the
+    /// concentrated rosters, and the bucketed driven window. It regresses
+    /// nothing.
+    pub const fn pt_v13() -> ModelParams {
+        let mut p = ModelParams::pt_v12();
+        // Persistence, and the coupling that pays for it.
+        p.market_vol_alpha = 0.300730582;
+        p.market_vol_beta = 0.66999041;
+        p.jump_vix_coupling = 0.2626;
+        p.jump_intensity_idio = 0.0068895346;
+        p.jump_sigma_idio = 0.08369236;
+        p.jump_intensity_market = 0.0565753337;
+        p.idio_sigma_scale = 0.5688;
+        // The crisis threshold group. garch_vix_coupling near zero is what
+        // holds crisis co-movement up while the rest spends it.
+        p.crisis_vix_threshold = 30.88325108;
+        p.crisis_blend_gain = 0.8275881;
+        p.garch_vix_coupling = 0.0269;
+        p.sector_factor_sigma = 0.01006215;
+        p.sector_loading = 0.57351027;
+        p.mispricing_half_life_days = 68.25733542;
+        // The curve's anchor, and the news sigma that pays for it.
+        p.market_vol_vix_anchor = 15.98426471;
+        p.endogenous_news_sigma = 0.021;
         p
     }
 
@@ -1756,6 +1871,7 @@ impl ModelParams {
             "pt-v10" => Some(PT_V10),
             "pt-v11" => Some(PT_V11),
             "pt-v12" => Some(PT_V12),
+            "pt-v13" => Some(PT_V13),
             _ => None,
         }
     }
@@ -1763,7 +1879,7 @@ impl ModelParams {
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
-          "pt-v11", "pt-v12"]
+          "pt-v11", "pt-v12", "pt-v13"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -1780,6 +1896,7 @@ impl ModelParams {
             "sector_loading" => self.sector_loading,
             "sector_loading_beta_slope" => self.sector_loading_beta_slope,
             "idio_sigma_scale" => self.idio_sigma_scale,
+            "idio_sigma_beta_slope" => self.idio_sigma_beta_slope,
             "order_flow_coefficient" => self.order_flow_coefficient,
             "inflation_ceiling" => self.inflation_ceiling,
             "inflation_floor" => self.inflation_floor,
@@ -1904,6 +2021,7 @@ impl ModelParams {
             "sector_loading" => out.sector_loading = value,
             "sector_loading_beta_slope" => out.sector_loading_beta_slope = value,
             "idio_sigma_scale" => out.idio_sigma_scale = value,
+            "idio_sigma_beta_slope" => out.idio_sigma_beta_slope = value,
             "order_flow_coefficient" => out.order_flow_coefficient = value,
             "inflation_ceiling" => out.inflation_ceiling = value,
             "inflation_floor" => out.inflation_floor = value,
@@ -2106,6 +2224,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "garch_gamma",
         "garch_omega",
         "garch_vix_coupling",
+        "idio_sigma_beta_slope",
         "idio_sigma_scale",
         "inflation_ceiling",
         "inflation_floor",
@@ -2317,19 +2436,30 @@ mod tests {
     }
 
     #[test]
-    fn the_default_preset_is_pt_v10() {
-        // The era boundary, asserted rather than assumed. An engine built
-        // without a model got pt-v3 from 2026-08-22 and pt-v10 from
-        // 2026-08-26; if this flips, every published figure silently
-        // describes a different market.
-        assert_eq!(crate::params::PT_V12.fingerprint(), "pt-v12");
+    fn the_default_is_one_preset_named_in_one_place() {
+        // This test was called `the_default_preset_is_pt_v10` and asserted
+        // "pt-v12" -- edited at the 2026-08-26 boundary and its NAME left
+        // behind, which is the drift the era-boundary checklist exists to
+        // stop. So it no longer names a preset at all.
+        //
+        // What matters is not WHICH preset is the default but that exactly
+        // one thing decides it. An engine built without a model must agree
+        // with `DEFAULT_PRESET_NAME`, and that name must resolve. If those
+        // two ever disagree, every published figure silently describes a
+        // different market from the one the docs name.
+        let named = crate::params::ModelParams::preset(DEFAULT_PRESET_NAME)
+            .expect("DEFAULT_PRESET_NAME must resolve to a shipped preset");
+        assert_eq!(named.fingerprint(), DEFAULT_PRESET_NAME);
         assert_eq!(
             crate::engine::Engine::default_model().fingerprint(),
-            "pt-v12"
+            DEFAULT_PRESET_NAME
         );
-        assert_eq!(DEFAULT_PRESET_NAME, "pt-v12");
-        // The earlier default still exists and still answers to its name.
+        // Every earlier default still exists and still answers to its name,
+        // which is what makes a recorded result replayable across a
+        // boundary.
         assert_eq!(crate::params::PT_V3.fingerprint(), "pt-v3");
+        assert_eq!(crate::params::PT_V10.fingerprint(), "pt-v10");
+        assert_eq!(crate::params::PT_V12.fingerprint(), "pt-v12");
     }
 
     #[test]

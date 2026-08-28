@@ -373,7 +373,32 @@ pub fn calculate_live_factors(
     // term's budget, so total volatility holds still. At 1.0 the multiply
     // is bit-inert.
     let daily_sigma = mathx::sqrt(mathx::max(company.garch_variance, 0.0001));
-    let idiosyncratic_sigma = daily_sigma * params.idio_sigma_scale / mathx::sqrt(390.0);
+    // The idiosyncratic scale was one number for every name in the roster:
+    // cap size varies a name's noise through `cap_mult` and GARCH varies it
+    // through the name's own conditional variance, but the SCALE itself did
+    // not vary at all. Real rosters disperse roughly twice as widely as the
+    // model's (interquartile volatility ratio 1.377 against 1.184), and no
+    // dial that moves every name together can close that.
+    //
+    // At slope zero the branch is not taken and the scale is exactly
+    // `idio_sigma_scale`, so a preset that leaves it unset is bit-identical.
+    let idio_scale = if params.idio_sigma_beta_slope == 0.0 {
+        params.idio_sigma_scale
+    } else {
+        // Same choice as `sector_loading_beta_slope`: tied to beta, which
+        // the universe already carries, so it costs no RNG stream and
+        // cannot move the draw schedule.
+        //
+        // Clamped at zero. A roster can hold a name with beta below
+        // 1 - 1/slope, and an unclamped scale would go negative there --
+        // which flips the sign of the noise draw rather than shrinking it,
+        // turning a defensive name into an inverted one.
+        mathx::max(
+            params.idio_sigma_scale * (1.0 + params.idio_sigma_beta_slope * (beta - 1.0)),
+            0.0,
+        )
+    };
+    let idiosyncratic_sigma = daily_sigma * idio_scale / mathx::sqrt(390.0);
 
     // DRAW SITE — here, before `crash_amplifier` is computed. The order is
     // contractual for the tape even though the two are independent.
@@ -939,6 +964,42 @@ mod tests {
         let mut rng = Fixed(1.0);
         let m = calculate_live_factors(&mega, &[], 0.0, 1.0, &shared(), &crate::params::PT_V1, &mut rng).random_noise;
         assert!(s > m, "small-cap noise {s} should exceed mega-cap {m}");
+    }
+
+    #[test]
+    fn the_idio_beta_slope_is_inert_at_zero_and_disperses_when_it_is_not() {
+        // With every shared factor at zero, `random_noise` IS the
+        // idiosyncratic term -- beta reaches it only through the new dial,
+        // so this isolates the mechanism rather than the factor structure.
+        let noise = |p: &crate::params::ModelParams, beta: f64| {
+            let mut c = company();
+            c.beta = Some(beta);
+            let mut rng = Fixed(1.0);
+            calculate_live_factors(&c, &[], 0.0, 1.0, &shared(), p, &mut rng).random_noise
+        };
+
+        // Inert: the shipped preset leaves the slope at zero, so a defensive
+        // name and an aggressive one carry identical idiosyncratic noise and
+        // every preset's tape is bit-unchanged.
+        let off = crate::params::PT_V1;
+        assert_eq!(off.idio_sigma_beta_slope, 0.0);
+        assert_eq!(noise(&off, 0.6), noise(&off, 1.8));
+
+        // Engaged: the same two names now differ, and in the right order.
+        let mut on = crate::params::PT_V1;
+        on.idio_sigma_beta_slope = 0.6;
+        let (lo, hi) = (noise(&on, 0.6), noise(&on, 1.8));
+        assert!(hi > lo, "beta 1.8 noise {hi} should exceed beta 0.6 noise {lo}");
+        // A name at beta 1.0 is the pivot and must not move at all.
+        assert_eq!(noise(&on, 1.0), noise(&off, 1.0));
+
+        // Clamped: beta below 1 - 1/slope would drive the scale negative,
+        // which flips the sign of the draw rather than shrinking it. A
+        // defensive name must go quiet, never inverted.
+        let mut steep = crate::params::PT_V1;
+        steep.idio_sigma_beta_slope = 4.0;
+        let inverted = noise(&steep, 0.1);
+        assert!(inverted >= 0.0, "clamp failed: noise {inverted} changed sign");
     }
 
     #[test]
