@@ -1182,6 +1182,9 @@ pub const PT_V11: ModelParams = ModelParams::pt_v11();
 pub const PT_V12: ModelParams = ModelParams::pt_v12();
 pub const PT_V13: ModelParams = ModelParams::pt_v13();
 pub const PT_V14: ModelParams = ModelParams::pt_v14();
+/// pt-v14 with the slow variance component switched on and the credit
+/// floor enforced -- see [`ModelParams::pt_v15`].
+pub const PT_V15: ModelParams = ModelParams::pt_v15();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -2056,6 +2059,66 @@ impl ModelParams {
         p
     }
 
+    /// pt-v14 with the slow variance component switched on, its VIX
+    /// coupling damped, and the daily credit floor enforced.
+    ///
+    /// Five numbers. Four are the two-timescale mixture the model has
+    /// carried inert since the pt-v4 era: the slow component takes weight
+    /// 0.35 of the market variance target (persistence 0.98, gain 0.05)
+    /// and its VIX coupling is damped to 0.374. The fifth,
+    /// [`daily_credit_floor_gain`](#structfield.daily_credit_floor_gain)
+    /// at 1.0, activates the #48 fix in full, arriving the way the
+    /// version policy requires a trajectory change to arrive: as a new
+    /// preset.
+    ///
+    /// The slow component carries part of the variance target at a
+    /// persistence the fast component cannot, and its damped VIX coupling
+    /// means a held crisis drives it less. Measured, that cuts how far
+    /// crisis co-movement wanders across seed blocks while leaving the
+    /// panel untouched. Against pt-v14 over thirteen thirty-seed blocks,
+    /// on the build 0.4.3 restores:
+    ///
+    /// | | pt-v14 | pt-v15 | |
+    /// |---|---|---|---|
+    /// | 504 panel, paired per block | -- | 0W 13T 0L | never worse |
+    /// | full-house panel blocks | 11/13 | 11/13 | |
+    /// | crisis co-movement, range over blocks | 0.0774 | **0.0502** | band width 0.0630 |
+    /// | co-movement blocks in range | 11/13 | 12/13 | |
+    /// | crisis lever, median | 6.127 | **6.159** | real 6.16 |
+    /// | lever blocks in tolerance | 13/13 | 13/13 | +/-5% |
+    ///
+    /// **The headline is the range row.** pt-v14's crisis co-movement
+    /// varies more across seed blocks than the whole width of the real
+    /// band, so no placement of its centre can hold every block. 0.0502
+    /// fits, and beats the 0.0551 of pt-v12, the only other preset whose
+    /// range ever has. The lever error falls 0.54% to 0.01%.
+    ///
+    /// The damp is 0.374 and not lower because the two crisis instruments
+    /// trade against each other block by block: every measured damp from
+    /// 0.26 to 0.374 moves both monotonically, one binding block caps
+    /// co-movement from above while another floors the lever from below,
+    /// and no value satisfies both on all thirteen. 0.374 is the end of
+    /// that frontier that holds the lever everywhere and cedes a single
+    /// co-movement block -- one pt-v14 also fails.
+    ///
+    /// The credit floor is measured free: against the same base with only
+    /// this dial moved, the panel reads 1W 12T 0L and both crisis
+    /// instruments are identical on every block. What it buys is an
+    /// invariant rather than a statistic: the corporate spread can no
+    /// longer drift below its floor between meetings.
+    ///
+    /// NOT the default. pt-v14 holds that and the envelope certifies
+    /// pt-v14.
+    pub const fn pt_v15() -> ModelParams {
+        let mut p = ModelParams::pt_v14();
+        p.market_vol_slow_weight = 0.35;
+        p.market_vol_slow_persistence = 0.98;
+        p.market_vol_slow_gain = 0.05;
+        p.market_vol_slow_vix_damp = 0.374;
+        p.daily_credit_floor_gain = 1.0;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -2084,6 +2147,7 @@ impl ModelParams {
             "pt-v12" => Some(PT_V12),
             "pt-v13" => Some(PT_V13),
             "pt-v14" => Some(PT_V14),
+            "pt-v15" => Some(PT_V15),
             _ => None,
         }
     }
@@ -2091,7 +2155,7 @@ impl ModelParams {
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
-          "pt-v11", "pt-v12", "pt-v13", "pt-v14"]
+          "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
