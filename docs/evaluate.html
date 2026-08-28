@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evaluate · pretium</title>
+<meta name="description" content="evaluate, rank, tca and reproduce: the calls that turn a market into a result someone else can check.">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/evaluate.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="Evaluate · pretium">
+<meta property="og:description" content="evaluate, rank, tca and reproduce: the calls that turn a market into a result someone else can check.">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/evaluate.html">
+<meta property="og:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="pretium — a market you can run a strategy against">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta name="author" content="Simon Coombes">
+<meta name="theme-color" content="#FAFBFA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1312" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<!-- The measurements every claim on this site rests on, as data. -->
+<link rel="alternate" type="application/json" href="envelope.json"
+      title="the realism envelope">
+<!-- The same pages as plain text, for a reader that is a model. -->
+<link rel="alternate" type="text/plain" href="llms.txt" title="summary for language models">
+<link rel="alternate" type="text/plain" href="llms-full.txt" title="full text for language models">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Evaluate","description":"evaluate, rank, tca and reproduce: the calls that turn a market into a result someone else can check.","url":"https://simoncoombes.github.io/pretium/evaluate.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-27"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"API"},{"@type":"ListItem","position":3,"name":"Evaluate","item":"https://simoncoombes.github.io/pretium/evaluate.html"}]}</script>
+<script>
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
+</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
+</head>
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu pt-here"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><span class="pt-current">Evaluate</span><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
+
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">EVALUATE</span>
+</div>
+
+<section class="pt-s33">
+<h1 class="pt-s30">Evaluate</h1>
+<p class="pt-s24">Four calls turn a market into a result: score one, rank twelve, price the execution, replay it later.</p>
+</section>
+
+<section style="padding:2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
+
+<div class="pt-s11">
+<div class="pt-s55">
+<h2 class="pt-s25"><span class="pt-s49">pt.evaluate</span></h2>
+<span class="pt-s0">Score agents on one identical market.</span>
+</div>
+<pre class="pt-s53">scores = pt.evaluate(
+    agents: dict[str, Agent | StrategySpec],
+    *, seed: int, universe: Universe,
+    days: int, scenario: Scenario | None = None,
+    model: str | None = None)</pre>
+<div>
+
+<div class="pt-s44">
+<span class="pt-s6">agents</span>
+<span class="pt-s3">A dict of name to agent, or name to StrategySpec. A spec carries its own fingerprint into the result.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">one engine each</span>
+<span class="pt-s3">Every agent gets its own Engine built from the same seed and roster, so nobody eats another agent's depth.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">returns</span>
+<span class="pt-s3">A dict of name to Scorecard.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">pt.reference_agents(seed=3)</span>
+<span class="pt-s3">The five shipped baselines as a ready dict: hold, random, momentum, mean_reversion and oracle.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">pt.capture_ratio(scores)</span>
+<span class="pt-s3">Each agent's P&amp;L as a fraction of the Oracle's.</span>
+</div>
+
+</div>
+<div class="pt-s54">One market is one sample. Use rank before you call a winner.</div>
+</div>
+
+
+<div class="pt-s11">
+<div class="pt-s55">
+<h2 class="pt-s25"><span class="pt-s49">pt.rank</span></h2>
+<span class="pt-s0">Repeat that across twelve seeds, and separate with a sign test.</span>
+</div>
+<pre class="pt-s53">ranking = pt.rank(
+    factory: Callable[[], dict],
+    *, seeds: Iterable[int], universe: Universe,
+    days: int, workers: int = 1)
+
+ranking.report()
+ranking.separation("mean_reversion", "momentum")</pre>
+<div>
+
+<div class="pt-s44">
+<span class="pt-s6">factory</span>
+<span class="pt-s3">A callable returning a fresh agent dict per seed, because an agent that carries state across markets is not being measured on either.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">report()</span>
+<span class="pt-s3">Pooled captures, their per-seed ranges, and how many seeds each agent topped.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">separation(a, b)</span>
+<span class="pt-s3">A paired sign test: wins, losses, ties and a p-value.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">workers</span>
+<span class="pt-s3">Processes. Seeds are independent, so this scales linearly.</span>
+</div>
+
+</div>
+<div class="pt-s54">On the published twelve-market grid, mean-reversion pools at +0.783 and momentum at +0.259, and mean-reversion wins 9 to 3 at p = 0.15. One seed picks the pooled leader eight times in twelve.</div>
+</div>
+
+
+<div class="pt-s11">
+<div class="pt-s55">
+<h2 class="pt-s25"><span class="pt-s49">pt.tca.analyse</span></h2>
+<span class="pt-s0">Price the execution against the world where you never traded.</span>
+</div>
+<pre class="pt-s53">ex = pt.tca.analyse(
+    algo, *, seed: int,
+    universe: Universe, days: int)
+
+ex.shortfall_bps()
+ex.by_step()
+ex.partial_fills()</pre>
+<div>
+
+<div class="pt-s44">
+<span class="pt-s6">algo</span>
+<span class="pt-s3">Any object with an act method.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">shortfall_bps()</span>
+<span class="pt-s3">What the footprint cost, against the same seed run with no orders.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">by_step()</span>
+<span class="pt-s3">Where it was paid, per decision.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">partial_fills()</span>
+<span class="pt-s3">What you asked for against what you got.</span>
+</div>
+
+</div>
+<div class="pt-s54">Round-trip shortfall measured over eight simulation seeds runs -17.72 to +2.03 bps. The range crosses zero, so one run tells you nothing.</div>
+</div>
+
+
+<div class="pt-s11">
+<div class="pt-s55">
+<h2 class="pt-s25"><span class="pt-s49">pt.RunManifest</span></h2>
+<span class="pt-s0">Write the run down so someone else can replay it.</span>
+</div>
+<pre class="pt-s53">manifest = pt.RunManifest.of(
+    engine, spec, seed=7)
+
+manifest.to_json(path)
+pt.RunManifest.from_json(text)
+pt.reproduce(manifest)</pre>
+<div>
+
+<div class="pt-s44">
+<span class="pt-s6">carries</span>
+<span class="pt-s3">Package version, preset, seed, universe fingerprint, macro conditions, scenario and strategy fingerprint, with the expected digest.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">reproduce()</span>
+<span class="pt-s3">Raises on a mismatch and names the component that disagreed.</span>
+</div>
+
+
+<div class="pt-s44">
+<span class="pt-s6">era_fingerprint()</span>
+<span class="pt-s3">The digest of a small fixed probe, recomputed before every replay, so two builds that agree on the probe agree on the arithmetic.</span>
+</div>
+
+</div>
+<div class="pt-s54">A manifest that quietly reproduced a different market would be worse than no manifest, so it refuses rather than warning.</div>
+</div>
+
+</section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">What a Scorecard carries</h2>
+<div class="pt-s11">
+
+<div class="pt-s105">
+<span class="pt-s6">return_pct</span>
+<span class="pt-s3">What it made, as a percentage.</span>
+</div>
+
+
+<div class="pt-s105">
+<span class="pt-s6">pnl</span>
+<span class="pt-s3">What it made, in currency.</span>
+</div>
+
+
+<div class="pt-s105">
+<span class="pt-s6">impact_bps</span>
+<span class="pt-s3">What its own footprint cost, in basis points.</span>
+</div>
+
+
+<div class="pt-s105">
+<span class="pt-s6">trades</span>
+<span class="pt-s3">How many fills it took.</span>
+</div>
+
+
+<div class="pt-s105">
+<span class="pt-s6">strategy_fingerprint</span>
+<span class="pt-s3">A sha256 over the spec. This is the one to cite.</span>
+</div>
+
+
+<div class="pt-s105">
+<span class="pt-s6">universe_fingerprint</span>
+<span class="pt-s3">A sha256 over the roster, order included.</span>
+</div>
+
+
+<div class="pt-s105">
+<span class="pt-s6">model</span>
+<span class="pt-s3">The preset the run used, so a result names its own coefficients.</span>
+</div>
+
+</div>
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
+<p class="pt-s58"><span class="pt-s184">strategy_fingerprint</span> is empty for a hand-built agent, because that result is reproducible only by citing code at a commit. A <span class="pt-s184">StrategySpec</span> gives you one, which is why the spec grammar exists.</p>
+</div>
+</section>
+
+
+
+
+</main></div>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><a href="two-loops.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></a><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><a href="agents.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></a><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><a href="presets.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></a><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></span><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="core-types.html"><span class="pt-eyebrow">BACK</span><span>Core types</span></a><a class="pt-next" href="parameters.html"><span class="pt-eyebrow">NEXT</span><span>Parameters</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">EVALUATE</span>
+</div>
+
+<section class="pt-s33">
+<h1 class="pt-s30">Evaluate</h1>
+<p class="pt-s24">Four calls turn a market into a result: score one, rank twelve, price the execution, replay it later.</p>
+</section>
+
+<section style="padding:2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
+<sc-for list="{{ calls }}" as="c">
+<div class="pt-s11">
+<div class="pt-s55">
+<h2 class="pt-s25"><span class="pt-s49">{{ c.name }}</span></h2>
+<span class="pt-s0">{{ c.lede }}</span>
+</div>
+<pre class="pt-s53">{{ c.sig }}</pre>
+<div>
+<sc-for list="{{ c.members }}" as="m">
+<div class="pt-s44">
+<span class="pt-s6">{{ m.k }}</span>
+<span class="pt-s3">{{ m.v }}</span>
+</div>
+
+</sc-for></div>
+<div class="pt-s54">{{ c.note }}</div>
+</div>
+
+</sc-for></section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">What a Scorecard carries</h2>
+<div class="pt-s11">
+<sc-for list="{{ scorecard }}" as="s">
+<div class="pt-s105">
+<span class="pt-s6">{{ s.k }}</span>
+<span class="pt-s3">{{ s.v }}</span>
+</div>
+
+</sc-for></div>
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
+<p class="pt-s58"><span class="pt-s184">strategy_fingerprint</span> is empty for a hand-built agent, because that result is reproducible only by citing code at a commit. A <span class="pt-s184">StrategySpec</span> gives you one, which is why the spec grammar exists.</p>
+</div>
+</section>
+
+
+
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) if (all[i] !== inside) all[i].removeAttribute('open');
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  DOORS = (this.props.doors || []).map((d) => [d.title, d.links.map((l) => [l.label, l.href])]);
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const self = 'evaluate.html';
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      showLight: dark ? 'none' : 'block',
+      showDark: dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      nav: this.DOORS.map(([title, links]) => ({
+        title: title,
+        col: links.some(l => l[1] === self) ? 'var(--accent)' : 'var(--ink-2)',
+        links: links.map(([label, href]) => ({
+          label: label, href: href,
+          col: href === self ? 'var(--accent)' : 'var(--ink-2)',
+          bg: href === self ? 'var(--accent-soft)' : 'transparent'
+        }))
+      })),
+      calls: [
+        { name: 'pt.evaluate',
+          lede: 'Score agents on one identical market.',
+          sig: 'scores = pt.evaluate(\n    agents: dict[str, Agent | StrategySpec],\n    *, seed: int, universe: Universe,\n    days: int, scenario: Scenario | None = None,\n    model: str | None = None)',
+          members: [
+            { k: 'agents', v: 'A dict of name to agent, or name to StrategySpec. A spec carries its own fingerprint into the result.' },
+            { k: 'one engine each', v: 'Every agent gets its own Engine built from the same seed and roster, so nobody eats another agent\u0027s depth.' },
+            { k: 'returns', v: 'A dict of name to Scorecard.' },
+            { k: 'pt.reference_agents(seed=3)', v: 'The five shipped baselines as a ready dict: hold, random, momentum, mean_reversion and oracle.' },
+            { k: 'pt.capture_ratio(scores)', v: 'Each agent\u0027s P&L as a fraction of the Oracle\u0027s.' }
+          ],
+          note: 'One market is one sample. Use rank before you call a winner.' },
+        { name: 'pt.rank',
+          lede: 'Repeat that across twelve seeds, and separate with a sign test.',
+          sig: 'ranking = pt.rank(\n    factory: Callable[[], dict],\n    *, seeds: Iterable[int], universe: Universe,\n    days: int, workers: int = 1)\n\nranking.report()\nranking.separation("mean_reversion", "momentum")',
+          members: [
+            { k: 'factory', v: 'A callable returning a fresh agent dict per seed, because an agent that carries state across markets is not being measured on either.' },
+            { k: 'report()', v: 'Pooled captures, their per-seed ranges, and how many seeds each agent topped.' },
+            { k: 'separation(a, b)', v: 'A paired sign test: wins, losses, ties and a p-value.' },
+            { k: 'workers', v: 'Processes. Seeds are independent, so this scales linearly.' }
+          ],
+          note: 'On the published twelve-market grid, mean-reversion pools at +0.783 and momentum at +0.259, and mean-reversion wins 9 to 3 at p = 0.15. One seed picks the pooled leader eight times in twelve.' },
+        { name: 'pt.tca.analyse',
+          lede: 'Price the execution against the world where you never traded.',
+          sig: 'ex = pt.tca.analyse(\n    algo, *, seed: int,\n    universe: Universe, days: int)\n\nex.shortfall_bps()\nex.by_step()\nex.partial_fills()',
+          members: [
+            { k: 'algo', v: 'Any object with an act method.' },
+            { k: 'shortfall_bps()', v: 'What the footprint cost, against the same seed run with no orders.' },
+            { k: 'by_step()', v: 'Where it was paid, per decision.' },
+            { k: 'partial_fills()', v: 'What you asked for against what you got.' }
+          ],
+          note: 'Round-trip shortfall measured over eight simulation seeds runs -17.72 to +2.03 bps. The range crosses zero, so one run tells you nothing.' },
+        { name: 'pt.RunManifest',
+          lede: 'Write the run down so someone else can replay it.',
+          sig: 'manifest = pt.RunManifest.of(\n    engine, spec, seed=7)\n\nmanifest.to_json(path)\npt.RunManifest.from_json(text)\npt.reproduce(manifest)',
+          members: [
+            { k: 'carries', v: 'Package version, preset, seed, universe fingerprint, macro conditions, scenario and strategy fingerprint, with the expected digest.' },
+            { k: 'reproduce()', v: 'Raises on a mismatch and names the component that disagreed.' },
+            { k: 'era_fingerprint()', v: 'The digest of a small fixed probe, recomputed before every replay, so two builds that agree on the probe agree on the arithmetic.' }
+          ],
+          note: 'A manifest that quietly reproduced a different market would be worse than no manifest, so it refuses rather than warning.' }
+      ],
+      scorecard: [
+        { k: 'return_pct', v: 'What it made, as a percentage.' },
+        { k: 'pnl', v: 'What it made, in currency.' },
+        { k: 'impact_bps', v: 'What its own footprint cost, in basis points.' },
+        { k: 'trades', v: 'How many fills it took.' },
+        { k: 'strategy_fingerprint', v: 'A sha256 over the spec. This is the one to cite.' },
+        { k: 'universe_fingerprint', v: 'A sha256 over the roster, order included.' },
+        { k: 'model', v: 'The preset the run used, so a result names its own coefficients.' }
+      ]
+    });
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {"doors": [{"title": "Start", "links": [{"label": "Install", "href": "install.html"}, {"label": "Core concepts", "href": "core-concepts.html"}, {"label": "The two loops", "href": "two-loops.html"}, {"label": "Running a market", "href": "running-a-market.html"}]}, {"title": "Use it", "links": [{"label": "Agents", "href": "agents.html"}, {"label": "Scenarios", "href": "scenarios.html"}, {"label": "Execution cost", "href": "execution-cost.html"}, {"label": "Checkpoints and forking", "href": "checkpoints.html"}, {"label": "Real companies from EDGAR", "href": "edgar.html"}, {"label": "RL environment", "href": "rl-environment.html"}, {"label": "The MCP server", "href": "mcp.html"}]}, {"title": "Trust it", "links": [{"label": "Realism envelope", "href": "realism-envelope.html"}, {"label": "The metrics", "href": "metrics.html"}, {"label": "Principles", "href": "principles.html"}, {"label": "Citing a run", "href": "citing.html"}]}, {"title": "Reference", "links": [{"label": "Glossary", "href": "glossary.html"}, {"label": "The nine factors", "href": "factors.html"}, {"label": "Conventions", "href": "conventions.html"}, {"label": "Schemas", "href": "schemas.html"}, {"label": "Presets", "href": "presets.html"}, {"label": "Release notes", "href": "release-notes.html"}]}, {"title": "API", "links": [{"label": "Core types", "href": "core-types.html"}, {"label": "Evaluate", "href": "evaluate.html"}, {"label": "Parameters", "href": "parameters.html"}]}]});
+})();
+</script>
+</body>
+</html>

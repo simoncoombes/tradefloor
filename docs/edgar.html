@@ -1,247 +1,184 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Real Companies from EDGAR · pretium docs</title>
-<meta name="description" content="Seed a universe from real SEC EDGAR filings. The fundamentals are real and usefully messy; every price path stays synthetic, and the filings snapshot is citable.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real companies from EDGAR · pretium</title>
+<meta name="description" content="Seed a universe from real SEC filings: real valuation dispersion, real sector weights, synthetic price paths.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/edgar.html">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium docs">
-<meta property="og:title" content="Real Companies from EDGAR">
-<meta property="og:description" content="Seed a universe from real SEC EDGAR filings. The fundamentals are real and usefully messy; every price path stays synthetic, and the filings snapshot is citable.">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="Real companies from EDGAR · pretium">
+<meta property="og:description" content="Seed a universe from real SEC filings: real valuation dispersion, real sector weights, synthetic price paths.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/edgar.html">
-<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
-<meta property="article:modified_time" content="2026-08-27T12:19:15-04:00">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Real Companies from EDGAR">
-<meta name="twitter:description" content="Seed a universe from real SEC EDGAR filings. The fundamentals are real and usefully messy; every price path stays synthetic, and the filings snapshot is citable.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Real Companies from EDGAR","description":"Seed a universe from real SEC EDGAR filings. The fundamentals are real and usefully messy; every price path stays synthetic, and the filings snapshot is citable.","url":"https://simoncoombes.github.io/pretium/edgar.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-27T12:19:15-04:00"}</script>
+<meta property="og:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="pretium — a market you can run a strategy against">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta name="author" content="Simon Coombes">
+<meta name="theme-color" content="#FAFBFA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1312" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<!-- The measurements every claim on this site rests on, as data. -->
+<link rel="alternate" type="application/json" href="envelope.json"
+      title="the realism envelope">
+<!-- The same pages as plain text, for a reader that is a model. -->
+<link rel="alternate" type="text/plain" href="llms.txt" title="summary for language models">
+<link rel="alternate" type="text/plain" href="llms-full.txt" title="full text for language models">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
-<style>:root{
-  --hue:55;
-  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
-  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
-  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
-  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
-  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
-  --bad:oklch(0.52 0.12 25);
-  --navact:oklch(0.945 0.012 var(--hue));
-  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
-  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
-  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
-  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
-}
-html[data-lightcode="true"]:not([data-theme="dark"]){
-  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
-  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
-}
-html[data-theme="dark"]{
-  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
-  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
-  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
-  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
-  --bad:oklch(0.72 0.11 25);
-  --navact:oklch(0.26 0.02 var(--hue));
-  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
-}
-html{scroll-behavior:auto}
-body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-::selection{background:var(--accent-soft)}
-p{margin:0 0 14px;text-wrap:pretty}
-h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
-ul{margin:0 0 14px;padding-left:22px}
-li{margin:0 0 7px}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
-pre{margin:0}
-code{font-family:var(--font-mono)}
-summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
-summary::marker{color:var(--faint)}
-details[open] summary{border-bottom:1px solid var(--linesoft)}
-button{font-family:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-h2[id],h3[id]{scroll-margin-top:80px}
-h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
-h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
-.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
-#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
-#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
-#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
-#hambtn{display:none}
-@media (max-width:920px){
-  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
-  #sbar[data-open="true"]{transform:none}
-  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
-  #hambtn{display:flex}
-  #searchwrap{display:none}
-  #ghlink{display:none}
-}
-.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
-  grid-template-columns:232px minmax(0,1fr);gap:40px}
-.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
-.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
-.sidebar li{margin:0 0 2px}
-.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
-.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
-.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
-main{padding:28px 0 72px;min-width:0}
-main h1{font-size:30px;margin:0 0 18px}
-main h2{font-size:20px;margin:34px 0 12px}
-main h3{font-size:16px;margin:24px 0 8px}
-.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
-.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
-  display:flex;align-items:baseline;gap:12px}
-.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
-.masthead .tag{color:var(--mut);font-size:13px}
-.masthead .spacer{flex:1}
-.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
-  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
-pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
-  padding:13px 16px;overflow-x:auto;font-size:13px}
-pre code{color:inherit}
-.tablewrap{overflow-x:auto}
-footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
-  color:var(--mut);font-size:13px}
-@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
-  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
-</style>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Real companies from EDGAR","description":"Seed a universe from real SEC filings: real valuation dispersion, real sector weights, synthetic price paths.","url":"https://simoncoombes.github.io/pretium/edgar.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-27"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"Use it"},{"@type":"ListItem","position":3,"name":"Real companies from EDGAR","item":"https://simoncoombes.github.io/pretium/edgar.html"}]}</script>
 <script>
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-1LBM3239ZF');
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </head>
-<body>
-<header class="masthead"><div class="inner">
-<a class="brand" href="./">pretium</a>
-<span class="tag">repeatable market simulation</span>
-<span class="spacer"></span>
-<a href="https://github.com/simoncoombes/pretium">GitHub</a>
-</div></header>
-<div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><span aria-current="page">Real companies from EDGAR</span></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li><li><a href="two-loops.html">The Two Loops</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="principles.html">The Principles</a></li></ul></nav>
-<main>
-<p class="appnote">This is the plain version of the page. The
-<a href="./#/edgar">full documentation app</a> adds search, dark mode
-and copy buttons.</p>
-<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">CONNECT</div>
-        <h1 style="font-size:30px">Real Companies from EDGAR</h1>
-        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">Seed a universe from real SEC filings. The fundamentals are real; every price path stays synthetic.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">When Real Fundamentals Help</h2>
-        <p>A generated universe is plausible but far too tidy. Real filings are messy in useful ways: valuations spread properly, sector weights are lopsided, and loss-makers turn up in realistic numbers. If your strategy reads fundamentals, test it on this.</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">snap = pt.edgar.fetch(as_of="2024-06-30", limit=100,
-                      user_agent="Jane Roe jane@example.org")
-snap.save("edgar-2024h1.json")     # the artifact: hashed, citable
-
-universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)
-engine = pt.Engine(seed=42, universe=universe)</code></pre>
-        </div>
-        <h2 style="font-size:21px;margin:46px 0 10px">How It Works</h2>
-        <ul style="color:var(--mut);font-size:14px">
-          <li>The fetch uses EDGAR's XBRL frames API: five market-wide requests plus one per company kept. It takes a <code style="font-size:12.5px">transport</code> argument, so the whole derivation is testable without a network.</li>
-          <li><code style="font-size:12.5px">user_agent</code> is required and must carry a contact address. The SEC's fair-access policy asks for one, and the library will not send a made-up one for you.</li>
-          <li>Each kept company becomes an <code style="font-size:12.5px">Instrument</code> with its filed fundamentals: eps, book value, shares outstanding, and the rest. The model then values and prices those fundamentals under the rate you pass, the same way it does for a generated roster.</li>
-        </ul>
-        <h2 style="font-size:21px;margin:46px 0 10px">Save and Cite the Snapshot</h2>
-        <p>Companies amend their filings, so the same request will return different numbers next year. The snapshot file is what you cite: hashed, saveable, and enough to rebuild the exact same universe later. Cite the file, not the query.</p>
-        <div style="border:1px solid var(--line);border-radius:9px;padding:14px 18px 4px;margin:26px 0;background:var(--panel)">
-          <div style="font:600 10.5px/1 var(--font-mono);letter-spacing:0.09em;color:var(--bad);margin:0 0 9px">WHAT THIS DOES NOT GIVE YOU</div>
-          <p style="font-size:13.5px;color:var(--mut)">EDGAR carries no market capitalisation, so <code style="font-size:12px">limit=</code> ranks companies by shareholders' equity and the roster ends up skewed toward balance-sheet-heavy names rather than resembling a cap-weighted index.</p>
-          <p style="font-size:13.5px;color:var(--mut)">And it loads fundamentals, not behaviour. A loaded ticker is a stock with that company's fundamentals under this model's assumptions. It is not that company: not its real volatility, not its microstructure, not its news flow.</p>
-        </div>
-        <h2 style="font-size:21px;margin:46px 0 10px">From Filings to an Archived Result</h2>
-        <p>The whole thing end to end. Fetch the filings, save the snapshot, look at what you got, measure realism on your own roster rather than borrowing the published numbers, run the strategy, then archive it so someone else can rebuild it.</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">import collections
-import pretium as pt
-from pretium import envelope
-
-# 1. fetch once, save the artifact, and cite THAT
-snap = pt.edgar.fetch(as_of="2024-06-30", limit=60,
-                      user_agent="Jane Roe jane@example.org")
-snap.save("edgar-2024h1.json")       # hashed, citable, replayable
-
-# 2. build the universe and look at what you actually got
-universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)
-print(len(universe), universe.fingerprint)
-print(collections.Counter(i.sector for i in universe))   # NOT balanced
-print(sum(1 for i in universe if i.eps &lt;= 0), "loss-makers")
-
-# 3. this roster's own realism panel, with the seed spread beside it
-panels = [pt.facts.measure(seed=s, universe=universe) for s in range(1, 7)]
-print(envelope.report_intervals(envelope.intervals(panels)))
-
-# 4. and the verdict for a concentrated roster
-print(envelope.check(horizon_days=252, sector_concentrated=True,
-                     statistics=["cross_sectional_corr"]))
-
-# 5. now run the study on real fundamentals
-spec = pt.StrategySpec.momentum(lookback_days=1.0, top_k=5)
-scores = pt.evaluate({"mom": spec}, seed=42, universe=universe, days=252)
-print(scores["mom"].return_pct, scores["mom"].pnl)
-
-# 6. archive it: snapshot file + manifest is a rebuildable result
-eng = pt.Engine(seed=42, universe=universe)
-manifest = pt.RunManifest.of(eng, seed=42, universe=universe, strategy=spec)
-open("run.json", "w").write(manifest.to_json())</code></pre>
-        </div>
-        <div style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">OUTPUT</span><span title="Shapes and field names are real; the numeric values were composed for the example." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--codemut);border:1px solid var(--codeline)">ILLUSTRATIVE</span></div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);color:var(--codemut)"># 2. what you got
-60 a1f4c9e2b7d05836
-Counter({'Financials': 14, 'Industrials': 9, 'Energy': 8,
-         'Health Care': 7, 'Technology': 6, 'Utilities': 5, ...})
-4 loss-makers
-
-# 3. this roster's own panel
-statistic                   median       p10       p90       sd             band  verdict
------------------------------------------------------------------------------------------
-annualised_vol_pct         31.8402   26.9113   38.7705    4.4021    (15.0, 36.0)  in band; p10-p90 crosses an edge
-excess_kurtosis             3.1147    1.8402    6.7715    1.9033    (1.6, 41.0)   in band
-return_acf1                 0.0412    0.0203    0.0688    0.0171   (-0.08, 0.06)  in band; p10-p90 crosses an edge
-abs_return_acf1             0.1688    0.0715    0.4102    0.1544    (0.02, 0.22)  in band; p10-p90 crosses an edge
-...
-volume_change_acf1         -0.3095   -0.3402   -0.2711    0.0268  (-0.32, -0.20)  in band; p10-p90 crosses an edge
-
-# 4. the verdict for a concentrated roster
-OUTSIDE the envelope
-  - the roster is sector-concentrated, and certification was measured on
-    a perfectly balanced one. An S&amp;P-like mix holds 8/10 (abs_return_acf5
-    leaves band); an all-technology roster holds 7/10 at 32.8% volatility.
-    Re-measure on your own universe
-  ? cross_sectional_corr is in band at the certified horizon (0.3063 in
-    (0.08, 0.56)) -- but that is a median across 30 seeds; check
-    `intervals` for the spread before relying on one seed
-
-# 5. the study
-0.1874 0.9231</code></pre>
-        </div>
-        <p>Step 4 refuses, which is the right answer here. Use the panel from step 3 as the realism record for this roster. The published numbers describe a different roster. The sector counts in step 2 are usually why yours differ: 14 financials against a round-robin roster's 3 or 4 per sector changes what the market does. Step 4's two counts are out of the ten-statistic panel of the pt-v3 era and have not been re-measured since; what they establish is a property of the roster rather than of a preset.</p>
-        <p>Store the snapshot file and the universe fingerprint alongside your results. Re-running the same EDGAR query later gives different numbers, and a re-ordered roster gives a different market.</p>
-</main>
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu pt-here"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><span class="pt-current">Real companies from EDGAR</span><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">USE IT</a><span>/</span><span class="pt-s10">REAL COMPANIES FROM EDGAR</span>
 </div>
-<footer class="site"><div class="layout" style="display:block">
-pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
-</div></footer>
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Real companies from EDGAR</h1>
+<p class="pt-s24">Seed a universe from real SEC filings. Real valuation dispersion, real sector weights, loss-makers in realistic proportion. The price path stays synthetic.</p>
+<pre style="margin:0.4rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">snap = pt.edgar.fetch(as_of="2024-06-30", limit=100,
+                      user_agent="Jane Roe jane@example.org")
+snap.save("edgar-2024h1.json")            # the artifact, hashed and citable
+
+universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)</pre>
+<p style="color:var(--ink-2);margin:0;font-size:0.875rem"><code>user_agent</code> must carry a contact address — the SEC's fair-access policy asks for one, and this library will not send a fabricated one for you.</p>
+</section>
+<section class="pt-s190">
+<h2 class="pt-s7">Save the snapshot, cite that</h2>
+<p class="pt-s182">EDGAR is not append-only: the same request returns different numbers next year. A snapshot is hashed and serialisable, so cite the file, not the query.</p>
+</section>
+<section class="pt-s190">
+<h2 class="pt-s7">Two ways to rank, two different biases</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">rank_by="equity" (default)</span>
+<p class="pt-s1">EDGAR carries no market cap, so ranking by shareholders' equity skews balance-sheet-heavy. Measured on the live SEC for CY2025, the top 150 by equity came back 27% financial services and 17% technology, against roughly 13% and 30% for the S&amp;P 500, with five banks in the top ten.</p>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">rank_by="public_float"</span>
+<p class="pt-s1">Ranks by the one market-derived number EDGAR has, producing a roster that resembles a real index. Costs: stale by six to eighteen months, and understates founder-controlled companies since float excludes what insiders hold.</p>
+</div>
+</div>
+<p class="pt-s182">Neither is a market-cap ranking, because EDGAR has no prices. For that, set <code>initial_price</code> yourself from a market data source. And this loads fundamentals, not behaviour: a loaded ticker gives you a stock with that company's fundamentals under this model's assumptions, not that company's volatility or microstructure.</p>
+</section>
+
+</main></div>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><a href="two-loops.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></a><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><a href="agents.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></a><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></span><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><a href="presets.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></a><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="checkpoints.html"><span class="pt-eyebrow">BACK</span><span>Checkpoints and forking</span></a><a class="pt-next" href="rl-environment.html"><span class="pt-eyebrow">NEXT</span><span>RL environment</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">USE IT</a><span>/</span><span class="pt-s10">REAL COMPANIES FROM EDGAR</span>
+</div>
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Real companies from EDGAR</h1>
+<p class="pt-s24">Seed a universe from real SEC filings. Real valuation dispersion, real sector weights, loss-makers in realistic proportion. The price path stays synthetic.</p>
+<pre style="margin:0.4rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">snap = pt.edgar.fetch(as_of="2024-06-30", limit=100,
+                      user_agent="Jane Roe jane@example.org")
+snap.save("edgar-2024h1.json")            # the artifact, hashed and citable
+
+universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)</pre>
+<p style="color:var(--ink-2);margin:0;font-size:0.875rem"><code>user_agent</code> must carry a contact address — the SEC's fair-access policy asks for one, and this library will not send a fabricated one for you.</p>
+</section>
+<section class="pt-s190">
+<h2 class="pt-s7">Save the snapshot, cite that</h2>
+<p class="pt-s182">EDGAR is not append-only: the same request returns different numbers next year. A snapshot is hashed and serialisable, so cite the file, not the query.</p>
+</section>
+<section class="pt-s190">
+<h2 class="pt-s7">Two ways to rank, two different biases</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">rank_by="equity" (default)</span>
+<p class="pt-s1">EDGAR carries no market cap, so ranking by shareholders' equity skews balance-sheet-heavy. Measured on the live SEC for CY2025, the top 150 by equity came back 27% financial services and 17% technology, against roughly 13% and 30% for the S&amp;P 500, with five banks in the top ten.</p>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">rank_by="public_float"</span>
+<p class="pt-s1">Ranks by the one market-derived number EDGAR has, producing a roster that resembles a real index. Costs: stale by six to eighteen months, and understates founder-controlled companies since float excludes what insiders hold.</p>
+</div>
+</div>
+<p class="pt-s182">Neither is a market-cap ranking, because EDGAR has no prices. For that, set <code>initial_price</code> yourself from a market data source. And this loads fundamentals, not behaviour: a loaded ticker gives you a stock with that company's fundamentals under this model's assumptions, not that company's volatility or microstructure.</p>
+</section>
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false };
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (e) {}
+  }
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark' : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (e) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+  }
+  renderVals() {
+    return {
+      markLogo: this.state.dark ? './mark-pretium-dark.png' : './mark-pretium.png',
+      themeGlyph: this.state.dark ? 'light' : 'dark',
+      toggleTheme: () => { const n = !this.state.dark; this.setState({ dark: n }); this.applyTheme(n); }
+    };
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {"doors": [{"title": "Start", "links": [{"label": "Install", "href": "install.html"}, {"label": "Core concepts", "href": "core-concepts.html"}, {"label": "The two loops", "href": "two-loops.html"}, {"label": "Running a market", "href": "running-a-market.html"}]}, {"title": "Use it", "links": [{"label": "Agents", "href": "agents.html"}, {"label": "Scenarios", "href": "scenarios.html"}, {"label": "Execution cost", "href": "execution-cost.html"}, {"label": "Checkpoints and forking", "href": "checkpoints.html"}, {"label": "Real companies from EDGAR", "href": "edgar.html"}, {"label": "RL environment", "href": "rl-environment.html"}, {"label": "The MCP server", "href": "mcp.html"}]}, {"title": "Trust it", "links": [{"label": "Realism envelope", "href": "realism-envelope.html"}, {"label": "The metrics", "href": "metrics.html"}, {"label": "Principles", "href": "principles.html"}, {"label": "Citing a run", "href": "citing.html"}]}, {"title": "Reference", "links": [{"label": "Glossary", "href": "glossary.html"}, {"label": "The nine factors", "href": "factors.html"}, {"label": "Conventions", "href": "conventions.html"}, {"label": "Schemas", "href": "schemas.html"}, {"label": "Presets", "href": "presets.html"}, {"label": "Release notes", "href": "release-notes.html"}]}, {"title": "API", "links": [{"label": "Core types", "href": "core-types.html"}, {"label": "Evaluate", "href": "evaluate.html"}, {"label": "Parameters", "href": "parameters.html"}]}]});
+})();
+</script>
 </body>
 </html>

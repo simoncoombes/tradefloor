@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Presets · pretium</title>
+<meta name="description" content="Twelve named coefficient sets. Which one to use, what each one measured, and what a preset does not pin.">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/presets.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="Presets · pretium">
+<meta property="og:description" content="Twelve named coefficient sets. Which one to use, what each one measured, and what a preset does not pin.">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/presets.html">
+<meta property="og:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="pretium — a market you can run a strategy against">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta name="author" content="Simon Coombes">
+<meta name="theme-color" content="#FAFBFA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1312" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<!-- The measurements every claim on this site rests on, as data. -->
+<link rel="alternate" type="application/json" href="envelope.json"
+      title="the realism envelope">
+<!-- The same pages as plain text, for a reader that is a model. -->
+<link rel="alternate" type="text/plain" href="llms.txt" title="summary for language models">
+<link rel="alternate" type="text/plain" href="llms-full.txt" title="full text for language models">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Presets","description":"Twelve named coefficient sets. Which one to use, what each one measured, and what a preset does not pin.","url":"https://simoncoombes.github.io/pretium/presets.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-27"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"Reference"},{"@type":"ListItem","position":3,"name":"Presets","item":"https://simoncoombes.github.io/pretium/presets.html"}]}</script>
+<script>
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
+</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
+</head>
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu pt-here"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><span class="pt-current">Presets</span><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
+
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">PRESETS</span>
+</div>
+
+<section class="pt-s33">
+<h1 class="pt-s30">Presets</h1>
+<p class="pt-s24">Twelve named coefficient sets. Use pt-v12 unless a published run names another one.</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-deep)">pt-v12</span>
+<span class="pt-s73">The default since 2026-08-26. All fourteen statistics in band at 252 days and again at 504.</span>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink)">12</span>
+<span class="pt-s0">Presets ship. All selectable, all reproducing bit for bit.</span>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink)">8</span>
+<span class="pt-s0">Numbers in the dictionary a preset carries. Others are live and absent from it.</span>
+</div>
+</div>
+</section>
+
+<section class="pt-s19">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
+<h2 class="pt-s7">Which preset to use</h2>
+<div style="display:flex;gap:0.35rem">
+
+<button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)">all twelve</button>
+
+
+<button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">for new work</button>
+
+
+<button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">reproduction only</button>
+
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;padding:0 1.1rem;font-size:0.75rem;color:var(--ink-3)">
+<span>Preset</span><span>Use it for</span>
+<span style="text-align:right" title="Realism statistics inside their real-market bands at 252 trading days">In band, 252d</span>
+<span style="text-align:right" title="The same panel scored against bands re-derived at 504 days">In band, 504d</span>
+</div>
+<div style="display:grid;grid-auto-rows:1fr;gap:0.7rem">
+
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
+<div class="pt-s40">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--accent-deep)">pt-v12</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--accent-deep)">RECOMMENDED</span>
+</div>
+<span style="font-size:0.875rem;color:var(--accent-deep)">Anything. The default, and the one the realism envelope certifies: all fourteen statistics in band at 252 days, and all fourteen again at 504.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">14/14</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">14/14</span>
+</div>
+
+
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
+<div class="pt-s40">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--accent-deep)">pt-v8</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--accent-deep)">RECOMMENDED, BY NAME</span>
+</div>
+<span style="font-size:0.875rem;color:var(--accent-deep)">Anything that measures how correlation moves through time: the factor variance has a memory, and thirteen of fourteen hold at 504 days.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-3)">-</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">13/14</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
+<div class="pt-s40">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v10</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Work published before the 2026-08-26 era boundary, when this was the default. All fourteen in band at 252 days, on thirty training seeds.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">14/14</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">13/14</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
+<div class="pt-s40">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v11</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">A run that names it: pt-v10 plus the crisis work, crisis_blend_gain, sector_vix_coupling, endogenous news and peer transfer, which pt-v12 inherits.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-3)">-</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-3)">-</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
+<div class="pt-s40">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v9</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">A run that names it: thirteen of fourteen at both horizons, and the first preset whose VIX responds to the day move rather than the closing minute.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">13/14</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">13/14</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
+<div class="pt-s40">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v7</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">A sector or crisis study that names it: the first preset with industries that survive a crisis, thirteen of fourteen at both horizons.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">13/14</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">13/14</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
+<div class="pt-s40">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v3</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Work published when this was the default, the era before pt-v10. Selectable, and it reproduces bit for bit under 0.1.4 and 0.2.0 alike.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-3)">-</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">7/14</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
+<div class="pt-s40">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v1, v2, v4, v5, v6</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">A run that names them. pt-v1 ships momentum_theta at 0.25 and measures return autocorrelation at +0.249, outside the real band.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-3)">-</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-3)">-</span>
+</div>
+
+</div>
+<div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.4rem">
+<p class="pt-s1"><strong style="font-weight:600">A band is the range a real equity market produces for one statistic.</strong> Fourteen statistics are measured on the simulated market and compared against their real-market ranges: volatility, the fatness of the tails, how much names move together, whether volatility arrives in episodes, whether volume behaves. A statistic is in band when the simulated value falls inside the real range. The columns count how many of the fourteen do, at one and at two trading years.</p>
+
+</div>
+</section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">Name it, or inherit a moving default</h2>
+<div class="pt-s29">
+<pre class="pt-s31">e = pt.Engine(seed=42, universe=u,
+              model="pt-v12")
+
+e.model_fingerprint   # "pt-v12"
+pt.model_preset()     # the set in force
+
+# a settable change renames it
+# "custom-7f290e34"</pre>
+<div class="pt-s186">
+<h3 class="pt-s4">The era boundary</h3>
+<p class="pt-s1">pt-v12 became the default on 2026-08-26, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
+<p class="pt-s1">Checked rather than asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
+</div>
+</div>
+</section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">What a preset pins</h2>
+<div class="pt-s68">
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 class="pt-s66">In the dictionary</h3>
+<p class="pt-s58">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms.</p>
+<p style="margin:0;font-size:0.8125rem;color:var(--accent-deep)">Two are derived rather than set: mispricing_phi and s_phi_tick come from the half-life.</p>
+</div>
+<div class="pt-s181">
+<h3 class="pt-s4">Live, and not in it</h3>
+<p class="pt-s1">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. Nothing forces a preset name to change when one of them moves.</p>
+<p class="pt-s185">So a fully specified run is package version, preset, universe fingerprint and seed. The preset alone is necessary and not sufficient.</p>
+</div>
+<div class="pt-s181">
+<h3 class="pt-s4">Never settable</h3>
+<p class="pt-s1">The draw schedule: market hours, the 390-tick day, the calendar and the sector key order. A preset changes what the draws are multiplied into, never the schedule itself.</p>
+<p class="pt-s185">The guards are settable but excluded from every calibration search, because they are worst-case guarantees. daily_shock_cap is not settable at all.</p>
+</div>
+</div>
+</section>
+
+
+
+
+</main></div>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><a href="two-loops.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></a><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><a href="agents.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></a><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></span><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="schemas.html"><span class="pt-eyebrow">BACK</span><span>Schemas</span></a><a class="pt-next" href="release-notes.html"><span class="pt-eyebrow">NEXT</span><span>Release notes</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">PRESETS</span>
+</div>
+
+<section class="pt-s33">
+<h1 class="pt-s30">Presets</h1>
+<p class="pt-s24">Twelve named coefficient sets. Use pt-v12 unless a published run names another one.</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-deep)">pt-v12</span>
+<span class="pt-s73">The default since 2026-08-26. All fourteen statistics in band at 252 days and again at 504.</span>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink)">12</span>
+<span class="pt-s0">Presets ship. All selectable, all reproducing bit for bit.</span>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink)">8</span>
+<span class="pt-s0">Numbers in the dictionary a preset carries. Others are live and absent from it.</span>
+</div>
+</div>
+</section>
+
+<section class="pt-s19">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
+<h2 class="pt-s7">Which preset to use</h2>
+<div style="display:flex;gap:0.35rem">
+<sc-for list="{{ filters }}" as="fl">
+<button onClick="{{ fl.pick }}" style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid {{ fl.border }};background:{{ fl.bg }};color:{{ fl.fg }}">{{ fl.label }}</button>
+
+</sc-for></div>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;padding:0 1.1rem;font-size:0.75rem;color:var(--ink-3)">
+<span>Preset</span><span>Use it for</span>
+<span style="text-align:right" title="Realism statistics inside their real-market bands at 252 trading days">In band, 252d</span>
+<span style="text-align:right" title="The same panel scored against bands re-derived at 504 days">In band, 504d</span>
+</div>
+<div style="display:grid;grid-auto-rows:1fr;gap:0.7rem">
+<sc-for list="{{ presets }}" as="p">
+<div style="border:1px solid {{ p.border }};border-radius:6px;background:{{ p.bg }};padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
+<div class="pt-s40">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:{{ p.nameCol }}">{{ p.name }}</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:{{ p.tagCol }}">{{ p.tag }}</span>
+</div>
+<span style="font-size:0.875rem;color:{{ p.bodyCol }}">{{ p.body }}</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:{{ p.c252col }}">{{ p.c252 }}</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:{{ p.c504col }}">{{ p.c504 }}</span>
+</div>
+
+</sc-for></div>
+<div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.4rem">
+<p class="pt-s1"><strong style="font-weight:600">A band is the range a real equity market produces for one statistic.</strong> Fourteen statistics are measured on the simulated market and compared against their real-market ranges: volatility, the fatness of the tails, how much names move together, whether volatility arrives in episodes, whether volume behaves. A statistic is in band when the simulated value falls inside the real range. The columns count how many of the fourteen do, at one and at two trading years.</p>
+
+</div>
+</section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">Name it, or inherit a moving default</h2>
+<div class="pt-s29">
+<pre class="pt-s31">e = pt.Engine(seed=42, universe=u,
+              model="pt-v12")
+
+e.model_fingerprint   # "pt-v12"
+pt.model_preset()     # the set in force
+
+# a settable change renames it
+# "custom-7f290e34"</pre>
+<div class="pt-s186">
+<h3 class="pt-s4">The era boundary</h3>
+<p class="pt-s1">pt-v12 became the default on 2026-08-26, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
+<p class="pt-s1">Checked rather than asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
+</div>
+</div>
+</section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">What a preset pins</h2>
+<div class="pt-s68">
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 class="pt-s66">In the dictionary</h3>
+<p class="pt-s58">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms.</p>
+<p style="margin:0;font-size:0.8125rem;color:var(--accent-deep)">Two are derived rather than set: mispricing_phi and s_phi_tick come from the half-life.</p>
+</div>
+<div class="pt-s181">
+<h3 class="pt-s4">Live, and not in it</h3>
+<p class="pt-s1">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. Nothing forces a preset name to change when one of them moves.</p>
+<p class="pt-s185">So a fully specified run is package version, preset, universe fingerprint and seed. The preset alone is necessary and not sufficient.</p>
+</div>
+<div class="pt-s181">
+<h3 class="pt-s4">Never settable</h3>
+<p class="pt-s1">The draw schedule: market hours, the 390-tick day, the calendar and the sector key order. A preset changes what the draws are multiplied into, never the schedule itself.</p>
+<p class="pt-s185">The guards are settable but excluded from every calibration search, because they are worst-case guarantees. daily_shock_cap is not settable at all.</p>
+</div>
+</div>
+</section>
+
+
+
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false, filter: 'all' , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) if (all[i] !== inside) all[i].removeAttribute('open');
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  DOORS = (this.props.doors || []).map((d) => [d.title, d.links.map((l) => [l.label, l.href])]);
+
+  PRESETS = [
+    { name: 'pt-v12', tag: 'RECOMMENDED', kind: 'use',
+      c252: "14/14", c504: "14/14", acf: "+0.0239",
+      body: 'Anything. The default, and the one the realism envelope certifies: all fourteen statistics in band at 252 days, and all fourteen again at 504.' },
+    { name: 'pt-v8', tag: 'RECOMMENDED, BY NAME', kind: 'use',
+      c252: "-", c504: "13/14", acf: "-",
+      body: 'Anything that measures how correlation moves through time: the factor variance has a memory, and thirteen of fourteen hold at 504 days.' },
+    { name: 'pt-v10', tag: 'REPRODUCTION ONLY', kind: 'repro',
+      c252: "14/14", c504: "13/14", acf: "-",
+      body: 'Work published before the 2026-08-26 era boundary, when this was the default. All fourteen in band at 252 days, on thirty training seeds.' },
+    { name: 'pt-v11', tag: 'REPRODUCTION ONLY', kind: 'repro',
+      c252: "-", c504: "-", acf: "-",
+      body: 'A run that names it: pt-v10 plus the crisis work, crisis_blend_gain, sector_vix_coupling, endogenous news and peer transfer, which pt-v12 inherits.' },
+    { name: 'pt-v9', tag: 'REPRODUCTION ONLY', kind: 'repro',
+      c252: "13/14", c504: "13/14", acf: "-",
+      body: 'A run that names it: thirteen of fourteen at both horizons, and the first preset whose VIX responds to the day move rather than the closing minute.' },
+    { name: 'pt-v7', tag: 'REPRODUCTION ONLY', kind: 'repro',
+      c252: "13/14", c504: "13/14", acf: "-",
+      body: 'A sector or crisis study that names it: the first preset with industries that survive a crisis, thirteen of fourteen at both horizons.' },
+    { name: 'pt-v3', tag: 'REPRODUCTION ONLY', kind: 'repro',
+      c252: "-", c504: "7/14", acf: "-",
+      body: 'Work published when this was the default, the era before pt-v10. Selectable, and it reproduces bit for bit under 0.1.4 and 0.2.0 alike.' },
+    { name: 'pt-v1, v2, v4, v5, v6', tag: 'REPRODUCTION ONLY', kind: 'repro',
+      c252: "-", c504: "-", acf: "+0.249",
+      body: 'A run that names them. pt-v1 ships momentum_theta at 0.25 and measures return autocorrelation at +0.249, outside the real band.' }
+  ];
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const self = 'presets.html';
+    const fl = this.state.filter;
+    const pill = (on) => on
+      ? { border: 'var(--accent-line)', bg: 'var(--accent-soft)', fg: 'var(--accent-deep)' }
+      : { border: 'var(--line)', bg: 'var(--card)', fg: 'var(--ink-2)' };
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      showLight: dark ? 'none' : 'block',
+      showDark: dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      nav: this.DOORS.map(([title, links]) => ({
+        title: title,
+        col: links.some(l => l[1] === self) ? 'var(--accent)' : 'var(--ink-2)',
+        links: links.map(([label, href]) => ({
+          label: label, href: href,
+          col: href === self ? 'var(--accent)' : 'var(--ink-2)',
+          bg: href === self ? 'var(--accent-soft)' : 'transparent'
+        }))
+      })),
+      filters: [['all', 'all twelve'], ['use', 'for new work'], ['repro', 'reproduction only']].map(([k, label]) => {
+        const p = pill(fl === k);
+        return { label: label, border: p.border, bg: p.bg, fg: p.fg, pick: () => this.setState({ filter: k }) };
+      }),
+      presets: this.PRESETS.filter(p => fl === 'all' || p.kind === fl).map(p => {
+        const hot = p.kind === 'use';
+        const statCol = (v) => v === '-' ? 'var(--ink-3)' : 'var(--ink-2)';
+        const acfCol = p.acf === '-' ? 'var(--ink-3)'
+          : (parseFloat(p.acf) > 0.06 || parseFloat(p.acf) < -0.08) ? 'var(--red)' : 'var(--green)';
+        return { name: p.name, tag: p.tag, body: p.body,
+          c252: p.c252, c504: p.c504, acf: p.acf,
+          c252col: statCol(p.c252), c504col: statCol(p.c504), acfCol: acfCol,
+          border: hot ? 'var(--accent-line)' : 'var(--line)',
+          bg: hot ? 'var(--accent-soft)' : 'var(--card)',
+          nameCol: hot ? 'var(--accent-deep)' : 'var(--ink)',
+          tagCol: hot ? 'var(--accent-deep)' : 'var(--ink-3)',
+          bodyCol: hot ? 'var(--accent-deep)' : 'var(--ink-2)' };
+      })
+    });
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {"doors": [{"title": "Start", "links": [{"label": "Install", "href": "install.html"}, {"label": "Core concepts", "href": "core-concepts.html"}, {"label": "The two loops", "href": "two-loops.html"}, {"label": "Running a market", "href": "running-a-market.html"}]}, {"title": "Use it", "links": [{"label": "Agents", "href": "agents.html"}, {"label": "Scenarios", "href": "scenarios.html"}, {"label": "Execution cost", "href": "execution-cost.html"}, {"label": "Checkpoints and forking", "href": "checkpoints.html"}, {"label": "Real companies from EDGAR", "href": "edgar.html"}, {"label": "RL environment", "href": "rl-environment.html"}, {"label": "The MCP server", "href": "mcp.html"}]}, {"title": "Trust it", "links": [{"label": "Realism envelope", "href": "realism-envelope.html"}, {"label": "The metrics", "href": "metrics.html"}, {"label": "Principles", "href": "principles.html"}, {"label": "Citing a run", "href": "citing.html"}]}, {"title": "Reference", "links": [{"label": "Glossary", "href": "glossary.html"}, {"label": "The nine factors", "href": "factors.html"}, {"label": "Conventions", "href": "conventions.html"}, {"label": "Schemas", "href": "schemas.html"}, {"label": "Presets", "href": "presets.html"}, {"label": "Release notes", "href": "release-notes.html"}]}, {"title": "API", "links": [{"label": "Core types", "href": "core-types.html"}, {"label": "Evaluate", "href": "evaluate.html"}, {"label": "Parameters", "href": "parameters.html"}]}]});
+})();
+</script>
+</body>
+</html>

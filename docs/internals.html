@@ -1,234 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Under the Hood · pretium docs</title>
-<meta name="description" content="How the simulator works: the Rust and Python split, the three layers of the price model, the order book, the macro chain, and why determinism holds to the last bit.">
-<link rel="canonical" href="https://simoncoombes.github.io/pretium/internals.html">
-<meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium docs">
-<meta property="og:title" content="Under the Hood">
-<meta property="og:description" content="How the simulator works: the Rust and Python split, the three layers of the price model, the order book, the macro chain, and why determinism holds to the last bit.">
-<meta property="og:url" content="https://simoncoombes.github.io/pretium/internals.html">
-<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
-<meta property="article:modified_time" content="2026-08-27T12:19:15-04:00">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Under the Hood">
-<meta name="twitter:description" content="How the simulator works: the Rust and Python split, the three layers of the price model, the order book, the macro chain, and why determinism holds to the last bit.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Under the Hood","description":"How the simulator works: the Rust and Python split, the three layers of the price model, the order book, the macro chain, and why determinism holds to the last bit.","url":"https://simoncoombes.github.io/pretium/internals.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-27T12:19:15-04:00"}</script>
+<title>Moved — pretium</title>
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/index.html">
+<meta http-equiv="refresh" content="0; url=index.html">
+<meta name="robots" content="noindex, follow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
-<style>:root{
-  --hue:55;
-  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
-  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
-  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
-  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
-  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
-  --bad:oklch(0.52 0.12 25);
-  --navact:oklch(0.945 0.012 var(--hue));
-  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
-  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
-  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
-  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
+<style>
+body{margin:0;background:#FAFBFA;color:#3C4A47;
+  font:400 1rem/1.65 'Public Sans',system-ui,-apple-system,sans-serif}
+main{max-width:34rem;margin:0 auto;padding:6rem 1.5rem}
+h1{font:600 1.5rem/1.2 'Source Serif 4',ui-serif,Georgia,serif;color:#101A18;margin:0 0 0.6rem}
+a{color:#0E6B65}
+@media (prefers-color-scheme: dark){
+  body{background:#0D1312;color:#B2C0BD} h1{color:#E5ECEA} a{color:#5FC9BE}
 }
-html[data-lightcode="true"]:not([data-theme="dark"]){
-  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
-  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
-}
-html[data-theme="dark"]{
-  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
-  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
-  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
-  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
-  --bad:oklch(0.72 0.11 25);
-  --navact:oklch(0.26 0.02 var(--hue));
-  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
-}
-html{scroll-behavior:auto}
-body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-::selection{background:var(--accent-soft)}
-p{margin:0 0 14px;text-wrap:pretty}
-h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
-ul{margin:0 0 14px;padding-left:22px}
-li{margin:0 0 7px}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
-pre{margin:0}
-code{font-family:var(--font-mono)}
-summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
-summary::marker{color:var(--faint)}
-details[open] summary{border-bottom:1px solid var(--linesoft)}
-button{font-family:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-h2[id],h3[id]{scroll-margin-top:80px}
-h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
-h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
-.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
-#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
-#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
-#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
-#hambtn{display:none}
-@media (max-width:920px){
-  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
-  #sbar[data-open="true"]{transform:none}
-  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
-  #hambtn{display:flex}
-  #searchwrap{display:none}
-  #ghlink{display:none}
-}
-.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
-  grid-template-columns:232px minmax(0,1fr);gap:40px}
-.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
-.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
-.sidebar li{margin:0 0 2px}
-.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
-.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
-.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
-main{padding:28px 0 72px;min-width:0}
-main h1{font-size:30px;margin:0 0 18px}
-main h2{font-size:20px;margin:34px 0 12px}
-main h3{font-size:16px;margin:24px 0 8px}
-.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
-.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
-  display:flex;align-items:baseline;gap:12px}
-.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
-.masthead .tag{color:var(--mut);font-size:13px}
-.masthead .spacer{flex:1}
-.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
-  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
-pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
-  padding:13px 16px;overflow-x:auto;font-size:13px}
-pre code{color:inherit}
-.tablewrap{overflow-x:auto}
-footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
-  color:var(--mut);font-size:13px}
-@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
-  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
 </style>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
-<script>
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-1LBM3239ZF');
-</script>
 </head>
 <body>
-<header class="masthead"><div class="inner">
-<a class="brand" href="./">pretium</a>
-<span class="tag">repeatable market simulation</span>
-<span class="spacer"></span>
-<a href="https://github.com/simoncoombes/pretium">GitHub</a>
-</div></header>
-<div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><span aria-current="page">Under the hood</span></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li><li><a href="two-loops.html">The Two Loops</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="principles.html">The Principles</a></li></ul></nav>
 <main>
-<p class="appnote">This is the plain version of the page. The
-<a href="./#/internals">full documentation app</a> adds search, dark mode
-and copy buttons.</p>
-<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">REFERENCE</div>
-        <h1 style="font-size:30px">Under the Hood</h1>
-        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">How the simulator actually works: the Rust and Python split, the three layers of the price model, the book, the macro chain, the random number architecture, and why the determinism guarantee holds to the last bit.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Rust Core, Python API</h2>
-        <p>Everything that runs a market lives in the Rust crate: the engine, the price model, the order book, the economy, the RNG and the vendored maths. The Python package re-exports it and adds the parts better written in Python: JSON round-trips, process pools for seed sweeps, and the analysis modules (<code style="font-size:13px">facts</code>, <code style="font-size:13px">loss</code>, <code style="font-size:13px">envelope</code>, <code style="font-size:13px">atlas</code>, <code style="font-size:13px">tca</code>). Forcing those into the extension would mean hand-rolling JSON escaping and reimplementing a process pool, both worse than the standard library versions.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Where a Decision Lives</h2>
-        <p>The day loop now lives in the core: the macro step, the day close, and the mapping of initial state. Previously parts of it sat in the bindings, which meant the browser surface and the Python surface each ran their own copy.</p>
-        <p>The rule behind that move is worth stating, because it is what keeps two surfaces honest: <strong>if it decides something about the market, it belongs in the core.</strong> A binding that re-implements a modelling decision is a fork wearing the costume of glue code, and the divergence stays invisible until a whole simulated market has drifted.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">How a Price Is Built</h2>
-        <figure style="margin:22px 0">
-        <svg viewBox="0 0 840 210" role="img" width="100%"
-             aria-label="The tick runs in four phases: factors, price, volume, settlement. The uniform drawn in phase one is spent in phase three, and the circuit breaker is applied twice, once to the model price in phase two and once to the settled print in phase four."
-             style="max-width:840px;color:currentColor">
-          <defs><marker id="tick-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker></defs>
-          <g fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.85"><rect x="20" y="60" width="170" height="52" rx="6"/><rect x="230" y="60" width="170" height="52" rx="6"/><rect x="440" y="60" width="170" height="52" rx="6"/><rect x="650" y="60" width="170" height="52" rx="6"/></g>
-          <g fill="none" stroke="currentColor" stroke-width="1.2"
-             marker-end="url(#tick-arrow)"><path d="M 190 86 L 244 86"/><path d="M 400 86 L 454 86"/><path d="M 610 86 L 664 86"/></g>
-          <g font-size="12.5" fill="currentColor" text-anchor="middle" font-family="var(--font-ui, sans-serif)"><text x="105" y="82">Factors</text><text x="105" y="99" opacity="0.6" font-size="11">one normal, one uniform</text><text x="315" y="82">Price</text><text x="315" y="99" opacity="0.6" font-size="11">s-process, then breaker</text><text x="525" y="82">Volume</text><text x="525" y="99" opacity="0.6" font-size="11">spends phase 1's uniform</text><text x="735" y="82">Settlement</text><text x="735" y="99" opacity="0.6" font-size="11">the book prints</text><text x="217" y="81" font-size="10.5" opacity="0.72">then</text><text x="427" y="81" font-size="10.5" opacity="0.72">then</text><text x="637" y="81" font-size="10.5" opacity="0.72">then</text></g>
-          <path d="M 105 60 C 105 22, 525 22, 525 56" fill="none"
-                stroke="var(--accent, currentColor)" stroke-width="1.5"
-                stroke-dasharray="4 3" marker-end="url(#tick-arrow)"/>
-          <text x="315" y="20" font-size="11.5" text-anchor="middle"
-                fill="var(--accent, currentColor)" font-family="var(--font-ui, sans-serif)">the uniform is stashed, not used</text>
-          <path d="M 315 112 C 315 152, 735 152, 735 116" fill="none"
-                stroke="var(--accent, currentColor)" stroke-width="1.5"
-                marker-end="url(#tick-arrow)"/>
-          <text x="525" y="172" font-size="11.5" text-anchor="middle"
-                fill="var(--accent, currentColor)" font-family="var(--font-ui, sans-serif)">the breaker runs again, on the print</text>
-          <text x="20" y="196" font-size="11" fill="currentColor" opacity="0.6" font-family="var(--font-mono, monospace)">
-            one tick, per company
-          </text>
-        </svg>
-        <figcaption style="color:var(--mut);font-size:13px;margin-top:8px">The order of operations is the model. The uniform drawn
-        in phase 1 is not used there; it is consumed in phase 3, so a port that
-        drew it where it is used would produce identical draw counts and a
-        different stream. The circuit breaker is applied twice, and the second
-        application is the one that matters, because the settled print becomes
-        the next tick's reference.</figcaption>
-        </figure>
-
-        <p><strong>Layer 1: fair value from fundamentals.</strong> Each instrument gets a true value computed from its fundamentals, discounted at the prevailing rates. This anchor moves: when the central bank's meeting calendar moves the discount rate, fair value reprices per instrument. The one exception is a loss-maker valued off book value, which carries no discount rate.</p>
-        <p><strong>Layer 2: an autoregressive mispricing process.</strong> The market price wanders around fair value through a mispricing term with mean reversion, momentum and a herding component, plus news shocks. This wedge between price and value is the ground truth the <code style="font-size:13px">truth</code> table records, and its momentum term is what makes returns trend. Under <code style="font-size:13px">pt-v1</code> that reads +0.249 at lag one against a real band around zero; the shipped <code style="font-size:13px">pt-v12</code> turns the term down to 0.0186 and measures +0.0239, inside the band. The herding term is load-bearing for the model's identity, and the counterfactual is one line: <code style="font-size:13px">ModelParams.from_preset("pt-v1", momentum_theta=0.05)</code> measured in band, honestly fingerprinted as custom.</p>
-        <p><strong>Layer 3: GJR-GARCH volatility with a shared market factor.</strong> Every name runs a GJR-GARCH variance process, so volatility clusters and reacts asymmetrically to losses, which is where the leverage effect comes from: a symmetric process produces none at any coefficients. On top sits a shared market factor with its own conditional variance, coupled to VIX. The factor's variance reverts to a target scaling with (VIX/15)², so a pinned VIX moves realised volatility: 31% annualised at VIX 5, 37% at 15, 105% at 45, 126% at 65. Above VIX 25.5 the cross-section blends toward the factor, and mean pairwise correlation reads +0.20 calm, +0.62 at VIX 45, +0.68 at 65. Diversification fails under stress the way real crises make it fail. Since the 2026-08-26 era boundary the coupling is not the factor's alone: a name's own GJR-GARCH variance follows the VIX too (<code style="font-size:13px">garch_vix_coupling</code> 0.3), the sector draw's variance follows the regime in full (<code style="font-size:13px">sector_vix_coupling</code> 1.0, which was a quarter under pt-v10 and was quadrupled by pt-v11's crisis work), the VIX's own fear channel reads the day's index return rather than the closing minute, the volatility regimes come off the market instead of the business cycle, and the factor's variance clamp sits at 32x its baseline rather than 8x. Descriptions of these mechanics written for pt-v3 do not carry over. <span style="font:400 11px/1.5 var(--font-mono);color:var(--faint)">Universe.random(20-25, seed=11) · 120 days · sim seed 3, VIX pinned.</span> Those levels straddle the certified panel's 32.76% rather than sitting near it, the two calm pins bracketing it and the two crisis pins running three to four times higher, because a pinned VIX is not a normal market: the pin drives the factor variance directly, and these runs use a smaller roster over 120 days rather than the certified 40 names over 252. The ratio between two of them is also not the crisis lever the realism page quotes, which is measured on the certified roster. Compare pins against each other, and take a headline volatility number from an unpinned run. See <a href="trust.html">Realism and Limits</a>.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">The Order Book</h2>
-        <p>Matching runs against a limit order book with price-time priority. You get queue position, partial fills, and a quoted spread that widens under stress. Impact is emergent: a large order pays worse prices because it consumed levels, and there is no slippage coefficient anywhere in the code. Read that as a statement about the mechanism, not about calibration: the realism envelope measures daily price, correlation and volume statistics, and nothing in it grades depth shape, cancellation intensity, queue dynamics, the intraday spread distribution, impact decay, resiliency or order-sign autocorrelation against real market data. The book is real and it is not certified. Session circuit breakers halt a name when a move binds the breaker, and the golden tests pin that behaviour tick by tick. The measured cost of trading too often is in <a href="simulate.html">Running a market</a>.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">The Macro Chain</h2>
-        <p>A full Taylor/Phillips/Okun loop advances at every day close: economy update, cycle transition, central bank. VIX takes a new value every day. The policy fields step at the central bank's meeting calendar: over one measured 120-day run, the funds rate took 2 distinct values, the corporate bond yield 3, inflation 4, GDP growth 6, and fair value repriced per instrument on the meeting days the discount rate moved, days 45 and 96 of that run. A pin overrides the endogenous step from the day it lands. <span style="font:400 11px/1.5 var(--font-mono);color:var(--faint)">Universe.random(20, seed=11) · sim seed 42 · run_days(120)</span></p>
-        <h2 style="font-size:21px;margin:46px 0 10px">RNG Streams</h2>
-        <p>One seed drives the whole simulation, through seven independent substreams, so changing what one consumer draws cannot shift any other consumer's sequence. Four of the seven exist because of that rule rather than in spite of it: a mechanism that consumes draws could not have been added to a shared stream at all without shifting every later draw and moving every shipped preset's trajectory, so jumps, volume, news and per-name volume each got a stream of their own and each arrived inert.</p>
-        <div class="tablewrap"><table style="max-width:640px">
-          <thead><tr><th>Stream</th><th style="text-align:right">Id</th><th>Serves</th></tr></thead>
-          <tbody style="font-size:13.5px">
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">market</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">0</td><td>every draw in the tick: market factor, sector factors, per-company noise, volume, book settlement</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">economy</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">1</td><td>the daily macro chain: economy update, cycle transition, central bank</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">external</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">2</td><td>the embedder, through Engine.draw_uniform() / draw_normal()</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">jumps</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">3</td><td>endogenous jumps, drawn once per name per day at the close</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">volume</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">4</td><td>the common persistent volume component, drawn once per day at the close</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">news</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">5</td><td>endogenous company news, drawn once per name per day at the open</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">volume_idio</td><td style="text-align:right;font-family:var(--font-mono);font-size:12.5px">6</td><td>per-name volume persistence, drawn once per name per day</td></tr>
-          </tbody>
-        </table></div>
-        <p style="margin:14px 0 14px">Why the split exists. TCA re-runs the market without your orders, and the subtraction is exact only if the untraded world sees the identical noise. The macro chain's draw count genuinely varies with macro state: a chain in contraction rolls a shock the expansion never draws, so it needs its own stream. And a host application that takes one random number of its own must never invalidate a seeded market. The market stream's schedule is a pure function of market status, active roster and sector count, so no price, no macro value and no order flow can move its position. <code style="font-size:13px">Engine.draws_by_stream()</code> reports the counts for the first three, which are the ones a TCA subtraction compares; the four later streams are diagnosed through the snapshot instead, where each occupies three of the 21 numbers in <code style="font-size:13px">state_snapshot()["rng"]</code>.</p>
-        <p>The derivation is a contract, pinned by a golden test against hand-computed values:</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">DERIVATION</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">mixed      = splitmix64_mix((s &lt;&lt; 32) | k)    # on 64 bits
-seed_k     = mixed &gt;&gt; 32                      # top 32 bits
-sequence_k = 256 + k
-stream_k   = GameRng(seed_k, sequence_k)      # PCG-XSH-RR 64/32</code></pre>
-        </div>
-        <p>Two properties make the streams independent. Each stream gets its own PCG sequence, hence its own odd increment, and two PCG32 generators with different increments traverse different orbits: one can never be a time-shifted copy of the other, by construction. And the seed is passed through an avalanche mixer first, because seeding two streams with the same raw state leaves a deterministic cross-stream relation that the output permutation only obscures. The mixer gives every stream an unrelated starting state. Everything in the derivation is integer arithmetic, exactly specified on every platform, so it adds nothing for the bit-identity claim to trip on.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Why the Crate Bans std Transcendentals</h2>
-        <p>Rust's <code style="font-size:13px">f64::cos</code> delegates to the platform's maths library: MSVC's on Windows, glibc's on Linux, Apple's on macOS. They give different answers. Measured, one operation out of four differs:</p>
-        <div class="tablewrap"><table style="max-width:420px">
-          <thead><tr><th>Op</th><th>Rust std vs V8</th></tr></thead>
-          <tbody style="font-family:var(--font-mono);font-size:12.5px">
-            <tr><td>ln</td><td style="color:var(--mut)">identical</td></tr>
-            <tr><td>sqrt</td><td style="color:var(--mut)">identical (IEEE-754 specifies it exactly)</td></tr>
-            <tr><td>sin</td><td style="color:var(--mut)">identical</td></tr>
-            <tr><td>cos</td><td style="color:var(--bad);font-weight:600">differs by 1 ULP</td></tr>
-          </tbody>
-        </table></div>
-        <p style="margin:14px 0 14px">One function, one bit, and one bit is enough. Normal draws route through cos, they feed the GARCH noise term for every company on every tick, and price = fair value × exp(s) is a non-linear feedback loop, so a last-bit difference becomes a different market within a simulated year. The same disagreement exists between browsers: measured across 60,000 recorded normal draws, Chrome's answers differ from a platform-libm build on 1.545% of draws, with the first divergence at draw 12. A parity test that checked six draws passed by stopping six short of the first mismatch. A test can pass because it is too small, and that is what it looks like.</p>
-        <p>So the crate vendors its maths: <code style="font-size:13px">exp</code>, <code style="font-size:13px">log</code>, <code style="font-size:13px">pow</code>, <code style="font-size:13px">sin</code> and <code style="font-size:13px">cos</code> come from the libm crate, a pure-Rust port of MUSL's implementation, the same code everywhere it compiles. No std transcendental reaches the source, and a test greps the source to enforce that rather than trusting anyone to remember.</p>
-        <p>What has been measured, by commit: identical digests on Windows x86_64 and macOS arm64 at <code style="font-size:13px">a5afd1c</code>; identical digests on all five targets (Linux x86_64 and aarch64, macOS arm64 and x86_64, Windows x86_64) at <code style="font-size:13px">ad91026</code>; the current era's baseline regenerated and confirmed on macOS arm64 only, until the gate runs again. The gate has not yet run against a tagged release. Read cross-platform bit-identity as measured at <code style="font-size:13px">ad91026</code> and as engineering intent for the current baseline.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Performance</h2>
-        <p>A 252-day year over 100 instruments takes 27 seconds on the documentation's reference desktop and under seven on an Apple-silicon laptop. Recording 9.8 million rows of ground truth costs less than wall-clock timing resolves: measured as interleaved pairs of recorded and plain runs, nearly half the pairs come out negative. Sweeps parallelise 3 to 4 times on eight cores, and runs stream a batch per day, so a hundred-seed sweep at tick grain never has to fit in memory.</p>
+<h1>This page was retired</h1>
+<p><code>internals.html</code> was part of the previous documentation and has no direct replacement. You are being sent to <a href="index.html">Learn pretium</a>.</p>
 </main>
-</div>
-<footer class="site"><div class="layout" style="display:block">
-pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
-</div></footer>
 </body>
 </html>

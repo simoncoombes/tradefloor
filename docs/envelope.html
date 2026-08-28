@@ -1,46 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Realism Envelope Dataset · pretium docs</title>
-<meta name="description" content="The 14 statistics pretium 0.3.0 is measured on, each with the real-market band it was scored against and the certified horizon of 252 days.">
-<link rel="canonical" href="https://simoncoombes.github.io/pretium/envelope.html">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"pretium realism envelope","alternateName":"pretium pt-v12 realism measurement","description":"The 14 statistics pretium's default preset pt-v12 is measured on, each with the real-market band it was scored against, the certified horizon of 252 trading days, and the named gaps stating what the simulator must not be used for.","url":"https://simoncoombes.github.io/pretium/envelope.html","identifier":"https://simoncoombes.github.io/pretium/envelope.json","license":"https://opensource.org/licenses/MIT","isAccessibleForFree":true,"creator":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isBasedOn":"https://github.com/simoncoombes/pretium","measurementTechnique":"Thirty-seed median of each statistic over a 252-day run on the certified 40-name roster, scored against bands derived from published real-market measurements.","variableMeasured":[{"@type":"PropertyValue","name":"annualised_vol_pct","value":32.7604,"minValue":15.0,"maxValue":36.0,"description":"Measured 32.7604 against a real-market band of 15.0 to 36.0; inside the band."},{"@type":"PropertyValue","name":"excess_kurtosis","value":6.7001,"minValue":1.6,"maxValue":41.0,"description":"Measured 6.7001 against a real-market band of 1.6 to 41.0; inside the band."},{"@type":"PropertyValue","name":"return_acf1","value":0.0239,"minValue":-0.08,"maxValue":0.06,"description":"Measured 0.0239 against a real-market band of -0.08 to 0.06; inside the band."},{"@type":"PropertyValue","name":"abs_return_acf1","value":0.1107,"minValue":0.02,"maxValue":0.22,"description":"Measured 0.1107 against a real-market band of 0.02 to 0.22; inside the band."},{"@type":"PropertyValue","name":"abs_return_acf5","value":0.0428,"minValue":0.02,"maxValue":0.09,"description":"Measured 0.0428 against a real-market band of 0.02 to 0.09; inside the band."},{"@type":"PropertyValue","name":"abs_return_acf20","value":0.004,"minValue":-0.04,"maxValue":0.08,"description":"Measured 0.004 against a real-market band of -0.04 to 0.08; inside the band."},{"@type":"PropertyValue","name":"cross_sectional_corr","value":0.3177,"minValue":0.08,"maxValue":0.56,"description":"Measured 0.3177 against a real-market band of 0.08 to 0.56; inside the band."},{"@type":"PropertyValue","name":"volume_abs_return_corr","value":0.5599,"minValue":0.46,"maxValue":0.66,"description":"Measured 0.5599 against a real-market band of 0.46 to 0.66; inside the band."},{"@type":"PropertyValue","name":"leverage_effect","value":-0.0401,"minValue":-0.16,"maxValue":0.0,"description":"Measured -0.0401 against a real-market band of -0.16 to 0.0; inside the band."},{"@type":"PropertyValue","name":"volume_change_acf1","value":-0.2656,"minValue":-0.32,"maxValue":-0.2,"description":"Measured -0.2656 against a real-market band of -0.32 to -0.2; inside the band."},{"@type":"PropertyValue","name":"corr_asymmetry","value":-0.0147,"minValue":-0.25,"maxValue":0.45,"description":"Measured -0.0147 against a real-market band of -0.25 to 0.45; inside the band."},{"@type":"PropertyValue","name":"corr_asymmetry_lagged","value":0.0181,"minValue":-0.2,"maxValue":0.55,"description":"Measured 0.0181 against a real-market band of -0.2 to 0.55; inside the band."},{"@type":"PropertyValue","name":"sector_excess_corr","value":0.2079,"minValue":0.11,"maxValue":0.23,"description":"Measured 0.2079 against a real-market band of 0.11 to 0.23; inside the band."},{"@type":"PropertyValue","name":"corr_persistence_acf1","value":0.1525,"minValue":-0.19,"maxValue":0.54,"description":"Measured 0.1525 against a real-market band of -0.19 to 0.54; inside the band."}],"distribution":[{"@type":"DataDownload","encodingFormat":"application/json","contentUrl":"https://simoncoombes.github.io/pretium/envelope.json"}]}</script>
+<title>Moved — pretium</title>
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/realism-envelope.html">
+<meta http-equiv="refresh" content="0; url=realism-envelope.html">
+<meta name="robots" content="noindex, follow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
-body{max-width:900px;margin:0 auto;padding:32px 24px;
-  font:15px/1.65 system-ui,-apple-system,sans-serif;color:#1a1a1a;
-  background:#fbfaf7}
-table{border-collapse:collapse;width:100%;margin:18px 0;font-size:13.5px}
-th,td{border-bottom:1px solid #e3e0d8;padding:6px 10px;text-align:left}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
-a{color:#12507a}
-@media(prefers-color-scheme:dark){body{background:#14150f;color:#eae7dd}
-  th,td{border-color:#333} a{color:#7fb6dd}}
+body{margin:0;background:#FAFBFA;color:#3C4A47;
+  font:400 1rem/1.65 'Public Sans',system-ui,-apple-system,sans-serif}
+main{max-width:34rem;margin:0 auto;padding:6rem 1.5rem}
+h1{font:600 1.5rem/1.2 'Source Serif 4',ui-serif,Georgia,serif;color:#101A18;margin:0 0 0.6rem}
+a{color:#0E6B65}
+@media (prefers-color-scheme: dark){
+  body{background:#0D1312;color:#B2C0BD} h1{color:#E5ECEA} a{color:#5FC9BE}
+}
 </style>
 </head>
 <body>
-<h1>Realism envelope</h1>
-<p>The 14 statistics pretium 0.3.0 is measured on, each with the real-market band it was scored against and the certified horizon of 252 days. Measured on preset
-<code>pt-v12</code>, thirty-seed median, on the
-certified roster. The machine-readable form is
-<a href="https://simoncoombes.github.io/pretium/envelope.json">envelope.json</a>, and the prose that
-explains each number is on <a href="https://simoncoombes.github.io/pretium/trust.html">Realism and
-limits</a>.</p>
-
-<h2>The statistics</h2>
-<table><thead><tr><th>statistic</th><th>measured</th><th>real-market band</th>
-<th>result</th></tr></thead><tbody><tr><td id="stat-annualised_vol_pct"><code>annualised_vol_pct</code></td><td>32.7604</td><td>15.0 to 36.0</td><td>in band</td></tr><tr><td id="stat-excess_kurtosis"><code>excess_kurtosis</code></td><td>6.7001</td><td>1.6 to 41.0</td><td>in band</td></tr><tr><td id="stat-return_acf1"><code>return_acf1</code></td><td>0.0239</td><td>-0.08 to 0.06</td><td>in band</td></tr><tr><td id="stat-abs_return_acf1"><code>abs_return_acf1</code></td><td>0.1107</td><td>0.02 to 0.22</td><td>in band</td></tr><tr><td id="stat-abs_return_acf5"><code>abs_return_acf5</code></td><td>0.0428</td><td>0.02 to 0.09</td><td>in band</td></tr><tr><td id="stat-abs_return_acf20"><code>abs_return_acf20</code></td><td>0.004</td><td>-0.04 to 0.08</td><td>in band</td></tr><tr><td id="stat-cross_sectional_corr"><code>cross_sectional_corr</code></td><td>0.3177</td><td>0.08 to 0.56</td><td>in band</td></tr><tr><td id="stat-volume_abs_return_corr"><code>volume_abs_return_corr</code></td><td>0.5599</td><td>0.46 to 0.66</td><td>in band</td></tr><tr><td id="stat-leverage_effect"><code>leverage_effect</code></td><td>-0.0401</td><td>-0.16 to 0.0</td><td>in band</td></tr><tr><td id="stat-volume_change_acf1"><code>volume_change_acf1</code></td><td>-0.2656</td><td>-0.32 to -0.2</td><td>in band</td></tr><tr><td id="stat-corr_asymmetry"><code>corr_asymmetry</code></td><td>-0.0147</td><td>-0.25 to 0.45</td><td>in band</td></tr><tr><td id="stat-corr_asymmetry_lagged"><code>corr_asymmetry_lagged</code></td><td>0.0181</td><td>-0.2 to 0.55</td><td>in band</td></tr><tr><td id="stat-sector_excess_corr"><code>sector_excess_corr</code></td><td>0.2079</td><td>0.11 to 0.23</td><td>in band</td></tr><tr><td id="stat-corr_persistence_acf1"><code>corr_persistence_acf1</code></td><td>0.1525</td><td>-0.19 to 0.54</td><td>in band</td></tr></tbody></table>
-
-<h2>The gaps</h2>
-<p>What the measurement does not cover, named rather than left implicit. Each
-one carries a rule about what it forbids you to conclude.</p>
-<ul><li id="gap-horizon"><code>horizon</code>: the certified horizon is 252 days</li><li id="gap-decay-shape"><code>decay-shape</code>: volatility memory decays exponentially, not hyperbolically</li><li id="gap-scenario-magnitude"><code>scenario-magnitude</code>: a scenario&#x27;s size is right on average and unreliable in one run</li><li id="gap-macro-range"><code>macro-range</code>: the endogenous macro state cannot reach its own crisis regimes</li><li id="gap-roster-concentration"><code>roster-concentration</code>: a concentrated roster holds at one year and comes apart at two</li></ul>
-
-<h2>Citing this</h2>
-<p>Cite the preset and the version, never the project alone: the numbers above
-are properties of <code>pt-v12</code> as shipped in
-pretium 0.3.0, and every preset is frozen under its own name. Source and
-licence at <a href="https://github.com/simoncoombes/pretium">https://github.com/simoncoombes/pretium</a>.</p>
+<main>
+<h1>This page has moved</h1>
+<p><code>envelope.html</code> is now part of another page. You are being sent to <a href="realism-envelope.html">Realism envelope</a>.</p>
+</main>
 </body>
 </html>

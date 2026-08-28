@@ -1,250 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Release Notes · pretium docs</title>
-<meta name="description" content="Release notes for pretium on PyPI and crates.io: what changed in each version, and what an era boundary means for reproducing a result you recorded earlier.">
-<link rel="canonical" href="https://simoncoombes.github.io/pretium/releases.html">
-<meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium docs">
-<meta property="og:title" content="Release Notes">
-<meta property="og:description" content="Release notes for pretium on PyPI and crates.io: what changed in each version, and what an era boundary means for reproducing a result you recorded earlier.">
-<meta property="og:url" content="https://simoncoombes.github.io/pretium/releases.html">
-<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
-<meta property="article:modified_time" content="2026-08-28T06:05:02-04:00">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Release Notes">
-<meta name="twitter:description" content="Release notes for pretium on PyPI and crates.io: what changed in each version, and what an era boundary means for reproducing a result you recorded earlier.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Release Notes","description":"Release notes for pretium on PyPI and crates.io: what changed in each version, and what an era boundary means for reproducing a result you recorded earlier.","url":"https://simoncoombes.github.io/pretium/releases.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-28T06:05:02-04:00"}</script>
+<title>Moved — pretium</title>
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/release-notes.html">
+<meta http-equiv="refresh" content="0; url=release-notes.html">
+<meta name="robots" content="noindex, follow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
-<style>:root{
-  --hue:55;
-  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
-  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
-  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
-  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
-  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
-  --bad:oklch(0.52 0.12 25);
-  --navact:oklch(0.945 0.012 var(--hue));
-  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
-  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
-  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
-  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
+<style>
+body{margin:0;background:#FAFBFA;color:#3C4A47;
+  font:400 1rem/1.65 'Public Sans',system-ui,-apple-system,sans-serif}
+main{max-width:34rem;margin:0 auto;padding:6rem 1.5rem}
+h1{font:600 1.5rem/1.2 'Source Serif 4',ui-serif,Georgia,serif;color:#101A18;margin:0 0 0.6rem}
+a{color:#0E6B65}
+@media (prefers-color-scheme: dark){
+  body{background:#0D1312;color:#B2C0BD} h1{color:#E5ECEA} a{color:#5FC9BE}
 }
-html[data-lightcode="true"]:not([data-theme="dark"]){
-  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
-  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
-}
-html[data-theme="dark"]{
-  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
-  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
-  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
-  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
-  --bad:oklch(0.72 0.11 25);
-  --navact:oklch(0.26 0.02 var(--hue));
-  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
-}
-html{scroll-behavior:auto}
-body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-::selection{background:var(--accent-soft)}
-p{margin:0 0 14px;text-wrap:pretty}
-h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
-ul{margin:0 0 14px;padding-left:22px}
-li{margin:0 0 7px}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
-pre{margin:0}
-code{font-family:var(--font-mono)}
-summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
-summary::marker{color:var(--faint)}
-details[open] summary{border-bottom:1px solid var(--linesoft)}
-button{font-family:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-h2[id],h3[id]{scroll-margin-top:80px}
-h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
-h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
-.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
-#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
-#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
-#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
-#hambtn{display:none}
-@media (max-width:920px){
-  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
-  #sbar[data-open="true"]{transform:none}
-  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
-  #hambtn{display:flex}
-  #searchwrap{display:none}
-  #ghlink{display:none}
-}
-.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
-  grid-template-columns:232px minmax(0,1fr);gap:40px}
-.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
-.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
-.sidebar li{margin:0 0 2px}
-.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
-.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
-.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
-main{padding:28px 0 72px;min-width:0}
-main h1{font-size:30px;margin:0 0 18px}
-main h2{font-size:20px;margin:34px 0 12px}
-main h3{font-size:16px;margin:24px 0 8px}
-.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
-.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
-  display:flex;align-items:baseline;gap:12px}
-.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
-.masthead .tag{color:var(--mut);font-size:13px}
-.masthead .spacer{flex:1}
-.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
-  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
-pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
-  padding:13px 16px;overflow-x:auto;font-size:13px}
-pre code{color:inherit}
-.tablewrap{overflow-x:auto}
-footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
-  color:var(--mut);font-size:13px}
-@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
-  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
 </style>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
-<script>
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-1LBM3239ZF');
-</script>
 </head>
 <body>
-<header class="masthead"><div class="inner">
-<a class="brand" href="./">pretium</a>
-<span class="tag">repeatable market simulation</span>
-<span class="spacer"></span>
-<a href="https://github.com/simoncoombes/pretium">GitHub</a>
-</div></header>
-<div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><span aria-current="page">Release notes</span></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li><li><a href="two-loops.html">The Two Loops</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="principles.html">The Principles</a></li></ul></nav>
 <main>
-<p class="appnote">This is the plain version of the page. The
-<a href="./#/releases">full documentation app</a> adds search, dark mode
-and copy buttons.</p>
-<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">REFERENCE</div>
-        <h1 style="font-size:30px">Release Notes</h1>
-
-        <h2 style="font-size:19px;margin:40px 0 4px">Status <span style="font-weight:400;color:var(--faint);font-size:15px">- 0.3.0, current</span></h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Published on PyPI as <code style="font-size:12.5px">pretium</code> and on crates.io as the <code style="font-size:12.5px">pretium</code> crate. The API is exercised by the test suite and the example notebooks are executed rather than written and hoped over, so the code on this site runs. Published FIGURES are a separate discipline and a weaker guarantee: they are re-measured by <code style="font-size:12.5px">tools/remeasure</code>, which reports every number the stated method no longer produces, and a figure it flags is a documentation defect until someone corrects it. The API may move before 1.0. Each release is tagged and its wheels are built by the release workflow, which runs one fixed simulation inside every wheel and compares digests before anything is uploaded. There is no DOI yet.</p>
-        <ul style="color:var(--mut);font-size:14px">
-          <li>Rust core with a Python API. Wheels are abi3, CPython 3.11+, no Rust toolchain needed. The core package has no dependencies.</li>
-          <li>Optional extras: <code style="font-size:12.5px">pretium[rl]</code> (numpy, gymnasium) and <code style="font-size:12.5px">pretium[arrow]</code> (pyarrow).</li>
-        </ul>
-
-        <h2 style="font-size:19px;margin:44px 0 4px">0.3.0<span style="font-weight:400;color:var(--faint);font-size:15px"> - current</span></h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><code style="font-size:12.5px">pt-v12</code> is the default. It is the first preset that looks like a real market over two years as well as one.</p>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">in band</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)"><code style="font-size:12.5px">pt-v10</code></th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)"><code style="font-size:12.5px">pt-v12</code></th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">one year</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">14 of 14</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">14 of 14</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)"><strong>two years</strong></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">13 of 14</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)"><strong>14 of 14</strong></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">a roster it never saw</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">14 of 14</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">14 of 14</td></tr></table></div></div>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Thirty-seed medians. Only the two-year row moved, and it cost nothing on the other two rows.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Your numbers change if you did not name a preset. Every earlier preset still runs exactly as it did:</p>
-        <pre style="background:var(--codebg);color:#e8e8e8;padding:12px 14px;border-radius:6px;overflow-x:auto;font:12.5px/1.6 var(--font-mono)">eng = pt.Engine(seed=42, universe=u, model=&quot;pt-v10&quot;)</pre>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>The fix was one number.</strong> Volume stopped responding to a move at 4 percent, so a stock down 12 traded like a stock down 4. That cap had been in the engine since the first version and nobody chose it. It is now 12 percent.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>One thing got worse.</strong> Under a real macro path, daily swings run 1.57x as wide as the real stock they are compared against, against 1.555x before. It is the <code style="font-size:12.5px">scenario-magnitude</code> gap.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong><code style="font-size:12.5px">pt-v11</code> also ships, and is not the default.</strong> It is the base <code style="font-size:12.5px">pt-v12</code> is built on, and the first preset whose crises behave like real ones.</p>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">in a crisis</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)"><code style="font-size:12.5px">pt-v10</code></th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)"><code style="font-size:12.5px">pt-v11</code></th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">real</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">volatility, calm to panic</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">5.0x</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">6.0x</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">6.2x</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">how tightly names move together</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">0.67</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">0.70</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">0.66 to 0.73</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">how much industries hold together</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">+0.04</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">+0.11</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">+0.10</td></tr></table></div></div>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Two mechanisms did that. <code style="font-size:12.5px">crisis_blend_gain</code> was a fixed number, already at its maximum in any real crisis. So an earlier preset could only make a crisis more violent through company-specific movement, which pulled names apart. Companies also generate their own news now, and that news reaches their sector peers. Before this, one company's earnings surprise reached nobody.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>Seventeen new settings</strong>, each at the value the engine already used, so no preset from <code style="font-size:12.5px">pt-v1</code> to <code style="font-size:12.5px">pt-v10</code> moves. <code style="font-size:12.5px">ModelParams</code> goes from 70 coefficients to 87. <code style="font-size:12.5px">pt.ModelParams.settable()</code> lists them.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>The envelope covers more than it did.</strong> Six gaps become five. <code style="font-size:12.5px">pt-v12</code> holds volume change in band at both horizons, so that gap is gone. Two-year and five-year runs are now measured rather than assumed. Over ten years, annualised volatility reads 31.5, 35.6, 30.2, 33.5, 33.0, 33.1, 31.3, 32.4, 32.4 and 31.6 percent, so nothing runs away and nothing drifts. The certified horizon stays 252 days, because the bands themselves were derived at one and two years. S&amp;P-like, technology-heavy and defensive rosters all hold 14 of 14 at one year.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>A bug fixed on the way.</strong> Driven a minute at a time, the model's own company news never reached you. A batched tick loop also rolled that news every minute. Both paths now print the same prices. This only affected <code style="font-size:12.5px">pt-v11</code>.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>Documentation.</strong> Every published figure was re-measured against the engine. Three new pages: a glossary, the two loops, and the principles. References to the reference implementation no longer disclose its paths or its language, and <code style="font-size:12.5px">tests/test_brand_commitments.py</code> now fails if they come back.</p>
-        <h2 style="font-size:19px;margin:44px 0 4px">0.2.0<span style="font-weight:400;color:var(--faint);font-size:15px"> - 2026-08-26</span></h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">The default moved from <code style="font-size:12.5px">pt-v3</code> to <code style="font-size:12.5px">pt-v10</code>, so the market itself is different. A run that names its preset replays exactly. A run that took the default does not.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><code style="font-size:12.5px">pt-v10</code> is the first preset to hold all fourteen statistics in band at one year, and thirteen of fourteen at two years. The default before it held twelve and seven. That holds on training seeds, on new seeds, and on a 60-name universe it never saw.</p>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)"></th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)"><code style="font-size:12.5px">pt-v3</code></th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)"><code style="font-size:12.5px">pt-v10</code></th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">real</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">days above its own crisis threshold</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">0%</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">10.2%</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">12.5%</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">volatility, calm to panic</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">3.07x</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">5.05x</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">6.16x</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">same-sector co-movement</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">0.004</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">0.135</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">0.11 to 0.23</td></tr></table></div></div>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Correlation now has a memory, and volume behaves at one year. Volume change at two years is the one row of fourteen that still misses.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>Two ground-truth defects fixed.</strong> A jump moved the mispricing state after the tick loop. So on a day a jump fired, the components did not sum to the move. A halted day booked its clamped price to nobody. <code style="font-size:12.5px">truth()</code> gains a <code style="font-size:12.5px">jump</code> column and a <code style="font-size:12.5px">circuit_breaker</code> column, <code style="font-size:12.5px">Engine.FACTORS</code> is nine, and the identity holds through a crisis to 1e-16. A decomposition published from 0.1.x is exact except on those days.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>Snapshots now carry the log-volume state.</strong> A restored <code style="font-size:12.5px">pt-v4</code> engine used to trade different volume and print different prices.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>Two behaviour changes.</strong> A VIX pin acts on the first day, not the second. And order flow large enough to move the index now costs about as much through other names' volatility as through its own book.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Also: <code style="font-size:12.5px">examples/00-a-year-in-one-market.ipynb</code>, the entry point the examples were missing. Two envelope gaps closed, both recorded rather than dropped: two-year kurtosis moved from 5.23 to 8.26, and sector co-movement from 0.004 to 0.135. Three inflation constants became settings, measured against real CPI and taken by no preset.</p>
-        <h2 style="font-size:19px;margin:44px 0 4px">0.1.4<span style="font-weight:400;color:var(--faint);font-size:15px"> - 2026-08-25</span></h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Two presets, four statistics, five settings. <code style="font-size:12.5px">pt-v3</code> is still the default and <code style="font-size:12.5px">pt-v1</code> through <code style="font-size:12.5px">pt-v6</code> reproduce bit for bit.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><code style="font-size:12.5px">pt-v7</code> is the first preset in which same-sector names co-move more than cross-sector names. <code style="font-size:12.5px">pt-v8</code> is the first whose correlation has a memory: in this window correlation is the market factor's variance, and that variance had almost none. Both hold 13 of 14 in band at 504 days.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Four statistics join the panel: <code style="font-size:12.5px">corr_asymmetry</code>, <code style="font-size:12.5px">corr_asymmetry_lagged</code>, <code style="font-size:12.5px">sector_excess_corr</code> and <code style="font-size:12.5px">corr_persistence_acf1</code>. <code style="font-size:12.5px">pt-v3</code> now reads 12 of 14 at 252 days and 7 of 14 at 504. The engine did not move. The misses were always there.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Five settings that were literals: <code style="font-size:12.5px">crisis_blend_source</code>, <code style="font-size:12.5px">sector_vix_coupling</code>, <code style="font-size:12.5px">fair_value_book_floor</code>, <code style="font-size:12.5px">inflation_reversion</code> and <code style="font-size:12.5px">inflation_ceiling</code>. Each ships at the value every preset already ran on.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>New gap: the economy cannot reach its own crisis regimes.</strong> Endogenous inflation peaks near 4.1 percent, against a real CPI that reached 9.1 percent. So an inflation regime needs a scenario to drive it, and the gap says how. On real 2022 data over six seeds, against a real S&amp;P of -20.0 percent:</p>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">scenario</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">index</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">none</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">-12.6%</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">the real seven-hike path only</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">-13.1%</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">the published CPI path</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">-23.3%</td></tr></table></div></div>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Inflation is the lever, because it steers the central bank into the corporate bond yield. A pinned policy rate does not.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>What each macro field transmits.</strong> Measured by a shock on day 5, read on day 25.</p>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">field</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">price move by day 25</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)"><code style="font-size:12.5px">vix</code> 15 to 60</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">39.2%</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)"><code style="font-size:12.5px">qe_pe_boost</code> 0 to -0.30</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">38.3%</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)"><code style="font-size:12.5px">corporate_bond_yield</code> 5.5% to 11.4%</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">28.3%</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)"><code style="font-size:12.5px">federal_funds_rate</code> 1.6% to 10%</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">0.00%</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)"><code style="font-size:12.5px">inflation_rate</code> 2% to 9%</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">0.00%</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)"><code style="font-size:12.5px">fear_greed_index</code> 50 to 0</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut)">0.00%</td></tr></table></div></div>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Three fields act the day you move them. Two wait for a central bank meeting, because both work through the corporate bond yield. <code style="font-size:12.5px">fear_greed_index</code> is settable, validated, and read by no pricing code.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">The real 2020-21 macro path now drives four scenario response channels rather than a claim. Every sign is right. Each channel runs at 70 to 85 percent of the size real AAPL shows, which is the scenario-magnitude gap from another angle.</p>
-        <h2 style="font-size:19px;margin:44px 0 4px">0.1.3<span style="font-weight:400;color:var(--faint);font-size:15px"> - 2026-08-25</span></h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Two presets. <code style="font-size:12.5px">pt-v3</code> is still the default, so nothing changes unless you ask for a preset by name.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><code style="font-size:12.5px">pt-v6</code> holds 9 of 10 statistics at 252 days and 8 of 10 at 504, against 9 and 5 for <code style="font-size:12.5px">pt-v3</code>. It is not strictly better: the two tie at one year, and <code style="font-size:12.5px">pt-v3</code> sits more comfortably inside six of the ten bands. What <code style="font-size:12.5px">pt-v6</code> buys is tail room, from 0.80 to 7.20 seed standard deviations. Use it for multi-year work where the tail matters. <code style="font-size:12.5px">pt-v3</code> is still the preset the envelope certifies.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>A trade-off that was a wiring accident.</strong> <code style="font-size:12.5px">pt-v4</code> reached the two-year tail and lost <code style="font-size:12.5px">return_acf1</code> at one year. That looked like the price of the tail. It was one line. A jump moved the mispricing state after the momentum roll had read it. The next close then read the jump as a re-rating and continued it. <code style="font-size:12.5px">jump_momentum_share</code> separates the two. <code style="font-size:12.5px">pt-v5</code> is <code style="font-size:12.5px">pt-v4</code> with it at zero. <code style="font-size:12.5px">pt-v6</code> also halves the herding term.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><code style="font-size:12.5px">garch_beta_dispersion</code> ships at zero. It was built for the decay-shape gap and moves away from it. The log-log slope reads -0.944 with it and -0.933 without, against a real -0.436. It is kept for a smaller gain it does give, on 504-day kurtosis and annualised volatility. Its documentation leads with the measurement, not with what it was for.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><code style="font-size:12.5px">examples/09-a-pandemic-shaped-market.ipynb</code> drives the real 2020-21 VIX, FOMC path and credit path through a 505-day run, and scores the result against Apple's shares. The daily series ship with it, so it runs offline. Two findings hold outside the notebook: only <code style="font-size:12.5px">qe_pe_boost</code> moves a valuation, and <code style="font-size:12.5px">fear_greed_index</code> moves nothing at all.</p>
-        <h2 style="font-size:19px;margin:44px 0 4px">0.1.2<span style="font-weight:400;color:var(--faint);font-size:15px"> - 2026-08-24</span></h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Fixes the PyPI project page. The engine did not move.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">The README linked to examples and licences by relative path. That works on GitHub and 404s on PyPI, which renders the same file. Eleven links were dead. It survived two releases because the file looks correct everywhere an author reads it. A test now fails on any relative README link. A second fails if an absolute link names a file that is not in the repository.</p>
-        <h2 style="font-size:19px;margin:44px 0 4px">0.1.1<span style="font-weight:400;color:var(--faint);font-size:15px"> - 2026-08-24</span></h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">A packaging fix. The engine did not move, so a result from 0.1.0 reproduces here exactly.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">0.1.0 published five wheels and no source distribution. PyPI refused the sdist because it declared its licence files at the package root and the build had put them under <code style="font-size:12.5px">rust/</code>. The wheels were never affected, so the fault showed up on one artefact out of six. This release ships the sdist with the paths declared.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">The v0.1.0 tag stays where it is. Moving it would break the link between that tag and the wheels published from it, and that link is the point.</p>
-        <h2 style="font-size:19px;margin:44px 0 4px">0.1.0<span style="font-weight:400;color:var(--faint);font-size:15px"> - 2026-08-24</span></h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">First release. pretium simulates an equity market you can run a strategy against. It runs prices, a limit order book with price-time priority and partial fills, and an economy that advances each day. Orders match against real depth, so your trades move the price.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">On top of that sit agent evaluation, ranking across seeds with paired sign tests, transaction cost analysis, sweeps and replay. There are also checkpoints with branching, a Gymnasium environment, five Arrow tables, and an SEC EDGAR loader.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Two things are less usual. The simulator computed every price, so it can tell you why one moved. That is seven factor contributions per instrument per tick, and they sum to the move. The same seed also gives the same market. So you can run it twice, once with your orders and once without, and price every fill against the market where you never traded.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>Determinism.</strong> Five targets build a wheel, run one fixed simulation inside it, and compare digests. Verified on linux-x86_64, linux-aarch64, macos-arm64, macos-x86_64 and windows-x86_64, all reproducing</p>
-        <pre style="background:var(--codebg);color:#e8e8e8;padding:12px 14px;border-radius:6px;overflow-x:auto;font:12.5px/1.6 var(--font-mono)">5bd011be292f823ce1c360d1a12bf46de3362deee058a37283c74ab47069d0c1</pre>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">A WebAssembly build gives the same numbers, so the engine can run in a browser without becoming a second model.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>Realism.</strong> Ten statistics are measured against real-market bands. At 252 days <code style="font-size:12.5px">pt-v3</code> holds nine of ten, and holds the same nine on seeds and a roster the calibration never saw. The tenth is the autocorrelation of volume changes, which misses by 13.7 seed standard deviations. It is outside the calibration objective on purpose: an optimiser pointed at a target it cannot reach distorts everything else. Six further gaps say what each one stops you concluding, and <code style="font-size:12.5px">envelope.check()</code> refuses a question that falls outside them.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><code style="font-size:12.5px">pt-v4</code> also ships and is not the default. It is the first preset to bring 504-day kurtosis inside its band, and it pays at one year, holding eight of ten.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px"><strong>Versioning.</strong> Anything that changes the simulated trajectory is a breaking change here, however small. A market that runs differently from the same seed invalidates every published result that cited it. So coefficient changes arrive as a new preset, and old presets keep running as they did.</p>
-
-        <h2 style="font-size:19px;margin:40px 0 4px">Known-answer v8 <span style="font-weight:400;color:var(--faint);font-size:15px">- 2026-08, era boundary</span></h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Every seeded trajectory changed. Runs from before this baseline are not comparable to runs after it. Figures below are the six-seed panel method (<code style="font-size:12px">Universe.random(40, seed=111)</code>, sim seeds 1 to 6, 252 days), which is what <code style="font-size:12px">pt.facts</code> reports. The 30-seed certification panel on <a href="trust.html">Realism and Limits</a> measures the same statistics on a different roster draw and horizon sample, and the two are not interchangeable: the leverage effect reads −0.085 here against −0.0349 certified, and volume against absolute return +0.585 against +0.5339. Quote whichever method you actually ran.</p>
-        <ul style="color:var(--mut);font-size:14px">
-          <li>The macro chain now advances from Python. VIX steps daily, policy fields step at the central bank's meeting calendar, fair value reprices when the discount rate moves. Previously every field held its initial value for the whole run.</li>
-          <li>The shared market factor got its own conditional variance process, coupled to VIX. Cross-sectional correlation moved from +0.024 to +0.257; a pinned VIX 45 takes it to +0.68.</li>
-          <li>Added a GJR asymmetry term, which produces the leverage effect. Now reads -0.085, negative on six seeds of six.</li>
-          <li>Removed the average-volume feedback that compounded the volume level. Volume against absolute return moved from +0.105 to +0.585.</li>
-          <li>Split the RNG into three streams (market, economy, external), so TCA counterfactuals are exact and host randomness cannot shift a market.</li>
-          <li>Re-derived the realism bands with provenance. Verdicts moved in both directions: on the six-seed method lag-one clustering came out above its re-derived band, and the leverage effect came inside one. On the 30-seed certification panel lag-one clustering reads +0.1413 and is <em>inside</em> the band, which is the number the shipped certificate carries: the two methods disagree on this row, and that disagreement is the point of naming the method.</li>
-          <li>Added presets <code style="font-size:12.5px">pt-v2</code> and <code style="font-size:12.5px">pt-v3</code>. <code style="font-size:12.5px">pt-v3</code> is now the default.</li>
-          <li>Fixed <code style="font-size:12.5px">model_preset()</code> reporting <code style="font-size:12.5px">pt-v1</code> after the engine default became <code style="font-size:12.5px">pt-v3</code>. No simulated value changed; the known-answer digest moved, because it hashes the reported preset.</li>
-          <li>Fixed the GARCH process being fed the day's total return instead of its noise component. Clustering fell from +0.12 to +0.10; the fix stayed, because it is what the model specifies.</li>
-          <li>Corrected the RNG parity claim. The integer core is bit-identical to the reference; normal draws differ on 1.545% of 60,000 recorded draws, first divergence at draw 12.</li>
-        </ul>
-
-        <h2 style="font-size:19px;margin:40px 0 4px">Known-answer v5 <span style="font-weight:400;color:var(--faint);font-size:15px">- commit ad91026</span></h2>
-        <ul style="color:var(--mut);font-size:14px">
-          <li>Determinism gate run across all five targets (Linux x86_64 and aarch64, macOS arm64 and x86_64, Windows x86_64). Identical digests, each also passing against the committed baseline.</li>
-        </ul>
-
-        <h2 style="font-size:19px;margin:40px 0 4px">Known-answer v3 <span style="font-weight:400;color:var(--faint);font-size:15px">- commit a5afd1c</span></h2>
-        <ul style="color:var(--mut);font-size:14px">
-          <li>Determinism gate run on Windows x86_64 and macOS arm64. Identical digests.</li>
-        </ul>
-
-        <h2 style="font-size:21px;margin:46px 0 10px">Checking Your Build</h2>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">import pretium as pt
-
-pt.__version__                  # package version
-pt.model_preset()["name"]       # coefficient set in use</code></pre>
-        </div>
+<h1>This page has moved</h1>
+<p><code>releases.html</code> is now part of another page. You are being sent to <a href="release-notes.html">Release notes</a>.</p>
 </main>
-</div>
-<footer class="site"><div class="layout" style="display:block">
-pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
-</div></footer>
 </body>
 </html>

@@ -1,219 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>An LLM Agent · pretium docs</title>
-<meta name="description" content="A worked example wiring a language model into the agent protocol and scoring it against the reference strategies. Any provider returning structured output fits.">
-<link rel="canonical" href="https://simoncoombes.github.io/pretium/llm-agent.html">
-<meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium docs">
-<meta property="og:title" content="An LLM Agent">
-<meta property="og:description" content="A worked example wiring a language model into the agent protocol and scoring it against the reference strategies. Any provider returning structured output fits.">
-<meta property="og:url" content="https://simoncoombes.github.io/pretium/llm-agent.html">
-<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
-<meta property="article:modified_time" content="2026-08-27T12:19:15-04:00">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="An LLM Agent">
-<meta name="twitter:description" content="A worked example wiring a language model into the agent protocol and scoring it against the reference strategies. Any provider returning structured output fits.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"An LLM Agent","description":"A worked example wiring a language model into the agent protocol and scoring it against the reference strategies. Any provider returning structured output fits.","url":"https://simoncoombes.github.io/pretium/llm-agent.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-27T12:19:15-04:00"}</script>
+<title>Moved — pretium</title>
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/mcp.html">
+<meta http-equiv="refresh" content="0; url=mcp.html">
+<meta name="robots" content="noindex, follow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
-<style>:root{
-  --hue:55;
-  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
-  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
-  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
-  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
-  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
-  --bad:oklch(0.52 0.12 25);
-  --navact:oklch(0.945 0.012 var(--hue));
-  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
-  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
-  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
-  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
+<style>
+body{margin:0;background:#FAFBFA;color:#3C4A47;
+  font:400 1rem/1.65 'Public Sans',system-ui,-apple-system,sans-serif}
+main{max-width:34rem;margin:0 auto;padding:6rem 1.5rem}
+h1{font:600 1.5rem/1.2 'Source Serif 4',ui-serif,Georgia,serif;color:#101A18;margin:0 0 0.6rem}
+a{color:#0E6B65}
+@media (prefers-color-scheme: dark){
+  body{background:#0D1312;color:#B2C0BD} h1{color:#E5ECEA} a{color:#5FC9BE}
 }
-html[data-lightcode="true"]:not([data-theme="dark"]){
-  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
-  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
-}
-html[data-theme="dark"]{
-  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
-  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
-  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
-  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
-  --bad:oklch(0.72 0.11 25);
-  --navact:oklch(0.26 0.02 var(--hue));
-  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
-}
-html{scroll-behavior:auto}
-body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-::selection{background:var(--accent-soft)}
-p{margin:0 0 14px;text-wrap:pretty}
-h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
-ul{margin:0 0 14px;padding-left:22px}
-li{margin:0 0 7px}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
-pre{margin:0}
-code{font-family:var(--font-mono)}
-summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
-summary::marker{color:var(--faint)}
-details[open] summary{border-bottom:1px solid var(--linesoft)}
-button{font-family:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-h2[id],h3[id]{scroll-margin-top:80px}
-h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
-h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
-.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
-#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
-#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
-#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
-#hambtn{display:none}
-@media (max-width:920px){
-  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
-  #sbar[data-open="true"]{transform:none}
-  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
-  #hambtn{display:flex}
-  #searchwrap{display:none}
-  #ghlink{display:none}
-}
-.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
-  grid-template-columns:232px minmax(0,1fr);gap:40px}
-.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
-.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
-.sidebar li{margin:0 0 2px}
-.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
-.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
-.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
-main{padding:28px 0 72px;min-width:0}
-main h1{font-size:30px;margin:0 0 18px}
-main h2{font-size:20px;margin:34px 0 12px}
-main h3{font-size:16px;margin:24px 0 8px}
-.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
-.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
-  display:flex;align-items:baseline;gap:12px}
-.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
-.masthead .tag{color:var(--mut);font-size:13px}
-.masthead .spacer{flex:1}
-.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
-  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
-pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
-  padding:13px 16px;overflow-x:auto;font-size:13px}
-pre code{color:inherit}
-.tablewrap{overflow-x:auto}
-footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
-  color:var(--mut);font-size:13px}
-@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
-  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
 </style>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
-<script>
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-1LBM3239ZF');
-</script>
 </head>
 <body>
-<header class="masthead"><div class="inner">
-<a class="brand" href="./">pretium</a>
-<span class="tag">repeatable market simulation</span>
-<span class="spacer"></span>
-<a href="https://github.com/simoncoombes/pretium">GitHub</a>
-</div></header>
-<div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><span aria-current="page">An LLM agent</span></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li><li><a href="two-loops.html">The Two Loops</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="principles.html">The Principles</a></li></ul></nav>
 <main>
-<p class="appnote">This is the plain version of the page. The
-<a href="./#/llm-agent">full documentation app</a> adds search, dark mode
-and copy buttons.</p>
-<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">CONNECT</div>
-        <h1 style="font-size:30px">An LLM Agent</h1>
-        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">A worked example, not a library feature: <code style="font-size:14px">examples/08-claude-agent.py</code> defines a <code style="font-size:14px">ClaudeTrader</code> that implements the same agent protocol as anything else, and the harness scores it against the reference agents. Nothing in the library is Claude-aware, so any provider that returns structured output slots in the same way.</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">SHELL</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="sh" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">pip install "pretium[claude]"
-export ANTHROPIC_API_KEY=...        # or: ant auth login
-python examples/08-claude-agent.py</code></pre>
-        </div>
-        <p>The interesting part is not that a language model can pick a portfolio. It is that this harness can check whether it picked one for the right reason.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">The Second Score</h2>
-        <p>Every agent gets a P&amp;L. An agent that also implements <code style="font-size:13px">explain(day)</code> gets a second score on top: the harness compares the factor the agent blames for the day against the engine's own record of what actually moved prices.</p>
-        <div style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">OUTPUT</span><span title="The oracle and momentum rows are measured; the claude row is deliberately blank." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--codemut);border:1px solid var(--codeline)">MIXED, SEE NOTE</span></div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);color:var(--codemut)">agent                     pnl    impact    why-right
-oracle                 229751       ...         100%
-claude                    ...       ...          ..%
-momentum                21520       ...            -</code></pre>
-        </div>
-        <p>The oracle and momentum rows are measured, by the same call the example makes: <code style="font-size:13px">pt.reference_agents(seed=3)</code> over <code style="font-size:13px">Universe.random(12, seed=7)</code>, seed 2026, 20 days, <code style="font-size:13px">max_leverage=2.0</code>. The claude row is blank on purpose. Every run costs money, no published run exists yet, and one seed would not be worth quoting anyway. Run it and you get your own numbers.</p>
-        <p>The oracle scores 100% on <code style="font-size:13px">why-right</code> because it reads the true mispricing directly, which is also why it is a reference rather than a competitor.</p>
-        <p>A model can earn a good P&amp;L by accident, and the second score is the one no real market can produce, because attributing a real price move to mean reversion rather than order flow is exactly the thing nobody can do. So the run gets at whether the model is describing the mechanism or telling a plausible story.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">How It Is Wired</h2>
-        <p>Claude returns a structured decision, so nothing has to be parsed out of free text.</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">class Decision(BaseModel):
-    weights: dict[str, float]   # -1.0 to 1.0 per ticker
-    driver: Factor              # one of the engine's nine factors
-    reasoning: str
-
-response = self.client.messages.parse(
-    model="claude-opus-5",
-    max_tokens=4000,
-    system=[{"type": "text", "text": SYSTEM,
-             "cache_control": {"type": "ephemeral"}}],
-    thinking={"type": "adaptive"},
-    output_config={"effort": self.effort},
-    messages=[{"role": "user", "content": self._prompt(obs)}],
-    output_format=Decision,
-)</code></pre>
-        </div>
-        <p><code style="font-size:13px">driver</code> is a literal of <a href="factors.html">the nine components</a>, so the answer comes from a closed set and can be checked against the truth table. <code style="font-size:13px">messages.parse</code> validates the response against the schema.</p>
-        <p>The market's rules go in the system prompt and never change, so they carry a cache breakpoint. The volatile part, prices and positions and the book, goes in the user turn after it. Put the market state in the system prompt and you invalidate the cache on every call.</p>
-        <p>The model returns weights rather than share counts, and the example converts them itself: divide by price, cap against average daily volume, difference against the current position. That is a few lines in the agent, and asking a model to do the arithmetic instead adds a place for it to go wrong. There is no library helper for it, because <code style="font-size:13px">act</code> is specified in shares (see <a href="agents.html">The Agent Harness</a>).</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Known Traps</h2>
-        <p><strong>The harness steps six times a day.</strong> <code style="font-size:13px">steps_per_day</code> defaults to 6, so an agent that calls the API inside <code style="font-size:13px">act</code> without gating makes six calls a day and six times the bill. The example tracks the last day it acted on:</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">if obs.day == self._last_day:
-    return {}
-self._last_day = obs.day
-
-# equivalent, and preferred in new code:
-# if not obs.is_first_step_of_day:
-#     return {}</code></pre>
-        </div>
-        <p>Those two are the same guard. <code style="font-size:13px">obs.is_first_step_of_day</code> is the one to reach for, because it cannot be confused with a once-a-run guard; the day-tracking version is what the example happens to use and works identically.</p>
-        <p><strong>explain takes the day.</strong> The full contract is on <a href="agents.html">The Agent Harness</a>. The signature is <code style="font-size:13px">explain(self, day)</code>, not <code style="font-size:13px">explain(self)</code>. Getting it wrong raises nowhere you will notice: the harness records the error per day and reports <code style="font-size:13px">explanation_accuracy</code> as <code style="font-size:13px">None</code>, so the column reads <code style="font-size:13px">-</code> and looks like the feature is switched off.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Cost</h2>
-        <p>One call per day, one day per decision. The default run is 20 days over 12 instruments, so 20 calls, which lands around $0.30 to $0.60 at Opus 5 rates with the system prompt cached. It scales linearly with <code style="font-size:13px">days</code>.</p>
-        <p>The mechanism does not need a frontier model to demonstrate. Pass <code style="font-size:13px">model="claude-haiku-4-5"</code> for a cheap smoke test and expect worse answers, particularly on <code style="font-size:13px">driver</code>.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">What This Does Not Tell You</h2>
-        <p>The same warning as everywhere else on this site, and it applies harder to a language model than to a coded strategy. This market has knowable structure, and the system prompt describes it. Under <code style="font-size:13px">pt-v3</code> the residual trend in returns is small enough to sit inside the real-market band (+0.0375 against −0.08 to 0.06), but it comes from a herding coefficient that real markets do not have, and earlier presets ran it four times harder. A model that finds that dial and leans on it is exploiting the simulator rather than showing skill that transfers. If you run under an older preset, check what the prompt is telling it.</p>
-        <p>The <code style="font-size:13px">why-right</code> column is the more durable of the two scores, because naming the mechanism correctly is a claim about reasoning rather than about this market's quirks. Even then, run it across seeds before concluding anything, because on one market you are largely ranking the market.</p>
-        <p style="margin:24px 0 0">Related: <a href="mcp.html">The MCP Server</a> points a model at the simulator the other way round, and <a href="trust.html">Realism and Limits</a> is the warning above, measured.</p>
+<h1>This page has moved</h1>
+<p><code>llm-agent.html</code> is now part of another page. You are being sent to <a href="mcp.html">The MCP server</a>.</p>
 </main>
-</div>
-<footer class="site"><div class="layout" style="display:block">
-pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
-</div></footer>
 </body>
 </html>

@@ -1,238 +1,504 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>The two loops · pretium docs</title>
-<meta name="description" content="Calibrating the market model and evaluating a strategy against it are different jobs with different seeds. Which loop you are in decides what you need to read.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The two loops · pretium</title>
+<meta name="description" content="Training means two different things here. One trains the market model, the other trains a strategy against a market that already exists.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/two-loops.html">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium docs">
-<meta property="og:title" content="The two loops">
-<meta property="og:description" content="Calibrating the market model and evaluating a strategy against it are different jobs with different seeds. Which loop you are in decides what you need to read.">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="The two loops · pretium">
+<meta property="og:description" content="Training means two different things here. One trains the market model, the other trains a strategy against a market that already exists.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/two-loops.html">
-<meta property="article:published_time" content="2026-08-27T11:30:25-04:00">
-<meta property="article:modified_time" content="2026-08-27T12:19:15-04:00">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="The two loops">
-<meta name="twitter:description" content="Calibrating the market model and evaluating a strategy against it are different jobs with different seeds. Which loop you are in decides what you need to read.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The two loops","description":"Calibrating the market model and evaluating a strategy against it are different jobs with different seeds. Which loop you are in decides what you need to read.","url":"https://simoncoombes.github.io/pretium/two-loops.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27T11:30:25-04:00","dateModified":"2026-08-27T12:19:15-04:00"}</script>
+<meta property="og:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="pretium — a market you can run a strategy against">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta name="author" content="Simon Coombes">
+<meta name="theme-color" content="#FAFBFA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1312" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<!-- The measurements every claim on this site rests on, as data. -->
+<link rel="alternate" type="application/json" href="envelope.json"
+      title="the realism envelope">
+<!-- The same pages as plain text, for a reader that is a model. -->
+<link rel="alternate" type="text/plain" href="llms.txt" title="summary for language models">
+<link rel="alternate" type="text/plain" href="llms-full.txt" title="full text for language models">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
-<style>:root{
-  --hue:55;
-  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
-  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
-  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
-  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
-  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
-  --bad:oklch(0.52 0.12 25);
-  --navact:oklch(0.945 0.012 var(--hue));
-  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
-  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
-  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
-  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
-}
-html[data-lightcode="true"]:not([data-theme="dark"]){
-  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
-  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
-}
-html[data-theme="dark"]{
-  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
-  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
-  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
-  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
-  --bad:oklch(0.72 0.11 25);
-  --navact:oklch(0.26 0.02 var(--hue));
-  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
-}
-html{scroll-behavior:auto}
-body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-::selection{background:var(--accent-soft)}
-p{margin:0 0 14px;text-wrap:pretty}
-h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
-ul{margin:0 0 14px;padding-left:22px}
-li{margin:0 0 7px}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
-pre{margin:0}
-code{font-family:var(--font-mono)}
-summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
-summary::marker{color:var(--faint)}
-details[open] summary{border-bottom:1px solid var(--linesoft)}
-button{font-family:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-h2[id],h3[id]{scroll-margin-top:80px}
-h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
-h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
-.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
-#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
-#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
-#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
-#hambtn{display:none}
-@media (max-width:920px){
-  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
-  #sbar[data-open="true"]{transform:none}
-  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
-  #hambtn{display:flex}
-  #searchwrap{display:none}
-  #ghlink{display:none}
-}
-.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
-  grid-template-columns:232px minmax(0,1fr);gap:40px}
-.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
-.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
-.sidebar li{margin:0 0 2px}
-.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
-.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
-.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
-main{padding:28px 0 72px;min-width:0}
-main h1{font-size:30px;margin:0 0 18px}
-main h2{font-size:20px;margin:34px 0 12px}
-main h3{font-size:16px;margin:24px 0 8px}
-.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
-.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
-  display:flex;align-items:baseline;gap:12px}
-.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
-.masthead .tag{color:var(--mut);font-size:13px}
-.masthead .spacer{flex:1}
-.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
-  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
-pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
-  padding:13px 16px;overflow-x:auto;font-size:13px}
-pre code{color:inherit}
-.tablewrap{overflow-x:auto}
-footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
-  color:var(--mut);font-size:13px}
-@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
-  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
-</style>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The two loops","description":"Training means two different things here. One trains the market model, the other trains a strategy against a market that already exists.","url":"https://simoncoombes.github.io/pretium/two-loops.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-27"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"Start here"},{"@type":"ListItem","position":3,"name":"The two loops","item":"https://simoncoombes.github.io/pretium/two-loops.html"}]}</script>
 <script>
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-1LBM3239ZF');
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </head>
-<body>
-<header class="masthead"><div class="inner">
-<a class="brand" href="./">pretium</a>
-<span class="tag">repeatable market simulation</span>
-<span class="spacer"></span>
-<a href="https://github.com/simoncoombes/pretium">GitHub</a>
-</div></header>
-<div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li><li><span aria-current="page">The Two Loops</span></li><li><a href="glossary.html">Glossary</a></li><li><a href="principles.html">The Principles</a></li></ul></nav>
-<main>
-<p class="appnote">This is the plain version of the page. The
-<a href="./#/two-loops">full documentation app</a> adds search, dark mode
-and copy buttons.</p>
-<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">GETTING STARTED</div>
-        <h1 style="font-size:30px">The two loops</h1>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">"Training" means two different things in this project. One trains the market model. The other trains a strategy against a market that already exists. They use different seeds, answer to different validation, and only one of them produces something you cite.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Most users only need the second. <a href="atlas.html" style="color:var(--accent)">Atlas</a> says so on its own page: you do not need it to run a simulation or test a strategy, and most users never go further.</p>
-        <h2 id="loop-a-calibrating-the-market-model" style="font-size:21px;margin:46px 0 10px">Loop A, calibrating the market model</h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Fitting the simulator's coefficients so the synthetic market reproduces real-market statistics.</p>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)"></th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)"></th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">what "training" means</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">the calibration seeds a search or survey measures on</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">what "validation" means</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">held-out seeds, a held-out universe, a held-out horizon</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">what comes out</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">a named preset, <code style="font-size:12.5px">pt-v12</code> on the shipped default</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">where Atlas lives</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">here</td></tr></table></div></div>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">The output is frozen. A preset is a complete, named set of coefficients, and changing any of them produces a different name, because a result recorded under one name has to replay under that name.</p>
-        <h2 id="loop-b-evaluating-a-strategy-or-agent" style="font-size:21px;margin:46px 0 10px">Loop B, evaluating a strategy or agent</h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Running a strategy, a reinforcement-learning policy or an LLM agent against a market that already exists.</p>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)"></th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)"></th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">what "training" means</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">training your policy against the Gymnasium environment, <code style="font-size:12.5px">pretium.gym.TradingEnv</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">what "validation" means</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">ranking across seeds with a paired sign test</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">the preset</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">a fixed input you cite, never something you tune</td></tr></table></div></div>
-        <h2 id="the-handover-runs-one-way" style="font-size:21px;margin:46px 0 10px">The handover runs one way</h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Loop A ends at a frozen, fingerprinted preset. Loop B names that preset in its result. Nothing travels back: a strategy result never tunes the market model, because tuning the market on a strategy's performance bakes that strategy's edge into the world it is then measured in.</p>
-        <figure style="margin:24px 0">
-<svg viewBox="0 0 880 320" role="img" width="100%"
-     aria-label="Loop A calibrates the market model and ends at a frozen preset; the preset and its realism envelope are inputs to Loop B, which evaluates a strategy. No arrow returns from Loop B to Loop A."
-     style="max-width:880px;color:currentColor">
-  <defs>
-    <marker id="tl-arrow" viewBox="0 0 10 10" refX="9" refY="5"
-            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
-    </marker>
-  </defs>
-  <g fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.85">
-    <rect x="12" y="26" width="150" height="46" rx="6"/>
-    <rect x="212" y="26" width="150" height="46" rx="6"/>
-    <rect x="412" y="26" width="150" height="46" rx="6"/>
-    <rect x="612" y="26" width="150" height="46" rx="6"/>
-    <rect x="12" y="248" width="150" height="46" rx="6"/>
-    <rect x="212" y="248" width="150" height="46" rx="6"/>
-    <rect x="412" y="248" width="150" height="46" rx="6"/>
-  </g>
-  <g font-size="12" fill="currentColor" text-anchor="middle"
-     font-family="var(--font-ui, sans-serif)">
-    <text x="87" y="45">map the space</text><text x="87" y="61" opacity="0.6">Atlas survey</text>
-    <text x="287" y="45">confirm</text><text x="287" y="61" opacity="0.6">disjoint seeds</text>
-    <text x="487" y="45">gates</text><text x="487" y="61" opacity="0.6">thirty seeds</text>
-    <text x="687" y="45">overfitting</text><text x="687" y="61" opacity="0.6">control</text>
-    <text x="87" y="267">write a strategy</text><text x="87" y="283" opacity="0.6">or train a policy</text>
-    <text x="287" y="267">evaluate</text><text x="287" y="283" opacity="0.6">many seeds</text>
-    <text x="487" y="267">paired sign test</text><text x="487" y="283" opacity="0.6">across seeds</text>
-  </g>
-  <g stroke="currentColor" stroke-width="1.2" fill="none" marker-end="url(#tl-arrow)">
-    <path d="M 162 49 L 206 49"/>
-    <path d="M 362 49 L 406 49"/>
-    <path d="M 562 49 L 606 49"/>
-    <path d="M 687 72 L 687 118"/>
-    <path d="M 350 160 L 350 242"/>
-    <path d="M 162 271 L 206 271"/>
-    <path d="M 362 271 L 406 271"/>
-    <path d="M 640 160 L 640 242"/>
-  </g>
-  <g fill="var(--accent, currentColor)" opacity="0.14">
-    <rect x="252" y="118" width="290" height="42" rx="6"/>
-  </g>
-  <rect x="252" y="118" width="290" height="42" rx="6" fill="none"
-        stroke="var(--accent, currentColor)" stroke-width="1.6"/>
-  <text x="397" y="144" font-size="13" text-anchor="middle"
-        fill="var(--accent, currentColor)"
-        font-family="var(--font-mono, monospace)">preset pt-v12, frozen</text>
-  <g fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.85">
-    <rect x="572" y="118" width="180" height="42" rx="6"/>
-  </g>
-  <text x="662" y="144" font-size="12" text-anchor="middle" fill="currentColor"
-        font-family="var(--font-ui, sans-serif)">realism envelope</text>
-  <path d="M 542 139 L 566 139" stroke="currentColor" stroke-width="1.2"
-        fill="none" marker-end="url(#tl-arrow)"/>
-  <g font-size="10.5" fill="currentColor" opacity="0.72"
-     font-family="var(--font-ui, sans-serif)">
-    <text x="184" y="44">then</text>
-    <text x="384" y="44">then</text>
-    <text x="584" y="44">then</text>
-    <text x="695" y="98">emits</text>
-    <text x="358" y="205">cited by</text>
-    <text x="648" y="205">bounds the claim</text>
-    <text x="184" y="266">then</text>
-    <text x="384" y="266">then</text>
-    <text x="550" y="134">attaches to</text>
-  </g>
-  <text x="12" y="16" font-size="11" fill="currentColor" opacity="0.6"
-        font-family="var(--font-mono, monospace)">LOOP A -- calibrate the market model</text>
-  <text x="12" y="232" font-size="11" fill="currentColor" opacity="0.6"
-        font-family="var(--font-mono, monospace)">LOOP B -- evaluate a strategy</text>
-</svg>
-<figcaption style="color:var(--mut);font-size:13px;margin-top:8px">
-Loop A ends at a frozen preset. The preset and the realism envelope attached to
-it are inputs to Loop B, and bound what a Loop B result may claim. There is no
-arrow from Loop B back to Loop A.
-</figcaption>
-</figure>
-        <h2 id="which-loop-you-are-in-decides-what-you-read" style="font-size:21px;margin:46px 0 10px">Which loop you are in decides what you read</h2>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">you want to</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">loop</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">start at</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">test a trading strategy</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">B</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="agents.html" style="color:var(--accent)">Agents and evaluation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">train a reinforcement-learning policy</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">B</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="simulate.html" style="color:var(--accent)">Running a simulation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">know what your result depends on</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">A</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">fit coefficients to your own data</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">A</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">know what the market is measured to reproduce</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">neither</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-envelope.md" style="color:var(--accent)">The realism envelope</a></td></tr></table></div></div>
-        <h2 id="what-the-envelope-adds" style="font-size:21px;margin:46px 0 10px">What the envelope adds</h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">The preset carries a measurement with it. <code style="font-size:12.5px">pt-v12</code> holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days, and the envelope names five gaps where it does not hold. A Loop B result inherits both. The certification is what lets you say the market behaved like a real one; the gaps are what stop you saying more than that.</p>
-</main>
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu pt-here"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><span class="pt-current">The two loops</span><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
+
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE TWO LOOPS</span>
 </div>
-<footer class="site"><div class="layout" style="display:block">
-pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
-</div></footer>
+
+<section class="pt-s33">
+<h1 class="pt-s30">The two loops</h1>
+<p class="pt-s24">The word training means two different things here. One kind trains the market model. The other kind trains a strategy against a market that exists. Most people need only the second kind.</p>
+
+<div style="border:1px solid var(--line);border-radius:8px;background:var(--card);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:0.9rem">
+<div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP A</span>
+<h3 class="pt-s4">Calibrate the market model</h3>
+</div>
+<div class="pt-s64">
+
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">map the space</span>
+<span class="pt-s23">Atlas survey</span>
+</span>
+<span class="pt-s32">then</span>
+</span>
+
+
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">confirm</span>
+<span class="pt-s23">disjoint seeds</span>
+</span>
+<span class="pt-s32">then</span>
+</span>
+
+
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">gates</span>
+<span class="pt-s23">thirty seeds</span>
+</span>
+<span class="pt-s32">then</span>
+</span>
+
+
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">overfitting</span>
+<span class="pt-s23">control</span>
+</span>
+<span class="pt-s32"></span>
+</span>
+
+</div>
+
+<div style="display:flex;justify-content:center;padding:0.2rem 0">
+<span class="pt-s32">emits</span>
+</div>
+
+<div style="display:flex;gap:0.7rem;align-items:stretch;flex-wrap:wrap">
+<div style="flex:1;min-width:14rem;border:1.5px solid var(--accent);border-radius:6px;background:var(--accent-soft);padding:0.7rem 0.9rem;display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.9375rem;color:var(--accent-deep)">preset pt-v12, frozen</span>
+<span style="font-size:0.75rem;color:var(--accent-deep)">A complete set of coefficients with one name. Change any of them and the set gets a new name.</span>
+</div>
+<div style="flex:1;min-width:14rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.7rem 0.9rem;display:flex;flex-direction:column;gap:1px">
+<span class="pt-s57">the realism envelope</span>
+<span class="pt-s71">Attached to the preset. Bounds what a result may claim.</span>
+</div>
+</div>
+
+<div style="display:flex;justify-content:center;padding:0.2rem 0">
+<span class="pt-s32">cited by, and bounds</span>
+</div>
+
+<div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP B</span>
+<h3 class="pt-s4">Evaluate a strategy or agent</h3>
+</div>
+<div class="pt-s64">
+
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">write a strategy</span>
+<span class="pt-s23">or train a policy</span>
+</span>
+<span class="pt-s32">then</span>
+</span>
+
+
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">evaluate</span>
+<span class="pt-s23">many seeds</span>
+</span>
+<span class="pt-s32">then</span>
+</span>
+
+
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">paired sign test</span>
+<span class="pt-s23">across seeds</span>
+</span>
+<span class="pt-s32"></span>
+</span>
+
+</div>
+<p style="margin:0.3rem 0 0;font-size:0.875rem;color:var(--ink-2)">Nothing travels back. If you tune the market on the results of a strategy, you put the edge of that strategy into the world that then measures it.</p>
+</div>
+</section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">Which loop you are in decides what you read</h2>
+<div class="pt-s11">
+
+<div class="pt-s100">
+<span class="pt-s0">Test a trading strategy</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">B</span>
+<a href="running-a-market.html" class="pt-s72">Running a market</a>
+</div>
+
+
+<div class="pt-s100">
+<span class="pt-s0">Train a reinforcement-learning policy</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">B</span>
+<a href="https://github.com/simoncoombes/pretium/blob/main/docs/reinforcement-learning.md" class="pt-s72">The RL environment</a>
+</div>
+
+
+<div class="pt-s100">
+<span class="pt-s0">Know what your result depends on</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--amber)">A</span>
+<a href="https://simoncoombes.github.io/pretium/atlas.html" class="pt-s72">Atlas</a>
+</div>
+
+
+<div class="pt-s100">
+<span class="pt-s0">Fit coefficients to your own data</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--amber)">A</span>
+<a href="https://simoncoombes.github.io/pretium/atlas.html" class="pt-s72">Atlas</a>
+</div>
+
+
+<div class="pt-s100">
+<span class="pt-s0">Know what the market reproduces</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-3)">neither</span>
+<a href="https://simoncoombes.github.io/pretium/trust.html" class="pt-s72">The realism envelope</a>
+</div>
+
+</div>
+</section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">What the envelope adds</h2>
+<p class="pt-s13">The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say that the market behaved as a real one. The gaps stop you before you say more than that.</p>
+<div style="display:flex;gap:0.7rem;flex-wrap:wrap">
+<a href="index.html#trust" style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep);border-radius:6px;padding:0.5rem 0.85rem">Check a question against the envelope</a>
+<a href="running-a-market.html" style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:6px;padding:0.5rem 0.85rem">Start Loop B</a>
+</div>
+</section>
+
+
+
+
+</main></div>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></span><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><a href="agents.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></a><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><a href="presets.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></a><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="core-concepts.html"><span class="pt-eyebrow">BACK</span><span>Core concepts</span></a><a class="pt-next" href="running-a-market.html"><span class="pt-eyebrow">NEXT</span><span>Running a market</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE TWO LOOPS</span>
+</div>
+
+<section class="pt-s33">
+<h1 class="pt-s30">The two loops</h1>
+<p class="pt-s24">The word training means two different things here. One kind trains the market model. The other kind trains a strategy against a market that exists. Most people need only the second kind.</p>
+
+<div style="border:1px solid var(--line);border-radius:8px;background:var(--card);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:0.9rem">
+<div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP A</span>
+<h3 class="pt-s4">Calibrate the market model</h3>
+</div>
+<div class="pt-s64">
+<sc-for list="{{ loopA }}" as="s">
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">{{ s.k }}</span>
+<span class="pt-s23">{{ s.v }}</span>
+</span>
+<span class="pt-s32">{{ s.arrow }}</span>
+</span>
+
+</sc-for></div>
+
+<div style="display:flex;justify-content:center;padding:0.2rem 0">
+<span class="pt-s32">emits</span>
+</div>
+
+<div style="display:flex;gap:0.7rem;align-items:stretch;flex-wrap:wrap">
+<div style="flex:1;min-width:14rem;border:1.5px solid var(--accent);border-radius:6px;background:var(--accent-soft);padding:0.7rem 0.9rem;display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.9375rem;color:var(--accent-deep)">preset pt-v12, frozen</span>
+<span style="font-size:0.75rem;color:var(--accent-deep)">A complete set of coefficients with one name. Change any of them and the set gets a new name.</span>
+</div>
+<div style="flex:1;min-width:14rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.7rem 0.9rem;display:flex;flex-direction:column;gap:1px">
+<span class="pt-s57">the realism envelope</span>
+<span class="pt-s71">Attached to the preset. Bounds what a result may claim.</span>
+</div>
+</div>
+
+<div style="display:flex;justify-content:center;padding:0.2rem 0">
+<span class="pt-s32">cited by, and bounds</span>
+</div>
+
+<div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP B</span>
+<h3 class="pt-s4">Evaluate a strategy or agent</h3>
+</div>
+<div class="pt-s64">
+<sc-for list="{{ loopB }}" as="s">
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">{{ s.k }}</span>
+<span class="pt-s23">{{ s.v }}</span>
+</span>
+<span class="pt-s32">{{ s.arrow }}</span>
+</span>
+
+</sc-for></div>
+<p style="margin:0.3rem 0 0;font-size:0.875rem;color:var(--ink-2)">Nothing travels back. If you tune the market on the results of a strategy, you put the edge of that strategy into the world that then measures it.</p>
+</div>
+</section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">Which loop you are in decides what you read</h2>
+<div class="pt-s11">
+<sc-for list="{{ routes }}" as="r">
+<div class="pt-s100">
+<span class="pt-s0">{{ r.want }}</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:{{ r.col }}">{{ r.loop }}</span>
+<a href="{{ r.href }}" class="pt-s72">{{ r.start }}</a>
+</div>
+
+</sc-for></div>
+</section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">What the envelope adds</h2>
+<p class="pt-s13">The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say that the market behaved as a real one. The gaps stop you before you say more than that.</p>
+<div style="display:flex;gap:0.7rem;flex-wrap:wrap">
+<a href="index.html#trust" style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep);border-radius:6px;padding:0.5rem 0.85rem">Check a question against the envelope</a>
+<a href="running-a-market.html" style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:6px;padding:0.5rem 0.85rem">Start Loop B</a>
+</div>
+</section>
+
+
+
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+
+    // One menu open at a time, and a click anywhere else closes them.
+    // <details> has no such behaviour on its own.
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) {
+        if (all[i] !== inside) all[i].removeAttribute('open');
+      }
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const chain = (steps) => steps.map((s, i) => ({
+      k: s[0], v: s[1], arrow: i === steps.length - 1 ? '' : 'then'
+    }));
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      markLogo: dark ? './mark-pretium-dark.png' : './mark-pretium.png',
+      showLight: this.state.dark ? 'none' : 'block',
+      showDark: this.state.dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      loopA: chain([
+        ['map the space', 'Atlas survey'],
+        ['confirm', 'disjoint seeds'],
+        ['gates', 'thirty seeds'],
+        ['overfitting', 'control']
+      ]),
+      loopB: chain([
+        ['write a strategy', 'or train a policy'],
+        ['evaluate', 'many seeds'],
+        ['paired sign test', 'across seeds']
+      ]),
+      routes: [
+        { want: 'Test a trading strategy', loop: 'B', start: 'Running a market', href: 'running-a-market.html' },
+        { want: 'Train a reinforcement-learning policy', loop: 'B', start: 'The RL environment', href: 'https://github.com/simoncoombes/pretium/blob/main/docs/reinforcement-learning.md' },
+        { want: 'Know what your result depends on', loop: 'A', start: 'Atlas', href: 'https://simoncoombes.github.io/pretium/atlas.html' },
+        { want: 'Fit coefficients to your own data', loop: 'A', start: 'Atlas', href: 'https://simoncoombes.github.io/pretium/atlas.html' },
+        { want: 'Know what the market reproduces', loop: 'neither', start: 'The realism envelope', href: 'https://simoncoombes.github.io/pretium/trust.html' }
+      ].map(r => ({ want: r.want, loop: r.loop, start: r.start, href: r.href,
+        col: r.loop === 'A' ? 'var(--amber)' : r.loop === 'B' ? 'var(--accent)' : 'var(--ink-3)' }))
+    });
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {"doors": [{"title": "Start", "links": [{"label": "Install", "href": "install.html"}, {"label": "Core concepts", "href": "core-concepts.html"}, {"label": "The two loops", "href": "two-loops.html"}, {"label": "Running a market", "href": "running-a-market.html"}]}, {"title": "Use it", "links": [{"label": "Agents", "href": "agents.html"}, {"label": "Scenarios", "href": "scenarios.html"}, {"label": "Execution cost", "href": "execution-cost.html"}, {"label": "Checkpoints and forking", "href": "checkpoints.html"}, {"label": "Real companies from EDGAR", "href": "edgar.html"}, {"label": "RL environment", "href": "rl-environment.html"}, {"label": "The MCP server", "href": "mcp.html"}]}, {"title": "Trust it", "links": [{"label": "Realism envelope", "href": "realism-envelope.html"}, {"label": "The metrics", "href": "metrics.html"}, {"label": "Principles", "href": "principles.html"}, {"label": "Citing a run", "href": "citing.html"}]}, {"title": "Reference", "links": [{"label": "Glossary", "href": "glossary.html"}, {"label": "The nine factors", "href": "factors.html"}, {"label": "Conventions", "href": "conventions.html"}, {"label": "Schemas", "href": "schemas.html"}, {"label": "Presets", "href": "presets.html"}, {"label": "Release notes", "href": "release-notes.html"}]}, {"title": "API", "links": [{"label": "Core types", "href": "core-types.html"}, {"label": "Evaluate", "href": "evaluate.html"}, {"label": "Parameters", "href": "parameters.html"}]}]});
+})();
+</script>
 </body>
 </html>

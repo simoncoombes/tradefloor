@@ -1,251 +1,590 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Install and Versioning · pretium docs</title>
-<meta name="description" content="Install pretium from PyPI, choose an extra, and check bit identity on your own machine. What moves between versions and what is guaranteed to stay put.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install and versioning · pretium</title>
+<meta name="description" content="Install pretium from PyPI or crates.io, and what a version number promises about a published result.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/install.html">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium docs">
-<meta property="og:title" content="Install and Versioning">
-<meta property="og:description" content="Install pretium from PyPI, choose an extra, and check bit identity on your own machine. What moves between versions and what is guaranteed to stay put.">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="Install and versioning · pretium">
+<meta property="og:description" content="Install pretium from PyPI or crates.io, and what a version number promises about a published result.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/install.html">
-<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
-<meta property="article:modified_time" content="2026-08-27T12:19:15-04:00">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Install and Versioning">
-<meta name="twitter:description" content="Install pretium from PyPI, choose an extra, and check bit identity on your own machine. What moves between versions and what is guaranteed to stay put.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Install and Versioning","description":"Install pretium from PyPI, choose an extra, and check bit identity on your own machine. What moves between versions and what is guaranteed to stay put.","url":"https://simoncoombes.github.io/pretium/install.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-27T12:19:15-04:00"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I install pretium?","acceptedAnswer":{"@type":"Answer","text":"pip install pretium. The core package has no dependencies at all. The extras are opt-in: [rl] adds numpy and gymnasium, [arrow] adds pyarrow, [mcp] adds the MCP server, and [claude] adds what the Claude agent example needs."}},{"@type":"Question","name":"Does it need numpy or pandas?","acceptedAnswer":{"@type":"Answer","text":"No. The core package depends on nothing. Runs come back as Arrow tables that read zero copy into polars, pandas, pyarrow or duckdb, and the package requires none of them: you use whichever you already have."}},{"@type":"Question","name":"How do I check I am getting bit-identical results?","acceptedAnswer":{"@type":"Answer","text":"The repository ships a known-answer baseline: a fixed seed and roster with a recorded SHA-256 of the resulting simulation. Re-running it on your machine and comparing the digest is the check, and it is what the determinism workflow runs on every supported platform."}},{"@type":"Question","name":"Will upgrading change my results?","acceptedAnswer":{"@type":"Answer","text":"Only at an era boundary, and the release notes say when one happens. Pin the preset by name and your numbers survive the upgrade; the current default is pt-v12."}}]}</script>
+<meta property="og:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="pretium — a market you can run a strategy against">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta name="author" content="Simon Coombes">
+<meta name="theme-color" content="#FAFBFA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1312" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<!-- The measurements every claim on this site rests on, as data. -->
+<link rel="alternate" type="application/json" href="envelope.json"
+      title="the realism envelope">
+<!-- The same pages as plain text, for a reader that is a model. -->
+<link rel="alternate" type="text/plain" href="llms.txt" title="summary for language models">
+<link rel="alternate" type="text/plain" href="llms-full.txt" title="full text for language models">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
-<style>:root{
-  --hue:55;
-  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
-  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
-  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
-  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
-  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
-  --bad:oklch(0.52 0.12 25);
-  --navact:oklch(0.945 0.012 var(--hue));
-  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
-  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
-  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
-  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
-}
-html[data-lightcode="true"]:not([data-theme="dark"]){
-  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
-  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
-}
-html[data-theme="dark"]{
-  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
-  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
-  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
-  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
-  --bad:oklch(0.72 0.11 25);
-  --navact:oklch(0.26 0.02 var(--hue));
-  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
-}
-html{scroll-behavior:auto}
-body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-::selection{background:var(--accent-soft)}
-p{margin:0 0 14px;text-wrap:pretty}
-h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
-ul{margin:0 0 14px;padding-left:22px}
-li{margin:0 0 7px}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
-pre{margin:0}
-code{font-family:var(--font-mono)}
-summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
-summary::marker{color:var(--faint)}
-details[open] summary{border-bottom:1px solid var(--linesoft)}
-button{font-family:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-h2[id],h3[id]{scroll-margin-top:80px}
-h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
-h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
-.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
-#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
-#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
-#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
-#hambtn{display:none}
-@media (max-width:920px){
-  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
-  #sbar[data-open="true"]{transform:none}
-  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
-  #hambtn{display:flex}
-  #searchwrap{display:none}
-  #ghlink{display:none}
-}
-.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
-  grid-template-columns:232px minmax(0,1fr);gap:40px}
-.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
-.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
-.sidebar li{margin:0 0 2px}
-.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
-.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
-.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
-main{padding:28px 0 72px;min-width:0}
-main h1{font-size:30px;margin:0 0 18px}
-main h2{font-size:20px;margin:34px 0 12px}
-main h3{font-size:16px;margin:24px 0 8px}
-.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
-.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
-  display:flex;align-items:baseline;gap:12px}
-.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
-.masthead .tag{color:var(--mut);font-size:13px}
-.masthead .spacer{flex:1}
-.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
-  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
-pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
-  padding:13px 16px;overflow-x:auto;font-size:13px}
-pre code{color:inherit}
-.tablewrap{overflow-x:auto}
-footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
-  color:var(--mut);font-size:13px}
-@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
-  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
-</style>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Install","description":"Install pretium from PyPI or crates.io, and what a version number promises about a published result.","url":"https://simoncoombes.github.io/pretium/install.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-27"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"Start here"},{"@type":"ListItem","position":3,"name":"Install","item":"https://simoncoombes.github.io/pretium/install.html"}]}</script>
 <script>
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-1LBM3239ZF');
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </head>
-<body>
-<header class="masthead"><div class="inner">
-<a class="brand" href="./">pretium</a>
-<span class="tag">repeatable market simulation</span>
-<span class="spacer"></span>
-<a href="https://github.com/simoncoombes/pretium">GitHub</a>
-</div></header>
-<div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><span aria-current="page">Install and versioning</span></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li><li><a href="two-loops.html">The Two Loops</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="principles.html">The Principles</a></li></ul></nav>
-<main>
-<p class="appnote">This is the plain version of the page. The
-<a href="./#/install">full documentation app</a> adds search, dark mode
-and copy buttons.</p>
-<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">GETTING STARTED</div>
-        <h1 style="font-size:30px">Install and Versioning</h1>
-        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">Wheels, extras, what moves between versions, and how to check bit-identity on your own machine.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Install</h2>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">SHELL</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="sh" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">pip install pretium              # core, no dependencies
-pip install "pretium[rl]"        # + numpy, gymnasium
-pip install "pretium[arrow]"     # + pyarrow
-pip install "pretium[claude]"    # + the Claude agent example's deps
-pip install "pretium[mcp]"       # + the MCP server</code></pre>
-        </div>
-        <div class="tablewrap"><table>
-          <thead><tr><th>Requirement</th><th></th></tr></thead>
-          <tbody style="font-size:13.5px">
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">Python</td><td>3.11 or later.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">Wheels</td><td>abi3, so one wheel per platform covers every supported Python.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">Rust toolchain</td><td>Not needed. The extension ships compiled.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">Dependencies</td><td>None for the core package. Arrow output works through the buffer protocol, so polars, pandas, pyarrow and duckdb read it without pretium depending on any of them.</td></tr>
-          </tbody>
-        </table></div>
-        <h2 style="font-size:21px;margin:46px 0 10px">Using it from Rust</h2>
-        <p style="color:var(--mut);font-size:14px">The engine is a Rust crate and is published on crates.io as <code style="font-size:12.5px">pretium</code>, the same code the Python wheels are built from.</p>
-        <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="sh" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">cargo add pretium</code></pre>
-        <p style="color:var(--mut);font-size:14px">Docs at <a href="https://docs.rs/pretium">docs.rs/pretium</a>. The crate carries the engine, the presets and the determinism guarantees; the Python package adds the harness, the evaluation layer and the notebooks.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Build Targets</h2>
-        <p style="color:var(--mut);font-size:14px">The release builds and compares five Python wheel targets. Anything else needs a source build and is outside the determinism claim.</p>
-        <div class="tablewrap"><table>
-          <thead><tr><th>Platform</th><th>Architecture</th></tr></thead>
-          <tbody style="font-size:13.5px">
-            <tr><td>Linux</td><td style="font-family:var(--font-mono);font-size:12.5px">x86_64, aarch64</td></tr>
-            <tr><td>macOS</td><td style="font-family:var(--font-mono);font-size:12.5px">arm64, x86_64</td></tr>
-            <tr><td>Windows</td><td style="font-family:var(--font-mono);font-size:12.5px">x86_64</td></tr>
-          </tbody>
-        </table></div>
-        <p>There is a sixth target that is not a wheel. The crate also compiles to <code style="font-size:13px">wasm32-unknown-unknown</code> for the browser, and that build produces a digest identical to the native one, and at 0.3.0 it is 204,290 bytes raw and 72,981 gzipped. Build it with <code style="font-size:13px">tools/wasm/build.sh</code>, which builds, runs wasm-bindgen and verifies the digest in one command. <a href="wasm.html">Running in the Browser</a> has the measurement and the two places it is still loose.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">If the Import Fails</h2>
-        <div class="tablewrap"><table>
-          <thead><tr><th>Symptom</th><th>Cause</th></tr></thead>
-          <tbody style="font-size:13.5px">
-            <tr><td>pip builds from source, or reports no matching distribution</td><td>Your platform is not one of the five, or your Python is older than 3.11. Check <code style="font-size:12px">pip debug --verbosity 1</code> against the tag list above.</td></tr>
-            <tr><td><code style="font-size:12px">ImportError</code> on <code style="font-size:12px">pretium._core</code></td><td>The compiled extension did not install. Reinstall with <code style="font-size:12px">--force-reinstall --no-cache-dir</code>.</td></tr>
-            <tr><td><code style="font-size:12px">ModuleNotFoundError: gymnasium</code> or <code style="font-size:12px">pyarrow</code></td><td>You called an extra's surface without installing the extra.</td></tr>
-            <tr><td>Numbers differ from a published figure</td><td>Check the preset and the version before anything else: <code style="font-size:12px">pt.__version__</code> and <code style="font-size:12px">pt.model_preset()["name"]</code>. Trajectories change across known-answer baselines.</td></tr>
-            <tr><td>A browser build disagrees with a native one</td><td>Check that relaxed SIMD is off, since it is non-deterministic by design. If a digest refuses to hash, a non-finite value appeared, which is a real failure rather than a mismatch to work around.</td></tr>
-          </tbody>
-        </table></div>
-        <h2 style="font-size:21px;margin:46px 0 10px">What Moves Between Versions</h2>
-        <p>Pre-1.0, the API may change. What has a stated policy is the simulated output, and it has five independent version numbers:</p>
-        <div class="tablewrap"><table>
-          <thead><tr><th>Versioned thing</th><th>Policy</th></tr></thead>
-          <tbody style="font-size:13.5px">
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">package version</td><td>Ordinary semver-ish. Pre-1.0 the Python surface can move.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">model preset</td><td>Never changes once shipped. A recalibration arrives as a new name, and every earlier name keeps reproducing exactly what it always did.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">known-answer baseline</td><td>Moves when a change legitimately alters simulated output. When it moves, every seeded trajectory changed. Results from either side are not comparable at the same seed.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">SPEC_VERSION</td><td>Strategy-spec grammar. Adding a kind keeps old specs valid; changing what a kind means would be a new version.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">RNG derivation</td><td>A contract, pinned by a golden test. Changing it is an era boundary in its own right.</td></tr>
-          </tbody>
-        </table></div>
-        <p>The practical rule, then, is to pin the package version in anything you publish and to re-measure rather than inherit a number across a baseline change. <code style="font-size:13px">facts.measure</code> takes the same arguments the rest of the library does for exactly that reason.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Checking Bit-Identity Yourself</h2>
-        <p>The published record is measured on all five wheel targets at commit <code style="font-size:13px">ad91026</code>, and the current baseline is confirmed on macOS arm64 only. To check your own target, run the known-answer test and compare its digest against the committed baseline:</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">SHELL</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="sh" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)"># from a clone, against the committed baseline for this build
-pytest tests/test_known_answer.py -q
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu pt-here"><summary>Start<span class="pt-caret">▼</span></summary><div><span class="pt-current">Install</span><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
 
-# the Rust side: no platform-varying transcendental reaches the source
-cargo test --manifest-path rust/Cargo.toml mathx_parity
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">INSTALL</span>
+</div>
 
-# the browser build, digest verified as part of the build
-tools/wasm/build.sh</code></pre>
-        </div>
-        <p>A pass means your machine reproduces the committed digest bit for bit, and a failure names the first value that diverged. If you are on a platform outside the five, that result is worth reporting, since cross-platform identity is the claim most in need of independent measurement.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Checkpoints and Forking</h2>
-        <p>A run can be frozen and resumed, or forked into futures from an identical state, which is how you ask what a single decision was actually worth. <a href="forking.html">Checkpoints and Forking</a> is the guide; the shape of it is:</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">cp = pt.Checkpoint.of(engine, universe=u, seed=42)   # survives the process
-left, right = pt.branch(engine, 2, universe=u, seed=42)
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.3rem">
+<h1 class="pt-s30">Install</h1>
+<p class="pt-s24">One command, and no dependencies. Prebuilt wheels cover Linux, macOS and Windows on CPython 3.11 and up.</p>
 
-left.pin_macro(corporate_bond_yield=0.09)
-left.run_days(30)
-right.run_days(30)                      # same noise, different macro</code></pre>
-        </div>
-        <p>A checkpoint carries twenty-one RNG numbers: state, increment and Box-Muller spare for each of the seven streams, which are market, economy, external, jumps, volume, news and per-name volume. It carried nine when there were three streams and grew by three each time a mechanism got its own, so restore reads the era off the length: nine, twelve, fifteen and eighteen all still restore, keeping this engine's seed-derived position for the streams the snapshot predates, which is what lets a checkpoint written before a mechanism existed replay as it did then. Only a pre-split snapshot with three numbers is refused, with its era named, because it froze a single-stream market this version cannot continue bit-exactly.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Support and Contributing</h2>
-        <p>The repository is <a href="https://github.com/simoncoombes/pretium">simoncoombes/pretium</a>. Issues and pull requests go there. Licensed MIT OR Apache-2.0, at your option.</p>
-        <p>If you are reporting a numerical disagreement, include your platform, <code style="font-size:13px">pt.__version__</code>, <code style="font-size:13px">pt.model_preset()["name"]</code>, the seed, and the universe fingerprint.</p>
-<section id="faq">
-<h2>Common questions</h2>
-<h3 id="faq-1">How do I install pretium?</h3>
-<p>pip install pretium. The core package has no dependencies at all. The extras are opt-in: [rl] adds numpy and gymnasium, [arrow] adds pyarrow, [mcp] adds the MCP server, and [claude] adds what the Claude agent example needs.</p><h3 id="faq-2">Does it need numpy or pandas?</h3>
-<p>No. The core package depends on nothing. Runs come back as Arrow tables that read zero copy into polars, pandas, pyarrow or duckdb, and the package requires none of them: you use whichever you already have.</p><h3 id="faq-3">How do I check I am getting bit-identical results?</h3>
-<p>The repository ships a known-answer baseline: a fixed seed and roster with a recorded SHA-256 of the resulting simulation. Re-running it on your machine and comparing the digest is the check, and it is what the determinism workflow runs on every supported platform.</p><h3 id="faq-4">Will upgrading change my results?</h3>
-<p>Only at an era boundary, and the release notes say when one happens. Pin the preset by name and your numbers survive the upgrade; the current default is pt-v12.</p>
+<div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+
+<button style="display:flex;align-items:center;gap:0.5rem;font-family:'Public Sans',sans-serif;font-size:0.8125rem;padding:0.45rem 0.8rem;border-radius:6px;cursor:pointer;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)">
+<img src="./logo-python.png" alt="" width="14" height="14" style="flex:none" class="pt-light"><img src="./logo-python-dark.png" alt="" width="14" height="14" style="flex:none" class="pt-dark">Python
+</button>
+
+
+<button style="display:flex;align-items:center;gap:0.5rem;font-family:'Public Sans',sans-serif;font-size:0.8125rem;padding:0.45rem 0.8rem;border-radius:6px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">
+<img src="./logo-rust.png" alt="" width="14" height="14" style="flex:none" class="pt-light"><img src="./logo-rust-dark.png" alt="" width="14" height="14" style="flex:none" class="pt-dark">Rust
+</button>
+
+
+<button style="display:flex;align-items:center;gap:0.5rem;font-family:'Public Sans',sans-serif;font-size:0.8125rem;padding:0.45rem 0.8rem;border-radius:6px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">
+<img src="./mark-pretium.png" alt="" width="14" height="14" style="flex:none" class="pt-light"><img src="./mark-pretium-dark.png" alt="" width="14" height="14" style="flex:none" class="pt-dark">MCP
+</button>
+
+</div>
+
+<div class="pt-s29">
+<pre class="pt-s31">pip install pretium
+
+python -c "import pretium as pt; \
+  print(pt.__version__)"</pre>
+<div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
+<h3 class="pt-s4">From PyPI</h3>
+
+<div class="pt-s2">
+<span class="pt-s5">No dependencies</span>
+<span class="pt-s0">The core package pulls nothing in. Read results into polars, pandas, pyarrow or duckdb if you want them.</span>
+</div>
+
+
+<div class="pt-s2">
+<span class="pt-s5">CPython 3.11 and up</span>
+<span class="pt-s0">Prebuilt wheels for Linux x86_64 and aarch64, macOS arm64 and x86_64, and Windows x86_64.</span>
+</div>
+
+
+<div class="pt-s2">
+<span class="pt-s5">Rust core</span>
+<span class="pt-s0">The engine is compiled. Nothing here is a Python loop over ticks.</span>
+</div>
+
+</div>
+</div>
 </section>
 
-</main>
+<section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<h2 class="pt-s7">What a version promises</h2>
+<p class="pt-s13">The API can still move before 1.0. A published result can not. A change to a simulated trajectory arrives as a new preset with a new name. It is never an edit to a preset that ships. A run that you cited last month therefore reproduces this month.</p>
+
+<div class="pt-s68">
+
+<div class="pt-s8">
+<h3 class="pt-s4">A trajectory change is a breaking change</h3>
+<p class="pt-s1">Whatever its size. A market that runs differently from the same seed invalidates every published result that cited it.</p>
 </div>
-<footer class="site"><div class="layout" style="display:block">
-pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
-</div></footer>
+
+
+<div class="pt-s8">
+<h3 class="pt-s4">Old presets never move</h3>
+<p class="pt-s1">Every preset from pt-v1 onward stays selectable and reproduces bit for bit, so an old result replays under its own name.</p>
+</div>
+
+
+<div class="pt-s8">
+<h3 class="pt-s4">A citation names software, not a run</h3>
+<p class="pt-s1">A RunManifest names the run: package version, preset, seed, universe fingerprint, macro conditions, scenario and strategy.</p>
+</div>
+
+</div>
+</section>
+
+<section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<h2 class="pt-s7">The determinism check</h2>
+<p class="pt-s13">Every release builds five targets, runs one fixed simulation inside each, and compares the digests. A disagreement stops the release. This is why the crate ships its own <span class="pt-s27">exp</span>, <span class="pt-s27">log</span>, <span class="pt-s27">sin</span> and <span class="pt-s27">cos</span> The crate does not call the platform libm, because the platform libm does not agree with itself across operating systems.</p>
+
+<div class="pt-s11">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0">
+
+<div class="pt-s170">
+<span class="pt-s120">linux-x86_64</span>
+<span class="pt-s88"><span class="pt-s178"></span>digests match</span>
+</div>
+
+
+<div class="pt-s170">
+<span class="pt-s120">linux-aarch64</span>
+<span class="pt-s88"><span class="pt-s178"></span>digests match</span>
+</div>
+
+
+<div class="pt-s170">
+<span class="pt-s120">macos-arm64</span>
+<span class="pt-s88"><span class="pt-s178"></span>digests match</span>
+</div>
+
+
+<div class="pt-s170">
+<span class="pt-s120">macos-x86_64</span>
+<span class="pt-s88"><span class="pt-s178"></span>digests match</span>
+</div>
+
+
+<div class="pt-s170">
+<span class="pt-s120">windows-x86_64</span>
+<span class="pt-s88"><span class="pt-s178"></span>digests match</span>
+</div>
+
+</div>
+<div style="padding:0.65rem 0.95rem;border-top:1px solid var(--line-soft);background:var(--surface);font-size:0.8125rem;color:var(--ink-2)">A person does a check of the WebAssembly build by hand, because it needs a toolchain that CI does not carry. On 2026-08-24 the native and wasm32 builds hashed the same fixed simulation, twelve instruments over five days on pt-v3, to <span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem">2b2f3141...</span></div>
+</div>
+</section>
+
+<section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:0.9rem">
+<h2 class="pt-s7">Presets and the era boundary</h2>
+<p class="pt-s13">Twelve presets ship, <span class="pt-s27">pt-v1</span> through <span class="pt-s27">pt-v12</span>. You can select all of them, and all of them reproduce bit for bit.</p>
+<div style="display:flex;gap:3px;align-items:flex-end;padding:0.3rem 0 0">
+
+<div class="pt-s110">
+<span style="width:100%;height:12px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v1</span>
+</div>
+
+
+<div class="pt-s110">
+<span style="width:100%;height:15px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v2</span>
+</div>
+
+
+<div class="pt-s110">
+<span style="width:100%;height:18px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v3</span>
+</div>
+
+
+<div class="pt-s110">
+<span style="width:100%;height:21px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v4</span>
+</div>
+
+
+<div class="pt-s110">
+<span style="width:100%;height:24px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v5</span>
+</div>
+
+
+<div class="pt-s110">
+<span style="width:100%;height:27px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v6</span>
+</div>
+
+
+<div class="pt-s110">
+<span style="width:100%;height:30px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v7</span>
+</div>
+
+
+<div class="pt-s110">
+<span style="width:100%;height:33px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v8</span>
+</div>
+
+
+<div class="pt-s110">
+<span style="width:100%;height:36px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v9</span>
+</div>
+
+
+<div class="pt-s110">
+<span style="width:100%;height:39px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v10</span>
+</div>
+
+
+<div class="pt-s110">
+<span style="width:100%;height:42px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v11</span>
+</div>
+
+
+<div class="pt-s110">
+<span style="width:100%;height:45px;border-radius:3px 3px 0 0;background:var(--accent)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--accent)">v12</span>
+</div>
+
+</div>
+<p style="color:var(--ink-2);margin:0.4rem 0 0">pt-v12 became the default on 2026-08-26. That date is an era boundary, because every trajectory from the default changed. You can not compare a run from before that date to a run from after it, unless each run names its preset.</p>
+
+<details class="pt-s12">
+<summary class="pt-s28">What fully specifies a run</summary>
+<div class="pt-s63">
+<p class="pt-s1">Package version, model preset, universe fingerprint, and seed. The preset pins the coefficients. The package version pins the implementation. This is measured, not asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
+</div>
+</details>
+</section>
+
+
+
+
+</main></div>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></span><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><a href="two-loops.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></a><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><a href="agents.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></a><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><a href="presets.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></a><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="index.html"><span class="pt-eyebrow">BACK</span><span>Learn pretium</span></a><a class="pt-next" href="core-concepts.html"><span class="pt-eyebrow">NEXT</span><span>Core concepts</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">INSTALL</span>
+</div>
+
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.3rem">
+<h1 class="pt-s30">Install</h1>
+<p class="pt-s24">One command, and no dependencies. Prebuilt wheels cover Linux, macOS and Windows on CPython 3.11 and up.</p>
+
+<div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+<sc-for list="{{ targets }}" as="t">
+<button onClick="{{ t.pick }}" style="display:flex;align-items:center;gap:0.5rem;font-family:'Public Sans',sans-serif;font-size:0.8125rem;padding:0.45rem 0.8rem;border-radius:6px;cursor:pointer;border:1px solid {{ t.border }};background:{{ t.bg }};color:{{ t.fg }}">
+<img src="{{ t.logoLight }}" alt="" width="14" height="14" style="flex:none" class="pt-light"><img src="{{ t.logoDark }}" alt="" width="14" height="14" style="flex:none" class="pt-dark">{{ t.label }}
+</button>
+
+</sc-for></div>
+
+<div class="pt-s29">
+<pre class="pt-s31">{{ install.code }}</pre>
+<div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
+<h3 class="pt-s4">{{ install.title }}</h3>
+<sc-for list="{{ install.facts }}" as="f">
+<div class="pt-s2">
+<span class="pt-s5">{{ f.k }}</span>
+<span class="pt-s0">{{ f.v }}</span>
+</div>
+
+</sc-for></div>
+</div>
+</section>
+
+<section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<h2 class="pt-s7">What a version promises</h2>
+<p class="pt-s13">The API can still move before 1.0. A published result can not. A change to a simulated trajectory arrives as a new preset with a new name. It is never an edit to a preset that ships. A run that you cited last month therefore reproduces this month.</p>
+
+<div class="pt-s68">
+<sc-for list="{{ promises }}" as="p">
+<div class="pt-s8">
+<h3 class="pt-s4">{{ p.head }}</h3>
+<p class="pt-s1">{{ p.body }}</p>
+</div>
+
+</sc-for></div>
+</section>
+
+<section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<h2 class="pt-s7">The determinism check</h2>
+<p class="pt-s13">Every release builds five targets, runs one fixed simulation inside each, and compares the digests. A disagreement stops the release. This is why the crate ships its own <span class="pt-s27">exp</span>, <span class="pt-s27">log</span>, <span class="pt-s27">sin</span> and <span class="pt-s27">cos</span> The crate does not call the platform libm, because the platform libm does not agree with itself across operating systems.</p>
+
+<div class="pt-s11">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0">
+<sc-for list="{{ wheels }}" as="w">
+<div class="pt-s170">
+<span class="pt-s120">{{ w }}</span>
+<span class="pt-s88"><span class="pt-s178"></span>digests match</span>
+</div>
+
+</sc-for></div>
+<div style="padding:0.65rem 0.95rem;border-top:1px solid var(--line-soft);background:var(--surface);font-size:0.8125rem;color:var(--ink-2)">A person does a check of the WebAssembly build by hand, because it needs a toolchain that CI does not carry. On 2026-08-24 the native and wasm32 builds hashed the same fixed simulation, twelve instruments over five days on pt-v3, to <span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem">2b2f3141...</span></div>
+</div>
+</section>
+
+<section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:0.9rem">
+<h2 class="pt-s7">Presets and the era boundary</h2>
+<p class="pt-s13">Twelve presets ship, <span class="pt-s27">pt-v1</span> through <span class="pt-s27">pt-v12</span>. You can select all of them, and all of them reproduce bit for bit.</p>
+<div style="display:flex;gap:3px;align-items:flex-end;padding:0.3rem 0 0">
+<sc-for list="{{ presets }}" as="p">
+<div class="pt-s110">
+<span style="width:100%;height:{{ p.h }};border-radius:3px 3px 0 0;background:{{ p.col }}"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:{{ p.label }}">{{ p.n }}</span>
+</div>
+
+</sc-for></div>
+<p style="color:var(--ink-2);margin:0.4rem 0 0">pt-v12 became the default on 2026-08-26. That date is an era boundary, because every trajectory from the default changed. You can not compare a run from before that date to a run from after it, unless each run names its preset.</p>
+
+<details class="pt-s12">
+<summary class="pt-s28">What fully specifies a run</summary>
+<div class="pt-s63">
+<p class="pt-s1">Package version, model preset, universe fingerprint, and seed. The preset pins the coefficients. The package version pins the implementation. This is measured, not asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
+</div>
+</details>
+</section>
+
+
+
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false, target: 'py' , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+
+    // One menu open at a time, and a click anywhere else closes them.
+    // <details> has no such behaviour on its own.
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) {
+        if (all[i] !== inside) all[i].removeAttribute('open');
+      }
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const t = this.state.target;
+    const INSTALL = {
+      py: {
+        code: 'pip install pretium\n\npython -c "import pretium as pt; \\\n  print(pt.__version__)"',
+        title: 'From PyPI',
+        facts: [
+          { k: 'No dependencies', v: 'The core package pulls nothing in. Read results into polars, pandas, pyarrow or duckdb if you want them.' },
+          { k: 'CPython 3.11 and up', v: 'Prebuilt wheels for Linux x86_64 and aarch64, macOS arm64 and x86_64, and Windows x86_64.' },
+          { k: 'Rust core', v: 'The engine is compiled. Nothing here is a Python loop over ticks.' }
+        ]
+      },
+      rs: {
+        code: 'cargo add pretium\n\n# https://crates.io/crates/pretium',
+        title: 'From crates.io',
+        facts: [
+          { k: 'No Python needed', v: 'The engine is published as a Rust crate and runs on its own.' },
+          { k: 'Same source, same version', v: 'Both packages are built from one source at the same version, and run the same market.' },
+          { k: 'Also compiles to wasm', v: 'The wasm32 target runs in a browser, checked by hand against the native build.' }
+        ]
+      },
+      mcp: {
+        code: 'pip install "pretium[mcp]"\n\nclaude mcp add pretium -- pretium-mcp',
+        title: 'For an agent',
+        facts: [
+          { k: 'Eleven read-only tools', v: 'A model can ask whether a strategy beats buy-and-hold here, and whether the difference is real.' },
+          { k: 'Everything is data', v: 'Strategies, universes and scenarios are composed as data. There is no path from a tool argument to code execution.' },
+          { k: 'Caveats travel with results', v: 'Every result carries computed caveats and full provenance, because the model has the tool output and nothing else.' }
+        ]
+      }
+    };
+    const pill = (on) => on
+      ? { border: 'var(--accent-line)', bg: 'var(--accent-soft)', fg: 'var(--accent-deep)' }
+      : { border: 'var(--line)', bg: 'var(--card)', fg: 'var(--ink-2)' };
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      markLogo: dark ? './mark-pretium-dark.png' : './mark-pretium.png',
+      showLight: this.state.dark ? 'none' : 'block',
+      showDark: this.state.dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      install: INSTALL[t],
+      targets: [
+        ['py', 'Python', './logo-python.png', './logo-python-dark.png'],
+        ['rs', 'Rust', './logo-rust.png', './logo-rust-dark.png'],
+        ['mcp', 'MCP', './mark-pretium.png', './mark-pretium-dark.png']
+      ].map(([k, label, light, darkSrc]) => {
+        const p = pill(t === k);
+        return { label: label, logoLight: light, logoDark: darkSrc,
+          border: p.border, bg: p.bg, fg: p.fg,
+          pick: () => this.setState({ target: k }) };
+      }),
+      promises: [
+        { head: 'A trajectory change is a breaking change',
+          body: 'Whatever its size. A market that runs differently from the same seed invalidates every published result that cited it.' },
+        { head: 'Old presets never move',
+          body: 'Every preset from pt-v1 onward stays selectable and reproduces bit for bit, so an old result replays under its own name.' },
+        { head: 'A citation names software, not a run',
+          body: 'A RunManifest names the run: package version, preset, seed, universe fingerprint, macro conditions, scenario and strategy.' }
+      ],
+      wheels: ['linux-x86_64', 'linux-aarch64', 'macos-arm64', 'macos-x86_64', 'windows-x86_64'],
+      presets: Array.from({ length: 12 }, (_, i) => {
+        const n = i + 1;
+        const current = n === 12;
+        return { n: 'v' + n, h: (12 + i * 3) + 'px',
+          col: current ? 'var(--accent)' : 'var(--band)',
+          label: current ? 'var(--accent)' : 'var(--ink-3)' };
+      })
+    });
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {"doors": [{"title": "Start", "links": [{"label": "Install", "href": "install.html"}, {"label": "Core concepts", "href": "core-concepts.html"}, {"label": "The two loops", "href": "two-loops.html"}, {"label": "Running a market", "href": "running-a-market.html"}]}, {"title": "Use it", "links": [{"label": "Agents", "href": "agents.html"}, {"label": "Scenarios", "href": "scenarios.html"}, {"label": "Execution cost", "href": "execution-cost.html"}, {"label": "Checkpoints and forking", "href": "checkpoints.html"}, {"label": "Real companies from EDGAR", "href": "edgar.html"}, {"label": "RL environment", "href": "rl-environment.html"}, {"label": "The MCP server", "href": "mcp.html"}]}, {"title": "Trust it", "links": [{"label": "Realism envelope", "href": "realism-envelope.html"}, {"label": "The metrics", "href": "metrics.html"}, {"label": "Principles", "href": "principles.html"}, {"label": "Citing a run", "href": "citing.html"}]}, {"title": "Reference", "links": [{"label": "Glossary", "href": "glossary.html"}, {"label": "The nine factors", "href": "factors.html"}, {"label": "Conventions", "href": "conventions.html"}, {"label": "Schemas", "href": "schemas.html"}, {"label": "Presets", "href": "presets.html"}, {"label": "Release notes", "href": "release-notes.html"}]}, {"title": "API", "links": [{"label": "Core types", "href": "core-types.html"}, {"label": "Evaluate", "href": "evaluate.html"}, {"label": "Parameters", "href": "parameters.html"}]}]});
+})();
+</script>
 </body>
 </html>

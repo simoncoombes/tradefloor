@@ -89,7 +89,7 @@ Five limits are measured and written down:
 | roster | certification used a sector-balanced roster, which no real index is |
 
 `pt.envelope.check()` refuses a question that falls outside a limit, and
-[the realism envelope](https://simoncoombes.github.io/pretium/trust.html) says
+[the realism envelope](https://simoncoombes.github.io/pretium/realism-envelope.html) says
 what each one forbids.
 
 Good results here do not predict real returns. The prices come from a known
