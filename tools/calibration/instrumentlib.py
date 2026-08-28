@@ -343,6 +343,14 @@ PARAM_SPECS: dict[str, dict] = {
     # interior optimum if one exists.
     "crisis_blend_variance_damp": {"kind": "abs", "step_unit": 0.05,
                                    "hard_range": (0.0, 1.0)},
+    # Re-assert the credit spread floors on every daily step (#48). Shipped at
+    # 0.0 on every preset, which is the reference implementation's behaviour
+    # and the one that lets an investment-grade yield sit under the risk-free
+    # curve for months between meetings. 1.0 enforces both floors in full. The
+    # unit interval is the whole domain: it scales a floor, so past 1.0 it
+    # would be inventing a spread rather than defending one.
+    "daily_credit_floor_gain": {"kind": "abs", "step_unit": 0.1,
+                                "hard_range": (0.0, 1.0)},
     # Per-name idiosyncratic volatility as beta^k (§47). Zero is the shipped
     # behaviour; 3 is where the 504-day panel collapses (§71), and the
     # interquartile volatility ratio is still rising there, so the hard range

@@ -180,6 +180,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # far end known to be broken -- which is what makes an interior optimum,
     # if there is one, worth finding.
     "crisis_blend_variance_damp": (0.0, 1.0),
+    # The daily credit spread floor (#48), shipped off. A gain on a floor, so
+    # the unit interval is the domain: 0 is today's behaviour and 1 enforces
+    # the floor the meeting already applies.
+    "daily_credit_floor_gain": (0.0, 1.0),
     # A name's own variance following the VIX (§78).
     "garch_vix_coupling": (0.0, 1.0),
     # A jump's arrival RATE following the VIX (§84). A share, so the unit

@@ -56,6 +56,7 @@
 //! cost is paid once per boundary crossing rather than 390 times a day.
 
 use crate::economy::{
+    Decision,
     check_cycle_transition, update_central_bank, update_economy_daily, CentralBankState,
     DailyInputs, EconomicShock, EconomyState,
 };
@@ -178,6 +179,20 @@ pub struct DayAdvanceRequest<'a> {
 pub struct DayAdvanceOutcome {
     pub phase_changed: bool,
     pub meeting_held: bool,
+    /// The action taken, when a meeting was held.
+    ///
+    /// `None` and `!meeting_held` are the same fact from two directions;
+    /// `meeting_held` is kept because removing it would break callers for no
+    /// gain. Before 0.4.2 this was computed, reduced to the boolean and
+    /// discarded, so an embedder saw the rate move with nothing able to say
+    /// why. Reconstructing it from the rate delta is guesswork:
+    /// `StagflationHike` and `LaborEmergencyCut` are separated by the
+    /// economic context that selected them, not by the size of the move.
+    pub decision: Option<Decision>,
+    /// Index into the six announcement variants, as `MeetingOutcome` reports
+    /// it. Carried instead of the string, for the same reason as there: the
+    /// draw is contractual and the prose is not.
+    pub announcement_variant: Option<usize>,
     pub draws_consumed: usize,
 }
 
@@ -1146,6 +1161,7 @@ impl Engine {
                 inflation_ceiling: self.params.inflation_ceiling,
                 inflation_floor: self.params.inflation_floor,
                 crisis_vix_threshold: self.params.crisis_vix_threshold,
+                daily_credit_floor_gain: self.params.daily_credit_floor_gain,
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,
                 market_return_pct: request.market_return_pct,
@@ -1158,12 +1174,16 @@ impl Engine {
         let meeting =
             update_central_bank(&self.central_bank, &self.economy, request.timestamp, rng);
         let meeting_held = meeting.decision.is_some();
+        let decision = meeting.decision;
+        let announcement_variant = meeting.announcement_variant;
         self.central_bank = meeting.central_bank;
         self.economy = meeting.economy;
 
         DayAdvanceOutcome {
             phase_changed: self.economy.cycle_phase != phase_before,
             meeting_held,
+            decision,
+            announcement_variant,
             draws_consumed: 0,
         }
     }
@@ -2784,6 +2804,40 @@ mod tests {
         assert_eq!(public, vec![false, true, false]);
         assert!(e.set_status(&[true; 2], &[true; 3]).is_err());
         assert!(e.set_status(&[true; 3], &[true; 4]).is_err());
+    }
+
+    #[test]
+    fn a_held_meeting_reports_which_decision_produced_the_rate_move() {
+        // `update_central_bank` computes a `Decision` and an announcement
+        // variant, and `advance_day` used to reduce both to a boolean. An
+        // embedder saw the rate move with nothing able to say why, and the
+        // obvious workaround -- classifying from the rate delta -- cannot
+        // separate `StagflationHike` from `LaborEmergencyCut`, which differ
+        // by the context that selected them rather than the size of the move.
+        let mut e = engine(3);
+        let mut held = 0;
+        let mut quiet = 0;
+        for day in 1..=400i64 {
+            let out = e.advance_macro_day(day);
+            if out.meeting_held {
+                held += 1;
+                assert!(
+                    out.decision.is_some(),
+                    "day {day}: a meeting was held with no decision reported"
+                );
+                assert!(
+                    out.announcement_variant.is_some(),
+                    "day {day}: a meeting was held with no announcement variant"
+                );
+                assert!(out.announcement_variant.unwrap() < 6, "variant out of range");
+            } else {
+                quiet += 1;
+                assert!(out.decision.is_none());
+                assert!(out.announcement_variant.is_none());
+            }
+        }
+        assert!(held > 0, "no meeting in 400 days, so the test proved nothing");
+        assert!(quiet > 0, "every day was a meeting, so the None case is untested");
     }
 }
 

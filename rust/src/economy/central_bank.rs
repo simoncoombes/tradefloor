@@ -29,7 +29,23 @@ use crate::rng::Rng;
 const ANNOUNCEMENT_VARIANTS: f64 = 6.0;
 
 /// The policy action taken at a meeting.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The corporate spread never sits under this, in basis points over the 10y.
+///
+/// An investment-grade yield below the risk-free curve is not a rare edge, it
+/// is an impossible quote. Stated here rather than as a literal because the
+/// floor is applied in two places -- once where the meeting computes the
+/// yield, and once at the end of the daily update, where the benchmark has
+/// moved underneath it since.
+pub const CORPORATE_SPREAD_FLOOR: f64 = 0.8;
+
+/// The mortgage spread's floor, on the same footing.
+///
+/// Structurally identical to the corporate one, and it survived on margin
+/// alone: this spread runs 1.5 to 2.8, so daily drift never reached 0.5. That
+/// is luck rather than a guarantee, so it is floored too.
+pub const MORTGAGE_SPREAD_FLOOR: f64 = 0.5;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Decision {
     AggressiveHike,
     Hike,
@@ -38,6 +54,25 @@ pub enum Decision {
     StagflationHike,
     LaborEmergencyCut,
     Hold,
+}
+
+impl Decision {
+    /// The decision's name, following `CyclePhase::as_str`.
+    ///
+    /// Anything aggregating decisions across a run otherwise has to match on
+    /// the enum to get a label, and a `match` in a caller goes stale silently
+    /// when a variant is added here.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Decision::AggressiveHike => "aggressive_hike",
+            Decision::Hike => "hike",
+            Decision::Cut => "cut",
+            Decision::EmergencyCut => "emergency_cut",
+            Decision::StagflationHike => "stagflation_hike",
+            Decision::LaborEmergencyCut => "labor_emergency_cut",
+            Decision::Hold => "hold",
+        }
+    }
 }
 
 /// What a meeting produced.
@@ -253,13 +288,16 @@ pub fn update_central_bank(
         CyclePhase::Expansion => 1.0,
     };
     let corporate_spread = base_corporate_spread * cycle_spread_multiplier;
-    let calculated_corp_yield = new_economy.treasury_yield_10y + clamp(corporate_spread, 0.8, 6.0);
+    let calculated_corp_yield = new_economy.treasury_yield_10y + clamp(corporate_spread, CORPORATE_SPREAD_FLOOR, 6.0);
     // The nested max is redundant — `+0.8` dominates `+0.3` — but it is what
     // the original writes, and collapsing it would be a silent edit rather
     // than a port.
     new_economy.corporate_bond_yield = mathx::max(
         new_economy.treasury_yield_10y + 0.3,
-        mathx::max(new_economy.treasury_yield_10y + 0.8, calculated_corp_yield),
+        mathx::max(
+            new_economy.treasury_yield_10y + CORPORATE_SPREAD_FLOOR,
+            calculated_corp_yield,
+        ),
     );
 
     // ── QE ────────────────────────────────────────────────────────────────

@@ -1014,7 +1014,10 @@ mod tests {
     /// The blend as `simulate_market_tick` computes it, extracted so the
     /// two tests above can ask about it without driving a whole market.
     fn blend_for(p: &crate::params::ModelParams, vix: f64, carried: f64) -> f64 {
-        let threshold = crate::economy::CRISIS_VIX_THRESHOLD;
+        // The PARAMETER, as `simulate_market_tick` reads it. This helper takes
+        // `p` and then read the constant, so it would have stopped mirroring
+        // production the moment a test moved the threshold.
+        let threshold = p.crisis_vix_threshold;
         let instant = if vix > threshold { vix - threshold } else { 0.0 };
         let effective = if p.universe_stress_weight == 0.0 {
             instant

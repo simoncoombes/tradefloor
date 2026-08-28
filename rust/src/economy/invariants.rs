@@ -10,6 +10,7 @@
 
 use super::*;
 use crate::rng::Rng;
+use super::central_bank::{CORPORATE_SPREAD_FLOOR, MORTGAGE_SPREAD_FLOOR};
 
 /// A generator with no noise. Every normal here has mean zero, so silencing
 /// them leaves the deterministic channel — which is what a property test
@@ -384,4 +385,112 @@ fn the_weibull_hazard_changes_character_across_shape_one() {
         assert_eq!(weibull_hazard(0.0, shape, scale), 0.0);
         assert_eq!(weibull_hazard(-5.0, shape, scale), 0.0);
     }
+}
+
+// ── crisis_vix_threshold reaches every gate that claims to use it ─────────
+
+#[test]
+fn moving_the_crisis_threshold_moves_both_the_gold_and_the_dollar_gate() {
+    // The gold crisis premium read the parameter and the USD safe-haven drift
+    // read the constant, so an embedder who moved `crisis_vix_threshold` got
+    // one gate at their level and one still at 25.5. The two describe the same
+    // regime and the default hid the split, because there the two agree.
+    //
+    // Asserts on BOTH series from one parameter move, which is the thing the
+    // old tests could not do: they only ever ran at the default.
+    let mut e = economy();
+    e.vix = 28.0;          // above the default gate, below a raised one
+    e.gdp_growth = -2.0;   // the gold premium also needs a contraction
+
+    let run = |threshold: f64, e: &EconomyState| {
+        update_economy_daily(
+            e,
+            &DailyInputs {
+                volatility: 1.0,
+                game_day: 1,
+                crisis_vix_threshold: threshold,
+                ..Default::default()
+            },
+            &mut Silent(0.5),
+        )
+    };
+
+    let at_default = run(CRISIS_VIX_THRESHOLD, &e);
+    let raised = run(40.0, &e);
+
+    assert_ne!(
+        at_default.gold_price, raised.gold_price,
+        "gold ignored crisis_vix_threshold"
+    );
+    assert_ne!(
+        at_default.usd_index, raised.usd_index,
+        "the dollar ignored crisis_vix_threshold; it read the constant"
+    );
+}
+
+// ── 6.5, extended past the moment of assignment ───────────────────────────
+
+/// Run the deterministic channel for 2000 days and return the worst spread
+/// each credit instrument reaches, at a given floor gain.
+fn worst_spreads(gain: f64) -> (f64, f64) {
+    let mut e = economy();
+    e = meeting(&e, &create_initial_central_bank_state(0)).economy;
+    let mut worst_corp = e.corporate_bond_yield - e.treasury_yield_10y;
+    let mut worst_mort = e.mortgage_rate_30y - e.treasury_yield_10y;
+    for day in 1..=2000i64 {
+        e = update_economy_daily(
+            &e,
+            &DailyInputs {
+                volatility: 1.0,
+                game_day: day,
+                daily_credit_floor_gain: gain,
+                ..Default::default()
+            },
+            &mut Silent(0.5),
+        );
+        let c = e.corporate_bond_yield - e.treasury_yield_10y;
+        let m = e.mortgage_rate_30y - e.treasury_yield_10y;
+        if c < worst_corp { worst_corp = c; }
+        if m < worst_mort { worst_mort = m; }
+    }
+    (worst_corp, worst_mort)
+}
+
+#[test]
+fn the_daily_step_still_lets_the_corporate_spread_invert_while_the_dial_is_off() {
+    // The defect, pinned so it cannot be fixed by accident. 6.5's own test
+    // measures `meeting(&e, ...).economy`, so it only ever inspected the
+    // instant the yields are computed. `update_economy_daily` moves
+    // `treasury_yield_10y` on every day and never writes either credit yield,
+    // so between periodic meetings the spread drifts wherever the benchmark
+    // takes it.
+    //
+    // This is asserted rather than fixed outright because that function is
+    // preset-independent: flooring unconditionally would move the economy
+    // trajectory of every shipped preset, and the version policy requires a
+    // trajectory change to arrive as a NEW preset. So the correction ships as
+    // `daily_credit_floor_gain`, inert, and this test records what the model
+    // does until a preset turns it on.
+    let (corp, _mort) = worst_spreads(0.0);
+    assert!(
+        corp < CORPORATE_SPREAD_FLOOR,
+        "the corporate spread no longer inverts with the dial off ({corp}). If that \
+         was deliberate it is a trajectory change for every preset; see the version \
+         policy in RELEASING.md."
+    );
+}
+
+#[test]
+fn the_floor_gain_holds_both_credit_spreads_above_their_floors() {
+    // And the remedy, gated. At 1.0 both floors are enforced against whatever
+    // the treasury has become, on every day rather than only at a meeting.
+    let (corp, mort) = worst_spreads(1.0);
+    assert!(
+        corp >= CORPORATE_SPREAD_FLOOR - 1e-12,
+        "corporate spread fell to {corp} with the floor gain at 1.0"
+    );
+    assert!(
+        mort >= MORTGAGE_SPREAD_FLOOR - 1e-12,
+        "mortgage spread fell to {mort} with the floor gain at 1.0"
+    );
 }

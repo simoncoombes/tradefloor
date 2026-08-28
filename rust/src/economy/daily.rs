@@ -39,6 +39,7 @@
 
 use super::state::*;
 use crate::mathx::{self, clamp_via_min_max as clamp};
+use super::central_bank::{CORPORATE_SPREAD_FLOOR, MORTGAGE_SPREAD_FLOOR};
 use crate::rng::Rng;
 
 /// `randomNormal(mean, stdDev)` — the reference implementation's local
@@ -109,6 +110,12 @@ pub struct DailyInputs<'a> {
     /// reason: where a crisis STARTS is a calibration question, and a const
     /// answers it before anyone asks.
     pub crisis_vix_threshold: f64,
+    /// Re-assert the credit spread floors on every daily step, scaled.
+    ///
+    /// 0.0 disables it, which is what every shipped preset sets and what the
+    /// reference implementation does. 1.0 enforces both floors in full. See
+    /// the block at the end of `update_economy_daily`.
+    pub daily_credit_floor_gain: f64,
 }
 
 impl<'a> Default for DailyInputs<'a> {
@@ -132,6 +139,7 @@ impl<'a> Default for DailyInputs<'a> {
             inflation_ceiling: INFLATION_CEILING,
             inflation_floor: INFLATION_FLOOR,
             crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
+            daily_credit_floor_gain: 0.0,
         }
     }
 }
@@ -631,8 +639,14 @@ pub fn update_economy_daily(
     let usd_mean_reversion = (usd_target - economy.usd_index) * 0.02;
     // Reference: `vix > 30` — dead for the same reason as the gold crisis
     // premium above; re-sited with it. See `CRISIS_VIX_THRESHOLD`.
-    let safe_haven_drift = if economy.vix > CRISIS_VIX_THRESHOLD {
-        (economy.vix - CRISIS_VIX_THRESHOLD) * 0.05
+    //
+    // Reads the PARAMETER, not the constant. It read the constant until
+    // 0.4.2, so an embedder who moved `crisis_vix_threshold` got a gold gate
+    // at their level and a dollar gate still at 25.5. The two describe one
+    // regime: a crisis is the same crisis whether you watch gold or the
+    // dollar. No behaviour changes at the default, where the two agree.
+    let safe_haven_drift = if economy.vix > inputs.crisis_vix_threshold {
+        (economy.vix - inputs.crisis_vix_threshold) * 0.05
     } else {
         0.0
     };
@@ -820,6 +834,46 @@ pub fn update_economy_daily(
     // the original. Deliberately not ported — out of scope per the surface audit §0,
     // and verified to consume zero draws, which is what makes the omission
     // invisible to the stream.
+
+    // Re-assert the credit spread floors against the benchmark as it now
+    // stands -- but only when `daily_credit_floor_gain` is non-zero, which no
+    // shipped preset yet sets.
+    //
+    // The defect it exists to close. `update_central_bank` floors both credit
+    // yields when it computes them, and this function moves
+    // `treasury_yield_10y` on EVERY day -- mean reversion toward fed funds
+    // plus term premium, and the bond-stock correlation shift -- while never
+    // writing either credit yield. Meetings are periodic, so between them the
+    // yields go stale against a benchmark that has moved underneath them and
+    // the spread drifts wherever the treasury takes it. Measured on the
+    // deterministic channel, corporate reaches 0.4216 against a floor of 0.8
+    // and first breaches on day 121. An investment-grade yield below the
+    // risk-free curve is not a rare edge, it is an impossible quote.
+    //
+    // Why it ships INERT rather than simply fixed. This function is
+    // preset-independent, so flooring unconditionally would move the economy
+    // trajectory of every preset including `pt-v1`. The version policy is
+    // explicit that a change to the simulated trajectory is breaking however
+    // small it looks, and that such changes arrive as a NEW PRESET rather
+    // than an edit to an existing one. So the correction is a dial, off
+    // everywhere, for a future preset to turn on. At 1.0 both floors are
+    // enforced in full; the gain scales them together because they are one
+    // decision about whether stale credit is allowed to invert.
+    //
+    // A floor rather than a recomputation, so the semantics stay put: the
+    // yields only ever get pushed UP to stay honest, and the next meeting
+    // recomputes them properly, so there is no ratchet. Consumes no draws.
+    if inputs.daily_credit_floor_gain > 0.0 {
+        let g = inputs.daily_credit_floor_gain;
+        new_state.corporate_bond_yield = mathx::max(
+            new_state.corporate_bond_yield,
+            new_state.treasury_yield_10y + g * CORPORATE_SPREAD_FLOOR,
+        );
+        new_state.mortgage_rate_30y = mathx::max(
+            new_state.mortgage_rate_30y,
+            new_state.treasury_yield_10y + g * MORTGAGE_SPREAD_FLOOR,
+        );
+    }
 
     new_state
 }

@@ -123,6 +123,12 @@ PERTURBATIONS = [
     # by a driven scenario and the probe runs none, so the multiplier has
     # nothing to scale.
     ("qe_pe_gain", 0.5, False),
+    # The daily credit spread floor (#48). It only bites once the 10y treasury
+    # has drifted far enough under the stale corporate yield to breach the 0.8
+    # floor, which takes about 120 days on the deterministic channel. Three
+    # sessions do not get there, so the probe sees nothing -- the floor is
+    # exercised directly in `economy/invariants.rs` instead.
+    ("daily_credit_floor_gain", 1.0, False),
     # 0.25, not 1.0: the default carries 1.0 since pt-v11, so perturbing TO
     # it is a no-op and the test read "not wired through". The value has to
     # differ from whatever the default holds, which is what an era boundary

@@ -1066,6 +1066,20 @@ pub struct ModelParams {
     /// reachable at all; whether it is the RIGHT point is a different
     /// question and now an answerable one.
     pub crisis_vix_threshold: f64,
+    /// Re-assert the credit spread floors on every daily step, scaled.
+    ///
+    /// INERT at 0.0, which every shipped preset sets. `update_economy_daily`
+    /// moves the 10y treasury daily and never writes the credit yields, so
+    /// between periodic meetings the corporate spread drifts below its 0.8
+    /// floor -- measured to 0.4216, first breaching on day 121, which is an
+    /// investment-grade yield under the risk-free curve.
+    ///
+    /// A dial rather than a straight fix because that function is
+    /// preset-independent: flooring unconditionally would move the economy
+    /// trajectory of every preset including `pt-v1`, and the version policy
+    /// requires a trajectory change to arrive as a new preset. 1.0 enforces
+    /// both floors in full.
+    pub daily_credit_floor_gain: f64,
 
     // ── Mispricing dynamics (mispricing.rs, market/tick.rs) ─────────────
     /// Trading days for half of a mispricing to decay. The ONE settable
@@ -1287,6 +1301,7 @@ impl ModelParams {
             vix_return_clamp: crate::economy::VIX_RETURN_CLAMP,
             vix_target_shock_cap: crate::economy::VIX_TARGET_SHOCK_CAP,
             crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
+            daily_credit_floor_gain: 0.0,
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
             news_peer_vix_coupling: 0.0,
@@ -2157,6 +2172,7 @@ impl ModelParams {
             "vix_return_source" => self.vix_return_source,
             "vix_target_shock_cap" => self.vix_target_shock_cap,
             "crisis_vix_threshold" => self.crisis_vix_threshold,
+            "daily_credit_floor_gain" => self.daily_credit_floor_gain,
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
             "news_peer_vix_coupling" => self.news_peer_vix_coupling,
@@ -2284,6 +2300,7 @@ impl ModelParams {
             "vix_return_source" => out.vix_return_source = value,
             "vix_target_shock_cap" => out.vix_target_shock_cap = value,
             "crisis_vix_threshold" => out.crisis_vix_threshold = value,
+            "daily_credit_floor_gain" => out.daily_credit_floor_gain = value,
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
             "news_peer_vix_coupling" => out.news_peer_vix_coupling = value,
@@ -2402,6 +2419,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "crowd_lean_cap",
         "crowd_momentum_gain",
         "crowd_valuation_gain",
+        "daily_credit_floor_gain",
         "endogenous_news_intensity",
         "endogenous_news_sigma",
         "fair_value_book_floor",
