@@ -23,20 +23,23 @@
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
 if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </head>
 <body class="pt-page">
 <div style="min-height:100vh;padding:0 0 5rem">
-<div id="pt-search" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)"><div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"><div id="pt-search-results" role="listbox" style="max-height:22rem;overflow-y:auto;padding:0.4rem"></div><div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
-<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)"><div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem"><a href="index.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22" style="flex:none"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22" style="flex:none"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span></a><nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap"><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--accent);cursor:pointer;list-style:none;padding:0.2rem 0">Start<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="install.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Install</a><span style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--accent);background:var(--accent-soft);white-space:nowrap">Core concepts</span><a href="two-loops.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The two loops</a><a href="running-a-market.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Running a market</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Use it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="agents.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Agents</a><a href="scenarios.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Scenarios</a><a href="execution-cost.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Execution cost</a><a href="checkpoints.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Checkpoints and forking</a><a href="edgar.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Real companies from EDGAR</a><a href="rl-environment.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">RL environment</a><a href="mcp.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The MCP server</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Trust it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="realism-envelope.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Realism envelope</a><a href="metrics.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The metrics</a><a href="principles.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Principles</a><a href="citing.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Citing a run</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Reference<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="glossary.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Glossary</a><a href="factors.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The nine factors</a><a href="conventions.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a><a href="schemas.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a><a href="presets.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Presets</a><a href="release-notes.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Release notes</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">API<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="core-types.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a><a href="evaluate.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a><a href="parameters.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a></div></details></nav><span style="flex:1"></span><button id="pt-search-open" type="button" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span id="pt-search-hint" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">CTRL K</span></button><button id="pt-theme" type="button" aria-label="Switch theme" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu pt-here"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><span class="pt-current">Core concepts</span><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
 
-<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">CORE CONCEPTS</span>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">CORE CONCEPTS</span>
 </div>
 
-<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
-<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Core concepts</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Three things define a run. Two of them do something you can not expect when the market starts to move.</p>
+<section class="pt-s33">
+<h1 class="pt-s30">Core concepts</h1>
+<p class="pt-s24">Three things define a run. Two of them do something you can not expect when the market starts to move.</p>
 <pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import pretium as pt
 
 universe = pt.Universe.random(108, seed=7)
@@ -44,112 +47,112 @@ macro = pt.Macro(federal_funds_rate=0.025, corporate_bond_yield=0.052, vix=16.0)
 engine = pt.Engine(seed=42, universe=universe, macro_state=macro)</pre>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
-<h2 style="font-size:1.5rem">Roster order changes the market</h2>
-<p style="color:var(--ink-2);margin:0"><span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">Universe</span> subclasses <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">list</span>. The engine walks the instruments in index order and draws random numbers as it goes. A re-sorted roster is therefore a different market from the same seed.</p>
+<section class="pt-s34">
+<h2 class="pt-s7">Roster order changes the market</h2>
+<p class="pt-s13"><span class="pt-s27">Universe</span> subclasses <span class="pt-s27">list</span>. The engine walks the instruments in index order and draws random numbers as it goes. A re-sorted roster is therefore a different market from the same seed.</p>
 
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
+<div class="pt-s29">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 style="font-size:1.0625rem;margin:0">What a reversed roster costs</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">On <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">Universe.random(20, seed=11)</span> at sim seed 42, AAA closes day 5 at:</p>
+<h3 class="pt-s4">What a reversed roster costs</h3>
+<p class="pt-s1">On <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">Universe.random(20, seed=11)</span> at sim seed 42, AAA closes day 5 at:</p>
 <div style="display:flex;gap:1.5rem;padding:0.2rem 0">
-<div style="display:flex;flex-direction:column;gap:1px">
+<div class="pt-s2">
 <span style="font-family:'Spline Sans Mono',monospace;font-size:1.375rem;color:var(--accent);font-variant-numeric:tabular-nums">143.03</span>
-<span style="font-size:0.75rem;color:var(--ink-3)">roster order</span>
+<span class="pt-s65">roster order</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:1px">
+<div class="pt-s2">
 <span style="font-family:'Spline Sans Mono',monospace;font-size:1.375rem;color:var(--red);font-variant-numeric:tabular-nums">134.88</span>
-<span style="font-size:0.75rem;color:var(--ink-3)">reversed</span>
+<span class="pt-s65">reversed</span>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Same names, same fundamentals, same seed. A sort of your tickers upstream does this without a warning.</p>
+<p class="pt-s1">Same names, same fundamentals, same seed. A sort of your tickers upstream does this without a warning.</p>
 </div>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.85rem">
-<h3 style="font-size:1.0625rem;margin:0">There are two seeds</h3>
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">The universe seed</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Picks the fundamentals. The generator assigns tickers and sectors by position. random(40, seed=1) and random(40, seed=99) therefore share every name and every sector. They agree on the fundamentals of none of the forty.</span>
+<div class="pt-s180">
+<h3 class="pt-s4">There are two seeds</h3>
+<div class="pt-s2">
+<span class="pt-s5">The universe seed</span>
+<span class="pt-s0">Picks the fundamentals. The generator assigns tickers and sectors by position. random(40, seed=1) and random(40, seed=99) therefore share every name and every sector. They agree on the fundamentals of none of the forty.</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">The simulation seed</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">This seed picks the market. Hold the universe fixed and change this one. That is the standard setup to find how much of a result was luck.</span>
+<div class="pt-s2">
+<span class="pt-s5">The simulation seed</span>
+<span class="pt-s0">This seed picks the market. Hold the universe fixed and change this one. That is the standard setup to find how much of a result was luck.</span>
 </div>
 </div>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
-<h2 style="font-size:1.5rem">The economy moves on its own</h2>
-<p style="color:var(--ink-2);margin:0">The <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">Macro</span> that you give the engine is the state on day zero. Every close advances the chain. The economy updates, the cycle can turn, and the central bank acts. If you want a frozen economy, you must ask for one.</p>
+<section class="pt-s34">
+<h2 class="pt-s7">The economy moves on its own</h2>
+<p class="pt-s13">The <span class="pt-s27">Macro</span> that you give the engine is the state on day zero. Every close advances the chain. The economy updates, the cycle can turn, and the central bank acts. If you want a frozen economy, you must ask for one.</p>
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<div class="pt-s11">
 <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--line-soft);background:var(--surface);display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
-<h3 style="font-size:1.0625rem;margin:0">How often each field takes a new value</h3>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">120 days, Universe.random(20, seed=11), sim seed 42</span>
+<h3 class="pt-s4">How often each field takes a new value</h3>
+<span class="pt-s61">120 days, Universe.random(20, seed=11), sim seed 42</span>
 </div>
 <div style="padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.55rem">
 
-<div style="display:flex;align-items:center;gap:0.7rem">
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-2);width:11rem;flex:none">vix</span>
-<span style="position:relative;flex:1;height:14px;background:var(--surface);border-radius:3px">
+<div class="pt-s92">
+<span class="pt-s121">vix</span>
+<span class="pt-s174">
 <span style="position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent);width:98.3%"></span>
 </span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink);width:9.5rem;text-align:right;font-variant-numeric:tabular-nums">118 of 120 days</span>
+<span class="pt-s119">118 of 120 days</span>
 </div>
 
 
-<div style="display:flex;align-items:center;gap:0.7rem">
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-2);width:11rem;flex:none">gdp_growth</span>
-<span style="position:relative;flex:1;height:14px;background:var(--surface);border-radius:3px">
+<div class="pt-s92">
+<span class="pt-s121">gdp_growth</span>
+<span class="pt-s174">
 <span style="position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--band);width:5.0%"></span>
 </span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink);width:9.5rem;text-align:right;font-variant-numeric:tabular-nums">6 values</span>
+<span class="pt-s119">6 values</span>
 </div>
 
 
-<div style="display:flex;align-items:center;gap:0.7rem">
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-2);width:11rem;flex:none">inflation_rate</span>
-<span style="position:relative;flex:1;height:14px;background:var(--surface);border-radius:3px">
+<div class="pt-s92">
+<span class="pt-s121">inflation_rate</span>
+<span class="pt-s174">
 <span style="position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--band);width:3.3%"></span>
 </span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink);width:9.5rem;text-align:right;font-variant-numeric:tabular-nums">4 values</span>
+<span class="pt-s119">4 values</span>
 </div>
 
 
-<div style="display:flex;align-items:center;gap:0.7rem">
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-2);width:11rem;flex:none">corporate_bond_yield</span>
-<span style="position:relative;flex:1;height:14px;background:var(--surface);border-radius:3px">
+<div class="pt-s92">
+<span class="pt-s121">corporate_bond_yield</span>
+<span class="pt-s174">
 <span style="position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--band);width:2.5%"></span>
 </span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink);width:9.5rem;text-align:right;font-variant-numeric:tabular-nums">3 values</span>
+<span class="pt-s119">3 values</span>
 </div>
 
 
-<div style="display:flex;align-items:center;gap:0.7rem">
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-2);width:11rem;flex:none">fundamental_value</span>
-<span style="position:relative;flex:1;height:14px;background:var(--surface);border-radius:3px">
+<div class="pt-s92">
+<span class="pt-s121">fundamental_value</span>
+<span class="pt-s174">
 <span style="position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--band);width:2.5%"></span>
 </span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink);width:9.5rem;text-align:right;font-variant-numeric:tabular-nums">3 per instrument</span>
+<span class="pt-s119">3 per instrument</span>
 </div>
 
 
-<div style="display:flex;align-items:center;gap:0.7rem">
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-2);width:11rem;flex:none">federal_funds_rate</span>
-<span style="position:relative;flex:1;height:14px;background:var(--surface);border-radius:3px">
+<div class="pt-s92">
+<span class="pt-s121">federal_funds_rate</span>
+<span class="pt-s174">
 <span style="position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--band);width:2.0%"></span>
 </span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink);width:9.5rem;text-align:right;font-variant-numeric:tabular-nums">2 values</span>
+<span class="pt-s119">2 values</span>
 </div>
 
 </div>
 <div style="padding:0.7rem 1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-size:0.8125rem;color:var(--ink-2)">VIX moves nearly every day. The policy fields step on the central bank's meeting calendar. Fair value reprices when the discount rate moves at a meeting. In that run it moved on day 45 and day 96. A run that crosses a meeting is therefore not a stationary experiment.</div>
 </div>
 
-<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
-<summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--ink)">Pinning a field does not freeze it</summary>
+<details class="pt-s12">
+<summary class="pt-s28">Pinning a field does not freeze it</summary>
 <div style="padding:0 0.9rem 0.9rem;border-top:1px solid var(--line-soft);padding-top:0.7rem;display:flex;flex-direction:column;gap:0.7rem">
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A pin replaces the endogenous step for that field one time. The chain then continues from the pinned value. Pin <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">vix=30.0</span> after day 3. The next four days read:</p>
+<p class="pt-s1">A pin replaces the endogenous step for that field one time. The chain then continues from the pinned value. Pin <span class="pt-s27">vix=30.0</span> after day 3. The next four days read:</p>
 <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
 
 <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;padding:0.3rem 0.6rem;border-radius:5px;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)">30.00 pinned</span>
@@ -167,14 +170,14 @@ engine = pt.Engine(seed=42, universe=universe, macro_state=macro)</pre>
 <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;padding:0.3rem 0.6rem;border-radius:5px;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">19.30</span>
 
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The series pulled back toward its mean. It did not hold. For a day-by-day exogenous series, pin the field every day, or drive a scenario.</p>
+<p class="pt-s1">The series pulled back toward its mean. It did not hold. For a day-by-day exogenous series, pin the field every day, or drive a scenario.</p>
 </div>
 </details>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">Four ways to build a universe</h2>
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">pt.Universe.random(108, seed=7)          # generated, plausible per sector
+<section class="pt-s19">
+<h2 class="pt-s7">Four ways to build a universe</h2>
+<pre class="pt-s31">pt.Universe.random(108, seed=7)          # generated, plausible per sector
 pt.Universe([pt.Instrument(...), ...])   # your own roster
 pt.Universe.from_edgar(snapshot)         # real SEC fundamentals
 pt.Universe.from_json(saved)             # one you saved with to_json
@@ -187,9 +190,9 @@ universe.fingerprint                     # sha256 over the roster, order include
 
 
 </main></div>
-<div style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
-<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem"><h2 style="font-size:1.25rem">All pages</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem"><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Start</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="install.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Install</span></a><span style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--accent)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Core concepts</span></span><a href="two-loops.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The two loops</span></a><a href="running-a-market.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Running a market</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Use it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="agents.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Agents</span></a><a href="scenarios.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Scenarios</span></a><a href="execution-cost.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Execution cost</span></a><a href="checkpoints.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Checkpoints and forking</span></a><a href="edgar.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Real companies from EDGAR</span></a><a href="rl-environment.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">RL environment</span></a><a href="mcp.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The MCP server</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Trust it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="realism-envelope.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Realism envelope</span></a><a href="metrics.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The metrics</span></a><a href="principles.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Principles</span></a><a href="citing.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Citing a run</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Reference</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="glossary.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Glossary</span></a><a href="factors.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The nine factors</span></a><a href="conventions.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Conventions</span></a><a href="schemas.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Schemas</span></a><a href="presets.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Presets</span></a><a href="release-notes.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Release notes</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">API</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="core-types.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Core types</span></a><a href="evaluate.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Evaluate</span></a><a href="parameters.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Parameters</span></a></div></div></div></section>
-<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem"><a href="install.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>Install</span></a><a href="two-loops.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>The two loops</span></a></nav>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></span><a href="two-loops.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></a><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><a href="agents.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></a><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><a href="presets.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></a><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="install.html"><span class="pt-eyebrow">BACK</span><span>Install</span></a><a class="pt-next" href="two-loops.html"><span class="pt-eyebrow">NEXT</span><span>The two loops</span></a></nav>
 </div>
 </div>
 <!-- The client-side copy of this page's template.
@@ -200,15 +203,15 @@ universe.fingerprint                     # sha256 over the roster, order include
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
 
-<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">CORE CONCEPTS</span>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">CORE CONCEPTS</span>
 </div>
 
-<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
-<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Core concepts</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Three things define a run. Two of them do something you can not expect when the market starts to move.</p>
+<section class="pt-s33">
+<h1 class="pt-s30">Core concepts</h1>
+<p class="pt-s24">Three things define a run. Two of them do something you can not expect when the market starts to move.</p>
 <pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import pretium as pt
 
 universe = pt.Universe.random(108, seed=7)
@@ -216,80 +219,80 @@ macro = pt.Macro(federal_funds_rate=0.025, corporate_bond_yield=0.052, vix=16.0)
 engine = pt.Engine(seed=42, universe=universe, macro_state=macro)</pre>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
-<h2 style="font-size:1.5rem">Roster order changes the market</h2>
-<p style="color:var(--ink-2);margin:0"><span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">Universe</span> subclasses <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">list</span>. The engine walks the instruments in index order and draws random numbers as it goes. A re-sorted roster is therefore a different market from the same seed.</p>
+<section class="pt-s34">
+<h2 class="pt-s7">Roster order changes the market</h2>
+<p class="pt-s13"><span class="pt-s27">Universe</span> subclasses <span class="pt-s27">list</span>. The engine walks the instruments in index order and draws random numbers as it goes. A re-sorted roster is therefore a different market from the same seed.</p>
 
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
+<div class="pt-s29">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
-<h3 style="font-size:1.0625rem;margin:0">What a reversed roster costs</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">On <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">Universe.random(20, seed=11)</span> at sim seed 42, AAA closes day 5 at:</p>
+<h3 class="pt-s4">What a reversed roster costs</h3>
+<p class="pt-s1">On <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">Universe.random(20, seed=11)</span> at sim seed 42, AAA closes day 5 at:</p>
 <div style="display:flex;gap:1.5rem;padding:0.2rem 0">
-<div style="display:flex;flex-direction:column;gap:1px">
+<div class="pt-s2">
 <span style="font-family:'Spline Sans Mono',monospace;font-size:1.375rem;color:var(--accent);font-variant-numeric:tabular-nums">143.03</span>
-<span style="font-size:0.75rem;color:var(--ink-3)">roster order</span>
+<span class="pt-s65">roster order</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:1px">
+<div class="pt-s2">
 <span style="font-family:'Spline Sans Mono',monospace;font-size:1.375rem;color:var(--red);font-variant-numeric:tabular-nums">134.88</span>
-<span style="font-size:0.75rem;color:var(--ink-3)">reversed</span>
+<span class="pt-s65">reversed</span>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Same names, same fundamentals, same seed. A sort of your tickers upstream does this without a warning.</p>
+<p class="pt-s1">Same names, same fundamentals, same seed. A sort of your tickers upstream does this without a warning.</p>
 </div>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.85rem">
-<h3 style="font-size:1.0625rem;margin:0">There are two seeds</h3>
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">The universe seed</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Picks the fundamentals. The generator assigns tickers and sectors by position. random(40, seed=1) and random(40, seed=99) therefore share every name and every sector. They agree on the fundamentals of none of the forty.</span>
+<div class="pt-s180">
+<h3 class="pt-s4">There are two seeds</h3>
+<div class="pt-s2">
+<span class="pt-s5">The universe seed</span>
+<span class="pt-s0">Picks the fundamentals. The generator assigns tickers and sectors by position. random(40, seed=1) and random(40, seed=99) therefore share every name and every sector. They agree on the fundamentals of none of the forty.</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">The simulation seed</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">This seed picks the market. Hold the universe fixed and change this one. That is the standard setup to find how much of a result was luck.</span>
+<div class="pt-s2">
+<span class="pt-s5">The simulation seed</span>
+<span class="pt-s0">This seed picks the market. Hold the universe fixed and change this one. That is the standard setup to find how much of a result was luck.</span>
 </div>
 </div>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
-<h2 style="font-size:1.5rem">The economy moves on its own</h2>
-<p style="color:var(--ink-2);margin:0">The <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">Macro</span> that you give the engine is the state on day zero. Every close advances the chain. The economy updates, the cycle can turn, and the central bank acts. If you want a frozen economy, you must ask for one.</p>
+<section class="pt-s34">
+<h2 class="pt-s7">The economy moves on its own</h2>
+<p class="pt-s13">The <span class="pt-s27">Macro</span> that you give the engine is the state on day zero. Every close advances the chain. The economy updates, the cycle can turn, and the central bank acts. If you want a frozen economy, you must ask for one.</p>
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<div class="pt-s11">
 <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--line-soft);background:var(--surface);display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
-<h3 style="font-size:1.0625rem;margin:0">How often each field takes a new value</h3>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">120 days, Universe.random(20, seed=11), sim seed 42</span>
+<h3 class="pt-s4">How often each field takes a new value</h3>
+<span class="pt-s61">120 days, Universe.random(20, seed=11), sim seed 42</span>
 </div>
 <div style="padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.55rem">
 <sc-for list="{{ fields }}" as="f">
-<div style="display:flex;align-items:center;gap:0.7rem">
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-2);width:11rem;flex:none">{{ f.k }}</span>
-<span style="position:relative;flex:1;height:14px;background:var(--surface);border-radius:3px">
+<div class="pt-s92">
+<span class="pt-s121">{{ f.k }}</span>
+<span class="pt-s174">
 <span style="position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:{{ f.col }};width:{{ f.w }}"></span>
 </span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink);width:9.5rem;text-align:right;font-variant-numeric:tabular-nums">{{ f.v }}</span>
+<span class="pt-s119">{{ f.v }}</span>
 </div>
 
 </sc-for></div>
 <div style="padding:0.7rem 1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-size:0.8125rem;color:var(--ink-2)">VIX moves nearly every day. The policy fields step on the central bank's meeting calendar. Fair value reprices when the discount rate moves at a meeting. In that run it moved on day 45 and day 96. A run that crosses a meeting is therefore not a stationary experiment.</div>
 </div>
 
-<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
-<summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--ink)">Pinning a field does not freeze it</summary>
+<details class="pt-s12">
+<summary class="pt-s28">Pinning a field does not freeze it</summary>
 <div style="padding:0 0.9rem 0.9rem;border-top:1px solid var(--line-soft);padding-top:0.7rem;display:flex;flex-direction:column;gap:0.7rem">
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A pin replaces the endogenous step for that field one time. The chain then continues from the pinned value. Pin <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">vix=30.0</span> after day 3. The next four days read:</p>
+<p class="pt-s1">A pin replaces the endogenous step for that field one time. The chain then continues from the pinned value. Pin <span class="pt-s27">vix=30.0</span> after day 3. The next four days read:</p>
 <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
 <sc-for list="{{ pinned }}" as="p">
 <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;padding:0.3rem 0.6rem;border-radius:5px;border:1px solid {{ p.border }};background:{{ p.bg }};color:{{ p.fg }}">{{ p.v }}</span>
 
 </sc-for></div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The series pulled back toward its mean. It did not hold. For a day-by-day exogenous series, pin the field every day, or drive a scenario.</p>
+<p class="pt-s1">The series pulled back toward its mean. It did not hold. For a day-by-day exogenous series, pin the field every day, or drive a scenario.</p>
 </div>
 </details>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">Four ways to build a universe</h2>
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">pt.Universe.random(108, seed=7)          # generated, plausible per sector
+<section class="pt-s19">
+<h2 class="pt-s7">Four ways to build a universe</h2>
+<pre class="pt-s31">pt.Universe.random(108, seed=7)          # generated, plausible per sector
 pt.Universe([pt.Instrument(...), ...])   # your own roster
 pt.Universe.from_edgar(snapshot)         # real SEC fundamentals
 pt.Universe.from_json(saved)             # one you saved with to_json

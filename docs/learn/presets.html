@@ -23,40 +23,43 @@
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
 if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </head>
 <body class="pt-page">
 <div style="min-height:100vh;padding:0 0 5rem">
-<div id="pt-search" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)"><div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"><div id="pt-search-results" role="listbox" style="max-height:22rem;overflow-y:auto;padding:0.4rem"></div><div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
-<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)"><div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem"><a href="index.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22" style="flex:none"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22" style="flex:none"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span></a><nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap"><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Start<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="install.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Install</a><a href="core-concepts.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core concepts</a><a href="two-loops.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The two loops</a><a href="running-a-market.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Running a market</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Use it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="agents.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Agents</a><a href="scenarios.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Scenarios</a><a href="execution-cost.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Execution cost</a><a href="checkpoints.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Checkpoints and forking</a><a href="edgar.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Real companies from EDGAR</a><a href="rl-environment.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">RL environment</a><a href="mcp.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The MCP server</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Trust it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="realism-envelope.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Realism envelope</a><a href="metrics.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The metrics</a><a href="principles.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Principles</a><a href="citing.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Citing a run</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--accent);cursor:pointer;list-style:none;padding:0.2rem 0">Reference<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="glossary.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Glossary</a><a href="factors.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The nine factors</a><a href="conventions.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a><a href="schemas.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a><span style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--accent);background:var(--accent-soft);white-space:nowrap">Presets</span><a href="release-notes.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Release notes</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">API<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="core-types.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a><a href="evaluate.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a><a href="parameters.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a></div></details></nav><span style="flex:1"></span><button id="pt-search-open" type="button" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span id="pt-search-hint" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">CTRL K</span></button><button id="pt-theme" type="button" aria-label="Switch theme" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu pt-here"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><span class="pt-current">Presets</span><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
 
-<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">PRESETS</span>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">PRESETS</span>
 </div>
 
-<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
-<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Presets</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Twelve named coefficient sets. Use pt-v12 unless a published run names another one.</p>
+<section class="pt-s33">
+<h1 class="pt-s30">Presets</h1>
+<p class="pt-s24">Twelve named coefficient sets. Use pt-v12 unless a published run names another one.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-deep)">pt-v12</span>
-<span style="font-size:0.875rem;color:var(--accent-deep)">The default since 2026-08-26. All fourteen statistics in band at 252 days and again at 504.</span>
+<span class="pt-s73">The default since 2026-08-26. All fourteen statistics in band at 252 days and again at 504.</span>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink)">12</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Presets ship. All selectable, all reproducing bit for bit.</span>
+<span class="pt-s0">Presets ship. All selectable, all reproducing bit for bit.</span>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink)">8</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Numbers in the dictionary a preset carries. Others are live and absent from it.</span>
+<span class="pt-s0">Numbers in the dictionary a preset carries. Others are live and absent from it.</span>
 </div>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<section class="pt-s19">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
-<h2 style="font-size:1.5rem">Which preset to use</h2>
+<h2 class="pt-s7">Which preset to use</h2>
 <div style="display:flex;gap:0.35rem">
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)">all twelve</button>
@@ -78,7 +81,7 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 <div style="display:grid;grid-auto-rows:1fr;gap:0.7rem">
 
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
-<div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<div class="pt-s40">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--accent-deep)">pt-v12</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--accent-deep)">RECOMMENDED</span>
 </div>
@@ -89,7 +92,7 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 
 
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
-<div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<div class="pt-s40">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--accent-deep)">pt-v8</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--accent-deep)">RECOMMENDED, BY NAME</span>
 </div>
@@ -100,7 +103,7 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
-<div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<div class="pt-s40">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v10</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
 </div>
@@ -111,7 +114,7 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
-<div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<div class="pt-s40">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v11</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
 </div>
@@ -122,7 +125,7 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
-<div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<div class="pt-s40">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v9</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
 </div>
@@ -133,7 +136,7 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
-<div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<div class="pt-s40">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v7</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
 </div>
@@ -144,7 +147,7 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
-<div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<div class="pt-s40">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v3</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
 </div>
@@ -155,7 +158,7 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
-<div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<div class="pt-s40">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v1, v2, v4, v5, v6</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
 </div>
@@ -166,15 +169,15 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 
 </div>
 <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.4rem">
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)"><strong style="font-weight:600">A band is the range a real equity market produces for one statistic.</strong> Fourteen statistics are measured on the simulated market and compared against their real-market ranges: volatility, the fatness of the tails, how much names move together, whether volatility arrives in episodes, whether volume behaves. A statistic is in band when the simulated value falls inside the real range. The columns count how many of the fourteen do, at one and at two trading years.</p>
+<p class="pt-s1"><strong style="font-weight:600">A band is the range a real equity market produces for one statistic.</strong> Fourteen statistics are measured on the simulated market and compared against their real-market ranges: volatility, the fatness of the tails, how much names move together, whether volatility arrives in episodes, whether volume behaves. A statistic is in band when the simulated value falls inside the real range. The columns count how many of the fourteen do, at one and at two trading years.</p>
 
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">Name it, or inherit a moving default</h2>
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">e = pt.Engine(seed=42, universe=u,
+<section class="pt-s19">
+<h2 class="pt-s7">Name it, or inherit a moving default</h2>
+<div class="pt-s29">
+<pre class="pt-s31">e = pt.Engine(seed=42, universe=u,
               model="pt-v12")
 
 e.model_fingerprint   # "pt-v12"
@@ -182,31 +185,31 @@ pt.model_preset()     # the set in force
 
 # a settable change renames it
 # "custom-7f290e34"</pre>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
-<h3 style="font-size:1.0625rem;margin:0">The era boundary</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">pt-v12 became the default on 2026-08-26, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Checked rather than asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
+<div class="pt-s186">
+<h3 class="pt-s4">The era boundary</h3>
+<p class="pt-s1">pt-v12 became the default on 2026-08-26, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
+<p class="pt-s1">Checked rather than asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
 </div>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">What a preset pins</h2>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem">
+<section class="pt-s19">
+<h2 class="pt-s7">What a preset pins</h2>
+<div class="pt-s68">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">In the dictionary</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms.</p>
+<h3 class="pt-s66">In the dictionary</h3>
+<p class="pt-s58">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms.</p>
 <p style="margin:0;font-size:0.8125rem;color:var(--accent-deep)">Two are derived rather than set: mispricing_phi and s_phi_tick come from the half-life.</p>
 </div>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0">Live, and not in it</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. Nothing forces a preset name to change when one of them moves.</p>
-<p style="margin:0;font-size:0.8125rem;color:var(--ink-3)">So a fully specified run is package version, preset, universe fingerprint and seed. The preset alone is necessary and not sufficient.</p>
+<div class="pt-s181">
+<h3 class="pt-s4">Live, and not in it</h3>
+<p class="pt-s1">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. Nothing forces a preset name to change when one of them moves.</p>
+<p class="pt-s185">So a fully specified run is package version, preset, universe fingerprint and seed. The preset alone is necessary and not sufficient.</p>
 </div>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0">Never settable</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The draw schedule: market hours, the 390-tick day, the calendar and the sector key order. A preset changes what the draws are multiplied into, never the schedule itself.</p>
-<p style="margin:0;font-size:0.8125rem;color:var(--ink-3)">The guards are settable but excluded from every calibration search, because they are worst-case guarantees. daily_shock_cap is not settable at all.</p>
+<div class="pt-s181">
+<h3 class="pt-s4">Never settable</h3>
+<p class="pt-s1">The draw schedule: market hours, the 390-tick day, the calendar and the sector key order. A preset changes what the draws are multiplied into, never the schedule itself.</p>
+<p class="pt-s185">The guards are settable but excluded from every calibration search, because they are worst-case guarantees. daily_shock_cap is not settable at all.</p>
 </div>
 </div>
 </section>
@@ -215,9 +218,9 @@ pt.model_preset()     # the set in force
 
 
 </main></div>
-<div style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
-<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem"><h2 style="font-size:1.25rem">All pages</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem"><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Start</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="install.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Install</span></a><a href="core-concepts.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Core concepts</span></a><a href="two-loops.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The two loops</span></a><a href="running-a-market.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Running a market</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Use it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="agents.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Agents</span></a><a href="scenarios.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Scenarios</span></a><a href="execution-cost.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Execution cost</span></a><a href="checkpoints.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Checkpoints and forking</span></a><a href="edgar.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Real companies from EDGAR</span></a><a href="rl-environment.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">RL environment</span></a><a href="mcp.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The MCP server</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Trust it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="realism-envelope.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Realism envelope</span></a><a href="metrics.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The metrics</span></a><a href="principles.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Principles</span></a><a href="citing.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Citing a run</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Reference</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="glossary.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Glossary</span></a><a href="factors.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The nine factors</span></a><a href="conventions.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Conventions</span></a><a href="schemas.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Schemas</span></a><span style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--accent)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Presets</span></span><a href="release-notes.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Release notes</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">API</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="core-types.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Core types</span></a><a href="evaluate.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Evaluate</span></a><a href="parameters.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Parameters</span></a></div></div></div></section>
-<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem"><a href="schemas.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>Schemas</span></a><a href="release-notes.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>Release notes</span></a></nav>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><a href="two-loops.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></a><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><a href="agents.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></a><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></span><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="schemas.html"><span class="pt-eyebrow">BACK</span><span>Schemas</span></a><a class="pt-next" href="release-notes.html"><span class="pt-eyebrow">NEXT</span><span>Release notes</span></a></nav>
 </div>
 </div>
 <!-- The client-side copy of this page's template.
@@ -228,35 +231,35 @@ pt.model_preset()     # the set in force
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
 
-<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">PRESETS</span>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">PRESETS</span>
 </div>
 
-<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
-<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Presets</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Twelve named coefficient sets. Use pt-v12 unless a published run names another one.</p>
+<section class="pt-s33">
+<h1 class="pt-s30">Presets</h1>
+<p class="pt-s24">Twelve named coefficient sets. Use pt-v12 unless a published run names another one.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-deep)">pt-v12</span>
-<span style="font-size:0.875rem;color:var(--accent-deep)">The default since 2026-08-26. All fourteen statistics in band at 252 days and again at 504.</span>
+<span class="pt-s73">The default since 2026-08-26. All fourteen statistics in band at 252 days and again at 504.</span>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink)">12</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Presets ship. All selectable, all reproducing bit for bit.</span>
+<span class="pt-s0">Presets ship. All selectable, all reproducing bit for bit.</span>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink)">8</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Numbers in the dictionary a preset carries. Others are live and absent from it.</span>
+<span class="pt-s0">Numbers in the dictionary a preset carries. Others are live and absent from it.</span>
 </div>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<section class="pt-s19">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
-<h2 style="font-size:1.5rem">Which preset to use</h2>
+<h2 class="pt-s7">Which preset to use</h2>
 <div style="display:flex;gap:0.35rem">
 <sc-for list="{{ filters }}" as="fl">
 <button onClick="{{ fl.pick }}" style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid {{ fl.border }};background:{{ fl.bg }};color:{{ fl.fg }}">{{ fl.label }}</button>
@@ -272,7 +275,7 @@ pt.model_preset()     # the set in force
 <div style="display:grid;grid-auto-rows:1fr;gap:0.7rem">
 <sc-for list="{{ presets }}" as="p">
 <div style="border:1px solid {{ p.border }};border-radius:6px;background:{{ p.bg }};padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
-<div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<div class="pt-s40">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:{{ p.nameCol }}">{{ p.name }}</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:{{ p.tagCol }}">{{ p.tag }}</span>
 </div>
@@ -283,15 +286,15 @@ pt.model_preset()     # the set in force
 
 </sc-for></div>
 <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.4rem">
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)"><strong style="font-weight:600">A band is the range a real equity market produces for one statistic.</strong> Fourteen statistics are measured on the simulated market and compared against their real-market ranges: volatility, the fatness of the tails, how much names move together, whether volatility arrives in episodes, whether volume behaves. A statistic is in band when the simulated value falls inside the real range. The columns count how many of the fourteen do, at one and at two trading years.</p>
+<p class="pt-s1"><strong style="font-weight:600">A band is the range a real equity market produces for one statistic.</strong> Fourteen statistics are measured on the simulated market and compared against their real-market ranges: volatility, the fatness of the tails, how much names move together, whether volatility arrives in episodes, whether volume behaves. A statistic is in band when the simulated value falls inside the real range. The columns count how many of the fourteen do, at one and at two trading years.</p>
 
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">Name it, or inherit a moving default</h2>
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">e = pt.Engine(seed=42, universe=u,
+<section class="pt-s19">
+<h2 class="pt-s7">Name it, or inherit a moving default</h2>
+<div class="pt-s29">
+<pre class="pt-s31">e = pt.Engine(seed=42, universe=u,
               model="pt-v12")
 
 e.model_fingerprint   # "pt-v12"
@@ -299,31 +302,31 @@ pt.model_preset()     # the set in force
 
 # a settable change renames it
 # "custom-7f290e34"</pre>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
-<h3 style="font-size:1.0625rem;margin:0">The era boundary</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">pt-v12 became the default on 2026-08-26, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Checked rather than asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
+<div class="pt-s186">
+<h3 class="pt-s4">The era boundary</h3>
+<p class="pt-s1">pt-v12 became the default on 2026-08-26, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
+<p class="pt-s1">Checked rather than asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
 </div>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">What a preset pins</h2>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem">
+<section class="pt-s19">
+<h2 class="pt-s7">What a preset pins</h2>
+<div class="pt-s68">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">In the dictionary</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms.</p>
+<h3 class="pt-s66">In the dictionary</h3>
+<p class="pt-s58">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms.</p>
 <p style="margin:0;font-size:0.8125rem;color:var(--accent-deep)">Two are derived rather than set: mispricing_phi and s_phi_tick come from the half-life.</p>
 </div>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0">Live, and not in it</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. Nothing forces a preset name to change when one of them moves.</p>
-<p style="margin:0;font-size:0.8125rem;color:var(--ink-3)">So a fully specified run is package version, preset, universe fingerprint and seed. The preset alone is necessary and not sufficient.</p>
+<div class="pt-s181">
+<h3 class="pt-s4">Live, and not in it</h3>
+<p class="pt-s1">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. Nothing forces a preset name to change when one of them moves.</p>
+<p class="pt-s185">So a fully specified run is package version, preset, universe fingerprint and seed. The preset alone is necessary and not sufficient.</p>
 </div>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0">Never settable</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The draw schedule: market hours, the 390-tick day, the calendar and the sector key order. A preset changes what the draws are multiplied into, never the schedule itself.</p>
-<p style="margin:0;font-size:0.8125rem;color:var(--ink-3)">The guards are settable but excluded from every calibration search, because they are worst-case guarantees. daily_shock_cap is not settable at all.</p>
+<div class="pt-s181">
+<h3 class="pt-s4">Never settable</h3>
+<p class="pt-s1">The draw schedule: market hours, the 390-tick day, the calendar and the sector key order. A preset changes what the draws are multiplied into, never the schedule itself.</p>
+<p class="pt-s185">The guards are settable but excluded from every calibration search, because they are worst-case guarantees. daily_shock_cap is not settable at all.</p>
 </div>
 </div>
 </section>

@@ -23,31 +23,34 @@
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
 if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </head>
 <body class="pt-page">
 <div style="min-height:100vh;padding:0 0 5rem">
-<div id="pt-search" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)"><div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"><div id="pt-search-results" role="listbox" style="max-height:22rem;overflow-y:auto;padding:0.4rem"></div><div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
-<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)"><div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem"><a href="index.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22" style="flex:none"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22" style="flex:none"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span></a><nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap"><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Start<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="install.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Install</a><a href="core-concepts.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core concepts</a><a href="two-loops.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The two loops</a><a href="running-a-market.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Running a market</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Use it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="agents.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Agents</a><a href="scenarios.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Scenarios</a><a href="execution-cost.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Execution cost</a><a href="checkpoints.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Checkpoints and forking</a><a href="edgar.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Real companies from EDGAR</a><a href="rl-environment.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">RL environment</a><a href="mcp.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The MCP server</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--accent);cursor:pointer;list-style:none;padding:0.2rem 0">Trust it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="realism-envelope.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Realism envelope</a><span style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--accent);background:var(--accent-soft);white-space:nowrap">The metrics</span><a href="principles.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Principles</a><a href="citing.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Citing a run</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Reference<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="glossary.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Glossary</a><a href="factors.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The nine factors</a><a href="conventions.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a><a href="schemas.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a><a href="presets.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Presets</a><a href="release-notes.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Release notes</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">API<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="core-types.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a><a href="evaluate.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a><a href="parameters.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a></div></details></nav><span style="flex:1"></span><button id="pt-search-open" type="button" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span id="pt-search-hint" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">CTRL K</span></button><button id="pt-theme" type="button" aria-label="Switch theme" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu pt-here"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><span class="pt-current">The metrics</span><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
 
-<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">THE METRICS</span>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE METRICS</span>
 </div>
 
-<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
-<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">The metrics</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Fourteen statistics. What each one measures, why it matters to a strategy, and where its band came from.</p>
+<section class="pt-s33">
+<h1 class="pt-s30">The metrics</h1>
+<p class="pt-s24">Fourteen statistics. What each one measures, why it matters to a strategy, and where its band came from.</p>
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
-<h3 style="font-size:1.0625rem;margin:0">Where every band came from</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Ten consecutive 252-day windows of 40 US large caps, 2015 to 2025, measured with this module's own estimators. Nine windows set each band. The tenth, the window that straddles the COVID crash, is reported separately as that band's crisis window.</p>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">So the panel is a claim about a typical year. Crisis behaviour is measured under pinned scenarios instead.</p>
+<div class="pt-s186">
+<h3 class="pt-s4">Where every band came from</h3>
+<p class="pt-s1">Ten consecutive 252-day windows of 40 US large caps, 2015 to 2025, measured with this module's own estimators. Nine windows set each band. The tenth, the window that straddles the COVID crash, is reported separately as that band's crisis window.</p>
+<p class="pt-s1">So the panel is a claim about a typical year. Crisis behaviour is measured under pinned scenarios instead.</p>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<section class="pt-s19">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
-<h2 style="font-size:1.5rem">The fourteen</h2>
+<h2 class="pt-s7">The fourteen</h2>
 <div style="display:flex;gap:0.35rem;flex-wrap:wrap">
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)">all fourteen</button>
@@ -65,444 +68,444 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">annualised_vol_pct</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">How violent the market is</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">annualised_vol_pct</span>
+<span class="pt-s113">How violent the market is</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(84.6% - 9.3px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>15.00</span>
-<span style="color:var(--accent)">32.7604</span>
+<span class="pt-s10">32.7604</span>
 <span>36.00</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">It sets the scale of every gain and every loss. Too high and every Sharpe ratio you measure is depressed and every stop is hit too often. Too low and risk looks free.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">18.3 / 25.9 / 30.7</span>
+<p class="pt-s1">It sets the scale of every gain and every loss. Too high and every Sharpe ratio you measure is depressed and every stop is hit too often. Too low and risk looks free.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">18.3 / 25.9 / 30.7</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">excess_kurtosis</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">How fat the tails are</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">excess_kurtosis</span>
+<span class="pt-s113">How fat the tails are</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(12.9% - 1.4px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>1.60</span>
-<span style="color:var(--accent)">6.7001</span>
+<span class="pt-s10">6.7001</span>
 <span>41.00</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">How often a day lands far from typical. Zero is a normal distribution, and real markets are strongly positive, because crashes and melt-ups happen far more often than a bell curve allows. This one decides whether tail risk means anything in your results.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">5.6 / 11.1 / 36.7</span>
+<p class="pt-s1">How often a day lands far from typical. Zero is a normal distribution, and real markets are strongly positive, because crashes and melt-ups happen far more often than a bell curve allows. This one decides whether tail risk means anything in your results.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">5.6 / 11.1 / 36.7</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">return_acf1</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">Does yesterday predict today</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">return_acf1</span>
+<span class="pt-s113">Does yesterday predict today</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(74.2% - 8.2px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>-0.08</span>
-<span style="color:var(--accent)">0.0239</span>
+<span class="pt-s10">0.0239</span>
 <span>0.06</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Near zero in a real market. A positive value is free money for a momentum rule, so this is the row that decides whether a trend result here is a finding or an artifact.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band -0.08 to 0.06</span>
+<p class="pt-s1">Near zero in a real market. A positive value is free money for a momentum rule, so this is the row that decides whether a trend result here is a finding or an artifact.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band -0.08 to 0.06</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">abs_return_acf1</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">Does a wild day follow a wild day</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">abs_return_acf1</span>
+<span class="pt-s113">Does a wild day follow a wild day</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(45.4% - 5.0px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>0.02</span>
-<span style="color:var(--accent)">0.1107</span>
+<span class="pt-s10">0.1107</span>
 <span>0.22</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Volatility clustering at one day. Present in every real market, and the reason a calm week is a poor forecast of the next one.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band 0.02 to 0.22</span>
+<p class="pt-s1">Volatility clustering at one day. Present in every real market, and the reason a calm week is a poor forecast of the next one.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band 0.02 to 0.22</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">abs_return_acf5</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">The same, one week apart</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">abs_return_acf5</span>
+<span class="pt-s113">The same, one week apart</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(32.6% - 3.6px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>0.02</span>
-<span style="color:var(--accent)">0.0428</span>
+<span class="pt-s10">0.0428</span>
 <span>0.09</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Clustering at lag five. Whether a volatile spell persists long enough for a weekly risk model to see it.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band 0.02 to 0.09</span>
+<p class="pt-s1">Clustering at lag five. Whether a volatile spell persists long enough for a weekly risk model to see it.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band 0.02 to 0.09</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">abs_return_acf20</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">The same, one month apart</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">abs_return_acf20</span>
+<span class="pt-s113">The same, one month apart</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(36.7% - 4.0px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>-0.04</span>
-<span style="color:var(--accent)">0.0040</span>
+<span class="pt-s10">0.0040</span>
 <span>0.08</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Clustering at lag twenty. This is where the decay-shape gap lives: the model holds the level here but reaches it with the wrong curve.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band -0.04 to 0.08</span>
+<p class="pt-s1">Clustering at lag twenty. This is where the decay-shape gap lives: the model holds the level here but reaches it with the wrong curve.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band -0.04 to 0.08</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">cross_sectional_corr</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">How much names move together</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">cross_sectional_corr</span>
+<span class="pt-s113">How much names move together</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(49.5% - 5.4px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>0.08</span>
-<span style="color:var(--accent)">0.3177</span>
+<span class="pt-s10">0.3177</span>
 <span>0.56</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The average pairwise correlation. It decides whether a diversified book is actually diversified, and it is the row that concentration moves first.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band 0.08 to 0.56</span>
+<p class="pt-s1">The average pairwise correlation. It decides whether a diversified book is actually diversified, and it is the row that concentration moves first.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band 0.08 to 0.56</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">volume_abs_return_corr</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">Do big moves come with volume</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">volume_abs_return_corr</span>
+<span class="pt-s113">Do big moves come with volume</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(49.9% - 5.5px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>0.46</span>
-<span style="color:var(--accent)">0.5599</span>
+<span class="pt-s10">0.5599</span>
 <span>0.66</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Volume and absolute return move together in every real market. An execution algorithm that assumes constant depth is wrong in exactly the moments that matter.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band 0.46 to 0.66</span>
+<p class="pt-s1">Volume and absolute return move together in every real market. An execution algorithm that assumes constant depth is wrong in exactly the moments that matter.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band 0.46 to 0.66</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">leverage_effect</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">Do falls raise volatility</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">leverage_effect</span>
+<span class="pt-s113">Do falls raise volatility</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(74.9% - 8.2px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>-0.16</span>
-<span style="color:var(--accent)">-0.0401</span>
+<span class="pt-s10">-0.0401</span>
 <span>0.00</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Negative returns raise future volatility more than positive ones do. A symmetric model gets the shape of a drawdown wrong.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band -0.16 to 0.00</span>
+<p class="pt-s1">Negative returns raise future volatility more than positive ones do. A symmetric model gets the shape of a drawdown wrong.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band -0.16 to 0.00</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">volume_change_acf1</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">Does volume mean-revert</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">volume_change_acf1</span>
+<span class="pt-s113">Does volume mean-revert</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(45.3% - 5.0px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>-0.32</span>
-<span style="color:var(--accent)">-0.2656</span>
+<span class="pt-s10">-0.2656</span>
 <span>-0.20</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Negative in real markets: a heavy day is followed by a lighter one. Participation caps read against ADV depend on it.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band -0.32 to -0.20</span>
+<p class="pt-s1">Negative in real markets: a heavy day is followed by a lighter one. Participation caps read against ADV depend on it.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band -0.32 to -0.20</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">corr_asymmetry</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">Do names couple more when falling</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">corr_asymmetry</span>
+<span class="pt-s113">Do names couple more when falling</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(33.6% - 3.7px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>-0.25</span>
-<span style="color:var(--accent)">-0.0147</span>
+<span class="pt-s10">-0.0147</span>
 <span>0.45</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Correlation rises in a selloff, which is when diversification is most wanted and least available.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band -0.25 to 0.45</span>
+<p class="pt-s1">Correlation rises in a selloff, which is when diversification is most wanted and least available.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band -0.25 to 0.45</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">corr_asymmetry_lagged</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">The same, one day later</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">corr_asymmetry_lagged</span>
+<span class="pt-s113">The same, one day later</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(29.1% - 3.2px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>-0.20</span>
-<span style="color:var(--accent)">0.0181</span>
+<span class="pt-s10">0.0181</span>
 <span>0.55</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Whether that coupling survives into the next session rather than being a one-day artifact.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band -0.20 to 0.55</span>
+<p class="pt-s1">Whether that coupling survives into the next session rather than being a one-day artifact.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band -0.20 to 0.55</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">sector_excess_corr</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">Do industries move together</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">sector_excess_corr</span>
+<span class="pt-s113">Do industries move together</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(81.6% - 9.0px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>0.11</span>
-<span style="color:var(--accent)">0.2079</span>
+<span class="pt-s10">0.2079</span>
 <span>0.23</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">How much more a name moves with its own industry than with the market. Undefined on a single-sector roster, because those are the same thing.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band 0.11 to 0.23</span>
+<p class="pt-s1">How much more a name moves with its own industry than with the market. Undefined on a single-sector roster, because those are the same thing.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band 0.11 to 0.23</span>
 </div>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">corr_persistence_acf1</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">Does correlation stay high after a panic</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">corr_persistence_acf1</span>
+<span class="pt-s113">Does correlation stay high after a panic</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(46.9% - 5.2px)"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>-0.19</span>
-<span style="color:var(--accent)">0.1525</span>
+<span class="pt-s10">0.1525</span>
 <span>0.54</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Correlation does not snap back the day after a crash. The single row pt-v12 misses on held-out seeds.</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">band -0.19 to 0.54</span>
+<p class="pt-s1">Correlation does not snap back the day after a crash. The single row pt-v12 misses on held-out seeds.</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">band -0.19 to 0.54</span>
 </div>
 </div>
 
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
-<h2 style="font-size:1.5rem">What one run actually shows you</h2>
-<p style="color:var(--ink-2);margin:0">Every banded number is a median across seeds. The spread around it is wide enough to change the answer, and <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">pretium.envelope.intervals()</span> reports it per statistic.</p>
+<section class="pt-s34">
+<h2 class="pt-s7">What one run actually shows you</h2>
+<p class="pt-s13">Every banded number is a median across seeds. The spread around it is wide enough to change the answer, and <span class="pt-s27">pretium.envelope.intervals()</span> reports it per statistic.</p>
 
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<div class="pt-s29">
+<div class="pt-s11">
 
-<div style="display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:0.8rem;padding:0.5rem 0.95rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">median</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">The point estimate a single panel would report.</span>
+<div class="pt-s108">
+<span class="pt-s6">median</span>
+<span class="pt-s3">The point estimate a single panel would report.</span>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:0.8rem;padding:0.5rem 0.95rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">low, high</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">The actual minimum and maximum across seeds.</span>
+<div class="pt-s108">
+<span class="pt-s6">low, high</span>
+<span class="pt-s3">The actual minimum and maximum across seeds.</span>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:0.8rem;padding:0.5rem 0.95rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">p10, p90</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">The tenth and ninetieth percentiles.</span>
+<div class="pt-s108">
+<span class="pt-s6">p10, p90</span>
+<span class="pt-s3">The tenth and ninetieth percentiles.</span>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:0.8rem;padding:0.5rem 0.95rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">sd</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">Across-seed standard deviation, measured on these panels.</span>
+<div class="pt-s108">
+<span class="pt-s6">sd</span>
+<span class="pt-s3">Across-seed standard deviation, measured on these panels.</span>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:0.8rem;padding:0.5rem 0.95rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">shipped_sd</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">facts.SEED_SD, measured once at the baseline.</span>
+<div class="pt-s108">
+<span class="pt-s6">shipped_sd</span>
+<span class="pt-s3">facts.SEED_SD, measured once at the baseline.</span>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:0.8rem;padding:0.5rem 0.95rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">distance</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">Band distance, and sd_out gives that distance in units of noise.</span>
+<div class="pt-s108">
+<span class="pt-s6">distance</span>
+<span class="pt-s3">Band distance, and sd_out gives that distance in units of noise.</span>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:0.8rem;padding:0.5rem 0.95rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">extremes_straddle</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">The minimum or maximum crosses a band edge.</span>
+<div class="pt-s108">
+<span class="pt-s6">extremes_straddle</span>
+<span class="pt-s3">The minimum or maximum crosses a band edge.</span>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:0.8rem;padding:0.5rem 0.95rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">typical_straddles</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">The p10 to p90 range crosses a band edge. This is the one to read.</span>
+<div class="pt-s108">
+<span class="pt-s6">typical_straddles</span>
+<span class="pt-s3">The p10 to p90 range crosses a band edge. This is the one to read.</span>
 </div>
 
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
-<h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">Read typical_straddles, not extremes_straddle</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">extremes_straddle fires when one seed of thirty crossed an edge. That is close to expected, so it is information rather than a finding.</p>
-<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">typical_straddles says the middle eighty percent crosses. Then a reader running one seed is likely, not merely able, to measure out of band on a statistic whose median sits well inside.</p>
+<h3 class="pt-s66">Read typical_straddles, not extremes_straddle</h3>
+<p class="pt-s58">extremes_straddle fires when one seed of thirty crossed an edge. That is close to expected, so it is information rather than a finding.</p>
+<p class="pt-s58">typical_straddles says the middle eighty percent crosses. Then a reader running one seed is likely, not merely able, to measure out of band on a statistic whose median sits well inside.</p>
 <p style="margin:0;font-size:0.8125rem;color:var(--accent-deep)">Measured on pt-v10 over thirty seeds, nine of the fourteen straddle by that test. That is the previous era's dispersion. pt-v12 moved the medians and the spread around them has not been re-measured.</p>
 </div>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">Three bands are not raw measurements</h2>
-<p style="color:var(--ink-2);margin:0">A band is what this measurement returns on real data, with three documented exceptions. Each names itself on its own provenance row.</p>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem">
+<section class="pt-s19">
+<h2 class="pt-s7">Three bands are not raw measurements</h2>
+<p class="pt-s13">A band is what this measurement returns on real data, with three documented exceptions. Each names itself on its own provenance row.</p>
+<div class="pt-s68">
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--accent)">annualised_vol_pct</span>
+<div class="pt-s8">
+<span class="pt-s148">annualised_vol_pct</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:var(--amber)">EXTENDED OUTWARD</span>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The ceiling moves from the windows' 34 to 36, so the band admits a slightly more violent year than the sample held.</p>
+<p class="pt-s1">The ceiling moves from the windows' 34 to 36, so the band admits a slightly more violent year than the sample held.</p>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--accent)">abs_return_acf1</span>
+<div class="pt-s8">
+<span class="pt-s148">abs_return_acf1</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:var(--accent)">CLAMPED INWARD</span>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The floor is held at +0.02. Zero volatility clustering appears in no retrieved source and no observed window.</p>
+<p class="pt-s1">The floor is held at +0.02. Zero volatility clustering appears in no retrieved source and no observed window.</p>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--accent)">leverage_effect</span>
+<div class="pt-s8">
+<span class="pt-s148">leverage_effect</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:var(--accent)">CLAMPED INWARD</span>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The ceiling is held at 0.00. A top above zero would certify a reversed leverage effect as real-market behaviour.</p>
+<p class="pt-s1">The ceiling is held at 0.00. A top above zero would certify a reversed leverage effect as real-market behaviour.</p>
 </div>
 
 </div>
@@ -512,9 +515,9 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 
 
 </main></div>
-<div style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
-<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem"><h2 style="font-size:1.25rem">All pages</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem"><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Start</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="install.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Install</span></a><a href="core-concepts.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Core concepts</span></a><a href="two-loops.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The two loops</span></a><a href="running-a-market.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Running a market</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Use it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="agents.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Agents</span></a><a href="scenarios.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Scenarios</span></a><a href="execution-cost.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Execution cost</span></a><a href="checkpoints.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Checkpoints and forking</span></a><a href="edgar.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Real companies from EDGAR</span></a><a href="rl-environment.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">RL environment</span></a><a href="mcp.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The MCP server</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Trust it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="realism-envelope.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Realism envelope</span></a><span style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--accent)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The metrics</span></span><a href="principles.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Principles</span></a><a href="citing.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Citing a run</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Reference</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="glossary.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Glossary</span></a><a href="factors.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The nine factors</span></a><a href="conventions.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Conventions</span></a><a href="schemas.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Schemas</span></a><a href="presets.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Presets</span></a><a href="release-notes.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Release notes</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">API</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="core-types.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Core types</span></a><a href="evaluate.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Evaluate</span></a><a href="parameters.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Parameters</span></a></div></div></div></section>
-<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem"><a href="realism-envelope.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>Realism envelope</span></a><a href="principles.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>Principles</span></a></nav>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><a href="two-loops.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></a><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><a href="agents.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></a><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></span><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><a href="presets.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></a><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="realism-envelope.html"><span class="pt-eyebrow">BACK</span><span>Realism envelope</span></a><a class="pt-next" href="principles.html"><span class="pt-eyebrow">NEXT</span><span>Principles</span></a></nav>
 </div>
 </div>
 <!-- The client-side copy of this page's template.
@@ -525,26 +528,26 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
 
-<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">THE METRICS</span>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE METRICS</span>
 </div>
 
-<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
-<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">The metrics</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Fourteen statistics. What each one measures, why it matters to a strategy, and where its band came from.</p>
+<section class="pt-s33">
+<h1 class="pt-s30">The metrics</h1>
+<p class="pt-s24">Fourteen statistics. What each one measures, why it matters to a strategy, and where its band came from.</p>
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
-<h3 style="font-size:1.0625rem;margin:0">Where every band came from</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Ten consecutive 252-day windows of 40 US large caps, 2015 to 2025, measured with this module's own estimators. Nine windows set each band. The tenth, the window that straddles the COVID crash, is reported separately as that band's crisis window.</p>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">So the panel is a claim about a typical year. Crisis behaviour is measured under pinned scenarios instead.</p>
+<div class="pt-s186">
+<h3 class="pt-s4">Where every band came from</h3>
+<p class="pt-s1">Ten consecutive 252-day windows of 40 US large caps, 2015 to 2025, measured with this module's own estimators. Nine windows set each band. The tenth, the window that straddles the COVID crash, is reported separately as that band's crisis window.</p>
+<p class="pt-s1">So the panel is a claim about a typical year. Crisis behaviour is measured under pinned scenarios instead.</p>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<section class="pt-s19">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
-<h2 style="font-size:1.5rem">The fourteen</h2>
+<h2 class="pt-s7">The fourteen</h2>
 <div style="display:flex;gap:0.35rem;flex-wrap:wrap">
 <sc-for list="{{ groups }}" as="g">
 <button onClick="{{ g.pick }}" style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid {{ g.border }};background:{{ g.bg }};color:{{ g.fg }}">{{ g.label }}</button>
@@ -553,63 +556,63 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 </div>
 
 <sc-for list="{{ stats }}" as="s">
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.7rem">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start">
-<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;color:var(--accent)">{{ s.k }}</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;color:var(--ink)">{{ s.plain }}</span>
+<div class="pt-s82">
+<div class="pt-s107">
+<div class="pt-s22">
+<span class="pt-s149">{{ s.k }}</span>
+<span class="pt-s113">{{ s.plain }}</span>
 </div>
-<div style="display:flex;flex-direction:column;gap:0.45rem">
-<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<div class="pt-s62">
+<span class="pt-s26">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:{{ s.left }}"></span>
 </span>
-<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">
+<div class="pt-s97">
 <span>{{ s.lo }}</span>
-<span style="color:var(--accent)">{{ s.m }}</span>
+<span class="pt-s10">{{ s.m }}</span>
 <span>{{ s.hi }}</span>
 </div>
 </div>
 </div>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">{{ s.why }}</p>
-<div style="display:flex;gap:0.6rem;align-items:baseline;padding-top:0.5rem;border-top:1px solid var(--line-soft)">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">REAL WINDOWS</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2)">{{ s.windows }}</span>
+<p class="pt-s1">{{ s.why }}</p>
+<div class="pt-s96">
+<span class="pt-s48">REAL WINDOWS</span>
+<span class="pt-s142">{{ s.windows }}</span>
 </div>
 </div>
 
 </sc-for></section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
-<h2 style="font-size:1.5rem">What one run actually shows you</h2>
-<p style="color:var(--ink-2);margin:0">Every banded number is a median across seeds. The spread around it is wide enough to change the answer, and <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">pretium.envelope.intervals()</span> reports it per statistic.</p>
+<section class="pt-s34">
+<h2 class="pt-s7">What one run actually shows you</h2>
+<p class="pt-s13">Every banded number is a median across seeds. The spread around it is wide enough to change the answer, and <span class="pt-s27">pretium.envelope.intervals()</span> reports it per statistic.</p>
 
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<div class="pt-s29">
+<div class="pt-s11">
 <sc-for list="{{ intervals }}" as="i">
-<div style="display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:0.8rem;padding:0.5rem 0.95rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">{{ i.k }}</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">{{ i.v }}</span>
+<div class="pt-s108">
+<span class="pt-s6">{{ i.k }}</span>
+<span class="pt-s3">{{ i.v }}</span>
 </div>
 
 </sc-for></div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
-<h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">Read typical_straddles, not extremes_straddle</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">extremes_straddle fires when one seed of thirty crossed an edge. That is close to expected, so it is information rather than a finding.</p>
-<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">typical_straddles says the middle eighty percent crosses. Then a reader running one seed is likely, not merely able, to measure out of band on a statistic whose median sits well inside.</p>
+<h3 class="pt-s66">Read typical_straddles, not extremes_straddle</h3>
+<p class="pt-s58">extremes_straddle fires when one seed of thirty crossed an edge. That is close to expected, so it is information rather than a finding.</p>
+<p class="pt-s58">typical_straddles says the middle eighty percent crosses. Then a reader running one seed is likely, not merely able, to measure out of band on a statistic whose median sits well inside.</p>
 <p style="margin:0;font-size:0.8125rem;color:var(--accent-deep)">Measured on pt-v10 over thirty seeds, nine of the fourteen straddle by that test. That is the previous era's dispersion. pt-v12 moved the medians and the spread around them has not been re-measured.</p>
 </div>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">Three bands are not raw measurements</h2>
-<p style="color:var(--ink-2);margin:0">A band is what this measurement returns on real data, with three documented exceptions. Each names itself on its own provenance row.</p>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem">
+<section class="pt-s19">
+<h2 class="pt-s7">Three bands are not raw measurements</h2>
+<p class="pt-s13">A band is what this measurement returns on real data, with three documented exceptions. Each names itself on its own provenance row.</p>
+<div class="pt-s68">
 <sc-for list="{{ edges }}" as="e">
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--accent)">{{ e.k }}</span>
+<div class="pt-s8">
+<span class="pt-s148">{{ e.k }}</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:{{ e.col }}">{{ e.dir }}</span>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">{{ e.why }}</p>
+<p class="pt-s1">{{ e.why }}</p>
 </div>
 
 </sc-for></div>

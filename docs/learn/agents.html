@@ -23,39 +23,42 @@
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
 if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </head>
 <body class="pt-page">
 <div style="min-height:100vh;padding:0 0 5rem">
-<div id="pt-search" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)"><div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"><div id="pt-search-results" role="listbox" style="max-height:22rem;overflow-y:auto;padding:0.4rem"></div><div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
-<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)"><div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem"><a href="index.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22" style="flex:none"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22" style="flex:none"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span></a><nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap"><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Start<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="install.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Install</a><a href="core-concepts.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core concepts</a><a href="two-loops.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The two loops</a><a href="running-a-market.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Running a market</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--accent);cursor:pointer;list-style:none;padding:0.2rem 0">Use it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><span style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--accent);background:var(--accent-soft);white-space:nowrap">Agents</span><a href="scenarios.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Scenarios</a><a href="execution-cost.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Execution cost</a><a href="checkpoints.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Checkpoints and forking</a><a href="edgar.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Real companies from EDGAR</a><a href="rl-environment.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">RL environment</a><a href="mcp.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The MCP server</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Trust it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="realism-envelope.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Realism envelope</a><a href="metrics.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The metrics</a><a href="principles.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Principles</a><a href="citing.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Citing a run</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Reference<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="glossary.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Glossary</a><a href="factors.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The nine factors</a><a href="conventions.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a><a href="schemas.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a><a href="presets.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Presets</a><a href="release-notes.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Release notes</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">API<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="core-types.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a><a href="evaluate.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a><a href="parameters.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a></div></details></nav><span style="flex:1"></span><button id="pt-search-open" type="button" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span id="pt-search-hint" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">CTRL K</span></button><button id="pt-theme" type="button" aria-label="Switch theme" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu pt-here"><summary>Use it<span class="pt-caret">▼</span></summary><div><span class="pt-current">Agents</span><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
 
-<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">AGENTS</span>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">AGENTS</span>
 </div>
 
-<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
-<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Agents</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">An agent is any object with an <span style="font-family:'Spline Sans Mono',monospace;font-size:1rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">act</span> method. The harness gives it an observation and takes back target weights.</p>
+<section class="pt-s33">
+<h1 class="pt-s30">Agents</h1>
+<p class="pt-s24">An agent is any object with an <span style="font-family:'Spline Sans Mono',monospace;font-size:1rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">act</span> method. The harness gives it an observation and takes back target weights.</p>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0">Three kinds of agent use this page</h3>
+<h3 class="pt-s4">Three kinds of agent use this page</h3>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.9rem">
 
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">An execution algorithm</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">A TWAP, a VWAP, an iceberg. You write the logic in Python.</span>
+<div class="pt-s2">
+<span class="pt-s5">An execution algorithm</span>
+<span class="pt-s3">A TWAP, a VWAP, an iceberg. You write the logic in Python.</span>
 </div>
 
 
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">A trained policy</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">A reinforcement-learning policy through the Gymnasium environment.</span>
+<div class="pt-s2">
+<span class="pt-s5">A trained policy</span>
+<span class="pt-s3">A reinforcement-learning policy through the Gymnasium environment.</span>
 </div>
 
 
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">An LLM agent</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">A model that reads the observation and answers with weights at each step.</span>
+<div class="pt-s2">
+<span class="pt-s5">An LLM agent</span>
+<span class="pt-s3">A model that reads the observation and answers with weights at each step.</span>
 </div>
 
 </div>
@@ -63,7 +66,7 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">class Mine:
+<pre class="pt-s31">class Mine:
     def act(self, obs):
         # target weights, one per name
         return {"AAA": 0.2, "AAB": -0.1}
@@ -74,87 +77,87 @@ scores = pt.evaluate(
 
 scores["mine"].return_pct
 scores["mine"].impact_bps</pre>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.85rem">
-<h3 style="font-size:1.0625rem;margin:0">Three rules of the harness</h3>
+<div class="pt-s180">
+<h3 class="pt-s4">Three rules of the harness</h3>
 
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">You return target weights</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Weights in [-1, 1], one per name. The harness turns them into orders, so a policy does not learn each price range first.</span>
+<div class="pt-s2">
+<span class="pt-s5">You return target weights</span>
+<span class="pt-s0">Weights in [-1, 1], one per name. The harness turns them into orders, so a policy does not learn each price range first.</span>
 </div>
 
 
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">The market answers back</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Orders match against real depth. Reward is measured after the market moves, so it already carries the cost of your own footprint.</span>
+<div class="pt-s2">
+<span class="pt-s5">The market answers back</span>
+<span class="pt-s0">Orders match against real depth. Reward is measured after the market moves, so it already carries the cost of your own footprint.</span>
 </div>
 
 
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">The seed owns the randomness</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Give the same agent the same seed and universe, and you get the same run.</span>
+<div class="pt-s2">
+<span class="pt-s5">The seed owns the randomness</span>
+<span class="pt-s0">Give the same agent the same seed and universe, and you get the same run.</span>
 </div>
 
 </div>
 </div>
 </section>
 
-<section id="see" style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
-<h2 style="font-size:1.5rem">The observation is narrow on purpose</h2>
-<p style="color:var(--ink-2);margin:0">Everything in it is something a real trader can see. Nothing in it is something only the simulator knows.</p>
+<section id="see" class="pt-s34">
+<h2 class="pt-s7">The observation is narrow on purpose</h2>
+<p class="pt-s13">Everything in it is something a real trader can see. Nothing in it is something only the simulator knows.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">The agent sees</h3>
+<h3 class="pt-s66">The agent sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--chip-teal);border:1px solid var(--accent-line);border-radius:4px;padding:0.25rem 0.5rem;color:var(--accent-deep)">prices</span>
+<span class="pt-s137">prices</span>
 
 
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--chip-teal);border:1px solid var(--accent-line);border-radius:4px;padding:0.25rem 0.5rem;color:var(--accent-deep)">the order book</span>
+<span class="pt-s137">the order book</span>
 
 
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--chip-teal);border:1px solid var(--accent-line);border-radius:4px;padding:0.25rem 0.5rem;color:var(--accent-deep)">your position</span>
+<span class="pt-s137">your position</span>
 
 
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--chip-teal);border:1px solid var(--accent-line);border-radius:4px;padding:0.25rem 0.5rem;color:var(--accent-deep)">your cash</span>
+<span class="pt-s137">your cash</span>
 
 
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--chip-teal);border:1px solid var(--accent-line);border-radius:4px;padding:0.25rem 0.5rem;color:var(--accent-deep)">the step number</span>
+<span class="pt-s137">the step number</span>
 
 </div>
 </div>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0">The agent never sees</h3>
+<div class="pt-s181">
+<h3 class="pt-s4">The agent never sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:0.25rem 0.5rem;color:var(--ink-3);text-decoration:line-through">the true mispricing</span>
+<span class="pt-s138">the true mispricing</span>
 
 
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:0.25rem 0.5rem;color:var(--ink-3);text-decoration:line-through">fair value</span>
+<span class="pt-s138">fair value</span>
 
 
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:0.25rem 0.5rem;color:var(--ink-3);text-decoration:line-through">tomorrow's prices</span>
+<span class="pt-s138">tomorrow's prices</span>
 
 
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:0.25rem 0.5rem;color:var(--ink-3);text-decoration:line-through">other agents' orders</span>
+<span class="pt-s138">other agents' orders</span>
 
 </div>
 <p style="margin:0.2rem 0 0;font-size:0.8125rem;color:var(--ink-2)">The Oracle is the exception. It reads the true mispricing and declares itself, which is why it is a reference and not a competitor.</p>
 </div>
 </div>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;font-size:0.875rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">step</span> counts the whole run, not the day. A ten-day run at three decisions a day ends at step 30.</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;font-size:0.875rem;color:var(--ink-2)"><span class="pt-s27">step</span> counts the whole run, not the day. A ten-day run at three decisions a day ends at step 30.</div>
 </section>
 
-<section id="compare" style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
-<h2 style="font-size:1.5rem">Compare agents</h2>
+<section id="compare" class="pt-s34">
+<h2 class="pt-s7">Compare agents</h2>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.4rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red)">ONE MARKET EACH, NOT ONE SHARED BOOK</span>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Ten agents in one <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">evaluate</span> call get ten private engines, built from the same seed and roster. Each agent pays its own impact and sees nobody else's orders. That is what makes the comparison clean. It is also why there is no arena. To make agents take each other's depth, drive one engine yourself and combine their flow into each tick.</p>
+<p class="pt-s1">Ten agents in one <span class="pt-s27">evaluate</span> call get ten private engines, built from the same seed and roster. Each agent pays its own impact and sees nobody else's orders. That is what makes the comparison clean. It is also why there is no arena. To make agents take each other's depth, drive one engine yourself and combine their flow into each tick.</p>
 </div>
-<p style="color:var(--ink-2);margin:0">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
+<p class="pt-s13">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
 
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
+<div class="pt-s29">
 <div style="display:flex;flex-direction:column;gap:0.8rem">
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">ranking = pt.rank(
+<pre class="pt-s31">ranking = pt.rank(
     lambda: pt.reference_agents(seed=3),
     seeds=range(12), universe=u,
     days=10, workers=4)
@@ -166,7 +169,7 @@ ranking.separation("mean_reversion",
 </div>
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.9rem">
-<h3 style="font-size:1.0625rem;margin:0">Twelve markets, one square each</h3>
+<h3 class="pt-s4">Twelve markets, one square each</h3>
 <div style="display:flex;gap:4px">
 
 <span style="flex:1;height:34px;border-radius:3px;background:var(--accent)"></span>
@@ -209,70 +212,70 @@ ranking.separation("mean_reversion",
 <span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent)"></span>mean-reversion won 9</span>
 <span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--amber)"></span>momentum won 3</span>
 </div>
-<p style="margin:0;font-size:0.8125rem;color:var(--ink-3)">The squares show the tally, not the seed order. Which seed fell which way is in the agents docs.</p>
+<p class="pt-s185">The squares show the tally, not the seed order. Which seed fell which way is in the agents docs.</p>
 </div>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:2px">
+<div class="pt-s83">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent);font-variant-numeric:tabular-nums">3x</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">pooled capture</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">Mean-reversion at +0.783 against momentum at +0.259, across the grid.</span>
+<span class="pt-s57">pooled capture</span>
+<span class="pt-s3">Mean-reversion at +0.783 against momentum at +0.259, across the grid.</span>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:2px">
+<div class="pt-s83">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--amber);font-variant-numeric:tabular-nums">0.15</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">sign-test p-value</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">A 9 to 3 split on twelve paired markets. The sign test does not call that settled.</span>
+<span class="pt-s57">sign-test p-value</span>
+<span class="pt-s3">A 9 to 3 split on twelve paired markets. The sign test does not call that settled.</span>
 </div>
 
 
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:2px">
+<div class="pt-s83">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--red);font-variant-numeric:tabular-nums">8 / 12</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">single-seed hit rate</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">How often one market picks the pooled leader. The other four crown momentum three times and buy-and-hold once.</span>
+<span class="pt-s57">single-seed hit rate</span>
+<span class="pt-s3">How often one market picks the pooled leader. The other four crown momentum three times and buy-and-hold once.</span>
 </div>
 
 </div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
-<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">Pooled, mean-reversion leads by three times. Paired, 9 to 3 at p = 0.15 is not a separation. Both numbers are true and they answer different questions: how much it won by, and how often. Report the pair.</p>
+<p class="pt-s58">Pooled, mean-reversion leads by three times. Paired, 9 to 3 at p = 0.15 is not a separation. Both numbers are true and they answer different questions: how much it won by, and how often. Report the pair.</p>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">The shipped baselines</h2>
-<p style="color:var(--ink-2);margin:0">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<section class="pt-s19">
+<h2 class="pt-s7">The shipped baselines</h2>
+<p class="pt-s13">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
+<div class="pt-s11">
 
-<div style="display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;padding:0.55rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">hold</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Buy the roster on day one and do nothing. The number every other agent must beat.</span>
+<div class="pt-s101">
+<span class="pt-s6">hold</span>
+<span class="pt-s0">Buy the roster on day one and do nothing. The number every other agent must beat.</span>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;padding:0.55rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">random</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Weights from its own seed, which lives in the spec. The noise floor.</span>
+<div class="pt-s101">
+<span class="pt-s6">random</span>
+<span class="pt-s0">Weights from its own seed, which lives in the spec. The noise floor.</span>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;padding:0.55rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">momentum</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Buys what rose. Pools at +0.259 on the published grid. Read the herding dial caveat below before you trust it.</span>
+<div class="pt-s101">
+<span class="pt-s6">momentum</span>
+<span class="pt-s0">Buys what rose. Pools at +0.259 on the published grid. Read the herding dial caveat below before you trust it.</span>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;padding:0.55rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">mean_reversion</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Buys what fell. Pools at +0.783 on the published grid, and it beats the Oracle on 5 of the 12 markets.</span>
+<div class="pt-s101">
+<span class="pt-s6">mean_reversion</span>
+<span class="pt-s0">Buys what fell. Pools at +0.783 on the published grid, and it beats the Oracle on 5 of the 12 markets.</span>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;padding:0.55rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">oracle</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">Reads the true mispricing, and gets no extra capital for it. A reference point, not a ceiling: agents out-earn it on 5 of 12 markets.</span>
+<div class="pt-s101">
+<span class="pt-s6">oracle</span>
+<span class="pt-s0">Reads the true mispricing, and gets no extra capital for it. A reference point, not a ceiling: agents out-earn it on 5 of 12 markets.</span>
 </div>
 
 </div>
@@ -280,16 +283,16 @@ ranking.separation("mean_reversion",
 
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
 <h2 style="font-size:1.25rem">Read this before you conclude</h2>
-<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
-<summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--ink)">Momentum can work here for a reason real markets do not supply</summary>
-<div style="padding:0.8rem 0.9rem;border-top:1px solid var(--line-soft)">
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v12 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0239, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
+<details class="pt-s12">
+<summary class="pt-s28">Momentum can work here for a reason real markets do not supply</summary>
+<div class="pt-s171">
+<p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v12 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0239, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
 </div>
 </details>
-<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
-<summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--ink)">No counterparty adapts to you</summary>
-<div style="padding:0.8rem 0.9rem;border-top:1px solid var(--line-soft)">
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">You trade against a market maker and aggregate flow. Orders arrive instantly and there is one book per name. Nothing in the market learns your pattern and front-runs it.</p>
+<details class="pt-s12">
+<summary class="pt-s28">No counterparty adapts to you</summary>
+<div class="pt-s171">
+<p class="pt-s1">You trade against a market maker and aggregate flow. Orders arrive instantly and there is one book per name. Nothing in the market learns your pattern and front-runs it.</p>
 </div>
 </details>
 </section>
@@ -298,9 +301,9 @@ ranking.separation("mean_reversion",
 
 
 </main></div>
-<div style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
-<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem"><h2 style="font-size:1.25rem">All pages</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem"><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Start</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="install.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Install</span></a><a href="core-concepts.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Core concepts</span></a><a href="two-loops.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The two loops</span></a><a href="running-a-market.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Running a market</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Use it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><span style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--accent)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Agents</span></span><a href="scenarios.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Scenarios</span></a><a href="execution-cost.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Execution cost</span></a><a href="checkpoints.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Checkpoints and forking</span></a><a href="edgar.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Real companies from EDGAR</span></a><a href="rl-environment.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">RL environment</span></a><a href="mcp.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The MCP server</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Trust it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="realism-envelope.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Realism envelope</span></a><a href="metrics.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The metrics</span></a><a href="principles.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Principles</span></a><a href="citing.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Citing a run</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Reference</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="glossary.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Glossary</span></a><a href="factors.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The nine factors</span></a><a href="conventions.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Conventions</span></a><a href="schemas.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Schemas</span></a><a href="presets.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Presets</span></a><a href="release-notes.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Release notes</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">API</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="core-types.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Core types</span></a><a href="evaluate.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Evaluate</span></a><a href="parameters.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Parameters</span></a></div></div></div></section>
-<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem"><a href="running-a-market.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>Running a market</span></a><a href="scenarios.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>Scenarios</span></a></nav>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><a href="two-loops.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></a><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></span><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><a href="presets.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></a><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="running-a-market.html"><span class="pt-eyebrow">BACK</span><span>Running a market</span></a><a class="pt-next" href="scenarios.html"><span class="pt-eyebrow">NEXT</span><span>Scenarios</span></a></nav>
 </div>
 </div>
 <!-- The client-side copy of this page's template.
@@ -311,22 +314,22 @@ ranking.separation("mean_reversion",
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
 
-<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">AGENTS</span>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">AGENTS</span>
 </div>
 
-<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
-<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Agents</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">An agent is any object with an <span style="font-family:'Spline Sans Mono',monospace;font-size:1rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">act</span> method. The harness gives it an observation and takes back target weights.</p>
+<section class="pt-s33">
+<h1 class="pt-s30">Agents</h1>
+<p class="pt-s24">An agent is any object with an <span style="font-family:'Spline Sans Mono',monospace;font-size:1rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">act</span> method. The harness gives it an observation and takes back target weights.</p>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0">Three kinds of agent use this page</h3>
+<h3 class="pt-s4">Three kinds of agent use this page</h3>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.9rem">
 <sc-for list="{{ kinds }}" as="k">
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">{{ k.k }}</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">{{ k.v }}</span>
+<div class="pt-s2">
+<span class="pt-s5">{{ k.k }}</span>
+<span class="pt-s3">{{ k.v }}</span>
 </div>
 
 </sc-for></div>
@@ -334,7 +337,7 @@ ranking.separation("mean_reversion",
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">class Mine:
+<pre class="pt-s31">class Mine:
     def act(self, obs):
         # target weights, one per name
         return {"AAA": 0.2, "AAB": -0.1}
@@ -345,54 +348,54 @@ scores = pt.evaluate(
 
 scores["mine"].return_pct
 scores["mine"].impact_bps</pre>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.85rem">
-<h3 style="font-size:1.0625rem;margin:0">Three rules of the harness</h3>
+<div class="pt-s180">
+<h3 class="pt-s4">Three rules of the harness</h3>
 <sc-for list="{{ rules }}" as="r">
-<div style="display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--accent)">{{ r.k }}</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">{{ r.v }}</span>
+<div class="pt-s2">
+<span class="pt-s5">{{ r.k }}</span>
+<span class="pt-s0">{{ r.v }}</span>
 </div>
 
 </sc-for></div>
 </div>
 </section>
 
-<section id="see" style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
-<h2 style="font-size:1.5rem">The observation is narrow on purpose</h2>
-<p style="color:var(--ink-2);margin:0">Everything in it is something a real trader can see. Nothing in it is something only the simulator knows.</p>
+<section id="see" class="pt-s34">
+<h2 class="pt-s7">The observation is narrow on purpose</h2>
+<p class="pt-s13">Everything in it is something a real trader can see. Nothing in it is something only the simulator knows.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">The agent sees</h3>
+<h3 class="pt-s66">The agent sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 <sc-for list="{{ sees }}" as="s">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--chip-teal);border:1px solid var(--accent-line);border-radius:4px;padding:0.25rem 0.5rem;color:var(--accent-deep)">{{ s }}</span>
+<span class="pt-s137">{{ s }}</span>
 
 </sc-for></div>
 </div>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 style="font-size:1.0625rem;margin:0">The agent never sees</h3>
+<div class="pt-s181">
+<h3 class="pt-s4">The agent never sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 <sc-for list="{{ hidden }}" as="s">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:0.25rem 0.5rem;color:var(--ink-3);text-decoration:line-through">{{ s }}</span>
+<span class="pt-s138">{{ s }}</span>
 
 </sc-for></div>
 <p style="margin:0.2rem 0 0;font-size:0.8125rem;color:var(--ink-2)">The Oracle is the exception. It reads the true mispricing and declares itself, which is why it is a reference and not a competitor.</p>
 </div>
 </div>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;font-size:0.875rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">step</span> counts the whole run, not the day. A ten-day run at three decisions a day ends at step 30.</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;font-size:0.875rem;color:var(--ink-2)"><span class="pt-s27">step</span> counts the whole run, not the day. A ten-day run at three decisions a day ends at step 30.</div>
 </section>
 
-<section id="compare" style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
-<h2 style="font-size:1.5rem">Compare agents</h2>
+<section id="compare" class="pt-s34">
+<h2 class="pt-s7">Compare agents</h2>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.4rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red)">ONE MARKET EACH, NOT ONE SHARED BOOK</span>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Ten agents in one <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">evaluate</span> call get ten private engines, built from the same seed and roster. Each agent pays its own impact and sees nobody else's orders. That is what makes the comparison clean. It is also why there is no arena. To make agents take each other's depth, drive one engine yourself and combine their flow into each tick.</p>
+<p class="pt-s1">Ten agents in one <span class="pt-s27">evaluate</span> call get ten private engines, built from the same seed and roster. Each agent pays its own impact and sees nobody else's orders. That is what makes the comparison clean. It is also why there is no arena. To make agents take each other's depth, drive one engine yourself and combine their flow into each tick.</p>
 </div>
-<p style="color:var(--ink-2);margin:0">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
+<p class="pt-s13">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
 
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
+<div class="pt-s29">
 <div style="display:flex;flex-direction:column;gap:0.8rem">
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">ranking = pt.rank(
+<pre class="pt-s31">ranking = pt.rank(
     lambda: pt.reference_agents(seed=3),
     seeds=range(12), universe=u,
     days=10, workers=4)
@@ -404,7 +407,7 @@ ranking.separation("mean_reversion",
 </div>
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.9rem">
-<h3 style="font-size:1.0625rem;margin:0">Twelve markets, one square each</h3>
+<h3 class="pt-s4">Twelve markets, one square each</h3>
 <div style="display:flex;gap:4px">
 <sc-for list="{{ tally }}" as="t">
 <span style="flex:1;height:34px;border-radius:3px;background:{{ t.col }}"></span>
@@ -414,32 +417,32 @@ ranking.separation("mean_reversion",
 <span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent)"></span>mean-reversion won 9</span>
 <span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--amber)"></span>momentum won 3</span>
 </div>
-<p style="margin:0;font-size:0.8125rem;color:var(--ink-3)">The squares show the tally, not the seed order. Which seed fell which way is in the agents docs.</p>
+<p class="pt-s185">The squares show the tally, not the seed order. Which seed fell which way is in the agents docs.</p>
 </div>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
 <sc-for list="{{ readouts }}" as="r">
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:2px">
+<div class="pt-s83">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:{{ r.col }};font-variant-numeric:tabular-nums">{{ r.n }}</span>
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">{{ r.k }}</span>
-<span style="font-size:0.8125rem;color:var(--ink-2)">{{ r.v }}</span>
+<span class="pt-s57">{{ r.k }}</span>
+<span class="pt-s3">{{ r.v }}</span>
 </div>
 
 </sc-for></div>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
-<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">Pooled, mean-reversion leads by three times. Paired, 9 to 3 at p = 0.15 is not a separation. Both numbers are true and they answer different questions: how much it won by, and how often. Report the pair.</p>
+<p class="pt-s58">Pooled, mean-reversion leads by three times. Paired, 9 to 3 at p = 0.15 is not a separation. Both numbers are true and they answer different questions: how much it won by, and how often. Report the pair.</p>
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">The shipped baselines</h2>
-<p style="color:var(--ink-2);margin:0">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<section class="pt-s19">
+<h2 class="pt-s7">The shipped baselines</h2>
+<p class="pt-s13">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
+<div class="pt-s11">
 <sc-for list="{{ baselines }}" as="b">
-<div style="display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;padding:0.55rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">{{ b.n }}</span>
-<span style="font-size:0.875rem;color:var(--ink-2)">{{ b.d }}</span>
+<div class="pt-s101">
+<span class="pt-s6">{{ b.n }}</span>
+<span class="pt-s0">{{ b.d }}</span>
 </div>
 
 </sc-for></div>
@@ -447,16 +450,16 @@ ranking.separation("mean_reversion",
 
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
 <h2 style="font-size:1.25rem">Read this before you conclude</h2>
-<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
-<summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--ink)">Momentum can work here for a reason real markets do not supply</summary>
-<div style="padding:0.8rem 0.9rem;border-top:1px solid var(--line-soft)">
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v12 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0239, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
+<details class="pt-s12">
+<summary class="pt-s28">Momentum can work here for a reason real markets do not supply</summary>
+<div class="pt-s171">
+<p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v12 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0239, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
 </div>
 </details>
-<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
-<summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--ink)">No counterparty adapts to you</summary>
-<div style="padding:0.8rem 0.9rem;border-top:1px solid var(--line-soft)">
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">You trade against a market maker and aggregate flow. Orders arrive instantly and there is one book per name. Nothing in the market learns your pattern and front-runs it.</p>
+<details class="pt-s12">
+<summary class="pt-s28">No counterparty adapts to you</summary>
+<div class="pt-s171">
+<p class="pt-s1">You trade against a market maker and aggregate flow. Orders arrive instantly and there is one book per name. Nothing in the market learns your pattern and front-runs it.</p>
 </div>
 </details>
 </section>

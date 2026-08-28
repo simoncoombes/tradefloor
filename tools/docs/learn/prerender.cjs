@@ -146,6 +146,69 @@ function balanced(text, start, open, close) {
   throw new Error('unbalanced expression');
 }
 
+// ---------------------------------------------------------- style extraction
+
+/* Turn repeated inline styles into classes.
+ *
+ * The design files are inline-styled because that is what the prototyping
+ * environment emitted, and the handoff is explicit that it is "a constraint
+ * of the prototyping environment and **not** a recommendation". Undoing it
+ * by hand across 3,729 style attributes would be a large chance to change
+ * one of them by accident, so it is done here, mechanically, and checked by
+ * comparing screenshots of every page before and after.
+ *
+ * Only a style with no bindings in it can become a class. A style is worth
+ * a class when it is repeated; an element inside a loop counts for more,
+ * because one attribute in the template is many in the rendered page.
+ *
+ * The classes are assigned across all pages at once, so one rule serves
+ * every page that uses it, and named in a stable order so a rebuild that
+ * changes nothing produces the same stylesheet.
+ */
+const LOOP_WEIGHT = 8;
+const WORTH_A_CLASS = 6;
+
+function collectStyles(ast, counts, inLoop) {
+  for (const node of ast) {
+    const loop = inLoop || node.kind === 'for';
+    if (node.kind === 'el') {
+      const style = (node.attrs || []).find((a) => a.name === 'style');
+      if (style && !style.parts.some((p) => typeof p !== 'string')) {
+        const key = style.raw.trim();
+        if (key) counts.set(key, (counts.get(key) || 0) + (loop ? LOOP_WEIGHT : 1));
+      }
+    }
+    if (node.children) collectStyles(node.children, counts, loop);
+  }
+}
+
+function assignClasses(counts) {
+  const worth = [...counts.entries()].filter(([, n]) => n >= WORTH_A_CLASS);
+  // Heaviest first, then alphabetical, so the names do not move between
+  // builds that did not change anything.
+  worth.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const map = new Map();
+  worth.forEach(([style], i) => map.set(style, `pt-s${i}`));
+  return map;
+}
+
+function applyClasses(ast, map) {
+  let applied = 0;
+  walk(ast, (node) => {
+    if (node.kind !== 'el') return;
+    const style = (node.attrs || []).find((a) => a.name === 'style');
+    if (!style || style.parts.some((p) => typeof p !== 'string')) return;
+    const name = map.get(style.raw.trim());
+    if (!name) return;
+    node.attrs = node.attrs.filter((a) => a !== style);
+    const existing = (node.attrs || []).find((a) => a.name === 'class');
+    if (existing) existing.raw = (existing.raw + ' ' + name).trim();
+    else node.attrs.push({ name: 'class', raw: name, parts: [name] });
+    applied++;
+  });
+  return applied;
+}
+
 // ------------------------------------------------------------- shell removal
 
 /* Lift the shell out of a page and return what is left.
@@ -195,7 +258,7 @@ function stripShell(ast) {
    * it only ever held the overlay, the header and main itself, and the
    * builder now supplies the first two — so returning the wrapper as well
    * would nest one page-height container inside another. */
-  return { template: PT.serialize([main]), removed, wrapStyle: attrRaw(wrap, 'style') };
+  return { ast: [main], removed, wrapStyle: attrRaw(wrap, 'style') };
 }
 
 /* Turn the theme-swapped image pairs into CSS classes.
@@ -342,8 +405,15 @@ const shared = {};
   }
 }
 
-const out = { pages: [], styles: [] };
+const out = { pages: [], styles: [], classes: {} };
 const seenStyle = new Set();
+
+/* Phase one: read every page and get it into the shape it will be rendered
+ * in — the door list wired, the theme images classed, the tables wrapped,
+ * the shell lifted out. Nothing is rendered yet, because the styles have to
+ * be counted across all twenty-five pages before any one of them is
+ * written. */
+const prepared = [];
 
 for (const page of manifest.pages) {
   const src = fs.readFileSync(path.join(base, page.src), 'utf8');
@@ -358,6 +428,25 @@ for (const page of manifest.pages) {
   for (const css of head.styles) {
     if (!seenStyle.has(css)) { seenStyle.add(css); out.styles.push({ slug: page.slug, css }); }
   }
+
+  const ast = PT.parse(piece.template);
+  const themed = themeImages(ast);
+  const wrapped = wrapTables(ast);
+  const stripped = stripShell(ast);
+
+  prepared.push({ page, piece, head, wiredDoors, themed, wrapped, stripped });
+}
+
+// Phase two: decide which styles earn a class, across the whole site.
+const counts = new Map();
+for (const p of prepared) collectStyles(p.stripped.ast, counts, false);
+const classMap = assignClasses(counts);
+for (const [style, name] of classMap) out.classes[name] = style;
+
+// Phase three: apply them, then render.
+for (const { page, piece, head, wiredDoors, themed, wrapped, stripped } of prepared) {
+  const classed = applyClasses(stripped.ast, classMap);
+  const template = PT.serialize(stripped.ast);
 
   const ctx = browser(shared);
   ctx.DCLogic = PT.DCLogic;
@@ -379,13 +468,8 @@ for (const page of manifest.pages) {
     }
   }
 
-  const parsed = PT.parse(piece.template);
-  const swapped = themeImages(parsed);
-  const wrapped = wrapTables(parsed);
-  const stripped = stripShell(parsed);
-  const ast = PT.parse(stripped.template);
   const vals = (inst.renderVals || inst.render).call(inst);
-  const html = PT.toHTML(PT.evaluate(ast, vals));
+  const html = PT.toHTML(PT.evaluate(PT.parse(template), vals));
 
   out.pages.push({
     slug: page.slug,
@@ -393,10 +477,11 @@ for (const page of manifest.pages) {
     title: head.title,
     description: head.description,
     html,
-    template: stripped.template,
+    template,
     removed: stripped.removed,
-    themeImages: swapped,
+    themeImages: themed,
     tablesWrapped: wrapped,
+    styleClasses: classed,
     wrapStyle: stripped.wrapStyle,
     script: piece.script,
     props: piece.props,

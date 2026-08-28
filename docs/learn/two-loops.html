@@ -23,67 +23,70 @@
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
 if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </head>
 <body class="pt-page">
 <div style="min-height:100vh;padding:0 0 5rem">
-<div id="pt-search" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)"><div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"><div id="pt-search-results" role="listbox" style="max-height:22rem;overflow-y:auto;padding:0.4rem"></div><div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
-<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)"><div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem"><a href="index.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22" style="flex:none"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22" style="flex:none"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span></a><nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap"><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--accent);cursor:pointer;list-style:none;padding:0.2rem 0">Start<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="install.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Install</a><a href="core-concepts.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core concepts</a><span style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--accent);background:var(--accent-soft);white-space:nowrap">The two loops</span><a href="running-a-market.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Running a market</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Use it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="agents.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Agents</a><a href="scenarios.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Scenarios</a><a href="execution-cost.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Execution cost</a><a href="checkpoints.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Checkpoints and forking</a><a href="edgar.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Real companies from EDGAR</a><a href="rl-environment.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">RL environment</a><a href="mcp.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The MCP server</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Trust it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="realism-envelope.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Realism envelope</a><a href="metrics.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The metrics</a><a href="principles.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Principles</a><a href="citing.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Citing a run</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Reference<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="glossary.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Glossary</a><a href="factors.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The nine factors</a><a href="conventions.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a><a href="schemas.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a><a href="presets.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Presets</a><a href="release-notes.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Release notes</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">API<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="core-types.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a><a href="evaluate.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a><a href="parameters.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a></div></details></nav><span style="flex:1"></span><button id="pt-search-open" type="button" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span id="pt-search-hint" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">CTRL K</span></button><button id="pt-theme" type="button" aria-label="Switch theme" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu pt-here"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><span class="pt-current">The two loops</span><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
 
-<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">THE TWO LOOPS</span>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE TWO LOOPS</span>
 </div>
 
-<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
-<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">The two loops</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">The word training means two different things here. One kind trains the market model. The other kind trains a strategy against a market that exists. Most people need only the second kind.</p>
+<section class="pt-s33">
+<h1 class="pt-s30">The two loops</h1>
+<p class="pt-s24">The word training means two different things here. One kind trains the market model. The other kind trains a strategy against a market that exists. Most people need only the second kind.</p>
 
 <div style="border:1px solid var(--line);border-radius:8px;background:var(--card);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:0.9rem">
 <div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP A</span>
-<h3 style="font-size:1.0625rem;margin:0">Calibrate the market model</h3>
+<h3 class="pt-s4">Calibrate the market model</h3>
 </div>
-<div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+<div class="pt-s64">
 
-<span style="display:flex;align-items:center;gap:0.5rem">
-<span style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.5rem 0.75rem;display:flex;flex-direction:column;gap:1px;min-width:8.5rem">
-<span style="font-size:0.8125rem;color:var(--ink)">map the space</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">Atlas survey</span>
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">map the space</span>
+<span class="pt-s23">Atlas survey</span>
 </span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)">then</span>
-</span>
-
-
-<span style="display:flex;align-items:center;gap:0.5rem">
-<span style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.5rem 0.75rem;display:flex;flex-direction:column;gap:1px;min-width:8.5rem">
-<span style="font-size:0.8125rem;color:var(--ink)">confirm</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">disjoint seeds</span>
-</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)">then</span>
+<span class="pt-s32">then</span>
 </span>
 
 
-<span style="display:flex;align-items:center;gap:0.5rem">
-<span style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.5rem 0.75rem;display:flex;flex-direction:column;gap:1px;min-width:8.5rem">
-<span style="font-size:0.8125rem;color:var(--ink)">gates</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">thirty seeds</span>
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">confirm</span>
+<span class="pt-s23">disjoint seeds</span>
 </span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)">then</span>
+<span class="pt-s32">then</span>
 </span>
 
 
-<span style="display:flex;align-items:center;gap:0.5rem">
-<span style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.5rem 0.75rem;display:flex;flex-direction:column;gap:1px;min-width:8.5rem">
-<span style="font-size:0.8125rem;color:var(--ink)">overfitting</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">control</span>
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">gates</span>
+<span class="pt-s23">thirty seeds</span>
 </span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)"></span>
+<span class="pt-s32">then</span>
+</span>
+
+
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">overfitting</span>
+<span class="pt-s23">control</span>
+</span>
+<span class="pt-s32"></span>
 </span>
 
 </div>
 
 <div style="display:flex;justify-content:center;padding:0.2rem 0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)">emits</span>
+<span class="pt-s32">emits</span>
 </div>
 
 <div style="display:flex;gap:0.7rem;align-items:stretch;flex-wrap:wrap">
@@ -92,45 +95,45 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 <span style="font-size:0.75rem;color:var(--accent-deep)">A complete set of coefficients with one name. Change any of them and the set gets a new name.</span>
 </div>
 <div style="flex:1;min-width:14rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.7rem 0.9rem;display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">the realism envelope</span>
-<span style="font-size:0.75rem;color:var(--ink-2)">Attached to the preset. Bounds what a result may claim.</span>
+<span class="pt-s57">the realism envelope</span>
+<span class="pt-s71">Attached to the preset. Bounds what a result may claim.</span>
 </div>
 </div>
 
 <div style="display:flex;justify-content:center;padding:0.2rem 0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)">cited by, and bounds</span>
+<span class="pt-s32">cited by, and bounds</span>
 </div>
 
 <div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP B</span>
-<h3 style="font-size:1.0625rem;margin:0">Evaluate a strategy or agent</h3>
+<h3 class="pt-s4">Evaluate a strategy or agent</h3>
 </div>
-<div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+<div class="pt-s64">
 
-<span style="display:flex;align-items:center;gap:0.5rem">
-<span style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.5rem 0.75rem;display:flex;flex-direction:column;gap:1px;min-width:8.5rem">
-<span style="font-size:0.8125rem;color:var(--ink)">write a strategy</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">or train a policy</span>
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">write a strategy</span>
+<span class="pt-s23">or train a policy</span>
 </span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)">then</span>
-</span>
-
-
-<span style="display:flex;align-items:center;gap:0.5rem">
-<span style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.5rem 0.75rem;display:flex;flex-direction:column;gap:1px;min-width:8.5rem">
-<span style="font-size:0.8125rem;color:var(--ink)">evaluate</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">many seeds</span>
-</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)">then</span>
+<span class="pt-s32">then</span>
 </span>
 
 
-<span style="display:flex;align-items:center;gap:0.5rem">
-<span style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.5rem 0.75rem;display:flex;flex-direction:column;gap:1px;min-width:8.5rem">
-<span style="font-size:0.8125rem;color:var(--ink)">paired sign test</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">across seeds</span>
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">evaluate</span>
+<span class="pt-s23">many seeds</span>
 </span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)"></span>
+<span class="pt-s32">then</span>
+</span>
+
+
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">paired sign test</span>
+<span class="pt-s23">across seeds</span>
+</span>
+<span class="pt-s32"></span>
 </span>
 
 </div>
@@ -138,50 +141,50 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">Which loop you are in decides what you read</h2>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<section class="pt-s19">
+<h2 class="pt-s7">Which loop you are in decides what you read</h2>
+<div class="pt-s11">
 
-<div style="display:grid;grid-template-columns:minmax(0,1.6fr) 4rem minmax(0,1fr);gap:0.9rem;padding:0.65rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-size:0.875rem;color:var(--ink-2)">Test a trading strategy</span>
+<div class="pt-s100">
+<span class="pt-s0">Test a trading strategy</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">B</span>
-<a href="running-a-market.html" style="font-size:0.875rem">Running a market</a>
+<a href="running-a-market.html" class="pt-s72">Running a market</a>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,1.6fr) 4rem minmax(0,1fr);gap:0.9rem;padding:0.65rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-size:0.875rem;color:var(--ink-2)">Train a reinforcement-learning policy</span>
+<div class="pt-s100">
+<span class="pt-s0">Train a reinforcement-learning policy</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent)">B</span>
-<a href="https://github.com/simoncoombes/pretium/blob/main/docs/reinforcement-learning.md" style="font-size:0.875rem">The RL environment</a>
+<a href="https://github.com/simoncoombes/pretium/blob/main/docs/reinforcement-learning.md" class="pt-s72">The RL environment</a>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,1.6fr) 4rem minmax(0,1fr);gap:0.9rem;padding:0.65rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-size:0.875rem;color:var(--ink-2)">Know what your result depends on</span>
+<div class="pt-s100">
+<span class="pt-s0">Know what your result depends on</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--amber)">A</span>
-<a href="https://simoncoombes.github.io/pretium/atlas.html" style="font-size:0.875rem">Atlas</a>
+<a href="https://simoncoombes.github.io/pretium/atlas.html" class="pt-s72">Atlas</a>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,1.6fr) 4rem minmax(0,1fr);gap:0.9rem;padding:0.65rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-size:0.875rem;color:var(--ink-2)">Fit coefficients to your own data</span>
+<div class="pt-s100">
+<span class="pt-s0">Fit coefficients to your own data</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--amber)">A</span>
-<a href="https://simoncoombes.github.io/pretium/atlas.html" style="font-size:0.875rem">Atlas</a>
+<a href="https://simoncoombes.github.io/pretium/atlas.html" class="pt-s72">Atlas</a>
 </div>
 
 
-<div style="display:grid;grid-template-columns:minmax(0,1.6fr) 4rem minmax(0,1fr);gap:0.9rem;padding:0.65rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-size:0.875rem;color:var(--ink-2)">Know what the market reproduces</span>
+<div class="pt-s100">
+<span class="pt-s0">Know what the market reproduces</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-3)">neither</span>
-<a href="https://simoncoombes.github.io/pretium/trust.html" style="font-size:0.875rem">The realism envelope</a>
+<a href="https://simoncoombes.github.io/pretium/trust.html" class="pt-s72">The realism envelope</a>
 </div>
 
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">What the envelope adds</h2>
-<p style="color:var(--ink-2);margin:0">The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say that the market behaved as a real one. The gaps stop you before you say more than that.</p>
+<section class="pt-s19">
+<h2 class="pt-s7">What the envelope adds</h2>
+<p class="pt-s13">The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say that the market behaved as a real one. The gaps stop you before you say more than that.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap">
 <a href="index.html#trust" style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep);border-radius:6px;padding:0.5rem 0.85rem">Check a question against the envelope</a>
 <a href="running-a-market.html" style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:6px;padding:0.5rem 0.85rem">Start Loop B</a>
@@ -192,9 +195,9 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 
 
 </main></div>
-<div style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
-<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem"><h2 style="font-size:1.25rem">All pages</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem"><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Start</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="install.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Install</span></a><a href="core-concepts.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Core concepts</span></a><span style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--accent)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The two loops</span></span><a href="running-a-market.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Running a market</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Use it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="agents.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Agents</span></a><a href="scenarios.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Scenarios</span></a><a href="execution-cost.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Execution cost</span></a><a href="checkpoints.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Checkpoints and forking</span></a><a href="edgar.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Real companies from EDGAR</span></a><a href="rl-environment.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">RL environment</span></a><a href="mcp.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The MCP server</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Trust it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="realism-envelope.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Realism envelope</span></a><a href="metrics.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The metrics</span></a><a href="principles.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Principles</span></a><a href="citing.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Citing a run</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Reference</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="glossary.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Glossary</span></a><a href="factors.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">The nine factors</span></a><a href="conventions.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Conventions</span></a><a href="schemas.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Schemas</span></a><a href="presets.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Presets</span></a><a href="release-notes.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Release notes</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">API</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="core-types.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Core types</span></a><a href="evaluate.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Evaluate</span></a><a href="parameters.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span class="pt-door-name" style="white-space:nowrap">Parameters</span></a></div></div></div></section>
-<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem"><a href="core-concepts.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>Core concepts</span></a><a href="running-a-market.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>Running a market</span></a></nav>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></span><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><a href="agents.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></a><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><a href="presets.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></a><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="core-concepts.html"><span class="pt-eyebrow">BACK</span><span>Core concepts</span></a><a class="pt-next" href="running-a-market.html"><span class="pt-eyebrow">NEXT</span><span>Running a market</span></a></nav>
 </div>
 </div>
 <!-- The client-side copy of this page's template.
@@ -205,35 +208,35 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
 
-<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">THE TWO LOOPS</span>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">THE TWO LOOPS</span>
 </div>
 
-<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
-<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">The two loops</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">The word training means two different things here. One kind trains the market model. The other kind trains a strategy against a market that exists. Most people need only the second kind.</p>
+<section class="pt-s33">
+<h1 class="pt-s30">The two loops</h1>
+<p class="pt-s24">The word training means two different things here. One kind trains the market model. The other kind trains a strategy against a market that exists. Most people need only the second kind.</p>
 
 <div style="border:1px solid var(--line);border-radius:8px;background:var(--card);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:0.9rem">
 <div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP A</span>
-<h3 style="font-size:1.0625rem;margin:0">Calibrate the market model</h3>
+<h3 class="pt-s4">Calibrate the market model</h3>
 </div>
-<div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+<div class="pt-s64">
 <sc-for list="{{ loopA }}" as="s">
-<span style="display:flex;align-items:center;gap:0.5rem">
-<span style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.5rem 0.75rem;display:flex;flex-direction:column;gap:1px;min-width:8.5rem">
-<span style="font-size:0.8125rem;color:var(--ink)">{{ s.k }}</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">{{ s.v }}</span>
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">{{ s.k }}</span>
+<span class="pt-s23">{{ s.v }}</span>
 </span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)">{{ s.arrow }}</span>
+<span class="pt-s32">{{ s.arrow }}</span>
 </span>
 
 </sc-for></div>
 
 <div style="display:flex;justify-content:center;padding:0.2rem 0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)">emits</span>
+<span class="pt-s32">emits</span>
 </div>
 
 <div style="display:flex;gap:0.7rem;align-items:stretch;flex-wrap:wrap">
@@ -242,27 +245,27 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 <span style="font-size:0.75rem;color:var(--accent-deep)">A complete set of coefficients with one name. Change any of them and the set gets a new name.</span>
 </div>
 <div style="flex:1;min-width:14rem;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.7rem 0.9rem;display:flex;flex-direction:column;gap:1px">
-<span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">the realism envelope</span>
-<span style="font-size:0.75rem;color:var(--ink-2)">Attached to the preset. Bounds what a result may claim.</span>
+<span class="pt-s57">the realism envelope</span>
+<span class="pt-s71">Attached to the preset. Bounds what a result may claim.</span>
 </div>
 </div>
 
 <div style="display:flex;justify-content:center;padding:0.2rem 0">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)">cited by, and bounds</span>
+<span class="pt-s32">cited by, and bounds</span>
 </div>
 
 <div style="display:flex;align-items:baseline;gap:0.7rem;flex-wrap:wrap">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.09em;color:var(--ink-3)">LOOP B</span>
-<h3 style="font-size:1.0625rem;margin:0">Evaluate a strategy or agent</h3>
+<h3 class="pt-s4">Evaluate a strategy or agent</h3>
 </div>
-<div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+<div class="pt-s64">
 <sc-for list="{{ loopB }}" as="s">
-<span style="display:flex;align-items:center;gap:0.5rem">
-<span style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0.5rem 0.75rem;display:flex;flex-direction:column;gap:1px;min-width:8.5rem">
-<span style="font-size:0.8125rem;color:var(--ink)">{{ s.k }}</span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)">{{ s.v }}</span>
+<span class="pt-s20">
+<span class="pt-s35">
+<span class="pt-s50">{{ s.k }}</span>
+<span class="pt-s23">{{ s.v }}</span>
 </span>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-line)">{{ s.arrow }}</span>
+<span class="pt-s32">{{ s.arrow }}</span>
 </span>
 
 </sc-for></div>
@@ -270,22 +273,22 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 </div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">Which loop you are in decides what you read</h2>
-<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<section class="pt-s19">
+<h2 class="pt-s7">Which loop you are in decides what you read</h2>
+<div class="pt-s11">
 <sc-for list="{{ routes }}" as="r">
-<div style="display:grid;grid-template-columns:minmax(0,1.6fr) 4rem minmax(0,1fr);gap:0.9rem;padding:0.65rem 1rem;border-bottom:1px solid var(--line-soft);align-items:baseline">
-<span style="font-size:0.875rem;color:var(--ink-2)">{{ r.want }}</span>
+<div class="pt-s100">
+<span class="pt-s0">{{ r.want }}</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:{{ r.col }}">{{ r.loop }}</span>
-<a href="{{ r.href }}" style="font-size:0.875rem">{{ r.start }}</a>
+<a href="{{ r.href }}" class="pt-s72">{{ r.start }}</a>
 </div>
 
 </sc-for></div>
 </section>
 
-<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
-<h2 style="font-size:1.5rem">What the envelope adds</h2>
-<p style="color:var(--ink-2);margin:0">The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say that the market behaved as a real one. The gaps stop you before you say more than that.</p>
+<section class="pt-s19">
+<h2 class="pt-s7">What the envelope adds</h2>
+<p class="pt-s13">The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say that the market behaved as a real one. The gaps stop you before you say more than that.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap">
 <a href="index.html#trust" style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep);border-radius:6px;padding:0.5rem 0.85rem">Check a question against the envelope</a>
 <a href="running-a-market.html" style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:6px;padding:0.5rem 0.85rem">Start Loop B</a>

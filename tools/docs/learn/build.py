@@ -37,6 +37,7 @@ import sys
 import tempfile
 
 import data
+import seo
 import shell
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -45,6 +46,43 @@ HANDOFF = HERE / "handoff"
 SITE = HERE / "site"
 
 BASE_URL = "https://simoncoombes.github.io/pretium/learn"
+
+#: Whether this site is the one served at the project root. It is not, yet —
+#: `docs/*.html` is — and the difference decides two things: whether a
+#: `robots.txt` is written (it only has effect at the root a crawler asks
+#: for) and what the canonical URLs say. Flipping this and BASE_URL together
+#: is most of what publishing the relaunch means.
+AT_SITE_ROOT = False
+
+
+def project_version() -> str:
+    """Read from pyproject, so the site cannot claim a version the package
+    does not have."""
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M)
+    if not m:
+        sys.exit("no version in pyproject.toml")
+    return m.group(1)
+
+
+#: The GA4 measurement ID, which `tools/docs/build_site.py` also carries. It
+#: is duplicated rather than imported because importing that module runs it,
+#: and `check_analytics_id()` asserts the two agree so the duplicate cannot
+#: quietly diverge.
+GA_MEASUREMENT_ID = "G-1LBM3239ZF"
+
+
+def check_analytics_id() -> None:
+    other = (ROOT / "tools" / "docs" / "build_site.py").read_text(encoding="utf-8")
+    m = re.search(r'GA_MEASUREMENT_ID\s*=\s*"([^"]*)"', other)
+    if m and m.group(1) != GA_MEASUREMENT_ID:
+        sys.exit(f"analytics ID disagrees with build_site.py: "
+                 f"{GA_MEASUREMENT_ID} here, {m.group(1)} there")
+
+
+ANALYTICS = """<script async src="https://www.googletagmanager.com/gtag/js?id={gid}"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments)}}
+gtag('js',new Date());gtag('config','{gid}');</script>"""
 
 #: The five doors, in reading order, and the pages behind each. The handoff
 #: left four pages linked only by their own prev/next chain; they are placed
@@ -354,13 +392,14 @@ PAGE = """<!doctype html>
 <link rel="stylesheet" href="{fonts}">
 <link rel="stylesheet" href="learn.css">
 {theme_script}
+{analytics}
 </head>
 <body class="{body_class}">
 <div style="min-height:100vh;padding:0 0 5rem">
 {overlay}
 {masthead}
 <div id="pt-root">{html}</div>
-<div style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<div class="pt-foot">
 {door_index}
 {prev_next}
 </div>
@@ -417,12 +456,12 @@ if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light
 #: until the script runs. CSS gets it right on the first paint and keeps
 #: working when the script is blocked.
 THEME_CSS = """
-.pt-dark{display:none}
-html[data-theme="dark"] .pt-dark{display:revert}
-html[data-theme="dark"] .pt-light{display:none}
+.pt-dark{display:none !important}
+html[data-theme="dark"] .pt-dark{display:revert !important}
+html[data-theme="dark"] .pt-light{display:none !important}
 @media (prefers-color-scheme: dark){
-  html:not([data-theme="light"]) .pt-dark{display:revert}
-  html:not([data-theme="light"]) .pt-light{display:none}
+  html:not([data-theme="light"]) .pt-dark{display:revert !important}
+  html:not([data-theme="light"]) .pt-light{display:none !important}
 }
 #pt-search-open[hidden]{display:none}
 .pt-scroll{overflow-x:auto;max-width:100%}
@@ -471,10 +510,14 @@ PRINT_CSS = """
 @media print{
   @page{margin:0.5cm}
   html,body{background:#fff}
-  *{print-color-adjust:exact;-webkit-print-color-adjust:exact;backdrop-filter:none}
-  header{position:static;border-bottom:1px solid var(--line)}
-  header nav,#pt-search-open,#pt-theme,#pt-search{display:none}
-  #pt-root{height:auto}
+  /* !important throughout, because everything being overridden here is set
+     by a class or an inline style, either of which outranks a bare element
+     selector. A print rule that loses is a print rule that is not there. */
+  *{print-color-adjust:exact !important;-webkit-print-color-adjust:exact !important;
+    backdrop-filter:none !important}
+  .pt-head{position:static !important}
+  .pt-nav,#pt-search-open,#pt-theme,#pt-search{display:none !important}
+  #pt-root{height:auto !important}
   figure,table,pre,details{break-inside:avoid}
   h1,h2,h3{break-after:avoid}
   a{text-decoration:none;color:inherit}
@@ -510,7 +553,9 @@ def build(out_dir: pathlib.Path) -> None:
 
     css = merge_stylesheet([s["css"] for s in rendered["styles"]])
     (out_dir / "learn.css").write_text(
-        (css + system_dark(css) + FRONT_OVERRIDES + THEME_CSS + NARROW_CSS + PRINT_CSS).strip() + "\n",
+        (css + system_dark(css) + shell.SHELL_CSS
+         + extracted_classes(rendered.get("classes", {}))
+         + FRONT_OVERRIDES + THEME_CSS + NARROW_CSS + PRINT_CSS).strip() + "\n",
         encoding="utf-8")
 
     for name in ("learn-runtime.js", "learn-shell.js"):
@@ -520,6 +565,9 @@ def build(out_dir: pathlib.Path) -> None:
 
     by_slug = {p["slug"]: p for p in rendered["pages"]}
     overlay = shell.search_overlay()
+    check_analytics_id()
+    analytics = ANALYTICS.format(gid=GA_MEASUREMENT_ID) if GA_MEASUREMENT_ID else ""
+    version = project_version()
     all_slugs = {p["slug"] for p in all_pages}
     carrying: list[str] = []
     emitted: dict[str, str] = {}
@@ -558,6 +606,7 @@ def build(out_dir: pathlib.Path) -> None:
             slug=page["slug"],
             fonts=FONTS,
             theme_script=THEME_SCRIPT,
+            analytics=analytics,
             body_class="pt-front" if page["slug"] == "index" else "pt-page",
             overlay=overlay,
             masthead=shell.masthead(DOORS, page["slug"]),
@@ -574,10 +623,35 @@ def build(out_dir: pathlib.Path) -> None:
     write_search_index(out_dir, all_pages, by_slug)
     write_data(out_dir)
     check_presets(emitted)
+    write_seo(out_dir, all_pages, by_slug, emitted, version)
 
     print(f"built {len(all_pages)} pages into {out_dir}")
     if carrying:
         print(f"  doors: {len(carrying)} components rewired to the site's page list")
+    lifted = sum(p.get("styleClasses", 0) for p in rendered["pages"])
+    if lifted:
+        print(f"  styles: {len(rendered['classes'])} classes replace "
+              f"{lifted} inline style attributes")
+
+
+def write_seo(out_dir, all_pages, by_slug, emitted, version) -> None:
+    """The sitemap, and the two files a language model reads.
+
+    `robots.txt` is written only when this site is the one at the root a
+    crawler asks for. A robots.txt in a subdirectory is read by nothing, and
+    writing one there would be a file that looks like a policy and is not.
+    """
+    summaries = {p["slug"]: by_slug[p["slug"]]["description"] for p in all_pages}
+    dates = {p["slug"]: seo.last_changed(HANDOFF / p["src"], ROOT) for p in all_pages}
+
+    (out_dir / "sitemap.xml").write_text(
+        seo.sitemap(all_pages, BASE_URL, dates), encoding="utf-8")
+    (out_dir / "llms.txt").write_text(
+        seo.llms(all_pages, DOORS, BASE_URL, version, summaries), encoding="utf-8")
+    (out_dir / "llms-full.txt").write_text(
+        seo.llms_full(all_pages, BASE_URL, version, emitted, summaries), encoding="utf-8")
+    if AT_SITE_ROOT:
+        (out_dir / "robots.txt").write_text(seo.robots(BASE_URL), encoding="utf-8")
 
 
 def write_data(out_dir: pathlib.Path) -> None:
@@ -645,6 +719,23 @@ def system_dark(css: str) -> str:
         f'  html:not([data-theme="light"]){{{m.group(1)}}}\n'
         "}\n"
     )
+
+
+def extracted_classes(classes: dict[str, str]) -> str:
+    """The rules for the styles the prerenderer lifted out of the markup.
+
+    Written as `#pt-root .pt-sN` rather than `.pt-sN`. The declarations
+    being moved were inline, and an inline style outranks every selector
+    that is not `!important`; the id prefix is what preserves that ranking,
+    so a rule that used to win still wins and nothing needs to be re-checked
+    one page at a time. The rules that are *meant* to override — print,
+    theme, the narrow-screen block — say `!important` and are unaffected.
+    """
+    if not classes:
+        return ""
+    lines = [f"#pt-root .{name}{{{style}}}" for name, style in sorted(classes.items(),
+             key=lambda kv: int(kv[0].removeprefix("pt-s")))]
+    return "\n/* Lifted out of the markup by prerender.cjs. */\n" + "\n".join(lines) + "\n"
 
 
 def esc(s: str) -> str:
