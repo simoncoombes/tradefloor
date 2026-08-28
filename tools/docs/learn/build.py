@@ -45,14 +45,69 @@ ROOT = HERE.parents[2]
 HANDOFF = HERE / "handoff"
 SITE = HERE / "site"
 
-#: The site's own address. It is the project root: this is the published
-#: documentation now, and `tools/docs/build_site.py`, which produced the
-#: pages that used to live here, is retired.
-BASE_URL = "https://simoncoombes.github.io/pretium"
+#: Where a build is going, and what that implies.
+#:
+#: There are two: the published site, and a staging copy at
+#: `simoncoombes.github.io/pretium-dev` for looking at a change before it is
+#: the documentation. Everything that differs between them is here, so
+#: nothing about the staging site is a hand edit that could be forgotten on
+#: the way to production.
+#:
+#: `indexable` is the one that matters. A staging copy of a documentation
+#: site competing with the real one in search results is worse than having
+#: no staging copy: the same words at two addresses, and no way to tell a
+#: search engine which is the real one after the fact.
+class Target:
+    def __init__(self, base_url, indexable, analytics, sitemap):
+        self.base_url = base_url
+        self.indexable = indexable
+        self.analytics = analytics
+        self.sitemap = sitemap
 
-#: True because the site is the one served at the root a crawler asks for,
-#: which is what makes a `robots.txt` worth writing.
+
+TARGETS = {
+    "live": Target(
+        base_url="https://simoncoombes.github.io/pretium",
+        indexable=True, analytics=True, sitemap=True),
+    "dev": Target(
+        base_url="https://simoncoombes.github.io/pretium-dev",
+        indexable=False, analytics=False, sitemap=False),
+}
+
+#: Set by `main()` before anything is written. Module-level because the
+#: builder was written against one destination and threading a target
+#: through every function would be a larger change than the difference
+#: between them warrants.
+TARGET = TARGETS["live"]
+BASE_URL = TARGET.base_url
+
+#: True because the live site is the one served at the root a crawler asks
+#: for, which is what makes a `robots.txt` worth writing. The staging site
+#: is served at its own root too, and writes a robots.txt that says the
+#: opposite.
 AT_SITE_ROOT = True
+
+#: Kept out of the index, and out of the crawl.
+#:
+#: The meta tag is the part that works: a page a crawler is forbidden to
+#: fetch can still be indexed as a bare URL from a link elsewhere, whereas
+#: one it fetches and finds `noindex` on is dropped. The robots.txt is there
+#: to stop well-behaved crawlers spending anything on the site at all.
+#: Carries its own leading newline, so that a live build — where it is the
+#: empty string — is byte-identical to one made before staging existed. A
+#: blank line in the head is harmless and a spurious diff across 25 pages is
+#: not: it would make the staleness check fail for a change to nothing.
+NOINDEX = ('\n<meta name="robots" content="noindex, nofollow">'
+           '\n<meta name="googlebot" content="noindex, nofollow">')
+
+STAGING_ROBOTS = """User-agent: *
+Disallow: /
+
+# This is a staging copy of https://simoncoombes.github.io/pretium.
+# Every page also carries <meta name="robots" content="noindex, nofollow">,
+# which is the part that keeps it out of an index; this file is here to
+# keep a crawler from spending anything on it in the first place.
+"""
 
 
 def project_version() -> str:
@@ -512,7 +567,7 @@ PAGE = """<!doctype html>
 <meta property="og:image:alt" content="pretium — a market you can run a strategy against">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="{base}/og-card.png">
-<meta name="author" content="Simon Coombes">
+<meta name="author" content="Simon Coombes">{robots_meta}
 <meta name="theme-color" content="#FAFBFA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0D1312" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -709,6 +764,13 @@ def build(out_dir: pathlib.Path) -> set[str]:
         shutil.copy(SITE / name, out_dir / name)
     for asset in ASSETS:
         shutil.copy(HANDOFF / asset, out_dir / asset)
+    #: GitHub Pages runs Jekyll unless told not to, and Jekyll skips files
+    #: whose names begin with an underscore and rewrites some of the rest.
+    #: The live site has carried this marker for a while as a tracked file;
+    #: writing it makes any build self-sufficient, which is what lets the
+    #: staging copy be a directory that is simply pushed.
+    (out_dir / ".nojekyll").write_text("", encoding="utf-8")
+
     for icon in ICONS:
         if (out_dir / icon).exists():
             continue
@@ -724,7 +786,8 @@ def build(out_dir: pathlib.Path) -> set[str]:
     by_slug = {p["slug"]: p for p in rendered["pages"]}
     overlay = shell.search_overlay()
     check_analytics_id()
-    analytics = ANALYTICS.format(gid=GA_MEASUREMENT_ID) if GA_MEASUREMENT_ID else ""
+    analytics = (ANALYTICS.format(gid=GA_MEASUREMENT_ID)
+                 if GA_MEASUREMENT_ID and TARGET.analytics else "")
     envelope = json.loads((ROOT / "docs" / "envelope.json").read_text(encoding="utf-8"))
     version = project_version()
     all_slugs = {p["slug"] for p in all_pages}
@@ -767,6 +830,7 @@ def build(out_dir: pathlib.Path) -> set[str]:
             fonts=FONTS,
             theme_script=THEME_SCRIPT,
             analytics=analytics,
+            robots_meta="" if TARGET.indexable else NOINDEX,
             structured_data=structured_data(page, r, version, envelope, emitted),
             body_class="pt-front" if page["slug"] == "index" else "pt-page",
             overlay=overlay,
@@ -794,8 +858,11 @@ def build(out_dir: pathlib.Path) -> set[str]:
     owned.update(ICONS)
     owned.update(ASSETS)
     owned.update(["learn.css", "learn-runtime.js", "learn-shell.js",
-                  "pt-data.js", "pt-search.js", "sitemap.xml",
+                  "pt-data.js", "pt-search.js",
                   "llms.txt", "llms-full.txt", "og-card.png", "site.webmanifest"])
+    owned.add(".nojekyll")
+    if TARGET.sitemap:
+        owned.add("sitemap.xml")
     if AT_SITE_ROOT:
         owned.add("robots.txt")
     if carrying:
@@ -868,14 +935,17 @@ def write_seo(out_dir, all_pages, by_slug, emitted, version) -> None:
     summaries = {p["slug"]: by_slug[p["slug"]]["description"] for p in all_pages}
     dates = {p["slug"]: seo.last_changed(HANDOFF / p["src"], ROOT) for p in all_pages}
 
-    (out_dir / "sitemap.xml").write_text(
-        seo.sitemap(all_pages, BASE_URL, dates), encoding="utf-8")
+    if TARGET.sitemap:
+        (out_dir / "sitemap.xml").write_text(
+            seo.sitemap(all_pages, BASE_URL, dates), encoding="utf-8")
     (out_dir / "llms.txt").write_text(
         seo.llms(all_pages, DOORS, BASE_URL, version, summaries), encoding="utf-8")
     (out_dir / "llms-full.txt").write_text(
         seo.llms_full(all_pages, BASE_URL, version, emitted, summaries), encoding="utf-8")
     if AT_SITE_ROOT:
-        (out_dir / "robots.txt").write_text(seo.robots(BASE_URL), encoding="utf-8")
+        (out_dir / "robots.txt").write_text(
+            seo.robots(BASE_URL) if TARGET.indexable else STAGING_ROBOTS,
+            encoding="utf-8")
 
 
 def write_data(out_dir: pathlib.Path) -> None:
@@ -969,10 +1039,19 @@ def esc(s: str) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", default=str(ROOT / "docs"))
+    ap.add_argument("--target", choices=sorted(TARGETS), default="live",
+                    help="live: the published site. dev: a staging copy, "
+                         "kept out of search and out of analytics.")
+    ap.add_argument("--out", default=None)
     ap.add_argument("--check", action="store_true",
                     help="build to a temporary directory and diff, writing nothing")
     args = ap.parse_args()
+
+    global TARGET, BASE_URL
+    TARGET = TARGETS[args.target]
+    BASE_URL = TARGET.base_url
+    if args.out is None:
+        args.out = str(ROOT / "docs") if args.target == "live" else str(ROOT / "dist" / "dev-site")
 
     if args.check:
         with tempfile.TemporaryDirectory() as tmp:
