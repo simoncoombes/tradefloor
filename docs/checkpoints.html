@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="learn.css">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Checkpoints and forking","description":"Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.","url":"https://simoncoombes.github.io/pretium/checkpoints.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.4.2","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Checkpoints and forking","description":"Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.","url":"https://simoncoombes.github.io/pretium/checkpoints.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.4.3","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"Use it"},{"@type":"ListItem","position":3,"name":"Checkpoints and forking","item":"https://simoncoombes.github.io/pretium/checkpoints.html"}]}</script>
 <script>
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
@@ -60,13 +60,13 @@ calm, hiked = mark.branch(2)   # two engines, identical up to day 60
 hiked.pin_macro(corporate_bond_yield=0.09)
 # calm and hiked now diverge only from here</pre>
 </section>
-<section class="pt-s181">
+<section class="pt-s182">
 <h2 class="pt-s7">Two mechanisms for different jobs</h2>
 <div class="pt-s12">
 <div class="pt-scroll"><table style="font-size:0.8125rem"><thead><tr>
 <th style="text-align:left;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)"></th>
-<th class="pt-s182">Cost</th>
-<th class="pt-s182">Survives the process</th>
+<th class="pt-s183">Cost</th>
+<th class="pt-s183">Survives the process</th>
 </tr></thead><tbody>
 <tr>
 <td style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">pt.branch(engine, 2, ...)</td>
@@ -82,7 +82,7 @@ hiked.pin_macro(corporate_bond_yield=0.09)
 </div>
 <p class="pt-s8"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
 </section>
-<section class="pt-s181">
+<section class="pt-s182">
 <h2 class="pt-s7">Why it refuses instead of loading wrong</h2>
 <p class="pt-s8">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
 <details class="pt-s13">
@@ -119,13 +119,13 @@ calm, hiked = mark.branch(2)   # two engines, identical up to day 60
 hiked.pin_macro(corporate_bond_yield=0.09)
 # calm and hiked now diverge only from here</pre>
 </section>
-<section class="pt-s181">
+<section class="pt-s182">
 <h2 class="pt-s7">Two mechanisms for different jobs</h2>
 <div class="pt-s12">
 <div class="pt-scroll"><table style="font-size:0.8125rem"><thead><tr>
 <th style="text-align:left;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)"></th>
-<th class="pt-s182">Cost</th>
-<th class="pt-s182">Survives the process</th>
+<th class="pt-s183">Cost</th>
+<th class="pt-s183">Survives the process</th>
 </tr></thead><tbody>
 <tr>
 <td style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">pt.branch(engine, 2, ...)</td>
@@ -141,7 +141,7 @@ hiked.pin_macro(corporate_bond_yield=0.09)
 </div>
 <p class="pt-s8"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
 </section>
-<section class="pt-s181">
+<section class="pt-s182">
 <h2 class="pt-s7">Why it refuses instead of loading wrong</h2>
 <p class="pt-s8">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
 <details class="pt-s13">

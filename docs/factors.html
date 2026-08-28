@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="learn.css">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The nine factors","description":"Every tick's change in mispricing decomposes into nine named components that sum to the move.","url":"https://simoncoombes.github.io/pretium/factors.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.4.2","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The nine factors","description":"Every tick's change in mispricing decomposes into nine named components that sum to the move.","url":"https://simoncoombes.github.io/pretium/factors.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.4.3","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"Reference"},{"@type":"ListItem","position":3,"name":"The nine factors","item":"https://simoncoombes.github.io/pretium/factors.html"}]}</script>
 <script>
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
@@ -56,7 +56,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">The nine factors</h1>
 <p class="pt-s23">Every tick's change in mispricing breaks into nine components that sum to it. These are the names the <code>truth</code> table uses, and the closed set an agent's <code>explain</code> must answer from.</p>
 </section>
-<section class="pt-s181">
+<section class="pt-s182">
 <h2 class="pt-s7">The set, in order</h2>
 <p class="pt-s8">The first three are the model's own dynamics, the next four are shocks, the last two are discrete events booked after the tick chain.</p>
 <div class="pt-s12">
@@ -110,7 +110,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </tbody></table></div>
 </div>
 </section>
-<section class="pt-s181">
+<section class="pt-s182">
 <h2 class="pt-s7">They sum, and that is the point</h2>
 <p class="pt-s8">Difference <code>mispricing_s</code> across two ticks, add the nine columns, and the residual sits near 1e-16. That is what makes this a dataset rather than a commentary: a label can be checked against the outcome instead of trusted.</p>
 <pre class="pt-s30">FACTORS = ["reversion", "momentum", "crowd_lean", "company_news",
@@ -155,7 +155,7 @@ print((delta[1:] - summed[1:]).abs().max())      # ~1e-16</pre>
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">The nine factors</h1>
 <p class="pt-s23">Every tick's change in mispricing breaks into nine components that sum to it. These are the names the <code>truth</code> table uses, and the closed set an agent's <code>explain</code> must answer from.</p>
 </section>
-<section class="pt-s181">
+<section class="pt-s182">
 <h2 class="pt-s7">The set, in order</h2>
 <p class="pt-s8">The first three are the model's own dynamics, the next four are shocks, the last two are discrete events booked after the tick chain.</p>
 <div class="pt-s12">
@@ -169,7 +169,7 @@ print((delta[1:] - summed[1:]).abs().max())      # ~1e-16</pre>
 </tbody></table></div>
 </div>
 </section>
-<section class="pt-s181">
+<section class="pt-s182">
 <h2 class="pt-s7">They sum, and that is the point</h2>
 <p class="pt-s8">Difference <code>mispricing_s</code> across two ticks, add the nine columns, and the residual sits near 1e-16. That is what makes this a dataset rather than a commentary: a label can be checked against the outcome instead of trusted.</p>
 <pre class="pt-s30">FACTORS = ["reversion", "momentum", "crowd_lean", "company_news",

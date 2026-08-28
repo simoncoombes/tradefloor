@@ -2,7 +2,7 @@
 
 > A reproducible evaluation environment for financial AI agents. A
 > deterministic market simulator with order-book execution, macro dynamics,
-> causal ground truth and agent-native interfaces. Version 0.4.2.
+> causal ground truth and agent-native interfaces. Version 0.4.3.
 
 Run controlled, reproducible experiments on trading agents in a market with
 realistic execution, rather than backtesting them over historical prices.
