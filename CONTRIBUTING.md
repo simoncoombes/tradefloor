@@ -77,6 +77,42 @@ reference implementation. They are the evidence for the port being
 bit-identical, so if you change anything in `rust/src/market/` or
 `rust/src/economy/`, run them.
 
+## Branches, and how work reaches `main`
+
+`main` is what ships. It is protected: nothing lands on it except through a
+pull request that has passed the determinism gate on all five targets and the
+documentation build, and only the owner merges. `dev` carries the same
+requirement.
+
+**Every piece of work gets its own branch.** Not `dev` directly, not `main`.
+
+```
+feature branch  ->  dev  ->  main  ->  tag
+```
+
+| branch | for |
+|---|---|
+| `preset/pt-vNN` | one preset, and nothing else. A preset is an era boundary; it needs its own history so it can be reviewed, measured and reverted as one thing. |
+| `feat/<name>` | a mechanism or an engine change |
+| `fix/<name>` | a reported defect |
+| `docs/<name>` | prose, the site, the notebooks |
+| `chore/<name>` | tooling, CI, release plumbing |
+
+**One preset per branch, always.** Two presets on one branch cannot be
+measured against each other, and the losing one cannot be dropped without
+rewriting the history of the winner. The measurement is the deliverable, so
+the branch is the unit that carries it.
+
+`dev` is the integration branch and is reset to `main` after every release, so
+it is never a long-lived fork. It requires the determinism gate but not the
+documentation build: model work legitimately leaves `docs/` stale until the
+release rebuilds it, and failing that check mid-experiment teaches nothing.
+`main` requires both, because that is where a reader sees it.
+
+**Neither branch allows a force push or a deletion.** A rewritten `dev` used
+to be a normal way to tidy up; it is now blocked, because a calibration run
+that cloned it cannot be reproduced afterwards if its commits are gone.
+
 ## Where code goes
 
 **If it decides something about the market, it belongs in `rust/src/`, not

@@ -251,36 +251,69 @@ time across all seven jobs. Ask for `all` here anyway, because the point of
 a release gate is that the whole artifact set was checked in one place,
 together, on the commit being shipped.
 
-It also runs on pushes to `main` touching `rust/**`, `python/**`,
-`pyproject.toml` or the workflow itself, so on a release from `main` it has
-usually already run. A tag push runs all five regardless of any input: a
+It also runs on pushes touching `rust/**`, `python/**`, `pyproject.toml` or
+the workflow itself. A tag push runs all five regardless of any input: a
 release must not ship on a partial gate.
+
+**`all targets agree` is now a REQUIRED check on `main` and on `dev`**, so
+this step is no longer advisory. The five-target run is what admits the pull
+request, which means it has to be dispatched against the release branch and
+be green before the merge, not against `main` afterwards. The two-target push
+gate does not satisfy it: the required context is the job named `all targets
+agree`, and a run started with the default `unverified` never produces it.
 
 ## Shipping it, in order
 
-The seven steps above run on `dev`. This is what puts them out.
+The seven steps above run on a release branch off `main`, not on `main` and
+not on `dev`. `main` is protected: a pull request is the only way in, it must
+pass the determinism gate on all five targets and the documentation build,
+and only the owner merges. `dev` is protected the same way, minus the docs
+build.
 
-1. **Push `dev`.** An AWS run clones the branch, so anything the release
-   needs has to be on the remote before it is launched.
-2. **Merge to `main` and push.** Pages serves from `main/docs`, so this is
-   the step that publishes the site. Nothing before it is visible to a reader.
-3. **Dispatch the determinism gate on `main` with `targets=all`** and wait.
-   The push itself fires the gate at two targets, not five.
-4. **Check the tag target is the gated commit.** `git rev-parse HEAD` against
-   the run's `headSha`, compared rather than assumed.
-5. **Tag and push the tag.** That is the irreversible step: a PyPI version
-   number cannot be reused.
-6. **Publish the crate.** Separate registry, separate command, below.
-7. **Check docs.rs.** A 404 in the first minutes is the build queue, not a
+That changes the order this used to describe. The old sequence merged to
+`main` and then dispatched the gate against it, which cannot happen now: the
+gate has to be green BEFORE the merge, because it is what admits the merge.
+
+1. **Branch from `main`.** `release/X.Y.Z`. The version bump, the changelog
+   section and the rebuilt site all belong on it.
+2. **Push the branch.** An AWS remeasure clones by branch name, so anything
+   the release needs must be on the remote before the run is launched.
+3. **Open the pull request into `main`.** Push fires the determinism gate at
+   two targets; the required check is the five-target run, so dispatch it
+   explicitly against the BRANCH:
+   `gh workflow run determinism.yml --ref release/X.Y.Z -f targets=all`.
+4. **Wait for both required checks**, `all targets agree` and `build`. Read
+   the run you started rather than the newest in the list; see step 7.
+5. **Merge the pull request.** Pages serves from `main/docs`, so this is the
+   step that publishes the site. Nothing before it is visible to a reader.
+6. **Check the tag target is the merged commit.** `git rev-parse origin/main`
+   against the merge commit, compared rather than assumed. A squash merge
+   makes a NEW commit, so the SHA that passed the gate is not the SHA you are
+   about to tag; the gate ran on the same tree, which is what matters, but
+   the tag must point at what is on `main`.
+7. **Tag `origin/main` and push the tag.** That is the irreversible step: a
+   PyPI version number cannot be reused.
+8. **Publish the crate.** Separate registry, separate command, below.
+9. **Check docs.rs.** A 404 in the first minutes is the build queue, not a
    failure. Compare against an earlier version: if `0.2.0` returns 200 and the
    new one still 404s after ten minutes, the build failed and the crate page
    says why.
+10. **Reset `dev` to `main`.** It is the integration branch, not a fork, and
+    a stale `dev` is how the site and the model drift apart. `dev` blocks
+    force pushes, so this is a merge, not a reset, unless it is a
+    fast-forward.
 
 **Check the branch after any step that moves branches.** A `git push origin
-main` run from `dev` reports `Everything up-to-date` and pushes nothing, which
-reads exactly like a successful deploy. `git branch --show-current` after
-every checkout or merge, and compare `git rev-parse --short main origin/main`
-before believing a push.
+main` run from another branch reports `Everything up-to-date` and pushes
+nothing, which reads exactly like a successful deploy. `git branch
+--show-current` after every checkout, and compare `git rev-parse --short HEAD
+origin/main` before believing a push.
+
+**The owner can still push directly to `main`.** `enforce_admins` is off, so
+protection is a workflow rather than a wall, and a hotfix is possible at
+three in the morning. It is not the route for a release: a release that
+skipped the pull request also skipped the required checks, which are the only
+thing standing between a tag and an unreproducible wheel on PyPI.
 
 ## Tagging
 
