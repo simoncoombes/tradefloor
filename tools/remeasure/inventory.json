@@ -1887,14 +1887,15 @@
    "file": "docs/an-llm-agent.md",
    "line": 50,
    "label": "momentum's twenty-day impact flips sign the same way",
-   "published": true,
    "group": "llm_impact",
    "key": "mom_imp20_flips",
    "compare": {
-    "kind": "exact"
+    "kind": "none"
    },
    "source": "stated",
-   "method": "as llm.imp20_lo, momentum impact_bps takes both signs across the twelve seeds"
+   "method": "as llm.imp20_lo, momentum impact_bps takes both signs across the twelve seeds",
+   "status_override": "info",
+   "note": "Retired 2026-08-28 at 0.4.0. docs/an-llm-agent.md now says a twenty-day impact figure has whatever sign the seed hands it, which is the opposite of what this row asserts. The row read structural_fail at 0.2.0, structural_ok at 0.3.0 and structural_fail again here: a claim that flips with the preset is not a stable published fact."
   },
   {
    "id": "llm.imp2_all_pos",
@@ -2059,14 +2060,15 @@
    "file": "docs/how-realistic-is-this-market.md",
    "line": 215,
    "label": "the leverage sign is stable: negative in six seeds of six",
-   "published": true,
    "group": "realism_six",
    "key": "leverage_all_negative",
    "compare": {
-    "kind": "exact"
+    "kind": "none"
    },
    "source": "stated",
-   "method": "max of leverage_effect across the six realism seeds is below zero"
+   "method": "max of leverage_effect across the six realism seeds is below zero",
+   "status_override": "info",
+   "note": "Retired 2026-08-28 at 0.4.0. The docs rewrite removed this sentence: docs/how-realistic-is-this-market.md no longer claims the leverage sign is stable across the six realism seeds, so there is no published figure to grade. The underlying measurement did move (pt-v12 negative in 6 of 6 seeds 1-6, pt-v14 in 5 of 6, one seed at +0.0013), and at thirty seeds both presets have positive seeds (4 of 30 and 6 of 30) with medians inside the -0.16 to 0.0 band. The claim was a fragile n=6, not a property of the model."
   },
   {
    "id": "realism.factor_halflife",

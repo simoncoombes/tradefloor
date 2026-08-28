@@ -260,7 +260,7 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink);width:4.5rem;text-align:right">{{ c.v }}</span>
 </div>
 </sc-for>
-<figcaption style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);line-height:1.55">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
+<figcaption style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);line-height:1.55">pt-v14, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
 </figure>
 </div>
 </section>
@@ -661,8 +661,8 @@ class Component extends DCLogic {
           body: 'The price process comes from a known model, so a strategy that fits that model\'s structure will look excellent and teach you nothing. A strategy that fails here is the informative case, because it broke against a live order book under honest impact costs.',
           src: '' },
         { head: 'Momentum can work here for a reason real markets do not supply',
-          body: 'Returns trend, because the mispricing process has a herding term with a dial on it. The shipped pt-v12 turns that dial well down: momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0239 against a real band of -0.08 to 0.06, so it is in band. pt-v1 ships the same knob at 0.25 and measures +0.249. Either way the dial exists and real markets have no equivalent.',
-          src: 'pt-v12: the certified panel, 30 seeds, 40 instruments, 252 days.' },
+          body: 'Returns trend, because the mispricing process has a herding term with a dial on it. The shipped pt-v14 turns that dial well down: momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0114 against a real band of -0.08 to 0.06, so it is in band. pt-v1 ships the same knob at 0.25 and measures +0.249. Either way the dial exists and real markets have no equivalent.',
+          src: 'pt-v14: the certified panel, 30 seeds, 40 instruments, 252 days.' },
         { head: 'One venue, no latency, no strategic counterparties',
           body: 'Orders arrive instantly, there is one book per name, and you trade against a market maker and aggregate flow, never against agents that adapt to you.',
           src: '' }

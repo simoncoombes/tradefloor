@@ -172,7 +172,7 @@ input{font-family:inherit}
 <h2 style="font-size:1.5rem">Change one, and the name changes</h2>
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
 <pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">params = pt.ModelParams.from_preset(
-    "pt-v12",
+    "pt-v14",
     momentum_theta=0.05)
 
 e = pt.Engine(seed=42, universe=u,
@@ -182,7 +182,7 @@ e.model_fingerprint
 # "custom-7f290e34"</pre>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
 <h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">Why it renames rather than warns</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">A changed preset that still called itself pt-v12 would let two different markets share one citation. The fingerprint is the first 8 hex characters of a sha256 over the canonical serialisation, so any settable change produces a new name.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">A changed preset that still called itself pt-v14 would let two different markets share one citation. The fingerprint is the first 8 hex characters of a sha256 over the canonical serialisation, so any settable change produces a new name.</p>
 <p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">An override of a compile-time constant is refused by name. Accepting one the engine would ignore would make the fingerprint a lie.</p>
 </div>
 </div>

@@ -56,12 +56,12 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <section class="pt-s33">
 <h1 class="pt-s29">Presets</h1>
-<p class="pt-s23">Twelve named coefficient sets. Use pt-v12 unless a published run names another one.</p>
+<p class="pt-s23">Fourteen named coefficient sets. Use pt-v14 unless a published run names another one.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-deep)">pt-v12</span>
-<span class="pt-s72">The default since 2026-08-26. All fourteen statistics in band at 252 days and again at 504.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-deep)">pt-v14</span>
+<span class="pt-s73">The default since 2026-08-28. All fourteen statistics in band at 252 days and again at 504.</span>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink)">12</span>
@@ -97,10 +97,20 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
 <div class="pt-s39">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--accent-deep)">pt-v12</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--accent-deep)">pt-v14</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--accent-deep)">RECOMMENDED</span>
 </div>
 <span style="font-size:0.875rem;color:var(--accent-deep)">Anything. The default, and the one the realism envelope certifies: all fourteen statistics in band at 252 days, and all fourteen again at 504.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">14/14</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">14/14</span>
+</div>
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:grid;grid-template-columns:minmax(0,8rem) minmax(0,1fr) 5rem 5rem;gap:1.1rem;align-items:center">
+<div class="pt-s39">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1rem;color:var(--ink)">pt-v12</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;letter-spacing:0.06em;color:var(--ink-3)">REPRODUCTION ONLY</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Work published before the 2026-08-28 era boundary, when this was the default. It holds all fourteen at both horizons; pt-v14 holds them on more seed blocks.</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">14/14</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;text-align:right;color:var(--ink-2)">14/14</span>
 </div>
@@ -186,16 +196,16 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <h2 class="pt-s7">Name it, or inherit a moving default</h2>
 <div class="pt-s28">
 <pre class="pt-s30">e = pt.Engine(seed=42, universe=u,
-              model="pt-v12")
+              model="pt-v14")
 
-e.model_fingerprint   # "pt-v12"
+e.model_fingerprint   # "pt-v14"
 pt.model_preset()     # the set in force
 
 # a settable change renames it
 # "custom-7f290e34"</pre>
-<div class="pt-s178">
+<div class="pt-s179">
 <h3 class="pt-s4">The era boundary</h3>
-<p class="pt-s1">pt-v12 became the default on 2026-08-26, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
+<p class="pt-s1">pt-v14 became the default on 2026-08-28, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
 <p class="pt-s1">Checked rather than asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
 </div>
 </div>
@@ -203,21 +213,21 @@ pt.model_preset()     # the set in force
 
 <section class="pt-s18">
 <h2 class="pt-s7">What a preset pins</h2>
-<div class="pt-s67">
+<div class="pt-s68">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 class="pt-s65">In the dictionary</h3>
+<h3 class="pt-s66">In the dictionary</h3>
 <p class="pt-s53">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms.</p>
 <p style="margin:0;font-size:0.8125rem;color:var(--accent-deep)">Two are derived rather than set: mispricing_phi and s_phi_tick come from the half-life.</p>
 </div>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">Live, and not in it</h3>
 <p class="pt-s1">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. Nothing forces a preset name to change when one of them moves.</p>
-<p class="pt-s177">So a fully specified run is package version, preset, universe fingerprint and seed. The preset alone is necessary and not sufficient.</p>
+<p class="pt-s178">So a fully specified run is package version, preset, universe fingerprint and seed. The preset alone is necessary and not sufficient.</p>
 </div>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">Never settable</h3>
 <p class="pt-s1">The draw schedule: market hours, the 390-tick day, the calendar and the sector key order. A preset changes what the draws are multiplied into, never the schedule itself.</p>
-<p class="pt-s177">The guards are settable but excluded from every calibration search, because they are worst-case guarantees. daily_shock_cap is not settable at all.</p>
+<p class="pt-s178">The guards are settable but excluded from every calibration search, because they are worst-case guarantees. daily_shock_cap is not settable at all.</p>
 </div>
 </div>
 </section>
@@ -247,12 +257,12 @@ pt.model_preset()     # the set in force
 
 <section class="pt-s33">
 <h1 class="pt-s29">Presets</h1>
-<p class="pt-s23">Twelve named coefficient sets. Use pt-v12 unless a published run names another one.</p>
+<p class="pt-s23">Fourteen named coefficient sets. Use pt-v14 unless a published run names another one.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-deep)">pt-v12</span>
-<span class="pt-s72">The default since 2026-08-26. All fourteen statistics in band at 252 days and again at 504.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-deep)">pt-v14</span>
+<span class="pt-s73">The default since 2026-08-28. All fourteen statistics in band at 252 days and again at 504.</span>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink)">12</span>
@@ -303,16 +313,16 @@ pt.model_preset()     # the set in force
 <h2 class="pt-s7">Name it, or inherit a moving default</h2>
 <div class="pt-s28">
 <pre class="pt-s30">e = pt.Engine(seed=42, universe=u,
-              model="pt-v12")
+              model="pt-v14")
 
-e.model_fingerprint   # "pt-v12"
+e.model_fingerprint   # "pt-v14"
 pt.model_preset()     # the set in force
 
 # a settable change renames it
 # "custom-7f290e34"</pre>
-<div class="pt-s178">
+<div class="pt-s179">
 <h3 class="pt-s4">The era boundary</h3>
-<p class="pt-s1">pt-v12 became the default on 2026-08-26, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
+<p class="pt-s1">pt-v14 became the default on 2026-08-28, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
 <p class="pt-s1">Checked rather than asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
 </div>
 </div>
@@ -320,21 +330,21 @@ pt.model_preset()     # the set in force
 
 <section class="pt-s18">
 <h2 class="pt-s7">What a preset pins</h2>
-<div class="pt-s67">
+<div class="pt-s68">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 class="pt-s65">In the dictionary</h3>
+<h3 class="pt-s66">In the dictionary</h3>
 <p class="pt-s53">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms.</p>
 <p style="margin:0;font-size:0.8125rem;color:var(--accent-deep)">Two are derived rather than set: mispricing_phi and s_phi_tick come from the half-life.</p>
 </div>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">Live, and not in it</h3>
 <p class="pt-s1">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. Nothing forces a preset name to change when one of them moves.</p>
-<p class="pt-s177">So a fully specified run is package version, preset, universe fingerprint and seed. The preset alone is necessary and not sufficient.</p>
+<p class="pt-s178">So a fully specified run is package version, preset, universe fingerprint and seed. The preset alone is necessary and not sufficient.</p>
 </div>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">Never settable</h3>
 <p class="pt-s1">The draw schedule: market hours, the 390-tick day, the calendar and the sector key order. A preset changes what the draws are multiplied into, never the schedule itself.</p>
-<p class="pt-s177">The guards are settable but excluded from every calibration search, because they are worst-case guarantees. daily_shock_cap is not settable at all.</p>
+<p class="pt-s178">The guards are settable but excluded from every calibration search, because they are worst-case guarantees. daily_shock_cap is not settable at all.</p>
 </div>
 </div>
 </section>
@@ -409,9 +419,12 @@ class Component extends DCLogic {
   DOORS = (this.props.doors || []).map((d) => [d.title, d.links.map((l) => [l.label, l.href])]);
 
   PRESETS = [
-    { name: 'pt-v12', tag: 'RECOMMENDED', kind: 'use',
-      c252: "14/14", c504: "14/14", acf: "+0.0239",
+    { name: 'pt-v14', tag: 'RECOMMENDED', kind: 'use',
+      c252: "14/14", c504: "14/14", acf: "+0.0114",
       body: 'Anything. The default, and the one the realism envelope certifies: all fourteen statistics in band at 252 days, and all fourteen again at 504.' },
+    { name: 'pt-v12', tag: 'REPRODUCTION ONLY', kind: 'repro',
+      c252: "14/14", c504: "14/14", acf: "+0.0239",
+      body: 'Work published before the 2026-08-28 era boundary, when this was the default. It holds all fourteen at both horizons; pt-v14 holds them on more seed blocks.' },
     { name: 'pt-v8', tag: 'RECOMMENDED, BY NAME', kind: 'use',
       c252: "-", c504: "13/14", acf: "-",
       body: 'Anything that measures how correlation moves through time: the factor variance has a memory, and thirteen of fourteen hold at 504 days.' },

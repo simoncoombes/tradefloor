@@ -82,9 +82,9 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <h2 class="pt-s7">bars</h2>
 <span class="pt-s59">engine.bars(grain="day" or "tick")</span>
 </div>
-<p class="pt-s13">OHLCV per instrument. This is the table a historical backtest would also give you.</p>
+<p class="pt-s11">OHLCV per instrument. This is the table a historical backtest would also give you.</p>
 
-<div class="pt-s11">
+<div class="pt-s12">
 <div style="overflow-x:auto;transition:opacity 0.13s ease;opacity:1">
 <table style="width:100%;border-collapse:collapse"><thead>
 <tr>
@@ -95,45 +95,45 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </thead><tbody>
 
 <tr>
-<td class="pt-s155">day</td>
-<td class="pt-s154">uint32</td>
-<td class="pt-s156">Day index.</td>
+<td class="pt-s156">day</td>
+<td class="pt-s155">uint32</td>
+<td class="pt-s157">Day index.</td>
 </tr>
 
 <tr>
-<td class="pt-s155">tick</td>
-<td class="pt-s154">uint32</td>
-<td class="pt-s156">Tick index. A tick is a minute, and there are 390 in a day. Tick grain only.</td>
+<td class="pt-s156">tick</td>
+<td class="pt-s155">uint32</td>
+<td class="pt-s157">Tick index. A tick is a minute, and there are 390 in a day. Tick grain only.</td>
 </tr>
 
 <tr>
-<td class="pt-s155">bar</td>
-<td class="pt-s154">uint32</td>
-<td class="pt-s156">Bar index within the day. Day grain only.</td>
+<td class="pt-s156">bar</td>
+<td class="pt-s155">uint32</td>
+<td class="pt-s157">Bar index within the day. Day grain only.</td>
 </tr>
 
 <tr>
-<td class="pt-s155">instrument_id</td>
-<td class="pt-s154">uint32</td>
-<td class="pt-s156">Roster index.</td>
+<td class="pt-s156">instrument_id</td>
+<td class="pt-s155">uint32</td>
+<td class="pt-s157">Roster index.</td>
 </tr>
 
 <tr>
-<td class="pt-s155">open · high · low</td>
-<td class="pt-s154">float64</td>
-<td class="pt-s156">Day grain only.</td>
+<td class="pt-s156">open · high · low</td>
+<td class="pt-s155">float64</td>
+<td class="pt-s157">Day grain only.</td>
 </tr>
 
 <tr>
-<td class="pt-s155">close</td>
-<td class="pt-s154">float64</td>
-<td class="pt-s156">What the book actually settled.</td>
+<td class="pt-s156">close</td>
+<td class="pt-s155">float64</td>
+<td class="pt-s157">What the book actually settled.</td>
 </tr>
 
 <tr>
-<td class="pt-s155">volume</td>
-<td class="pt-s154">float64</td>
-<td class="pt-s156">Shares.</td>
+<td class="pt-s156">volume</td>
+<td class="pt-s155">float64</td>
+<td class="pt-s157">Shares.</td>
 </tr>
 
 </tbody></table>
@@ -144,8 +144,8 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <section class="pt-s18">
 <h2 class="pt-s7">Where a call refuses</h2>
-<p class="pt-s13">Each of these raises rather than returning a number it can not support. The list is the shape of the library's judgment about its own limits.</p>
-<div class="pt-s11">
+<p class="pt-s11">Each of these raises rather than returning a number it can not support. The list is the shape of the library's judgment about its own limits.</p>
+<div class="pt-s12">
 
 <div class="pt-s42">
 <span class="pt-s6">envelope.intervals</span>
@@ -249,9 +249,9 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <h2 class="pt-s7">{{ table.title }}</h2>
 <span class="pt-s59">{{ table.grain }}</span>
 </div>
-<p class="pt-s13">{{ table.lede }}</p>
+<p class="pt-s11">{{ table.lede }}</p>
 
-<div class="pt-s11">
+<div class="pt-s12">
 <div style="overflow-x:auto;transition:opacity 0.13s ease;opacity:{{ fade }}">
 <table style="width:100%;border-collapse:collapse"><thead>
 <tr>
@@ -262,9 +262,9 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </thead><tbody>
 <sc-for list="{{ table.rows }}" as="r">
 <tr>
-<td class="pt-s155">{{ r.c }}</td>
-<td class="pt-s154">{{ r.t }}</td>
-<td class="pt-s156">{{ r.d }}</td>
+<td class="pt-s156">{{ r.c }}</td>
+<td class="pt-s155">{{ r.t }}</td>
+<td class="pt-s157">{{ r.d }}</td>
 </tr>
 </sc-for>
 </tbody></table>
@@ -275,8 +275,8 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <section class="pt-s18">
 <h2 class="pt-s7">Where a call refuses</h2>
-<p class="pt-s13">Each of these raises rather than returning a number it can not support. The list is the shape of the library's judgment about its own limits.</p>
-<div class="pt-s11">
+<p class="pt-s11">Each of these raises rather than returning a number it can not support. The list is the shape of the library's judgment about its own limits.</p>
+<div class="pt-s12">
 <sc-for list="{{ refusals }}" as="r">
 <div class="pt-s42">
 <span class="pt-s6">{{ r.k }}</span>

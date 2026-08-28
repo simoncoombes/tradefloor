@@ -56,63 +56,63 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">The nine factors</h1>
 <p class="pt-s23">Every tick's change in mispricing breaks into nine components that sum to it. These are the names the <code>truth</code> table uses, and the closed set an agent's <code>explain</code> must answer from.</p>
 </section>
-<section class="pt-s180">
+<section class="pt-s181">
 <h2 class="pt-s7">The set, in order</h2>
-<p class="pt-s175">The first three are the model's own dynamics, the next four are shocks, the last two are discrete events booked after the tick chain.</p>
-<div class="pt-s11">
+<p class="pt-s176">The first three are the model's own dynamics, the next four are shocks, the last two are discrete events booked after the tick chain.</p>
+<div class="pt-s12">
 <div class="pt-scroll"><table style="font-size:0.8125rem"><tbody>
 
 <tr>
-<td class="pt-s164">reversion</td>
-<td class="pt-s75">The pull back toward fair value. Negative above fair value, positive below, decaying at a rate set by its half-life.</td>
+<td class="pt-s165">reversion</td>
+<td class="pt-s62">The pull back toward fair value. Negative above fair value, positive below, decaying at a rate set by its half-life.</td>
 </tr>
 
 <tr>
-<td class="pt-s164">momentum</td>
-<td class="pt-s75">Herding: the fraction of yesterday's re-rating that continues today. Controlled by momentum_theta, and the reason returns trend here.</td>
+<td class="pt-s165">momentum</td>
+<td class="pt-s62">Herding: the fraction of yesterday's re-rating that continues today. Controlled by momentum_theta, and the reason returns trend here.</td>
 </tr>
 
 <tr>
-<td class="pt-s164">crowd_lean</td>
-<td class="pt-s75">The crowd's net flow: net-buys what trades below fair value, net-sells what trades above, and chases yesterday's move. Bounded.</td>
+<td class="pt-s165">crowd_lean</td>
+<td class="pt-s62">The crowd's net flow: net-buys what trades below fair value, net-sells what trades above, and chases yesterday's move. Bounded.</td>
 </tr>
 
 <tr>
-<td class="pt-s164">company_news</td>
-<td class="pt-s75">News priced in: a name's own events at full weight, its sector's at a fraction, market-wide at a smaller fraction.</td>
+<td class="pt-s165">company_news</td>
+<td class="pt-s62">News priced in: a name's own events at full weight, its sector's at a fraction, market-wide at a smaller fraction.</td>
 </tr>
 
 <tr>
-<td class="pt-s164">order_flow_impact</td>
-<td class="pt-s75">The permanent, information-bearing part of order imbalance. Your own orders land here.</td>
+<td class="pt-s165">order_flow_impact</td>
+<td class="pt-s62">The permanent, information-bearing part of order imbalance. Your own orders land here.</td>
 </tr>
 
 <tr>
-<td class="pt-s164">short_squeeze_effect</td>
-<td class="pt-s75">Forced flow: squeezes on high short interest into a rising price, and stop cascades in either direction.</td>
+<td class="pt-s165">short_squeeze_effect</td>
+<td class="pt-s62">Forced flow: squeezes on high short interest into a rising price, and stop cascades in either direction.</td>
 </tr>
 
 <tr>
-<td class="pt-s164">random_noise</td>
-<td class="pt-s75">The idiosyncratic draw, scaled by the name's beta, its sector's volatility, its size, and the GARCH variance state.</td>
+<td class="pt-s165">random_noise</td>
+<td class="pt-s62">The idiosyncratic draw, scaled by the name's beta, its sector's volatility, its size, and the GARCH variance state.</td>
 </tr>
 
 <tr>
-<td class="pt-s164">circuit_breaker</td>
-<td class="pt-s75">The session breaker's own correction, when the model price leaves the allowed band.</td>
+<td class="pt-s165">circuit_breaker</td>
+<td class="pt-s62">The session breaker's own correction, when the model price leaves the allowed band.</td>
 </tr>
 
 <tr>
-<td class="pt-s164">jump</td>
-<td class="pt-s75">The daily jump, applied after the tick loop, recorded on the tick where it is first observed.</td>
+<td class="pt-s165">jump</td>
+<td class="pt-s62">The daily jump, applied after the tick loop, recorded on the tick where it is first observed.</td>
 </tr>
 
 </tbody></table></div>
 </div>
 </section>
-<section class="pt-s180">
+<section class="pt-s181">
 <h2 class="pt-s7">They sum, and that is the point</h2>
-<p class="pt-s175">Difference <code>mispricing_s</code> across two ticks, add the nine columns, and the residual sits near 1e-16. That is what makes this a dataset rather than a commentary: a label can be checked against the outcome instead of trusted.</p>
+<p class="pt-s176">Difference <code>mispricing_s</code> across two ticks, add the nine columns, and the residual sits near 1e-16. That is what makes this a dataset rather than a commentary: a label can be checked against the outcome instead of trusted.</p>
 <pre class="pt-s30">FACTORS = ["reversion", "momentum", "crowd_lean", "company_news",
            "order_flow_impact", "short_squeeze_effect", "random_noise",
            "circuit_breaker", "jump"]                 # Engine.FACTORS
@@ -121,7 +121,7 @@ one = truth.filter(pl.col("instrument_id") == 0).sort("day", "tick")
 delta = one["mispricing_s"].diff()
 summed = one.select(sum(pl.col(c) for c in FACTORS)).to_series()
 print((delta[1:] - summed[1:]).abs().max())      # ~1e-16</pre>
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">Before 2026-08-26 this did not always hold</summary>
 <div class="pt-s61">
 <p class="pt-s1">On any day a jump landed, from pt-v4 onward, or any day the session circuit breaker bound, the seven-column identity fell short: 0.128 off on one measured seed over 120 days. Both mechanisms are columns now, and the identity holds through a crisis. The columns were never wrong, only incomplete.</p>
@@ -130,7 +130,7 @@ print((delta[1:] - summed[1:]).abs().max())      # ~1e-16</pre>
 </section>
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
 <h2 style="font-size:1.25rem">Scope</h2>
-<p class="pt-s175">It decomposes the mispricing, the gap between price and fair value, not the price itself. Everything that moves fair value, such as a rate change repricing the discount, lives in <code>fundamental_value</code> instead. And it is per tick, deliberately: a day-level attribution can say order flow moved a price today, never when, and a label that cannot align to a bar is not a label.</p>
+<p class="pt-s176">It decomposes the mispricing, the gap between price and fair value, not the price itself. Everything that moves fair value, such as a rate change repricing the discount, lives in <code>fundamental_value</code> instead. And it is per tick, deliberately: a day-level attribution can say order flow moved a price today, never when, and a label that cannot align to a bar is not a label.</p>
 </section>
 
 </main></div>
@@ -155,23 +155,23 @@ print((delta[1:] - summed[1:]).abs().max())      # ~1e-16</pre>
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">The nine factors</h1>
 <p class="pt-s23">Every tick's change in mispricing breaks into nine components that sum to it. These are the names the <code>truth</code> table uses, and the closed set an agent's <code>explain</code> must answer from.</p>
 </section>
-<section class="pt-s180">
+<section class="pt-s181">
 <h2 class="pt-s7">The set, in order</h2>
-<p class="pt-s175">The first three are the model's own dynamics, the next four are shocks, the last two are discrete events booked after the tick chain.</p>
-<div class="pt-s11">
+<p class="pt-s176">The first three are the model's own dynamics, the next four are shocks, the last two are discrete events booked after the tick chain.</p>
+<div class="pt-s12">
 <div class="pt-scroll"><table style="font-size:0.8125rem"><tbody>
 <sc-for list="{{ factors }}" as="f">
 <tr>
-<td class="pt-s164">{{ f.n }}</td>
-<td class="pt-s75">{{ f.d }}</td>
+<td class="pt-s165">{{ f.n }}</td>
+<td class="pt-s62">{{ f.d }}</td>
 </tr>
 </sc-for>
 </tbody></table></div>
 </div>
 </section>
-<section class="pt-s180">
+<section class="pt-s181">
 <h2 class="pt-s7">They sum, and that is the point</h2>
-<p class="pt-s175">Difference <code>mispricing_s</code> across two ticks, add the nine columns, and the residual sits near 1e-16. That is what makes this a dataset rather than a commentary: a label can be checked against the outcome instead of trusted.</p>
+<p class="pt-s176">Difference <code>mispricing_s</code> across two ticks, add the nine columns, and the residual sits near 1e-16. That is what makes this a dataset rather than a commentary: a label can be checked against the outcome instead of trusted.</p>
 <pre class="pt-s30">FACTORS = ["reversion", "momentum", "crowd_lean", "company_news",
            "order_flow_impact", "short_squeeze_effect", "random_noise",
            "circuit_breaker", "jump"]                 # Engine.FACTORS
@@ -180,7 +180,7 @@ one = truth.filter(pl.col("instrument_id") == 0).sort("day", "tick")
 delta = one["mispricing_s"].diff()
 summed = one.select(sum(pl.col(c) for c in FACTORS)).to_series()
 print((delta[1:] - summed[1:]).abs().max())      # ~1e-16</pre>
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">Before 2026-08-26 this did not always hold</summary>
 <div class="pt-s61">
 <p class="pt-s1">On any day a jump landed, from pt-v4 onward, or any day the session circuit breaker bound, the seven-column identity fell short: 0.128 off on one measured seed over 120 days. Both mechanisms are columns now, and the identity holds through a crisis. The columns were never wrong, only incomplete.</p>
@@ -189,7 +189,7 @@ print((delta[1:] - summed[1:]).abs().max())      # ~1e-16</pre>
 </section>
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
 <h2 style="font-size:1.25rem">Scope</h2>
-<p class="pt-s175">It decomposes the mispricing, the gap between price and fair value, not the price itself. Everything that moves fair value, such as a rate change repricing the discount, lives in <code>fundamental_value</code> instead. And it is per tick, deliberately: a day-level attribution can say order flow moved a price today, never when, and a label that cannot align to a bar is not a label.</p>
+<p class="pt-s176">It decomposes the mispricing, the gap between price and fair value, not the price itself. Everything that moves fair value, such as a rate change repricing the discount, lives in <code>fundamental_value</code> instead. And it is per tick, deliberately: a day-level attribution can say order flow moved a price today, never when, and a label that cannot align to a bar is not a label.</p>
 </section>
 
 </main></script>

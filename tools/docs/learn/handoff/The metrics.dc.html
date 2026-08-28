@@ -224,7 +224,7 @@ input{font-family:inherit}
 <h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">Read typical_straddles, not extremes_straddle</h3>
 <p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">extremes_straddle fires when one seed of thirty crossed an edge. That is close to expected, so it is information rather than a finding.</p>
 <p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">typical_straddles says the middle eighty percent crosses. Then a reader running one seed is likely, not merely able, to measure out of band on a statistic whose median sits well inside.</p>
-<p style="margin:0;font-size:0.8125rem;color:var(--accent-deep)">Measured on pt-v10 over thirty seeds, nine of the fourteen straddle by that test. That is the previous era's dispersion. pt-v12 moved the medians and the spread around them has not been re-measured.</p>
+<p style="margin:0;font-size:0.8125rem;color:var(--accent-deep)">Measured on pt-v10 over thirty seeds, nine of the fourteen straddle by that test. That is the previous era's dispersion. pt-v14 moved the medians and the spread around them has not been re-measured.</p>
 </div>
 </div>
 </section>
@@ -369,7 +369,7 @@ class Component extends DCLogic {
       why: 'Whether that coupling survives into the next session rather than being a one-day artifact.',
       windows: 'band -0.20 to 0.55' },
     corr_persistence_acf1: { g: 'many names', plain: 'Does correlation stay high after a panic',
-      why: 'Correlation does not snap back the day after a crash. The single row pt-v12 misses on held-out seeds.',
+      why: 'Correlation does not snap back the day after a crash. The single row pt-v14 misses on held-out seeds.',
       windows: 'band -0.19 to 0.54' }
   };
 

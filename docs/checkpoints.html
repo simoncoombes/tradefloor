@@ -60,13 +60,13 @@ calm, hiked = mark.branch(2)   # two engines, identical up to day 60
 hiked.pin_macro(corporate_bond_yield=0.09)
 # calm and hiked now diverge only from here</pre>
 </section>
-<section class="pt-s180">
+<section class="pt-s181">
 <h2 class="pt-s7">Two mechanisms for different jobs</h2>
-<div class="pt-s11">
+<div class="pt-s12">
 <div class="pt-scroll"><table style="font-size:0.8125rem"><thead><tr>
 <th style="text-align:left;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)"></th>
-<th style="text-align:right;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)">Cost</th>
-<th style="text-align:right;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)">Survives the process</th>
+<th class="pt-s182">Cost</th>
+<th class="pt-s182">Survives the process</th>
 </tr></thead><tbody>
 <tr>
 <td style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">pt.branch(engine, 2, ...)</td>
@@ -80,15 +80,15 @@ hiked.pin_macro(corporate_bond_yield=0.09)
 </tr>
 </tbody></table></div>
 </div>
-<p class="pt-s175"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
+<p class="pt-s176"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
 </section>
-<section class="pt-s180">
+<section class="pt-s181">
 <h2 class="pt-s7">Why it refuses instead of loading wrong</h2>
-<p class="pt-s175">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
-<details class="pt-s12">
+<p class="pt-s176">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
+<details class="pt-s13">
 <summary class="pt-s27">What restore_state cannot catch</summary>
 <div class="pt-s61">
-<p class="pt-s1">The low-level <code>restore_state</code> holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a <code>ValidationError</code> naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not - prefer <code>branch</code> and <code>Checkpoint</code>, which check that.</p>
+<p class="pt-s1">The low-level <code>restore_state</code> holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v14 snapshot into a pt-v1 engine raises a <code>ValidationError</code> naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not - prefer <code>branch</code> and <code>Checkpoint</code>, which check that.</p>
 </div>
 </details>
 </section>
@@ -119,13 +119,13 @@ calm, hiked = mark.branch(2)   # two engines, identical up to day 60
 hiked.pin_macro(corporate_bond_yield=0.09)
 # calm and hiked now diverge only from here</pre>
 </section>
-<section class="pt-s180">
+<section class="pt-s181">
 <h2 class="pt-s7">Two mechanisms for different jobs</h2>
-<div class="pt-s11">
+<div class="pt-s12">
 <div class="pt-scroll"><table style="font-size:0.8125rem"><thead><tr>
 <th style="text-align:left;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)"></th>
-<th style="text-align:right;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)">Cost</th>
-<th style="text-align:right;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)">Survives the process</th>
+<th class="pt-s182">Cost</th>
+<th class="pt-s182">Survives the process</th>
 </tr></thead><tbody>
 <tr>
 <td style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">pt.branch(engine, 2, ...)</td>
@@ -139,15 +139,15 @@ hiked.pin_macro(corporate_bond_yield=0.09)
 </tr>
 </tbody></table></div>
 </div>
-<p class="pt-s175"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
+<p class="pt-s176"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
 </section>
-<section class="pt-s180">
+<section class="pt-s181">
 <h2 class="pt-s7">Why it refuses instead of loading wrong</h2>
-<p class="pt-s175">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
-<details class="pt-s12">
+<p class="pt-s176">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
+<details class="pt-s13">
 <summary class="pt-s27">What restore_state cannot catch</summary>
 <div class="pt-s61">
-<p class="pt-s1">The low-level <code>restore_state</code> holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a <code>ValidationError</code> naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not - prefer <code>branch</code> and <code>Checkpoint</code>, which check that.</p>
+<p class="pt-s1">The low-level <code>restore_state</code> holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v14 snapshot into a pt-v1 engine raises a <code>ValidationError</code> naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not - prefer <code>branch</code> and <code>Checkpoint</code>, which check that.</p>
 </div>
 </details>
 </section>

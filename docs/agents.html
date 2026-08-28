@@ -92,7 +92,7 @@ scores = pt.evaluate(
 
 scores["mine"].return_pct
 scores["mine"].impact_bps</pre>
-<div class="pt-s173">
+<div class="pt-s174">
 <h3 class="pt-s4">Three rules of the harness</h3>
 
 <div class="pt-s2">
@@ -116,35 +116,35 @@ scores["mine"].impact_bps</pre>
 
 <section id="see" class="pt-s34">
 <h2 class="pt-s7">The observation is narrow on purpose</h2>
-<p class="pt-s13">Everything in it is information available to a trader inside the simulated market. Nothing in it is something only the simulator knows.</p>
+<p class="pt-s11">Everything in it is information available to a trader inside the simulated market. Nothing in it is something only the simulator knows.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 class="pt-s65">The agent sees</h3>
+<h3 class="pt-s66">The agent sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 
-<span class="pt-s135">prices</span>
+<span class="pt-s136">prices</span>
 
-<span class="pt-s135">the order book</span>
+<span class="pt-s136">the order book</span>
 
-<span class="pt-s135">your position</span>
+<span class="pt-s136">your position</span>
 
-<span class="pt-s135">your cash</span>
+<span class="pt-s136">your cash</span>
 
-<span class="pt-s135">the step number</span>
+<span class="pt-s136">the step number</span>
 
 </div>
 </div>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">The agent never sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 
-<span class="pt-s136">the true mispricing</span>
+<span class="pt-s137">the true mispricing</span>
 
-<span class="pt-s136">fair value</span>
+<span class="pt-s137">fair value</span>
 
-<span class="pt-s136">tomorrow's prices</span>
+<span class="pt-s137">tomorrow's prices</span>
 
-<span class="pt-s136">other agents' orders</span>
+<span class="pt-s137">other agents' orders</span>
 
 </div>
 <p style="margin:0.2rem 0 0;font-size:0.8125rem;color:var(--ink-2)">The Oracle is the exception. It reads the true mispricing and declares itself, which is why it is a reference and not a competitor.</p>
@@ -159,7 +159,7 @@ scores["mine"].impact_bps</pre>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red)">ONE MARKET EACH, NOT ONE SHARED BOOK</span>
 <p class="pt-s1">Ten agents in one <span class="pt-s26">evaluate</span> call get ten private engines, built from the same seed and roster. Each agent pays its own impact and sees nobody else's orders. That is what makes the comparison clean. It is also why there is no arena. To make agents take each other's depth, drive one engine yourself and combine their flow into each tick.</p>
 </div>
-<p class="pt-s13">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
+<p class="pt-s11">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
 
 <div class="pt-s28">
 <div style="display:flex;flex-direction:column;gap:0.8rem">
@@ -207,25 +207,25 @@ ranking.separation("mean_reversion",
 <span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent)"></span>mean-reversion won 9</span>
 <span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--amber)"></span>momentum won 3</span>
 </div>
-<p class="pt-s177">The squares show the tally, not the seed order. Which seed fell which way is in the agents docs.</p>
+<p class="pt-s178">The squares show the tally, not the seed order. Which seed fell which way is in the agents docs.</p>
 </div>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
 
-<div class="pt-s85">
+<div class="pt-s86">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent);font-variant-numeric:tabular-nums">3x</span>
 <span class="pt-s55">pooled capture</span>
 <span class="pt-s3">Mean-reversion at +0.783 against momentum at +0.259, across the grid.</span>
 </div>
 
-<div class="pt-s85">
+<div class="pt-s86">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--amber);font-variant-numeric:tabular-nums">0.15</span>
 <span class="pt-s55">sign-test p-value</span>
 <span class="pt-s3">A 9 to 3 split on twelve paired markets. The sign test does not call that settled.</span>
 </div>
 
-<div class="pt-s85">
+<div class="pt-s86">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--red);font-variant-numeric:tabular-nums">8 / 12</span>
 <span class="pt-s55">single-seed hit rate</span>
 <span class="pt-s3">How often one market picks the pooled leader. The other four crown momentum three times and buy-and-hold once.</span>
@@ -239,30 +239,30 @@ ranking.separation("mean_reversion",
 
 <section class="pt-s18">
 <h2 class="pt-s7">The shipped baselines</h2>
-<p class="pt-s13">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
-<div class="pt-s11">
+<p class="pt-s11">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
+<div class="pt-s12">
 
-<div class="pt-s102">
+<div class="pt-s103">
 <span class="pt-s6">hold</span>
 <span class="pt-s0">Buy the roster on day one and do nothing. The number every other agent must beat.</span>
 </div>
 
-<div class="pt-s102">
+<div class="pt-s103">
 <span class="pt-s6">random</span>
 <span class="pt-s0">Weights from its own seed, which lives in the spec. The noise floor.</span>
 </div>
 
-<div class="pt-s102">
+<div class="pt-s103">
 <span class="pt-s6">momentum</span>
 <span class="pt-s0">Buys what rose. Pools at +0.259 on the published grid. Read the herding dial caveat below before you trust it.</span>
 </div>
 
-<div class="pt-s102">
+<div class="pt-s103">
 <span class="pt-s6">mean_reversion</span>
 <span class="pt-s0">Buys what fell. Pools at +0.783 on the published grid, and it beats the Oracle on 5 of the 12 markets.</span>
 </div>
 
-<div class="pt-s102">
+<div class="pt-s103">
 <span class="pt-s6">oracle</span>
 <span class="pt-s0">Reads the true mispricing, and gets no extra capital for it. A reference point, not a ceiling: agents out-earn it on 5 of 12 markets.</span>
 </div>
@@ -272,15 +272,15 @@ ranking.separation("mean_reversion",
 
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
 <h2 style="font-size:1.25rem">Read this before you conclude</h2>
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">Momentum can work here for a reason real markets do not supply</summary>
-<div class="pt-s166">
-<p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v12 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0239, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
+<div class="pt-s167">
+<p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v14 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0114, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
 </div>
 </details>
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">No counterparty adapts to you</summary>
-<div class="pt-s166">
+<div class="pt-s167">
 <p class="pt-s1">You trade against a market maker and aggregate flow. Orders arrive instantly and there is one book per name. Nothing in the market learns your pattern and front-runs it.</p>
 </div>
 </details>
@@ -337,7 +337,7 @@ scores = pt.evaluate(
 
 scores["mine"].return_pct
 scores["mine"].impact_bps</pre>
-<div class="pt-s173">
+<div class="pt-s174">
 <h3 class="pt-s4">Three rules of the harness</h3>
 <sc-for list="{{ rules }}" as="r">
 <div class="pt-s2">
@@ -351,21 +351,21 @@ scores["mine"].impact_bps</pre>
 
 <section id="see" class="pt-s34">
 <h2 class="pt-s7">The observation is narrow on purpose</h2>
-<p class="pt-s13">Everything in it is information available to a trader inside the simulated market. Nothing in it is something only the simulator knows.</p>
+<p class="pt-s11">Everything in it is information available to a trader inside the simulated market. Nothing in it is something only the simulator knows.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
-<h3 class="pt-s65">The agent sees</h3>
+<h3 class="pt-s66">The agent sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 <sc-for list="{{ sees }}" as="s">
-<span class="pt-s135">{{ s }}</span>
+<span class="pt-s136">{{ s }}</span>
 </sc-for>
 </div>
 </div>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">The agent never sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 <sc-for list="{{ hidden }}" as="s">
-<span class="pt-s136">{{ s }}</span>
+<span class="pt-s137">{{ s }}</span>
 </sc-for>
 </div>
 <p style="margin:0.2rem 0 0;font-size:0.8125rem;color:var(--ink-2)">The Oracle is the exception. It reads the true mispricing and declares itself, which is why it is a reference and not a competitor.</p>
@@ -380,7 +380,7 @@ scores["mine"].impact_bps</pre>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red)">ONE MARKET EACH, NOT ONE SHARED BOOK</span>
 <p class="pt-s1">Ten agents in one <span class="pt-s26">evaluate</span> call get ten private engines, built from the same seed and roster. Each agent pays its own impact and sees nobody else's orders. That is what makes the comparison clean. It is also why there is no arena. To make agents take each other's depth, drive one engine yourself and combine their flow into each tick.</p>
 </div>
-<p class="pt-s13">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
+<p class="pt-s11">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
 
 <div class="pt-s28">
 <div style="display:flex;flex-direction:column;gap:0.8rem">
@@ -406,13 +406,13 @@ ranking.separation("mean_reversion",
 <span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent)"></span>mean-reversion won 9</span>
 <span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--amber)"></span>momentum won 3</span>
 </div>
-<p class="pt-s177">The squares show the tally, not the seed order. Which seed fell which way is in the agents docs.</p>
+<p class="pt-s178">The squares show the tally, not the seed order. Which seed fell which way is in the agents docs.</p>
 </div>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
 <sc-for list="{{ readouts }}" as="r">
-<div class="pt-s85">
+<div class="pt-s86">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:{{ r.col }};font-variant-numeric:tabular-nums">{{ r.n }}</span>
 <span class="pt-s55">{{ r.k }}</span>
 <span class="pt-s3">{{ r.v }}</span>
@@ -426,10 +426,10 @@ ranking.separation("mean_reversion",
 
 <section class="pt-s18">
 <h2 class="pt-s7">The shipped baselines</h2>
-<p class="pt-s13">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
-<div class="pt-s11">
+<p class="pt-s11">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
+<div class="pt-s12">
 <sc-for list="{{ baselines }}" as="b">
-<div class="pt-s102">
+<div class="pt-s103">
 <span class="pt-s6">{{ b.n }}</span>
 <span class="pt-s0">{{ b.d }}</span>
 </div>
@@ -439,15 +439,15 @@ ranking.separation("mean_reversion",
 
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
 <h2 style="font-size:1.25rem">Read this before you conclude</h2>
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">Momentum can work here for a reason real markets do not supply</summary>
-<div class="pt-s166">
-<p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v12 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0239, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
+<div class="pt-s167">
+<p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v14 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0114, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
 </div>
 </details>
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">No counterparty adapts to you</summary>
-<div class="pt-s166">
+<div class="pt-s167">
 <p class="pt-s1">You trade against a market maker and aggregate flow. Orders arrive instantly and there is one book per name. Nothing in the market learns your pattern and front-runs it.</p>
 </div>
 </details>

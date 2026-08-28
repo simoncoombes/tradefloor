@@ -112,27 +112,27 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <p style="color:var(--ink-2);margin:0;max-width:none">A run gives you five Arrow tables. polars, pandas, pyarrow and duckdb read them zero-copy, and the package needs none of them.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.7rem">
 
-<div class="pt-s78">
+<div class="pt-s79">
 <span class="pt-s5">Bars</span>
 <span class="pt-s0">OHLCV per name, at the grain you ask for</span>
 </div>
 
-<div class="pt-s78">
+<div class="pt-s79">
 <span class="pt-s5">Truth</span>
 <span class="pt-s0">The true value, and what drove every move</span>
 </div>
 
-<div class="pt-s78">
+<div class="pt-s79">
 <span class="pt-s5">Macro</span>
 <span class="pt-s0">The economy, day by day</span>
 </div>
 
-<div class="pt-s78">
+<div class="pt-s79">
 <span class="pt-s5">Fills</span>
 <span class="pt-s0">What you asked for against what you got</span>
 </div>
 
-<div class="pt-s78">
+<div class="pt-s79">
 <span class="pt-s5">Book</span>
 <span class="pt-s0">The order book, level by level</span>
 </div>
@@ -238,37 +238,37 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <section id="compare" style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
 <h2 class="pt-s7">Orders move the price</h2>
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:1.5rem;align-items:center">
-<p class="pt-s13">Orders match against a simulated limit order book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.</p>
+<p class="pt-s11">Orders match against a simulated limit order book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.</p>
 <figure style="margin:0;display:flex;flex-direction:column;gap:0.5rem">
 
-<div class="pt-s92">
-<span class="pt-s141">3 a day</span>
-<span class="pt-s170">
+<div class="pt-s93">
+<span class="pt-s142">3 a day</span>
+<span class="pt-s171">
 <span style="position:absolute;left:50.0%;width:46.9%;height:22px;border-radius:3px;background:var(--accent)"></span>
-<span class="pt-s168"></span>
+<span class="pt-s169"></span>
 </span>
-<span class="pt-s138">+37.55%</span>
+<span class="pt-s139">+37.55%</span>
 </div>
 
-<div class="pt-s92">
-<span class="pt-s141">6 a day</span>
-<span class="pt-s170">
+<div class="pt-s93">
+<span class="pt-s142">6 a day</span>
+<span class="pt-s171">
 <span style="position:absolute;left:50.0%;width:12.2%;height:22px;border-radius:3px;background:var(--accent)"></span>
-<span class="pt-s168"></span>
+<span class="pt-s169"></span>
 </span>
-<span class="pt-s138">+9.79%</span>
+<span class="pt-s139">+9.79%</span>
 </div>
 
-<div class="pt-s92">
-<span class="pt-s141">12 a day</span>
-<span class="pt-s170">
+<div class="pt-s93">
+<span class="pt-s142">12 a day</span>
+<span class="pt-s171">
 <span style="position:absolute;left:15.7%;width:34.3%;height:22px;border-radius:3px;background:var(--red)"></span>
-<span class="pt-s168"></span>
+<span class="pt-s169"></span>
 </span>
-<span class="pt-s138">-27.46%</span>
+<span class="pt-s139">-27.46%</span>
 </div>
 
-<figcaption style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);line-height:1.55">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
+<figcaption style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);line-height:1.55">pt-v14, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
 </figure>
 </div>
 </section>
@@ -334,27 +334,27 @@ print(ranking.separation("momentum", "mean_reversion"))</pre>
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
 <h2 style="font-size:1.25rem">Read this before you conclude</h2>
 
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">Good results here do not predict real returns</summary>
 <div class="pt-s61">
 <p class="pt-s1">The price process comes from a known model, so a strategy that fits that model's structure will look excellent and teach you nothing. A strategy that fails here is the informative case, because it broke against a live order book under honest impact costs.</p>
-<p class="pt-s151"></p>
+<p class="pt-s152"></p>
 </div>
 </details>
 
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">Momentum can work here for a reason real markets do not supply</summary>
 <div class="pt-s61">
-<p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. The shipped pt-v12 turns that dial well down: momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0239 against a real band of -0.08 to 0.06, so it is in band. pt-v1 ships the same knob at 0.25 and measures +0.249. Either way the dial exists and real markets have no equivalent.</p>
-<p class="pt-s151">pt-v12: the certified panel, 30 seeds, 40 instruments, 252 days.</p>
+<p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. The shipped pt-v14 turns that dial well down: momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0114 against a real band of -0.08 to 0.06, so it is in band. pt-v1 ships the same knob at 0.25 and measures +0.249. Either way the dial exists and real markets have no equivalent.</p>
+<p class="pt-s152">pt-v14: the certified panel, 30 seeds, 40 instruments, 252 days.</p>
 </div>
 </details>
 
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">One venue, no latency, no strategic counterparties</summary>
 <div class="pt-s61">
 <p class="pt-s1">Orders arrive instantly, there is one book per name, and you trade against a market maker and aggregate flow, never against agents that adapt to you.</p>
-<p class="pt-s151"></p>
+<p class="pt-s152"></p>
 </div>
 </details>
 
@@ -431,7 +431,7 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <p style="color:var(--ink-2);margin:0;max-width:none">A run gives you five Arrow tables. polars, pandas, pyarrow and duckdb read them zero-copy, and the package needs none of them.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.7rem">
 <sc-for list="{{ tables }}" as="t">
-<div class="pt-s78">
+<div class="pt-s79">
 <span class="pt-s5">{{ t.n }}</span>
 <span class="pt-s0">{{ t.d }}</span>
 </div>
@@ -469,19 +469,19 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <section id="compare" style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
 <h2 class="pt-s7">Orders move the price</h2>
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:1.5rem;align-items:center">
-<p class="pt-s13">Orders match against a simulated limit order book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.</p>
+<p class="pt-s11">Orders match against a simulated limit order book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.</p>
 <figure style="margin:0;display:flex;flex-direction:column;gap:0.5rem">
 <sc-for list="{{ cadence }}" as="c">
-<div class="pt-s92">
-<span class="pt-s141">{{ c.label }}</span>
-<span class="pt-s170">
+<div class="pt-s93">
+<span class="pt-s142">{{ c.label }}</span>
+<span class="pt-s171">
 <span style="position:absolute;left:{{ c.x }};width:{{ c.w }};height:22px;border-radius:3px;background:{{ c.col }}"></span>
-<span class="pt-s168"></span>
+<span class="pt-s169"></span>
 </span>
-<span class="pt-s138">{{ c.v }}</span>
+<span class="pt-s139">{{ c.v }}</span>
 </div>
 </sc-for>
-<figcaption style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);line-height:1.55">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
+<figcaption style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);line-height:1.55">pt-v14, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
 </figure>
 </div>
 </section>
@@ -547,11 +547,11 @@ print(ranking.separation("momentum", "mean_reversion"))</pre>
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
 <h2 style="font-size:1.25rem">Read this before you conclude</h2>
 <sc-for list="{{ caveats }}" as="c">
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">{{ c.head }}</summary>
 <div class="pt-s61">
 <p class="pt-s1">{{ c.body }}</p>
-<p class="pt-s151">{{ c.src }}</p>
+<p class="pt-s152">{{ c.src }}</p>
 </div>
 </details>
 </sc-for>
@@ -829,8 +829,8 @@ class Component extends DCLogic {
           body: 'The price process comes from a known model, so a strategy that fits that model\'s structure will look excellent and teach you nothing. A strategy that fails here is the informative case, because it broke against a live order book under honest impact costs.',
           src: '' },
         { head: 'Momentum can work here for a reason real markets do not supply',
-          body: 'Returns trend, because the mispricing process has a herding term with a dial on it. The shipped pt-v12 turns that dial well down: momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0239 against a real band of -0.08 to 0.06, so it is in band. pt-v1 ships the same knob at 0.25 and measures +0.249. Either way the dial exists and real markets have no equivalent.',
-          src: 'pt-v12: the certified panel, 30 seeds, 40 instruments, 252 days.' },
+          body: 'Returns trend, because the mispricing process has a herding term with a dial on it. The shipped pt-v14 turns that dial well down: momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0114 against a real band of -0.08 to 0.06, so it is in band. pt-v1 ships the same knob at 0.25 and measures +0.249. Either way the dial exists and real markets have no equivalent.',
+          src: 'pt-v14: the certified panel, 30 seeds, 40 instruments, 252 days.' },
         { head: 'One venue, no latency, no strategic counterparties',
           body: 'Orders arrive instantly, there is one book per name, and you trade against a market maker and aggregate flow, never against agents that adapt to you.',
           src: '' }

@@ -526,59 +526,59 @@ Real markets have habits. Prices jump by a typical amount. A calm week often com
 
 annualised_vol_pct 
 
-32.7604 
+28.3103 
 
 excess_kurtosis 
 
-6.7001 
+10.0043 
 
 return_acf1 
 
-0.0239 
+0.0114 
 
 abs_return_acf1 
 
-0.1107 
+0.0769 
 
 abs_return_acf5 
 
-0.0428 
+0.0305 
 
 abs_return_acf20 
 
-0.0040 
+0.0096 
 
 cross_sectional_corr 
 
-0.3177 
+0.2616 
 
 volume_abs_return_corr 
 
-0.5599 
+0.5108 
 
 leverage_effect 
 
--0.0401 
+-0.0258 
 
 volume_change_acf1 
 
--0.2656 
+-0.2794 
 
 corr_asymmetry 
 
--0.0147 
+-0.0018 
 
 corr_asymmetry_lagged 
 
-0.0181 
+-0.0327 
 
 sector_excess_corr 
 
-0.2079 
+0.2081 
 
 corr_persistence_acf1 
 
-0.1525 
+0.1771 
 
 band floor 
 band ceiling 
@@ -800,7 +800,7 @@ A person does a check of the WebAssembly build by hand, because it needs a toolc
 
 Presets and the era boundary
 
-Twelve presets ship, pt-v1 through pt-v12 . You can select all of them, and all of them reproduce bit for bit.
+Twelve presets ship, pt-v1 through pt-v14 . You can select all of them, and all of them reproduce bit for bit.
 
 v1 
 
@@ -826,7 +826,7 @@ v11
 
 v12 
 
-pt-v12 became the default on 2026-08-26. That date is an era boundary, because every trajectory from the default changed. You can not compare a run from before that date to a run from after it, unless each run names its preset.
+pt-v14 became the default on 2026-08-28. That date is an era boundary, because every trajectory from the default changed. You can not compare a run from before that date to a run from after it, unless each run names its preset.
 
 What fully specifies a run
 
@@ -998,7 +998,7 @@ control
 
 emits 
 
-preset pt-v12, frozen 
+preset pt-v14, frozen 
 A complete set of coefficients with one name. Change any of them and the set gets a new name. 
 
 the realism envelope 
@@ -1048,7 +1048,7 @@ The realism envelope
 
 What the envelope adds
 
-The preset carries a measurement with it. pt-v12 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say the market reproduced those fourteen habits of real equities. The gaps stop you before you say more than that.
+The preset carries a measurement with it. pt-v14 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say the market reproduced those fourteen habits of real equities. The gaps stop you before you say more than that.
 
 Check a question against the envelope
 Start Loop B
@@ -1163,7 +1163,7 @@ Orders match against a simulated limit order book with price-time priority. A bi
 
 -27.46% 
 
-pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.
+pt-v14, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.
 
 One market is one sample
 
@@ -1229,9 +1229,9 @@ The price process comes from a known model, so a strategy that fits that model's
 
 Momentum can work here for a reason real markets do not supply
 
-Returns trend, because the mispricing process has a herding term with a dial on it. The shipped pt-v12 turns that dial well down: momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0239 against a real band of -0.08 to 0.06, so it is in band. pt-v1 ships the same knob at 0.25 and measures +0.249. Either way the dial exists and real markets have no equivalent.
+Returns trend, because the mispricing process has a herding term with a dial on it. The shipped pt-v14 turns that dial well down: momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0114 against a real band of -0.08 to 0.06, so it is in band. pt-v1 ships the same knob at 0.25 and measures +0.249. Either way the dial exists and real markets have no equivalent.
 
-pt-v12: the certified panel, 30 seeds, 40 instruments, 252 days.
+pt-v14: the certified panel, 30 seeds, 40 instruments, 252 days.
 
 One venue, no latency, no strategic counterparties
 
@@ -1391,7 +1391,7 @@ Read this before you conclude
 
 Momentum can work here for a reason real markets do not supply
 
-Returns trend, because the mispricing process has a herding term with a dial on it. pt-v12 turns that dial well down. momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0239, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.
+Returns trend, because the mispricing process has a herding term with a dial on it. pt-v14 turns that dial well down. momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0114, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.
 
 No counterparty adapts to you
 
@@ -1658,7 +1658,7 @@ A Checkpoint records the universe fingerprint and refuses to load against a rost
 
 What restore_state cannot catch
 
-The low-level restore_state holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a ValidationError naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not - prefer branch and Checkpoint, which check that.
+The low-level restore_state holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v14 snapshot into a pt-v1 engine raises a ValidationError naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not - prefer branch and Checkpoint, which check that.
 
 All pages
 
@@ -2054,72 +2054,72 @@ Each row is one habit of a real market. The bar is the range that real equities 
 annualised_vol_pct 
 how much prices move in a year 
 
-32.7604 
+28.3103 
 
 excess_kurtosis 
 how fat the tails are 
 
-6.7001 
+10.0043 
 
 return_acf1 
 does yesterday predict today 
 
-0.0239 
+0.0114 
 
 abs_return_acf1 
 does a wild day follow a wild day 
 
-0.1107 
+0.0769 
 
 abs_return_acf5 
 the same, one week apart 
 
-0.0428 
+0.0305 
 
 abs_return_acf20 
 the same, one month apart 
 
-0.0040 
+0.0096 
 
 cross_sectional_corr 
 how much names move together 
 
-0.3177 
+0.2616 
 
 volume_abs_return_corr 
 do big moves come with volume 
 
-0.5599 
+0.5108 
 
 leverage_effect 
 do falls raise volatility 
 
--0.0401 
+-0.0258 
 
 volume_change_acf1 
 does volume mean-revert 
 
--0.2656 
+-0.2794 
 
 corr_asymmetry 
 do names couple more when falling 
 
--0.0147 
+-0.0018 
 
 corr_asymmetry_lagged 
 the same, one day later 
 
-0.0181 
+-0.0327 
 
 sector_excess_corr 
 do industries move together 
 
-0.2079 
+0.2081 
 
 corr_persistence_acf1 
 does correlation stay high after a panic 
 
-0.1525 
+0.1771 
 
 band floor 
 band ceiling 
@@ -2130,7 +2130,7 @@ Why the horizon stops at 252 days
 
 The count is not the reason
 
-At 504 days pt-v12 also holds all fourteen, against bands that were re-derived for that window. pt-v3 held seven there. pt-v10 held thirteen.
+At 504 days pt-v14 also holds all fourteen, against bands that were re-derived for that window. pt-v3 held seven there. pt-v10 held thirteen.
 
 Two things keep the certification at one year. Annualised volatility reads 33.89 against a band that ends at 34.0, which is thin headroom. And certified means measured at 252 days on thirty seeds, which is what this module measures.
 
@@ -2171,7 +2171,7 @@ FORBIDS
 multi-year backtests, and anything keyed on volatility dynamics beyond one year 
 
 MEASURED 
-At 504 days pt-v12 holds all fourteen against re-derived bands. At 2520 days it holds ten of fourteen against the 504-day bands. 
+At 504 days pt-v14 holds all fourteen against re-derived bands. At 2520 days it holds ten of fourteen against the 504-day bands. 
 
 abs_return_acf1 
 
@@ -2285,7 +2285,7 @@ annualised_vol_pct
 How violent the market is 
 
 15.00 
-32.7604 
+28.3103 
 36.00 
 
 It sets the scale of every gain and every loss. Too high and every Sharpe ratio you measure is depressed and every stop is hit too often. Too low and risk looks free.
@@ -2297,7 +2297,7 @@ excess_kurtosis
 How fat the tails are 
 
 1.60 
-6.7001 
+10.0043 
 41.00 
 
 How often a day lands far from typical. Zero is a normal distribution, and real markets are strongly positive, because crashes and melt-ups happen far more often than a bell curve allows. This one decides whether tail risk means anything in your results.
@@ -2309,7 +2309,7 @@ return_acf1
 Does yesterday predict today 
 
 -0.08 
-0.0239 
+0.0114 
 0.06 
 
 Near zero in a real market. A positive value is free money for a momentum rule, so this is the row that decides whether a trend result here is a finding or an artifact.
@@ -2321,7 +2321,7 @@ abs_return_acf1
 Does a wild day follow a wild day 
 
 0.02 
-0.1107 
+0.0769 
 0.22 
 
 Volatility clustering at one day. Present in every real market, and the reason a calm week is a poor forecast of the next one.
@@ -2332,9 +2332,9 @@ band 0.02 to 0.22
 abs_return_acf5 
 The same, one week apart 
 
-0.02 
-0.0428 
-0.09 
+0.01 
+0.0305 
+0.12 
 
 Clustering at lag five. Whether a volatile spell persists long enough for a weekly risk model to see it.
 
@@ -2345,7 +2345,7 @@ abs_return_acf20
 The same, one month apart 
 
 -0.04 
-0.0040 
+0.0096 
 0.08 
 
 Clustering at lag twenty. This is where the decay-shape gap lives: the model holds the level here but reaches it with the wrong curve.
@@ -2357,7 +2357,7 @@ cross_sectional_corr
 How much names move together 
 
 0.08 
-0.3177 
+0.2616 
 0.56 
 
 The average pairwise correlation. It decides whether a diversified book is actually diversified, and it is the row that concentration moves first.
@@ -2369,7 +2369,7 @@ volume_abs_return_corr
 Do big moves come with volume 
 
 0.46 
-0.5599 
+0.5108 
 0.66 
 
 Volume and absolute return move together in every real market. An execution algorithm that assumes constant depth is wrong in exactly the moments that matter.
@@ -2381,7 +2381,7 @@ leverage_effect
 Do falls raise volatility 
 
 -0.16 
--0.0401 
+-0.0258 
 0.00 
 
 Negative returns raise future volatility more than positive ones do. A symmetric model gets the shape of a drawdown wrong.
@@ -2393,7 +2393,7 @@ volume_change_acf1
 Does volume mean-revert 
 
 -0.32 
--0.2656 
+-0.2794 
 -0.20 
 
 Negative in real markets: a heavy day is followed by a lighter one. Participation caps read against ADV depend on it.
@@ -2405,7 +2405,7 @@ corr_asymmetry
 Do names couple more when falling 
 
 -0.25 
--0.0147 
+-0.0018 
 0.45 
 
 Correlation rises in a selloff, which is when diversification is most wanted and least available.
@@ -2417,7 +2417,7 @@ corr_asymmetry_lagged
 The same, one day later 
 
 -0.20 
-0.0181 
+-0.0327 
 0.55 
 
 Whether that coupling survives into the next session rather than being a one-day artifact.
@@ -2429,7 +2429,7 @@ sector_excess_corr
 Do industries move together 
 
 0.11 
-0.2079 
+0.2081 
 0.23 
 
 How much more a name moves with its own industry than with the market. Undefined on a single-sector roster, because those are the same thing.
@@ -2441,10 +2441,10 @@ corr_persistence_acf1
 Does correlation stay high after a panic 
 
 -0.19 
-0.1525 
+0.1771 
 0.54 
 
-Correlation does not snap back the day after a crash. The single row pt-v12 misses on held-out seeds.
+Correlation does not snap back the day after a crash. The single row pt-v14 misses on held-out seeds.
 
 REAL WINDOWS 
 band -0.19 to 0.54 
@@ -2483,7 +2483,7 @@ extremes_straddle fires when one seed of thirty crossed an edge. That is close t
 
 typical_straddles says the middle eighty percent crosses. Then a reader running one seed is likely, not merely able, to measure out of band on a statistic whose median sits well inside.
 
-Measured on pt-v10 over thirty seeds, nine of the fourteen straddle by that test. That is the previous era's dispersion. pt-v12 moved the medians and the spread around them has not been re-measured.
+Measured on pt-v10 over thirty seeds, nine of the fourteen straddle by that test. That is the previous era's dispersion. pt-v14 moved the medians and the spread around them has not been re-measured.
 
 Three bands are not raw measurements
 
@@ -2760,11 +2760,11 @@ Why it raises instead of a warning
 
 A manifest that quietly reproduced a different market would be worse than no manifest. So reproduce() compares the digest it got against the digest the manifest expected, and names the field that differs.
 
-In most cases it is the preset. pt-v12 became the default on 2026-08-26, so a manifest written before that date and replayed after it fails unless it named its preset.
+In most cases it is the preset. pt-v14 became the default on 2026-08-28, so a manifest written before that date and replayed after it fails unless it named its preset.
 
 What to put in a paper
 
-Momentum, top_k 5, one-day lookback, scored on pretium 0.3.0 under preset pt-v12, universe fingerprint 4c1e9f77a3b8d502, seeds 0 to 11, 252 days. Strategy fingerprint 9f2c8d41e7b6a530. Manifest and order log attached.
+Momentum, top_k 5, one-day lookback, scored on pretium 0.4.0 under preset pt-v14, universe fingerprint 4c1e9f77a3b8d502, seeds 0 to 11, 252 days. Strategy fingerprint 9f2c8d41e7b6a530. Manifest and order log attached.
 
 Illustrative. The fingerprints in that sentence are placeholders, and yours will differ.
 
@@ -2855,7 +2855,7 @@ Market hours, the 390-tick day, the calendar and the sector key order. Nothing s
 draw_delta 
 provenance 
 
-The market stream's draw-count difference between the two runs compare() puts side by side. Zero across all twenty-eight comparisons on pt-v12. Non-zero means a halt, a delisting or a roster change moved the schedule. 
+The market stream's draw-count difference between the two runs compare() puts side by side. Zero across all twenty-eight comparisons on pt-v14. Non-zero means a halt, a delisting or a roster change moved the schedule. 
 
 draws_consumed 
 provenance 
@@ -3177,11 +3177,11 @@ A re-sorted universe is a different market. The fingerprint covers order as well
 
 Coefficients ship as a preset
 
-model="pt-v12" 
+model="pt-v14" 
 not 
 Engine(garch_alpha=...) 
 
-They are named and versioned rather than passed as constructor keywords, so two published results can be compared. pt-v12 is the default as of the 2026-08-26 era boundary, pt-v10 was the default before it, and every earlier name from pt-v1 on still reproduces bit for bit.
+They are named and versioned rather than passed as constructor keywords, so two published results can be compared. pt-v14 is the default as of the 2026-08-28 era boundary, pt-v12 was the default before it, and every earlier name from pt-v1 on still reproduces bit for bit.
 
 Every numeric column is f64
 
@@ -3372,10 +3372,10 @@ LEARN/ PRESETS
 
 Presets
 
-Twelve named coefficient sets. Use pt-v12 unless a published run names another one.
+Fourteen named coefficient sets. Use pt-v14 unless a published run names another one.
 
-pt-v12 
-The default since 2026-08-26. All fourteen statistics in band at 252 days and again at 504. 
+pt-v14 
+The default since 2026-08-28. All fourteen statistics in band at 252 days and again at 504. 
 
 12 
 Presets ship. All selectable, all reproducing bit for bit. 
@@ -3395,10 +3395,17 @@ Preset Use it for
 In band, 252d 
 In band, 504d 
 
-pt-v12 
+pt-v14 
 RECOMMENDED 
 
 Anything. The default, and the one the realism envelope certifies: all fourteen statistics in band at 252 days, and all fourteen again at 504. 
+14/14 
+14/14 
+
+pt-v12 
+REPRODUCTION ONLY 
+
+Work published before the 2026-08-28 era boundary, when this was the default. It holds all fourteen at both horizons; pt-v14 holds them on more seed blocks. 
 14/14 
 14/14 
 
@@ -3456,9 +3463,9 @@ A band is the range a real equity market produces for one statistic. Fourteen st
 Name it, or inherit a moving default
 
 e = pt.Engine(seed=42, universe=u,
- model="pt-v12")
+ model="pt-v14")
 
-e.model_fingerprint # "pt-v12"
+e.model_fingerprint # "pt-v14"
 pt.model_preset() # the set in force
 
 # a settable change renames it
@@ -3466,7 +3473,7 @@ pt.model_preset() # the set in force
 
 The era boundary
 
-pt-v12 became the default on 2026-08-26, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.
+pt-v14 became the default on 2026-08-28, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.
 
 Checked rather than asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.
 
@@ -3515,6 +3522,28 @@ REFERENCE/ RELEASE NOTES
 Release notes
 
 What changed, what it means for a run you already have, and how to pin the old behaviour if you need it. Full history in CHANGELOG.md.
+
+0.4.0
+
+2026-08-28 
+
+pt-v14 is now the default. It beats pt-v12 by a wider margin than any preset before it, and it is never worse on any of the thirteen seed blocks it was measured on.
+
+Over 13 seed blocks 
+Before (pt-v12) 
+Now (pt-v14) 
+
+two-year panel, blocks fully in band 3 of 13 11 of 13 
+
+crisis correlation outside its real range 4 of 13 2 of 13 
+
+roster shapes in band 131 of 138 137 of 138 
+
+Industry-level volatility now carries more of the market's shared movement, and the market's own volatility memory was retuned to pay for it. Stocks in different industries stop moving together quite so uniformly in a crisis, which is what real markets do.
+
+One thing got slightly worse. Volume and volatility still arrive together, but less tightly: the measure falls from 0.56 to 0.52 in a band that runs 0.46 to 0.66. It never leaves the band at the resolution this project certifies.
+
+The documentation is rebuilt as a learning path. Old URLs still work: twelve redirect to the page that replaced them, and four pages were retired.
 
 0.3.0
 
@@ -4000,7 +4029,7 @@ Settable, and excluded from every calibration search.
 Change one, and the name changes
 
 params = pt.ModelParams.from_preset(
- "pt-v12",
+ "pt-v14",
  momentum_theta=0.05)
 
 e = pt.Engine(seed=42, universe=u,
@@ -4011,7 +4040,7 @@ e.model_fingerprint
 
 Why it renames rather than warns
 
-A changed preset that still called itself pt-v12 would let two different markets share one citation. The fingerprint is the first 8 hex characters of a sha256 over the canonical serialisation, so any settable change produces a new name.
+A changed preset that still called itself pt-v14 would let two different markets share one citation. The fingerprint is the first 8 hex characters of a sha256 over the canonical serialisation, so any settable change produces a new name.
 
 An override of a compile-time constant is refused by name. Accepting one the engine would ignore would make the fingerprint a lie.
 

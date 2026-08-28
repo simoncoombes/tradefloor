@@ -65,6 +65,10 @@ ORIGIN_PATTERNS = {
 #: consumers of the wasm build get. Allowed as a phrase rather than by file,
 #: so a genuinely new reference in the same file still fails.
 WASM_CONSUMER_ALLOWANCE = (
+    # A Babel preset list names a syntax plugin, not this engine's history.
+    # Rewording it would break the JSX loader in the design handoff, which
+    # is the one place where the word is an API argument rather than prose.
+    'presets: ["react", "typescript"]',
     "wasm-bindgen emits a",
     "consumers get the signatures without anything extra",
     "Nothing in the shipped tooling is",

@@ -125,12 +125,12 @@ input{font-family:inherit}
 
 <section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Presets</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Twelve named coefficient sets. Use pt-v12 unless a published run names another one.</p>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Fourteen named coefficient sets. Use pt-v14 unless a published run names another one.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-deep)">pt-v12</span>
-<span style="font-size:0.875rem;color:var(--accent-deep)">The default since 2026-08-26. All fourteen statistics in band at 252 days and again at 504.</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-deep)">pt-v14</span>
+<span style="font-size:0.875rem;color:var(--accent-deep)">The default since 2026-08-28. All fourteen statistics in band at 252 days and again at 504.</span>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.3rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink)">12</span>
@@ -181,16 +181,16 @@ input{font-family:inherit}
 <h2 style="font-size:1.5rem">Name it, or inherit a moving default</h2>
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
 <pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">e = pt.Engine(seed=42, universe=u,
-              model="pt-v12")
+              model="pt-v14")
 
-e.model_fingerprint   # "pt-v12"
+e.model_fingerprint   # "pt-v14"
 pt.model_preset()     # the set in force
 
 # a settable change renames it
 # "custom-7f290e34"</pre>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
 <h3 style="font-size:1.0625rem;margin:0">The era boundary</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">pt-v12 became the default on 2026-08-26, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">pt-v14 became the default on 2026-08-28, and every trajectory that came from the default changed that day. A run recorded before it is not comparable to one after it unless both name their preset.</p>
 <p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Checked rather than asserted: pt-v1, pt-v2 and pt-v3 give identical market digests under 0.1.4 and 0.2.0.</p>
 </div>
 </div>
@@ -311,9 +311,12 @@ class Component extends DCLogic {
   ];
 
   PRESETS = [
-    { name: 'pt-v12', tag: 'RECOMMENDED', kind: 'use',
-      c252: "14/14", c504: "14/14", acf: "+0.0239",
+    { name: 'pt-v14', tag: 'RECOMMENDED', kind: 'use',
+      c252: "14/14", c504: "14/14", acf: "+0.0114",
       body: 'Anything. The default, and the one the realism envelope certifies: all fourteen statistics in band at 252 days, and all fourteen again at 504.' },
+    { name: 'pt-v12', tag: 'REPRODUCTION ONLY', kind: 'repro',
+      c252: "14/14", c504: "14/14", acf: "+0.0239",
+      body: 'Work published before the 2026-08-28 era boundary, when this was the default. It holds all fourteen at both horizons; pt-v14 holds them on more seed blocks.' },
     { name: 'pt-v8', tag: 'RECOMMENDED, BY NAME', kind: 'use',
       c252: "-", c504: "13/14", acf: "-",
       body: 'Anything that measures how correlation moves through time: the factor variance has a memory, and thirteen of fourteen hold at 504 days.' },

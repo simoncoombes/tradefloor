@@ -205,7 +205,7 @@ pt.reproduce(saved)   # or it raises</pre>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.85rem">
 <h3 style="font-size:1.0625rem;margin:0">Why it raises instead of a warning</h3>
 <p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A manifest that quietly reproduced a different market would be worse than no manifest. So <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">reproduce()</span> compares the digest it got against the digest the manifest expected, and names the field that differs.</p>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">In most cases it is the preset. pt-v12 became the default on 2026-08-26, so a manifest written before that date and replayed after it fails unless it named its preset.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">In most cases it is the preset. pt-v14 became the default on 2026-08-28, so a manifest written before that date and replayed after it fails unless it named its preset.</p>
 </div>
 </div>
 </section>
@@ -213,7 +213,7 @@ pt.reproduce(saved)   # or it raises</pre>
 <section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <h2 style="font-size:1.5rem">What to put in a paper</h2>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
-<p style="margin:0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.8;color:var(--ink-2)">Momentum, top_k 5, one-day lookback, scored on pretium 0.3.0 under preset pt-v12, universe fingerprint 4c1e9f77a3b8d502, seeds 0 to 11, 252 days. Strategy fingerprint 9f2c8d41e7b6a530. Manifest and order log attached.</p>
+<p style="margin:0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.8;color:var(--ink-2)">Momentum, top_k 5, one-day lookback, scored on pretium 0.4.0 under preset pt-v14, universe fingerprint 4c1e9f77a3b8d502, seeds 0 to 11, 252 days. Strategy fingerprint 9f2c8d41e7b6a530. Manifest and order log attached.</p>
 <p style="margin:0;font-size:0.8125rem;color:var(--ink-3)">Illustrative. The fingerprints in that sentence are placeholders, and yours will differ.</p>
 </div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem">

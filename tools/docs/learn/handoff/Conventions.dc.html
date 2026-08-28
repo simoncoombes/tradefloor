@@ -377,8 +377,8 @@ class Component extends DCLogic {
           body: 'The squeeze rule divides it by the float. A value strictly between 0 and 1 raises for a company with a real share count.' },
         { head: 'Roster order is contractual', good: 'universe.fingerprint', bad: 'sorted(tickers)',
           body: 'A re-sorted universe is a different market. The fingerprint covers order as well as content.' },
-        { head: 'Coefficients ship as a preset', good: 'model="pt-v12"', bad: 'Engine(garch_alpha=...)',
-          body: 'They are named and versioned rather than passed as constructor keywords, so two published results can be compared. pt-v12 is the default as of the 2026-08-26 era boundary, pt-v10 was the default before it, and every earlier name from pt-v1 on still reproduces bit for bit.' },
+        { head: 'Coefficients ship as a preset', good: 'model="pt-v14"', bad: 'Engine(garch_alpha=...)',
+          body: 'They are named and versioned rather than passed as constructor keywords, so two published results can be compared. pt-v14 is the default as of the 2026-08-28 era boundary, pt-v12 was the default before it, and every earlier name from pt-v1 on still reproduces bit for bit.' },
         { head: 'Every numeric column is f64', good: 'float64', bad: 'mixed dtypes',
           body: 'No integer columns, no downcasting. A join that produces a different dtype is a sign the read went wrong.' }
       ],

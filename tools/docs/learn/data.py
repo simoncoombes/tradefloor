@@ -16,7 +16,7 @@ from the file that owns it -
 - so a golden that moves either moves the chart with it or fails the build.
 
 The goldens hold their floats as big-endian IEEE-754 in sixteen hex digits,
-which is what makes them exact across the TypeScript, Rust and wasm builds
+which is what makes them exact across every build the project ships
 that all have to agree. Decoding is therefore lossless, and the rounding
 applied below is a display decision, made once, here, rather than by hand in
 a data file nobody diffs.
@@ -55,7 +55,7 @@ def plain(text):
 
     The goldens carry a step note or two written with an em dash. They are
     parity fixtures — the same bytes have to decode identically in
-    TypeScript, Rust and wasm — so the fix belongs on the way out, next to
+    every build the project ships, so the fix belongs on the way out, next to
     the rounding, rather than in a file whose job is to not change.
     """
     if text is None:

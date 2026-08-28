@@ -64,7 +64,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 claude mcp add pretium -- pretium-mcp
 
 # then ask it a question in plain words</pre>
-<div class="pt-s173">
+<div class="pt-s174">
 <h3 class="pt-s4">Inside the market, or outside it</h3>
 <div class="pt-s2">
 <span class="pt-s5">An LLM agent trades</span>
@@ -80,33 +80,33 @@ claude mcp add pretium -- pretium-mcp
 
 <section class="pt-s34">
 <h2 class="pt-s7">Two places a model can sit</h2>
-<p class="pt-s13">Both are supported and they answer different questions. Pick by what you want out.</p>
+<p class="pt-s11">Both are supported and they answer different questions. Pick by what you want out.</p>
 
 <div class="pt-s28">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.8rem">
 <div style="display:flex;align-items:baseline;gap:0.6rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.08em;color:var(--accent-deep)">OUTSIDE</span>
-<h3 class="pt-s65">The model studies the market</h3>
+<h3 class="pt-s66">The model studies the market</h3>
 </div>
 
 <div class="pt-s2">
-<span class="pt-s112">It writes no code</span>
-<span class="pt-s72">Strategies, universes and scenarios arrive as data. There is no path from a tool argument to code execution.</span>
+<span class="pt-s113">It writes no code</span>
+<span class="pt-s73">Strategies, universes and scenarios arrive as data. There is no path from a tool argument to code execution.</span>
 </div>
 
 <div class="pt-s2">
-<span class="pt-s112">It can not move a price</span>
-<span class="pt-s72">No orders reach the book, so nothing the model asks changes the market it is asking about.</span>
+<span class="pt-s113">It can not move a price</span>
+<span class="pt-s73">No orders reach the book, so nothing the model asks changes the market it is asking about.</span>
 </div>
 
 <div class="pt-s2">
-<span class="pt-s112">It gets the caveats</span>
-<span class="pt-s72">Each result carries computed caveats and provenance, so a summary can not lose them.</span>
+<span class="pt-s113">It gets the caveats</span>
+<span class="pt-s73">Each result carries computed caveats and provenance, so a summary can not lose them.</span>
 </div>
 
 <div class="pt-s2">
-<span class="pt-s112">It is cheap to be wrong</span>
-<span class="pt-s72">check_envelope answers before you spend anything, and refuses a question the model can not support.</span>
+<span class="pt-s113">It is cheap to be wrong</span>
+<span class="pt-s73">check_envelope answers before you spend anything, and refuses a question the model can not support.</span>
 </div>
 
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-deep);margin-top:auto;padding-top:0.5rem;border-top:1px solid var(--accent-line)">this page</span>
@@ -161,7 +161,7 @@ class LLMTrader:
 
 <section id="tools" class="pt-s18">
 <h2 class="pt-s7">The eleven tools</h2>
-<div class="pt-s11">
+<div class="pt-s12">
 
 <div class="pt-s42">
 <span class="pt-s6">describe_simulator</span>
@@ -223,7 +223,7 @@ class LLMTrader:
 
 <section class="pt-s18">
 <h2 class="pt-s7">Strategies are data, never code</h2>
-<p class="pt-s13">A client composes a strategy as JSON. There is no path from a tool argument to code execution.</p>
+<p class="pt-s11">A client composes a strategy as JSON. There is no path from a tool argument to code execution.</p>
 <pre class="pt-s30">{
   "spec_version": 1,
   "signal":    {"kind": "momentum", "lookback_days": 1.0},
@@ -231,41 +231,41 @@ class LLMTrader:
   "execution": {"cadence": "step", "max_participation": 0.02},
   "seed": null
 }</pre>
-<p class="pt-s13">Universes and scenarios are data in the same way. Each result carries a fingerprint, so a second client can check the first one.</p>
+<p class="pt-s11">Universes and scenarios are data in the same way. Each result carries a fingerprint, so a second client can check the first one.</p>
 </section>
 
 <section id="limits" class="pt-s18">
 <h2 class="pt-s7">The limits, and why they exist</h2>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.7rem">
 
-<div class="pt-s79">
-<span class="pt-s146">60</span>
-<span class="pt-s123">max_days, direct</span>
-<span class="pt-s70">An inline call must answer while the client waits.</span>
+<div class="pt-s80">
+<span class="pt-s147">60</span>
+<span class="pt-s124">max_days, direct</span>
+<span class="pt-s71">An inline call must answer while the client waits.</span>
 </div>
 
-<div class="pt-s79">
-<span class="pt-s146">252</span>
-<span class="pt-s123">max_days, job</span>
-<span class="pt-s70">The certified horizon, and no further.</span>
+<div class="pt-s80">
+<span class="pt-s147">252</span>
+<span class="pt-s124">max_days, job</span>
+<span class="pt-s71">The certified horizon, and no further.</span>
 </div>
 
-<div class="pt-s79">
-<span class="pt-s146">120</span>
-<span class="pt-s123">max_universe</span>
-<span class="pt-s70">Keeps one question inside one machine.</span>
+<div class="pt-s80">
+<span class="pt-s147">120</span>
+<span class="pt-s124">max_universe</span>
+<span class="pt-s71">Keeps one question inside one machine.</span>
 </div>
 
-<div class="pt-s79">
-<span class="pt-s146">8</span>
-<span class="pt-s123">max_strategies</span>
-<span class="pt-s70">Enough to compare, few enough to read.</span>
+<div class="pt-s80">
+<span class="pt-s147">8</span>
+<span class="pt-s124">max_strategies</span>
+<span class="pt-s71">Enough to compare, few enough to read.</span>
 </div>
 
-<div class="pt-s79">
-<span class="pt-s146">12</span>
-<span class="pt-s123">max_seeds</span>
-<span class="pt-s70">Enough for a paired sign test to mean something.</span>
+<div class="pt-s80">
+<span class="pt-s147">12</span>
+<span class="pt-s124">max_seeds</span>
+<span class="pt-s71">Enough for a paired sign test to mean something.</span>
 </div>
 
 </div>
@@ -275,11 +275,11 @@ class LLMTrader:
 <section class="pt-s18">
 <h2 class="pt-s7">Every result carries its own caveats</h2>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem">
-<p class="pt-s53">A model that summarises a result has the tool output and nothing else. Without the caveats in the payload it will report <span class="pt-s176">return_pct: 88.7</span> as "the strategy made 88.7%". So each result ships with computed caveats and full provenance: package version, preset, seed, universe fingerprint, and the strategy fingerprint.</p>
+<p class="pt-s53">A model that summarises a result has the tool output and nothing else. Without the caveats in the payload it will report <span class="pt-s177">return_pct: 88.7</span> as "the strategy made 88.7%". So each result ships with computed caveats and full provenance: package version, preset, seed, universe fingerprint, and the strategy fingerprint.</p>
 </div>
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">One seed is not an answer</summary>
-<div class="pt-s166">
+<div class="pt-s167">
 <p class="pt-s1">A single market is one sample. <span class="pt-s26">rank_strategies</span> runs many seeds and compares them with a paired sign test. On the twelve-market grid the docs measure, mean-reversion wins 9 to 3 at p = 0.15. One seed picks the pooled leader eight times in twelve.</p>
 </div>
 </details>
@@ -288,7 +288,7 @@ class LLMTrader:
 <section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
 <h2 style="font-size:1.25rem">All pages</h2>
-<a href="index.html" class="pt-s71">Back to the front door</a>
+<a href="index.html" class="pt-s72">Back to the front door</a>
 </div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem">
 <div class="pt-s57">
@@ -370,7 +370,7 @@ class LLMTrader:
 claude mcp add pretium -- pretium-mcp
 
 # then ask it a question in plain words</pre>
-<div class="pt-s173">
+<div class="pt-s174">
 <h3 class="pt-s4">Inside the market, or outside it</h3>
 <div class="pt-s2">
 <span class="pt-s5">An LLM agent trades</span>
@@ -386,18 +386,18 @@ claude mcp add pretium -- pretium-mcp
 
 <section class="pt-s34">
 <h2 class="pt-s7">Two places a model can sit</h2>
-<p class="pt-s13">Both are supported and they answer different questions. Pick by what you want out.</p>
+<p class="pt-s11">Both are supported and they answer different questions. Pick by what you want out.</p>
 
 <div class="pt-s28">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.8rem">
 <div style="display:flex;align-items:baseline;gap:0.6rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.08em;color:var(--accent-deep)">OUTSIDE</span>
-<h3 class="pt-s65">The model studies the market</h3>
+<h3 class="pt-s66">The model studies the market</h3>
 </div>
 <sc-for list="{{ outside }}" as="o">
 <div class="pt-s2">
-<span class="pt-s112">{{ o.k }}</span>
-<span class="pt-s72">{{ o.v }}</span>
+<span class="pt-s113">{{ o.k }}</span>
+<span class="pt-s73">{{ o.v }}</span>
 </div>
 </sc-for>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--accent-deep);margin-top:auto;padding-top:0.5rem;border-top:1px solid var(--accent-line)">this page</span>
@@ -437,7 +437,7 @@ class LLMTrader:
 
 <section id="tools" class="pt-s18">
 <h2 class="pt-s7">The eleven tools</h2>
-<div class="pt-s11">
+<div class="pt-s12">
 <sc-for list="{{ tools }}" as="t">
 <div class="pt-s42">
 <span class="pt-s6">{{ t.n }}</span>
@@ -449,7 +449,7 @@ class LLMTrader:
 
 <section class="pt-s18">
 <h2 class="pt-s7">Strategies are data, never code</h2>
-<p class="pt-s13">A client composes a strategy as JSON. There is no path from a tool argument to code execution.</p>
+<p class="pt-s11">A client composes a strategy as JSON. There is no path from a tool argument to code execution.</p>
 <pre class="pt-s30">{
   "spec_version": 1,
   "signal":    {"kind": "momentum", "lookback_days": 1.0},
@@ -457,17 +457,17 @@ class LLMTrader:
   "execution": {"cadence": "step", "max_participation": 0.02},
   "seed": null
 }</pre>
-<p class="pt-s13">Universes and scenarios are data in the same way. Each result carries a fingerprint, so a second client can check the first one.</p>
+<p class="pt-s11">Universes and scenarios are data in the same way. Each result carries a fingerprint, so a second client can check the first one.</p>
 </section>
 
 <section id="limits" class="pt-s18">
 <h2 class="pt-s7">The limits, and why they exist</h2>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.7rem">
 <sc-for list="{{ limits }}" as="l">
-<div class="pt-s79">
-<span class="pt-s146">{{ l.v }}</span>
-<span class="pt-s123">{{ l.k }}</span>
-<span class="pt-s70">{{ l.why }}</span>
+<div class="pt-s80">
+<span class="pt-s147">{{ l.v }}</span>
+<span class="pt-s124">{{ l.k }}</span>
+<span class="pt-s71">{{ l.why }}</span>
 </div>
 </sc-for>
 </div>
@@ -477,11 +477,11 @@ class LLMTrader:
 <section class="pt-s18">
 <h2 class="pt-s7">Every result carries its own caveats</h2>
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem">
-<p class="pt-s53">A model that summarises a result has the tool output and nothing else. Without the caveats in the payload it will report <span class="pt-s176">return_pct: 88.7</span> as "the strategy made 88.7%". So each result ships with computed caveats and full provenance: package version, preset, seed, universe fingerprint, and the strategy fingerprint.</p>
+<p class="pt-s53">A model that summarises a result has the tool output and nothing else. Without the caveats in the payload it will report <span class="pt-s177">return_pct: 88.7</span> as "the strategy made 88.7%". So each result ships with computed caveats and full provenance: package version, preset, seed, universe fingerprint, and the strategy fingerprint.</p>
 </div>
-<details class="pt-s12">
+<details class="pt-s13">
 <summary class="pt-s27">One seed is not an answer</summary>
-<div class="pt-s166">
+<div class="pt-s167">
 <p class="pt-s1">A single market is one sample. <span class="pt-s26">rank_strategies</span> runs many seeds and compares them with a paired sign test. On the twelve-market grid the docs measure, mean-reversion wins 9 to 3 at p = 0.15. One seed picks the pooled leader eight times in twelve.</p>
 </div>
 </details>
@@ -490,7 +490,7 @@ class LLMTrader:
 <section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
 <h2 style="font-size:1.25rem">All pages</h2>
-<a href="index.html" class="pt-s71">Back to the front door</a>
+<a href="index.html" class="pt-s72">Back to the front door</a>
 </div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem">
 <div class="pt-s57">

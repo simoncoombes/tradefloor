@@ -203,7 +203,7 @@ summary::marker{color:var(--accent-line)}
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
 <h3 style="font-size:1.0625rem;margin:0">The count is not the reason</h3>
-<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">At 504 days pt-v12 also holds all fourteen, against bands that were re-derived for that window. pt-v3 held seven there. pt-v10 held thirteen.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">At 504 days pt-v14 also holds all fourteen, against bands that were re-derived for that window. pt-v3 held seven there. pt-v10 held thirteen.</p>
 <p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Two things keep the certification at one year. Annualised volatility reads 33.89 against a band that ends at 34.0, which is thin headroom. And certified means measured at 252 days on thirty seeds, which is what this module measures.</p>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
@@ -404,7 +404,7 @@ class Component extends DCLogic {
   // The measured figure for each gap, kept short. Full text lives in
   // pretium.envelope.GAPS.
   gapNotes = {
-    horizon: 'At 504 days pt-v12 holds all fourteen against re-derived bands. At 2520 days it holds ten of fourteen against the 504-day bands.',
+    horizon: 'At 504 days pt-v14 holds all fourteen against re-derived bands. At 2520 days it holds ten of fourteen against the 504-day bands.',
     'decay-shape': 'The log-log slope over lags 1 to 20 reads -0.953 against a real -0.436. The curve turns negative by lag 30, where real markets stay weakly positive to lag 60.',
     'scenario-magnitude': 'The steady-state lever reads 6.04x against a real 6.16x. Residual dispersion over the driven window runs 1.565 times real, which is the defect.',
     'macro-range': 'Endogenous inflation peaks at 4.0% on every seed over five years. Real US CPI peaked at 9.0% in June 2022.',

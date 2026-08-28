@@ -66,6 +66,14 @@ that replaced them, and four pages were retired.
 windows, which means it was rejecting reality. Re-derived from eight windows
 instead of three, it is 0.01 to 0.12. No preset's score changes.
 
+**The leverage effect sits nearer its edge.** Its median moves from -0.0377
+to -0.0222 in a band that runs -0.16 to 0.0, and the count of seeds landing
+at or above zero goes from 4 of 30 to 6 of 30. Both presets pass the
+statistic at the certified resolution. A sentence in the old documentation
+said the sign was negative in six seeds of six; that was a fragile n=6 rather
+than a property of the model, and the row asserting it has been retired from
+the re-measurement inventory with its history recorded there.
+
 **How the table was measured.** Every row is 13 seed blocks of 30 seeds each,
 at block starts 101 through 1401. The panel row counts blocks whose whole
 two-year panel sits in band; 11 of 13 against 3 of 13 gives Wilson intervals
