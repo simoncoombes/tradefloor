@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+The documentation is rebuilt as a learning path. Twenty-five pages take you
+from what a limit order book is to the API reference. Every page carries one
+chart drawn from the repository's own reference data, and the caveats sit in
+collapsible blocks beside the thing they qualify rather than in every
+paragraph.
+
+Nothing in the package changed. Old documentation URLs still work: twelve
+redirect to the page that replaced them, and four pages were retired.
+
 ## 0.3.0
 
 `pt-v12` is the default. It is the first preset that looks like a real market
