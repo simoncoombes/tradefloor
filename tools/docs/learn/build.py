@@ -163,7 +163,7 @@ DOORS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
         ("Scenarios", "scenarios"),
         ("Execution cost", "execution-cost"),
         ("Checkpoints and forking", "checkpoints"),
-        ("Real companies from EDGAR", "edgar"),
+        ("Real companies from EDGAR", "edgar", "EDGAR companies"),
         ("RL environment", "rl-environment"),
         ("The MCP server", "mcp"),
     ]),
@@ -331,6 +331,17 @@ def check_nothing_orphaned(out_dir: pathlib.Path, all_pages) -> None:
                  "REDIRECTS or delete them:\n  " + "\n  ".join(stale))
 
 
+def nav_label(entry) -> str:
+    """What a link to this page says.
+
+    A page title can be a sentence; a link in a five-column index has about
+    fifteen characters before it wraps or pushes the column out. Where the
+    two want different words the entry carries both, and the title is still
+    what the page itself is called.
+    """
+    return entry[2] if len(entry) > 2 else entry[0]
+
+
 def door_list() -> list[dict]:
     """The one door list, in the shape the front door's cards expect.
 
@@ -340,7 +351,7 @@ def door_list() -> list[dict]:
     """
     return [
         {"title": short,
-         "links": [{"label": name, "href": f"{slug}.html"} for name, slug in entries]}
+         "links": [{"label": nav_label(e), "href": f"{e[1]}.html"} for e in entries]}
         for _name, short, _slug, entries in DOORS
     ]
 
@@ -349,8 +360,9 @@ def pages() -> list[dict]:
     """Every page, in reading order, with its door and its neighbours."""
     out = [{"name": FRONT[0], "slug": FRONT[1], "door": None, "door_slug": None}]
     for door, _short, door_slug, entries in DOORS:
-        for name, slug in entries:
-            out.append({"name": name, "slug": slug, "door": door, "door_slug": door_slug})
+        for entry in entries:
+            out.append({"name": entry[0], "slug": entry[1], "nav": nav_label(entry),
+                        "door": door, "door_slug": door_slug})
     for i, p in enumerate(out):
         p["src"] = f"{p['name']}.dc.html"
         p["prev"] = out[i - 1] if i else None
@@ -835,7 +847,10 @@ def build(out_dir: pathlib.Path) -> set[str]:
             body_class="pt-front" if page["slug"] == "index" else "pt-page",
             overlay=overlay,
             masthead=shell.masthead(DOORS, page["slug"]),
-            door_index=shell.door_index(DOORS, page["slug"]),
+            # The front door carries its own five-door index under "Start
+            # here", so the generated one would be the same twenty-five
+            # links a second time, one screen further down.
+            door_index="" if page["slug"] == "index" else shell.door_index(DOORS, page["slug"]),
             prev_next=shell.prev_next(page["prev"], page["next"]),
             html=html,
             template=template,

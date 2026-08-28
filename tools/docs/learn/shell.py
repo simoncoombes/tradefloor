@@ -99,12 +99,18 @@ def esc(s: str) -> str:
     return html.escape(s, quote=True)
 
 
+def label_of(entry) -> str:
+    """The short form a link uses, falling back to the page's title."""
+    return entry[2] if len(entry) > 2 else entry[0]
+
+
 # ------------------------------------------------------------------- masthead
 
 def _menu(short: str, entries, current_slug: str) -> str:
-    active = any(slug == current_slug for _, slug in entries)
+    active = any(e[1] == current_slug for e in entries)
     items = []
-    for name, slug in entries:
+    for entry in entries:
+        name, slug = label_of(entry), entry[1]
         if slug == current_slug:
             items.append(f'<span class="pt-current">{esc(name)}</span>')
         else:
@@ -179,7 +185,8 @@ def door_index(doors, current_slug: str) -> str:
     cols = []
     for _name, short, _slug, entries in doors:
         links = []
-        for page_name, slug in entries:
+        for entry in entries:
+            page_name, slug = label_of(entry), entry[1]
             inner = (f'<span class="pt-arrow">&gt;</span>'
                      f'<span class="pt-door-name">{esc(page_name)}</span>')
             if slug == current_slug:

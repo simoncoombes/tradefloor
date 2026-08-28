@@ -303,9 +303,11 @@ def llms(pages, doors, base_url: str, version: str, summaries: dict[str, str]) -
     for name, _short, _slug, entries in doors:
         lines.append(f"## {name}")
         lines.append("")
-        for page_name, slug in entries:
+        for entry in entries:
+            # llms.txt names the page, not the short label a nav link uses.
+            page_name, slug = entry[0], entry[1]
             summary = summaries.get(slug, "")
-            lines.append(f"- [{page_name}]({base_url}/{slug}.html): {summary}")
+            lines.append(f"- [{page_name}]({canonical(base_url, slug)}): {summary}")
         lines.append("")
     return "\n".join(lines)
 

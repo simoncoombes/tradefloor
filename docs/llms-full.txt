@@ -673,7 +673,7 @@ Use it
 
 > Checkpoints and forking 
 
-> Real companies from EDGAR 
+> EDGAR companies 
 
 > RL environment 
 
@@ -710,10 +710,6 @@ API
 > Evaluate 
 
 > Parameters 
-
-All pages
-
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 NEXT Install 
 
@@ -832,7 +828,7 @@ Package version, model preset, universe fingerprint, and seed. The preset pins t
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Learn pretium NEXT Core concepts 
 
@@ -949,7 +945,7 @@ The generator fills twelve sectors round-robin, so a generated roster is more ba
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Install NEXT The two loops 
 
@@ -1053,7 +1049,7 @@ Start Loop B
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Core concepts NEXT Running a market 
 
@@ -1237,7 +1233,7 @@ Orders arrive instantly, there is one book per name, and you trade against a mar
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK The two loops NEXT Agents 
 
@@ -1397,7 +1393,7 @@ You trade against a market maker and aggregate flow. Orders arrive instantly and
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Running a market NEXT Scenarios 
 
@@ -1500,7 +1496,7 @@ Left alone, inflation peaks at 4.0% on every seed over five years. Real US CPI p
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Agents NEXT Execution cost 
 
@@ -1606,7 +1602,7 @@ VIX drives the market factor's variance, so the market prices fear of your flow.
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Scenarios NEXT Checkpoints and forking 
 
@@ -1660,7 +1656,7 @@ The low-level restore_state holds no fundamentals, so it can only verify roster 
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Execution cost NEXT Real companies from EDGAR 
 
@@ -1708,7 +1704,7 @@ Neither is a market-cap ranking, because EDGAR has no prices. For that, set init
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Checkpoints and forking NEXT RL environment 
 
@@ -1796,7 +1792,7 @@ The model forgets a volatile period faster than a real market. The log-log slope
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Real companies from EDGAR NEXT The MCP server 
 
@@ -2009,7 +2005,7 @@ API
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK RL environment NEXT Realism envelope 
 
@@ -2239,7 +2235,7 @@ The strategy will earn this in a real market. The price process comes from a kno
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK The MCP server NEXT The metrics 
 
@@ -2501,7 +2497,7 @@ The ceiling is held at 0.00. A top above zero would certify a reversed leverage 
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Realism envelope NEXT Principles 
 
@@ -2680,7 +2676,7 @@ Every number in both claims was right. The mechanism each asserted was wrong, an
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK The metrics NEXT Citing a run 
 
@@ -2776,7 +2772,7 @@ The strategy earns this. A result here is a statement about a model market, and 
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Principles NEXT Glossary 
 
@@ -3027,7 +3023,7 @@ The roster of instruments. Its order is contractual: the engine walks it in inde
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Citing a run NEXT The nine factors 
 
@@ -3105,7 +3101,7 @@ It decomposes the mispricing, the gap between price and fair value, not the pric
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Glossary NEXT Conventions 
 
@@ -3228,7 +3224,7 @@ So the preset name is necessary and not sufficient. A fully specified run also n
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK The nine factors NEXT Schemas 
 
@@ -3348,7 +3344,7 @@ A missing or zero noise scale. An unweighted sum is a choice, and it will not ha
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Conventions NEXT Presets 
 
@@ -3490,7 +3486,7 @@ The guards are settable but excluded from every calibration search, because they
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Schemas NEXT Release notes 
 
@@ -3546,7 +3542,7 @@ One thing got worse: driven by a real macro path, daily swings now run 1.57x as 
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Presets NEXT Core types 
 
@@ -3733,7 +3729,7 @@ A rejected order: a zero, negative or NaN quantity, or a NaN price on a limit. N
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Release notes NEXT Evaluate 
 
@@ -3885,7 +3881,7 @@ strategy_fingerprint is empty for a hand-built agent, because that result is rep
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Core types NEXT Parameters 
 
@@ -4015,7 +4011,7 @@ An override of a compile-time constant is refused by name. Accepting one the eng
 
 All pages
 
-Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > Real companies from EDGAR > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
+Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
 BACK Evaluate 
 
