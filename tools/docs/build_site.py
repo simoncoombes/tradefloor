@@ -3154,7 +3154,38 @@ def build_robots() -> str:
     return seo.build_robots(BASE_URL)
 
 
+RETIRED = """
+tools/docs/build_site.py is retired.
+
+It generated the documentation that used to live in docs/, from
+tools/docs/design-bundle.html. Since 2026-08-28 that directory holds the
+learning-path site instead, built by tools/docs/learn/build.py, and running
+this script would overwrite twenty-five pages with the ones they replaced.
+
+It is kept, not deleted, because it is the record of how the previous site
+was produced and because design-bundle.html is still the only copy of that
+design. To read what it did, read it. To build the site, run:
+
+    python tools/docs/learn/build.py
+
+If you genuinely need to regenerate the old site — to compare against it,
+or to recover a page — pass --i-know-this-is-retired and an --out that is
+not docs/.
+"""
+
+
 def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser(add_help=True)
+    ap.add_argument("--i-know-this-is-retired", action="store_true")
+    ap.add_argument("--out", default=None)
+    args, _ = ap.parse_known_args()
+    if not args.i_know_this_is_retired:
+        sys.exit(RETIRED)
+    if args.out is None or pathlib.Path(args.out).resolve() == OUT.resolve():
+        sys.exit("refusing to write to docs/: that is the learning-path site now")
+    globals()["OUT"] = pathlib.Path(args.out)
+
     bundle = read_bundle()
     doc = inner_document(bundle)
     css = design_css(doc)

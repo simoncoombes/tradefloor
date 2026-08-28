@@ -1,6 +1,6 @@
 # The learning-path site
 
-This builds `docs/learn/`: twenty-five pages that take a reader from "what is
+This builds `docs/`: twenty-five pages that take a reader from "what is
 a limit order book" to the API reference.
 
 **It is not the published site.** `docs/*.html` still is, and that is built by
@@ -12,20 +12,20 @@ published site over to this one is an open decision — see §3.1 of
 ## Building it
 
 ```
-python tools/docs/learn/build.py            # write docs/learn/
-python tools/docs/learn/build.py --check    # fail if docs/learn/ is stale
+python tools/docs/learn/build.py            # write docs/
+python tools/docs/learn/build.py --check    # fail if docs/ is stale
 python tools/docs/learn/data.py --check     # charts still match the goldens
 python tools/docs/learn/figures.py          # prose figures against remeasure
-node   tools/docs/learn/verify.cjs docs/learn
-node   tools/docs/learn/verify.cjs docs/learn --responsive
+node   tools/docs/learn/verify.cjs docs
+node   tools/docs/learn/verify.cjs docs --responsive
 ```
 
 Before and after a change that alters how something is drawn:
 
 ```
-node tools/docs/learn/shots.cjs capture /tmp/before --site docs/learn
+node tools/docs/learn/shots.cjs capture /tmp/before --site docs
 # ... make the change, rebuild ...
-node tools/docs/learn/shots.cjs capture /tmp/after  --site docs/learn
+node tools/docs/learn/shots.cjs capture /tmp/after  --site docs
 node tools/docs/learn/shots.cjs compare /tmp/before /tmp/after
 ```
 
@@ -45,7 +45,7 @@ run it by hand when the work warrants it.
 ```
 handoff/*.dc.html ──┐
                     ├──> prerender.cjs ──> static HTML per page ──┐
-site/learn-runtime.js ┘         │                                 ├──> build.py ──> docs/learn/
+site/learn-runtime.js ┘         │                                 ├──> build.py ──> docs/
                                 └──> the page's template ─────────┤
 rust/goldens/*.json ────> data.py ──> pt-data.js ─────────────────┤
 shell.py ──> masthead, search, door index, prev/next ─────────────┘

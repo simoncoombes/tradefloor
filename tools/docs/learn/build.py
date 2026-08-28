@@ -5,7 +5,7 @@ script turns them into a static site: one HTML file per page that reads
 correctly with JavaScript switched off, one shared stylesheet, one shared
 runtime, and two generated data modules.
 
-    python tools/docs/learn/build.py [--out docs/learn] [--check]
+    python tools/docs/learn/build.py [--out docs] [--check]
 
 What it owns, and therefore overwrites, is everything under the output
 directory. What it reads is the handoff in `handoff/` plus the repository's
@@ -45,14 +45,14 @@ ROOT = HERE.parents[2]
 HANDOFF = HERE / "handoff"
 SITE = HERE / "site"
 
-BASE_URL = "https://simoncoombes.github.io/pretium/learn"
+#: The site's own address. It is the project root: this is the published
+#: documentation now, and `tools/docs/build_site.py`, which produced the
+#: pages that used to live here, is retired.
+BASE_URL = "https://simoncoombes.github.io/pretium"
 
-#: Whether this site is the one served at the project root. It is not, yet —
-#: `docs/*.html` is — and the difference decides two things: whether a
-#: `robots.txt` is written (it only has effect at the root a crawler asks
-#: for) and what the canonical URLs say. Flipping this and BASE_URL together
-#: is most of what publishing the relaunch means.
-AT_SITE_ROOT = False
+#: True because the site is the one served at the root a crawler asks for,
+#: which is what makes a `robots.txt` worth writing.
+AT_SITE_ROOT = True
 
 
 def project_version() -> str:
@@ -135,6 +135,49 @@ DOORS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
 
 FRONT = ("Learn pretium", "index")
 
+#: Where each page of the previous site goes.
+#:
+#: The two sites are not a restyling of each other: the learning path was
+#: rebuilt around what a reader does, and the review that produced it cut
+#: four pages outright. Every old URL still gets an answer, because a link
+#: someone saved or a search result someone follows should not end in a 404
+#: on the day the docs improve.
+#:
+#: An old slug that is also a new slug is absent from this table: the new
+#: page simply takes the URL. Anything else that used to exist and is not
+#: here fails the build, so a page cannot be dropped by forgetting it.
+REDIRECTS = {
+    "api-core": "core-types",
+    "api-params": "parameters",
+    "api-presets": "presets",
+    "api-realism": "realism-envelope",
+    "api-run": "running-a-market",
+    "change": "release-notes",
+    "envelope": "realism-envelope",
+    "forking": "checkpoints",
+    "llm-agent": "mcp",
+    "releases": "release-notes",
+    "simulate": "running-a-market",
+    "trust": "realism-envelope",
+    # Cut in the design review with nothing to take their place. They go to
+    # the front door rather than to a page that merely sounds similar, and
+    # say so, because guessing what the reader wanted is worse than telling
+    # them the page is gone.
+    "atlas": "index",
+    "internals": "index",
+    "interrogate": "index",
+    "wasm": "index",
+}
+
+#: The four above, kept separate so the stub can say something true about
+#: why the page is not there any more.
+RETIRED = {"atlas", "internals", "interrogate", "wasm"}
+
+#: Written by `tools/docs/learn/make_icons.py` from the design's own mark.
+#: The build checks they are present rather than generating them, because
+#: tracing the mark needs a browser and a build should not need one.
+ICONS = ["favicon.svg", "favicon.ico", "apple-touch-icon.png", "icon-512.png"]
+
 ASSETS = [
     "mark-pretium.png", "mark-pretium-dark.png",
     "logo-python.png", "logo-python-dark.png",
@@ -151,6 +194,85 @@ body.pt-front{line-height:1.6}
 body.pt-front p{margin:0 0 0.85rem}
 body.pt-front h1,body.pt-front h2,body.pt-front h3{line-height:1.12}
 """
+
+
+REDIRECT_PAGE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Moved — pretium</title>
+<link rel="canonical" href="{base}/{target}.html">
+<meta http-equiv="refresh" content="0; url={target}.html">
+<meta name="robots" content="noindex, follow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+body{{margin:0;background:#FAFBFA;color:#3C4A47;
+  font:400 1rem/1.65 'Public Sans',system-ui,-apple-system,sans-serif}}
+main{{max-width:34rem;margin:0 auto;padding:6rem 1.5rem}}
+h1{{font:600 1.5rem/1.2 'Source Serif 4',ui-serif,Georgia,serif;color:#101A18;margin:0 0 0.6rem}}
+a{{color:#0E6B65}}
+@media (prefers-color-scheme: dark){{
+  body{{background:#0D1312;color:#B2C0BD}} h1{{color:#E5ECEA}} a{{color:#5FC9BE}}
+}}
+</style>
+</head>
+<body>
+<main>
+<h1>{heading}</h1>
+<p>{sentence} You are being sent to <a href="{target}.html">{title}</a>.</p>
+</main>
+</body>
+</html>
+"""
+
+
+def write_redirects(out_dir: pathlib.Path, all_pages) -> None:
+    """Give every URL the old site published an answer.
+
+    A redirect is a page, not a server rule: GitHub Pages serves static
+    files and has no redirect table, so the only thing that can forward a
+    reader is a document that says so. Each carries a canonical link to its
+    destination, so a search engine consolidates the two rather than
+    indexing both, and `noindex` so the stub itself never becomes a result.
+    """
+    titles = {p["slug"]: p["name"] for p in all_pages}
+    new_slugs = set(titles)
+
+    for old_slug, target in sorted(REDIRECTS.items()):
+        if target not in new_slugs:
+            sys.exit(f"redirect {old_slug} points at {target}, which is not a page")
+        if old_slug in new_slugs:
+            sys.exit(f"redirect {old_slug} would overwrite the page of the same name")
+        retired = old_slug in RETIRED
+        doc = REDIRECT_PAGE.format(
+            base=BASE_URL,
+            target=target,
+            title=esc(titles[target]),
+            heading="This page was retired" if retired else "This page has moved",
+            sentence=(
+                f"<code>{esc(old_slug)}.html</code> was part of the previous "
+                "documentation and has no direct replacement."
+                if retired else
+                f"<code>{esc(old_slug)}.html</code> is now part of another page."
+            ),
+        )
+        (out_dir / f"{old_slug}.html").write_text(doc, encoding="utf-8")
+
+    print(f"  redirects: {len(REDIRECTS)} old URLs answered")
+
+
+def check_nothing_orphaned(out_dir: pathlib.Path, all_pages) -> None:
+    """Fail if a page the old site published has no answer at all.
+
+    Run against whatever `docs/` holds after the build, so a file left over
+    from the previous site is either a page now, a redirect now, or a build
+    failure — never a stale document quietly still being served.
+    """
+    expected = {p["slug"] for p in all_pages} | set(REDIRECTS)
+    stale = sorted(f.stem for f in out_dir.glob("*.html") if f.stem not in expected)
+    if stale:
+        sys.exit("these pages are neither built nor redirected — add them to "
+                 "REDIRECTS or delete them:\n  " + "\n  ".join(stale))
 
 
 def door_list() -> list[dict]:
@@ -384,9 +506,9 @@ PAGE = """<!doctype html>
 <meta property="og:description" content="{description}">
 <meta property="og:url" content="{base}/{slug}.html">
 <meta name="twitter:card" content="summary">
-<link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<link rel="alternate icon" href="../favicon.ico" sizes="16x16 32x32 48x48">
-<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="{fonts}">
@@ -525,7 +647,15 @@ PRINT_CSS = """
 """
 
 
-def build(out_dir: pathlib.Path) -> None:
+def build(out_dir: pathlib.Path) -> set[str]:
+    """Write the site, and report which files this builder owns.
+
+    `docs/` also holds things it does not write — the published
+    `envelope.json`, the markdown the measurement inventory points at, and
+    `.nojekyll` — so the staleness check has to compare what is generated
+    rather than the directory.
+    """
+    owned: set[str] = set()
     all_pages = pages()
     slug_of = {p["name"]: p["slug"] for p in all_pages}
 
@@ -562,6 +692,17 @@ def build(out_dir: pathlib.Path) -> None:
         shutil.copy(SITE / name, out_dir / name)
     for asset in ASSETS:
         shutil.copy(HANDOFF / asset, out_dir / asset)
+    for icon in ICONS:
+        if (out_dir / icon).exists():
+            continue
+        # Building somewhere other than the site itself — `--check` uses a
+        # temporary directory. The icons are generated by a separate tool
+        # because tracing the mark needs a browser and a build should not,
+        # so take the committed ones; only their absence there is a fault.
+        committed = ROOT / "docs" / icon
+        if not committed.exists():
+            sys.exit(f"missing {committed} — run tools/docs/learn/make_icons.py")
+        shutil.copy(committed, out_dir / icon)
 
     by_slug = {p["slug"]: p for p in rendered["pages"]}
     overlay = shell.search_overlay()
@@ -623,15 +764,27 @@ def build(out_dir: pathlib.Path) -> None:
     write_search_index(out_dir, all_pages, by_slug)
     write_data(out_dir)
     check_presets(emitted)
+    write_redirects(out_dir, all_pages)
+    check_nothing_orphaned(out_dir, all_pages)
     write_seo(out_dir, all_pages, by_slug, emitted, version)
 
     print(f"built {len(all_pages)} pages into {out_dir}")
+    owned.update(f"{p['slug']}.html" for p in all_pages)
+    owned.update(f"{slug}.html" for slug in REDIRECTS)
+    owned.update(ICONS)
+    owned.update(ASSETS)
+    owned.update(["learn.css", "learn-runtime.js", "learn-shell.js",
+                  "pt-data.js", "pt-search.js", "sitemap.xml",
+                  "llms.txt", "llms-full.txt"])
+    if AT_SITE_ROOT:
+        owned.add("robots.txt")
     if carrying:
         print(f"  doors: {len(carrying)} components rewired to the site's page list")
     lifted = sum(p.get("styleClasses", 0) for p in rendered["pages"])
     if lifted:
         print(f"  styles: {len(rendered['classes'])} classes replace "
               f"{lifted} inline style attributes")
+    return owned
 
 
 def write_seo(out_dir, all_pages, by_slug, emitted, version) -> None:
@@ -745,19 +898,25 @@ def esc(s: str) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", default=str(ROOT / "docs" / "learn"))
+    ap.add_argument("--out", default=str(ROOT / "docs"))
     ap.add_argument("--check", action="store_true",
                     help="build to a temporary directory and diff, writing nothing")
     args = ap.parse_args()
 
     if args.check:
         with tempfile.TemporaryDirectory() as tmp:
-            build(pathlib.Path(tmp))
-            diff = subprocess.run(["diff", "-ru", args.out, tmp], capture_output=True, text=True)
-            if diff.returncode != 0:
-                print(diff.stdout[:8000])
-                sys.exit("docs/learn is stale — run tools/docs/learn/build.py")
-            print("docs/learn is up to date")
+            owned = build(pathlib.Path(tmp))
+            stale = []
+            for name in sorted(owned):
+                here, there = pathlib.Path(args.out) / name, pathlib.Path(tmp) / name
+                if not here.exists():
+                    stale.append(f"{name}: not committed")
+                elif here.read_bytes() != there.read_bytes():
+                    stale.append(f"{name}: differs from what the sources build")
+            if stale:
+                print("\n".join("  " + line for line in stale[:40]))
+                sys.exit(f"{args.out} is stale — run tools/docs/learn/build.py")
+            print(f"{args.out} is up to date ({len(owned)} generated files)")
         return
 
     build(pathlib.Path(args.out))

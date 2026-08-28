@@ -1,307 +1,482 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Scenarios and Crises · pretium docs</title>
-<meta name="description" content="Force the economy down a path you choose: a hiking cycle, a VIX spike, a liquidity crisis. Run the same shock across many seeds and measure what it actually did.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scenarios · pretium</title>
+<meta name="description" content="Drive a macro path through the market instead of letting the economy find its own, and what a scenario result may claim.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/scenarios.html">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium docs">
-<meta property="og:title" content="Scenarios and Crises">
-<meta property="og:description" content="Force the economy down a path you choose: a hiking cycle, a VIX spike, a liquidity crisis. Run the same shock across many seeds and measure what it actually did.">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="Scenarios · pretium">
+<meta property="og:description" content="Drive a macro path through the market instead of letting the economy find its own, and what a scenario result may claim.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/scenarios.html">
-<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
-<meta property="article:modified_time" content="2026-08-27T11:30:25-04:00">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Scenarios and Crises">
-<meta name="twitter:description" content="Force the economy down a path you choose: a hiking cycle, a VIX spike, a liquidity crisis. Run the same shock across many seeds and measure what it actually did.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Scenarios and Crises","description":"Force the economy down a path you choose: a hiking cycle, a VIX spike, a liquidity crisis. Run the same shock across many seeds and measure what it actually did.","url":"https://simoncoombes.github.io/pretium/scenarios.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-27T11:30:25-04:00"}</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
-<style>:root{
-  --hue:55;
-  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
-  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
-  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
-  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
-  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
-  --bad:oklch(0.52 0.12 25);
-  --navact:oklch(0.945 0.012 var(--hue));
-  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
-  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
-  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
-  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
-}
-html[data-lightcode="true"]:not([data-theme="dark"]){
-  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
-  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
-}
-html[data-theme="dark"]{
-  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
-  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
-  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
-  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
-  --bad:oklch(0.72 0.11 25);
-  --navact:oklch(0.26 0.02 var(--hue));
-  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
-}
-html{scroll-behavior:auto}
-body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-::selection{background:var(--accent-soft)}
-p{margin:0 0 14px;text-wrap:pretty}
-h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
-ul{margin:0 0 14px;padding-left:22px}
-li{margin:0 0 7px}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
-pre{margin:0}
-code{font-family:var(--font-mono)}
-summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
-summary::marker{color:var(--faint)}
-details[open] summary{border-bottom:1px solid var(--linesoft)}
-button{font-family:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-h2[id],h3[id]{scroll-margin-top:80px}
-h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
-h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
-.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
-#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
-#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
-#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
-#hambtn{display:none}
-@media (max-width:920px){
-  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
-  #sbar[data-open="true"]{transform:none}
-  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
-  #hambtn{display:flex}
-  #searchwrap{display:none}
-  #ghlink{display:none}
-}
-.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
-  grid-template-columns:232px minmax(0,1fr);gap:40px}
-.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
-.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
-.sidebar li{margin:0 0 2px}
-.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
-.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
-.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
-main{padding:28px 0 72px;min-width:0}
-main h1{font-size:30px;margin:0 0 18px}
-main h2{font-size:20px;margin:34px 0 12px}
-main h3{font-size:16px;margin:24px 0 8px}
-.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
-.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
-  display:flex;align-items:baseline;gap:12px}
-.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
-.masthead .tag{color:var(--mut);font-size:13px}
-.masthead .spacer{flex:1}
-.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
-  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
-pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
-  padding:13px 16px;overflow-x:auto;font-size:13px}
-pre code{color:inherit}
-.tablewrap{overflow-x:auto}
-footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
-  color:var(--mut);font-size:13px}
-@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
-  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
-</style>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
 <script>
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-1LBM3239ZF');
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </head>
-<body>
-<header class="masthead"><div class="inner">
-<a class="brand" href="./">pretium</a>
-<span class="tag">repeatable market simulation</span>
-<span class="spacer"></span>
-<a href="https://github.com/simoncoombes/pretium">GitHub</a>
-</div></header>
-<div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><span aria-current="page">Scenarios and crises</span></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li><li><a href="two-loops.html">The Two Loops</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="principles.html">The Principles</a></li></ul></nav>
-<main>
-<p class="appnote">This is the plain version of the page. The
-<a href="./#/scenarios">full documentation app</a> adds search, dark mode
-and copy buttons.</p>
-<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">GUIDE</div>
-        <h1 style="font-size:30px">Scenarios and Crises</h1>
-        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">A scenario is a path you force the economy down: rates walking up, a VIX spike, a contraction. The engine follows it and everything else carries on around it.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">What This Buys You</h2>
-        <p>A decade of history gives you one hiking cycle and maybe one crisis, and you cannot rerun either. Here you run the same market twice, once with the event and once without, on identical noise. The difference is what the event cost you. That answers things a backtest cannot: does the strategy survive rates doubling, and what does a crisis do to your execution cost.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">No Built-In Crises</h2>
-        <p>There is no canned pandemic, war or crash. A ready-made event hides the choices that decide what your test actually means: how high, how fast, and from where. You get three building blocks instead, three shape constructors, and published recipes whose numbers are all anchored to real episodes you can go and check.</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">from pretium import Scenario
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu pt-here"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><span class="pt-current">Scenarios</span><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
 
-Scenario().hold(vix=45.0)                # pin a field at a level
-Scenario().ramp("inflation_rate",        # walk it over a window
-                start=0.02, end=0.09, over=60)
-Scenario().step("corporate_bond_yield",  # jump it on a given day
-                before=0.05, after=0.08, at=10)
-
-# shape constructors build a whole scenario in one call:
-Scenario.rate_shock(start=0.025, end=0.05, over=15)
-Scenario.vix_shock(calm=15.0, peak=45.0, at=10, over=30)</code></pre>
-        </div>
-        <p>Pins on one field lie end to end, so a spike, a plateau and a decay compose into one scenario. Check the path before you spend a run on it: <code style="font-size:13px">Scenario.table(days)</code> prints the day-by-day values.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Example: A Rate Shock</h2>
-        <p>Walking the rate from 2.5% to 5% while agents hold positions, against the same market with no shock:</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">shock = pt.Scenario.rate_shock(start=0.025, end=0.05, over=15)
-agents = pt.reference_agents(seed=3)          # or your own, see The Agent Harness
-pt.evaluate(agents, seed=7, universe=universe, days=20, scenario=shock)</code></pre>
-        </div>
-        <div class="tablewrap"><table style="max-width:480px">
-          <thead><tr><th>Agent</th><th style="text-align:right">Calm</th><th style="text-align:right">Hiked</th><th style="text-align:right">Delta</th></tr></thead>
-          <tbody style="font-family:var(--font-mono);font-size:12.5px">
-            <tr><td>buy_and_hold</td><td style="text-align:right">−5.63%</td><td style="text-align:right">−8.76%</td><td style="text-align:right">−3.13</td></tr>
-            <tr><td>momentum</td><td style="text-align:right">−7.88%</td><td style="text-align:right">−9.74%</td><td style="text-align:right">−1.86</td></tr>
-            <tr><td>oracle</td><td style="text-align:right">+14.98%</td><td style="text-align:right">+12.99%</td><td style="text-align:right">−1.99</td></tr>
-          </tbody>
-        </table></div>
-        <p>Buy-and-hold is long only, holds through the repricing, and gives up the most. Momentum and the Oracle trade around it and each give up about two points. The sizes belong to the seed: across sim seeds 5 to 9 buy-and-hold gives up 3.0 to 5.0 points every time, while momentum's give-up spans −1.9 to +0.5. Run more than one seed before you quote a size.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">What a VIX Scenario Moves</h2>
-        <p>VIX moves four things at once, which is why pinning it high feels like a crisis rather than turning up a dial:</p>
-        <ul style="color:var(--mut);font-size:14px">
-          <li><strong style="color:var(--fg)">Volatility.</strong> The market factor's variance chases a target that scales with (VIX/15)². Realised annual volatility: 31% at VIX 5, 37% at 15, 105% at 45, 126% at 65.</li>
-          <li><strong style="color:var(--fg)">Spreads.</strong> Mean quoted spread goes from 11.7 bps at VIX 15 to 21.5 bps at VIX 65, so trading costs more exactly when you least want it to.</li>
-          <li><strong style="color:var(--fg)">Correlation.</strong> Above VIX 25.5 the cross-section blends toward the market factor: mean pairwise correlation reads +0.20 calm, +0.62 at VIX 45, +0.68 at 65. Diversification stops working, the way it does in a real crisis.</li>
-          <li><strong style="color:var(--fg)">Credit spreads,</strong> recomputed at central-bank meetings, so a VIX path also ends up repricing the yield that equities discount off.</li>
-        </ul>
-        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Measured: Universe.random(20-25, seed=11) · 120 days · sim seed 3, pinned through the scenario API. Since the 2026-08-26 era boundary VIX also moves a name's own variance, through <code style="font-size:12px">garch_vix_coupling</code>; before it, VIX sized only the shared factor. These figures straddle the 32.76% on <a href="trust.html">Realism and Limits</a> rather than sitting near it, the calm pins bracketing it and the crisis pins running three to four times higher, because a pinned VIX is not a normal market: the pin drives the factor variance directly, and these runs use a smaller roster over 120 days rather than the certified 40 names over 252. Compare pins against each other, and take the certified number from an unpinned run. The ratio between two pins is NOT the crisis lever the realism page and the release notes quote: that one runs VIX 5 to VIX 65 on the certified roster over 252 days at thirty seeds and reads 6.04x on pt-v12. Three numbers, three measurements.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Example: A Liquidity Crisis</h2>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">crisis = pt.Scenario.vix_shock(calm=18.0, peak=80.0, at=20, over=60)
-
-shocked = pt.facts.measure(seed=3, universe=u, days=120, scenario=crisis)
-calm = pt.facts.measure(seed=3, universe=u, days=120,
-                        scenario=pt.Scenario("calm").hold(vix=18.0))
-print(f"{calm['annualised_vol_pct']:.2f}% calm, "
-      f"{shocked['annualised_vol_pct']:.2f}% crisis")
-# 39.98% calm, 67.68% crisis</code></pre>
-        </div>
-        <p>The peak of 80 is anchored on the VIX's highest close of 2008: 80.86, on 20 November. The recipe docs anchor every number this way, and also say what each recipe does not claim: reproducing a volatility level is not reproducing a crisis. 2008 was a solvency crisis with a frozen money market behind it, and none of that is in this model.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">Comparing With and Without the Event</h2>
-        <p>The scenario and its baseline see identical noise, draw for draw, because macro state never touches the market's random numbers. So the difference between the two runs is the event and nothing else. <code style="font-size:13px">compare()</code> reports the paired difference and a <code style="font-size:13px">draw_delta</code> beside it: zero means the two markets saw the same noise, and anything else means the scenario changed the market's structure (a halt, a delisting), which you want surfaced rather than averaged away.</p>
-        <p>Scenarios reach every entry point: <code style="font-size:13px">evaluate</code>, <code style="font-size:13px">tca.analyse</code>, <code style="font-size:13px">facts.measure</code> and <code style="font-size:13px">run_many</code> all take <code style="font-size:13px">scenario=</code>. Does execution cost more when VIX is high? Measured over ten days and twelve seeds: the VIX 45 world costs more in 12 of 12, median shortfall 11.69 bps against 6.06.</p>
-        <div style="border:1px solid var(--line);border-radius:9px;padding:14px 18px 4px;margin:26px 0;background:var(--panel)">
-          <div style="font:600 10.5px/1 var(--font-mono);letter-spacing:0.09em;color:var(--bad);margin:0 0 9px">TRAPS AND LIMITS</div>
-          <p style="font-size:13.5px;color:var(--mut)">Pinning <code style="font-size:12px">federal_funds_rate</code> alone does nothing until the first central-bank meeting, around day 45, because equities discount off the corporate bond yield. A short policy-only study measures exactly 0.00% and looks fine. <code style="font-size:12px">rate_shock</code> moves the whole curve when you want an immediate repricing.</p>
-          <p style="font-size:13.5px;color:var(--mut)">The shape constructors build a whole scenario. <code style="font-size:12px">Scenario().hold(...).vix_shock(...)</code> reads like chaining and would throw away your holds; the library refuses it by name.</p>
-          <p style="font-size:13.5px;color:var(--mut)">And gap 3 on the realism page: a scenario's size is right on average and unreliable in one run. The steady-state lever, a sustained crisis against a calm market, reads 6.04x here against 6.16x for real markets on the certified roster, which is within two percent; what is not calibrated is the spread around it, so a single run understates how much of its own move was the scenario. Use scenarios to detect breakage, and size a loss across many seeds or not at all.</p>
-        </div>
-        <h2 style="font-size:21px;margin:46px 0 10px">A Whole Crisis Study</h2>
-        <p>A whole crisis study. Build the event, look at the path before you spend anything on it, check the question is answerable, then measure what the crisis did to the market, to a strategy and to execution cost. Same seed throughout, so the only difference between the two worlds is the event.</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">import pretium as pt
-from pretium import Scenario, envelope
-
-u = pt.Universe.random(20, seed=11)
-
-# 1. build the event and its control, and LOOK at the path first
-crisis = Scenario.vix_shock(calm=18.0, peak=80.0, at=20, over=60)
-control = Scenario("calm").hold(vix=18.0)
-for row in crisis.table(120)[:25]:
-    print(row)                       # day-by-day, before spending a run
-
-# 2. can this market answer the question? magnitude is NOT certified
-print(envelope.check(horizon_days=120, scenario_magnitude=False,
-                     statistics=["annualised_vol_pct",
-                                 "cross_sectional_corr"]))
-
-# 3. what the crisis did to the MARKET
-shocked = pt.facts.measure(seed=3, universe=u, days=120, scenario=crisis)
-quiet   = pt.facts.measure(seed=3, universe=u, days=120, scenario=control)
-shocked["annualised_vol_pct"], quiet["annualised_vol_pct"]
-# 82.16% crisis against 61.76% calm
-shocked["cross_sectional_corr"]        # correlation rises with it
-
-# 4. what it did to a STRATEGY, same seed both sides
-spec = pt.StrategySpec.momentum(lookback_days=1.0, top_k=5)
-for label, sc in (("calm", control), ("crisis", crisis)):
-    scores = pt.evaluate({"mom": spec}, seed=3, universe=u,
-                         days=120, scenario=sc)
-    print(label, scores["mom"].return_pct, scores["mom"].impact_bps)
-
-# 5. what it did to EXECUTION COST
-calm_ex  = pt.tca.analyse(my_algo, seed=3, universe=u, days=10,
-                          scenario=Scenario().hold(vix=15))
-spike_ex = pt.tca.analyse(my_algo, seed=3, universe=u, days=10,
-                          scenario=Scenario().hold(vix=45))
-print(calm_ex.shortfall_bps(), spike_ex.shortfall_bps())
-# measured with BuyAndHold, seeds 1 to 12:
-#   median 6.06 bps calm, 11.69 bps at VIX 45
-#   the crisis world costs more in 12 of 12, paired median +5.62 bps
-
-# 6. repeat across seeds before quoting any size
-for s in range(1, 13):
-    ...                              # one seed is one sample</code></pre>
-        </div>
-        <div style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">OUTPUT</span><span title="Captured from the run named beside this block." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--tks);border:1px solid var(--tks)">MEASURED</span></div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);color:var(--codemut)">{'day': 0, 'vix': 18.0}
-{'day': 1, 'vix': 18.0}
-...
-{'day': 19, 'vix': 18.0}
-{'day': 20, 'vix': 80.0}
-{'day': 21, 'vix': 78.97}
-{'day': 22, 'vix': 77.93}
-{'day': 23, 'vix': 76.90}
-{'day': 24, 'vix': 75.87}
-
-inside the envelope
-  - horizon 120d is within the certified 252d, and no named statistic
-    meets a measured gap
-  ? annualised_vol_pct is in band at the certified horizon (31.4632 in
-    (15.0, 36.0)) -- but that is a median across 30 seeds; check
-    `intervals` for the spread before relying on one seed
-  ? cross_sectional_corr is in band at the certified horizon (0.3063 in
-    (0.08, 0.56)) -- but that is a median across 30 seeds; check
-    `intervals` for the spread before relying on one seed
-
-(67.68, 39.98)      # annualised vol %, crisis against calm
-0.6235              # cross-sectional correlation under the crisis
-
-calm   -42.9347  11.9232
-crisis -56.6869  95.0928
-
-6.06 11.69          # shortfall bps, calm then VIX 45</code></pre>
-        </div>
-        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Every line in that block is a measurement on pretium 0.2.0 under pt-v10, the default before 0.3.0, from the code above it and left as measured rather than relabelled. The scenario rows are elided in the middle and rounded to two decimals; nothing else is edited. Note what the path actually does: <code style="font-size:12.5px">vix_shock</code> puts the peak on day <code style="font-size:12.5px">at</code> and decays it over the window, rather than ramping up to it.</p>
-        <p>Volatility goes from 40% to 68%, and correlation climbs with it, 0.49 to 0.62. The strategy's drawdown grows, and you can separate the causes: fair value repricing, wider spreads, and a cross-section that stopped diversifying. Execution cost nearly doubles on all twelve seeds, so that result belongs to the regime rather than to one path.</p>
-        <p>Do not quote one run's sizes as real. The steady-state crisis lever is calibrated on average, 6.04x against a real 6.16x, and the dispersion around it is not (gap 3); the pinned pair above is a different measurement again. Read the direction and the ordering, and take a magnitude from many seeds rather than from this one.</p>
-</main>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">SCENARIOS</span>
 </div>
-<footer class="site"><div class="layout" style="display:block">
-pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
-</div></footer>
+
+<section class="pt-s33">
+<h1 class="pt-s30">Scenarios</h1>
+<p class="pt-s24">A scenario drives the macro path. Without one, the economy finds its own path from day zero.</p>
+
+<div class="pt-s29">
+<pre class="pt-s31">shock = pt.Scenario.rate_shock(
+    start=0.025, end=0.05, over=15)
+
+pt.evaluate(agents, seed=7,
+            universe=u, days=20,
+            scenario=shock)
+
+# or move one field yourself
+engine.pin_macro(
+    corporate_bond_yield=0.09)</pre>
+<div class="pt-s180">
+<h3 class="pt-s4">Two ways to move the economy</h3>
+<div class="pt-s2">
+<span class="pt-s5">A scenario</span>
+<span class="pt-s0">Drives a path over many days. Use it for a crisis, a hiking cycle, or a real historical window.</span>
+</div>
+<div class="pt-s2">
+<span class="pt-s5">A pin</span>
+<span class="pt-s0">Sets one field one time. The chain then continues from the pinned value, so a pin does not freeze the field.</span>
+</div>
+</div>
+</div>
+</section>
+
+<section id="drive" class="pt-s34">
+<h2 class="pt-s7">Which field you drive decides the answer</h2>
+<p class="pt-s13">Measured on real 2022 data over six seeds, against a real S&amp;P 500 that fell 20.0%. The lever is inflation, not the policy rate.</p>
+
+<div class="pt-s186">
+
+<div class="pt-s106">
+<span class="pt-s39">
+<span class="pt-s51">Real S&amp;P 500, 2022</span>
+<span class="pt-s23">what actually happened</span>
+</span>
+<span class="pt-s176">
+<span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--ink);width:38.5%"></span>
+<span class="pt-s172"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums">-20.0%</span>
+</div>
+
+
+<div class="pt-s106">
+<span class="pt-s39">
+<span class="pt-s51">Drive inflation_rate</span>
+<span class="pt-s23">the published CPI path</span>
+</span>
+<span class="pt-s176">
+<span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--accent);width:44.8%"></span>
+<span class="pt-s172"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--accent);text-align:right;font-variant-numeric:tabular-nums">-23.3%</span>
+</div>
+
+
+<div class="pt-s106">
+<span class="pt-s39">
+<span class="pt-s51">Drive federal_funds_rate</span>
+<span class="pt-s23">the real seven-hike path</span>
+</span>
+<span class="pt-s176">
+<span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--amber);width:25.2%"></span>
+<span class="pt-s172"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--amber);text-align:right;font-variant-numeric:tabular-nums">-13.1%</span>
+</div>
+
+
+<div class="pt-s106">
+<span class="pt-s39">
+<span class="pt-s51">No scenario at all</span>
+<span class="pt-s23">drift and nothing more</span>
+</span>
+<span class="pt-s176">
+<span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--amber);width:24.2%"></span>
+<span class="pt-s172"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--amber);text-align:right;font-variant-numeric:tabular-nums">-12.6%</span>
+</div>
+
+</div>
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
+<p class="pt-s58">Inflation works because it steers the central bank's own reaction into the corporate bond yield. Do not pin <span class="pt-s184">corporate_bond_yield</span> when you do this. If you pin it, you cut the channel that the inflation path is using.</p>
+</div>
+</section>
+
+<section id="claim" class="pt-s34">
+<h2 class="pt-s7">Detect a scenario, do not size one</h2>
+<p class="pt-s13">The expected response is calibrated. The spread around it is not, and that is the whole gap.</p>
+
+<div class="pt-s68">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
+<h3 class="pt-s4">The size is right</h3>
+
+<div class="pt-s42">
+<span class="pt-s36">VIX</span>
+<span class="pt-s47">-0.00461 vs -0.00500</span>
+</div>
+
+<p class="pt-s157">OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.</p>
+
+<div class="pt-s42">
+<span class="pt-s36">Credit yield</span>
+<span class="pt-s47">-8.106 vs -7.445</span>
+</div>
+
+<p class="pt-s157">OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.</p>
+
+<div class="pt-s42">
+<span class="pt-s36">Valuation</span>
+<span class="pt-s47">+1.226 vs +1.272</span>
+</div>
+
+<p class="pt-s157">OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.</p>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
+<h3 class="pt-s4">The spread is too wide</h3>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.75rem;color:var(--red);font-variant-numeric:tabular-nums">1.565x</span>
+<p class="pt-s1">Residual dispersion over the driven window, against real. One run therefore understates how much of its own move came from the scenario.</p>
+<p class="pt-s185">So the envelope lets you detect a scenario's effect. It forbids you to size one from a single run.</p>
+</div>
+</div>
+
+<details class="pt-s12">
+<summary class="pt-s28">An event study agrees on sign two times out of six</summary>
+<div class="pt-s171">
+<p class="pt-s1">Over the five sessions after each of six dated 2020-21 events, the model agrees with real Apple on direction twice. The two that agree are the two the macro path carries. The Fed's intermeeting cut of 3 March 2020 goes the wrong way, +9.9% against a real -1.4%, because an announcement channel is absent. The vaccine result and Omicron are single-name news, which a macro path can not know.</p>
+</div>
+</details>
+
+<details class="pt-s12">
+<summary class="pt-s28">The endogenous economy can not reach its own crisis regimes</summary>
+<div class="pt-s171">
+<p class="pt-s1">Left alone, inflation peaks at 4.0% on every seed over five years. Real US CPI peaked at 9.0% in June 2022. The central bank has a crisis cadence that pulls its next meeting in, and a default run can not reach it. So an inflation regime or a policy crisis must come from a scenario. A volatility crisis does not: on pt-v10 the preset's own VIX crossed its crisis threshold on 10.2% of days against a real 12.5%.</p>
+</div>
+</details>
+</section>
+
+
+
+
+</main></div>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><a href="two-loops.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></a><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><a href="agents.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></a><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></span><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><a href="presets.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></a><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="agents.html"><span class="pt-eyebrow">BACK</span><span>Agents</span></a><a class="pt-next" href="execution-cost.html"><span class="pt-eyebrow">NEXT</span><span>Execution cost</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">SCENARIOS</span>
+</div>
+
+<section class="pt-s33">
+<h1 class="pt-s30">Scenarios</h1>
+<p class="pt-s24">A scenario drives the macro path. Without one, the economy finds its own path from day zero.</p>
+
+<div class="pt-s29">
+<pre class="pt-s31">shock = pt.Scenario.rate_shock(
+    start=0.025, end=0.05, over=15)
+
+pt.evaluate(agents, seed=7,
+            universe=u, days=20,
+            scenario=shock)
+
+# or move one field yourself
+engine.pin_macro(
+    corporate_bond_yield=0.09)</pre>
+<div class="pt-s180">
+<h3 class="pt-s4">Two ways to move the economy</h3>
+<div class="pt-s2">
+<span class="pt-s5">A scenario</span>
+<span class="pt-s0">Drives a path over many days. Use it for a crisis, a hiking cycle, or a real historical window.</span>
+</div>
+<div class="pt-s2">
+<span class="pt-s5">A pin</span>
+<span class="pt-s0">Sets one field one time. The chain then continues from the pinned value, so a pin does not freeze the field.</span>
+</div>
+</div>
+</div>
+</section>
+
+<section id="drive" class="pt-s34">
+<h2 class="pt-s7">Which field you drive decides the answer</h2>
+<p class="pt-s13">Measured on real 2022 data over six seeds, against a real S&amp;P 500 that fell 20.0%. The lever is inflation, not the policy rate.</p>
+
+<div class="pt-s186">
+<sc-for list="{{ levers }}" as="l">
+<div class="pt-s106">
+<span class="pt-s39">
+<span class="pt-s51">{{ l.k }}</span>
+<span class="pt-s23">{{ l.note }}</span>
+</span>
+<span class="pt-s176">
+<span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:{{ l.col }};width:{{ l.w }}"></span>
+<span class="pt-s172"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:{{ l.col }};text-align:right;font-variant-numeric:tabular-nums">{{ l.v }}</span>
+</div>
+
+</sc-for></div>
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
+<p class="pt-s58">Inflation works because it steers the central bank's own reaction into the corporate bond yield. Do not pin <span class="pt-s184">corporate_bond_yield</span> when you do this. If you pin it, you cut the channel that the inflation path is using.</p>
+</div>
+</section>
+
+<section id="claim" class="pt-s34">
+<h2 class="pt-s7">Detect a scenario, do not size one</h2>
+<p class="pt-s13">The expected response is calibrated. The spread around it is not, and that is the whole gap.</p>
+
+<div class="pt-s68">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
+<h3 class="pt-s4">The size is right</h3>
+<sc-for list="{{ gains }}" as="g">
+<div class="pt-s42">
+<span class="pt-s36">{{ g.k }}</span>
+<span class="pt-s47">{{ g.v }}</span>
+</div>
+
+<p class="pt-s157">OLS slope of daily return on each driver, model against real Apple, over the same 504 sessions.</p>
+</sc-for></div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
+<h3 class="pt-s4">The spread is too wide</h3>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.75rem;color:var(--red);font-variant-numeric:tabular-nums">1.565x</span>
+<p class="pt-s1">Residual dispersion over the driven window, against real. One run therefore understates how much of its own move came from the scenario.</p>
+<p class="pt-s185">So the envelope lets you detect a scenario's effect. It forbids you to size one from a single run.</p>
+</div>
+</div>
+
+<details class="pt-s12">
+<summary class="pt-s28">An event study agrees on sign two times out of six</summary>
+<div class="pt-s171">
+<p class="pt-s1">Over the five sessions after each of six dated 2020-21 events, the model agrees with real Apple on direction twice. The two that agree are the two the macro path carries. The Fed's intermeeting cut of 3 March 2020 goes the wrong way, +9.9% against a real -1.4%, because an announcement channel is absent. The vaccine result and Omicron are single-name news, which a macro path can not know.</p>
+</div>
+</details>
+
+<details class="pt-s12">
+<summary class="pt-s28">The endogenous economy can not reach its own crisis regimes</summary>
+<div class="pt-s171">
+<p class="pt-s1">Left alone, inflation peaks at 4.0% on every seed over five years. Real US CPI peaked at 9.0% in June 2022. The central bank has a crisis cadence that pulls its next meeting in, and a default run can not reach it. So an inflation regime or a policy crisis must come from a scenario. A volatility crisis does not: on pt-v10 the preset's own VIX crossed its crisis threshold on 10.2% of days against a real 12.5%.</p>
+</div>
+</details>
+</section>
+
+
+
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+
+    // One menu open at a time, and a click anywhere else closes them.
+    // <details> has no such behaviour on its own.
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) {
+        if (all[i] !== inside) all[i].removeAttribute('open');
+      }
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    // Median return over six seeds on real 2022 data, against a real -20.0%.
+    const rows = [
+      { k: 'Real S&P 500, 2022', n: -20.0, note: 'what actually happened', real: true },
+      { k: 'Drive inflation_rate', n: -23.3, note: 'the published CPI path' },
+      { k: 'Drive federal_funds_rate', n: -13.1, note: 'the real seven-hike path' },
+      { k: 'No scenario at all', n: -12.6, note: 'drift and nothing more' }
+    ];
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      showLight: dark ? 'none' : 'block',
+      showDark: dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      levers: rows.map(r => ({
+        k: r.k, note: r.note,
+        v: r.n.toFixed(1) + '%',
+        w: (50 * Math.abs(r.n) / 26).toFixed(1) + '%',
+        col: r.real ? 'var(--ink)' : Math.abs(r.n + 20) < 5 ? 'var(--accent)' : 'var(--amber)'
+      })),
+      gains: [
+        { k: 'VIX', v: '-0.00461 vs -0.00500' },
+        { k: 'Credit yield', v: '-8.106 vs -7.445' },
+        { k: 'Valuation', v: '+1.226 vs +1.272' }
+      ]
+    });
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {"doors": [{"title": "Start", "links": [{"label": "Install", "href": "install.html"}, {"label": "Core concepts", "href": "core-concepts.html"}, {"label": "The two loops", "href": "two-loops.html"}, {"label": "Running a market", "href": "running-a-market.html"}]}, {"title": "Use it", "links": [{"label": "Agents", "href": "agents.html"}, {"label": "Scenarios", "href": "scenarios.html"}, {"label": "Execution cost", "href": "execution-cost.html"}, {"label": "Checkpoints and forking", "href": "checkpoints.html"}, {"label": "Real companies from EDGAR", "href": "edgar.html"}, {"label": "RL environment", "href": "rl-environment.html"}, {"label": "The MCP server", "href": "mcp.html"}]}, {"title": "Trust it", "links": [{"label": "Realism envelope", "href": "realism-envelope.html"}, {"label": "The metrics", "href": "metrics.html"}, {"label": "Principles", "href": "principles.html"}, {"label": "Citing a run", "href": "citing.html"}]}, {"title": "Reference", "links": [{"label": "Glossary", "href": "glossary.html"}, {"label": "The nine factors", "href": "factors.html"}, {"label": "Conventions", "href": "conventions.html"}, {"label": "Schemas", "href": "schemas.html"}, {"label": "Presets", "href": "presets.html"}, {"label": "Release notes", "href": "release-notes.html"}]}, {"title": "API", "links": [{"label": "Core types", "href": "core-types.html"}, {"label": "Evaluate", "href": "evaluate.html"}, {"label": "Parameters", "href": "parameters.html"}]}]});
+})();
+</script>
 </body>
 </html>

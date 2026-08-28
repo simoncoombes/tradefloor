@@ -1,333 +1,663 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>The Agent Harness · pretium docs</title>
-<meta name="description" content="Any object with an act method is an agent. The whole contract with the evaluation harness: what it hands you, what you return, and how it scores what you did.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agents · pretium</title>
+<meta name="description" content="Any object with an act method can trade this market. What the agent sees, what the harness gives it, and how to compare two of them.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/agents.html">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium docs">
-<meta property="og:title" content="The Agent Harness">
-<meta property="og:description" content="Any object with an act method is an agent. The whole contract with the evaluation harness: what it hands you, what you return, and how it scores what you did.">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="Agents · pretium">
+<meta property="og:description" content="Any object with an act method can trade this market. What the agent sees, what the harness gives it, and how to compare two of them.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/agents.html">
-<meta property="article:published_time" content="2026-08-24T21:12:46-04:00">
-<meta property="article:modified_time" content="2026-08-27T11:30:25-04:00">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="The Agent Harness">
-<meta name="twitter:description" content="Any object with an act method is an agent. The whole contract with the evaluation harness: what it hands you, what you return, and how it scores what you did.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The Agent Harness","description":"Any object with an act method is an agent. The whole contract with the evaluation harness: what it hands you, what you return, and how it scores what you did.","url":"https://simoncoombes.github.io/pretium/agents.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-24T21:12:46-04:00","dateModified":"2026-08-27T11:30:25-04:00"}</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
-<style>:root{
-  --hue:55;
-  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
-  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
-  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
-  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
-  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
-  --bad:oklch(0.52 0.12 25);
-  --navact:oklch(0.945 0.012 var(--hue));
-  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
-  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
-  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
-  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
-}
-html[data-lightcode="true"]:not([data-theme="dark"]){
-  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
-  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
-}
-html[data-theme="dark"]{
-  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
-  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
-  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
-  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
-  --bad:oklch(0.72 0.11 25);
-  --navact:oklch(0.26 0.02 var(--hue));
-  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
-}
-html{scroll-behavior:auto}
-body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-::selection{background:var(--accent-soft)}
-p{margin:0 0 14px;text-wrap:pretty}
-h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
-ul{margin:0 0 14px;padding-left:22px}
-li{margin:0 0 7px}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
-pre{margin:0}
-code{font-family:var(--font-mono)}
-summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
-summary::marker{color:var(--faint)}
-details[open] summary{border-bottom:1px solid var(--linesoft)}
-button{font-family:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-h2[id],h3[id]{scroll-margin-top:80px}
-h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
-h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
-.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
-#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
-#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
-#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
-#hambtn{display:none}
-@media (max-width:920px){
-  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
-  #sbar[data-open="true"]{transform:none}
-  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
-  #hambtn{display:flex}
-  #searchwrap{display:none}
-  #ghlink{display:none}
-}
-.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
-  grid-template-columns:232px minmax(0,1fr);gap:40px}
-.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
-.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
-.sidebar li{margin:0 0 2px}
-.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
-.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
-.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
-main{padding:28px 0 72px;min-width:0}
-main h1{font-size:30px;margin:0 0 18px}
-main h2{font-size:20px;margin:34px 0 12px}
-main h3{font-size:16px;margin:24px 0 8px}
-.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
-.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
-  display:flex;align-items:baseline;gap:12px}
-.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
-.masthead .tag{color:var(--mut);font-size:13px}
-.masthead .spacer{flex:1}
-.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
-  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
-pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
-  padding:13px 16px;overflow-x:auto;font-size:13px}
-pre code{color:inherit}
-.tablewrap{overflow-x:auto}
-footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
-  color:var(--mut);font-size:13px}
-@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
-  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
-</style>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
 <script>
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-1LBM3239ZF');
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </head>
-<body>
-<header class="masthead"><div class="inner">
-<a class="brand" href="./">pretium</a>
-<span class="tag">repeatable market simulation</span>
-<span class="spacer"></span>
-<a href="https://github.com/simoncoombes/pretium">GitHub</a>
-</div></header>
-<div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><span aria-current="page">The agent harness</span></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li><li><a href="two-loops.html">The Two Loops</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="principles.html">The Principles</a></li></ul></nav>
-<main>
-<p class="appnote">This is the plain version of the page. The
-<a href="./#/agents">full documentation app</a> adds search, dark mode
-and copy buttons.</p>
-<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">GUIDE</div>
-        <h1 style="font-size:30px">The Agent Harness</h1>
-        <p style="font-size:16px;color:var(--mut);margin:14px 0 0">Any object with an <code style="font-size:14px">act</code> method is an agent. This page is the whole contract with the harness: what it hands you, what you return, and how it scores you.</p>
-        <p style="color:var(--mut);font-size:13.5px;margin:10px 0 0">This page is <strong>Loop B</strong>, evaluating a strategy against a market that already exists. The preset is a fixed input here. <a href="two-loops.html" style="color:var(--accent)">The two loops</a> says which is which.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">The Contract</h2>
-        <p>An agent needs one method: <code style="font-size:13px">act(obs)</code> receives an <code style="font-size:13px">Observation</code> and returns a dict of share quantities keyed by ticker, where positive buys, negative sells, and a ticker you omit or set to zero does nothing. There is no base class to inherit and nothing to register, so any object with that method will do.</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">class MyAgent:
-    def act(self, obs):
-        if not obs.is_first_step_of_day:      # once a day, correctly
-            return {}
-        ticker = obs.tickers[0]
-        shares = 0.01 * obs.avg_volume(ticker)   # size by participation
-        return {ticker: shares}
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu pt-here"><summary>Use it<span class="pt-caret">▼</span></summary><div><span class="pt-current">Agents</span><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
 
-scores = pt.evaluate({"mine": MyAgent()}, seed=7,
-                     universe=universe, days=10)
-print(scores["mine"].return_pct, scores["mine"].trades)</code></pre>
-        </div>
-        <div style="border:1px solid var(--line);border-radius:9px;padding:14px 18px 4px;margin:26px 0;background:var(--panel)">
-          <div style="font:600 10.5px/1 var(--font-mono);letter-spacing:0.09em;color:var(--bad);margin:0 0 9px">THE TRAP THAT HAS COST PEOPLE REAL RUNS</div>
-          <p style="font-size:13.5px;color:var(--mut)"><code style="font-size:12px">obs.step</code> counts the whole run, not the day. At the default six steps a day, day 1 starts at step 6 and day 3 at step 18. So <code style="font-size:12px">if obs.step != 0: return {}</code> reads like a once-a-day guard and is a once-a-run guard: the agent trades on the first step of day zero, never again, and produces a scorecard with <code style="font-size:12px">trades=1</code> and no errors. It looks exactly like an agent that considered the market and declined.</p>
-          <p style="font-size:13.5px;color:var(--mut)">Use <code style="font-size:12px">obs.is_first_step_of_day</code>, <code style="font-size:12px">obs.is_last_step_of_day</code> or <code style="font-size:12px">obs.step_of_day</code>. The library cannot catch the mistake, because it is arithmetic on an integer with no call to intercept.</p>
-        </div>
-        <h2 style="font-size:21px;margin:46px 0 10px">What You Are Handed</h2>
-        <p><code style="font-size:13px">Observation</code> is deliberately narrow: everything on it is something a real trader could see, and nothing on it is something only the simulator knows.</p>
-        <div class="tablewrap"><table>
-          <thead><tr><th>Member</th><th>What it is</th></tr></thead>
-          <tbody style="font-size:13.5px">
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">obs.step</td><td>Index over every decision point in the run. Day 1 starts at 6 under the default cadence.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.step_of_day</td><td>Index within the day, 0 at every open. Derived, so it cannot disagree with <code style="font-size:12px">step</code>.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.is_first_step_of_day</td><td>True at the day's opening decision point. The correct once-a-day guard.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.is_last_step_of_day</td><td>True at the day's final decision point, before the close.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.day</td><td>Day index in the run.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.steps_per_day</td><td>The harness cadence. Exposed because an agent reasoning about a horizon cannot infer it at step zero.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.tickers</td><td>The roster, in index order.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.prices</td><td>Current prices, aligned to <code style="font-size:12px">tickers</code>.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.price(ticker)</td><td>One price by name.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.book(ticker)</td><td>The live order book, with the depth a trader would see.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.avg_volume(ticker)</td><td>Average daily volume. Public information, and how size should be reasoned about.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.participation(ticker, shares)</td><td>That order as a fraction of average daily volume.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.position(ticker)</td><td>Your current holding, in shares. Zero if none.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.portfolio</td><td>The <code style="font-size:12px">Portfolio</code>: cash and positions.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">obs.engine</td><td>The engine itself. Available, and using it for anything a trader could not see makes your result a different claim.</td></tr>
-          </tbody>
-        </table></div>
-        <div style="border:1px solid var(--line);border-radius:9px;padding:14px 18px 4px;margin:26px 0;background:var(--panel)">
-          <div style="font:600 10.5px/1 var(--font-mono);letter-spacing:0.09em;color:var(--accent);margin:0 0 9px">SIZE IN PARTICIPATION, NOT SHARES</div>
-          <p style="font-size:13.5px;color:var(--mut)">Impact scales with participation. The same 13.7 million shares is 0.05x a day's volume in one name here and 407x in another; the first order moves nothing and the second moves the price 47%. An agent sizing in flat share counts is not choosing a position, it is running a different experiment per instrument.</p>
-        </div>
-        <h2 style="font-size:21px;margin:46px 0 10px">The Two Objects You Reach Through</h2>
-        <p><code style="font-size:13px">obs.portfolio</code> is a <code style="font-size:13px">Portfolio</code>: your cash and your holdings.</p>
-        <div class="tablewrap"><table>
-          <tbody style="font-size:13.5px">
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">portfolio.cash</td><td>Uninvested cash.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">portfolio.positions</td><td>A dict of ticker to <code style="font-size:12px">Position</code>. A ticker you hold nothing in is absent rather than present at zero, which is why <code style="font-size:12px">obs.position(ticker)</code> exists.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">position.quantity</td><td>Shares held. Negative when short.</td></tr>
-          </tbody>
-        </table></div>
-        <p><code style="font-size:13px">obs.book(ticker)</code> returns the live <code style="font-size:13px">OrderBook</code>, with the depth on each side as <code style="font-size:13px">PriceLevel</code> entries carrying a price and a size. That is what lets an agent size against real liquidity instead of guessing: walk the levels and you know what your order will actually pay before you send it.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">The Optional Second Method</h2>
-        <p><code style="font-size:13px">explain(day)</code> is optional, and returns the factor you believe drove the largest recent move, as one of the nine names in <a href="factors.html">The Nine Components</a>. The harness compares your answer against the engine's own attribution and reports the hit rate as <code style="font-size:13px">explanation_accuracy</code> on the scorecard.</p>
-        <p>The signature is <code style="font-size:13px">explain(self, day)</code>, not <code style="font-size:13px">explain(self)</code>. Get it wrong and nothing raises where you will see it: the harness records the error per day and reports <code style="font-size:13px">explanation_accuracy</code> as <code style="font-size:13px">None</code>, so the column reads <code style="font-size:13px">-</code> and looks like the feature is switched off.</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">class MyAgent:
-    def act(self, obs):
-        ...
-
-    def explain(self, day):
-        return "momentum"        # one of the nine factor names</code></pre>
-        </div>
-        <h2 style="font-size:21px;margin:46px 0 10px">How the Harness Runs You</h2>
-        <p><code style="font-size:13px">pt.evaluate</code> owns the session, and its defaults are the shape of your run, so they matter more than most defaults do.</p>
-        <div class="tablewrap"><table>
-          <thead><tr><th>Argument</th><th style="text-align:right">Default</th><th>What it does</th></tr></thead>
-          <tbody style="font-size:13.5px">
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">agents</td><td style="text-align:right">-</td><td>A dict of name to agent instance or <code style="font-size:12px">StrategySpec</code>.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">seed</td><td style="text-align:right">-</td><td>The market. Required.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">universe</td><td style="text-align:right">-</td><td>The roster. Required.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">days</td><td style="text-align:right">5</td><td>Trading days to run.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">steps_per_day</td><td style="text-align:right">6</td><td>Decision points per day. The clock advances between them, so a stepped day is bit-identical to one unbroken session.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">ticks_per_step</td><td style="text-align:right">65</td><td>Minutes per step. Six times 65 is the 390-minute day.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">cash</td><td style="text-align:right">1_000_000.0</td><td>Starting cash.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">max_leverage</td><td style="text-align:right">2.0</td><td>Gross exposure cap. Orders that would breach it are rejected and counted in <code style="font-size:12px">rejected</code>.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">macro</td><td style="text-align:right">None</td><td>Day-zero macro state.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">scenario</td><td style="text-align:right">None</td><td>A macro path to impose.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">model</td><td style="text-align:right">None</td><td>Preset name or <code style="font-size:12px">ModelParams</code>. Every agent in one call runs the same model, because scoring across models would compare markets.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">start</td><td style="text-align:right">(9, 30, 3)</td><td>Session start time.</td></tr>
-          </tbody>
-        </table></div>
-        <p><strong>Agents are stateful, and one instance cannot be reused across two calls.</strong> Build a fresh instance per evaluation, or pass a factory, as <code style="font-size:13px">pt.rank</code> does.</p>
-        <p>No fees or commissions are charged. Everything an order costs you comes from the book: the spread you cross and the levels you consume. Borrow costs are not modelled either, so a short is free to hold.</p>
-        <h2 style="font-size:21px;margin:46px 0 10px">What You Get Back</h2>
-        <p>You get one <code style="font-size:13px">Scorecard</code> per agent, and <code style="font-size:13px">as_dict()</code> returns every field on it. Note that there is no Sharpe or drawdown here: compute those from <code style="font-size:13px">bars</code> if you want them.</p>
-        <div class="tablewrap"><table>
-          <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
-          <tbody style="font-size:13.5px">
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px;white-space:nowrap">name</td><td>The key you passed in.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">pnl</td><td>Profit and loss in currency.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">return_pct</td><td>Return as a percentage.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">final_net_worth</td><td>Cash plus marked positions at the end.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">trades</td><td>Fills executed.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">turnover</td><td>Traded notional.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">impact_bps</td><td>Your footprint against the same seed with nobody trading. Read it over a day or two, not weeks: fills feed back into the price process, so the gap compounds and by day three the sign belongs to the seed.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">max_leverage</td><td>Peak gross exposure reached.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">rejected</td><td>Orders refused, usually by the leverage cap.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">errors</td><td>Exceptions your agent raised, per step. Check this before reading anything else.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">explanations</td><td>Your <code style="font-size:12px">explain</code> answers beside the engine's.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">explanation_accuracy</td><td>Share of days you named the right factor, or <code style="font-size:12px">None</code> if you did not implement <code style="font-size:12px">explain</code>.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">seed · universe_fingerprint</td><td>Which market this came from. A leaderboard without both is a table that cannot be rerun.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">strategy_fingerprint</td><td>Set when the agent came from a <code style="font-size:12px">StrategySpec</code>. Empty for a hand-written agent, which is the honest reading: that result is reproducible only by citing code at a commit.</td></tr>
-            <tr><td style="font-family:var(--font-mono);font-size:12.5px">model_fingerprint</td><td>Which coefficients priced it.</td></tr>
-          </tbody>
-        </table></div>
-        <h2 style="font-size:21px;margin:46px 0 10px">A Complete Custom Agent</h2>
-        <p>A complete agent that buys the cheapest names against fair value, sizes by participation, rebalances once a day and explains itself, which you can paste and run as it stands.</p>
-        <div data-codeblock="1" style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px 7px 14px;border-bottom:1px solid var(--codeline)">
-            <span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">PYTHON</span>
-            
-          </div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="py" style="font:400 13px/1.7 var(--font-mono);color:var(--codefg)">import pretium as pt
-
-class ValueAgent:
-    """Buy the most undervalued names, one decision a day."""
-
-    def __init__(self, top_k=5, participation=0.02):
-        self.top_k = top_k
-        self.participation = participation
-
-    def act(self, obs):
-        if not obs.is_first_step_of_day:
-            return {}
-
-        # rank by discount to fair value, which a real trader would
-        # estimate; here we use our own crude proxy: price vs its own
-        # 5-day mean, held on the agent.
-        history = getattr(self, "_hist", [])
-        history.append(list(obs.prices))
-        self._hist = history[-6:]
-        if len(self._hist) &lt; 6:
-            return {}
-
-        scores = []
-        for i, ticker in enumerate(obs.tickers):
-            mean = sum(h[i] for h in self._hist) / len(self._hist)
-            scores.append(((obs.prices[i] - mean) / mean, ticker))
-        scores.sort()
-        picks = [t for _, t in scores[: self.top_k]]
-
-        orders = {}
-        for ticker in picks:
-            target = self.participation * obs.avg_volume(ticker)
-            delta = target - obs.position(ticker)
-            if abs(delta) &gt; 1:
-                orders[ticker] = delta
-        return orders
-
-    def explain(self, day):
-        return "reversion"
-
-universe = pt.Universe.random(30, seed=11)
-scores = pt.evaluate({"value": ValueAgent(),
-                      **{k: v for k, v in pt.reference_agents(seed=3).items()}},
-                     seed=7, universe=universe, days=20)
-
-for name, card in scores.items():
-    print(f"{name:16s} {card.return_pct:+7.2f}%  trades={card.trades:4d} "
-          f"errors={len(card.errors)} why={card.explanation_accuracy}")</code></pre>
-        </div>
-        <div style="background:var(--codebg);border:1px solid var(--codeline);border-radius:9px;margin:18px 0;overflow:hidden">
-          <div style="padding:7px 14px;border-bottom:1px solid var(--codeline)"><span style="font:500 10.5px/1 var(--font-mono);color:var(--codemut);letter-spacing:0.07em">OUTPUT</span><span title="Captured from the run named beside this block." style="font:500 9.5px/1 var(--font-mono);letter-spacing:0.07em;border-radius:5px;padding:3px 6px;margin-left:8px;color:var(--tks);border:1px solid var(--tks)">MEASURED</span></div>
-          <pre style="padding:13px 16px;overflow-x:auto"><code data-lang="txt" style="font:400 12.5px/1.75 var(--font-mono);color:var(--codemut)">value             -19.99%  trades=   5 errors=56 why=0.0
-buy_and_hold       -5.01%  trades=  30 errors=0 why=None
-random             -2.70%  trades=3583 errors=0 why=None
-momentum           +0.26%  trades=1485 errors=0 why=None
-mean_reversion    +13.44%  trades=1606 errors=0 why=None
-oracle            +15.68%  trades=1124 errors=0 why=1.0</code></pre>
-        </div>
-        <p style="font:400 12px/1.6 var(--font-mono);color:var(--faint);margin:10px 0 14px">Measured: pretium 0.3.0, pt-v12, the code above it run verbatim. Nothing is edited, which is the point of the block.</p>
-        <p>Read <code style="font-size:13px">errors</code> first, and both failure shapes are in front of you. The QUIET one is a guard bug: a suspiciously low <code style="font-size:13px">trades</code> count with an EMPTY error list, which is the trap at the top of this page. The LOUD one is the <code style="font-size:13px">value</code> row here, 5 trades against 56 errors, every one of them <code style="font-size:12.5px">trade would take leverage to N above the 2.00x limit</code>. Sizing at 2% of average volume across five names asks for far more than a $1,000,000 account can carry, so the harness rejects the order instead of filling it. That agent is not a bad strategy, it is an unsized one, and its <code style="font-size:13px">why=0.0</code> is the same story: it answers <code style="font-size:12.5px">"reversion"</code> every day whatever moved. Then remember the oracle reads the true mispricing, so it is a reference rather than a competitor, and one seed ranks the seed as much as the agents. Take it to <a href="simulate.html">many markets</a> before you believe an ordering.</p>
-</main>
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">AGENTS</span>
 </div>
-<footer class="site"><div class="layout" style="display:block">
-pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
-</div></footer>
+
+<section class="pt-s33">
+<h1 class="pt-s30">Agents</h1>
+<p class="pt-s24">An agent is any object with an <span style="font-family:'Spline Sans Mono',monospace;font-size:1rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">act</span> method. The harness gives it an observation and takes back target weights.</p>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 class="pt-s4">Three kinds of agent use this page</h3>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.9rem">
+
+<div class="pt-s2">
+<span class="pt-s5">An execution algorithm</span>
+<span class="pt-s3">A TWAP, a VWAP, an iceberg. You write the logic in Python.</span>
+</div>
+
+
+<div class="pt-s2">
+<span class="pt-s5">A trained policy</span>
+<span class="pt-s3">A reinforcement-learning policy through the Gymnasium environment.</span>
+</div>
+
+
+<div class="pt-s2">
+<span class="pt-s5">An LLM agent</span>
+<span class="pt-s3">A model that reads the observation and answers with weights at each step.</span>
+</div>
+
+</div>
+<p style="margin:0.2rem 0 0;padding-top:0.75rem;border-top:1px solid var(--line-soft);font-size:0.8125rem;color:var(--ink-2)">An LLM agent trades inside the market from here. A model that studies the market from outside uses <a href="mcp.html">the MCP server</a> instead, and writes no code at all.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
+<pre class="pt-s31">class Mine:
+    def act(self, obs):
+        # target weights, one per name
+        return {"AAA": 0.2, "AAB": -0.1}
+
+scores = pt.evaluate(
+    {"mine": Mine()}, seed=7,
+    universe=u, days=10)
+
+scores["mine"].return_pct
+scores["mine"].impact_bps</pre>
+<div class="pt-s180">
+<h3 class="pt-s4">Three rules of the harness</h3>
+
+<div class="pt-s2">
+<span class="pt-s5">You return target weights</span>
+<span class="pt-s0">Weights in [-1, 1], one per name. The harness turns them into orders, so a policy does not learn each price range first.</span>
+</div>
+
+
+<div class="pt-s2">
+<span class="pt-s5">The market answers back</span>
+<span class="pt-s0">Orders match against real depth. Reward is measured after the market moves, so it already carries the cost of your own footprint.</span>
+</div>
+
+
+<div class="pt-s2">
+<span class="pt-s5">The seed owns the randomness</span>
+<span class="pt-s0">Give the same agent the same seed and universe, and you get the same run.</span>
+</div>
+
+</div>
+</div>
+</section>
+
+<section id="see" class="pt-s34">
+<h2 class="pt-s7">The observation is narrow on purpose</h2>
+<p class="pt-s13">Everything in it is something a real trader can see. Nothing in it is something only the simulator knows.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 class="pt-s66">The agent sees</h3>
+<div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+
+<span class="pt-s137">prices</span>
+
+
+<span class="pt-s137">the order book</span>
+
+
+<span class="pt-s137">your position</span>
+
+
+<span class="pt-s137">your cash</span>
+
+
+<span class="pt-s137">the step number</span>
+
+</div>
+</div>
+<div class="pt-s181">
+<h3 class="pt-s4">The agent never sees</h3>
+<div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+
+<span class="pt-s138">the true mispricing</span>
+
+
+<span class="pt-s138">fair value</span>
+
+
+<span class="pt-s138">tomorrow's prices</span>
+
+
+<span class="pt-s138">other agents' orders</span>
+
+</div>
+<p style="margin:0.2rem 0 0;font-size:0.8125rem;color:var(--ink-2)">The Oracle is the exception. It reads the true mispricing and declares itself, which is why it is a reference and not a competitor.</p>
+</div>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;font-size:0.875rem;color:var(--ink-2)"><span class="pt-s27">step</span> counts the whole run, not the day. A ten-day run at three decisions a day ends at step 30.</div>
+</section>
+
+<section id="compare" class="pt-s34">
+<h2 class="pt-s7">Compare agents</h2>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.4rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red)">ONE MARKET EACH, NOT ONE SHARED BOOK</span>
+<p class="pt-s1">Ten agents in one <span class="pt-s27">evaluate</span> call get ten private engines, built from the same seed and roster. Each agent pays its own impact and sees nobody else's orders. That is what makes the comparison clean. It is also why there is no arena. To make agents take each other's depth, drive one engine yourself and combine their flow into each tick.</p>
+</div>
+<p class="pt-s13">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
+
+<div class="pt-s29">
+<div style="display:flex;flex-direction:column;gap:0.8rem">
+<pre class="pt-s31">ranking = pt.rank(
+    lambda: pt.reference_agents(seed=3),
+    seeds=range(12), universe=u,
+    days=10, workers=4)
+
+ranking.separation("mean_reversion",
+                   "momentum")</pre>
+<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-3)">{'wins': 9, 'losses': 3,
+ 'ties': 0, 'p_value': 0.1460}</pre>
+</div>
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.9rem">
+<h3 class="pt-s4">Twelve markets, one square each</h3>
+<div style="display:flex;gap:4px">
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--accent)"></span>
+
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--accent)"></span>
+
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--accent)"></span>
+
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--accent)"></span>
+
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--accent)"></span>
+
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--accent)"></span>
+
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--accent)"></span>
+
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--amber)"></span>
+
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--amber)"></span>
+
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--amber)"></span>
+
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--amber)"></span>
+
+
+<span style="flex:1;height:34px;border-radius:3px;background:var(--amber)"></span>
+
+</div>
+<div style="display:flex;gap:1.2rem;flex-wrap:wrap">
+<span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent)"></span>mean-reversion won 9</span>
+<span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--amber)"></span>momentum won 3</span>
+</div>
+<p class="pt-s185">The squares show the tally, not the seed order. Which seed fell which way is in the agents docs.</p>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
+
+<div class="pt-s83">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent);font-variant-numeric:tabular-nums">3x</span>
+<span class="pt-s57">pooled capture</span>
+<span class="pt-s3">Mean-reversion at +0.783 against momentum at +0.259, across the grid.</span>
+</div>
+
+
+<div class="pt-s83">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--amber);font-variant-numeric:tabular-nums">0.15</span>
+<span class="pt-s57">sign-test p-value</span>
+<span class="pt-s3">A 9 to 3 split on twelve paired markets. The sign test does not call that settled.</span>
+</div>
+
+
+<div class="pt-s83">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--red);font-variant-numeric:tabular-nums">8 / 12</span>
+<span class="pt-s57">single-seed hit rate</span>
+<span class="pt-s3">How often one market picks the pooled leader. The other four crown momentum three times and buy-and-hold once.</span>
+</div>
+
+</div>
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
+<p class="pt-s58">Pooled, mean-reversion leads by three times. Paired, 9 to 3 at p = 0.15 is not a separation. Both numbers are true and they answer different questions: how much it won by, and how often. Report the pair.</p>
+</div>
+</section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">The shipped baselines</h2>
+<p class="pt-s13">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
+<div class="pt-s11">
+
+<div class="pt-s101">
+<span class="pt-s6">hold</span>
+<span class="pt-s0">Buy the roster on day one and do nothing. The number every other agent must beat.</span>
+</div>
+
+
+<div class="pt-s101">
+<span class="pt-s6">random</span>
+<span class="pt-s0">Weights from its own seed, which lives in the spec. The noise floor.</span>
+</div>
+
+
+<div class="pt-s101">
+<span class="pt-s6">momentum</span>
+<span class="pt-s0">Buys what rose. Pools at +0.259 on the published grid. Read the herding dial caveat below before you trust it.</span>
+</div>
+
+
+<div class="pt-s101">
+<span class="pt-s6">mean_reversion</span>
+<span class="pt-s0">Buys what fell. Pools at +0.783 on the published grid, and it beats the Oracle on 5 of the 12 markets.</span>
+</div>
+
+
+<div class="pt-s101">
+<span class="pt-s6">oracle</span>
+<span class="pt-s0">Reads the true mispricing, and gets no extra capital for it. A reference point, not a ceiling: agents out-earn it on 5 of 12 markets.</span>
+</div>
+
+</div>
+</section>
+
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
+<h2 style="font-size:1.25rem">Read this before you conclude</h2>
+<details class="pt-s12">
+<summary class="pt-s28">Momentum can work here for a reason real markets do not supply</summary>
+<div class="pt-s171">
+<p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v12 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0239, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
+</div>
+</details>
+<details class="pt-s12">
+<summary class="pt-s28">No counterparty adapts to you</summary>
+<div class="pt-s171">
+<p class="pt-s1">You trade against a market maker and aggregate flow. Orders arrive instantly and there is one book per name. Nothing in the market learns your pattern and front-runs it.</p>
+</div>
+</details>
+</section>
+
+
+
+
+</main></div>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><a href="two-loops.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></a><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></span><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><a href="glossary.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></a><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><a href="presets.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></a><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="running-a-market.html"><span class="pt-eyebrow">BACK</span><span>Running a market</span></a><a class="pt-next" href="scenarios.html"><span class="pt-eyebrow">NEXT</span><span>Scenarios</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">AGENTS</span>
+</div>
+
+<section class="pt-s33">
+<h1 class="pt-s30">Agents</h1>
+<p class="pt-s24">An agent is any object with an <span style="font-family:'Spline Sans Mono',monospace;font-size:1rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">act</span> method. The harness gives it an observation and takes back target weights.</p>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 class="pt-s4">Three kinds of agent use this page</h3>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.9rem">
+<sc-for list="{{ kinds }}" as="k">
+<div class="pt-s2">
+<span class="pt-s5">{{ k.k }}</span>
+<span class="pt-s3">{{ k.v }}</span>
+</div>
+
+</sc-for></div>
+<p style="margin:0.2rem 0 0;padding-top:0.75rem;border-top:1px solid var(--line-soft);font-size:0.8125rem;color:var(--ink-2)">An LLM agent trades inside the market from here. A model that studies the market from outside uses <a href="mcp.html">the MCP server</a> instead, and writes no code at all.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
+<pre class="pt-s31">class Mine:
+    def act(self, obs):
+        # target weights, one per name
+        return {"AAA": 0.2, "AAB": -0.1}
+
+scores = pt.evaluate(
+    {"mine": Mine()}, seed=7,
+    universe=u, days=10)
+
+scores["mine"].return_pct
+scores["mine"].impact_bps</pre>
+<div class="pt-s180">
+<h3 class="pt-s4">Three rules of the harness</h3>
+<sc-for list="{{ rules }}" as="r">
+<div class="pt-s2">
+<span class="pt-s5">{{ r.k }}</span>
+<span class="pt-s0">{{ r.v }}</span>
+</div>
+
+</sc-for></div>
+</div>
+</section>
+
+<section id="see" class="pt-s34">
+<h2 class="pt-s7">The observation is narrow on purpose</h2>
+<p class="pt-s13">Everything in it is something a real trader can see. Nothing in it is something only the simulator knows.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 class="pt-s66">The agent sees</h3>
+<div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+<sc-for list="{{ sees }}" as="s">
+<span class="pt-s137">{{ s }}</span>
+
+</sc-for></div>
+</div>
+<div class="pt-s181">
+<h3 class="pt-s4">The agent never sees</h3>
+<div style="display:flex;flex-wrap:wrap;gap:0.3rem">
+<sc-for list="{{ hidden }}" as="s">
+<span class="pt-s138">{{ s }}</span>
+
+</sc-for></div>
+<p style="margin:0.2rem 0 0;font-size:0.8125rem;color:var(--ink-2)">The Oracle is the exception. It reads the true mispricing and declares itself, which is why it is a reference and not a competitor.</p>
+</div>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;font-size:0.875rem;color:var(--ink-2)"><span class="pt-s27">step</span> counts the whole run, not the day. A ten-day run at three decisions a day ends at step 30.</div>
+</section>
+
+<section id="compare" class="pt-s34">
+<h2 class="pt-s7">Compare agents</h2>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.4rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red)">ONE MARKET EACH, NOT ONE SHARED BOOK</span>
+<p class="pt-s1">Ten agents in one <span class="pt-s27">evaluate</span> call get ten private engines, built from the same seed and roster. Each agent pays its own impact and sees nobody else's orders. That is what makes the comparison clean. It is also why there is no arena. To make agents take each other's depth, drive one engine yourself and combine their flow into each tick.</p>
+</div>
+<p class="pt-s13">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
+
+<div class="pt-s29">
+<div style="display:flex;flex-direction:column;gap:0.8rem">
+<pre class="pt-s31">ranking = pt.rank(
+    lambda: pt.reference_agents(seed=3),
+    seeds=range(12), universe=u,
+    days=10, workers=4)
+
+ranking.separation("mean_reversion",
+                   "momentum")</pre>
+<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-3)">{'wins': 9, 'losses': 3,
+ 'ties': 0, 'p_value': 0.1460}</pre>
+</div>
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.9rem">
+<h3 class="pt-s4">Twelve markets, one square each</h3>
+<div style="display:flex;gap:4px">
+<sc-for list="{{ tally }}" as="t">
+<span style="flex:1;height:34px;border-radius:3px;background:{{ t.col }}"></span>
+
+</sc-for></div>
+<div style="display:flex;gap:1.2rem;flex-wrap:wrap">
+<span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent)"></span>mean-reversion won 9</span>
+<span style="display:flex;align-items:center;gap:0.35rem;font-size:0.8125rem;color:var(--ink-2)"><span style="width:9px;height:9px;border-radius:2px;background:var(--amber)"></span>momentum won 3</span>
+</div>
+<p class="pt-s185">The squares show the tally, not the seed order. Which seed fell which way is in the agents docs.</p>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:1rem">
+<sc-for list="{{ readouts }}" as="r">
+<div class="pt-s83">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:{{ r.col }};font-variant-numeric:tabular-nums">{{ r.n }}</span>
+<span class="pt-s57">{{ r.k }}</span>
+<span class="pt-s3">{{ r.v }}</span>
+</div>
+
+</sc-for></div>
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:0.9rem 1rem">
+<p class="pt-s58">Pooled, mean-reversion leads by three times. Paired, 9 to 3 at p = 0.15 is not a separation. Both numbers are true and they answer different questions: how much it won by, and how often. Report the pair.</p>
+</div>
+</section>
+
+<section class="pt-s19">
+<h2 class="pt-s7">The shipped baselines</h2>
+<p class="pt-s13">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
+<div class="pt-s11">
+<sc-for list="{{ baselines }}" as="b">
+<div class="pt-s101">
+<span class="pt-s6">{{ b.n }}</span>
+<span class="pt-s0">{{ b.d }}</span>
+</div>
+
+</sc-for></div>
+</section>
+
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
+<h2 style="font-size:1.25rem">Read this before you conclude</h2>
+<details class="pt-s12">
+<summary class="pt-s28">Momentum can work here for a reason real markets do not supply</summary>
+<div class="pt-s171">
+<p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v12 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0239, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
+</div>
+</details>
+<details class="pt-s12">
+<summary class="pt-s28">No counterparty adapts to you</summary>
+<div class="pt-s171">
+<p class="pt-s1">You trade against a market maker and aggregate flow. Orders arrive instantly and there is one book per name. Nothing in the market learns your pattern and front-runs it.</p>
+</div>
+</details>
+</section>
+
+
+
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+
+    // One menu open at a time, and a click anywhere else closes them.
+    // <details> has no such behaviour on its own.
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) {
+        if (all[i] !== inside) all[i].removeAttribute('open');
+      }
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      showLight: dark ? 'none' : 'block',
+      showDark: dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      // 7 wins, 5 losses on the published twelve-market grid. The squares are
+      // the tally only: which seed fell which way is not in these docs.
+      tally: Array.from({ length: 12 }, (_, i) => ({
+        col: i < 7 ? 'var(--accent)' : 'var(--amber)'
+      })),
+      readouts: [
+        { n: '3x', k: 'pooled capture', v: 'Mean-reversion at +0.783 against momentum at +0.259, across the grid.', col: 'var(--accent)' },
+        { n: '0.15', k: 'sign-test p-value', v: 'A 9 to 3 split on twelve paired markets. The sign test does not call that settled.', col: 'var(--amber)' },
+        { n: '8 / 12', k: 'single-seed hit rate', v: 'How often one market picks the pooled leader. The other four crown momentum three times and buy-and-hold once.', col: 'var(--red)' }
+      ],
+      kinds: [
+        { k: 'An execution algorithm', v: 'A TWAP, a VWAP, an iceberg. You write the logic in Python.' },
+        { k: 'A trained policy', v: 'A reinforcement-learning policy through the Gymnasium environment.' },
+        { k: 'An LLM agent', v: 'A model that reads the observation and answers with weights at each step.' }
+      ],
+      rules: [
+        { k: 'You return target weights', v: 'Weights in [-1, 1], one per name. The harness turns them into orders, so a policy does not learn each price range first.' },
+        { k: 'The market answers back', v: 'Orders match against real depth. Reward is measured after the market moves, so it already carries the cost of your own footprint.' },
+        { k: 'The seed owns the randomness', v: 'Give the same agent the same seed and universe, and you get the same run.' }
+      ],
+      sees: ['prices', 'the order book', 'your position', 'your cash', 'the step number'],
+      hidden: ['the true mispricing', 'fair value', 'tomorrow\u0027s prices', 'other agents\u0027 orders'],
+      baselines: [
+        { n: 'hold', d: 'Buy the roster on day one and do nothing. The number every other agent must beat.' },
+        { n: 'random', d: 'Weights from its own seed, which lives in the spec. The noise floor.' },
+        { n: 'momentum', d: 'Buys what rose. Pools at +0.259 on the published grid. Read the herding dial caveat below before you trust it.' },
+        { n: 'mean_reversion', d: 'Buys what fell. Pools at +0.783 on the published grid, and it beats the Oracle on 5 of the 12 markets.' },
+        { n: 'oracle', d: 'Reads the true mispricing, and gets no extra capital for it. A reference point, not a ceiling: agents out-earn it on 5 of 12 markets.' }
+      ]
+    });
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {"doors": [{"title": "Start", "links": [{"label": "Install", "href": "install.html"}, {"label": "Core concepts", "href": "core-concepts.html"}, {"label": "The two loops", "href": "two-loops.html"}, {"label": "Running a market", "href": "running-a-market.html"}]}, {"title": "Use it", "links": [{"label": "Agents", "href": "agents.html"}, {"label": "Scenarios", "href": "scenarios.html"}, {"label": "Execution cost", "href": "execution-cost.html"}, {"label": "Checkpoints and forking", "href": "checkpoints.html"}, {"label": "Real companies from EDGAR", "href": "edgar.html"}, {"label": "RL environment", "href": "rl-environment.html"}, {"label": "The MCP server", "href": "mcp.html"}]}, {"title": "Trust it", "links": [{"label": "Realism envelope", "href": "realism-envelope.html"}, {"label": "The metrics", "href": "metrics.html"}, {"label": "Principles", "href": "principles.html"}, {"label": "Citing a run", "href": "citing.html"}]}, {"title": "Reference", "links": [{"label": "Glossary", "href": "glossary.html"}, {"label": "The nine factors", "href": "factors.html"}, {"label": "Conventions", "href": "conventions.html"}, {"label": "Schemas", "href": "schemas.html"}, {"label": "Presets", "href": "presets.html"}, {"label": "Release notes", "href": "release-notes.html"}]}, {"title": "API", "links": [{"label": "Core types", "href": "core-types.html"}, {"label": "Evaluate", "href": "evaluate.html"}, {"label": "Parameters", "href": "parameters.html"}]}]});
+})();
+</script>
 </body>
 </html>

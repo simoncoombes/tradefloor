@@ -219,7 +219,7 @@ def kind_of(sentence: str) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--site", default=str(ROOT / "docs" / "learn"))
+    ap.add_argument("--site", default=str(ROOT / "docs2" / "v2"))
     ap.add_argument("--out", default=str(HERE / "figures-todo.json"))
     args = ap.parse_args()
 
@@ -255,7 +255,7 @@ def main() -> None:
             "bring it under remeasure.py."
         ),
         "figures": [
-            {"id": f"learn.{c['page']}.{i}", "file": f"docs/learn/{c['page']}.html",
+            {"id": f"learn.{c['page']}.{i}", "file": f"docs/{c['page']}.html",
              "label": c["sentence"][:160], "published": c["value"], "unit": c["unit"],
              "kind": kind_of(c["sentence"]), "group": None, "key": None}
             for i, c in enumerate(todo)

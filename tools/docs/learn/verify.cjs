@@ -1,6 +1,6 @@
 /* Load every built page in a real browser and check it.
  *
- *     node tools/docs/learn/verify.cjs docs/learn
+ *     node tools/docs/learn/verify.cjs docs
  *
  * A static site generator can only prove that it wrote files. This proves
  * the files work: it drives headless Chrome over the DevTools protocol,
@@ -27,7 +27,7 @@ const path = require('path');
 const CHROME = process.env.CHROME ||
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
-const outDir = path.resolve(process.argv[2] || 'docs/learn');
+const outDir = path.resolve(process.argv[2] || 'docs');
 
 // --------------------------------------------------------------- the browser
 
@@ -349,10 +349,42 @@ const WIDTHS = [360, 414, 620, 900];
 
   const { proc, profile, port } = await launch();
   let failures = 0;
+  let redirects = 0;
 
   try {
     for (const file of pages) {
       const full = path.join(outDir, file);
+
+      /* A redirect stub is not a page and must not be checked as one. Left
+       * to the page probe it passes for the wrong reason: the browser has
+       * already followed the refresh by the time the probe runs, so what
+       * gets inspected is the destination. What is worth checking is the
+       * stub itself. */
+      const source = fs.readFileSync(full, 'utf8');
+      const refresh = /<meta http-equiv="refresh" content="0; url=([^"]+)"/.exec(source);
+      if (refresh) {
+        const problems = [];
+        const target = refresh[1];
+        if (!fs.existsSync(path.join(outDir, target))) {
+          problems.push(`redirects to ${target}, which does not exist`);
+        }
+        if (!/<link rel="canonical" href="[^"]+"/.test(source)) {
+          problems.push('no canonical link, so both URLs will be indexed');
+        }
+        if (!/<meta name="robots" content="noindex/.test(source)) {
+          problems.push('not noindex, so the stub itself can become a result');
+        }
+        if (problems.length) {
+          failures++;
+          console.log(`FAIL ${file}`);
+          for (const p of problems) console.log(`       ${p}`);
+        } else {
+          redirects++;
+          console.log(`ok   ${file}  -> ${target}`);
+        }
+        continue;
+      }
+
       const res = await visit(port, 'file://' + full);
       const findings = [...res.problems, ...((res.probe && res.probe.findings) || [])];
 
@@ -409,6 +441,8 @@ const WIDTHS = [360, 414, 620, 900];
     catch (err) { /* a leftover profile in tmp is not a failure */ }
   }
 
-  console.log(`\n${pages.length - failures}/${pages.length} pages clean`);
+  const checked = pages.length - redirects;
+  console.log(`\n${checked - failures}/${checked} pages clean` +
+              (redirects ? `, ${redirects} redirects verified` : ''));
   process.exit(failures ? 1 : 0);
 })();

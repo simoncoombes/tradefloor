@@ -1,6 +1,6 @@
 /* Screenshot every page, and compare two sets.
  *
- *     node tools/docs/learn/shots.cjs capture <dir> [--site docs/learn]
+ *     node tools/docs/learn/shots.cjs capture <dir> [--site docs]
  *     node tools/docs/learn/shots.cjs compare <before> <after>
  *
  * `verify.cjs` proves the markup is the same. It cannot prove the page still
@@ -210,7 +210,7 @@ function difference(a, b) {
 
   const outDir = path.resolve(process.argv[3]);
   const siteArg = process.argv.indexOf('--site');
-  const site = path.resolve(siteArg > 0 ? process.argv[siteArg + 1] : 'docs/learn');
+  const site = path.resolve(siteArg > 0 ? process.argv[siteArg + 1] : 'docs');
   fs.mkdirSync(outDir, { recursive: true });
 
   const pages = fs.readdirSync(site).filter((f) => f.endsWith('.html')).sort();

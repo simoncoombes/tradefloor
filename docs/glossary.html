@@ -1,167 +1,742 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Glossary · pretium docs</title>
-<meta name="description" content="The terms this project uses in a specific sense: band, era boundary, capture ratio, structural. A one-line gloss each, and the page that owns it.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glossary · pretium</title>
+<meta name="description" content="Every term this library uses in a specific way, with the measurement that makes it specific.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/glossary.html">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium docs">
-<meta property="og:title" content="Glossary">
-<meta property="og:description" content="The terms this project uses in a specific sense: band, era boundary, capture ratio, structural. A one-line gloss each, and the page that owns it.">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="Glossary · pretium">
+<meta property="og:description" content="Every term this library uses in a specific way, with the measurement that makes it specific.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/glossary.html">
-<meta property="article:published_time" content="2026-08-27T11:30:25-04:00">
-<meta property="article:modified_time" content="2026-08-27T11:30:25-04:00">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Glossary">
-<meta name="twitter:description" content="The terms this project uses in a specific sense: band, era boundary, capture ratio, structural. A one-line gloss each, and the page that owns it.">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Glossary","description":"The terms this project uses in a specific sense: band, era boundary, capture ratio, structural. A one-line gloss each, and the page that owns it.","url":"https://simoncoombes.github.io/pretium/glossary.html","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"pretium docs","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","sameAs":["https://pypi.org/project/pretium/","https://crates.io/crates/pretium","https://docs.rs/pretium","https://github.com/simoncoombes/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27T11:30:25-04:00","dateModified":"2026-08-27T11:30:25-04:00"}</script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;0,650;1,400&family=Spline+Sans+Mono:wght@400;600&display=swap">
-<style>:root{
-  --hue:55;
-  --font-ui:'Public Sans',system-ui,sans-serif; --font-mono:'Spline Sans Mono',ui-monospace,monospace; --font-head:var(--font-ui);
-  --bg:oklch(0.985 0.004 80); --panel:oklch(0.966 0.005 80); --fg:oklch(0.24 0.012 60);
-  --mut:oklch(0.47 0.014 60); --faint:oklch(0.62 0.012 70);
-  --line:oklch(0.9 0.007 80); --linesoft:oklch(0.93 0.006 80);
-  --accent:oklch(0.52 0.12 var(--hue)); --accent-soft:oklch(0.95 0.025 var(--hue));
-  --bad:oklch(0.52 0.12 25);
-  --navact:oklch(0.945 0.012 var(--hue));
-  --codebg:oklch(0.235 0.012 60); --codeline:oklch(0.32 0.012 60);
-  --codefg:oklch(0.9 0.008 80); --codemut:oklch(0.62 0.012 70);
-  --tkk:oklch(0.78 0.11 var(--hue)); --tks:oklch(0.8 0.09 150); --tkn:oklch(0.79 0.09 242);
-  --tkc:oklch(0.58 0.014 80); --tkf:oklch(0.88 0.05 90);
-}
-html[data-lightcode="true"]:not([data-theme="dark"]){
-  --codebg:oklch(0.962 0.006 80); --codeline:oklch(0.89 0.007 80); --codefg:oklch(0.3 0.012 60); --codemut:oklch(0.52 0.012 70);
-  --tkk:oklch(0.5 0.13 var(--hue)); --tks:oklch(0.5 0.1 150); --tkn:oklch(0.48 0.1 242); --tkc:oklch(0.56 0.012 80); --tkf:oklch(0.45 0.07 90);
-}
-html[data-theme="dark"]{
-  --bg:oklch(0.175 0.008 60); --panel:oklch(0.21 0.01 60); --fg:oklch(0.92 0.006 80);
-  --mut:oklch(0.68 0.01 80); --faint:oklch(0.55 0.01 80);
-  --line:oklch(0.3 0.012 60); --linesoft:oklch(0.255 0.01 60);
-  --accent:oklch(0.74 0.11 var(--hue)); --accent-soft:oklch(0.27 0.03 var(--hue));
-  --bad:oklch(0.72 0.11 25);
-  --navact:oklch(0.26 0.02 var(--hue));
-  --codebg:oklch(0.205 0.01 60); --codeline:oklch(0.3 0.012 60);
-}
-html{scroll-behavior:auto}
-body{margin:0;font:400 15px/1.7 var(--font-ui);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-::selection{background:var(--accent-soft)}
-p{margin:0 0 14px;text-wrap:pretty}
-h1,h2,h3,h4{font-family:var(--font-head);line-height:1.25;letter-spacing:-0.015em;font-weight:650;margin:0}
-ul{margin:0 0 14px;padding-left:22px}
-li{margin:0 0 7px}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th{font:600 10.5px/1.3 var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-td{padding:7px 10px;border-bottom:1px solid var(--linesoft);vertical-align:top}
-pre{margin:0}
-code{font-family:var(--font-mono)}
-summary{cursor:pointer;font-weight:600;font-size:14.5px;padding:13px 16px;list-style-position:outside}
-summary::marker{color:var(--faint)}
-details[open] summary{border-bottom:1px solid var(--linesoft)}
-button{font-family:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-h2[id],h3[id]{scroll-margin-top:80px}
-h2[id]>a.anchor,h3[id]>a.anchor{opacity:0;margin-left:8px;font-weight:400;color:var(--faint);text-decoration:none;font-size:0.8em}
-h2[id]:hover>a.anchor,h3[id]:hover>a.anchor,a.anchor:focus{opacity:1}
-.tk-k{color:var(--tkk)} .tk-s{color:var(--tks)} .tk-n{color:var(--tkn)} .tk-c{color:var(--tkc)} .tk-f{color:var(--tkf)}
-#sbar a{display:block;padding:5px 10px;border-radius:6px;color:var(--mut);font-size:13px;line-height:1.5}
-#sbar a:hover{color:var(--fg);background:var(--panel);text-decoration:none}
-#sbar a[data-active="true"]{color:var(--fg);background:var(--navact);font-weight:550}
-#hambtn{display:none}
-@media (max-width:920px){
-  #sbar{position:fixed;top:57px;left:0;bottom:0;transform:translateX(-105%);transition:transform 0.2s ease;background:var(--bg);z-index:40;box-shadow:0 8px 40px rgba(0,0,0,0.18)}
-  #sbar[data-open="true"]{transform:none}
-  #main{margin-left:0 !important;padding-left:22px !important;padding-right:22px !important}
-  #hambtn{display:flex}
-  #searchwrap{display:none}
-  #ghlink{display:none}
-}
-.layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;
-  grid-template-columns:232px minmax(0,1fr);gap:40px}
-.sidebar{padding:28px 0;border-right:1px solid var(--linesoft)}
-.sidebar ul{list-style:none;padding:0;margin:0;font-size:13.5px}
-.sidebar li{margin:0 0 2px}
-.sidebar a,.sidebar span{display:block;padding:5px 10px;border-radius:6px;color:var(--mut)}
-.sidebar a:hover{background:var(--panel);text-decoration:none;color:var(--fg)}
-.sidebar span[aria-current]{background:var(--navact);color:var(--fg);font-weight:600}
-main{padding:28px 0 72px;min-width:0}
-main h1{font-size:30px;margin:0 0 18px}
-main h2{font-size:20px;margin:34px 0 12px}
-main h3{font-size:16px;margin:24px 0 8px}
-.masthead{border-bottom:1px solid var(--line);background:var(--panel)}
-.masthead .inner{max-width:1120px;margin:0 auto;padding:14px 24px;
-  display:flex;align-items:baseline;gap:12px}
-.masthead a.brand{font-weight:650;color:var(--fg);font-size:15px}
-.masthead .tag{color:var(--mut);font-size:13px}
-.masthead .spacer{flex:1}
-.appnote{margin:0 0 26px;padding:10px 14px;border:1px solid var(--linesoft);
-  border-radius:8px;background:var(--panel);font-size:13px;color:var(--mut)}
-pre{background:var(--codebg);color:var(--codefg);border-radius:9px;
-  padding:13px 16px;overflow-x:auto;font-size:13px}
-pre code{color:inherit}
-.tablewrap{overflow-x:auto}
-footer.site{border-top:1px solid var(--line);margin-top:48px;padding:22px 0;
-  color:var(--mut);font-size:13px}
-@media(max-width:820px){.layout{grid-template-columns:1fr;gap:0}
-  .sidebar{border-right:0;border-bottom:1px solid var(--linesoft)}}
-</style>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
 <script>
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-1LBM3239ZF');
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1LBM3239ZF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}
+gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </head>
-<body>
-<header class="masthead"><div class="inner">
-<a class="brand" href="./">pretium</a>
-<span class="tag">repeatable market simulation</span>
-<span class="spacer"></span>
-<a href="https://github.com/simoncoombes/pretium">GitHub</a>
-</div></header>
-<div class="layout">
-<nav class="sidebar" aria-label="Documentation"><ul><li><a href="./">Overview</a></li><li><a href="simulate.html">Running a market</a></li><li><a href="scenarios.html">Scenarios and crises</a></li><li><a href="llm-agent.html">An LLM agent</a></li><li><a href="mcp.html">The MCP server</a></li><li><a href="wasm.html">Running in the browser</a></li><li><a href="edgar.html">Real companies from EDGAR</a></li><li><a href="forking.html">Checkpoints and forking</a></li><li><a href="trust.html">Realism and limits</a></li><li><a href="interrogate.html">Testing your edge</a></li><li><a href="change.html">Presets and custom models</a></li><li><a href="atlas.html">Atlas reference</a></li><li><a href="internals.html">Under the hood</a></li><li><a href="releases.html">Release notes</a></li><li><a href="agents.html">The agent harness</a></li><li><a href="factors.html">The nine components</a></li><li><a href="schemas.html">Tables and schemas</a></li><li><a href="citing.html">Citing a result</a></li><li><a href="install.html">Install and versioning</a></li><li><a href="api-core.html">API Core types</a></li><li><a href="api-run.html">API Running and evaluating</a></li><li><a href="api-realism.html">API Realism and Atlas</a></li><li><a href="api-params.html">API Model parameters</a></li><li><a href="api-presets.html">API Shipped presets</a></li><li><a href="two-loops.html">The Two Loops</a></li><li><span aria-current="page">Glossary</span></li><li><a href="principles.html">The Principles</a></li></ul></nav>
-<main>
-<p class="appnote">This is the plain version of the page. The
-<a href="./#/glossary">full documentation app</a> adds search, dark mode
-and copy buttons.</p>
-<div style="font:600 11px/1 var(--font-mono);color:var(--accent);letter-spacing:0.1em;margin:0 0 12px">REFERENCE</div>
-        <h1 style="font-size:30px">Glossary</h1>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">The terms this project uses in a specific sense. Each gloss is sourced from the page that owns the term and links to it, so a reader who meets one mid-page has somewhere to go.</p>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Where no page defines a term the entry reads <code style="font-size:12.5px">no owning page</code>, and the gloss is written from the code instead. Those rows are collected at the foot of this page: they are a list of things this documentation does not currently explain.</p>
-        <h2 id="the-run" style="font-size:21px;margin:46px 0 10px">The run</h2>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">term</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">what it means here</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">owning page</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Universe</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The roster of instruments, and its order is contractual, because the engine walks it in index order drawing random numbers as it goes, so a re-sorted universe gives a different market from the same seed.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="core-concepts.md" style="color:var(--accent)">Core concepts</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Instrument</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One tradable company -- ticker, sector and eight fundamentals -- whose <code style="font-size:12.5px">short_interest</code> is a share count, so a value strictly between 0 and 1 raises rather than being read as a fraction.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Macro</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Day-zero rates, inflation and the cycle, and the chain runs on from there endogenously, so <code style="font-size:12.5px">vix</code> takes 118 distinct values over a 120-day run.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="core-concepts.md" style="color:var(--accent)">Core concepts</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">seed</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One integer, separate from the universe seed, and it does not identify a run on its own, because the market an agent trades depends on that agent's own orders.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="reproducing-a-run.md" style="color:var(--accent)">Reproducing a run</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">tick</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One minute of game time, and a day is 390 regular-session ticks, so a hand loop that passes the same <code style="font-size:12.5px">hour, minute</code> 390 times simulates a different market.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="simulate.html" style="color:var(--accent)">Running a simulation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Engine</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">A whole market stepped through time, owning the seeded generator, the per-company price state, the economy and the central bank, and nothing beyond those four.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">order book</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">engine.book(ticker)</code> returns a detached snapshot, so filling against it prices your execution at the levels you consume and leaves <code style="font-size:12.5px">prices()</code> byte-identical to the run that never traded.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="simulate.html" style="color:var(--accent)">Running a simulation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">market maker</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The counterparty on every book, quoting both sides and shifting both quotes toward reducing its inventory, so the book absorbs one-sided flow without running dry.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">ADV</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Average daily volume, the denominator for participation, because 13.7 million shares is 0.05x a day's volume in one name and 407x in another.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">circuit breaker</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">When the model price leaves the session band the tick re-derives <code style="font-size:12.5px">mispricing_s</code> from the clamped price, so a factor sum that omits the <code style="font-size:12.5px">circuit_breaker</code> column misses that correction on any day the breaker binds.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="ground-truth.md" style="color:var(--accent)">Ground truth</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Checkpoint and branch</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Two ways to fork a run at one state: on a sixty-day, forty-instrument run <code style="font-size:12.5px">branch</code> copies engine state in under 1 ms and does not survive the process, <code style="font-size:12.5px">Checkpoint</code> replays the order log in 2.7 s and does.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="forking.html" style="color:var(--accent)">Forking a simulation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">sweep</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Streams one seed at a time, because a hundred recorded 252-day 100-instrument engines alive at once is roughly 110 GB against a little over 1 GB for one.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="sweeps-and-parallelism.md" style="color:var(--accent)">Sweeps and parallelism</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">order_flow</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The channel that tells the market you traded, passed to <code style="font-size:12.5px">tick()</code> or <code style="font-size:12.5px">run_session()</code>, and pushing 500,000 AAA shares through it closes the name at 137.45 against 135.67 untouched.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="simulate.html" style="color:var(--accent)">Running a simulation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">order log</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">engine.order_log</code> holds every input the engine consumed, and an unknown entry raises on replay rather than being skipped, because a replay that ignored one would look like a success.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="reproducing-a-run.md" style="color:var(--accent)">Reproducing a run</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">close_market</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The day's close bookkeeping -- momentum roll, GARCH, macro step -- and it advances the macro chain into the next day, so a row recorded after it carries the values the next day will trade under.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="simulate.html" style="color:var(--accent)">Running a simulation</a></td></tr></table></div></div>
-        <h2 id="price-formation" style="font-size:21px;margin:46px 0 10px">Price formation</h2>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">term</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">what it means here</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">owning page</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">fundamental_value</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">What the company is worth on its fundamentals, with no mispricing in it.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="ground-truth.md" style="color:var(--accent)">ground truth</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">anchor_price</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">fundamental_value</code> times <code style="font-size:12.5px">exp(mispricing_s)</code>, what the model wanted before the book touched it, so <code style="font-size:12.5px">close - anchor_price</code> isolates the microstructure.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="ground-truth.md" style="color:var(--accent)">ground truth</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">mispricing_s</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Log deviation of price from fair value, and the nine factor columns sum to its change with a worst residual of 1.9e-16 over 39,000 rows.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="ground-truth.md" style="color:var(--accent)">ground truth</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">the nine factors</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">reversion</code>, <code style="font-size:12.5px">momentum</code>, <code style="font-size:12.5px">crowd_lean</code>, <code style="font-size:12.5px">company_news</code>, <code style="font-size:12.5px">order_flow_impact</code>, <code style="font-size:12.5px">short_squeeze_effect</code>, <code style="font-size:12.5px">random_noise</code>, <code style="font-size:12.5px">circuit_breaker</code> and <code style="font-size:12.5px">jump</code> -- difference <code style="font-size:12.5px">mispricing_s</code>, add all nine, and you can check the label instead of trusting it.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="ground-truth.md" style="color:var(--accent)">ground truth</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">market factor</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One normal drawn per tick that reaches every name through its beta, and without shared factors a 108-name index would have almost no aggregate volatility because independent noise cancels.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">sector factor</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One normal per sector per tick that reaches each member through its sector loading, blending toward the market factor above VIX 25.5 so diversification stops working exactly when it is most wanted.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">idiosyncratic</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The part of a name's return no other name shares, one normal per company per tick sized by that name's own GARCH variance; the market factor's variance share was raised out of this term's budget so total volatility held still.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">GARCH and GJR-GARCH</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The per-name conditional variance recursion, <code style="font-size:12.5px">garch_alpha</code> on yesterday's squared return and <code style="font-size:12.5px">garch_beta</code> on yesterday's variance, plus a GJR <code style="font-size:12.5px">garch_gamma</code> that adds weight when that return was negative, because a symmetric GARCH squares the return and destroys its sign.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">jump</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Applied to <code style="font-size:12.5px">mispricing_s</code> after the tick loop rather than inside it, so dropping it from the sum takes the worst residual from 1.9e-16 to 0.090 on a run carrying one jump row in 39,000.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="ground-truth.md" style="color:var(--accent)">ground truth</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">crowd lean</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The crowd net-buys what trades below fair value and net-sells what trades above it, capped at 0.02 in log price so the crowd can never dominate a news day.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">order flow impact</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The permanent, information share of order flow into <code style="font-size:12.5px">mispricing_s</code>, 0.35 of the total impact coefficient of 50.0, because the book already charges the temporary component when orders walk real depth.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">guards</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The mispricing cap, the crowd lean cap, the session breaker and the price cap, settable and excluded from every calibration search because they are worst-case guarantees, plus <code style="font-size:12.5px">daily_shock_cap</code>, which is not settable at all.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="model-presets.md" style="color:var(--accent)">model presets</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">fair value</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The level mean reversion pulls toward, repricing at the central bank's meeting calendar, so a run long enough to cross a meeting is not a stationary experiment.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="core-concepts.md" style="color:var(--accent)">core concepts</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">random_noise</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The market component times the crash amplifier, plus the sector component, plus the idiosyncratic draw, summed into one column, so <code style="font-size:12.5px">truth</code> cannot separate the three.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">circuit_breaker</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Books the rewrite when the model price leaves the session band and the tick re-derives <code style="font-size:12.5px">s</code> from the clamped price, and with no column for it the sum misses that correction on any day the breaker binds.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="ground-truth.md" style="color:var(--accent)">ground truth</a></td></tr></table></div></div>
-        <h2 id="truth-and-provenance" style="font-size:21px;margin:46px 0 10px">Truth and provenance</h2>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">term</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">what it means here</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">owning page</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">truth table</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One row per instrument per tick carrying <code style="font-size:12.5px">fundamental_value</code>, <code style="font-size:12.5px">anchor_price</code>, <code style="font-size:12.5px">mispricing_s</code> and nine factor columns; the nine sum to the change in <code style="font-size:12.5px">mispricing_s</code>, so you can verify the label instead of trusting it.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="ground-truth.md" style="color:var(--accent)">ground truth</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">residual</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The gap between differenced <code style="font-size:12.5px">mispricing_s</code> and the sum of the nine factor columns, 1.9e-16 at worst over the 39,000 rows of a 20-name 5-day run, so anything larger means the join is wrong -- sorting <code style="font-size:12.5px">tick</code> without <code style="font-size:12.5px">day</code> takes that same run to 0.149.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="ground-truth.md" style="color:var(--accent)">ground truth</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">fingerprint (universe)</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">A sha256 over the roster's canonical form, order included, because a re-sorted universe is a different market: AAA closes day 5 at 143.03 in roster order and 134.88 reversed.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="core-concepts.md" style="color:var(--accent)">core concepts</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">fingerprint (model)</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The first 8 hex characters of a sha256 over the preset's canonical serialisation, so any settable change reads <code style="font-size:12.5px">custom-7f290e34</code> rather than <code style="font-size:12.5px">pt-v1</code> and a changed preset cannot present as the shipped one.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="model-presets.md" style="color:var(--accent)">model presets</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">fingerprint (strategy)</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">A sha256 over the spec's canonical serialisation, unchanged by whitespace, key order or scaling every blend weight by two, and empty for a hand-built agent because that result is reproducible only by citing code at a commit.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="strategy-specs.md" style="color:var(--accent)">strategy specs</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">RNG substream</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One of seven generators derived from the root seed -- market, economy, external, jumps, volume, news and per-name volume -- so a new mechanism on its own stream perturbs nothing, however it draws.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="internals.html" style="color:var(--accent)">RNG streams</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">draw schedule</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Market hours, the 390-tick day, the calendar and the sector key order, which nothing settable may change, because a preset changes what the draws are multiplied into and never the schedule.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="model-presets.md" style="color:var(--accent)">model presets</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">draw_delta</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The market stream's draw-count difference between the two runs <code style="font-size:12.5px">compare()</code> puts side by side, zero across all twenty-eight comparisons on <code style="font-size:12.5px">pt-v12</code>, and non-zero means a halt, a delisting or a roster change moved the draw schedule and the two markets are structurally different.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="scenarios.html" style="color:var(--accent)">scenarios</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">draws_consumed</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The total draws taken from three of the seven streams, <code style="font-size:12.5px">market</code>, <code style="font-size:12.5px">economy</code> and <code style="font-size:12.5px">external</code>; equal <code style="font-size:12.5px">market</code> counts between two runs of the same tick schedule mean both saw an identical noise sequence, which is the whole point of the diagnostic.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="internals.html" style="color:var(--accent)">RNG streams</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">draws_by_stream()</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Those three counts reported separately as <code style="font-size:12.5px">{"market": n, "economy": n, "external": n}</code>; the four later streams are not counted there and their positions read from <code style="font-size:12.5px">state_snapshot()["rng"]</code> instead.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="internals.html" style="color:var(--accent)">RNG streams</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">common random numbers</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Running one seed under two presets so <code style="font-size:12.5px">draws_consumed</code> comes out identical, which makes every difference in the outcome a parameter effect rather than reshuffled noise.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="model-presets.md" style="color:var(--accent)">model presets</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">known-answer test</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One fixed simulation run inside each of five wheel targets and hashed, compared target against target and against the <code style="font-size:12.5px">sha256</code> committed in <code style="font-size:12.5px">tests/known_answer.json</code>, so a disagreement stops the upload rather than merely reporting one.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="reproducing-a-run.md" style="color:var(--accent)">reproducing a run</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">RunManifest</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The five things that identify a run as one object, embedding the roster, the macro initial conditions, the realised scenario path, the order log and the strategy; <code style="font-size:12.5px">reproduce()</code> raises with the disagreeing component named, because every component travels with its own fingerprint rather than one hash over the file.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="sharing-a-run.md" style="color:var(--accent)">sharing a run</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">order log</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">engine.order_log</code>, every input the engine consumed as JSON-serialisable dicts and the only one of the five run identifiers it carries; an unknown operation raises on replay, because skipping one would produce a market the log does not describe and it would look like a success.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="reproducing-a-run.md" style="color:var(--accent)">reproducing a run</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">era boundary</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">A change that moves every seeded trajectory, caught by a probe digest rather than by a version string, because one calendar day brought three trajectory-changing fixes while <code style="font-size:12.5px">pt.version()</code> stayed 0.1.0 and the preset stayed <code style="font-size:12.5px">pt-v1</code>.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="sharing-a-run.md" style="color:var(--accent)">sharing a run</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">era_fingerprint()</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The digest of a small fixed probe simulation, recomputed before every replay, so two builds that agree on the probe agree on the arithmetic it exercises and the manifest refuses by name when they do not.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="sharing-a-run.md" style="color:var(--accent)">sharing a run</a></td></tr></table></div></div>
-        <h2 id="model-configuration" style="font-size:21px;margin:46px 0 10px">Model configuration</h2>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">term</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">what it means here</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">owning page</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">ModelParams</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The model's coefficients as one immutable value, built by <code style="font-size:12.5px">ModelParams.from_preset("pt-v1", garch_alpha=0.12)</code> and fingerprinted as the first 8 hex characters of a sha256 over sorted names and raw IEEE-754 bits, so a modified model reads <code style="font-size:12.5px">custom-7f290e34</code>, never <code style="font-size:12.5px">pt-v1</code>.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="model-presets.md" style="color:var(--accent)">model presets</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">preset</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The model's complete coefficient set, frozen under one versioned name; twelve ship, <code style="font-size:12.5px">pt-v12</code> is the default, and every earlier name stays selectable and bit-reproducing forever, because if every user ran a bespoke set no two published results would be comparable.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="model-presets.md" style="color:var(--accent)">model presets</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">settable surface</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The 87 names at 0.3.0 that <code style="font-size:12.5px">ModelParams.settable()</code> lists and an override may change; nothing on it may change how many draws are taken or in what order, so two presets run on one seed consume identical draws and every difference in the outcome is a parameter effect.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="model-presets.md" style="color:var(--accent)">model presets</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">derived coefficient</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">mispricing_phi</code> and <code style="font-size:12.5px">s_phi_tick</code>, the two coefficients carried as recorded bit patterns and refused as a direct override; overriding <code style="font-size:12.5px">mispricing_half_life_days</code> recomputes both, deterministically on a given build but not bit-identically to any recorded constant.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="model-presets.md" style="color:var(--accent)">model presets</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">compile-time constant</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One of the 28 preset entries visible in <code style="font-size:12.5px">ModelParams.to_dict()</code> and covered by the fingerprint but refused as an override, because accepting an override the engine would ignore would make the fingerprint a lie.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="model-presets.md" style="color:var(--accent)">model presets</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">promotion</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Moving a coefficient off its compiled literal onto the settable surface, the way <code style="font-size:12.5px">volume_move_cap</code> came off its <code style="font-size:12.5px">4.0</code> in <code style="font-size:12.5px">tick.rs</code> for <code style="font-size:12.5px">pt-v12</code>; <code style="font-size:12.5px">settable()</code> went from 70 names at 0.2.0 to 87 at 0.3.0, and every earlier preset still runs the literal, which is why they replay unchanged.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">model_preset()</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Returns the nine-key mispricing and crowd dictionary for the preset in force, <code style="font-size:12.5px">pt-v12</code> by default; the GARCH parameters and the factor sigmas are live and none of them appear, so quote <code style="font-size:12.5px">pt.version()</code> beside the name because the version is what pins the build.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="conventions.md" style="color:var(--accent)">conventions</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">ModelParams.from_preset()</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Builds a <code style="font-size:12.5px">ModelParams</code> from a shipped preset plus keyword overrides, <code style="font-size:12.5px">from_preset("pt-v1", garch_alpha=0.12)</code>; an unknown or non-settable key is refused by name, and the refusal prints the whole settable surface beside it.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="model-presets.md" style="color:var(--accent)">model presets</a></td></tr></table></div></div>
-        <h2 id="evaluation" style="font-size:21px;margin:46px 0 10px">Evaluation</h2>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">term</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">what it means here</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">owning page</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">agent</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Sees prices, the order book and its own positions, and never fair value, mispricing or the attribution, because inferring those is the task and they are used for scoring on the other side of the wall.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="agents.html" style="color:var(--accent)">agents and evaluation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">StrategySpec</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">A strategy as data, declarative, versioned and hashable, whose sha256 fingerprint a methods section cites; a hand-written Python agent leaves <code style="font-size:12.5px">strategy_fingerprint</code> empty and its result is reproducible only by citing code at a commit.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="strategy-specs.md" style="color:var(--accent)">strategy specs</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">Scorecard</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One agent's result -- <code style="font-size:12.5px">pnl</code>, <code style="font-size:12.5px">return_pct</code>, <code style="font-size:12.5px">trades</code>, <code style="font-size:12.5px">turnover</code>, <code style="font-size:12.5px">impact_bps</code>, <code style="font-size:12.5px">max_leverage</code>, <code style="font-size:12.5px">explanation_accuracy</code> -- carrying the seed and the universe, strategy and model fingerprints, because the seed alone does not identify a market and a leaderboard without them cannot be re-run.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Oracle</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Reads the true mispricing and trades it without estimation error, on the same gross exposure and 2%-of-ADV participation cap every other baseline gets, spending them on a naive equal-weight rule at <code style="font-size:12.5px">top_k=5</code> per side that mean-reversion out-earns on 5 of 12 markets.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="agents.html" style="color:var(--accent)">agents and evaluation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">capture ratio</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Each agent's P&amp;L as a fraction of the Oracle's; above 1.0 is legal and does occur, mean-reversion clearing it on 5 of 12 markets, and the Oracle's configuration and the horizon both move the denominator -- the same agent on the same market scores 0.066 at five days and 1.18 at sixty -- so quote both with any ratio.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="agents.html" style="color:var(--accent)">agents and evaluation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">paired sign test</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Counts the seeds on which one agent beat another in the same market and sets <code style="font-size:12.5px">decisive</code> only on a clean sweep, so twelve paired seeds put a 9-3 win at p = 0.15 and cannot report better than p = 0.0005 however wide the gap gets.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="agents.html" style="color:var(--accent)">agents and evaluation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">pooling</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The headline capture sums P&amp;Ls and Oracle P&amp;Ls across seeds rather than averaging per-seed ratios, because a $13.7k three-day denominator produced a +1.57 ratio and averaging the ten ratios instead of pooling them moves the verdict from +0.78 to +0.88.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="agents.html" style="color:var(--accent)">agents and evaluation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">impact_bps</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Compares the traded run's closing prices against the same seed with nobody trading; fills feed back into the price process, so the gap compounds with the horizon -- the oracle's sign holds on 12 of 12 seeds at two days and 5 of 12 at twenty -- and the number is worth reading over a day or two and across seeds.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="llm-agent.html" style="color:var(--accent)">an LLM agent</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">explanation_accuracy</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Scores the factor an agent's <code style="font-size:12.5px">explain(day)</code> names against the day's dominant factor, summed in absolute value across the roster, which <code style="font-size:12.5px">random_noise</code> wins on 240 of 240 scored days, so an agent that trades nothing and answers <code style="font-size:12.5px">random_noise</code> every day scores 100%.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="llm-agent.html" style="color:var(--accent)">an LLM agent</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">TCA and shortfall</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Runs the same seed with and without your orders and prices every fill against the world where you never traded, signed so positive is a cost, and a round trip can come back negative -- between -17.72 and +2.03 bps across eight sim seeds -- because the exit sells into the impact the entry left.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="transaction-cost-analysis.md" style="color:var(--accent)">transaction cost analysis</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">partial_fills()</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Lists the fills the book truncated at its displayed depth -- requests of 4,856, 9,713 and 48,563 shares all filled 483 on sim seed 2026 -- so read it before believing a low cost.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="transaction-cost-analysis.md" style="color:var(--accent)">transaction cost analysis</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">TradingEnv</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The Gymnasium environment, which passes gymnasium's <code style="font-size:12.5px">env_checker</code>, takes actions as target weights in <code style="font-size:12.5px">[-1, 1]</code> so a policy does not have to learn each instrument's price range first, and pays reward as the step's P&amp;L after the market moves, which includes the cost of the agent's own footprint.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="reinforcement-learning.md" style="color:var(--accent)">reinforcement learning</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">cadence</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">How often a strategy re-decides, <code style="font-size:12.5px">"step"</code> or <code style="font-size:12.5px">"daily"</code>, and it sits in the spec because the same one-day signal returns +37.55% at three decisions a day, +9.79% at six and -27.46% at twelve.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="strategy-specs.md" style="color:var(--accent)">strategy specs</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">rank</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Scores agents over many seeds and ranks them on the pooled capture, taking a factory rather than built agents, because agents are stateful and reusing one carries a market's history into the next with no visible symptom.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="agents.html" style="color:var(--accent)">agents and evaluation</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">privileged</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Set <code style="font-size:12.5px">True</code> on an agent built from a spec naming <code style="font-size:12.5px">oracle</code> or from any blend containing one, on the built agent rather than on the spec, so a results table can label the row that read state no real trader has.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="strategy-specs.md" style="color:var(--accent)">strategy specs</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">unmeasurable</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The seeds a ranking could not measure capture on because the Oracle lost money there, excluded from both the pooled numerator and the denominator since a negative denominator flips the sign of everything above it, and reported rather than dropped.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">rebalance cadence</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">How often a strategy re-decides, and part of its identity rather than a run setting: the same one-day signal returns +37.55% at three decisions a day, +9.79% at six and -27.46% at twelve, so two runs of one fingerprint could differ by the cadence alone if the spec left it out.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="strategy-specs.md" style="color:var(--accent)">Strategy specs</a></td></tr></table></div></div>
-        <h2 id="realism" style="font-size:21px;margin:46px 0 10px">Realism</h2>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">term</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">what it means here</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">owning page</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">the panel</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The fourteen statistics <code style="font-size:12.5px">pretium.facts.measure()</code> returns, measured at a single flat VIX on one horizon, so a preset can be perfect on all fourteen while the market's response to a crisis changes underneath it.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">band</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The range a statistic must land in, measured with the panel's own estimators on real data: nine consecutive 252-day windows of 40 US large caps over 2015-2025 set each one, and the tenth is held out because it straddles the COVID crash.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">crisis_window</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The tenth of those ten windows, reported beside each band rather than setting it, because the panel is a claim about a typical year and crisis behaviour is measured under pinned scenarios.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">SEED_SD</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Each statistic's across-seed standard deviation at the shipped baseline, and the unit every band exit is priced in, so a miss on volatility measured in tens and a miss on an autocorrelation measured in hundredths are comparable.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">L_real</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The band-distance loss a calibration search minimises, <code style="font-size:12.5px">sum over k of (d_k / s_k)^2</code> across nine of the fourteen, zero anywhere inside a band because there is no credit for sitting in the middle of one.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">live target</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One of the five statistics the calibration search is trying to move into band, and the role <code style="font-size:12.5px">band_distance_loss</code> reports on their rows; appending a key to <code style="font-size:12.5px">LIVE_TARGETS</code> is the one edit that promotes a structural statistic into the loss.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">constraint</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One of the four statistics already in band at the baseline, contributing zero loss where they stand and pushing back only when a candidate drives them out, because a calibration that fixed correlation by breaking kurtosis would trade a documented gap for a new one.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">structural</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The five statistics banded, measured and given a verdict but contributing zero to <code style="font-size:12.5px">L_real</code>, because no lever has been shown to move them cleanly; membership states the calibration objective rather than reachability, and the shipped <code style="font-size:12.5px">pt-v12</code> holds all five in band at the certified horizon.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">dual_horizon_loss</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">L_real</code> at 252 days plus <code style="font-size:12.5px">L_real</code> at 504 days, each against its own bands and its own noise scale, because three consecutive calibration searches bought 252-day realism by spending 504-day realism and the objective could not see the trade.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">sd_out</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">A statistic's band distance in units of its across-seed noise, which is what makes band widths comparable across the panel: <code style="font-size:12.5px">sector_excess_corr</code>'s 0.12-wide band is 17.6 across-seed standard deviations, the second most forgiving of the fourteen.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">intervals() and typical_straddles</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">envelope.intervals()</code> reports each statistic's p10, p90 and across-seed sd beside its median, and <code style="font-size:12.5px">typical_straddles</code> fires when the p10-to-p90 range crosses a band edge: nine of the fourteen did so on <code style="font-size:12.5px">pt-v10</code> over thirty seeds, so one seed can read out of band on a median that sits inside.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">decay curve</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The model's absolute-return autocorrelation at ten lags out to 60, fitted as a log-log slope over lags 1 to 20 because no single lag reveals a shape: real markets fit -0.436 and the model -0.953, so its volatility memory fades about 2.2 times as fast.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">VIX lever</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The ratio of realised volatility at a high held VIX to a low one, so how much more violent a sustained crisis is than a calm market; real markets read x6.16, and it is a gate rather than a calibration target because the panel cannot see it.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">VIX shock</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The ratio of realised volatility during a 20-day VIX spike to a flat baseline, so how fast the market reacts as distinct from where it settles: a variance process with a long half-life reaches the right level for a sustained crisis and cannot track a short spike.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">envelope</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">What pretium certifies and what it does not -- the statistics matched, the horizon, the axes the claim survives and the five measured gaps -- published instead of a single realism score, because one number hides the structure that decides whether a result means anything.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-envelope.md" style="color:var(--accent)">realism envelope</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">certified horizon</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">252 trading days, the horizon the certification was measured at on thirty seeds, and <code style="font-size:12.5px">envelope.check</code> refuses to certify beyond it even though <code style="font-size:12.5px">pt-v12</code> holds all fourteen against bands re-derived at 504 days.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-envelope.md" style="color:var(--accent)">realism envelope</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Gap</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One measured way the model departs from real markets, each ending in a rule about what it forbids you to conclude: five ship with <code style="font-size:12.5px">pt-v12</code>, down from six at that boundary and eight at 0.1.4, and the three that closed are recorded rather than deleted.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-envelope.md" style="color:var(--accent)">realism envelope</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">check()</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">envelope.check()</code> answers whether a question falls inside the envelope and returns a boolean with its reasons attached, and it raises on an unknown statistic name because a silently dropped name is a silently granted certification.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">validation axes</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The four axes every calibration certificate reports <code style="font-size:12.5px">L_real</code> on -- training seeds, held-out seeds, held-out universe, held-out horizon -- because a model fitted to thirty seeds and reported on those same thirty seeds has demonstrated nothing.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">skew</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The skewness of the pooled standardised daily returns, returned by <code style="font-size:12.5px">measure()</code> on every panel and given no band, so the model could carry the wrong sign on it indefinitely and no verdict would say so.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">MEMORY_VALID_TO_LAG</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Lag 20, the line in code past which the model's volatility memory runs wrong in sign, which puts vol-targeting and risk-parity overlays reading a one-month or longer volatility estimate outside the envelope.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-envelope.md" style="color:var(--accent)">realism envelope</a></td></tr></table></div></div>
-        <h2 id="calibration-and-atlas" style="font-size:21px;margin:46px 0 10px">Calibration and Atlas</h2>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">term</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">what it means here</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">owning page</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Atlas</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Samples the simulator's parameter space, measures whatever you care about at every point, and describes the response surface, because six consecutive calibration searches were rejected for selling whatever a scalar objective could not see.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Axis</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">One parameter and the range the survey moves it over; <code style="font-size:12.5px">log=True</code> samples the log of the value and refuses a low of zero, because zero is infinitely far away in log space.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">box</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The range an axis sweeps, by default a quarter to four times the preset's shipped value; a 96-core search once concluded there was nothing to find because the best known value sat just outside that ceiling.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Latin hypercube</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Stratifies each axis independently, so every parameter is sampled evenly across its range however many others vary, which is what makes a few thousand points informative in fifty dimensions rather than merely scattered.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">plan()</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Returns the vectors a survey will measure without measuring them, so you can check them before spending anything, because a sampled vector can easily sit outside the region your model is stationary over.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">screening resolution</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The few seeds per point a survey runs at, chosen so the map is affordable; it is enough to rank and describe, and anything it recommends still needs <code style="font-size:12.5px">confirm</code> at full resolution.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">sensitivity</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Ranks each parameter by rank correlation against one output; a near-zero sensitivity is not proof of inertness, because a sensitivity is one axis at a time and a mechanism that needs two parameters is structurally invisible to it.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">profile</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Bins one output against one parameter to give the shape of the effect, monotone or an interior optimum; read the bin counts, because a filter that leaves too few rows answers a noisier question.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">unidentified</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The parameters that move nothing at all across the named outputs; the reading is no monotone effect over the sampled ranges at this resolution, so it deprioritises a parameter in a search and never retires a mechanism.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Pareto front</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Shows every available trade at the same time and makes a human choose, because whatever sits outside a scalar objective is free and the optimiser sells it silently.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">attribution</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Decomposes the difference between two vectors across the parameters that differ, assuming approximate additivity; on a purely multiplicative surface it can overstate a contribution several-fold, so pass <code style="font-size:12.5px">measured=</code> and read the residual.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">confirm()</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Re-measures a candidate at full resolution on seed blocks disjoint from the survey's and reports the paired difference in each block, because a candidate declared shippable on a +0.1297 gap read -0.0315 on fresh seeds.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">emptiness certificate</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Earns or refuses the strong negative claim that no parameter vector in the named box reaches the named targets jointly, with the residual saying by how far, and it stays a numerical minimum over a bounded box under a named budget, not a proof.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">calibration certificate</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The record a calibration run writes, carrying <code style="font-size:12.5px">L_real</code> on the four validation axes and the overfitting rule as text beside its verdict; the per-statistic breakdown stays because one certificate reads a training <code style="font-size:12.5px">L_real</code> of 0.0000 and is still rejected on two flips.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">the overfitting control</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Rejects a candidate on either of two counts, a trained-to statistic in band on the training seeds and out of band on a validation axis, or a validation <code style="font-size:12.5px">L_real</code> exceeding the training <code style="font-size:12.5px">L_real</code> by more than twice its bootstrap spread across seeds; the first clause is the one that actually fires.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">gate</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Everything a candidate preset has to pass in one run: thirty-seed panels at 252 and 504 days, a held VIX 45 crisis state, six held-out seeds and a held-out 60-name universe, then the response instrument against the base.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">emit_preset</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Turns a calibration certificate into the <code style="font-size:12.5px">const fn</code> body for <code style="font-size:12.5px">rust/src/params.rs</code> and a bit-pattern assertion beside it, because the vector a search found and the vector a build ships have to be the same sixty-four bits and somebody retyping a number off a report is how that breaks.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">no owning page</code></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">survey</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The measured table <code style="font-size:12.5px">atlas.survey</code> returns, one row per planned vector; a vector whose measurement raises is recorded and skipped rather than fatal, because a region that breaks the model is a fact about the model.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">where=</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Restricts a <code style="font-size:12.5px">sensitivity</code> or <code style="font-size:12.5px">profile</code> to a region of the other parameters; conditioning the 4,000-vector survey on <code style="font-size:12.5px">decay &gt; 0.9</code> left about 380 rows whose bin medians swung three times wider than the effect, so check the counts.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="atlas.html" style="color:var(--accent)">Atlas</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">validation axes</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The four axes every calibration certificate reports <code style="font-size:12.5px">L_real</code> on: training seeds, held-out seeds, held-out universe, held-out horizon; only the first is what the search optimised.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">trained-to</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The nine statistics in the loss, not all fourteen; the overfitting control's first clause fires on one of those in band on the training seeds and out of band on a validation axis.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">realism metrics</a></td></tr></table></div></div>
-        <h2 id="scenarios" style="font-size:21px;margin:46px 0 10px">Scenarios</h2>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">term</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">what it means here</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">owning page</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Scenario</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">A macro path an agent holds positions through: the rate walking from 2.5% to 5% over fifteen days costs buy-and-hold 2.56 points against the same market with no scenario.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="scenarios.html" style="color:var(--accent)">Scenarios</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">pin_macro</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Overrides the endogenous step for the named field from the day it lands: pin <code style="font-size:12.5px">vix=30.0</code> once after day 3 and day 3 reads 30.0 while the four days that follow read 22.75, 23.62, 23.89 and 19.30, because the chain carries on from the pinned value rather than freezing it.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="core-concepts.md" style="color:var(--accent)">Core concepts</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">endogenous versus driven</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The macro chain evolves on its own from the day-zero state unless a scenario drives a path through it, and endogenous inflation peaks at 4.0% on every one of thirty seeds against real CPI's 9.0% in June 2022, so an inflation regime or a policy crisis has to be driven through a scenario.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-envelope.md" style="color:var(--accent)">The realism envelope</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">the meeting-calendar trap</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">A policy-only rate path moves every price by exactly 0.00% over 40 days and a median -4.00% once a 60-day run crosses the first central-bank meeting at day 45, because equities discount off the corporate bond yield and only a meeting recomputes it, so a short policy-only study sees nothing, silently.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="scenarios.html" style="color:var(--accent)">Scenarios</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">scenario response</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The two gate metrics from <code style="font-size:12.5px">tools/calibration/scenario_response.py</code>, the steady-state VIX lever and the transient 20-day VIX shock, are invisible to the fourteen-statistic panel, because the panel is measured at a single flat VIX on one horizon and a vector can be perfect on all fourteen while the market's response to a crisis changes underneath it.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="realism-metrics.md" style="color:var(--accent)">The realism metrics</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">draw_delta</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">The market stream's draw-count difference between a scenario run and its baseline, reported by <code style="font-size:12.5px">compare()</code> rather than asserted zero, because a non-zero delta means the scenario changed the market's own draw schedule and the result compares two structurally different markets; measured at zero across all twenty-eight comparisons on <code style="font-size:12.5px">pt-v12</code>.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="scenarios.html" style="color:var(--accent)">Scenarios</a></td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">compare()</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">Runs a scenario against a baseline defaulting to <code style="font-size:12.5px">Scenario().hold(**scenario.at(0))</code>, the scenario's own day-zero values held flat, and refuses a scenario that never moves inside the horizon because every instrument would come back at exactly 0.00% by construction rather than by measurement.</td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><a href="scenario-recipes.md" style="color:var(--accent)">Scenario recipes</a></td></tr></table></div></div>
-        <h2 id="terms-no-page-owns" style="font-size:21px;margin:46px 0 10px">Terms no page owns</h2>
-        <p style="color:var(--mut);font-size:14px;margin:0 0 12px">22 of the terms above are defined nowhere in <code style="font-size:12.5px">docs/</code>. Each is glossed above from the code, and each is a paragraph some page is missing.</p>
-        <div style="overflow-x:auto"><div class="tablewrap"><table style="border-collapse:collapse;margin:12px 0;min-width:100%"><tr><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">term</th><th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font:600 12px var(--font-ui)">where the definition actually lives</th></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">Instrument</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">no docs/*.md defines it. core-concepts.md names it once inside a code comment (<code style="font-size:12.5px">pt.Universe([pt.Instrument(...), ...])</code>, line 46) and reproducing-a-ru.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">Engine</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">no docs/*.md says what an Engine is. core-concepts.md has <code style="font-size:12.5px">### Universe</code> and <code style="font-size:12.5px">### Macro</code> sections but no <code style="font-size:12.5px">### Engine</code> section, despite constructing on.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">market maker</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">the phrase appears in no docs/*.md at all.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">ADV</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">used in three docs pages as an established term and expanded in none of them. transaction-cost-analysis.md:26 and :45 quote a name's ADV as 9,713 shar.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">market factor</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only in rust/src/market/factors.rs (the <code style="font-size:12.5px">SharedFactors</code> doc comment: drawn once per tick, reaches every name through beta, without it a 108-na.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">sector factor</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only in rust/src/market/tick.rs lines 507-533 (one normal per sector key per tick, blended toward the market factor above `crisis_vix_threshol.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">idiosyncratic</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only in rust/src/market/factors.rs lines 372-380 (<code style="font-size:12.5px">idiosyncratic_sigma = sqrt(garch_variance) * idio_sigma_scale / sqrt(390)</code>, one draw per co.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">GARCH and GJR-GARCH</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only in the module header of rust/src/market/garch.rs (alpha = yesterday's surprise, beta = persistence, gamma = extra weight on a negative su.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">crowd lean</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only in rust/src/mispricing.rs lines 90-96 and 159-179 (<code style="font-size:12.5px">crowd_lean_with</code>, the restoring force plus a smaller herding term, clamped to `crowd_.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">order flow impact</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only in rust/src/market/factors.rs (<code style="font-size:12.5px">ORDER_FLOW_COEFFICIENT</code> 50.0, <code style="font-size:12.5px">INFORMED_FLOW_FRACTION</code> 0.35 with the argument that the book now charges t.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">truth table</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">the exact phrase appears in NO docs/*.md file.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">known-answer test</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">named in docs/model-presets.md:200 and docs/reading-results.md:35 but defined on neither. docs/reproducing-a-run.md describes the mechanism in full (f.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">era boundary</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">used on eight docs pages (conventions, model-presets, scenarios, realism-envelope, rng-streams, sharing-a-run, atlas) and defined on none of them.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">promotion</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">no docs/*.md page defines it.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">Scorecard</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only in code, at python/pretium/harness.py:222, docstring "One agent's result", with the field list in <code style="font-size:12.5px">__slots__</code> at line 231 and the fingerp.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">unmeasurable</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only in code, at python/pretium/ranking.py:227-231 ("Seeds where capture was not measurable because the reference did not make money") and enf.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">live target</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only in python/pretium/loss.py: the module docstring at line 31 ("the five statistics the search is trying to move into band"), the LIVE_TARGE.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">constraint</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only in python/pretium/loss.py: the module docstring at line 34 ("the four statistics in band at the baseline ... push back only when a candid.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">Axis</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">the type is defined only at python/pretium/atlas.py:142, <code style="font-size:12.5px">class Axis: "One parameter and the range the survey moves it over."</code>, with the log-axis refu.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">emptiness certificate</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only at tools/calibration/falsify.py:1-40 (module docstring, CALIBRATION.md 4.4).</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">gate</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only at tools/calibration/gate_pick.py:1-13 (the thirty-seed battery for one candidate) and gate_batch.py:1-34 (the same axes for many candida.</td></tr><tr><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top"><code style="font-size:12.5px">emit_preset</code></td><td style="padding:6px 10px;border-bottom:1px solid var(--linesoft);font-size:13px;color:var(--mut);vertical-align:top">defined only at tools/calibration/emit_preset.py:1-20.</td></tr></table></div></div>
-</main>
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">Real companies from EDGAR</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu pt-here"><summary>Reference<span class="pt-caret">▼</span></summary><div><span class="pt-current">Glossary</span><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
+
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">GLOSSARY</span>
 </div>
-<footer class="site"><div class="layout" style="display:block">
-pretium repeatable market simulation. <a href="https://github.com/simoncoombes/pretium">Source on GitHub</a>.
-</div></footer>
+
+<section class="pt-s33">
+<h1 class="pt-s30">Glossary</h1>
+<p class="pt-s24">Terms this library uses in one specific way. Where a number pins the meaning, the number is here.</p>
+
+<div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
+<input type="text" placeholder="Filter terms" aria-label="Filter terms" style="flex:1;min-width:12rem;height:38px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:0.9375rem;padding:0 0.85rem">
+<div style="display:flex;gap:0.35rem;flex-wrap:wrap">
+
+<button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.4rem 0.7rem;border-radius:5px;cursor:pointer;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)">all</button>
+
+
+<button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.4rem 0.7rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">the run</button>
+
+
+<button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.4rem 0.7rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">price formation</button>
+
+
+<button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.4rem 0.7rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">provenance</button>
+
+</div>
+</div>
+<span class="pt-s61">43 of 43 terms</span>
+</section>
+
+<section style="padding:1.4rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">ADV</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">Average daily volume, the denominator for participation. 13.7 million shares is 0.05x a day in one name and 407x in another.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">anchor_price</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">fundamental_value times exp(mispricing_s): what the model wanted before the book touched it. So close minus anchor_price isolates the microstructure.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">Checkpoint and branch</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">Two ways to fork a run at one state. On a 60-day 40-instrument run, branch copies engine state in under 1 ms and does not survive the process. Checkpoint replays the order log in 2.7 s and does.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">circuit_breaker</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">Books the rewrite when the model price leaves the session band and the tick re-derives s from the clamped price. Omit the column and the factor sum misses that correction on any day the breaker binds.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">close_market</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">The day's close bookkeeping: momentum roll, GARCH, macro step. It advances the macro chain into the next day, so a row recorded after it carries the values the next day will trade under.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">common random numbers</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">Running one seed under two presets so draws_consumed comes out identical. Every difference in the outcome is then a parameter effect rather than reshuffled noise.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">crowd lean</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">The crowd net-buys what trades below fair value and net-sells what trades above it, capped at 0.02 in log price so the crowd can never dominate a news day.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">draw schedule</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">Market hours, the 390-tick day, the calendar and the sector key order. Nothing settable may change it: a preset changes what the draws are multiplied into, never the schedule.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">draw_delta</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">The market stream's draw-count difference between the two runs compare() puts side by side. Zero across all twenty-eight comparisons on pt-v12. Non-zero means a halt, a delisting or a roster change moved the schedule.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">draws_consumed</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">Total draws from three of the seven streams: market, economy and external. Equal market counts between two runs of the same tick schedule mean both saw an identical noise sequence.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">Engine</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">A whole market stepped through time. It owns the seeded generator, the per-company price state, the economy and the central bank, and nothing beyond those four.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">era boundary</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">A change that moves every seeded trajectory, caught by a probe digest rather than a version string. One calendar day once brought three trajectory-changing fixes while the version and the preset both stayed put.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">era_fingerprint()</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">The digest of a small fixed probe simulation, recomputed before every replay. Two builds that agree on the probe agree on the arithmetic it exercises.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">fair value</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">The level mean reversion pulls toward. It reprices at the central bank's meeting calendar, so a run long enough to cross a meeting is not a stationary experiment.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">fingerprint, model</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">The first 8 hex characters of a sha256 over the preset's canonical serialisation. Any settable change reads custom-7f290e34 rather than pt-v1, so a changed preset can not present as the shipped one.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">fingerprint, strategy</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">A sha256 over the spec, unchanged by whitespace, key order, or scaling every blend weight by two. Empty for a hand-built agent, because that result is reproducible only by citing code at a commit.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">fingerprint, universe</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">A sha256 over the roster's canonical form, order included. AAA closes day 5 at 143.03 in roster order and 134.88 reversed.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">fundamental_value</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">What the company is worth on its fundamentals, with no mispricing in it.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">GJR-GARCH</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">The per-name variance recursion. garch_alpha on yesterday's squared return, garch_beta on yesterday's variance, plus a GJR garch_gamma that adds weight when that return was negative, because a symmetric GARCH squares the return and destroys its sign.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">guards</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">The mispricing cap, the crowd lean cap, the session breaker and the price cap. Settable, and excluded from every calibration search because they are worst-case guarantees. daily_shock_cap is not settable at all.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">idiosyncratic</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">The part of a name's return no other name shares: one normal per company per tick, sized by that name's own GARCH variance.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">Instrument</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">One tradable company: ticker, sector and eight fundamentals. short_interest is a share count, so a value between 0 and 1 raises rather than being read as a fraction.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">jump</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">Applied to mispricing_s after the tick loop rather than inside it. Dropping it from the sum takes the worst residual from 1.9e-16 to 0.090 on a run carrying one jump row in 39,000.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">known-answer test</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">One fixed simulation run inside each of five wheel targets and hashed, compared target against target and against the sha256 committed in tests/known_answer.json. A disagreement stops the upload.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">Macro</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">Day-zero rates, inflation and the cycle. The chain runs on from there by itself, so vix takes 118 distinct values over a 120-day run.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">market factor</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">One normal drawn per tick that reaches every name through its beta. Without shared factors a 108-name index would have almost no aggregate volatility, because independent noise cancels.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">market maker</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">The counterparty on every book. It quotes both sides and shifts both quotes toward reducing its inventory, so the book absorbs one-sided flow without running dry.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">mispricing_s</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">Log deviation of price from fair value. The nine factor columns sum to its change, with a worst residual of 1.9e-16 over 39,000 rows.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">order book</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">engine.book(ticker) returns a detached snapshot. Filling against it prices your execution at the levels you consume and leaves prices() byte-identical to the run that never traded.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">order flow impact</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">The permanent, information share of order flow into mispricing_s: 0.35 of the total impact coefficient of 50.0. The book already charges the temporary component when orders walk real depth.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">order log</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">engine.order_log holds every input the engine consumed. An unknown entry raises on replay rather than being skipped, because a replay that ignored one would look like a success.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">order_flow</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">The channel that tells the market you traded, passed to tick() or run_session(). Pushing 500,000 AAA shares through it closes the name at 137.45 against 135.67 untouched.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">random_noise</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">The market component times the crash amplifier, plus the sector component, plus the idiosyncratic draw, summed into one column. truth can not separate the three.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">residual</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">The gap between differenced mispricing_s and the sum of the nine columns: 1.9e-16 at worst over 39,000 rows. Anything larger means the join is wrong. Sorting tick without day takes that same run to 0.149.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">RNG substream</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">One of seven generators derived from the root seed: market, economy, external, jumps, volume, news and per-name volume. A new mechanism on its own stream perturbs nothing, however it draws.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">RunManifest</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">The five things that identify a run, as one object: roster, macro initial conditions, realised scenario path, order log and strategy. reproduce() raises with the disagreeing component named.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">sector factor</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">One normal per sector per tick, reaching each member through its sector loading. It blends toward the market factor above VIX 25.5, so diversification stops working exactly when it is most wanted.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">seed</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">One integer, separate from the universe seed. It does not identify a run on its own, because the market an agent trades depends on that agent's own orders.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">sweep</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">Streams one seed at a time. A hundred recorded 252-day 100-instrument engines alive at once is roughly 110 GB, against a little over 1 GB for one.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">the nine factors</span>
+<span class="pt-s65">price formation</span>
+</div>
+<span class="pt-s0">reversion, momentum, crowd_lean, company_news, order_flow_impact, short_squeeze_effect, random_noise, circuit_breaker and jump. Difference mispricing_s, add all nine, and you can check the label instead of trusting it.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">tick</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">One minute of game time. A day is 390 regular-session ticks, so a hand loop that passes the same hour and minute 390 times simulates a different market.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">truth table</span>
+<span class="pt-s65">provenance</span>
+</div>
+<span class="pt-s0">One row per instrument per tick carrying fundamental_value, anchor_price, mispricing_s and nine factor columns. The nine sum to the change in mispricing_s.</span>
+</div>
+
+
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">Universe</span>
+<span class="pt-s65">the run</span>
+</div>
+<span class="pt-s0">The roster of instruments. Its order is contractual: the engine walks it in index order drawing random numbers as it goes, so a re-sorted universe gives a different market from the same seed.</span>
+</div>
+
+</section>
+
+
+
+
+</main></div>
+<div class="pt-foot">
+<section class="pt-index"><h2>All pages</h2><div class="pt-index-grid"><div class="pt-index-col"><span class="pt-index-door">Start</span><div class="pt-index-links"><a href="install.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Install</span></a><a href="core-concepts.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core concepts</span></a><a href="two-loops.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The two loops</span></a><a href="running-a-market.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Running a market</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Use it</span><div class="pt-index-links"><a href="agents.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Agents</span></a><a href="scenarios.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Scenarios</span></a><a href="execution-cost.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Execution cost</span></a><a href="checkpoints.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Checkpoints and forking</span></a><a href="edgar.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Real companies from EDGAR</span></a><a href="rl-environment.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">RL environment</span></a><a href="mcp.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The MCP server</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Trust it</span><div class="pt-index-links"><a href="realism-envelope.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Realism envelope</span></a><a href="metrics.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The metrics</span></a><a href="principles.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Principles</span></a><a href="citing.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Citing a run</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">Reference</span><div class="pt-index-links"><span><span class="pt-arrow">&gt;</span><span class="pt-door-name">Glossary</span></span><a href="factors.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">The nine factors</span></a><a href="conventions.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Conventions</span></a><a href="schemas.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Schemas</span></a><a href="presets.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Presets</span></a><a href="release-notes.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Release notes</span></a></div></div><div class="pt-index-col"><span class="pt-index-door">API</span><div class="pt-index-links"><a href="core-types.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Core types</span></a><a href="evaluate.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Evaluate</span></a><a href="parameters.html"><span class="pt-arrow">&gt;</span><span class="pt-door-name">Parameters</span></a></div></div></div></section>
+<nav class="pt-prevnext"><a class="pt-prev" href="citing.html"><span class="pt-eyebrow">BACK</span><span>Citing a run</span></a><a class="pt-next" href="factors.html"><span class="pt-eyebrow">NEXT</span><span>The nine factors</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+
+<div class="pt-s21">
+<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">GLOSSARY</span>
+</div>
+
+<section class="pt-s33">
+<h1 class="pt-s30">Glossary</h1>
+<p class="pt-s24">Terms this library uses in one specific way. Where a number pins the meaning, the number is here.</p>
+
+<div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
+<input type="text" value="{{ query }}" onInput="{{ setQuery }}" placeholder="Filter terms" aria-label="Filter terms" style="flex:1;min-width:12rem;height:38px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:0.9375rem;padding:0 0.85rem">
+<div style="display:flex;gap:0.35rem;flex-wrap:wrap">
+<sc-for list="{{ groups }}" as="g">
+<button onClick="{{ g.pick }}" style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.4rem 0.7rem;border-radius:5px;cursor:pointer;border:1px solid {{ g.border }};background:{{ g.bg }};color:{{ g.fg }}">{{ g.label }}</button>
+
+</sc-for></div>
+</div>
+<span class="pt-s61">{{ count }}</span>
+</section>
+
+<section style="padding:1.4rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
+<sc-for list="{{ terms }}" as="t">
+<div class="pt-s79">
+<div class="pt-s22">
+<span style="font-family:'{{ t.font }}',ui-monospace,monospace;font-size:{{ t.size }};font-weight:600;color:var(--ink)">{{ t.term }}</span>
+<span class="pt-s65">{{ t.group }}</span>
+</div>
+<span class="pt-s0">{{ t.body }}</span>
+</div>
+
+</sc-for></section>
+
+
+
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false, query: '', group: 'all' , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+
+    // One menu open at a time, and a click anywhere else closes them.
+    // <details> has no such behaviour on its own.
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) {
+        if (all[i] !== inside) all[i].removeAttribute('open');
+      }
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  // Field names keep the mono face; prose terms take the serif.
+  TERMS = [
+    { term: 'Universe', group: 'the run', code: false, body: 'The roster of instruments. Its order is contractual: the engine walks it in index order drawing random numbers as it goes, so a re-sorted universe gives a different market from the same seed.' },
+    { term: 'Instrument', group: 'the run', code: false, body: 'One tradable company: ticker, sector and eight fundamentals. short_interest is a share count, so a value between 0 and 1 raises rather than being read as a fraction.' },
+    { term: 'Macro', group: 'the run', code: false, body: 'Day-zero rates, inflation and the cycle. The chain runs on from there by itself, so vix takes 118 distinct values over a 120-day run.' },
+    { term: 'seed', group: 'the run', code: true, body: 'One integer, separate from the universe seed. It does not identify a run on its own, because the market an agent trades depends on that agent\u0027s own orders.' },
+    { term: 'tick', group: 'the run', code: true, body: 'One minute of game time. A day is 390 regular-session ticks, so a hand loop that passes the same hour and minute 390 times simulates a different market.' },
+    { term: 'Engine', group: 'the run', code: false, body: 'A whole market stepped through time. It owns the seeded generator, the per-company price state, the economy and the central bank, and nothing beyond those four.' },
+    { term: 'order book', group: 'the run', code: false, body: 'engine.book(ticker) returns a detached snapshot. Filling against it prices your execution at the levels you consume and leaves prices() byte-identical to the run that never traded.' },
+    { term: 'market maker', group: 'the run', code: false, body: 'The counterparty on every book. It quotes both sides and shifts both quotes toward reducing its inventory, so the book absorbs one-sided flow without running dry.' },
+    { term: 'ADV', group: 'the run', code: false, body: 'Average daily volume, the denominator for participation. 13.7 million shares is 0.05x a day in one name and 407x in another.' },
+    { term: 'order_flow', group: 'the run', code: true, body: 'The channel that tells the market you traded, passed to tick() or run_session(). Pushing 500,000 AAA shares through it closes the name at 137.45 against 135.67 untouched.' },
+    { term: 'order log', group: 'the run', code: false, body: 'engine.order_log holds every input the engine consumed. An unknown entry raises on replay rather than being skipped, because a replay that ignored one would look like a success.' },
+    { term: 'close_market', group: 'the run', code: true, body: 'The day\u0027s close bookkeeping: momentum roll, GARCH, macro step. It advances the macro chain into the next day, so a row recorded after it carries the values the next day will trade under.' },
+    { term: 'Checkpoint and branch', group: 'the run', code: false, body: 'Two ways to fork a run at one state. On a 60-day 40-instrument run, branch copies engine state in under 1 ms and does not survive the process. Checkpoint replays the order log in 2.7 s and does.' },
+    { term: 'sweep', group: 'the run', code: false, body: 'Streams one seed at a time. A hundred recorded 252-day 100-instrument engines alive at once is roughly 110 GB, against a little over 1 GB for one.' },
+
+    { term: 'fundamental_value', group: 'price formation', code: true, body: 'What the company is worth on its fundamentals, with no mispricing in it.' },
+    { term: 'anchor_price', group: 'price formation', code: true, body: 'fundamental_value times exp(mispricing_s): what the model wanted before the book touched it. So close minus anchor_price isolates the microstructure.' },
+    { term: 'mispricing_s', group: 'price formation', code: true, body: 'Log deviation of price from fair value. The nine factor columns sum to its change, with a worst residual of 1.9e-16 over 39,000 rows.' },
+    { term: 'the nine factors', group: 'price formation', code: false, body: 'reversion, momentum, crowd_lean, company_news, order_flow_impact, short_squeeze_effect, random_noise, circuit_breaker and jump. Difference mispricing_s, add all nine, and you can check the label instead of trusting it.' },
+    { term: 'market factor', group: 'price formation', code: false, body: 'One normal drawn per tick that reaches every name through its beta. Without shared factors a 108-name index would have almost no aggregate volatility, because independent noise cancels.' },
+    { term: 'sector factor', group: 'price formation', code: false, body: 'One normal per sector per tick, reaching each member through its sector loading. It blends toward the market factor above VIX 25.5, so diversification stops working exactly when it is most wanted.' },
+    { term: 'idiosyncratic', group: 'price formation', code: false, body: 'The part of a name\u0027s return no other name shares: one normal per company per tick, sized by that name\u0027s own GARCH variance.' },
+    { term: 'GJR-GARCH', group: 'price formation', code: false, body: 'The per-name variance recursion. garch_alpha on yesterday\u0027s squared return, garch_beta on yesterday\u0027s variance, plus a GJR garch_gamma that adds weight when that return was negative, because a symmetric GARCH squares the return and destroys its sign.' },
+    { term: 'jump', group: 'price formation', code: true, body: 'Applied to mispricing_s after the tick loop rather than inside it. Dropping it from the sum takes the worst residual from 1.9e-16 to 0.090 on a run carrying one jump row in 39,000.' },
+    { term: 'crowd lean', group: 'price formation', code: false, body: 'The crowd net-buys what trades below fair value and net-sells what trades above it, capped at 0.02 in log price so the crowd can never dominate a news day.' },
+    { term: 'order flow impact', group: 'price formation', code: false, body: 'The permanent, information share of order flow into mispricing_s: 0.35 of the total impact coefficient of 50.0. The book already charges the temporary component when orders walk real depth.' },
+    { term: 'circuit_breaker', group: 'price formation', code: true, body: 'Books the rewrite when the model price leaves the session band and the tick re-derives s from the clamped price. Omit the column and the factor sum misses that correction on any day the breaker binds.' },
+    { term: 'random_noise', group: 'price formation', code: true, body: 'The market component times the crash amplifier, plus the sector component, plus the idiosyncratic draw, summed into one column. truth can not separate the three.' },
+    { term: 'fair value', group: 'price formation', code: false, body: 'The level mean reversion pulls toward. It reprices at the central bank\u0027s meeting calendar, so a run long enough to cross a meeting is not a stationary experiment.' },
+    { term: 'guards', group: 'price formation', code: false, body: 'The mispricing cap, the crowd lean cap, the session breaker and the price cap. Settable, and excluded from every calibration search because they are worst-case guarantees. daily_shock_cap is not settable at all.' },
+
+    { term: 'truth table', group: 'provenance', code: false, body: 'One row per instrument per tick carrying fundamental_value, anchor_price, mispricing_s and nine factor columns. The nine sum to the change in mispricing_s.' },
+    { term: 'residual', group: 'provenance', code: false, body: 'The gap between differenced mispricing_s and the sum of the nine columns: 1.9e-16 at worst over 39,000 rows. Anything larger means the join is wrong. Sorting tick without day takes that same run to 0.149.' },
+    { term: 'fingerprint, universe', group: 'provenance', code: false, body: 'A sha256 over the roster\u0027s canonical form, order included. AAA closes day 5 at 143.03 in roster order and 134.88 reversed.' },
+    { term: 'fingerprint, model', group: 'provenance', code: false, body: 'The first 8 hex characters of a sha256 over the preset\u0027s canonical serialisation. Any settable change reads custom-7f290e34 rather than pt-v1, so a changed preset can not present as the shipped one.' },
+    { term: 'fingerprint, strategy', group: 'provenance', code: false, body: 'A sha256 over the spec, unchanged by whitespace, key order, or scaling every blend weight by two. Empty for a hand-built agent, because that result is reproducible only by citing code at a commit.' },
+    { term: 'RNG substream', group: 'provenance', code: false, body: 'One of seven generators derived from the root seed: market, economy, external, jumps, volume, news and per-name volume. A new mechanism on its own stream perturbs nothing, however it draws.' },
+    { term: 'draw schedule', group: 'provenance', code: false, body: 'Market hours, the 390-tick day, the calendar and the sector key order. Nothing settable may change it: a preset changes what the draws are multiplied into, never the schedule.' },
+    { term: 'draws_consumed', group: 'provenance', code: true, body: 'Total draws from three of the seven streams: market, economy and external. Equal market counts between two runs of the same tick schedule mean both saw an identical noise sequence.' },
+    { term: 'draw_delta', group: 'provenance', code: true, body: 'The market stream\u0027s draw-count difference between the two runs compare() puts side by side. Zero across all twenty-eight comparisons on pt-v12. Non-zero means a halt, a delisting or a roster change moved the schedule.' },
+    { term: 'common random numbers', group: 'provenance', code: false, body: 'Running one seed under two presets so draws_consumed comes out identical. Every difference in the outcome is then a parameter effect rather than reshuffled noise.' },
+    { term: 'known-answer test', group: 'provenance', code: false, body: 'One fixed simulation run inside each of five wheel targets and hashed, compared target against target and against the sha256 committed in tests/known_answer.json. A disagreement stops the upload.' },
+    { term: 'RunManifest', group: 'provenance', code: false, body: 'The five things that identify a run, as one object: roster, macro initial conditions, realised scenario path, order log and strategy. reproduce() raises with the disagreeing component named.' },
+    { term: 'era boundary', group: 'provenance', code: false, body: 'A change that moves every seeded trajectory, caught by a probe digest rather than a version string. One calendar day once brought three trajectory-changing fixes while the version and the preset both stayed put.' },
+    { term: 'era_fingerprint()', group: 'provenance', code: true, body: 'The digest of a small fixed probe simulation, recomputed before every replay. Two builds that agree on the probe agree on the arithmetic it exercises.' }
+  ];
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const q = (this.state.query || '').trim().toLowerCase();
+    const g = this.state.group;
+    const groupNames = ['the run', 'price formation', 'provenance'];
+    const rows = this.TERMS.filter(t => (g === 'all' || t.group === g)
+      && (!q || t.term.toLowerCase().indexOf(q) >= 0 || t.body.toLowerCase().indexOf(q) >= 0))
+      .slice()
+      .sort((a, b) => a.term.toLowerCase().localeCompare(b.term.toLowerCase()));
+    const pill = (on) => on
+      ? { border: 'var(--accent-line)', bg: 'var(--accent-soft)', fg: 'var(--accent-deep)' }
+      : { border: 'var(--line)', bg: 'var(--card)', fg: 'var(--ink-2)' };
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      showLight: dark ? 'none' : 'block',
+      showDark: dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      query: this.state.query,
+      setQuery: (e) => this.setState({ query: e.target.value }),
+      count: rows.length + ' of ' + this.TERMS.length + ' terms',
+      groups: [['all', 'all']].concat(groupNames.map(n => [n, n])).map(([k, label]) => {
+        const p = pill(g === k);
+        return { label: label, border: p.border, bg: p.bg, fg: p.fg,
+          pick: () => this.setState({ group: k }) };
+      }),
+      terms: rows.map(t => ({
+        term: t.term, group: t.group, body: t.body,
+        font: t.code ? 'Spline Sans Mono' : 'Source Serif 4',
+        size: t.code ? '0.8125rem' : '1rem'
+      }))
+    });
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {"doors": [{"title": "Start", "links": [{"label": "Install", "href": "install.html"}, {"label": "Core concepts", "href": "core-concepts.html"}, {"label": "The two loops", "href": "two-loops.html"}, {"label": "Running a market", "href": "running-a-market.html"}]}, {"title": "Use it", "links": [{"label": "Agents", "href": "agents.html"}, {"label": "Scenarios", "href": "scenarios.html"}, {"label": "Execution cost", "href": "execution-cost.html"}, {"label": "Checkpoints and forking", "href": "checkpoints.html"}, {"label": "Real companies from EDGAR", "href": "edgar.html"}, {"label": "RL environment", "href": "rl-environment.html"}, {"label": "The MCP server", "href": "mcp.html"}]}, {"title": "Trust it", "links": [{"label": "Realism envelope", "href": "realism-envelope.html"}, {"label": "The metrics", "href": "metrics.html"}, {"label": "Principles", "href": "principles.html"}, {"label": "Citing a run", "href": "citing.html"}]}, {"title": "Reference", "links": [{"label": "Glossary", "href": "glossary.html"}, {"label": "The nine factors", "href": "factors.html"}, {"label": "Conventions", "href": "conventions.html"}, {"label": "Schemas", "href": "schemas.html"}, {"label": "Presets", "href": "presets.html"}, {"label": "Release notes", "href": "release-notes.html"}]}, {"title": "API", "links": [{"label": "Core types", "href": "core-types.html"}, {"label": "Evaluate", "href": "evaluate.html"}, {"label": "Parameters", "href": "parameters.html"}]}]});
+})();
+</script>
 </body>
 </html>
