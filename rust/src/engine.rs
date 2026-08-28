@@ -1161,6 +1161,7 @@ impl Engine {
                 inflation_ceiling: self.params.inflation_ceiling,
                 inflation_floor: self.params.inflation_floor,
                 crisis_vix_threshold: self.params.crisis_vix_threshold,
+                usd_crisis_vix_threshold: self.params.usd_crisis_vix_threshold,
                 daily_credit_floor_gain: self.params.daily_credit_floor_gain,
                 volatility: request.volatility,
                 active_shocks: request.active_shocks,

@@ -390,6 +390,62 @@ fn the_weibull_hazard_changes_character_across_shape_one() {
 // ── crisis_vix_threshold reaches every gate that claims to use it ─────────
 
 #[test]
+fn a_preset_that_moves_the_crisis_threshold_leaves_the_dollar_gate_alone() {
+    // The regression 0.4.2 shipped, pinned. Issue #50 was right that the
+    // dollar gate read a constant where the gold premium read the parameter,
+    // and the one-line fix pointed both at `crisis_vix_threshold`. But
+    // `pt-v13` and `pt-v14` OVERRIDE that parameter to 30.88, so their dollar
+    // gate moved from 25.5 and their trajectories moved with it, in a patch
+    // release, against a version policy that forbids exactly that.
+    //
+    // Nothing caught it because nothing looks here. The known-answer test
+    // starts at VIX 19.5 and never crosses 25.5; the two surviving full
+    // bit-parity economy trajectories peak at 25.44 and 16.51; the three that
+    // do cross were retired at the crisis-gates fork. This test drives the
+    // VIX ABOVE the gate deliberately, which is the region none of them
+    // sample.
+    let mut e = economy();
+    e.vix = 28.0;          // above 25.5, below a preset's raised 30.88
+    e.gdp_growth = -2.0;
+
+    let run = |crisis: f64, usd: f64| {
+        update_economy_daily(
+            &e,
+            &DailyInputs {
+                volatility: 1.0,
+                game_day: 1,
+                crisis_vix_threshold: crisis,
+                usd_crisis_vix_threshold: usd,
+                ..Default::default()
+            },
+            &mut Silent(0.5),
+        )
+    };
+
+    let base = run(CRISIS_VIX_THRESHOLD, CRISIS_VIX_THRESHOLD);
+    // A preset raising ONLY the crisis threshold, as pt-v14 does.
+    let raised_crisis = run(30.88325108, CRISIS_VIX_THRESHOLD);
+    assert_eq!(
+        base.usd_index, raised_crisis.usd_index,
+        "moving crisis_vix_threshold moved the dollar. The two gates share a \
+         default; they are not the same dial, and a preset that raises one \
+         must not silently move the other."
+    );
+    assert_ne!(
+        base.gold_price, raised_crisis.gold_price,
+        "moving crisis_vix_threshold did not move gold, so this test is no \
+         longer exercising the gate it claims to"
+    );
+
+    // And the dollar gate still works when asked for directly.
+    let raised_usd = run(CRISIS_VIX_THRESHOLD, 40.0);
+    assert_ne!(
+        base.usd_index, raised_usd.usd_index,
+        "usd_crisis_vix_threshold did not reach the dollar"
+    );
+}
+
+#[test]
 fn moving_the_crisis_threshold_moves_both_the_gold_and_the_dollar_gate() {
     // The gold crisis premium read the parameter and the USD safe-haven drift
     // read the constant, so an embedder who moved `crisis_vix_threshold` got
@@ -409,6 +465,10 @@ fn moving_the_crisis_threshold_moves_both_the_gold_and_the_dollar_gate() {
                 volatility: 1.0,
                 game_day: 1,
                 crisis_vix_threshold: threshold,
+                // Both, deliberately: this test asks whether a caller moving
+                // the whole crisis regime reaches both series, which is issue
+                // #50's actual question. The test above asks the narrower one.
+                usd_crisis_vix_threshold: threshold,
                 ..Default::default()
             },
             &mut Silent(0.5),

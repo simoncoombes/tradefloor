@@ -1066,6 +1066,15 @@ pub struct ModelParams {
     /// reachable at all; whether it is the RIGHT point is a different
     /// question and now an answerable one.
     pub crisis_vix_threshold: f64,
+    /// The VIX above which the dollar catches a safe-haven bid.
+    ///
+    /// Defaults to the same constant as `crisis_vix_threshold` and is a
+    /// SEPARATE dial. 0.4.2 pointed the dollar gate at `crisis_vix_threshold`
+    /// to close issue #50, which moved it from 25.5 to 30.88 for `pt-v13` and
+    /// `pt-v14`, the two presets that override that parameter, and changed
+    /// their trajectories in a patch release. A preset that wants the two
+    /// gates to move together sets them together.
+    pub usd_crisis_vix_threshold: f64,
     /// Re-assert the credit spread floors on every daily step, scaled.
     ///
     /// INERT at 0.0, which every shipped preset sets. `update_economy_daily`
@@ -1301,6 +1310,7 @@ impl ModelParams {
             vix_return_clamp: crate::economy::VIX_RETURN_CLAMP,
             vix_target_shock_cap: crate::economy::VIX_TARGET_SHOCK_CAP,
             crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
+            usd_crisis_vix_threshold: crate::economy::CRISIS_VIX_THRESHOLD,
             daily_credit_floor_gain: 0.0,
             news_peer_weight: 0.0,
             news_peer_weight_down: 0.0,
@@ -2172,6 +2182,7 @@ impl ModelParams {
             "vix_return_source" => self.vix_return_source,
             "vix_target_shock_cap" => self.vix_target_shock_cap,
             "crisis_vix_threshold" => self.crisis_vix_threshold,
+            "usd_crisis_vix_threshold" => self.usd_crisis_vix_threshold,
             "daily_credit_floor_gain" => self.daily_credit_floor_gain,
             "news_peer_weight" => self.news_peer_weight,
             "news_peer_weight_down" => self.news_peer_weight_down,
@@ -2300,6 +2311,7 @@ impl ModelParams {
             "vix_return_source" => out.vix_return_source = value,
             "vix_target_shock_cap" => out.vix_target_shock_cap = value,
             "crisis_vix_threshold" => out.crisis_vix_threshold = value,
+            "usd_crisis_vix_threshold" => out.usd_crisis_vix_threshold = value,
             "daily_credit_floor_gain" => out.daily_credit_floor_gain = value,
             "news_peer_weight" => out.news_peer_weight = value,
             "news_peer_weight_down" => out.news_peer_weight_down = value,
@@ -2481,6 +2493,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "spread_size_smoothness",
         "universe_stress_decay",
         "universe_stress_weight",
+        "usd_crisis_vix_threshold",
         "vix_cycle_amplitude",
         "vix_mean_reversion",
         "vix_realised_vol_weight",

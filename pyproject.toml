@@ -4,8 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "pretium"
-version = "0.4.2"
-description = "Deterministic market simulation with a real limit order book."
+version = "0.4.3"
+description = "A reproducible evaluation environment for financial AI agents."
 readme = "README.md"
 requires-python = ">=3.11"
 # Dual-licensed, the Rust-ecosystem norm. See LICENSE-APACHE and LICENSE-MIT
