@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>pretium: learn it in one page</title>
-<meta name="description" content="A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.">
+<title>pretium: a reproducible market for evaluating AI agents</title>
+<meta name="description" content="Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.">
 <link rel="canonical" href="https://simoncoombes.github.io/pretium/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="pretium">
-<meta property="og:title" content="pretium: learn it in one page">
-<meta property="og:description" content="A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.">
+<meta property="og:title" content="pretium: a reproducible market for evaluating AI agents">
+<meta property="og:description" content="Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.">
 <meta property="og:url" content="https://simoncoombes.github.io/pretium/">
 <meta property="og:image" content="https://simoncoombes.github.io/pretium/og-card.png">
 <meta property="og:image:width" content="1200">
@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="learn.css">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Learn pretium","description":"A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.","url":"https://simoncoombes.github.io/pretium/","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Learn pretium","description":"Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.","url":"https://simoncoombes.github.io/pretium/","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.3.0","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/","inLanguage":"en","publisher":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"potentialAction":{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://simoncoombes.github.io/pretium/index.html?q={search_term_string}"},"query-input":"required name=search_term_string"}}</script>
 <script>
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
@@ -52,7 +52,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <section style="padding:3.5rem 0 0;display:flex;flex-direction:column;gap:1.5rem">
 <div style="display:flex;flex-direction:column;gap:1.1rem">
-<h1 style="font-size:clamp(1.85rem,4vw,2.7rem);max-width:none;text-wrap:balance">A reproducible evaluation environment for financial AI agents</h1>
+<h1 style="font-size:clamp(1.85rem,3.4vw,2.25rem);max-width:none;text-wrap:balance">A reproducible evaluation environment for financial AI agents</h1>
 <p style="font-size:1.1875rem;color:var(--ink-2);max-width:none;margin:0">Run controlled, reproducible experiments on trading agents in a market with realistic execution - not a backtest over historical prices. A deterministic market simulator with order-book execution, macro dynamics, causal ground truth and agent-native interfaces.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
 <a href="https://pypi.org/project/pretium/" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--accent-deep);text-decoration:none"><img src="./logo-python.png" alt="" width="16" height="16" style="flex:none" class="pt-light"><img src="./logo-python-dark.png" alt="" width="16" height="16" style="flex:none" class="pt-dark">pip install pretium</a>
@@ -220,7 +220,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s62">
 <span class="pt-s69">REPRODUCIBILITY</span>
 <h2 class="pt-s73">Git for market experiments</h2>
-<p style="margin:0;color:var(--ink-2);max-width:none">Not literally - there is no repository and no history. What carries over is the working practice. The market is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. Share the configuration, share the seed, re-run the experiment.</p>
+<p style="margin:0;color:var(--ink-2);max-width:none">A market here is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. It is the working practice of version control applied to an experiment rather than to code: share the configuration, share the seed, re-run the experiment and get the same market back.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
@@ -1244,7 +1244,7 @@ pt.evaluate(agents, seed=7,
 
 <section style="padding:3.5rem 0 0;display:flex;flex-direction:column;gap:1.5rem">
 <div style="display:flex;flex-direction:column;gap:1.1rem">
-<h1 style="font-size:clamp(1.85rem,4vw,2.7rem);max-width:none;text-wrap:balance">A reproducible evaluation environment for financial AI agents</h1>
+<h1 style="font-size:clamp(1.85rem,3.4vw,2.25rem);max-width:none;text-wrap:balance">A reproducible evaluation environment for financial AI agents</h1>
 <p style="font-size:1.1875rem;color:var(--ink-2);max-width:none;margin:0">Run controlled, reproducible experiments on trading agents in a market with realistic execution - not a backtest over historical prices. A deterministic market simulator with order-book execution, macro dynamics, causal ground truth and agent-native interfaces.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
 <a href="https://pypi.org/project/pretium/" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--accent-deep);text-decoration:none"><img src="./logo-python.png" alt="" width="16" height="16" style="flex:none" class="pt-light"><img src="./logo-python-dark.png" alt="" width="16" height="16" style="flex:none" class="pt-dark">pip install pretium</a>
@@ -1355,7 +1355,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s62">
 <span class="pt-s69">REPRODUCIBILITY</span>
 <h2 class="pt-s73">Git for market experiments</h2>
-<p style="margin:0;color:var(--ink-2);max-width:none">Not literally - there is no repository and no history. What carries over is the working practice. The market is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. Share the configuration, share the seed, re-run the experiment.</p>
+<p style="margin:0;color:var(--ink-2);max-width:none">A market here is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. It is the working practice of version control applied to an experiment rather than to code: share the configuration, share the seed, re-run the experiment and get the same market back.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">

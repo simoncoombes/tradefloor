@@ -1,6 +1,8 @@
 # pretium
 
-> A deterministic market simulator with a real limit order book.
+> A reproducible evaluation environment for financial AI agents: a
+> deterministic market simulator with order-book execution, macro dynamics
+> and causal ground truth.
 > Version 0.3.0. Every page of the learning path, in reading order.
 
 
@@ -8,7 +10,7 @@
 # Learn pretium
 https://simoncoombes.github.io/pretium/
 
-A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.
+Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.
 ======================================================================
 
 A reproducible evaluation environment for financial AI agents
@@ -92,7 +94,7 @@ A Python object with an act method, a Gymnasium environment, or a model calling 
 REPRODUCIBILITY 
 Git for market experiments
 
-Not literally - there is no repository and no history. What carries over is the working practice. The market is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. Share the configuration, share the seed, re-run the experiment.
+A market here is an explicit configuration and a seed, so an experiment can be recorded, re-run, compared and branched without depending on a market nobody controls. It is the working practice of version control applied to an experiment rather than to code: share the configuration, share the seed, re-run the experiment and get the same market back.
 
 What a RunManifest pins
 

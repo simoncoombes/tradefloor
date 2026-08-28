@@ -1,21 +1,34 @@
 # pretium
 
-> A deterministic market simulator with a real limit order book. Give it a
-> seed and a roster of companies and it runs prices, a limit order book,
-> fills and an economy forward, day by day. Version 0.3.0.
+> A reproducible evaluation environment for financial AI agents. A
+> deterministic market simulator with order-book execution, macro dynamics,
+> causal ground truth and agent-native interfaces. Version 0.3.0.
 
-These pages are a learning path rather than a reference: they go from what a
-limit order book is, through running one and driving it with an agent, to
-what the simulator has been measured against and what it must not be used
-for. Each page states its own limits in place rather than in a separate
-caveats document.
+Run controlled, reproducible experiments on trading agents in a market with
+realistic execution, rather than backtesting them over historical prices.
+The same universe, macro state and seed produce the same market on every
+supported platform, so a result can be re-run by anyone who has those three.
+
+Four properties these pages document and measure:
+
+- reproducible: the same seed gives the same market on Linux, macOS and Windows
+- execution-aware: agents trade through an order book and pay their own impact
+- inspectable: nine factor contributions sum to each price move, residual ~1e-16
+- agent-native: a Python object, a Gymnasium environment, or a model over MCP
+
+What it does not do is predict real markets. The realism envelope states what
+has been measured, over what horizon and on what configuration, and names five
+gaps that each end in a rule about what the simulator must not be used for.
+
+These pages are a learning path rather than a reference, and each states its
+own limits in place rather than in a separate caveats document.
 
 When quoting this project, cite the preset and the version, not "pretium":
 every preset is frozen and named, and the numbers change between them.
 
 ## Start
 
-- [Learn pretium](https://simoncoombes.github.io/pretium/): A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.
+- [Learn pretium](https://simoncoombes.github.io/pretium/): Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.
 
 ## Start here
 
