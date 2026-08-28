@@ -3,7 +3,7 @@
 > A reproducible evaluation environment for financial AI agents: a
 > deterministic market simulator with order-book execution, macro dynamics
 > and causal ground truth.
-> Version 0.4.1. Every page of the learning path, in reading order.
+> Version 0.4.2. Every page of the learning path, in reading order.
 
 
 ======================================================================
@@ -3520,6 +3520,18 @@ REFERENCE/ RELEASE NOTES
 Release notes
 
 What changed, what it means for a run you already have, and how to pin the old behaviour if you need it. Full history in CHANGELOG.md.
+
+0.4.2
+
+2026-08-28 
+
+Three reported defects, no trajectory change. Every preset runs exactly as it did in 0.4.1.
+
+Moving crisis_vix_threshold gated the gold crisis premium at your level and left the dollar's safe-haven drift at the default, silently. The two describe one regime, and both read the parameter now.
+
+A held meeting now reports what it decided. advance_day computed the central bank's decision and announcement variant and discarded both; DayAdvanceOutcome carries them.
+
+Between meetings the corporate bond yield goes stale while the treasury keeps moving, so the credit spread can drift under its floor and quote an investment-grade yield below the risk-free curve. daily_credit_floor_gain corrects it and ships at 0.0, because that code path is shared by every preset and a trajectory change belongs at a preset boundary.
 
 0.4.1
 

@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="learn.css">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Release notes","description":"What changed, what it means for a run you already have, and how to pin an old preset if you need the old behaviour.","url":"https://simoncoombes.github.io/pretium/release-notes.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.4.1","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Release notes","description":"What changed, what it means for a run you already have, and how to pin an old preset if you need the old behaviour.","url":"https://simoncoombes.github.io/pretium/release-notes.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.4.2","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"Reference"},{"@type":"ListItem","position":3,"name":"Release notes","item":"https://simoncoombes.github.io/pretium/release-notes.html"}]}</script>
 <script>
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
@@ -56,6 +56,17 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Release notes</h1>
 <p class="pt-s23">What changed, what it means for a run you already have, and how to pin the old behaviour if you need it. Full history in <a href="https://github.com/simoncoombes/pretium/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
 </section>
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<div style="display:flex;align-items:baseline;gap:0.7rem">
+<h2 class="pt-s7">0.4.2</h2>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-3)">2026-08-28</span>
+</div>
+<p class="pt-s8"><strong style="color:var(--ink)">Three reported defects, no trajectory change.</strong> Every preset runs exactly as it did in 0.4.1.</p>
+<p class="pt-s8">Moving <code>crisis_vix_threshold</code> gated the gold crisis premium at your level and left the dollar's safe-haven drift at the default, silently. The two describe one regime, and both read the parameter now.</p>
+<p class="pt-s8">A held meeting now reports what it decided. <code>advance_day</code> computed the central bank's decision and announcement variant and discarded both; <code>DayAdvanceOutcome</code> carries them.</p>
+<p class="pt-s8">Between meetings the corporate bond yield goes stale while the treasury keeps moving, so the credit spread can drift under its floor and quote an investment-grade yield below the risk-free curve. <code>daily_credit_floor_gain</code> corrects it and ships at 0.0, because that code path is shared by every preset and a trajectory change belongs at a preset boundary.</p>
+</section>
+
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <div style="display:flex;align-items:baseline;gap:0.7rem">
 <h2 class="pt-s7">0.4.1</h2>
@@ -140,6 +151,17 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Release notes</h1>
 <p class="pt-s23">What changed, what it means for a run you already have, and how to pin the old behaviour if you need it. Full history in <a href="https://github.com/simoncoombes/pretium/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
 </section>
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<div style="display:flex;align-items:baseline;gap:0.7rem">
+<h2 class="pt-s7">0.4.2</h2>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-3)">2026-08-28</span>
+</div>
+<p class="pt-s8"><strong style="color:var(--ink)">Three reported defects, no trajectory change.</strong> Every preset runs exactly as it did in 0.4.1.</p>
+<p class="pt-s8">Moving <code>crisis_vix_threshold</code> gated the gold crisis premium at your level and left the dollar's safe-haven drift at the default, silently. The two describe one regime, and both read the parameter now.</p>
+<p class="pt-s8">A held meeting now reports what it decided. <code>advance_day</code> computed the central bank's decision and announcement variant and discarded both; <code>DayAdvanceOutcome</code> carries them.</p>
+<p class="pt-s8">Between meetings the corporate bond yield goes stale while the treasury keeps moving, so the credit spread can drift under its floor and quote an investment-grade yield below the risk-free curve. <code>daily_credit_floor_gain</code> corrects it and ships at 0.0, because that code path is shared by every preset and a trajectory change belongs at a preset boundary.</p>
+</section>
+
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <div style="display:flex;align-items:baseline;gap:0.7rem">
 <h2 class="pt-s7">0.4.1</h2>
