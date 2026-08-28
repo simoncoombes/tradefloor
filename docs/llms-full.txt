@@ -11,7 +11,7 @@ https://simoncoombes.github.io/pretium/
 A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.
 ======================================================================
 
-A reproducible market for testing agents
+A reproducible financial market built for AI agents
 
 Run a trading agent against a market that reacts to it. Orders match against real order-book depth, so the agent pays for the size it takes and moves the price it trades at. The same seed gives the same market on every platform, so a result you publish is a result someone else can re-run.
 
