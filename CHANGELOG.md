@@ -9,6 +9,63 @@ competing for the same liquidity and scored under identical conditions.
 Not shipped, and the realism envelope does not cover it: certification was
 measured on a single agent.
 
+## 0.4.3
+
+**0.4.2 changed `pt-v13` and `pt-v14`, and it should not have.** If you
+pinned either preset, this release puts them back exactly as they were in
+0.4.0 and 0.4.1. All fourteen certified statistics are bit-identical to the
+pre-0.4.2 values again.
+
+The fix in 0.4.2 for a reported defect pointed the dollar's safe-haven gate at
+`crisis_vix_threshold`, and both presets override that parameter to 30.88, so
+their dollar gate moved from 25.5 and their trajectories moved with it. That
+is a breaking change, and it went out in a patch release. The changelog said
+there was no behaviour change at the default; that was wrong, and this
+corrects it.
+
+**What it cost, measured rather than estimated.** All fourteen statistics
+moved and all fourteen stayed in band, the largest displacement being 4.48% of
+a band width on `abs_return_acf5`. So no result computed under 0.4.2 is wrong.
+But a run recorded under `pt-v14` before 0.4.2 does not replay under it, and
+the preset name is what a citation carries, which is the whole reason presets
+are frozen.
+
+**The dollar gate is now its own dial**, `usd_crisis_vix_threshold`, defaulted
+to the same 25.5 as before. A preset that wants both gates to move together
+sets both. That still answers the original report, which was that the dollar
+gate was an invisible constant while gold read a parameter: it is a named,
+settable, documented parameter now.
+
+**Also in this release**, the package description changes from "Deterministic
+market simulation with a real limit order book" to "A reproducible evaluation
+environment for financial AI agents", matching what the documentation has said
+since the site was rebuilt.
+
+<!-- release-note-ends -->
+
+### the detail, and why nothing caught it
+
+The dollar index is not an output-only series. `economy/daily.rs` reads it for
+the inflation effect and for the dollar effect, so a change to the safe-haven
+drift propagates through inflation into the whole macro chain and out into
+equity fair values. It is a trajectory change by any definition.
+
+Nothing in the suite could see it, and the reason is structural rather than an
+oversight. The cross-platform known-answer test starts at VIX 19.5 and never
+crosses 25.5, so neither the old gate nor the new one fires in its 250 days.
+The two surviving full bit-parity economy trajectories have recorded VIX
+ceilings of 25.44 and 16.51, both under the old gate. The three trajectories
+that do cross 25.5 are exactly the ones retired under `#[ignore]` at the
+2026-08-21 crisis-trigger fork. Every gate that could have caught this had
+already been switched off, correctly, for an unrelated reason.
+
+`a_preset_that_moves_the_crisis_threshold_leaves_the_dollar_gate_alone` closes
+that hole. It drives the VIX above the gate deliberately, which is the region
+none of the surviving gates sample, and asserts that raising
+`crisis_vix_threshold` alone moves gold and leaves the dollar where it is. It
+was checked against the 0.4.2 expression before being committed, and fails
+there naming the regression.
+
 ## 0.4.2
 
 Three reported defects, none of which changes a trajectory. Every preset runs

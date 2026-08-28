@@ -1,8 +1,8 @@
 [package]
 name = "pretium"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2021"
-description = "Deterministic market simulation with a real limit order book."
+description = "A reproducible evaluation environment for financial AI agents."
 # Dual-licensed, the Rust-ecosystem norm (serde, tokio, rand): a downstream
 # user picks whichever term suits their own policy. Supersedes an earlier
 # Apache-2.0-only decision -- see DECISIONS.md in pretium-design for the

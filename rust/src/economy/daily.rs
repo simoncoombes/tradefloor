@@ -110,6 +110,17 @@ pub struct DailyInputs<'a> {
     /// reason: where a crisis STARTS is a calibration question, and a const
     /// answers it before anyone asks.
     pub crisis_vix_threshold: f64,
+    /// The VIX above which the dollar catches a safe-haven bid.
+    ///
+    /// SEPARATE from `crisis_vix_threshold`, and defaulted to the same
+    /// constant, because 0.4.2 learned what happens when they are the same
+    /// dial. Issue #50 correctly reported that this gate read the constant
+    /// while the gold crisis premium read the parameter, and the one-line fix
+    /// pointed both at the parameter. But `pt-v13` and `pt-v14` OVERRIDE
+    /// `crisis_vix_threshold` to 30.88, so their dollar gate moved from 25.5
+    /// and their trajectories moved with it, in a patch release. Two gates
+    /// that happen to share a default are not one gate.
+    pub usd_crisis_vix_threshold: f64,
     /// Re-assert the credit spread floors on every daily step, scaled.
     ///
     /// 0.0 disables it, which is what every shipped preset sets and what the
@@ -139,6 +150,7 @@ impl<'a> Default for DailyInputs<'a> {
             inflation_ceiling: INFLATION_CEILING,
             inflation_floor: INFLATION_FLOOR,
             crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
+            usd_crisis_vix_threshold: CRISIS_VIX_THRESHOLD,
             daily_credit_floor_gain: 0.0,
         }
     }
@@ -645,8 +657,8 @@ pub fn update_economy_daily(
     // at their level and a dollar gate still at 25.5. The two describe one
     // regime: a crisis is the same crisis whether you watch gold or the
     // dollar. No behaviour changes at the default, where the two agree.
-    let safe_haven_drift = if economy.vix > inputs.crisis_vix_threshold {
-        (economy.vix - inputs.crisis_vix_threshold) * 0.05
+    let safe_haven_drift = if economy.vix > inputs.usd_crisis_vix_threshold {
+        (economy.vix - inputs.usd_crisis_vix_threshold) * 0.05
     } else {
         0.0
     };

@@ -123,6 +123,13 @@ PERTURBATIONS = [
     # by a driven scenario and the probe runs none, so the multiplier has
     # nothing to scale.
     ("qe_pe_gain", 0.5, False),
+    # The dollar's crisis gate (0.4.3). Lowering it to 15 does fire the
+    # safe-haven drift, but the dollar reaches equities only through the
+    # macro chain: usd_index moves inflation, inflation moves the economy,
+    # the economy moves fair value. Three sessions do not get there, which is
+    # also why nothing in the suite caught the 0.4.2 regression this dial
+    # exists to prevent. It is exercised directly in economy/invariants.rs.
+    ("usd_crisis_vix_threshold", 15.0, False),
     # The daily credit spread floor (#48). It only bites once the 10y treasury
     # has drifted far enough under the stale corporate yield to breach the 0.8
     # floor, which takes about 120 days on the deterministic channel. Three

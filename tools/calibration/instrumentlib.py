@@ -148,6 +148,10 @@ PARAM_SPECS: dict[str, dict] = {
     # my own regulariser. Scale parameters take the log class, which is what
     # the log/raw split exists for.
     "crisis_vix_threshold": {"kind": "log"},
+    # The dollar's own crisis gate, split from the crisis threshold at 0.4.3.
+    # Same class and box as its sibling: it is a VIX level, so a raw deviation
+    # penalty on it would be about the regulariser rather than the model.
+    "usd_crisis_vix_threshold": {"kind": "log"},
     "vix_mean_reversion": {"kind": "abs", "step_unit": 0.02},
     # The volatility feedback (§68). Real markets move the VIX 165 points
     # per unit return on a heavy down day against the shipped 25, so the
