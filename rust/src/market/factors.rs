@@ -167,6 +167,14 @@ pub struct LiveFactors {
 /// smooth curve pivots where the discrete one already read 1.0.
 pub const SIZE_EFFECT_REFERENCE_B: f64 = 25.0;
 
+/// Bounds on the beta-driven idiosyncratic-volatility multiplier.
+///
+/// Wide enough not to bind on an ordinary roster -- the certified forty span
+/// beta 0.384 to 1.580, which at exponent 2 gives 0.15 to 2.50 -- and there
+/// only so that a degenerate beta cannot silence a name or hand one name the
+/// roster's entire variance budget.
+pub const IDIO_BETA_BOUNDS: (f64, f64) = (0.1, 4.0);
+
 /// Bounds on the continuous size multiplier.
 ///
 /// Wider than the step function's own [0.8, 1.6] on purpose -- the extra
@@ -376,27 +384,33 @@ pub fn calculate_live_factors(
     // The idiosyncratic scale was one number for every name in the roster:
     // cap size varies a name's noise through `cap_mult` and GARCH varies it
     // through the name's own conditional variance, but the SCALE itself did
-    // not vary at all. Real rosters disperse roughly twice as widely as the
-    // model's (interquartile volatility ratio 1.377 against 1.184), and no
-    // dial that moves every name together can close that.
+    // not vary at all. Real rosters disperse well past that -- interquartile
+    // volatility ratio 1.273..1.486 over ten reference windows against
+    // pt-v12's 1.205 -- and no dial that moves every name together closes a
+    // dispersion gap.
     //
-    // At slope zero the branch is not taken and the scale is exactly
+    // At exponent zero the branch is not taken and the scale is exactly
     // `idio_sigma_scale`, so a preset that leaves it unset is bit-identical.
-    let idio_scale = if params.idio_sigma_beta_slope == 0.0 {
+    let idio_scale = if params.idio_sigma_beta_exponent == 0.0 {
+        params.idio_sigma_scale
+    } else if beta <= 0.0 {
+        // A non-positive beta has no exposure to raise to a power, and
+        // `pow` of a negative base with a fractional exponent is NaN. The
+        // homogeneous scale is the honest answer, following
+        // `cap_size_multiplier_with`'s treatment of a non-positive cap.
         params.idio_sigma_scale
     } else {
         // Same choice as `sector_loading_beta_slope`: tied to beta, which
         // the universe already carries, so it costs no RNG stream and
         // cannot move the draw schedule.
         //
-        // Clamped at zero. A roster can hold a name with beta below
-        // 1 - 1/slope, and an unclamped scale would go negative there --
-        // which flips the sign of the noise draw rather than shrinking it,
-        // turning a defensive name into an inverted one.
-        mathx::max(
-            params.idio_sigma_scale * (1.0 + params.idio_sigma_beta_slope * (beta - 1.0)),
-            0.0,
-        )
+        // Bounded for the same reason the size effect is: a power law is
+        // unbounded as its base leaves the ordinary range, and a degenerate
+        // beta must not be able to silence a name or let one dominate the
+        // roster's whole variance budget.
+        let (lo, hi) = IDIO_BETA_BOUNDS;
+        params.idio_sigma_scale
+            * mathx::clamp(mathx::pow(beta, params.idio_sigma_beta_exponent), lo, hi)
     };
     let idiosyncratic_sigma = daily_sigma * idio_scale / mathx::sqrt(390.0);
 
@@ -967,7 +981,7 @@ mod tests {
     }
 
     #[test]
-    fn the_idio_beta_slope_is_inert_at_zero_and_disperses_when_it_is_not() {
+    fn the_idio_beta_exponent_is_inert_at_zero_and_disperses_when_it_is_not() {
         // With every shared factor at zero, `random_noise` IS the
         // idiosyncratic term -- beta reaches it only through the new dial,
         // so this isolates the mechanism rather than the factor structure.
@@ -978,28 +992,33 @@ mod tests {
             calculate_live_factors(&c, &[], 0.0, 1.0, &shared(), p, &mut rng).random_noise
         };
 
-        // Inert: the shipped preset leaves the slope at zero, so a defensive
-        // name and an aggressive one carry identical idiosyncratic noise and
-        // every preset's tape is bit-unchanged.
+        // Inert: the shipped preset leaves the exponent at zero, so a
+        // defensive name and an aggressive one carry identical idiosyncratic
+        // noise and every preset's tape is bit-unchanged.
         let off = crate::params::PT_V1;
-        assert_eq!(off.idio_sigma_beta_slope, 0.0);
+        assert_eq!(off.idio_sigma_beta_exponent, 0.0);
         assert_eq!(noise(&off, 0.6), noise(&off, 1.8));
 
         // Engaged: the same two names now differ, and in the right order.
         let mut on = crate::params::PT_V1;
-        on.idio_sigma_beta_slope = 0.6;
+        on.idio_sigma_beta_exponent = 2.0;
         let (lo, hi) = (noise(&on, 0.6), noise(&on, 1.8));
         assert!(hi > lo, "beta 1.8 noise {hi} should exceed beta 0.6 noise {lo}");
-        // A name at beta 1.0 is the pivot and must not move at all.
+        // Beta 1.0 is the pivot: 1^k is 1 for every k, so it cannot move.
         assert_eq!(noise(&on, 1.0), noise(&off, 1.0));
 
-        // Clamped: beta below 1 - 1/slope would drive the scale negative,
-        // which flips the sign of the draw rather than shrinking it. A
-        // defensive name must go quiet, never inverted.
+        // The exponent form exists because the linear one it replaced drove
+        // low-beta names to EXACTLY zero. Every positive beta must stay
+        // audible however steep the exponent gets.
         let mut steep = crate::params::PT_V1;
-        steep.idio_sigma_beta_slope = 4.0;
-        let inverted = noise(&steep, 0.1);
-        assert!(inverted >= 0.0, "clamp failed: noise {inverted} changed sign");
+        steep.idio_sigma_beta_exponent = 8.0;
+        let quiet = noise(&steep, 0.3);
+        assert!(quiet > 0.0, "a defensive name went silent at {quiet}");
+
+        // A non-positive beta would be NaN under `pow` with a fractional
+        // exponent. It falls back to the homogeneous scale instead.
+        assert_eq!(noise(&on, -0.5), noise(&off, -0.5));
+        assert!(noise(&on, -0.5).is_finite());
     }
 
     #[test]

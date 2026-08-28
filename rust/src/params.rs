@@ -157,24 +157,34 @@ pub struct ModelParams {
     /// Scale on the per-name idiosyncratic GARCH sigma — the funding side
     /// of the factor-variance reallocation. Bit-inert at 1.0.
     pub idio_sigma_scale: f64,
-    /// How much a name's idiosyncratic volatility follows its market beta.
-    /// Zero on every preset before this dial and bit-identical.
+    /// How strongly a name's idiosyncratic volatility follows its market
+    /// beta, as an EXPONENT. Zero on every preset before this dial and
+    /// bit-identical.
     ///
-    /// At `s` the scale is `idio_sigma_scale * (1 + s * (beta - 1))`. Like
-    /// [`sector_loading_beta_slope`] it reuses a per-name attribute the
-    /// universe already carries rather than drawing a fresh one, so it costs
-    /// no RNG stream and cannot move the draw schedule.
+    /// At `k` the scale is `idio_sigma_scale * beta^k`, bounded by
+    /// [`IDIO_BETA_BOUNDS`]. Like [`sector_loading_beta_slope`] it reuses a
+    /// per-name attribute the universe already carries rather than drawing a
+    /// fresh one, so it costs no RNG stream and cannot move the draw
+    /// schedule.
     ///
     /// It exists because `idio_sigma_scale` is the last homogeneous term in
-    /// a name's volatility. Cap size already varies it through
-    /// `cap_size_multiplier`, and GARCH varies it through each name's own
+    /// a name's volatility. Cap size varies it through
+    /// `cap_size_multiplier` and GARCH varies it through each name's own
     /// conditional variance, but the SCALE itself is one number for every
-    /// name in the roster. Measured against real markets the model's names
-    /// come out roughly twice as alike as they should: the interquartile
-    /// ratio of annualised name volatility reads 1.184 where the real
-    /// roster reads 1.377. That is a dispersion gap, not a level gap, and
-    /// no dial that moves every name together can close it.
-    pub idio_sigma_beta_slope: f64,
+    /// name in the roster. Real rosters disperse considerably more: over ten
+    /// non-overlapping 252-day windows of the forty-name reference panel the
+    /// interquartile ratio of annualised name volatility runs 1.273 to
+    /// 1.486, where pt-v12 averages 1.205 across thirty seeds. That is a
+    /// dispersion gap, not a level gap, and no dial that moves every name
+    /// together can close it.
+    ///
+    /// An exponent rather than the linear `1 + s(beta - 1)` this dial was
+    /// first built as. The linear form has a wall: it drives any name with
+    /// beta below `1 - 1/s` to exactly zero volatility, and on the certified
+    /// roster that starts at `s` near 2 -- before the form reaches the
+    /// bottom of the real range, which it never did. `beta^k` is positive
+    /// for every positive beta, so it disperses without deleting names.
+    pub idio_sigma_beta_exponent: f64,
     /// Order-flow impact coefficient, before the informed fraction.
     pub order_flow_coefficient: f64,
     /// Permanent (information) share of order-flow impact.
@@ -1146,7 +1156,7 @@ impl ModelParams {
             sector_loading: 0.5,
             sector_loading_beta_slope: 0.0,
             idio_sigma_scale: factor_vol::IDIO_SIGMA_SCALE,
-            idio_sigma_beta_slope: 0.0,
+            idio_sigma_beta_exponent: 0.0,
             order_flow_coefficient: factors::ORDER_FLOW_COEFFICIENT,
             informed_flow_fraction: factors::INFORMED_FLOW_FRACTION,
             inflation_reversion: crate::economy::INFLATION_MEAN_REVERSION,
@@ -1896,7 +1906,7 @@ impl ModelParams {
             "sector_loading" => self.sector_loading,
             "sector_loading_beta_slope" => self.sector_loading_beta_slope,
             "idio_sigma_scale" => self.idio_sigma_scale,
-            "idio_sigma_beta_slope" => self.idio_sigma_beta_slope,
+            "idio_sigma_beta_exponent" => self.idio_sigma_beta_exponent,
             "order_flow_coefficient" => self.order_flow_coefficient,
             "inflation_ceiling" => self.inflation_ceiling,
             "inflation_floor" => self.inflation_floor,
@@ -2021,7 +2031,7 @@ impl ModelParams {
             "sector_loading" => out.sector_loading = value,
             "sector_loading_beta_slope" => out.sector_loading_beta_slope = value,
             "idio_sigma_scale" => out.idio_sigma_scale = value,
-            "idio_sigma_beta_slope" => out.idio_sigma_beta_slope = value,
+            "idio_sigma_beta_exponent" => out.idio_sigma_beta_exponent = value,
             "order_flow_coefficient" => out.order_flow_coefficient = value,
             "inflation_ceiling" => out.inflation_ceiling = value,
             "inflation_floor" => out.inflation_floor = value,
@@ -2224,7 +2234,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "garch_gamma",
         "garch_omega",
         "garch_vix_coupling",
-        "idio_sigma_beta_slope",
+        "idio_sigma_beta_exponent",
         "idio_sigma_scale",
         "inflation_ceiling",
         "inflation_floor",
