@@ -62,6 +62,25 @@ from pretium import envelope, facts  # noqa: E402
 #: measurement is documented and a second copy is a second thing to drift.
 CRISIS_COMOVEMENT_REAL = (0.664, 0.727)
 
+#: Real markets' crisis volatility lever, from `real_vix_lever.py`: 17.2%
+#: annualised at VIX under 12 against 106.1% at VIX 45 and above.
+CRISIS_LEVER_REAL = 6.16
+
+#: How far from `CRISIS_LEVER_REAL` a candidate may sit before the gate says
+#: so. Five percent is chosen, not derived: the `scenario-magnitude` gap
+#: calls pt-v12's 6.04 "within two percent of real" and treats that as the
+#: headline, so a candidate at eight percent has moved a published claim.
+#:
+#: This row exists because the gate has now hidden the same class of defect
+#: TWICE. Crisis co-movement was printed and compared against nothing until
+#: round 9, by which time the leading candidate had been outside its real
+#: range on three seed blocks of five. The lever was printed and compared
+#: against nothing until round 23, by which time p970 had been reported as
+#: regressing nothing while costing 0.28 of lever on all five blocks. The
+#: lesson generalises past these two: a number with a published real value
+#: that nothing compares against is a defect waiting for a preset.
+CRISIS_LEVER_TOLERANCE = 0.05
+
 KINDS = ("p252", "p504", "vix5", "vix45", "vix65", "driven",
          "ho_seeds", "ho_universe")
 
@@ -205,8 +224,13 @@ def main() -> int:
             lever = (v["vix65"]["annualised_vol_pct"]
                      / v["vix5"]["annualised_vol_pct"])
             v["vol_lever"] = lever
+            err = abs(lever - CRISIS_LEVER_REAL) / CRISIS_LEVER_REAL
+            v["vol_lever_error"] = err
+            v["vol_lever_in_tolerance"] = err <= CRISIS_LEVER_TOLERANCE
             print(f"  crisis lever  vol(VIX 65)/vol(VIX 5) = {lever:.3f}"
-                  f"   (real 6.16)", flush=True)
+                  f"   (real {CRISIS_LEVER_REAL})  {err:+.1%}  "
+                  f"{'ok' if err <= CRISIS_LEVER_TOLERANCE else 'OUT OF TOLERANCE'}",
+                  flush=True)
         results[label] = {
             "base": c["base"], "overrides": c["overrides"],
             "fingerprint": gate_pick.model(c["base"], c["overrides"]).fingerprint,
