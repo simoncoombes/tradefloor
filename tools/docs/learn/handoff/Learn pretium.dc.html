@@ -471,14 +471,14 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <section style="padding:3rem 0 0;display:flex;flex-direction:column;gap:1.4rem">
 <div style="display:flex;flex-direction:column;gap:0.5rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">STEP 04 - DRIVE IT</span>
-<h2 style="font-size:1.75rem">Three ways to drive it</h2>
+<h2 style="font-size:1.75rem">Three ways to use it</h2>
 <p style="color:var(--ink-2);max-width:none;margin:0">Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote. Cheapest first.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1.1rem">
 <div style="border:1px solid var(--line);border-radius:6px;padding:0.9rem;background:var(--card);display:flex;flex-direction:column;gap:0.6rem">
 <h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0">Agents over MCP</h3>
-<p style="margin:0;font-size:0.8125rem;color:var(--ink-2)">Nothing you write. Claude or another model calls the simulator as a tool and reads the answers. Eleven tools, everything composed as data.</p>
+<p style="margin:0;font-size:0.8125rem;color:var(--ink-2)">No simulator integration code. Claude or another model calls pretium through MCP, observes the market and submits trades as tool calls. Eleven tools, everything composed as data.</p>
 <pre style="margin:0.2rem 0 0;margin-top:auto;background:var(--surface);border:1px solid var(--line-soft);border-radius:5px;padding:0.7rem;font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;line-height:1.65;color:var(--ink-2);overflow-x:auto">pip install "pretium[mcp]"
 
 claude mcp add pretium \
@@ -515,7 +515,7 @@ pt.tca.analyse(Mine(), seed=42,
 <p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Then <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">rank</span> repeats that across seeds and separates them with a paired sign test. The Oracle reads the true mispricing and says so. Read it as a reference point, not a ceiling: it spends the same gross on a naive rule, and mean-reversion beats it on 5 of the 12 markets.</p>
 <div style="margin-top:0.2rem;padding-top:0.7rem;border-top:1px solid var(--line-soft)">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3)">SHIPPED &#183; EACH IN ITS OWN COPY</span>
-<p style="margin:0.3rem 0 0;font-size:0.8125rem;color:var(--ink-2)">Ten agents, ten identical markets. Each agent runs in its own copy of the same deterministic market, so nobody eats another agent's depth and the comparison stays clean and reproducible. One market with many agents in it is the extension below.</p>
+<p style="margin:0.3rem 0 0;font-size:0.8125rem;color:var(--ink-2)">Ten agents, ten identical markets. Each agent runs in its own copy of the same deterministic market, so nobody eats another agent's depth and the comparison stays clean and reproducible. A single shared market with many agents is the extension described below.</p>
 </div>
 </div>
 <pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">agents = pt.reference_agents(seed=3)
@@ -615,8 +615,8 @@ for day in range(days):
 <section id="trust" style="padding:3rem 0 0;display:flex;flex-direction:column;gap:1.4rem">
 <div style="display:flex;flex-direction:column;gap:0.5rem">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.12em;color:var(--accent)">STEP 05 - TRUST THE RESULT</span>
-<h2 style="font-size:1.75rem">How real is it</h2>
-<p style="color:var(--ink-2);max-width:none;margin:0">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. The shipped preset falls inside all fourteen of those ranges over a one-year simulation, on the configuration the certification was measured on. There is no single score, because one number travels further than its caveats.</p>
+<h2 style="font-size:1.75rem">How closely it reproduces measured behaviour</h2>
+<p style="color:var(--ink-2);max-width:none;margin:0">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:1.6rem;align-items:stretch">
@@ -823,7 +823,7 @@ class Component extends DCLogic {
 
   verdictFor(days, shape) {
     const bodies = {
-      'a|balanced': 'This is the exact roster the certification was measured on: twelve sectors, filled round-robin, forty names. All fourteen habits landed in range on thirty seeds.',
+      'a|balanced': 'This is the exact roster the certification was measured on: twelve sectors, filled round-robin, forty names. The thirty-seed median of all fourteen landed in range on it.',
       'a|sp-like': 'About a third technology, as the real index is. That shape was re-measured on the shipped preset and it keeps all fourteen over a year, so the certification is not an artifact of a tidy roster.',
       'a|tech-heavy': 'Sixty percent in one industry, and it still keeps all fourteen over a year. Concentration costs nothing at this length, which is the surprising half of the finding.',
       'b|balanced': 'Two years on an evenly spread roster keeps all fourteen, and it is the only shape that does. But the ranges it was graded against were rebuilt for that window rather than the published ones, so it is measured, not certified.',
@@ -1245,9 +1245,10 @@ class Component extends DCLogic {
         : 'no fills'
     };
 
-    // Levels shown, and what the taker actually paid against the price that
-    // was on screen before the order arrived. Arithmetic on the golden's own
-    // fills, which is the honest version of a slippage number.
+    // What the taker actually paid, against the resting quote on its own side
+    // before the order arrived -- the arrival price, not the mid. Naming it
+    // matters: a slippage number means nothing without its benchmark.
+    // Arithmetic on the golden's own fills.
     const prevSt = s.bookStep > 0 ? D.book[s.bookStep - 1] : null;
     const qty = st.fills.reduce((a, f) => a + f.qty, 0);
     const avg = qty ? st.fills.reduce((a, f) => a + f.price * f.qty, 0) / qty : null;
@@ -1272,8 +1273,11 @@ class Component extends DCLogic {
     ];
     if (avg != null && arrival) {
       const bps = (op.side === 'buy' ? (avg - arrival) / arrival : (arrival - avg) / arrival) * 10000;
-      out.book.paid = 'filled ' + qty + ' at ' + avg.toFixed(4) + ' against ' + arrival.toFixed(2)
-        + ' on screen: ' + (bps >= 0 ? '+' : '') + bps.toFixed(0) + ' bps';
+      out.book.paid = qty + ' filled at a VWAP of ' + avg.toFixed(4)
+        + ' against the ' + arrival.toFixed(2)
+        + (op.side === 'buy' ? ' best offer' : ' best bid')
+        + ' resting when the order arrived: '
+        + (bps >= 0 ? '+' : '') + bps.toFixed(0) + ' bps';
       out.book.paidCol = bps > 0 ? 'var(--red)' : 'var(--accent-deep)';
     } else {
       out.book.paid = avg != null ? 'filled ' + qty + ' at ' + avg.toFixed(4) : 'nothing traded';

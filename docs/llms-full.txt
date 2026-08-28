@@ -519,18 +519,18 @@ moved
 
 Fills 
 50 @ 101.00 110 @ 102.00 15 @ 103.00
-filled 175 at 101.8000 against 101.00 on screen: +79 bps
+175 filled at a VWAP of 101.8000 against the 101.00 best offer resting when the order arrived: +79 bps
 
 >
 
 STEP 04 - DRIVE IT 
-Three ways to drive it
+Three ways to use it
 
 Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote. Cheapest first.
 
 Agents over MCP
 
-Nothing you write. Claude or another model calls the simulator as a tool and reads the answers. Eleven tools, everything composed as data.
+No simulator integration code. Claude or another model calls pretium through MCP, observes the market and submits trades as tool calls. Eleven tools, everything composed as data.
 
 pip install "pretium[mcp]"
 
@@ -568,7 +568,7 @@ Hand evaluate a dict of ten agents and each one runs in its own copy of an ident
 Then rank repeats that across seeds and separates them with a paired sign test. The Oracle reads the true mispricing and says so. Read it as a reference point, not a ceiling: it spends the same gross on a naive rule, and mean-reversion beats it on 5 of the 12 markets.
 
 SHIPPED · EACH IN ITS OWN COPY 
-Ten agents, ten identical markets. Each agent runs in its own copy of the same deterministic market, so nobody eats another agent's depth and the comparison stays clean and reproducible. One market with many agents in it is the extension below.
+Ten agents, ten identical markets. Each agent runs in its own copy of the same deterministic market, so nobody eats another agent's depth and the comparison stays clean and reproducible. A single shared market with many agents is the extension described below.
 
 agents = pt.reference_agents(seed=3)
 agents["mine"] = Mine()
@@ -667,9 +667,9 @@ What it would not give you
 A market maker that learns the cohort. The maker and the aggregate flow do not adapt, so the only strategic behaviour in the arena is the behaviour you brought. The realism envelope is also silent here: it was measured on one agent, so a cohort result sits outside what has been certified.
 
 STEP 05 - TRUST THE RESULT 
-How real is it
+How closely it reproduces measured behaviour
 
-Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. The shipped preset falls inside all fourteen of those ranges over a one-year simulation, on the configuration the certification was measured on. There is no single score, because one number travels further than its caveats.
+Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.
 
 annualised_vol_pct 
 
@@ -743,7 +743,7 @@ Shaped as the S&P
 Mostly Technology
 
 Yes. 
-This is the exact roster the certification was measured on: twelve sectors, filled round-robin, forty names. All fourteen habits landed in range on thirty seeds. 
+This is the exact roster the certification was measured on: twelve sectors, filled round-robin, forty names. The thirty-seed median of all fourteen landed in range on it. 
 
 Run a crisis through it
 
@@ -1289,7 +1289,7 @@ One row per name per bar. This is the table a backtest would give you, and the o
 
 Orders move the price
 
-Orders match against a real book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.
+Orders match against a simulated limit order book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.
 
 3 a day 
 
@@ -1438,7 +1438,7 @@ You return target weights
 Weights in [-1, 1], one per name. The harness turns them into orders, so a policy does not learn each price range first. 
 
 The market answers back 
-Orders match against real depth. Reward is measured after the market moves, so it already carries the cost of your own footprint. 
+Orders match against the engine's own depth. Reward is measured after the market moves, so it already carries the cost of your own footprint. 
 
 The seed owns the randomness 
 Give the same agent the same seed and universe, and you get the same run. 
@@ -2026,7 +2026,7 @@ The model reads an observation and answers with target weights at each step.
 the agents page
 
 It pays for size 
-Orders match against real depth, so the reward already carries the cost of the footprint. 
+Orders match against the engine's own depth, so the reward already carries the cost of the footprint. 
 
 the agents page
 
@@ -3165,7 +3165,7 @@ engine.book(ticker) returns a detached snapshot. Filling against it prices your 
 order flow impact 
 price formation 
 
-The permanent, information share of order flow into mispricing_s: 0.35 of the total impact coefficient of 50.0. The book already charges the temporary component when orders walk real depth. 
+The permanent, information share of order flow into mispricing_s: 0.35 of the total impact coefficient of 50.0. The book already charges the temporary component when orders walk the book's depth. 
 
 order log 
 the run 

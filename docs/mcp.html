@@ -133,7 +133,7 @@ claude mcp add pretium -- pretium-mcp
 
 <div class="pt-s3">
 <span class="pt-s5">It pays for size</span>
-<span class="pt-s0">Orders match against real depth, so the reward already carries the cost of the footprint.</span>
+<span class="pt-s0">Orders match against the engine's own depth, so the reward already carries the cost of the footprint.</span>
 </div>
 
 <a href="agents.html" class="pt-s144">the agents page</a>
@@ -641,7 +641,7 @@ class Component extends DCLogic {
       ],
       inside: [
         { k: 'It sends orders', v: 'The model reads an observation and answers with target weights at each step.' },
-        { k: 'It pays for size', v: 'Orders match against real depth, so the reward already carries the cost of the footprint.' },
+        { k: 'It pays for size', v: 'Orders match against the engine\u0027s own depth, so the reward already carries the cost of the footprint.' },
         { k: 'It needs a harness', v: 'Any object with an act method works. The model call sits inside that method.' },
         { k: 'It is slower and it costs', v: 'One model call per decision. A 20-day run at three decisions a day is 60 calls.' }
       ],

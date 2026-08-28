@@ -518,7 +518,7 @@ class Component extends DCLogic {
       ],
       rules: [
         { k: 'You return target weights', v: 'Weights in [-1, 1], one per name. The harness turns them into orders, so a policy does not learn each price range first.' },
-        { k: 'The market answers back', v: 'Orders match against real depth. Reward is measured after the market moves, so it already carries the cost of your own footprint.' },
+        { k: 'The market answers back', v: 'Orders match against the engine\u0027s own depth. Reward is measured after the market moves, so it already carries the cost of your own footprint.' },
         { k: 'The seed owns the randomness', v: 'Give the same agent the same seed and universe, and you get the same run.' }
       ],
       sees: ['prices', 'the order book', 'your position', 'your cash', 'the step number'],
