@@ -84,11 +84,39 @@ def _sd(xs):
     return (sum((x - mu) ** 2 for x in xs) / n) ** 0.5
 
 
-def driven_window(m, seed: int) -> dict:
-    """Daily return sd and the VIX-channel gain, against real AAPL's own."""
+_QE_MEASURED = Path(__file__).resolve().parent / "data" / "qe-measured-2020-2021.json"
+
+
+def qe_measured():
+    """The MEASURED qe_pe_boost series, aligned to the covid window's dates.
+
+    FRED WSHOSHO + WSHOMCB (securities held outright), trailing four-week
+    purchases through the engine's own scale `0.10 * monthly / 120`. This is
+    NOT what the certified driven gate runs: that remains the EMA proxy in
+    `_covid_inputs`, because every recorded driven figure was measured
+    against it and a silent swap would orphan them all. The measured series
+    correlates -0.485 with the proxy -- QE is countercyclical, the proxy is
+    procyclical -- so treat any conclusion transferred between them as
+    unsupported until re-measured.
+    """
+    raw = json.loads(_COVID.read_text(encoding="utf-8"))
+    meas = json.loads(_QE_MEASURED.read_text(encoding="utf-8"))
+    assert meas["dates"] == raw["dates"], "the measured series must align by date"
+    return meas["qe_pe_boost"]
+
+
+def driven_window(m, seed: int, qe_series=None) -> dict:
+    """Daily return sd and the VIX-channel gain, against real AAPL's own.
+
+    `qe_series` replaces the proxy `qe_pe_boost` input day for day when
+    given (see `qe_measured`); None runs the shipped proxy, bit for bit.
+    """
     import pyarrow as pa
     import pyarrow.compute as pc
     raw, policy, credit, qe = _covid_inputs()
+    if qe_series is not None:
+        assert len(qe_series) == len(qe), "qe_series must cover the window"
+        qe = list(qe_series)
     n = len(raw["dates"])
     path = [{"day": i, "vix": raw["vix"][i], "federal_funds_rate": policy[i],
              "corporate_bond_yield": credit[i], "qe_pe_boost": qe[i]}
