@@ -126,7 +126,49 @@ function stripShell(ast) {
     return true;
   });
 
-  return { template: PT.serialize(ast), removed, wrapStyle: attrRaw(wrap, 'style') };
+  /* What comes back is the <main> alone. The wrapper the design put around
+   * it only ever held the overlay, the header and main itself, and the
+   * builder now supplies the first two — so returning the wrapper as well
+   * would nest one page-height container inside another. */
+  return { template: PT.serialize([main]), removed, wrapStyle: attrRaw(wrap, 'style') };
+}
+
+/* Turn the theme-swapped image pairs into CSS classes.
+ *
+ * The design binds each pair's visibility to a `dark` flag the page's own
+ * component holds: `style="display:{{ showLight }}"`. That has two faults
+ * once the shell owns the theme. The wrong image is on screen until the
+ * script runs, and the flag never hears about a toggle the shell performed,
+ * so the logos stop agreeing with the page around them. Two stylesheet
+ * rules do the same job before the first paint and keep doing it.
+ */
+function themeImages(ast) {
+  let swapped = 0;
+  walk(ast, (node) => {
+    if (node.kind !== 'el') return;
+    const style = (node.attrs || []).find((a) => a.name === 'style');
+    if (!style) return;
+    let cls = null;
+    if (/display:\s*\{\{\s*showLight\s*\}\}/.test(style.raw)) cls = 'pt-light';
+    else if (/display:\s*\{\{\s*showDark\s*\}\}/.test(style.raw)) cls = 'pt-dark';
+    if (!cls) return;
+
+    style.raw = style.raw
+      .replace(/display:\s*\{\{\s*show(Light|Dark)\s*\}\}\s*;?/, '')
+      .replace(/^;+|;+$/g, '');
+    const existing = (node.attrs || []).find((a) => a.name === 'class');
+    if (existing) existing.raw = (existing.raw + ' ' + cls).trim();
+    else node.attrs.push({ name: 'class', raw: cls, parts: [cls] });
+    swapped++;
+  });
+  return swapped;
+}
+
+function walk(nodes, fn) {
+  for (const n of nodes) {
+    fn(n);
+    if (n.children) walk(n.children, fn);
+  }
 }
 
 function attrRaw(node, name) {
@@ -162,7 +204,15 @@ function browser(shared) {
   const win = {
     document: doc,
     localStorage: { getItem: () => null, setItem: noop, removeItem: noop },
-    matchMedia: () => ({ matches: false, addEventListener: noop, removeEventListener: noop }),
+    /* A page served without JavaScript cannot animate, so the static
+     * markup should be the still frame — which is what the pages already
+     * draw when the reader has asked for reduced motion. Answering `true`
+     * here is not a lie about the reader's settings; it is the honest
+     * description of a document with no script running. */
+    matchMedia: (q) => ({
+      matches: /prefers-reduced-motion/.test(String(q)),
+      addEventListener: noop, removeEventListener: noop
+    }),
     navigator: { platform: '', userAgent: 'prerender' },
     addEventListener: noop, removeEventListener: noop,
     requestAnimationFrame: noop, cancelAnimationFrame: noop,
@@ -229,7 +279,9 @@ for (const page of manifest.pages) {
     }
   }
 
-  const stripped = stripShell(PT.parse(piece.template));
+  const parsed = PT.parse(piece.template);
+  const swapped = themeImages(parsed);
+  const stripped = stripShell(parsed);
   const ast = PT.parse(stripped.template);
   const vals = (inst.renderVals || inst.render).call(inst);
   const html = PT.toHTML(PT.evaluate(ast, vals));
@@ -242,6 +294,7 @@ for (const page of manifest.pages) {
     html,
     template: stripped.template,
     removed: stripped.removed,
+    themeImages: swapped,
     wrapStyle: stripped.wrapStyle,
     script: piece.script,
     props: piece.props

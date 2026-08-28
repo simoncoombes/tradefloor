@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glossary · pretium</title>
+<meta name="description" content="Every term this library uses in a specific way, with the measurement that makes it specific.">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/learn/glossary.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="Glossary · pretium">
+<meta property="og:description" content="Every term this library uses in a specific way, with the measurement that makes it specific.">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/learn/glossary.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="alternate icon" href="../favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
+<script>
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
+</script>
+</head>
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)"><div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"><div id="pt-search-results" role="listbox" style="max-height:22rem;overflow-y:auto;padding:0.4rem"></div><div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)"><div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem"><a href="index.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22" style="flex:none"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22" style="flex:none"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span></a><nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap"><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Start<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="install.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Install</a><a href="core-concepts.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core concepts</a><a href="two-loops.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The two loops</a><a href="running-a-market.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Running a market</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Use it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="agents.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Agents</a><a href="scenarios.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Scenarios</a><a href="execution-cost.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Execution cost</a><a href="checkpoints.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Checkpoints and forking</a><a href="edgar.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Real companies from EDGAR</a><a href="rl-environment.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">RL environment</a><a href="mcp.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The MCP server</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Trust it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="realism-envelope.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Realism envelope</a><a href="metrics.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The metrics</a><a href="principles.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Principles</a><a href="citing.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Citing a run</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--accent);cursor:pointer;list-style:none;padding:0.2rem 0">Reference<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><span style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--accent);background:var(--accent-soft);white-space:nowrap">Glossary</span><a href="factors.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The nine factors</a><a href="conventions.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a><a href="schemas.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a><a href="presets.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Presets</a><a href="release-notes.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Release notes</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">API<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="core-types.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a><a href="evaluate.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a><a href="parameters.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a></div></details></nav><span style="flex:1"></span><button id="pt-search-open" type="button" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span id="pt-search-hint" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">CTRL K</span></button><button id="pt-theme" type="button" aria-label="Switch theme" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">GLOSSARY</span>
+</div>
+
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Glossary</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Terms this library uses in one specific way. Where a number pins the meaning, the number is here.</p>
+
+<div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
+<input type="text" placeholder="Filter terms" aria-label="Filter terms" style="flex:1;min-width:12rem;height:38px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:0.9375rem;padding:0 0.85rem">
+<div style="display:flex;gap:0.35rem;flex-wrap:wrap">
+
+<button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.4rem 0.7rem;border-radius:5px;cursor:pointer;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)">all</button>
+
+
+<button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.4rem 0.7rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">the run</button>
+
+
+<button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.4rem 0.7rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">price formation</button>
+
+
+<button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.4rem 0.7rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">provenance</button>
+
+</div>
+</div>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">43 of 43 terms</span>
+</section>
+
+<section style="padding:1.4rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">ADV</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Average daily volume, the denominator for participation. 13.7 million shares is 0.05x a day in one name and 407x in another.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">anchor_price</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">fundamental_value times exp(mispricing_s): what the model wanted before the book touched it. So close minus anchor_price isolates the microstructure.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">Checkpoint and branch</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Two ways to fork a run at one state. On a 60-day 40-instrument run, branch copies engine state in under 1 ms and does not survive the process. Checkpoint replays the order log in 2.7 s and does.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">circuit_breaker</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Books the rewrite when the model price leaves the session band and the tick re-derives s from the clamped price. Omit the column and the factor sum misses that correction on any day the breaker binds.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">close_market</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The day's close bookkeeping: momentum roll, GARCH, macro step. It advances the macro chain into the next day, so a row recorded after it carries the values the next day will trade under.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">common random numbers</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Running one seed under two presets so draws_consumed comes out identical. Every difference in the outcome is then a parameter effect rather than reshuffled noise.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">crowd lean</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The crowd net-buys what trades below fair value and net-sells what trades above it, capped at 0.02 in log price so the crowd can never dominate a news day.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">draw schedule</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Market hours, the 390-tick day, the calendar and the sector key order. Nothing settable may change it: a preset changes what the draws are multiplied into, never the schedule.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">draw_delta</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The market stream's draw-count difference between the two runs compare() puts side by side. Zero across all twenty-eight comparisons on pt-v12. Non-zero means a halt, a delisting or a roster change moved the schedule.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">draws_consumed</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Total draws from three of the seven streams: market, economy and external. Equal market counts between two runs of the same tick schedule mean both saw an identical noise sequence.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">Engine</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">A whole market stepped through time. It owns the seeded generator, the per-company price state, the economy and the central bank, and nothing beyond those four.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">era boundary</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">A change that moves every seeded trajectory, caught by a probe digest rather than a version string. One calendar day once brought three trajectory-changing fixes while the version and the preset both stayed put.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">era_fingerprint()</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The digest of a small fixed probe simulation, recomputed before every replay. Two builds that agree on the probe agree on the arithmetic it exercises.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">fair value</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The level mean reversion pulls toward. It reprices at the central bank's meeting calendar, so a run long enough to cross a meeting is not a stationary experiment.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">fingerprint, model</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The first 8 hex characters of a sha256 over the preset's canonical serialisation. Any settable change reads custom-7f290e34 rather than pt-v1, so a changed preset can not present as the shipped one.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">fingerprint, strategy</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">A sha256 over the spec, unchanged by whitespace, key order, or scaling every blend weight by two. Empty for a hand-built agent, because that result is reproducible only by citing code at a commit.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">fingerprint, universe</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">A sha256 over the roster's canonical form, order included. AAA closes day 5 at 143.03 in roster order and 134.88 reversed.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">fundamental_value</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">What the company is worth on its fundamentals, with no mispricing in it.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">GJR-GARCH</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The per-name variance recursion. garch_alpha on yesterday's squared return, garch_beta on yesterday's variance, plus a GJR garch_gamma that adds weight when that return was negative, because a symmetric GARCH squares the return and destroys its sign.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">guards</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The mispricing cap, the crowd lean cap, the session breaker and the price cap. Settable, and excluded from every calibration search because they are worst-case guarantees. daily_shock_cap is not settable at all.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">idiosyncratic</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The part of a name's return no other name shares: one normal per company per tick, sized by that name's own GARCH variance.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">Instrument</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">One tradable company: ticker, sector and eight fundamentals. short_interest is a share count, so a value between 0 and 1 raises rather than being read as a fraction.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">jump</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Applied to mispricing_s after the tick loop rather than inside it. Dropping it from the sum takes the worst residual from 1.9e-16 to 0.090 on a run carrying one jump row in 39,000.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">known-answer test</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">One fixed simulation run inside each of five wheel targets and hashed, compared target against target and against the sha256 committed in tests/known_answer.json. A disagreement stops the upload.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">Macro</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Day-zero rates, inflation and the cycle. The chain runs on from there by itself, so vix takes 118 distinct values over a 120-day run.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">market factor</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">One normal drawn per tick that reaches every name through its beta. Without shared factors a 108-name index would have almost no aggregate volatility, because independent noise cancels.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">market maker</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The counterparty on every book. It quotes both sides and shifts both quotes toward reducing its inventory, so the book absorbs one-sided flow without running dry.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">mispricing_s</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Log deviation of price from fair value. The nine factor columns sum to its change, with a worst residual of 1.9e-16 over 39,000 rows.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">order book</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">engine.book(ticker) returns a detached snapshot. Filling against it prices your execution at the levels you consume and leaves prices() byte-identical to the run that never traded.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">order flow impact</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The permanent, information share of order flow into mispricing_s: 0.35 of the total impact coefficient of 50.0. The book already charges the temporary component when orders walk real depth.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">order log</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">engine.order_log holds every input the engine consumed. An unknown entry raises on replay rather than being skipped, because a replay that ignored one would look like a success.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">order_flow</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The channel that tells the market you traded, passed to tick() or run_session(). Pushing 500,000 AAA shares through it closes the name at 137.45 against 135.67 untouched.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">random_noise</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The market component times the crash amplifier, plus the sector component, plus the idiosyncratic draw, summed into one column. truth can not separate the three.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">residual</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The gap between differenced mispricing_s and the sum of the nine columns: 1.9e-16 at worst over 39,000 rows. Anything larger means the join is wrong. Sorting tick without day takes that same run to 0.149.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">RNG substream</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">One of seven generators derived from the root seed: market, economy, external, jumps, volume, news and per-name volume. A new mechanism on its own stream perturbs nothing, however it draws.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">RunManifest</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The five things that identify a run, as one object: roster, macro initial conditions, realised scenario path, order log and strategy. reproduce() raises with the disagreeing component named.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">sector factor</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">One normal per sector per tick, reaching each member through its sector loading. It blends toward the market factor above VIX 25.5, so diversification stops working exactly when it is most wanted.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">seed</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">One integer, separate from the universe seed. It does not identify a run on its own, because the market an agent trades depends on that agent's own orders.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">sweep</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">Streams one seed at a time. A hundred recorded 252-day 100-instrument engines alive at once is roughly 110 GB, against a little over 1 GB for one.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">the nine factors</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">price formation</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">reversion, momentum, crowd_lean, company_news, order_flow_impact, short_squeeze_effect, random_noise, circuit_breaker and jump. Difference mispricing_s, add all nine, and you can check the label instead of trusting it.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;font-weight:600;color:var(--ink)">tick</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">One minute of game time. A day is 390 regular-session ticks, so a hand loop that passes the same hour and minute 390 times simulates a different market.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">truth table</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">provenance</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">One row per instrument per tick carrying fundamental_value, anchor_price, mispricing_s and nine factor columns. The nine sum to the change in mispricing_s.</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'Source Serif 4',ui-monospace,monospace;font-size:1rem;font-weight:600;color:var(--ink)">Universe</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">the run</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">The roster of instruments. Its order is contractual: the engine walks it in index order drawing random numbers as it goes, so a re-sorted universe gives a different market from the same seed.</span>
+</div>
+
+</section>
+
+
+
+
+</main></div>
+<div style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem"><h2 style="font-size:1.25rem">All pages</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem"><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Start</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="install.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Install</span></a><a href="core-concepts.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Core concepts</span></a><a href="two-loops.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The two loops</span></a><a href="running-a-market.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Running a market</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Use it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="agents.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Agents</span></a><a href="scenarios.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Scenarios</span></a><a href="execution-cost.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Execution cost</span></a><a href="checkpoints.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Checkpoints and forking</span></a><a href="edgar.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Real companies from EDGAR</span></a><a href="rl-environment.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">RL environment</span></a><a href="mcp.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The MCP server</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Trust it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="realism-envelope.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Realism envelope</span></a><a href="metrics.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The metrics</span></a><a href="principles.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Principles</span></a><a href="citing.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Citing a run</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Reference</span><div style="display:flex;flex-direction:column;gap:0.3rem"><span style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--accent)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;flex:none">&gt;</span><span style="white-space:nowrap">Glossary</span></span><a href="factors.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The nine factors</span></a><a href="conventions.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Conventions</span></a><a href="schemas.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Schemas</span></a><a href="presets.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Presets</span></a><a href="release-notes.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Release notes</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">API</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="core-types.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Core types</span></a><a href="evaluate.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Evaluate</span></a><a href="parameters.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Parameters</span></a></div></div></div></section>
+<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem"><a href="citing.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>Citing a run</span></a><a href="factors.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>The nine factors</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">GLOSSARY</span>
+</div>
+
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Glossary</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Terms this library uses in one specific way. Where a number pins the meaning, the number is here.</p>
+
+<div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
+<input type="text" value="{{ query }}" onInput="{{ setQuery }}" placeholder="Filter terms" aria-label="Filter terms" style="flex:1;min-width:12rem;height:38px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:0.9375rem;padding:0 0.85rem">
+<div style="display:flex;gap:0.35rem;flex-wrap:wrap">
+<sc-for list="{{ groups }}" as="g">
+<button onClick="{{ g.pick }}" style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.4rem 0.7rem;border-radius:5px;cursor:pointer;border:1px solid {{ g.border }};background:{{ g.bg }};color:{{ g.fg }}">{{ g.label }}</button>
+
+</sc-for></div>
+</div>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">{{ count }}</span>
+</section>
+
+<section style="padding:1.4rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
+<sc-for list="{{ terms }}" as="t">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1.05rem;display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);gap:1.1rem;align-items:start">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-family:'{{ t.font }}',ui-monospace,monospace;font-size:{{ t.size }};font-weight:600;color:var(--ink)">{{ t.term }}</span>
+<span style="font-size:0.75rem;color:var(--ink-3)">{{ t.group }}</span>
+</div>
+<span style="font-size:0.875rem;color:var(--ink-2)">{{ t.body }}</span>
+</div>
+
+</sc-for></section>
+
+
+
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="pt-search.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false, query: '', group: 'all' , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+
+    // One menu open at a time, and a click anywhere else closes them.
+    // <details> has no such behaviour on its own.
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) {
+        if (all[i] !== inside) all[i].removeAttribute('open');
+      }
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  // Field names keep the mono face; prose terms take the serif.
+  TERMS = [
+    { term: 'Universe', group: 'the run', code: false, body: 'The roster of instruments. Its order is contractual: the engine walks it in index order drawing random numbers as it goes, so a re-sorted universe gives a different market from the same seed.' },
+    { term: 'Instrument', group: 'the run', code: false, body: 'One tradable company: ticker, sector and eight fundamentals. short_interest is a share count, so a value between 0 and 1 raises rather than being read as a fraction.' },
+    { term: 'Macro', group: 'the run', code: false, body: 'Day-zero rates, inflation and the cycle. The chain runs on from there by itself, so vix takes 118 distinct values over a 120-day run.' },
+    { term: 'seed', group: 'the run', code: true, body: 'One integer, separate from the universe seed. It does not identify a run on its own, because the market an agent trades depends on that agent\u0027s own orders.' },
+    { term: 'tick', group: 'the run', code: true, body: 'One minute of game time. A day is 390 regular-session ticks, so a hand loop that passes the same hour and minute 390 times simulates a different market.' },
+    { term: 'Engine', group: 'the run', code: false, body: 'A whole market stepped through time. It owns the seeded generator, the per-company price state, the economy and the central bank, and nothing beyond those four.' },
+    { term: 'order book', group: 'the run', code: false, body: 'engine.book(ticker) returns a detached snapshot. Filling against it prices your execution at the levels you consume and leaves prices() byte-identical to the run that never traded.' },
+    { term: 'market maker', group: 'the run', code: false, body: 'The counterparty on every book. It quotes both sides and shifts both quotes toward reducing its inventory, so the book absorbs one-sided flow without running dry.' },
+    { term: 'ADV', group: 'the run', code: false, body: 'Average daily volume, the denominator for participation. 13.7 million shares is 0.05x a day in one name and 407x in another.' },
+    { term: 'order_flow', group: 'the run', code: true, body: 'The channel that tells the market you traded, passed to tick() or run_session(). Pushing 500,000 AAA shares through it closes the name at 137.45 against 135.67 untouched.' },
+    { term: 'order log', group: 'the run', code: false, body: 'engine.order_log holds every input the engine consumed. An unknown entry raises on replay rather than being skipped, because a replay that ignored one would look like a success.' },
+    { term: 'close_market', group: 'the run', code: true, body: 'The day\u0027s close bookkeeping: momentum roll, GARCH, macro step. It advances the macro chain into the next day, so a row recorded after it carries the values the next day will trade under.' },
+    { term: 'Checkpoint and branch', group: 'the run', code: false, body: 'Two ways to fork a run at one state. On a 60-day 40-instrument run, branch copies engine state in under 1 ms and does not survive the process. Checkpoint replays the order log in 2.7 s and does.' },
+    { term: 'sweep', group: 'the run', code: false, body: 'Streams one seed at a time. A hundred recorded 252-day 100-instrument engines alive at once is roughly 110 GB, against a little over 1 GB for one.' },
+
+    { term: 'fundamental_value', group: 'price formation', code: true, body: 'What the company is worth on its fundamentals, with no mispricing in it.' },
+    { term: 'anchor_price', group: 'price formation', code: true, body: 'fundamental_value times exp(mispricing_s): what the model wanted before the book touched it. So close minus anchor_price isolates the microstructure.' },
+    { term: 'mispricing_s', group: 'price formation', code: true, body: 'Log deviation of price from fair value. The nine factor columns sum to its change, with a worst residual of 1.9e-16 over 39,000 rows.' },
+    { term: 'the nine factors', group: 'price formation', code: false, body: 'reversion, momentum, crowd_lean, company_news, order_flow_impact, short_squeeze_effect, random_noise, circuit_breaker and jump. Difference mispricing_s, add all nine, and you can check the label instead of trusting it.' },
+    { term: 'market factor', group: 'price formation', code: false, body: 'One normal drawn per tick that reaches every name through its beta. Without shared factors a 108-name index would have almost no aggregate volatility, because independent noise cancels.' },
+    { term: 'sector factor', group: 'price formation', code: false, body: 'One normal per sector per tick, reaching each member through its sector loading. It blends toward the market factor above VIX 25.5, so diversification stops working exactly when it is most wanted.' },
+    { term: 'idiosyncratic', group: 'price formation', code: false, body: 'The part of a name\u0027s return no other name shares: one normal per company per tick, sized by that name\u0027s own GARCH variance.' },
+    { term: 'GJR-GARCH', group: 'price formation', code: false, body: 'The per-name variance recursion. garch_alpha on yesterday\u0027s squared return, garch_beta on yesterday\u0027s variance, plus a GJR garch_gamma that adds weight when that return was negative, because a symmetric GARCH squares the return and destroys its sign.' },
+    { term: 'jump', group: 'price formation', code: true, body: 'Applied to mispricing_s after the tick loop rather than inside it. Dropping it from the sum takes the worst residual from 1.9e-16 to 0.090 on a run carrying one jump row in 39,000.' },
+    { term: 'crowd lean', group: 'price formation', code: false, body: 'The crowd net-buys what trades below fair value and net-sells what trades above it, capped at 0.02 in log price so the crowd can never dominate a news day.' },
+    { term: 'order flow impact', group: 'price formation', code: false, body: 'The permanent, information share of order flow into mispricing_s: 0.35 of the total impact coefficient of 50.0. The book already charges the temporary component when orders walk real depth.' },
+    { term: 'circuit_breaker', group: 'price formation', code: true, body: 'Books the rewrite when the model price leaves the session band and the tick re-derives s from the clamped price. Omit the column and the factor sum misses that correction on any day the breaker binds.' },
+    { term: 'random_noise', group: 'price formation', code: true, body: 'The market component times the crash amplifier, plus the sector component, plus the idiosyncratic draw, summed into one column. truth can not separate the three.' },
+    { term: 'fair value', group: 'price formation', code: false, body: 'The level mean reversion pulls toward. It reprices at the central bank\u0027s meeting calendar, so a run long enough to cross a meeting is not a stationary experiment.' },
+    { term: 'guards', group: 'price formation', code: false, body: 'The mispricing cap, the crowd lean cap, the session breaker and the price cap. Settable, and excluded from every calibration search because they are worst-case guarantees. daily_shock_cap is not settable at all.' },
+
+    { term: 'truth table', group: 'provenance', code: false, body: 'One row per instrument per tick carrying fundamental_value, anchor_price, mispricing_s and nine factor columns. The nine sum to the change in mispricing_s.' },
+    { term: 'residual', group: 'provenance', code: false, body: 'The gap between differenced mispricing_s and the sum of the nine columns: 1.9e-16 at worst over 39,000 rows. Anything larger means the join is wrong. Sorting tick without day takes that same run to 0.149.' },
+    { term: 'fingerprint, universe', group: 'provenance', code: false, body: 'A sha256 over the roster\u0027s canonical form, order included. AAA closes day 5 at 143.03 in roster order and 134.88 reversed.' },
+    { term: 'fingerprint, model', group: 'provenance', code: false, body: 'The first 8 hex characters of a sha256 over the preset\u0027s canonical serialisation. Any settable change reads custom-7f290e34 rather than pt-v1, so a changed preset can not present as the shipped one.' },
+    { term: 'fingerprint, strategy', group: 'provenance', code: false, body: 'A sha256 over the spec, unchanged by whitespace, key order, or scaling every blend weight by two. Empty for a hand-built agent, because that result is reproducible only by citing code at a commit.' },
+    { term: 'RNG substream', group: 'provenance', code: false, body: 'One of seven generators derived from the root seed: market, economy, external, jumps, volume, news and per-name volume. A new mechanism on its own stream perturbs nothing, however it draws.' },
+    { term: 'draw schedule', group: 'provenance', code: false, body: 'Market hours, the 390-tick day, the calendar and the sector key order. Nothing settable may change it: a preset changes what the draws are multiplied into, never the schedule.' },
+    { term: 'draws_consumed', group: 'provenance', code: true, body: 'Total draws from three of the seven streams: market, economy and external. Equal market counts between two runs of the same tick schedule mean both saw an identical noise sequence.' },
+    { term: 'draw_delta', group: 'provenance', code: true, body: 'The market stream\u0027s draw-count difference between the two runs compare() puts side by side. Zero across all twenty-eight comparisons on pt-v12. Non-zero means a halt, a delisting or a roster change moved the schedule.' },
+    { term: 'common random numbers', group: 'provenance', code: false, body: 'Running one seed under two presets so draws_consumed comes out identical. Every difference in the outcome is then a parameter effect rather than reshuffled noise.' },
+    { term: 'known-answer test', group: 'provenance', code: false, body: 'One fixed simulation run inside each of five wheel targets and hashed, compared target against target and against the sha256 committed in tests/known_answer.json. A disagreement stops the upload.' },
+    { term: 'RunManifest', group: 'provenance', code: false, body: 'The five things that identify a run, as one object: roster, macro initial conditions, realised scenario path, order log and strategy. reproduce() raises with the disagreeing component named.' },
+    { term: 'era boundary', group: 'provenance', code: false, body: 'A change that moves every seeded trajectory, caught by a probe digest rather than a version string. One calendar day once brought three trajectory-changing fixes while the version and the preset both stayed put.' },
+    { term: 'era_fingerprint()', group: 'provenance', code: true, body: 'The digest of a small fixed probe simulation, recomputed before every replay. Two builds that agree on the probe agree on the arithmetic it exercises.' }
+  ];
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const q = (this.state.query || '').trim().toLowerCase();
+    const g = this.state.group;
+    const groupNames = ['the run', 'price formation', 'provenance'];
+    const rows = this.TERMS.filter(t => (g === 'all' || t.group === g)
+      && (!q || t.term.toLowerCase().indexOf(q) >= 0 || t.body.toLowerCase().indexOf(q) >= 0))
+      .slice()
+      .sort((a, b) => a.term.toLowerCase().localeCompare(b.term.toLowerCase()));
+    const pill = (on) => on
+      ? { border: 'var(--accent-line)', bg: 'var(--accent-soft)', fg: 'var(--accent-deep)' }
+      : { border: 'var(--line)', bg: 'var(--card)', fg: 'var(--ink-2)' };
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      showLight: dark ? 'none' : 'block',
+      showDark: dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      query: this.state.query,
+      setQuery: (e) => this.setState({ query: e.target.value }),
+      count: rows.length + ' of ' + this.TERMS.length + ' terms',
+      groups: [['all', 'all']].concat(groupNames.map(n => [n, n])).map(([k, label]) => {
+        const p = pill(g === k);
+        return { label: label, border: p.border, bg: p.bg, fg: p.fg,
+          pick: () => this.setState({ group: k }) };
+      }),
+      terms: rows.map(t => ({
+        term: t.term, group: t.group, body: t.body,
+        font: t.code ? 'Spline Sans Mono' : 'Source Serif 4',
+        size: t.code ? '0.8125rem' : '1rem'
+      }))
+    });
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {});
+})();
+</script>
+</body>
+</html>

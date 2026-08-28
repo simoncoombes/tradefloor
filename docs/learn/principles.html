@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Principles · pretium</title>
+<meta name="description" content="Twelve rules this project works under, six of them bought with a specific loss.">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/learn/principles.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="Principles · pretium">
+<meta property="og:description" content="Twelve rules this project works under, six of them bought with a specific loss.">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/learn/principles.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="alternate icon" href="../favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
+<script>
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
+</script>
+</head>
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)"><div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"><div id="pt-search-results" role="listbox" style="max-height:22rem;overflow-y:auto;padding:0.4rem"></div><div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)"><div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem"><a href="index.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22" style="flex:none"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22" style="flex:none"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span></a><nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap"><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Start<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="install.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Install</a><a href="core-concepts.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core concepts</a><a href="two-loops.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The two loops</a><a href="running-a-market.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Running a market</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Use it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="agents.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Agents</a><a href="scenarios.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Scenarios</a><a href="execution-cost.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Execution cost</a><a href="checkpoints.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Checkpoints and forking</a><a href="edgar.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Real companies from EDGAR</a><a href="rl-environment.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">RL environment</a><a href="mcp.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The MCP server</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--accent);cursor:pointer;list-style:none;padding:0.2rem 0">Trust it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="realism-envelope.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Realism envelope</a><a href="metrics.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The metrics</a><span style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--accent);background:var(--accent-soft);white-space:nowrap">Principles</span><a href="citing.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Citing a run</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Reference<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="glossary.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Glossary</a><a href="factors.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The nine factors</a><a href="conventions.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a><a href="schemas.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a><a href="presets.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Presets</a><a href="release-notes.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Release notes</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">API<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="core-types.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a><a href="evaluate.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a><a href="parameters.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a></div></details></nav><span style="flex:1"></span><button id="pt-search-open" type="button" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span id="pt-search-hint" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">CTRL K</span></button><button id="pt-theme" type="button" aria-label="Switch theme" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">PRINCIPLES</span>
+</div>
+
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Principles</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Twelve rules this project works under. Six were bought with a specific loss, and those say which one.</p>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">01</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">Determinism is the product</h2>
+<p style="margin:0;color:var(--ink-2)">Anything that would make two runs differ is a correctness bug rather than a performance trade.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">The crate ships its own exp, log, pow, sin and cos. Every release builds five targets, runs one fixed simulation in each and compares digests.</span>
+</div>
+</div>
+</div>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">02</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">Measure rather than assert</h2>
+<p style="margin:0;color:var(--ink-2)">Every claim in the documentation is a number that was produced by running something.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">tools/remeasure re-runs the stated method behind each published figure and reports every number the current build no longer produces.</span>
+</div>
+</div>
+</div>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">03</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">State the limitation next to the capability</h2>
+<p style="margin:0;color:var(--ink-2)">Never in a footnote.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">The realism page publishes fourteen statistics inside their bands and five named gaps on the same page, and each gap ends in a rule about what it forbids.</span>
+</div>
+</div>
+</div>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">04</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">A changed model has a different name</h2>
+<p style="margin:0;color:var(--ink-2)">Changing a coefficient is allowed. Reporting the result under the shipped preset name is not.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">Change any settable coefficient and the fingerprint reads custom-7f290e34 rather than pt-v1.</span>
+</div>
+</div>
+</div>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">05</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">Whatever sits outside the objective is free</h2>
+<p style="margin:0;color:var(--ink-2)">A scalar objective collapses everything you care about into one number, and the optimiser sells whatever is not in that number.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">Atlas exists for this reason: it surveys the parameter space rather than optimising one score.</span>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--amber)">THE FAILURE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">Six consecutive calibration searches were rejected, each for the same underlying reason. Fixing one blind spot moved the selling to the next one.</span>
+</div>
+
+</div>
+</div>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">06</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">Discovery seeds and validation seeds must be disjoint</h2>
+<p style="margin:0;color:var(--ink-2)">A result found on a set of seeds has to be re-measured on seeds it never saw.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">atlas.Survey.confirm re-measures on seed blocks disjoint from the survey and refuses to run on overlapping seeds.</span>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--amber)">THE FAILURE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">A candidate was declared shippable on a 13% improvement. On fresh seeds it read +0.1297 where it was found, and -0.0315, +0.0209 and +0.0233 elsewhere, reversing sign once. Discovery and validation had used the same thirty seeds, so re-measuring reproduced the same fluctuation exactly.</span>
+</div>
+
+</div>
+</div>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">07</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">The ruler must match the horizon</h2>
+<p style="margin:0;color:var(--ink-2)">A statistic measured over 504 days is scored against bands re-derived at 504 days, not against the 252-day bands.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">loss.dual_horizon_loss scores L_real at both horizons and refuses to run on one.</span>
+</div>
+</div>
+</div>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">08</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">A number invites scepticism and a sentence does not</h2>
+<p style="margin:0;color:var(--ink-2)">A scalar travels and a caveat does not.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">The library publishes fourteen statistics with bands rather than one realism score, and a summary says outright that an additivity check failed rather than quietly presenting an unchecked number.</span>
+</div>
+</div>
+</div>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">09</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">One seed is not an answer</h2>
+<p style="margin:0;color:var(--ink-2)">One market is one sample, and the cost of believing it has been measured.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">On the twelve-market grid a single seed picks the pooled leader eight times in twelve, and what a seed says momentum is worth runs from -0.503 to +0.909 depending only on which market it drew. The paired sign test is reported beside the pooled number.</span>
+</div>
+</div>
+</div>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">10</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">Strategies are data, never code</h2>
+<p style="margin:0;color:var(--ink-2)">A StrategySpec is declarative, versioned and hashable.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">That is what lets one travel through the MCP server without executing anything a caller sent.</span>
+</div>
+</div>
+</div>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">11</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">Absence differs from zero, and invalid input raises</h2>
+<p style="margin:0;color:var(--ink-2)">Nothing is silently clamped, because a simulator that repairs your inputs gives you a market you did not specify.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">corporate_bond_yield=None falls through to the default, and where a column can not carry None, absence is NaN, because zero is a real rate.</span>
+</div>
+</div>
+</div>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">12</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">The reader's job leads</h2>
+<p style="margin:0;color:var(--ink-2)">A reader who can not tell which loop they are in can not tell which pages are theirs.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">The docs are racked by task rather than by module, and the two loops page exists to place the reader in one of them.</span>
+</div>
+</div>
+</div>
+</div>
+
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h2 style="font-size:1.5rem">What these rules refuse</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem">
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
+<h3 style="font-size:1.0625rem;margin:0">No realism score</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A scalar travels and a caveat does not. There is a panel of fourteen measurements and a list of gaps instead.</p>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
+<h3 style="font-size:1.0625rem;margin:0">No invented evidence</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">No testimonials, customers, competitor benchmarks, pricing or adoption numbers exist. None may be invented.</p>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
+<h3 style="font-size:1.0625rem;margin:0">No silent trajectory change</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">A preset is frozen once published. Tuning it would rewrite results that other people already cited.</p>
+</div>
+
+</div>
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h2 style="font-size:1.5rem">The rule that shapes the rest</h2>
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.2rem 1.3rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 style="font-size:1.25rem;margin:0;color:var(--accent-deep)">Any change to the simulated trajectory breaks the contract</h3>
+<p style="margin:0;font-size:0.9375rem;color:var(--accent-deep)">A market that runs differently from the same seed invalidates every published result that cited it. So a coefficient change arrives as a new preset with a new name, and every preset from pt-v1 onward stays selectable forever.</p>
+</div>
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<div style="display:flex;flex-direction:column;gap:0.3rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.09em;color:var(--amber)">PRINCIPLE 02, TESTED ON ITSELF</span>
+<h2 style="font-size:1.5rem">The one that was wrong twice</h2>
+</div>
+<p style="color:var(--ink-2);margin:0;max-width:74ch">The realism page called <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">volume_change_acf1</span> structurally unreachable twice. Both claims carried correct numbers, and both named the wrong mechanism.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 style="font-size:1.0625rem;margin:0">The first claim</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Reaching its band costs volume_abs_return_corr, because the common log-volume state adds volume variance unrelated to any name\u0027s own moves.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-3)">The trade was real, and it was priced on the pt-v3 era base. On the pt-v10 base both one-year bands became reachable together, in a window about 0.03 wide in the innovation sigma.</p>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 style="font-size:1.0625rem;margin:0">The second claim</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The two-year half needed more volume memory.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-3)">What closed it was volume_move_cap, a hard-coded 4.0 in tick.rs that saturated a name\u0027s volume response at a 4% daily move. Lifting it to 12.0 reads -0.2656 at 252 days and -0.2572 at 504, inside both bands.</p>
+</div>
+</div>
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem">
+<p style="margin:0;font-size:0.9375rem;color:var(--accent-deep)">Every number in both claims was right. The mechanism each asserted was wrong, and the second was wrong in the same direction as the first: it described the limit as a property of the model rather than of the value one constant happened to hold.</p>
+</div>
+</section>
+
+
+
+
+</main></div>
+<div style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem"><h2 style="font-size:1.25rem">All pages</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem"><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Start</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="install.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Install</span></a><a href="core-concepts.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Core concepts</span></a><a href="two-loops.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The two loops</span></a><a href="running-a-market.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Running a market</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Use it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="agents.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Agents</span></a><a href="scenarios.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Scenarios</span></a><a href="execution-cost.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Execution cost</span></a><a href="checkpoints.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Checkpoints and forking</span></a><a href="edgar.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Real companies from EDGAR</span></a><a href="rl-environment.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">RL environment</span></a><a href="mcp.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The MCP server</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Trust it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="realism-envelope.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Realism envelope</span></a><a href="metrics.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The metrics</span></a><span style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--accent)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;flex:none">&gt;</span><span style="white-space:nowrap">Principles</span></span><a href="citing.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Citing a run</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Reference</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="glossary.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Glossary</span></a><a href="factors.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The nine factors</span></a><a href="conventions.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Conventions</span></a><a href="schemas.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Schemas</span></a><a href="presets.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Presets</span></a><a href="release-notes.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Release notes</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">API</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="core-types.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Core types</span></a><a href="evaluate.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Evaluate</span></a><a href="parameters.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Parameters</span></a></div></div></div></section>
+<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem"><a href="metrics.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>The metrics</span></a><a href="citing.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>Citing a run</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">PRINCIPLES</span>
+</div>
+
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">Principles</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Twelve rules this project works under. Six were bought with a specific loss, and those say which one.</p>
+
+<sc-for list="{{ principles }}" as="p">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:1rem;align-items:start">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent-line);font-variant-numeric:tabular-nums">{{ p.n }}</span>
+<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">
+<h2 style="font-size:1.3125rem;margin:0">{{ p.head }}</h2>
+<p style="margin:0;color:var(--ink-2)">{{ p.body }}</p>
+<div style="display:grid;grid-template-columns:{{ p.cols }};gap:0.9rem;padding-top:0.6rem;border-top:1px solid var(--line-soft)">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--accent)">IN PRACTICE</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">{{ p.practice }}</span>
+</div>
+<sc-if value="{{ p.hasCost }}">
+<div style="display:flex;flex-direction:column;gap:1px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--amber)">{{ p.costTag }}</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">{{ p.cost }}</span>
+</div>
+
+</sc-if></div>
+</div>
+</div>
+
+</sc-for></section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h2 style="font-size:1.5rem">What these rules refuse</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem">
+<sc-for list="{{ refusals }}" as="r">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
+<h3 style="font-size:1.0625rem;margin:0">{{ r.head }}</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">{{ r.body }}</p>
+</div>
+
+</sc-for></div>
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h2 style="font-size:1.5rem">The rule that shapes the rest</h2>
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.2rem 1.3rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 style="font-size:1.25rem;margin:0;color:var(--accent-deep)">Any change to the simulated trajectory breaks the contract</h3>
+<p style="margin:0;font-size:0.9375rem;color:var(--accent-deep)">A market that runs differently from the same seed invalidates every published result that cited it. So a coefficient change arrives as a new preset with a new name, and every preset from pt-v1 onward stays selectable forever.</p>
+</div>
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<div style="display:flex;flex-direction:column;gap:0.3rem">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.09em;color:var(--amber)">PRINCIPLE 02, TESTED ON ITSELF</span>
+<h2 style="font-size:1.5rem">The one that was wrong twice</h2>
+</div>
+<p style="color:var(--ink-2);margin:0;max-width:74ch">The realism page called <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">volume_change_acf1</span> structurally unreachable twice. Both claims carried correct numbers, and both named the wrong mechanism.</p>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 style="font-size:1.0625rem;margin:0">The first claim</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Reaching its band costs volume_abs_return_corr, because the common log-volume state adds volume variance unrelated to any name\u0027s own moves.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-3)">The trade was real, and it was priced on the pt-v3 era base. On the pt-v10 base both one-year bands became reachable together, in a window about 0.03 wide in the innovation sigma.</p>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
+<h3 style="font-size:1.0625rem;margin:0">The second claim</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The two-year half needed more volume memory.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-3)">What closed it was volume_move_cap, a hard-coded 4.0 in tick.rs that saturated a name\u0027s volume response at a 4% daily move. Lifting it to 12.0 reads -0.2656 at 252 days and -0.2572 at 504, inside both bands.</p>
+</div>
+</div>
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem">
+<p style="margin:0;font-size:0.9375rem;color:var(--accent-deep)">Every number in both claims was right. The mechanism each asserted was wrong, and the second was wrong in the same direction as the first: it described the limit as a property of the model rather than of the value one constant happened to hold.</p>
+</div>
+</section>
+
+
+
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="pt-search.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+
+    // One menu open at a time, and a click anywhere else closes them.
+    // <details> has no such behaviour on its own.
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) {
+        if (all[i] !== inside) all[i].removeAttribute('open');
+      }
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  withCost(list) {
+    return list.map(p => Object.assign({}, p, {
+      hasCost: !!p.cost,
+      cols: p.cost ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr)'
+    }));
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const S = this.searchVals();
+    return Object.assign({}, S, {
+      showLight: dark ? 'none' : 'block',
+      showDark: dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      principles: this.withCost([
+        { n: '01', head: "Determinism is the product",
+          body: "Anything that would make two runs differ is a correctness bug rather than a performance trade.",
+          practice: "The crate ships its own exp, log, pow, sin and cos. Every release builds five targets, runs one fixed simulation in each and compares digests.",
+          cost: "", costTag: "" },
+        { n: '02', head: "Measure rather than assert",
+          body: "Every claim in the documentation is a number that was produced by running something.",
+          practice: "tools/remeasure re-runs the stated method behind each published figure and reports every number the current build no longer produces.",
+          cost: "", costTag: "" },
+        { n: '03', head: "State the limitation next to the capability",
+          body: "Never in a footnote.",
+          practice: "The realism page publishes fourteen statistics inside their bands and five named gaps on the same page, and each gap ends in a rule about what it forbids.",
+          cost: "", costTag: "" },
+        { n: '04', head: "A changed model has a different name",
+          body: "Changing a coefficient is allowed. Reporting the result under the shipped preset name is not.",
+          practice: "Change any settable coefficient and the fingerprint reads custom-7f290e34 rather than pt-v1.",
+          cost: "", costTag: "" },
+        { n: '05', head: "Whatever sits outside the objective is free",
+          body: "A scalar objective collapses everything you care about into one number, and the optimiser sells whatever is not in that number.",
+          practice: "Atlas exists for this reason: it surveys the parameter space rather than optimising one score.",
+          cost: "Six consecutive calibration searches were rejected, each for the same underlying reason. Fixing one blind spot moved the selling to the next one.", costTag: "THE FAILURE" },
+        { n: '06', head: "Discovery seeds and validation seeds must be disjoint",
+          body: "A result found on a set of seeds has to be re-measured on seeds it never saw.",
+          practice: "atlas.Survey.confirm re-measures on seed blocks disjoint from the survey and refuses to run on overlapping seeds.",
+          cost: "A candidate was declared shippable on a 13% improvement. On fresh seeds it read +0.1297 where it was found, and -0.0315, +0.0209 and +0.0233 elsewhere, reversing sign once. Discovery and validation had used the same thirty seeds, so re-measuring reproduced the same fluctuation exactly.", costTag: "THE FAILURE" },
+        { n: '07', head: "The ruler must match the horizon",
+          body: "A statistic measured over 504 days is scored against bands re-derived at 504 days, not against the 252-day bands.",
+          practice: "loss.dual_horizon_loss scores L_real at both horizons and refuses to run on one.",
+          cost: "", costTag: "" },
+        { n: '08', head: "A number invites scepticism and a sentence does not",
+          body: "A scalar travels and a caveat does not.",
+          practice: "The library publishes fourteen statistics with bands rather than one realism score, and a summary says outright that an additivity check failed rather than quietly presenting an unchecked number.",
+          cost: "", costTag: "" },
+        { n: '09', head: "One seed is not an answer",
+          body: "One market is one sample, and the cost of believing it has been measured.",
+          practice: "On the twelve-market grid a single seed picks the pooled leader eight times in twelve, and what a seed says momentum is worth runs from -0.503 to +0.909 depending only on which market it drew. The paired sign test is reported beside the pooled number.",
+          cost: "", costTag: "" },
+        { n: '10', head: "Strategies are data, never code",
+          body: "A StrategySpec is declarative, versioned and hashable.",
+          practice: "That is what lets one travel through the MCP server without executing anything a caller sent.",
+          cost: "", costTag: "" },
+        { n: '11', head: "Absence differs from zero, and invalid input raises",
+          body: "Nothing is silently clamped, because a simulator that repairs your inputs gives you a market you did not specify.",
+          practice: "corporate_bond_yield=None falls through to the default, and where a column can not carry None, absence is NaN, because zero is a real rate.",
+          cost: "", costTag: "" },
+        { n: '12', head: "The reader's job leads",
+          body: "A reader who can not tell which loop they are in can not tell which pages are theirs.",
+          practice: "The docs are racked by task rather than by module, and the two loops page exists to place the reader in one of them.",
+          cost: "", costTag: "" }
+      ]),
+      refusals: [
+        { head: 'No realism score', body: 'A scalar travels and a caveat does not. There is a panel of fourteen measurements and a list of gaps instead.' },
+        { head: 'No invented evidence', body: 'No testimonials, customers, competitor benchmarks, pricing or adoption numbers exist. None may be invented.' },
+        { head: 'No silent trajectory change', body: 'A preset is frozen once published. Tuning it would rewrite results that other people already cited.' }
+      ]
+    });
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {});
+})();
+</script>
+</body>
+</html>

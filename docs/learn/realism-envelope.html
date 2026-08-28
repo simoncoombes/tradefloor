@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The realism envelope · pretium</title>
+<meta name="description" content="Fourteen statistics, a certified horizon of 252 days, and five named gaps. What this market reproduces, and what it forbids you to claim.">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/learn/realism-envelope.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="The realism envelope · pretium">
+<meta property="og:description" content="Fourteen statistics, a certified horizon of 252 days, and five named gaps. What this market reproduces, and what it forbids you to claim.">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/learn/realism-envelope.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="alternate icon" href="../favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
+<script>
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
+</script>
+</head>
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)"><div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"><div id="pt-search-results" role="listbox" style="max-height:22rem;overflow-y:auto;padding:0.4rem"></div><div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)"><div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem"><a href="index.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22" style="flex:none"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22" style="flex:none"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span></a><nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap"><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Start<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="install.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Install</a><a href="core-concepts.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core concepts</a><a href="two-loops.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The two loops</a><a href="running-a-market.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Running a market</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Use it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="agents.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Agents</a><a href="scenarios.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Scenarios</a><a href="execution-cost.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Execution cost</a><a href="checkpoints.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Checkpoints and forking</a><a href="edgar.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Real companies from EDGAR</a><a href="rl-environment.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">RL environment</a><a href="mcp.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The MCP server</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--accent);cursor:pointer;list-style:none;padding:0.2rem 0">Trust it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><span style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--accent);background:var(--accent-soft);white-space:nowrap">Realism envelope</span><a href="metrics.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The metrics</a><a href="principles.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Principles</a><a href="citing.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Citing a run</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Reference<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="glossary.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Glossary</a><a href="factors.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The nine factors</a><a href="conventions.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a><a href="schemas.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a><a href="presets.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Presets</a><a href="release-notes.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Release notes</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">API<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="core-types.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a><a href="evaluate.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a><a href="parameters.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a></div></details></nav><span style="flex:1"></span><button id="pt-search-open" type="button" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span id="pt-search-hint" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">CTRL K</span></button><button id="pt-theme" type="button" aria-label="Switch theme" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">THE REALISM ENVELOPE</span>
+</div>
+
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">The realism envelope</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">There is no realism score. There is a panel of fourteen measurements, a horizon they hold to, and five named gaps.</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1rem">
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:2px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent);font-variant-numeric:tabular-nums">14</span>
+<span style="font-size:0.8125rem;color:var(--ink-2)">statistics in band at one year</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:2px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--accent);font-variant-numeric:tabular-nums">252</span>
+<span style="font-size:0.8125rem;color:var(--ink-2)">trading days certified</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:2px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--ink);font-variant-numeric:tabular-nums">30</span>
+<span style="font-size:0.8125rem;color:var(--ink-2)">seeds behind the panel</span>
+</div>
+
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:2px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:var(--amber);font-variant-numeric:tabular-nums">5</span>
+<span style="font-size:0.8125rem;color:var(--ink-2)">named gaps</span>
+</div>
+
+</div>
+</section>
+
+<section id="panel" style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<h2 style="font-size:1.5rem">What the fourteen measure</h2>
+<p style="color:var(--ink-2);margin:0">Each row is one habit of a real market. The bar is the range that real equities hold. The dot is what the shipped preset measured at 252 days. A dot inside the bar means the model got that habit correct.</p>
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.55rem">
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">annualised_vol_pct</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">how much prices move in a year</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(84.6% - 9.3px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">32.7604</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">excess_kurtosis</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">how fat the tails are</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(12.9% - 1.4px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">6.7001</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">return_acf1</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">does yesterday predict today</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(74.2% - 8.2px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">0.0239</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">abs_return_acf1</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">does a wild day follow a wild day</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(45.4% - 5.0px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">0.1107</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">abs_return_acf5</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">the same, one week apart</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(32.6% - 3.6px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">0.0428</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">abs_return_acf20</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">the same, one month apart</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(36.7% - 4.0px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">0.0040</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">cross_sectional_corr</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">how much names move together</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(49.5% - 5.4px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">0.3177</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">volume_abs_return_corr</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">do big moves come with volume</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(49.9% - 5.5px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">0.5599</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">leverage_effect</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">do falls raise volatility</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(74.9% - 8.2px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">-0.0401</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">volume_change_acf1</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">does volume mean-revert</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(45.3% - 5.0px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">-0.2656</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">corr_asymmetry</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">do names couple more when falling</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(33.6% - 3.7px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">-0.0147</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">corr_asymmetry_lagged</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">the same, one day later</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(29.1% - 3.2px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">0.0181</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">sector_excess_corr</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">do industries move together</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(81.6% - 9.0px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">0.2079</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">corr_persistence_acf1</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">does correlation stay high after a panic</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(46.9% - 5.2px)"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">0.1525</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+</div>
+<p style="color:var(--ink-2);margin:0.2rem 0 0">All fourteen dots sit inside their bands. That is a market with the correct volatility, the correct tails and the correct co-movement. Industries move together more than strangers do. Correlation stays high after a panic, volume behaves, and the model produces its own volatility episodes.</p>
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<h2 style="font-size:1.5rem">Why the horizon stops at 252 days</h2>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
+<h3 style="font-size:1.0625rem;margin:0">The count is not the reason</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">At 504 days pt-v12 also holds all fourteen, against bands that were re-derived for that window. pt-v3 held seven there. pt-v10 held thirteen.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Two things keep the certification at one year. Annualised volatility reads 33.89 against a band that ends at 34.0, which is thin headroom. And certified means measured at 252 days on thirty seeds, which is what this module measures.</p>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
+<h3 style="font-size:1.0625rem;margin:0">Nothing runs away</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Annualised volatility, measured year by year over ten years on twenty seeds:</p>
+<div style="display:flex;gap:3px;align-items:flex-end;height:74px">
+
+<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:3px;align-items:center">
+<span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:38px"></span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;color:var(--ink-3)">31.5</span>
+</span>
+
+
+<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:3px;align-items:center">
+<span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:66px"></span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;color:var(--ink-3)">35.6</span>
+</span>
+
+
+<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:3px;align-items:center">
+<span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:28px"></span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;color:var(--ink-3)">30.2</span>
+</span>
+
+
+<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:3px;align-items:center">
+<span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:52px"></span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;color:var(--ink-3)">33.5</span>
+</span>
+
+
+<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:3px;align-items:center">
+<span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:48px"></span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;color:var(--ink-3)">33.0</span>
+</span>
+
+
+<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:3px;align-items:center">
+<span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:49px"></span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;color:var(--ink-3)">33.1</span>
+</span>
+
+
+<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:3px;align-items:center">
+<span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:36px"></span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;color:var(--ink-3)">31.3</span>
+</span>
+
+
+<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:3px;align-items:center">
+<span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:44px"></span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;color:var(--ink-3)">32.4</span>
+</span>
+
+
+<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:3px;align-items:center">
+<span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:44px"></span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;color:var(--ink-3)">32.4</span>
+</span>
+
+
+<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:3px;align-items:center">
+<span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:38px"></span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;color:var(--ink-3)">31.6</span>
+</span>
+
+</div>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Flat, with the year-to-year variation that a real market has. At 2520 days the panel holds ten of the fourteen, graded against the 504-day bands, which are the wrong ruler for a ten-year window.</p>
+</div>
+</div>
+</section>
+
+<section id="gaps" style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h2 style="font-size:1.5rem">The five gaps</h2>
+<p style="color:var(--ink-2);margin:0">Each gap names what it forbids. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">pt.envelope.check()</span> refuses a question that falls outside one, so this is a function rather than a paragraph.</p>
+
+<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+<summary style="cursor:pointer;padding:0.75rem 0.9rem;display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent)">horizon</span>
+<span style="font-size:0.875rem;color:var(--ink)">the certified horizon is 252 days</span>
+</summary>
+<div style="border-top:1px solid var(--line-soft);padding:0.8rem 0.9rem;display:flex;flex-direction:column;gap:0.5rem">
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red);flex:none">FORBIDS</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">multi-year backtests, and anything keyed on volatility dynamics beyond one year</span>
+</div>
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">MEASURED</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">At 504 days pt-v12 holds all fourteen against re-derived bands. At 2520 days it holds ten of fourteen against the 504-day bands.</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:0.3rem;padding-top:0.2rem">
+
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0.2rem 0.45rem;color:var(--ink-2)">abs_return_acf1</span>
+
+
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0.2rem 0.45rem;color:var(--ink-2)">abs_return_acf5</span>
+
+
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0.2rem 0.45rem;color:var(--ink-2)">return_acf1</span>
+
+
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0.2rem 0.45rem;color:var(--ink-2)">excess_kurtosis</span>
+
+</div>
+</div>
+</details>
+
+
+<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+<summary style="cursor:pointer;padding:0.75rem 0.9rem;display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent)">decay-shape</span>
+<span style="font-size:0.875rem;color:var(--ink)">volatility memory decays exponentially, not hyperbolically</span>
+</summary>
+<div style="border-top:1px solid var(--line-soft);padding:0.8rem 0.9rem;display:flex;flex-direction:column;gap:0.5rem">
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red);flex:none">FORBIDS</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">strategies whose edge depends on volatility memory beyond about lag 20 -- vol targeting and risk parity on a one-month or longer estimate</span>
+</div>
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">MEASURED</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">The log-log slope over lags 1 to 20 reads -0.953 against a real -0.436. The curve turns negative by lag 30, where real markets stay weakly positive to lag 60.</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:0.3rem;padding-top:0.2rem">
+
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0.2rem 0.45rem;color:var(--ink-2)">abs_return_acf20</span>
+
+</div>
+</div>
+</details>
+
+
+<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+<summary style="cursor:pointer;padding:0.75rem 0.9rem;display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent)">scenario-magnitude</span>
+<span style="font-size:0.875rem;color:var(--ink)">a scenario's size is right on average and unreliable in one run</span>
+</summary>
+<div style="border-top:1px solid var(--line-soft);padding:0.8rem 0.9rem;display:flex;flex-direction:column;gap:0.5rem">
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red);flex:none">FORBIDS</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">sizing a scenario's impact rather than detecting it</span>
+</div>
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">MEASURED</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">The steady-state lever reads 6.04x against a real 6.16x. Residual dispersion over the driven window runs 1.565 times real, which is the defect.</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:0.3rem;padding-top:0.2rem">
+
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0.2rem 0.45rem;color:var(--ink-2)">no single statistic carries this one</span>
+
+</div>
+</div>
+</details>
+
+
+<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+<summary style="cursor:pointer;padding:0.75rem 0.9rem;display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent)">macro-range</span>
+<span style="font-size:0.875rem;color:var(--ink)">the endogenous macro state cannot reach its own crisis regimes</span>
+</summary>
+<div style="border-top:1px solid var(--line-soft);padding:0.8rem 0.9rem;display:flex;flex-direction:column;gap:0.5rem">
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red);flex:none">FORBIDS</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">studying inflation regimes or policy crises from the endogenous economy alone</span>
+</div>
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">MEASURED</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">Endogenous inflation peaks at 4.0% on every seed over five years. Real US CPI peaked at 9.0% in June 2022.</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:0.3rem;padding-top:0.2rem">
+
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0.2rem 0.45rem;color:var(--ink-2)">no single statistic carries this one</span>
+
+</div>
+</div>
+</details>
+
+
+<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+<summary style="cursor:pointer;padding:0.75rem 0.9rem;display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent)">roster-concentration</span>
+<span style="font-size:0.875rem;color:var(--ink)">a concentrated roster holds at one year and comes apart at two</span>
+</summary>
+<div style="border-top:1px solid var(--line-soft);padding:0.8rem 0.9rem;display:flex;flex-direction:column;gap:0.5rem">
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red);flex:none">FORBIDS</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">inheriting this envelope for a sector-concentrated roster BEYOND one year -- at the certified horizon it now transfers</span>
+</div>
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">MEASURED</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">At 252 days every roster shape holds all fourteen. At 504 days an S&amp;P-like roster holds thirteen and a technology-heavy roster holds eleven.</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:0.3rem;padding-top:0.2rem">
+
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0.2rem 0.45rem;color:var(--ink-2)">cross_sectional_corr</span>
+
+
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0.2rem 0.45rem;color:var(--ink-2)">annualised_vol_pct</span>
+
+
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0.2rem 0.45rem;color:var(--ink-2)">corr_persistence_acf1</span>
+
+</div>
+</div>
+</details>
+
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h2 style="font-size:1.5rem">What a result may claim</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
+<h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">You can say this</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">The strategy behaved this way in a market that reproduces the fourteen habits of real equities over a trading year. Here is the manifest, so you can run it again.</p>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
+<h3 style="font-size:1.0625rem;margin:0">You can not say this</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The strategy will earn this in a real market. The price process comes from a known model, so a strategy that fits the structure of that model looks excellent and teaches you nothing.</p>
+</div>
+</div>
+</section>
+
+
+
+
+</main></div>
+<div style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem"><h2 style="font-size:1.25rem">All pages</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem"><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Start</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="install.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Install</span></a><a href="core-concepts.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Core concepts</span></a><a href="two-loops.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The two loops</span></a><a href="running-a-market.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Running a market</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Use it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="agents.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Agents</span></a><a href="scenarios.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Scenarios</span></a><a href="execution-cost.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Execution cost</span></a><a href="checkpoints.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Checkpoints and forking</span></a><a href="edgar.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Real companies from EDGAR</span></a><a href="rl-environment.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">RL environment</span></a><a href="mcp.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The MCP server</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Trust it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><span style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--accent)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;flex:none">&gt;</span><span style="white-space:nowrap">Realism envelope</span></span><a href="metrics.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The metrics</span></a><a href="principles.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Principles</span></a><a href="citing.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Citing a run</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Reference</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="glossary.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Glossary</span></a><a href="factors.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The nine factors</span></a><a href="conventions.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Conventions</span></a><a href="schemas.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Schemas</span></a><a href="presets.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Presets</span></a><a href="release-notes.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Release notes</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">API</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="core-types.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Core types</span></a><a href="evaluate.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Evaluate</span></a><a href="parameters.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Parameters</span></a></div></div></div></section>
+<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem"><a href="mcp.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>The MCP server</span></a><a href="metrics.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>The metrics</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="index.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">THE REALISM ENVELOPE</span>
+</div>
+
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);text-wrap:balance">The realism envelope</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">There is no realism score. There is a panel of fourteen measurements, a horizon they hold to, and five named gaps.</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:1rem">
+<sc-for list="{{ headline }}" as="h">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:0.9rem 1rem;display:flex;flex-direction:column;gap:2px">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.5rem;color:{{ h.col }};font-variant-numeric:tabular-nums">{{ h.n }}</span>
+<span style="font-size:0.8125rem;color:var(--ink-2)">{{ h.label }}</span>
+</div>
+
+</sc-for></div>
+</section>
+
+<section id="panel" style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<h2 style="font-size:1.5rem">What the fourteen measure</h2>
+<p style="color:var(--ink-2);margin:0">Each row is one habit of a real market. The bar is the range that real equities hold. The dot is what the shipped preset measured at 252 days. A dot inside the bar means the model got that habit correct.</p>
+
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.55rem">
+<sc-for list="{{ panel }}" as="p">
+<div style="display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr) 4rem;gap:0.8rem;align-items:center">
+<span style="display:flex;flex-direction:column;gap:0px;min-width:0">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.k }}</span>
+<span style="font-size:0.75rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.plain }}</span>
+</span>
+<span style="position:relative;height:13px;border-radius:3px;background:var(--band)">
+<span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:{{ p.left }}"></span>
+</span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums">{{ p.m }}</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3);padding:0.3rem 4.8rem 0 13.8rem">
+<span>band floor</span>
+<span>band ceiling</span>
+</div>
+</sc-for></div>
+<p style="color:var(--ink-2);margin:0.2rem 0 0">All fourteen dots sit inside their bands. That is a market with the correct volatility, the correct tails and the correct co-movement. Industries move together more than strangers do. Correlation stays high after a panic, volume behaves, and the model produces its own volatility episodes.</p>
+</section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
+<h2 style="font-size:1.5rem">Why the horizon stops at 252 days</h2>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
+<h3 style="font-size:1.0625rem;margin:0">The count is not the reason</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">At 504 days pt-v12 also holds all fourteen, against bands that were re-derived for that window. pt-v3 held seven there. pt-v10 held thirteen.</p>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Two things keep the certification at one year. Annualised volatility reads 33.89 against a band that ends at 34.0, which is thin headroom. And certified means measured at 252 days on thirty seeds, which is what this module measures.</p>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem">
+<h3 style="font-size:1.0625rem;margin:0">Nothing runs away</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Annualised volatility, measured year by year over ten years on twenty seeds:</p>
+<div style="display:flex;gap:3px;align-items:flex-end;height:74px">
+<sc-for list="{{ decade }}" as="y">
+<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:3px;align-items:center">
+<span style="width:100%;border-radius:2px 2px 0 0;background:var(--accent);height:{{ y.h }}"></span>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.5625rem;color:var(--ink-3)">{{ y.v }}</span>
+</span>
+
+</sc-for></div>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Flat, with the year-to-year variation that a real market has. At 2520 days the panel holds ten of the fourteen, graded against the 504-day bands, which are the wrong ruler for a ten-year window.</p>
+</div>
+</div>
+</section>
+
+<section id="gaps" style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h2 style="font-size:1.5rem">The five gaps</h2>
+<p style="color:var(--ink-2);margin:0">Each gap names what it forbids. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">pt.envelope.check()</span> refuses a question that falls outside one, so this is a function rather than a paragraph.</p>
+<sc-for list="{{ gaps }}" as="g">
+<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+<summary style="cursor:pointer;padding:0.75rem 0.9rem;display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:0.9rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent)">{{ g.id }}</span>
+<span style="font-size:0.875rem;color:var(--ink)">{{ g.summary }}</span>
+</summary>
+<div style="border-top:1px solid var(--line-soft);padding:0.8rem 0.9rem;display:flex;flex-direction:column;gap:0.5rem">
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red);flex:none">FORBIDS</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">{{ g.forbids }}</span>
+</div>
+<div style="display:flex;gap:0.6rem;align-items:baseline">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--ink-3);flex:none">MEASURED</span>
+<span style="font-size:0.875rem;color:var(--ink-2)">{{ g.note }}</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:0.3rem;padding-top:0.2rem">
+<sc-for list="{{ g.stats }}" as="s">
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0.2rem 0.45rem;color:var(--ink-2)">{{ s }}</span>
+
+</sc-for></div>
+</div>
+</details>
+
+</sc-for></section>
+
+<section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h2 style="font-size:1.5rem">What a result may claim</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
+<div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
+<h3 style="font-size:1.0625rem;margin:0;color:var(--accent-deep)">You can say this</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--accent-deep)">The strategy behaved this way in a market that reproduces the fourteen habits of real equities over a trading year. Here is the manifest, so you can run it again.</p>
+</div>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.4rem">
+<h3 style="font-size:1.0625rem;margin:0">You can not say this</h3>
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The strategy will earn this in a real market. The price process comes from a known model, so a strategy that fits the structure of that model looks excellent and teaches you nothing.</p>
+</div>
+</div>
+</section>
+
+
+
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="pt-search.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false , searchOpen: false, searchQuery: '', searchSel: 0 };
+
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (err) { /* private mode */ }
+  }
+
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark'
+        : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (err) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+
+    // One menu open at a time, and a click anywhere else closes them.
+    // <details> has no such behaviour on its own.
+    this.menuHandler = (e) => {
+      const inside = e.target && e.target.closest ? e.target.closest('details.ptmenu') : null;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) {
+        if (all[i] !== inside) all[i].removeAttribute('open');
+      }
+    };
+    this.menuKey = (e) => {
+      if (e.key !== 'Escape') return;
+      const all = document.querySelectorAll('details.ptmenu');
+      for (let i = 0; i < all.length; i++) all[i].removeAttribute('open');
+    };
+    document.addEventListener('click', this.menuHandler);
+    document.addEventListener('keydown', this.menuKey);
+
+    this.searchKeyGlobal = (e) => {
+      const k = e.key === 'k' || e.key === 'K';
+      if (k && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      }
+      if (e.key === 'Escape') this.setState({ searchOpen: false });
+    };
+    document.addEventListener('keydown', this.searchKeyGlobal);
+  }
+
+  // One plain-language gloss per statistic, so the row means something before
+  // the reader knows the field name.
+  plain = {
+    annualised_vol_pct: 'how much prices move in a year',
+    excess_kurtosis: 'how fat the tails are',
+    return_acf1: 'does yesterday predict today',
+    abs_return_acf1: 'does a wild day follow a wild day',
+    abs_return_acf5: 'the same, one week apart',
+    abs_return_acf20: 'the same, one month apart',
+    cross_sectional_corr: 'how much names move together',
+    volume_abs_return_corr: 'do big moves come with volume',
+    leverage_effect: 'do falls raise volatility',
+    volume_change_acf1: 'does volume mean-revert',
+    corr_asymmetry: 'do names couple more when falling',
+    corr_asymmetry_lagged: 'the same, one day later',
+    sector_excess_corr: 'do industries move together',
+    corr_persistence_acf1: 'does correlation stay high after a panic'
+  };
+
+  // The measured figure for each gap, kept short. Full text lives in
+  // pretium.envelope.GAPS.
+  gapNotes = {
+    horizon: 'At 504 days pt-v12 holds all fourteen against re-derived bands. At 2520 days it holds ten of fourteen against the 504-day bands.',
+    'decay-shape': 'The log-log slope over lags 1 to 20 reads -0.953 against a real -0.436. The curve turns negative by lag 30, where real markets stay weakly positive to lag 60.',
+    'scenario-magnitude': 'The steady-state lever reads 6.04x against a real 6.16x. Residual dispersion over the driven window runs 1.565 times real, which is the defect.',
+    'macro-range': 'Endogenous inflation peaks at 4.0% on every seed over five years. Real US CPI peaked at 9.0% in June 2022.',
+    'roster-concentration': 'At 252 days every roster shape holds all fourteen. At 504 days an S&P-like roster holds thirteen and a technology-heavy roster holds eleven.'
+  };
+
+  componentWillUnmount() {
+    if (this.menuHandler) document.removeEventListener('click', this.menuHandler);
+    if (this.menuKey) document.removeEventListener('keydown', this.menuKey);
+
+    if (this.searchKeyGlobal) document.removeEventListener('keydown', this.searchKeyGlobal);
+  }
+
+
+  // Search over the shared index in pt-search.js. Title matches rank above
+  // keyword matches, so typing a page name lands on that page first.
+  searchVals() {
+    const idx = (typeof window !== 'undefined' && window.PT_SEARCH) || [];
+    const q = (this.state.searchQuery || '').trim().toLowerCase();
+    const scored = [];
+    for (const p of idx) {
+      const title = p.title.toLowerCase();
+      const keys = p.keywords.toLowerCase();
+      let score = -1;
+      if (!q) score = 0;
+      else if (title.indexOf(q) === 0) score = 3;
+      else if (title.indexOf(q) >= 0) score = 2;
+      else if (keys.indexOf(q) >= 0) score = 1;
+      if (score < 0) continue;
+      let hint = p.keywords;
+      if (q) {
+        const at = keys.indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 28);
+          hint = (from > 0 ? '...' : '') + p.keywords.slice(from, from + 82);
+        }
+      }
+      scored.push({ p: p, score: score, hint: hint });
+    }
+    scored.sort((a, b) => b.score - a.score || a.p.title.localeCompare(b.p.title));
+    const sel = Math.max(0, Math.min(this.state.searchSel || 0, scored.length - 1));
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    return {
+      searchShow: this.state.searchOpen ? 'flex' : 'none',
+      searchQuery: this.state.searchQuery,
+      searchKeyHint: isMac ? 'CMD K' : 'CTRL K',
+      searchCount: scored.length + ' of ' + idx.length + ' pages',
+      openSearch: () => {
+        this.setState({ searchOpen: true, searchQuery: '', searchSel: 0 });
+        setTimeout(() => {
+          const el = document.querySelector('input[aria-label="Search the docs"]');
+          if (el) el.focus();
+        }, 30);
+      },
+      closeSearch: (e) => {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+        this.setState({ searchOpen: false });
+      },
+      setSearchQuery: (e) => this.setState({ searchQuery: e.target.value, searchSel: 0 }),
+      searchKey: (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ searchSel: sel + 1 }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ searchSel: Math.max(0, sel - 1) }); }
+        else if (e.key === 'Enter' && scored[sel]) { window.location.href = scored[sel].p.href; }
+        else if (e.key === 'Escape') this.setState({ searchOpen: false });
+      },
+      searchHits: scored.slice(0, 12).map((s, i) => ({
+        title: s.p.title, href: s.p.href, door: s.p.door, hint: s.hint,
+        bg: i === sel ? 'var(--accent-soft)' : 'transparent',
+        titleCol: i === sel ? 'var(--accent-deep)' : 'var(--ink)'
+      }))
+    };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const D = (typeof window !== 'undefined' && window.PT) || null;
+    const out = Object.assign({}, this.searchVals(), {
+      showLight: dark ? 'none' : 'block',
+      showDark: dark ? 'block' : 'none',
+      themeGlyph: dark ? 'light' : 'dark',
+      themeLabel: dark ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => {
+        const next = !dark;
+        this.setState({ dark: next });
+        this.applyTheme(next);
+      },
+      headline: [
+        { n: '14', label: 'statistics in band at one year', col: 'var(--accent)' },
+        { n: '252', label: 'trading days certified', col: 'var(--accent)' },
+        { n: '30', label: 'seeds behind the panel', col: 'var(--ink)' },
+        { n: '5', label: 'named gaps', col: 'var(--amber)' }
+      ],
+      decade: [31.5, 35.6, 30.2, 33.5, 33.0, 33.1, 31.3, 32.4, 32.4, 31.6].map(v => ({
+        v: v.toFixed(1), h: Math.round(20 + (v - 29) * 7) + 'px'
+      }))
+    });
+    if (!D) return out;
+    out.panel = D.envelope.stats.map(p => {
+      const t = Math.max(0, Math.min(1, (p.m - p.band[0]) / (p.band[1] - p.band[0])));
+      return { k: p.k, plain: this.plain[p.k] || '',
+        left: 'calc(' + (100 * t).toFixed(1) + '% - ' + (11 * t).toFixed(1) + 'px)',
+        m: p.m.toFixed(4) };
+    });
+    out.gaps = D.envelope.gaps.map(g => ({
+      id: g.id, summary: g.summary, forbids: g.forbids,
+      note: this.gapNotes[g.id] || '',
+      stats: g.stats.length ? g.stats : ['no single statistic carries this one']
+    }));
+    return out;
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {});
+})();
+</script>
+</body>
+</html>

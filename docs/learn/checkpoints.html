@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checkpoints and forking · pretium</title>
+<meta name="description" content="Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.">
+<link rel="canonical" href="https://simoncoombes.github.io/pretium/learn/checkpoints.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium">
+<meta property="og:title" content="Checkpoints and forking · pretium">
+<meta property="og:description" content="Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.">
+<meta property="og:url" content="https://simoncoombes.github.io/pretium/learn/checkpoints.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="alternate icon" href="../favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="learn.css">
+<script>
+(function(){try{var s=localStorage.getItem('pt-learn-theme');
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
+</script>
+</head>
+<body class="pt-page">
+<div style="min-height:100vh;padding:0 0 5rem">
+<div id="pt-search" hidden style="position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)"><div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off" style="width:100%;border:0;border-bottom:1px solid var(--line-soft);background:var(--card);color:var(--ink);font-size:1rem;padding:0.95rem 1.1rem;outline:none"><div id="pt-search-results" role="listbox" style="max-height:22rem;overflow-y:auto;padding:0.4rem"></div><div style="display:flex;justify-content:space-between;gap:1rem;padding:0.55rem 1.1rem;border-top:1px solid var(--line-soft);background:var(--surface);font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;color:var(--ink-3)"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
+<header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)"><div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem"><a href="index.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22" style="flex:none"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22" style="flex:none"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span></a><nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap"><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Start<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="install.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Install</a><a href="core-concepts.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core concepts</a><a href="two-loops.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The two loops</a><a href="running-a-market.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Running a market</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--accent);cursor:pointer;list-style:none;padding:0.2rem 0">Use it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="agents.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Agents</a><a href="scenarios.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Scenarios</a><a href="execution-cost.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Execution cost</a><span style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--accent);background:var(--accent-soft);white-space:nowrap">Checkpoints and forking</span><a href="edgar.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Real companies from EDGAR</a><a href="rl-environment.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">RL environment</a><a href="mcp.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The MCP server</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Trust it<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="realism-envelope.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Realism envelope</a><a href="metrics.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The metrics</a><a href="principles.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Principles</a><a href="citing.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Citing a run</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Reference<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="glossary.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Glossary</a><a href="factors.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The nine factors</a><a href="conventions.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a><a href="schemas.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a><a href="presets.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Presets</a><a href="release-notes.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Release notes</a></div></details><details class="ptmenu" style="position:relative"><summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">API<span style="font-size:0.5rem;color:var(--accent-line)">▼</span></summary><div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60"><a href="core-types.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a><a href="evaluate.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a><a href="parameters.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a></div></details></nav><span style="flex:1"></span><button id="pt-search-open" type="button" aria-label="Search the docs" style="display:flex;align-items:center;gap:0.45rem;font-size:0.8125rem;color:var(--ink-3);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 10px 3px 12px;cursor:pointer">Search<span id="pt-search-hint" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--ink-3)">CTRL K</span></button><button id="pt-theme" type="button" aria-label="Switch theme" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="index.html" style="color:var(--ink-3)">USE IT</a><span>/</span><span style="color:var(--accent)">CHECKPOINTS AND FORKING</span>
+</div>
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Checkpoints and forking</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.</p>
+<pre style="margin:0.4rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">mark = pt.Checkpoint.of(engine, universe=universe, seed=42)
+calm, hiked = mark.branch(2)   # two engines, identical up to day 60
+hiked.pin_macro(corporate_bond_yield=0.09)
+# calm and hiked now diverge only from here</pre>
+</section>
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem">
+<h2 style="font-size:1.5rem">Two mechanisms for different jobs</h2>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<table style="font-size:0.8125rem"><thead><tr>
+<th style="text-align:left;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)"></th>
+<th style="text-align:right;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)">Cost</th>
+<th style="text-align:right;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)">Survives the process</th>
+</tr></thead><tbody>
+<tr>
+<td style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">pt.branch(engine, 2, ...)</td>
+<td style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--line-soft);text-align:right;font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--ink-2)">&lt; 1 ms</td>
+<td style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--line-soft);text-align:right;color:var(--ink-2)">no</td>
+</tr>
+<tr>
+<td style="padding:0.6rem 0.9rem;font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">Checkpoint.resume()</td>
+<td style="padding:0.6rem 0.9rem;text-align:right;font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--ink-2)">2.7 s</td>
+<td style="padding:0.6rem 0.9rem;text-align:right;color:var(--ink-2)">yes</td>
+</tr>
+</tbody></table>
+</div>
+<p style="color:var(--ink-2);margin:0;max-width:70ch"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
+</section>
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem">
+<h2 style="font-size:1.5rem">Why it refuses instead of loading wrong</h2>
+<p style="color:var(--ink-2);margin:0;max-width:70ch">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
+<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+<summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--ink)">What restore_state cannot catch</summary>
+<div style="padding:0 0.9rem 0.9rem;border-top:1px solid var(--line-soft);padding-top:0.7rem">
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The low-level <code>restore_state</code> holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a <code>ValidationError</code> naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not — prefer <code>branch</code> and <code>Checkpoint</code>, which check that.</p>
+</div>
+</details>
+</section>
+
+</main></div>
+<div style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<section style="padding:2.8rem 0 0;margin-top:2.8rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:1.1rem"><h2 style="font-size:1.25rem">All pages</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.9rem"><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Start</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="install.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Install</span></a><a href="core-concepts.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Core concepts</span></a><a href="two-loops.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The two loops</span></a><a href="running-a-market.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Running a market</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Use it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="agents.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Agents</span></a><a href="scenarios.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Scenarios</span></a><a href="execution-cost.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Execution cost</span></a><span style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--accent)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;flex:none">&gt;</span><span style="white-space:nowrap">Checkpoints and forking</span></span><a href="edgar.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Real companies from EDGAR</span></a><a href="rl-environment.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">RL environment</span></a><a href="mcp.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The MCP server</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Trust it</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="realism-envelope.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Realism envelope</span></a><a href="metrics.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The metrics</span></a><a href="principles.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Principles</span></a><a href="citing.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Citing a run</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">Reference</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="glossary.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Glossary</span></a><a href="factors.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">The nine factors</span></a><a href="conventions.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Conventions</span></a><a href="schemas.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Schemas</span></a><a href="presets.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Presets</span></a><a href="release-notes.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Release notes</span></a></div></div><div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0"><span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:0.9375rem;font-weight:600;color:var(--ink)">API</span><div style="display:flex;flex-direction:column;gap:0.3rem"><a href="core-types.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Core types</span></a><a href="evaluate.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Evaluate</span></a><a href="parameters.html" style="display:flex;gap:0.4rem;align-items:baseline;font-size:0.8125rem;color:var(--ink-2)"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--accent-line);flex:none">&gt;</span><span style="white-space:nowrap">Parameters</span></a></div></div></div></section>
+<nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem"><a href="execution-cost.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>Execution cost</span></a><a href="edgar.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>Real companies from EDGAR</span></a></nav>
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template"><main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+<div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
+<a href="index.html" style="color:var(--ink-3)">USE IT</a><span>/</span><span style="color:var(--accent)">CHECKPOINTS AND FORKING</span>
+</div>
+<section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1rem">
+<h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Checkpoints and forking</h1>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.</p>
+<pre style="margin:0.4rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">mark = pt.Checkpoint.of(engine, universe=universe, seed=42)
+calm, hiked = mark.branch(2)   # two engines, identical up to day 60
+hiked.pin_macro(corporate_bond_yield=0.09)
+# calm and hiked now diverge only from here</pre>
+</section>
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem">
+<h2 style="font-size:1.5rem">Two mechanisms for different jobs</h2>
+<div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
+<table style="font-size:0.8125rem"><thead><tr>
+<th style="text-align:left;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)"></th>
+<th style="text-align:right;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)">Cost</th>
+<th style="text-align:right;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)">Survives the process</th>
+</tr></thead><tbody>
+<tr>
+<td style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--line-soft);font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">pt.branch(engine, 2, ...)</td>
+<td style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--line-soft);text-align:right;font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--ink-2)">&lt; 1 ms</td>
+<td style="padding:0.6rem 0.9rem;border-bottom:1px solid var(--line-soft);text-align:right;color:var(--ink-2)">no</td>
+</tr>
+<tr>
+<td style="padding:0.6rem 0.9rem;font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--accent-deep)">Checkpoint.resume()</td>
+<td style="padding:0.6rem 0.9rem;text-align:right;font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;color:var(--ink-2)">2.7 s</td>
+<td style="padding:0.6rem 0.9rem;text-align:right;color:var(--ink-2)">yes</td>
+</tr>
+</tbody></table>
+</div>
+<p style="color:var(--ink-2);margin:0;max-width:70ch"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
+</section>
+<section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem">
+<h2 style="font-size:1.5rem">Why it refuses instead of loading wrong</h2>
+<p style="color:var(--ink-2);margin:0;max-width:70ch">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
+<details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
+<summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--ink)">What restore_state cannot catch</summary>
+<div style="padding:0 0.9rem 0.9rem;border-top:1px solid var(--line-soft);padding-top:0.7rem">
+<p style="margin:0;font-size:0.875rem;color:var(--ink-2)">The low-level <code>restore_state</code> holds no fundamentals, so it can only verify roster order, size, and the model fingerprint the snapshot was taken under. Restoring a pt-v12 snapshot into a pt-v1 engine raises a <code>ValidationError</code> naming both. What it cannot see is a roster whose tickers still match but whose fundamentals do not — prefer <code>branch</code> and <code>Checkpoint</code>, which check that.</p>
+</div>
+</details>
+</section>
+
+</main></script>
+<script src="pt-data.js"></script>
+<script src="pt-search.js"></script>
+<script src="learn-runtime.js"></script>
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+
+class Component extends DCLogic {
+  state = { dark: false };
+  applyTheme(dark) {
+    if (typeof document === 'undefined') return;
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { window.localStorage.setItem('pt-learn-theme', dark ? 'dark' : 'light'); } catch (e) {}
+  }
+  componentDidMount() {
+    let dark = false;
+    try {
+      const saved = window.localStorage.getItem('pt-learn-theme');
+      dark = saved ? saved === 'dark' : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (e) { dark = false; }
+    this.setState({ dark: dark });
+    this.applyTheme(dark);
+  }
+  renderVals() {
+    return {
+      markLogo: this.state.dark ? './mark-pretium-dark.png' : './mark-pretium.png',
+      themeGlyph: this.state.dark ? 'light' : 'dark',
+      toggleTheme: () => { const n = !this.state.dark; this.setState({ dark: n }); this.applyTheme(n); }
+    };
+  }
+}
+
+
+;(function(){
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () { return {}; };
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {};
+  var host = document.getElementById('pt-root');
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
+  PTLearn.mount(host, Component, ast, {});
+})();
+</script>
+</body>
+</html>

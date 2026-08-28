@@ -36,6 +36,8 @@ import subprocess
 import sys
 import tempfile
 
+import shell
+
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 HANDOFF = HERE / "handoff"
@@ -46,14 +48,23 @@ BASE_URL = "https://simoncoombes.github.io/pretium/learn"
 #: The five doors, in reading order, and the pages behind each. The handoff
 #: left four pages linked only by their own prev/next chain; they are placed
 #: here, which is what puts them in the menus, the footer index and search.
-DOORS: list[tuple[str, str, list[tuple[str, str]]]] = [
-    ("Start here", "start", [
+#: The five doors, in reading order: full name, the short label the menus
+#: use, a slug, and the pages behind it. The handoff left four pages linked
+#: only by their own prev/next chain; placing them here is what puts them in
+#: the menus, the footer index and the search results.
+#:
+#: The MCP server sits under "Use it". The handoff's own door table puts it
+#: there and its front door calls MCP one of the three ways to drive the
+#: simulator; the design files' menus filed it under API, which is the one
+#: place the two disagree. Driving it is a use, so it is a use.
+DOORS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
+    ("Start here", "Start", "start", [
         ("Install", "install"),
         ("Core concepts", "core-concepts"),
         ("The two loops", "two-loops"),
         ("Running a market", "running-a-market"),
     ]),
-    ("Use it", "use", [
+    ("Use it", "Use it", "use", [
         ("Agents", "agents"),
         ("Scenarios", "scenarios"),
         ("Execution cost", "execution-cost"),
@@ -62,13 +73,13 @@ DOORS: list[tuple[str, str, list[tuple[str, str]]]] = [
         ("RL environment", "rl-environment"),
         ("The MCP server", "mcp"),
     ]),
-    ("Trust it", "trust", [
+    ("Trust it", "Trust it", "trust", [
         ("Realism envelope", "realism-envelope"),
         ("The metrics", "metrics"),
         ("Principles", "principles"),
         ("Citing a run", "citing"),
     ]),
-    ("Reference", "reference", [
+    ("Reference", "Reference", "reference", [
         ("Glossary", "glossary"),
         ("The nine factors", "factors"),
         ("Conventions", "conventions"),
@@ -76,7 +87,7 @@ DOORS: list[tuple[str, str, list[tuple[str, str]]]] = [
         ("Presets", "presets"),
         ("Release notes", "release-notes"),
     ]),
-    ("API", "api", [
+    ("API", "API", "api", [
         ("Core types", "core-types"),
         ("Evaluate", "evaluate"),
         ("Parameters", "parameters"),
@@ -106,7 +117,7 @@ body.pt-front h1,body.pt-front h2,body.pt-front h3{line-height:1.12}
 def pages() -> list[dict]:
     """Every page, in reading order, with its door and its neighbours."""
     out = [{"name": FRONT[0], "slug": FRONT[1], "door": None, "door_slug": None}]
-    for door, door_slug, entries in DOORS:
+    for door, _short, door_slug, entries in DOORS:
         for name, slug in entries:
             out.append({"name": name, "slug": slug, "door": door, "door_slug": door_slug})
     for i, p in enumerate(out):
@@ -207,6 +218,33 @@ def _tighter(sel: str, prop: str) -> bool:
 
 # ---------------------------------------------------------------- page assembly
 
+#: Bindings the search overlay used to supply. If one survives in a page's
+#: template the shell and the page are both trying to own search, and the
+#: page will render an empty control rather than fail loudly — so fail here.
+#: Corrections applied to a page's component on the way out.
+#:
+#: Each is asserted, so a redrawn design that no longer contains the text
+#: being replaced fails the build rather than silently dropping the fix.
+#: That is the same discipline `tools/docs/build_site.py` uses for prose,
+#: and for the same reason: a fix that can go missing quietly will.
+SCRIPT_FIXES: dict[str, list[tuple[str, str]]] = {
+    # The front door reveals its verdict a word at a time. Its three other
+    # players check `prefers-reduced-motion` and stay still; this one was
+    # written later and does not, so a reader who has asked the platform to
+    # stop moving things gets text that types itself anyway.
+    "index": [(
+        """    let n = 0;
+    this.setState({ vSnap: next, vStream: '' });""",
+        """    let n = 0;
+    const still = typeof window !== 'undefined' && window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (still) { this.setState({ vSnap: next, vStream: null }); return; }
+    this.setState({ vSnap: next, vStream: '' });""",
+    )],
+}
+
+SEARCH_BINDING = re.compile(r"\{\{\s*(search[A-Za-z]*)\s*\}\}")
+
 FONTS = ("https://fonts.googleapis.com/css2?"
          "family=Source+Serif+4:opsz,wght@8..60,400;8..60,600"
          "&family=Public+Sans:wght@400;500;600"
@@ -229,7 +267,21 @@ def rewrite_links(text: str, slug_of: dict[str, str]) -> str:
     return re.sub(r"\./([^\"'<>]+?)\.dc\.html", sub, text)
 
 
-HEAD = """<!doctype html>
+def dead_door_table(script: str, slugs: set[str]) -> bool:
+    """Does this component still carry its own copy of the door index?
+
+    Eight pages build the "All pages" section from a list of page names and
+    links held in the component. The builder generates that section now, so
+    the list is dead — but it is dead data that still asserts which pages
+    exist, and dead data that disagrees with the site is how a stale menu
+    finds its way back. Its links are rewritten so nothing can 404, and the
+    build reports the pages that still need the list deleted at source.
+    """
+    found = set(re.findall(r"['\"](?:\./)?([a-z0-9-]+)\.html['\"]", script))
+    return len(found & slugs) >= 5
+
+
+PAGE = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -238,6 +290,7 @@ HEAD = """<!doctype html>
 <meta name="description" content="{description}">
 <link rel="canonical" href="{base}/{slug}.html">
 <meta property="og:type" content="article">
+<meta property="og:site_name" content="pretium">
 <meta property="og:title" content="{title}">
 <meta property="og:description" content="{description}">
 <meta property="og:url" content="{base}/{slug}.html">
@@ -252,15 +305,46 @@ HEAD = """<!doctype html>
 {theme_script}
 </head>
 <body class="{body_class}">
+<div style="min-height:100vh;padding:0 0 5rem">
+{overlay}
+{masthead}
 <div id="pt-root">{html}</div>
-<template id="pt-template">{template}</template>
+<div style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
+{door_index}
+{prev_next}
+</div>
+</div>
+<!-- The client-side copy of this page's template.
+
+     It is a raw-text script block, not a <template> element, and that is
+     not a style choice. An HTML parser applies the table content model to
+     anything it parses, and `<sc-for>` is not in it — so a loop written
+     inside a table is foster-parented out of the table and its rows are
+     left behind ungrouped. The template survives a <script> intact because
+     a script's contents are never parsed as markup. -->
+<script id="pt-template" type="text/x-pt-template">{template}</script>
 <script src="pt-data.js"></script>
 <script src="pt-search.js"></script>
 <script src="learn-runtime.js"></script>
-<script>{script}
+<script src="learn-shell.js" defer></script>
+<script>
+/* The handoff's components are written as `class Component extends DCLogic`,
+   so the base class has to be a global by the time the class statement is
+   evaluated. */
+var DCLogic = PTLearn.DCLogic;
+{script}
 ;(function(){{
+  /* The search overlay belongs to the shell now, so the per-page
+     `searchVals` has no consumer: its markup was stripped from this
+     page's template. Left in place it would still run on every render,
+     against an index whose shape it no longer knows. */
+  if (Component.prototype.searchVals) Component.prototype.searchVals = function () {{ return {{}}; }};
+  /* The theme belongs to the shell too. Left alone, every page would write
+     the reader's *system* preference into localStorage on first load, which
+     turns "follow my system" into a choice they never made. */
+  if (Component.prototype.applyTheme) Component.prototype.applyTheme = function () {{}};
   var host = document.getElementById('pt-root');
-  var ast = PTLearn.parse(document.getElementById('pt-template').innerHTML);
+  var ast = PTLearn.parse(document.getElementById('pt-template').textContent);
   PTLearn.mount(host, Component, ast, {props});
 }})();
 </script>
@@ -268,22 +352,35 @@ HEAD = """<!doctype html>
 </html>
 """
 
-#: Read the stored theme before the first paint. Without this the page
-#: renders light and then flips, which is worse than either theme. It is
-#: inline and tiny for the same reason: a separate file would arrive after
-#: the paint it exists to prevent.
+#: Read the stored theme before the first paint. Without it the page renders
+#: light and then flips, which is worse than either theme on its own. Inline
+#: and tiny for the same reason: a separate file would arrive after the
+#: paint it exists to prevent.
 THEME_SCRIPT = """<script>
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
-var d=s?s==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
-if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
 </script>"""
+
+#: Two rules that replace a piece of the design's JavaScript. The mark and
+#: the language logos shipped as image pairs whose visibility was bound to a
+#: `dark` flag held in each page's component, so the wrong one is on screen
+#: until the script runs. CSS gets it right on the first paint and keeps
+#: working when the script is blocked.
+THEME_CSS = """
+.pt-dark{display:none}
+html[data-theme="dark"] .pt-dark{display:revert}
+html[data-theme="dark"] .pt-light{display:none}
+@media (prefers-color-scheme: dark){
+  html:not([data-theme="light"]) .pt-dark{display:revert}
+  html:not([data-theme="light"]) .pt-light{display:none}
+}
+#pt-search-open[hidden]{display:none}
+"""
 
 
 def build(out_dir: pathlib.Path) -> None:
     all_pages = pages()
     slug_of = {p["name"]: p["slug"] for p in all_pages}
-    # The handoff's own front-door filename, used in every masthead link.
-    slug_of.setdefault("Learn pretium", "index")
 
     manifest = {
         "base": str(HANDOFF),
@@ -298,25 +395,54 @@ def build(out_dir: pathlib.Path) -> None:
         ["node", str(HERE / "prerender.cjs"), manifest_path],
         capture_output=True, text=True,
     )
+    if result.stderr.strip():
+        print(result.stderr.rstrip())
     if result.returncode != 0:
-        sys.exit("prerender failed:\n" + result.stderr)
+        sys.exit("prerender failed")
     rendered = json.loads(result.stdout)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    css = merge_stylesheet([s["css"] for s in rendered["styles"]]) + FRONT_OVERRIDES
-    (out_dir / "learn.css").write_text(css.strip() + "\n", encoding="utf-8")
+    css = merge_stylesheet([s["css"] for s in rendered["styles"]])
+    (out_dir / "learn.css").write_text(
+        (css + FRONT_OVERRIDES + THEME_CSS).strip() + "\n", encoding="utf-8")
 
-    shutil.copy(SITE / "learn-runtime.js", out_dir / "learn-runtime.js")
+    for name in ("learn-runtime.js", "learn-shell.js"):
+        shutil.copy(SITE / name, out_dir / name)
     for asset in ASSETS:
         shutil.copy(HANDOFF / asset, out_dir / asset)
 
     by_slug = {p["slug"]: p for p in rendered["pages"]}
+    overlay = shell.search_overlay()
+    all_slugs = {p["slug"] for p in all_pages}
+    carrying: list[str] = []
+
     for page in all_pages:
         r = by_slug[page["slug"]]
         html = rewrite_links(r["html"], slug_of)
         template = rewrite_links(r["template"], slug_of)
-        doc = HEAD.format(
+        # Components carry links too: one page routes the reader onward from
+        # data rather than markup, and eight carry a now-dead copy of the
+        # door table. Both go through the same rewrite so neither can point
+        # at a filename this site does not publish.
+        script = rewrite_links(r["script"], slug_of)
+        for before, after in SCRIPT_FIXES.get(page["slug"], ()):
+            if before not in script:
+                sys.exit(f"{page['slug']}: a SCRIPT_FIXES anchor no longer matches "
+                         f"the design — re-check the fix against the new page")
+            script = script.replace(before, after, 1)
+        if ".dc.html" in script:
+            sys.exit(f"{page['slug']}: a link in the component survived rewriting")
+        if dead_door_table(script, all_slugs):
+            carrying.append(page["slug"])
+        # A raw-text script ends at the first `</script`, wherever it is.
+        if "</script" in template.lower():
+            sys.exit(f"{page['slug']}: template contains a closing script tag")
+        stray = SEARCH_BINDING.findall(template)
+        if stray:
+            sys.exit(f"{page['slug']}: template still binds search values "
+                     f"({', '.join(sorted(set(stray)))}) — the shell owns search now")
+        doc = PAGE.format(
             title=esc(r["title"]),
             description=esc(r["description"]),
             base=BASE_URL,
@@ -324,14 +450,51 @@ def build(out_dir: pathlib.Path) -> None:
             fonts=FONTS,
             theme_script=THEME_SCRIPT,
             body_class="pt-front" if page["slug"] == "index" else "pt-page",
+            overlay=overlay,
+            masthead=shell.masthead(DOORS, page["slug"]),
+            door_index=shell.door_index(DOORS, page["slug"]),
+            prev_next=shell.prev_next(page["prev"], page["next"]),
             html=html,
             template=template,
-            script=r["script"],
+            script=script,
             props=json.dumps(r["props"]),
         )
         (out_dir / f"{page['slug']}.html").write_text(doc, encoding="utf-8")
 
+    write_search_index(out_dir, all_pages, by_slug)
+    shutil.copy(HANDOFF / "pt-data.js", out_dir / "pt-data.js")
+
     print(f"built {len(all_pages)} pages into {out_dir}")
+    if carrying:
+        print(f"  note: {len(carrying)} components still carry a dead door table "
+              f"({', '.join(carrying)}) — see ISSUES.md")
+
+
+def write_search_index(out_dir, all_pages, by_slug) -> None:
+    """Build the search index from the rendered pages.
+
+    The handoff shipped a hand-written keyword list per page and said so:
+    it finds pages, not passages. This reads the text the build just
+    produced, so a phrase a reader remembers seeing is a phrase that finds
+    the page it was on — and the index cannot fall behind the prose, because
+    it is made from it.
+    """
+    entries = []
+    for page in all_pages:
+        r = by_slug[page["slug"]]
+        text = re.sub(r"<[^>]+>", " ", r["html"])
+        text = re.sub(r"\s+", " ", text).strip()
+        entries.append({
+            "title": page["name"],
+            "slug": page["slug"],
+            "door": (page["door"] or "Start").upper(),
+            "text": text[:6000],
+        })
+    body = json.dumps(entries, separators=(",", ":"), ensure_ascii=False)
+    (out_dir / "pt-search.js").write_text(
+        "/* Generated by tools/docs/learn/build.py from the rendered pages.\n"
+        "   Do not edit: rebuild instead. */\n"
+        f"window.PT_SEARCH = {body};\n", encoding="utf-8")
 
 
 def esc(s: str) -> str:
