@@ -13,7 +13,7 @@ A market simulator you can run a strategy against. Beginner to expert in one pag
 
 A reproducible financial market built for AI agents
 
-Run a trading agent against a market that reacts to it. Orders match against real order-book depth, so the agent pays for the size it takes and moves the price it trades at. The same seed gives the same market on every platform, so a result you publish is a result someone else can re-run.
+Give it a universe, a macro state and a seed. Pretium runs the economy, the prices, the order books and the fills forward deterministically — so an agent can be evaluated under execution costs and market impact.
 
 pip install pretium
 cargo add pretium
@@ -83,7 +83,7 @@ RETURN SPREAD
 
 Three inputs define a market
 
-A universe of companies, a macro state for day zero, and a seed. Same three, same market, on every platform.
+A universe of companies, a macro state for day zero, and a seed. The same three inputs produce the same market on every supported platform, so a run is reproducible by anyone who has them.
 
 The economy runs itself
 
@@ -91,41 +91,7 @@ Every close advances it. The economy updates, the cycle can turn, and the centra
 
 Every move is labelled
 
-The simulator computed each price, so it can say why. Nine factor contributions sum to the move. The residual is near 1e-16.
-
-WHY IT EXISTS 
-History happened once
-
-A backtest replays a recording. It cannot tell you what would have happened had the agent traded differently, because the prices in it were set by people who never saw the order. Size is free, the market never reacts, and the same run gives the same answer for the wrong reason.
-
-A market that computes its own prices can answer those questions. It can be re-run from a seed, driven through a crisis on demand, forked at a decision point, and asked why a price moved — because it did the moving. What it cannot do is tell you what a real market will do next, and this site is explicit about where that line falls.
-
-WHAT YOU GET 
-Five properties, each of them checkable
-
-Every one of these has a page behind it showing the measurement or the mechanism. None of them is a claim about how the simulator compares to anything else.
-
-Deterministic
-
-The same universe, macro state and seed give the same market on Linux, macOS and Windows, digit for digit. Every release checks it across five wheel targets and a disagreement stops the release.
-
-Real execution
-
-An agent submits orders to a limit order book and is filled at the levels it consumes. It is not handed a price and told what it would have got.
-
-Its own impact
-
-Taking size moves the price the agent trades at. Run the same seed with the orders and without them and the difference is what the trading cost, priced against the market where it never traded.
-
-Observable
-
-Nine factor columns sum to each price move, so the simulator can say why a price went where it did. The residual is near 1e-16.
-
-Measured, and bounded
-
-Fourteen statistics against the ranges real equities hold, a certified horizon of 252 days, and five named gaps that each end in a rule about what the market must not be used for.
-
-Reinforcement learning, model-driven agents over MCP, execution-cost research, market-making, scenario studies and agent benchmarking all run on the same engine. The market is the first environment it ships with, not the limit of what it is for.
+The simulator computed each price, so it can say why. The nine factor contributions sum to the move — an identity, not a fitted explanation. The residual is near 1e-16.
 
 STEP 01 - SEE IT 
 The seed fixes every random number
@@ -560,7 +526,7 @@ filled 175 at 101.8000 against 101.00 on screen: +79 bps
 STEP 04 - DRIVE IT 
 Three ways to drive it
 
-A model can study the market from outside, or trade inside it. A policy can train against it. An algorithm you wrote can be scored on it. Cheapest first.
+Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote. Cheapest first.
 
 Agents over MCP
 
@@ -601,8 +567,8 @@ Hand evaluate a dict of ten agents and each one runs in its own copy of an ident
 
 Then rank repeats that across seeds and separates them with a paired sign test. The Oracle reads the true mispricing and says so. Read it as a reference point, not a ceiling: it spends the same gross on a naive rule, and mean-reversion beats it on 5 of the 12 markets.
 
-EACH IN ITS OWN COPY 
-Ten agents means ten private engines, so nobody eats another agent's depth. That keeps the comparison clean. To put them in one book, build an arena.
+SHIPPED · EACH IN ITS OWN COPY 
+Ten agents, ten identical markets. Each agent runs in its own copy of the same deterministic market, so nobody eats another agent's depth and the comparison stays clean and reproducible. One market with many agents in it is the extension below.
 
 agents = pt.reference_agents(seed=3)
 agents["mine"] = Mine()
@@ -615,97 +581,44 @@ ranking = pt.rank(
  lambda: dict(agents), seeds=range(12),
  universe=u, days=10, workers=4)
 
-BUILD ON IT 
+EXTENSION YOU CAN BUILD 
 An agent arena
 
-Ten model-driven agents in one order book, trading against each other, with the market maker as the house. The harness does not do this: it gives each agent its own copy of the market, which is what makes a comparison clean. Every part an arena needs is public, so you can build one.
+Ten model-driven agents in one order book, trading against each other, with the market maker as the house. A shared-book multi-agent arena is not a shipped Pretium feature. The primitives needed to build one are public and composable, and this is what building it takes.
 
-What you already have
+What an arena takes
 
-act(obs) is the bridge 
-The harness never asks what is inside an agent. Put a model call in act and the model is a trader. 
+COMPONENT 
+PRETIUM GIVES YOU 
+YOU WRITE 
 
-What you would write
+agent 
+act(obs). The harness never asks what is inside an agent. 
+The model call behind it. 
 
-the merge 
-Combine every agent's pending flow into one dict per tick. 
+merge 
+engine.run_session takes an order_flow dict, so many agents can push orders into the same tick. 
+Combining every agent's pending flow into one dict per tick. 
 
-the observation 
-Decide what each agent sees, and how you serialise it into a prompt the model can answer. 
+observation 
+The book, the position and the truth table, every tick. 
+What each agent sees, and how you serialise it into a prompt a model can answer. 
 
-the model budget 
+model budget 
+Nothing: this one is entirely yours. 
 One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls. 
 
-the scoreboard 
-Rank the cohort yourself. pt.rank compares agents across seeds, not against each other in one book. 
+execution 
+Portfolio turns target weights into orders and reports pending_flow(). One book per name, price-time priority, so the agent that arrives first fills first. 
+The participation cap and the order sizing. 
 
-engine.run_session 
-Takes an order_flow dict, so many agents can push orders into the same tick. 
+scoreboard 
+pt.rank compares agents across seeds, not against each other in one book. 
+Ranking the cohort within the shared book. 
 
-What you would write
-
-the merge 
-Combine every agent's pending flow into one dict per tick. 
-
-the observation 
-Decide what each agent sees, and how you serialise it into a prompt the model can answer. 
-
-the model budget 
-One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls. 
-
-the scoreboard 
-Rank the cohort yourself. pt.rank compares agents across seeds, not against each other in one book. 
-
-Portfolio 
-Turns target weights into orders and reports pending_flow() for the next tick. 
-
-What you would write
-
-the merge 
-Combine every agent's pending flow into one dict per tick. 
-
-the observation 
-Decide what each agent sees, and how you serialise it into a prompt the model can answer. 
-
-the model budget 
-One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls. 
-
-the scoreboard 
-Rank the cohort yourself. pt.rank compares agents across seeds, not against each other in one book. 
-
-one book per name 
-Price-time priority, so the agent that arrives first fills first. 
-
-What you would write
-
-the merge 
-Combine every agent's pending flow into one dict per tick. 
-
-the observation 
-Decide what each agent sees, and how you serialise it into a prompt the model can answer. 
-
-the model budget 
-One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls. 
-
-the scoreboard 
-Rank the cohort yourself. pt.rank compares agents across seeds, not against each other in one book. 
-
-the counterfactual 
-Run the same seed with no flow at all and price what the whole cohort cost. 
-
-What you would write
-
-the merge 
-Combine every agent's pending flow into one dict per tick. 
-
-the observation 
-Decide what each agent sees, and how you serialise it into a prompt the model can answer. 
-
-the model budget 
-One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls. 
-
-the scoreboard 
-Rank the cohort yourself. pt.rank compares agents across seeds, not against each other in one book. 
+counterfactual 
+The same seed with no flow at all. 
+The comparison that prices the whole cohort's footprint. 
 
 # 1. an agent is a model behind act()
 class LLMTrader:
@@ -747,7 +660,7 @@ for day in range(days):
 
 What the arena would give you
 
-Agents that pay for each other's size. One agent's sweep takes the depth the next one wanted, and every fill is priced by whoever else was in the book that tick. That is a genuine multi-agent market, and the counterfactual run still works: same seed, no flow, and you can price the whole cohort's footprint.
+Agents that pay for each other's size. In a shared book agents do not only compete on returns, they compete for liquidity: one agent's sweep consumes the depth another expected to trade against, and every fill is priced by whoever else was in the book that tick. The counterfactual still works — same seed, no flow — so you can price the whole cohort's footprint.
 
 What it would not give you
 
@@ -756,7 +669,7 @@ A market maker that learns the cohort. The maker and the aggregate flow do not a
 STEP 05 - TRUST THE RESULT 
 How real is it
 
-Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. The shipped preset lands inside all fourteen over a trading year, and there is no single score, because one number travels further than its caveats.
+Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. The shipped preset falls inside all fourteen of those ranges over a one-year simulation, on the configuration the certification was measured on. There is no single score, because one number travels further than its caveats.
 
 annualised_vol_pct 
 

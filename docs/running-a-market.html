@@ -72,19 +72,19 @@ engine.run_days(252)</pre>
 <div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
 <h3 class="pt-s4">Three things define a run</h3>
 
-<div class="pt-s2">
+<div class="pt-s3">
 <span class="pt-s5">A universe</span>
 <span class="pt-s0">Which companies exist and what they are worth. Order matters, so keep it fixed.</span>
 </div>
 
 
-<div class="pt-s2">
+<div class="pt-s3">
 <span class="pt-s5">A macro state</span>
 <span class="pt-s0">Rates, inflation and the cycle on day zero only. Every close advances the economy from there.</span>
 </div>
 
 
-<div class="pt-s2">
+<div class="pt-s3">
 <span class="pt-s5">A seed</span>
 <span class="pt-s0">Every random number, in the order drawn. Same three inputs, same market, digit for digit.</span>
 </div>
@@ -114,31 +114,31 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <p style="color:var(--ink-2);margin:0;max-width:none">A run gives you five Arrow tables. polars, pandas, pyarrow and duckdb read them zero-copy, and the package needs none of them.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.7rem">
 
-<div class="pt-s78">
+<div class="pt-s76">
 <span class="pt-s5">Bars</span>
 <span class="pt-s0">OHLCV per name, at the grain you ask for</span>
 </div>
 
 
-<div class="pt-s78">
+<div class="pt-s76">
 <span class="pt-s5">Truth</span>
 <span class="pt-s0">The true value, and what drove every move</span>
 </div>
 
 
-<div class="pt-s78">
+<div class="pt-s76">
 <span class="pt-s5">Macro</span>
 <span class="pt-s0">The economy, day by day</span>
 </div>
 
 
-<div class="pt-s78">
+<div class="pt-s76">
 <span class="pt-s5">Fills</span>
 <span class="pt-s0">What you asked for against what you got</span>
 </div>
 
 
-<div class="pt-s78">
+<div class="pt-s76">
 <span class="pt-s5">Book</span>
 <span class="pt-s0">The order book, level by level</span>
 </div>
@@ -150,27 +150,27 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)">Bars</button>
 
 <span class="pt-s17"></span>
-<span class="pt-s71">AAPL, first five days</span>
+<span class="pt-s69">AAPL, first five days</span>
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">Truth</button>
 
 <span class="pt-s17"></span>
-<span class="pt-s71">AAPL, first five days</span>
+<span class="pt-s69">AAPL, first five days</span>
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">Macro</button>
 
 <span class="pt-s17"></span>
-<span class="pt-s71">AAPL, first five days</span>
+<span class="pt-s69">AAPL, first five days</span>
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">Fills</button>
 
 <span class="pt-s17"></span>
-<span class="pt-s71">AAPL, first five days</span>
+<span class="pt-s69">AAPL, first five days</span>
 
 <button style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2)">Book</button>
 
 <span class="pt-s17"></span>
-<span class="pt-s71">AAPL, first five days</span>
+<span class="pt-s69">AAPL, first five days</span>
 </div>
 <div style="overflow-x:auto;transition:opacity 0.13s ease;opacity:1">
 <table style="width:100%;border-collapse:collapse;font-size:0.8125rem"><thead>
@@ -281,38 +281,38 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <p class="pt-s13">Orders match against a real book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.</p>
 <figure style="margin:0;display:flex;flex-direction:column;gap:0.5rem">
 
-<div class="pt-s93">
-<span class="pt-s147">3 a day</span>
-<span class="pt-s178">
+<div class="pt-s91">
+<span class="pt-s143">3 a day</span>
+<span class="pt-s176">
 <span style="position:absolute;left:50.0%;width:46.9%;height:22px;border-radius:3px;background:var(--accent)"></span>
-<span class="pt-s176"></span>
+<span class="pt-s174"></span>
 </span>
-<span class="pt-s144">+37.55%</span>
+<span class="pt-s140">+37.55%</span>
 </div>
 
-<figcaption class="pt-s135">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
+<figcaption class="pt-s133">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
 
-<div class="pt-s93">
-<span class="pt-s147">6 a day</span>
-<span class="pt-s178">
+<div class="pt-s91">
+<span class="pt-s143">6 a day</span>
+<span class="pt-s176">
 <span style="position:absolute;left:50.0%;width:12.2%;height:22px;border-radius:3px;background:var(--accent)"></span>
-<span class="pt-s176"></span>
+<span class="pt-s174"></span>
 </span>
-<span class="pt-s144">+9.79%</span>
+<span class="pt-s140">+9.79%</span>
 </div>
 
-<figcaption class="pt-s135">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
+<figcaption class="pt-s133">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
 
-<div class="pt-s93">
-<span class="pt-s147">12 a day</span>
-<span class="pt-s178">
+<div class="pt-s91">
+<span class="pt-s143">12 a day</span>
+<span class="pt-s176">
 <span style="position:absolute;left:15.7%;width:34.3%;height:22px;border-radius:3px;background:var(--red)"></span>
-<span class="pt-s176"></span>
+<span class="pt-s174"></span>
 </span>
-<span class="pt-s144">-27.46%</span>
+<span class="pt-s140">-27.46%</span>
 </div>
 
-<figcaption class="pt-s135">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
+<figcaption class="pt-s133">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
 </figure>
 </div>
 </section>
@@ -382,7 +382,7 @@ print(ranking.separation("momentum", "mean_reversion"))</pre>
 <summary class="pt-s28">Good results here do not predict real returns</summary>
 <div class="pt-s63">
 <p class="pt-s1">The price process comes from a known model, so a strategy that fits that model's structure will look excellent and teach you nothing. A strategy that fails here is the informative case, because it broke against a live order book under honest impact costs.</p>
-<p class="pt-s162"></p>
+<p class="pt-s156"></p>
 </div>
 </details>
 
@@ -391,7 +391,7 @@ print(ranking.separation("momentum", "mean_reversion"))</pre>
 <summary class="pt-s28">Momentum can work here for a reason real markets do not supply</summary>
 <div class="pt-s63">
 <p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. The shipped pt-v12 turns that dial well down: momentum_theta sits at 0.0186 and return autocorrelation at lag one reads +0.0239 against a real band of -0.08 to 0.06, so it is in band. pt-v1 ships the same knob at 0.25 and measures +0.249. Either way the dial exists and real markets have no equivalent.</p>
-<p class="pt-s162">pt-v12: the certified panel, 30 seeds, 40 instruments, 252 days.</p>
+<p class="pt-s156">pt-v12: the certified panel, 30 seeds, 40 instruments, 252 days.</p>
 </div>
 </details>
 
@@ -400,7 +400,7 @@ print(ranking.separation("momentum", "mean_reversion"))</pre>
 <summary class="pt-s28">One venue, no latency, no strategic counterparties</summary>
 <div class="pt-s63">
 <p class="pt-s1">Orders arrive instantly, there is one book per name, and you trade against a market maker and aggregate flow, never against agents that adapt to you.</p>
-<p class="pt-s162"></p>
+<p class="pt-s156"></p>
 </div>
 </details>
 
@@ -447,7 +447,7 @@ engine.run_days(252)</pre>
 <div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
 <h3 class="pt-s4">Three things define a run</h3>
 <sc-for list="{{ inputs }}" as="i">
-<div class="pt-s2">
+<div class="pt-s3">
 <span class="pt-s5">{{ i.k }}</span>
 <span class="pt-s0">{{ i.v }}</span>
 </div>
@@ -477,7 +477,7 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <p style="color:var(--ink-2);margin:0;max-width:none">A run gives you five Arrow tables. polars, pandas, pyarrow and duckdb read them zero-copy, and the package needs none of them.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0.7rem">
 <sc-for list="{{ tables }}" as="t">
-<div class="pt-s78">
+<div class="pt-s76">
 <span class="pt-s5">{{ t.n }}</span>
 <span class="pt-s0">{{ t.d }}</span>
 </div>
@@ -489,7 +489,7 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <button onClick="{{ tb.pick }}" style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;padding:0.3rem 0.65rem;border-radius:5px;cursor:pointer;border:1px solid {{ tb.border }};background:{{ tb.bg }};color:{{ tb.fg }}">{{ tb.label }}</button>
 
 <span class="pt-s17"></span>
-<span class="pt-s71">{{ preview.note }}</span>
+<span class="pt-s69">{{ preview.note }}</span>
 </sc-for></div>
 <div style="overflow-x:auto;transition:opacity 0.13s ease;opacity:{{ tabOp }}">
 <table style="width:100%;border-collapse:collapse;font-size:0.8125rem"><thead>
@@ -518,16 +518,16 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <p class="pt-s13">Orders match against a real book with price-time priority. A big order gets worse prices, because it took the levels that rested there. There is no slippage formula in the code. The one momentum signal below changes only how often it rebalances.</p>
 <figure style="margin:0;display:flex;flex-direction:column;gap:0.5rem">
 <sc-for list="{{ cadence }}" as="c">
-<div class="pt-s93">
-<span class="pt-s147">{{ c.label }}</span>
-<span class="pt-s178">
+<div class="pt-s91">
+<span class="pt-s143">{{ c.label }}</span>
+<span class="pt-s176">
 <span style="position:absolute;left:{{ c.x }};width:{{ c.w }};height:22px;border-radius:3px;background:{{ c.col }}"></span>
-<span class="pt-s176"></span>
+<span class="pt-s174"></span>
 </span>
-<span class="pt-s144">{{ c.v }}</span>
+<span class="pt-s140">{{ c.v }}</span>
 </div>
 
-<figcaption class="pt-s135">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
+<figcaption class="pt-s133">pt-v12, seed 2026, Universe.random(40, seed=7), 30 days, no fees charged. The whole gap is spread and depth.</figcaption>
 </sc-for></figure>
 </div>
 </section>
@@ -597,7 +597,7 @@ print(ranking.separation("momentum", "mean_reversion"))</pre>
 <summary class="pt-s28">{{ c.head }}</summary>
 <div class="pt-s63">
 <p class="pt-s1">{{ c.body }}</p>
-<p class="pt-s162">{{ c.src }}</p>
+<p class="pt-s156">{{ c.src }}</p>
 </div>
 </details>
 

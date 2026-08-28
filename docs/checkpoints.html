@@ -60,7 +60,7 @@ calm, hiked = mark.branch(2)   # two engines, identical up to day 60
 hiked.pin_macro(corporate_bond_yield=0.09)
 # calm and hiked now diverge only from here</pre>
 </section>
-<section class="pt-s190">
+<section class="pt-s191">
 <h2 class="pt-s7">Two mechanisms for different jobs</h2>
 <div class="pt-s11">
 <div class="pt-scroll"><table style="font-size:0.8125rem"><thead><tr>
@@ -80,11 +80,11 @@ hiked.pin_macro(corporate_bond_yield=0.09)
 </tr>
 </tbody></table></div>
 </div>
-<p class="pt-s185"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
+<p class="pt-s183"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
 </section>
-<section class="pt-s190">
+<section class="pt-s191">
 <h2 class="pt-s7">Why it refuses instead of loading wrong</h2>
-<p class="pt-s185">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
+<p class="pt-s183">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
 <details class="pt-s12">
 <summary class="pt-s28">What restore_state cannot catch</summary>
 <div class="pt-s63">
@@ -119,7 +119,7 @@ calm, hiked = mark.branch(2)   # two engines, identical up to day 60
 hiked.pin_macro(corporate_bond_yield=0.09)
 # calm and hiked now diverge only from here</pre>
 </section>
-<section class="pt-s190">
+<section class="pt-s191">
 <h2 class="pt-s7">Two mechanisms for different jobs</h2>
 <div class="pt-s11">
 <div class="pt-scroll"><table style="font-size:0.8125rem"><thead><tr>
@@ -139,11 +139,11 @@ hiked.pin_macro(corporate_bond_yield=0.09)
 </tr>
 </tbody></table></div>
 </div>
-<p class="pt-s185"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
+<p class="pt-s183"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
 </section>
-<section class="pt-s190">
+<section class="pt-s191">
 <h2 class="pt-s7">Why it refuses instead of loading wrong</h2>
-<p class="pt-s185">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
+<p class="pt-s183">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
 <details class="pt-s12">
 <summary class="pt-s28">What restore_state cannot catch</summary>
 <div class="pt-s63">

@@ -101,51 +101,51 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </thead><tbody>
 
 <tr>
-<td class="pt-s166">day</td>
-<td class="pt-s165">uint32</td>
-<td class="pt-s167">Day index.</td>
+<td class="pt-s161">day</td>
+<td class="pt-s160">uint32</td>
+<td class="pt-s162">Day index.</td>
 </tr>
 
 
 <tr>
-<td class="pt-s166">tick</td>
-<td class="pt-s165">uint32</td>
-<td class="pt-s167">Tick index. A tick is a minute, and there are 390 in a day. Tick grain only.</td>
+<td class="pt-s161">tick</td>
+<td class="pt-s160">uint32</td>
+<td class="pt-s162">Tick index. A tick is a minute, and there are 390 in a day. Tick grain only.</td>
 </tr>
 
 
 <tr>
-<td class="pt-s166">bar</td>
-<td class="pt-s165">uint32</td>
-<td class="pt-s167">Bar index within the day. Day grain only.</td>
+<td class="pt-s161">bar</td>
+<td class="pt-s160">uint32</td>
+<td class="pt-s162">Bar index within the day. Day grain only.</td>
 </tr>
 
 
 <tr>
-<td class="pt-s166">instrument_id</td>
-<td class="pt-s165">uint32</td>
-<td class="pt-s167">Roster index.</td>
+<td class="pt-s161">instrument_id</td>
+<td class="pt-s160">uint32</td>
+<td class="pt-s162">Roster index.</td>
 </tr>
 
 
 <tr>
-<td class="pt-s166">open · high · low</td>
-<td class="pt-s165">float64</td>
-<td class="pt-s167">Day grain only.</td>
+<td class="pt-s161">open · high · low</td>
+<td class="pt-s160">float64</td>
+<td class="pt-s162">Day grain only.</td>
 </tr>
 
 
 <tr>
-<td class="pt-s166">close</td>
-<td class="pt-s165">float64</td>
-<td class="pt-s167">What the book actually settled.</td>
+<td class="pt-s161">close</td>
+<td class="pt-s160">float64</td>
+<td class="pt-s162">What the book actually settled.</td>
 </tr>
 
 
 <tr>
-<td class="pt-s166">volume</td>
-<td class="pt-s165">float64</td>
-<td class="pt-s167">Shares.</td>
+<td class="pt-s161">volume</td>
+<td class="pt-s160">float64</td>
+<td class="pt-s162">Shares.</td>
 </tr>
 
 </tbody></table>
@@ -161,73 +161,73 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s43">
 <span class="pt-s6">envelope.intervals</span>
-<span class="pt-s3">Fewer than two panels. A spread over one observation is not a spread.</span>
+<span class="pt-s2">Fewer than two panels. A spread over one observation is not a spread.</span>
 </div>
 
 
 <div class="pt-s43">
 <span class="pt-s6">atlas.plan</span>
-<span class="pt-s3">Fewer than 8 samples.</span>
+<span class="pt-s2">Fewer than 8 samples.</span>
 </div>
 
 
 <div class="pt-s43">
 <span class="pt-s6">Survey.sensitivity</span>
-<span class="pt-s3">Fewer than 8 usable rows, or an output no row measured.</span>
+<span class="pt-s2">Fewer than 8 usable rows, or an output no row measured.</span>
 </div>
 
 
 <div class="pt-s43">
 <span class="pt-s6">Survey.profile</span>
-<span class="pt-s3">Fewer than three rows per bin.</span>
+<span class="pt-s2">Fewer than three rows per bin.</span>
 </div>
 
 
 <div class="pt-s43">
 <span class="pt-s6">Survey.attribution</span>
-<span class="pt-s3">A vector value outside the surveyed range, a parameter set on one side only, or a parameter that was not surveyed.</span>
+<span class="pt-s2">A vector value outside the surveyed range, a parameter set on one side only, or a parameter that was not surveyed.</span>
 </div>
 
 
 <div class="pt-s43">
 <span class="pt-s6">Survey.confirm</span>
-<span class="pt-s3">Any seed shared with the survey or between blocks, and a survey with no seed record at all. An empty list is the absence of a record wearing the key.</span>
+<span class="pt-s2">Any seed shared with the survey or between blocks, and a survey with no seed record at all. An empty list is the absence of a record wearing the key.</span>
 </div>
 
 
 <div class="pt-s43">
 <span class="pt-s6">ModelParams.from_preset</span>
-<span class="pt-s3">An override of a compile-time constant, by name. Accepting one the engine would ignore would make the fingerprint a lie.</span>
+<span class="pt-s2">An override of a compile-time constant, by name. Accepting one the engine would ignore would make the fingerprint a lie.</span>
 </div>
 
 
 <div class="pt-s43">
 <span class="pt-s6">Scenario</span>
-<span class="pt-s3">Chaining a shape constructor onto a built scenario, or a compare() baseline that realises the same path as the scenario.</span>
+<span class="pt-s2">Chaining a shape constructor onto a built scenario, or a compare() baseline that realises the same path as the scenario.</span>
 </div>
 
 
 <div class="pt-s43">
 <span class="pt-s6">RunManifest.reproduce</span>
-<span class="pt-s3">A build whose arithmetic does not match the manifest's. It names the culprit rather than replaying a different market.</span>
+<span class="pt-s2">A build whose arithmetic does not match the manifest's. It names the culprit rather than replaying a different market.</span>
 </div>
 
 
 <div class="pt-s43">
 <span class="pt-s6">Checkpoint restore</span>
-<span class="pt-s3">A pre-split snapshot with three RNG numbers instead of nine, naming the era. It can not be continued bit-exactly.</span>
+<span class="pt-s2">A pre-split snapshot with three RNG numbers instead of nine, naming the era. It can not be continued bit-exactly.</span>
 </div>
 
 
 <div class="pt-s43">
 <span class="pt-s6">Instrument</span>
-<span class="pt-s3">A short_interest between 0 and 1 on a real share count, and an unknown sector key.</span>
+<span class="pt-s2">A short_interest between 0 and 1 on a real share count, and an unknown sector key.</span>
 </div>
 
 
 <div class="pt-s43">
 <span class="pt-s6">loss.band_distance_loss</span>
-<span class="pt-s3">A missing or zero noise scale. An unweighted sum is a choice, and it will not happen by accident.</span>
+<span class="pt-s2">A missing or zero noise scale. An unweighted sum is a choice, and it will not happen by accident.</span>
 </div>
 
 </div>
@@ -285,9 +285,9 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </thead><tbody>
 <sc-for list="{{ table.rows }}" as="r">
 <tr>
-<td class="pt-s166">{{ r.c }}</td>
-<td class="pt-s165">{{ r.t }}</td>
-<td class="pt-s167">{{ r.d }}</td>
+<td class="pt-s161">{{ r.c }}</td>
+<td class="pt-s160">{{ r.t }}</td>
+<td class="pt-s162">{{ r.d }}</td>
 </tr>
 
 </sc-for></tbody></table>
@@ -303,7 +303,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <sc-for list="{{ refusals }}" as="r">
 <div class="pt-s43">
 <span class="pt-s6">{{ r.k }}</span>
-<span class="pt-s3">{{ r.v }}</span>
+<span class="pt-s2">{{ r.v }}</span>
 </div>
 
 </sc-for></div>

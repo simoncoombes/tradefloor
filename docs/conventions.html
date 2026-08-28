@@ -59,98 +59,98 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p class="pt-s24">Units and input rules. Read these before you hit them, because each one raises rather than guesses.</p>
 
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem">
-<p style="margin:0;font-size:0.9375rem;color:var(--accent-deep)">Nothing is silently clamped. A simulator that repairs your inputs gives you a market you did not specify, so a malformed scenario raises <span class="pt-s186">ValidationError</span> and a rejected order raises <span class="pt-s186">OrderError</span>.</p>
+<p style="margin:0;font-size:0.9375rem;color:var(--accent-deep)">Nothing is silently clamped. A simulator that repairs your inputs gives you a market you did not specify, so a malformed scenario raises <span class="pt-s185">ValidationError</span> and a rejected order raises <span class="pt-s185">OrderError</span>.</p>
 </div>
 </section>
 
 <section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:0.7rem">
 <h2 class="pt-s7">The rules</h2>
 
-<div class="pt-s87">
-<div class="pt-s95">
+<div class="pt-s85">
+<div class="pt-s93">
 <h3 class="pt-s4">Rates are fractional</h3>
 <div class="pt-s64">
-<span class="pt-s149">0.052</span>
+<span class="pt-s145">0.052</span>
 <span class="pt-s61">not</span>
-<span class="pt-s150">5.2</span>
+<span class="pt-s146">5.2</span>
 </div>
 </div>
 <p class="pt-s1">0.052 means 5.2 percent. Passing 5.2 raises, with an error that says so.</p>
 </div>
 
 
-<div class="pt-s87">
-<div class="pt-s95">
+<div class="pt-s85">
+<div class="pt-s93">
 <h3 class="pt-s4">Absence differs from zero</h3>
 <div class="pt-s64">
-<span class="pt-s149">None</span>
+<span class="pt-s145">None</span>
 <span class="pt-s61">not</span>
-<span class="pt-s150">0.0</span>
+<span class="pt-s146">0.0</span>
 </div>
 </div>
 <p class="pt-s1">corporate_bond_yield=None falls through to the policy rate. 0.0 is a real observation and is used as given. In a columnar read, where a column can not carry None, absence is NaN and never zero, because zero is a real maker inventory, a real mispricing and a real return.</p>
 </div>
 
 
-<div class="pt-s87">
-<div class="pt-s95">
+<div class="pt-s85">
+<div class="pt-s93">
 <h3 class="pt-s4">Negative EPS is legal</h3>
 <div class="pt-s64">
-<span class="pt-s149">eps=-1.20</span>
+<span class="pt-s145">eps=-1.20</span>
 <span class="pt-s61">not</span>
-<span class="pt-s150">filter them out</span>
+<span class="pt-s146">filter them out</span>
 </div>
 </div>
 <p class="pt-s1">Loss-makers are valued off book value, and a universe without them is not realistic. It also never exercises that valuation path, so a study on such a roster covers half the model.</p>
 </div>
 
 
-<div class="pt-s87">
-<div class="pt-s95">
+<div class="pt-s85">
+<div class="pt-s93">
 <h3 class="pt-s4">Short interest is a share count</h3>
 <div class="pt-s64">
-<span class="pt-s149">3_000_000</span>
+<span class="pt-s145">3_000_000</span>
 <span class="pt-s61">not</span>
-<span class="pt-s150">0.03</span>
+<span class="pt-s146">0.03</span>
 </div>
 </div>
 <p class="pt-s1">The squeeze rule divides it by the float. A value strictly between 0 and 1 raises for a company with a real share count.</p>
 </div>
 
 
-<div class="pt-s87">
-<div class="pt-s95">
+<div class="pt-s85">
+<div class="pt-s93">
 <h3 class="pt-s4">Roster order is contractual</h3>
 <div class="pt-s64">
-<span class="pt-s149">universe.fingerprint</span>
+<span class="pt-s145">universe.fingerprint</span>
 <span class="pt-s61">not</span>
-<span class="pt-s150">sorted(tickers)</span>
+<span class="pt-s146">sorted(tickers)</span>
 </div>
 </div>
 <p class="pt-s1">A re-sorted universe is a different market. The fingerprint covers order as well as content.</p>
 </div>
 
 
-<div class="pt-s87">
-<div class="pt-s95">
+<div class="pt-s85">
+<div class="pt-s93">
 <h3 class="pt-s4">Coefficients ship as a preset</h3>
 <div class="pt-s64">
-<span class="pt-s149">model="pt-v12"</span>
+<span class="pt-s145">model="pt-v12"</span>
 <span class="pt-s61">not</span>
-<span class="pt-s150">Engine(garch_alpha=...)</span>
+<span class="pt-s146">Engine(garch_alpha=...)</span>
 </div>
 </div>
 <p class="pt-s1">They are named and versioned rather than passed as constructor keywords, so two published results can be compared. pt-v12 is the default as of the 2026-08-26 era boundary, pt-v10 was the default before it, and every earlier name from pt-v1 on still reproduces bit for bit.</p>
 </div>
 
 
-<div class="pt-s87">
-<div class="pt-s95">
+<div class="pt-s85">
+<div class="pt-s93">
 <h3 class="pt-s4">Every numeric column is f64</h3>
 <div class="pt-s64">
-<span class="pt-s149">float64</span>
+<span class="pt-s145">float64</span>
 <span class="pt-s61">not</span>
-<span class="pt-s150">mixed dtypes</span>
+<span class="pt-s146">mixed dtypes</span>
 </div>
 </div>
 <p class="pt-s1">No integer columns, no downcasting. A join that produces a different dtype is a sign the read went wrong.</p>
@@ -162,7 +162,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <h2 class="pt-s7">Short interest, in detail</h2>
 <p class="pt-s13">This is the convention that bites hardest, because the mistake would otherwise be silent. The squeeze rule divides short interest by the float, so 3% of a hundred million shares is 3,000,000.</p>
 <div class="pt-s29">
-<div class="pt-s188">
+<div class="pt-s187">
 <h3 class="pt-s4">Why 0.03 raises</h3>
 <p class="pt-s1">Three hundredths of one share against a real float is a squeeze ratio of 3e-10, and a squeeze that can never fire. So a value strictly between 0 and 1 raises for a company with a real share count.</p>
 <p class="pt-s1">Zero is legal. It means no short interest, which is a real observation.</p>
@@ -190,7 +190,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 
 </div>
-<p class="pt-s187">A hundred names is a small sample of a draw whose top and bottom differ by a factor of seventy-five, so a roster the size these docs use runs lower and noisier.</p>
+<p class="pt-s186">A hundred names is a small sample of a draw whose top and bottom differ by a factor of seventy-five, so a roster the size these docs use runs lower and noisier.</p>
 </div>
 </div>
 </section>
@@ -200,12 +200,12 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div class="pt-s29">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s66">In the dictionary</h3>
-<p class="pt-s56">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms. Eight numbers, and every one of them live.</p>
+<p class="pt-s58">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms. Eight numbers, and every one of them live.</p>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s4">Live, and absent from it</h3>
 <p class="pt-s1">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. None of them appear, and nothing forces a preset name to change when one of them moves.</p>
-<p class="pt-s187">So the preset name is necessary and not sufficient. A fully specified run also names the package version, which pins the implementation.</p>
+<p class="pt-s186">So the preset name is necessary and not sufficient. A fully specified run also names the package version, which pins the implementation.</p>
 </div>
 </div>
 </section>
@@ -238,20 +238,20 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p class="pt-s24">Units and input rules. Read these before you hit them, because each one raises rather than guesses.</p>
 
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem">
-<p style="margin:0;font-size:0.9375rem;color:var(--accent-deep)">Nothing is silently clamped. A simulator that repairs your inputs gives you a market you did not specify, so a malformed scenario raises <span class="pt-s186">ValidationError</span> and a rejected order raises <span class="pt-s186">OrderError</span>.</p>
+<p style="margin:0;font-size:0.9375rem;color:var(--accent-deep)">Nothing is silently clamped. A simulator that repairs your inputs gives you a market you did not specify, so a malformed scenario raises <span class="pt-s185">ValidationError</span> and a rejected order raises <span class="pt-s185">OrderError</span>.</p>
 </div>
 </section>
 
 <section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:0.7rem">
 <h2 class="pt-s7">The rules</h2>
 <sc-for list="{{ rules }}" as="r">
-<div class="pt-s87">
-<div class="pt-s95">
+<div class="pt-s85">
+<div class="pt-s93">
 <h3 class="pt-s4">{{ r.head }}</h3>
 <div class="pt-s64">
-<span class="pt-s149">{{ r.good }}</span>
+<span class="pt-s145">{{ r.good }}</span>
 <span class="pt-s61">not</span>
-<span class="pt-s150">{{ r.bad }}</span>
+<span class="pt-s146">{{ r.bad }}</span>
 </div>
 </div>
 <p class="pt-s1">{{ r.body }}</p>
@@ -263,7 +263,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <h2 class="pt-s7">Short interest, in detail</h2>
 <p class="pt-s13">This is the convention that bites hardest, because the mistake would otherwise be silent. The squeeze rule divides short interest by the float, so 3% of a hundred million shares is 3,000,000.</p>
 <div class="pt-s29">
-<div class="pt-s188">
+<div class="pt-s187">
 <h3 class="pt-s4">Why 0.03 raises</h3>
 <p class="pt-s1">Three hundredths of one share against a real float is a squeeze ratio of 3e-10, and a squeeze that can never fire. So a value strictly between 0 and 1 raises for a company with a real share count.</p>
 <p class="pt-s1">Zero is legal. It means no short interest, which is a real observation.</p>
@@ -279,7 +279,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 
 </sc-for></div>
-<p class="pt-s187">A hundred names is a small sample of a draw whose top and bottom differ by a factor of seventy-five, so a roster the size these docs use runs lower and noisier.</p>
+<p class="pt-s186">A hundred names is a small sample of a draw whose top and bottom differ by a factor of seventy-five, so a roster the size these docs use runs lower and noisier.</p>
 </div>
 </div>
 </section>
@@ -289,12 +289,12 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div class="pt-s29">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s66">In the dictionary</h3>
-<p class="pt-s56">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms. Eight numbers, and every one of them live.</p>
+<p class="pt-s58">The mispricing and crowd model: the half-life, mispricing_phi, momentum_theta, the mispricing and daily-shock caps, and the three crowd terms. Eight numbers, and every one of them live.</p>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.6rem">
 <h3 class="pt-s4">Live, and absent from it</h3>
 <p class="pt-s1">The GARCH parameters, the market and sector factor sigmas, and the order-flow coefficient. None of them appear, and nothing forces a preset name to change when one of them moves.</p>
-<p class="pt-s187">So the preset name is necessary and not sufficient. A fully specified run also names the package version, which pins the implementation.</p>
+<p class="pt-s186">So the preset name is necessary and not sufficient. A fully specified run also names the package version, which pins the implementation.</p>
 </div>
 </div>
 </section>
