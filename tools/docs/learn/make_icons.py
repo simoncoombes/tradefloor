@@ -417,6 +417,77 @@ def write_ico(path: pathlib.Path, pngs: list[tuple[int, bytes]]) -> None:
     path.write_bytes(header + entries + blobs)
 
 
+#: The card a link to this site unfurls into on Slack, on a social site, or
+#: in a chat window. Without one those all fall back to a bare URL, which is
+#: the least persuasive form a link to a documentation site can take.
+CARD = """<!doctype html><meta charset=utf-8>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<style>
+html,body{{margin:0;width:1200px;height:630px;background:{ground};overflow:hidden}}
+main{{box-sizing:border-box;width:100%;height:100%;padding:88px 96px;
+  display:flex;flex-direction:column;justify-content:space-between}}
+.row{{display:flex;align-items:center;gap:20px}}
+.row img{{width:44px;height:63px;display:block}}
+.mark{{font-family:'Spline Sans Mono',monospace;font-size:40px;font-weight:500;
+  letter-spacing:-0.01em;color:{ink}}}
+h1{{font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:78px;
+  line-height:1.06;letter-spacing:-0.02em;color:{ink};margin:0;max-width:15ch}}
+p{{font-family:'Spline Sans Mono',monospace;font-size:23px;letter-spacing:0.04em;
+  color:{accent};margin:0}}
+.rule{{height:10px;background:{accent};width:150px;border-radius:5px}}
+</style>
+<main>
+  <div class="row"><img src="mark.png"><span class="mark">pretium</span></div>
+  <h1>{headline}</h1>
+  <div>
+    <div class="rule" style="margin-bottom:26px"></div>
+    <p>{strapline}</p>
+  </div>
+</main>
+"""
+
+HEADLINE = "A market you can run a strategy against"
+STRAPLINE = "DETERMINISTIC \u00b7 A REAL ORDER BOOK \u00b7 MEASURED AGAINST REAL MARKETS"
+
+
+def write_card(chrome: str, out: pathlib.Path) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        work = pathlib.Path(tmp)
+        (work / "card.html").write_text(
+            CARD.format(ground=GROUND, ink="#101A18", accent=ACCENT,
+                        headline=HEADLINE, strapline=STRAPLINE),
+            encoding="utf-8")
+        shutil.copy(MARK, work / "mark.png")
+        target = work / "card.png"
+        subprocess.run(
+            [chrome, "--headless=new", "--disable-gpu", "--no-sandbox",
+             "--hide-scrollbars", "--window-size=1200,630",
+             "--virtual-time-budget=6000", f"--screenshot={target}",
+             str(work / "card.html")],
+            check=True, capture_output=True)
+        shutil.copy(target, out / "og-card.png")
+        print(f"wrote {out / 'og-card.png'} (1200x630)")
+
+
+def write_manifest(out: pathlib.Path) -> None:
+    """A web app manifest, so the icons have somewhere to be declared and an
+    installed copy gets the right name rather than the page title."""
+    (out / "site.webmanifest").write_text(json.dumps({
+        "name": "pretium documentation",
+        "short_name": "pretium",
+        "start_url": "index.html",
+        "display": "minimal-ui",
+        "background_color": GROUND,
+        "theme_color": ACCENT,
+        "icons": [
+            {"src": "icon-512.png", "sizes": "512x512", "type": "image/png",
+             "purpose": "any"},
+            {"src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png"},
+        ],
+    }, indent=1) + "\n", encoding="utf-8")
+    print(f"wrote {out / 'site.webmanifest'}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default=str(ROOT / "docs2" / "v2"),
@@ -446,6 +517,9 @@ def main() -> None:
             render(args.chrome, source, size, png)
             shutil.copy(png, out / name)
             print(f"wrote {out / name} ({size}px)")
+
+    write_card(args.chrome, out)
+    write_manifest(out)
 
 
 if __name__ == "__main__":

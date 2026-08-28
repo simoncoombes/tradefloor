@@ -24,9 +24,212 @@ from __future__ import annotations
 
 import datetime
 import html
+import json
 import pathlib
 import re
 import subprocess
+
+
+REPO_URL = "https://github.com/simoncoombes/pretium"
+AUTHOR = {"@type": "Person", "name": "Simon Coombes",
+          "url": "https://github.com/simoncoombes"}
+SAME_AS = [REPO_URL, "https://pypi.org/project/pretium/", "https://crates.io/crates/pretium"]
+
+
+def software_node(version: str) -> dict:
+    """The package itself, described once and referred to from every page.
+
+    Without it the PyPI package, the crate, the repository and this site are
+    four unrelated things to a search engine rather than one — and "pretium"
+    is Latin for price, which is a crowded name to have no disambiguation.
+    """
+    return {
+        "@type": "SoftwareApplication",
+        "name": "pretium",
+        "alternateName": "pretium market simulator",
+        "applicationCategory": "DeveloperApplication",
+        "applicationSubCategory": "Market simulation",
+        "operatingSystem": "Linux, macOS, Windows",
+        "programmingLanguage": ["Rust", "Python"],
+        "softwareVersion": version,
+        "codeRepository": REPO_URL,
+        "license": "https://opensource.org/licenses/MIT",
+        "author": AUTHOR,
+        "sameAs": SAME_AS,
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+    }
+
+
+def article_node(page, base_url, version, description, published, modified) -> dict:
+    """One page, as a technical article about the package."""
+    node = {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": page["name"],
+        "description": description,
+        "url": canonical(base_url, page['slug']),
+        "inLanguage": "en",
+        "author": AUTHOR,
+        "isPartOf": {"@type": "WebSite", "name": "pretium documentation",
+                     "url": f"{base_url}/"},
+        "about": software_node(version),
+    }
+    if published:
+        node["datePublished"] = published
+    if modified:
+        node["dateModified"] = modified
+    return node
+
+
+def breadcrumb_node(page, base_url) -> dict | None:
+    """Where the page sits, which is also what the masthead says.
+
+    Answer engines use this to say "in Trust it" rather than guessing from
+    the URL, which carries no hierarchy here — every page is one level down.
+    """
+    if not page.get("door"):
+        return None
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "pretium",
+             "item": f"{base_url}/index.html"},
+            {"@type": "ListItem", "position": 2, "name": page["door"]},
+            {"@type": "ListItem", "position": 3, "name": page["name"],
+             "item": f"{base_url}/{page['slug']}.html"},
+        ],
+    }
+
+
+def website_node(base_url: str) -> dict:
+    """The site, with its search. Only on the front door."""
+    return {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "pretium documentation",
+        "url": f"{base_url}/",
+        "inLanguage": "en",
+        "publisher": AUTHOR,
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": {"@type": "EntryPoint",
+                       "urlTemplate": f"{base_url}/index.html?q={{search_term_string}}"},
+            "query-input": "required name=search_term_string",
+        },
+    }
+
+
+def dataset_node(envelope: dict, base_url: str) -> dict:
+    """The realism envelope as a citable dataset.
+
+    It is the project's central claim and it is already published as JSON,
+    so it should be findable as data rather than only as prose. Each of the
+    fourteen statistics becomes a measured variable with the band it was
+    scored against, which is the part a reader — or a model answering a
+    question about it — actually needs.
+    """
+    measured = []
+    for key, stat in envelope["statistics"].items():
+        measured.append({
+            "@type": "PropertyValue",
+            "name": key,
+            "value": stat["measured"],
+            "minValue": stat["band"][0],
+            "maxValue": stat["band"][1],
+            "description": ("measured on the shipped preset; the range is the "
+                            "band real equities hold"),
+        })
+    return {
+        "@context": "https://schema.org",
+        "@type": "Dataset",
+        "name": "pretium realism envelope",
+        "alternateName": f"pretium {envelope['preset']} realism measurement",
+        "description": (
+            f"The {len(measured)} statistics pretium's default preset "
+            f"{envelope['preset']} is measured on, each with the real-market "
+            f"band it was scored against, a certified horizon of "
+            f"{envelope['certified_horizon_days']} trading days, and the named "
+            f"gaps stating what the simulator must not be used for."
+        ),
+        "url": f"{base_url}/realism-envelope.html",
+        "identifier": f"{base_url}/envelope.json",
+        "license": "https://opensource.org/licenses/MIT",
+        "isAccessibleForFree": True,
+        "creator": AUTHOR,
+        "isBasedOn": REPO_URL,
+        "measurementTechnique": (
+            "Thirty-seed median of each statistic over a 252-day run on the "
+            "certified roster, scored against bands derived from published "
+            "real-market measurements."
+        ),
+        "variableMeasured": measured,
+        "distribution": [{"@type": "DataDownload",
+                          "encodingFormat": "application/json",
+                          "contentUrl": f"{base_url}/envelope.json"}],
+    }
+
+
+def glossary_node(terms, base_url: str) -> dict | None:
+    """The glossary as a set of defined terms.
+
+    Forty-odd definitions in a filterable grid of cards are invisible as
+    data. As a DefinedTermSet each one can be quoted with its source, which
+    is the difference between a model paraphrasing a definition and citing
+    it.
+
+    The terms come from the page's own component rather than from its
+    rendered markup, so the structured data and the page cannot disagree.
+    """
+    if not terms:
+        return None
+    defined = []
+    for entry in terms:
+        name = (entry.get("term") or "").strip()
+        body = (entry.get("body") or "").strip()
+        if not name or len(body) < 12:
+            continue
+        item = {"@type": "DefinedTerm", "name": name, "description": body,
+                "inDefinedTermSet": f"{base_url}/glossary.html"}
+        if entry.get("group"):
+            item["termCode"] = entry["group"]
+        defined.append(item)
+    if len(defined) < 5:
+        return None
+    return {
+        "@context": "https://schema.org",
+        "@type": "DefinedTermSet",
+        "name": "pretium glossary",
+        "description": (
+            f"{len(defined)} terms used across the pretium documentation, "
+            "each defined in the sense the library uses it."
+        ),
+        "url": f"{base_url}/glossary.html",
+        "inLanguage": "en",
+        "hasDefinedTerm": defined,
+    }
+
+
+def ld_script(node) -> str:
+    blob = json.dumps(node, separators=(",", ":"), ensure_ascii=False)
+    # A closing tag inside JSON would end the script element early.
+    blob = blob.replace("</", "<\\/")
+    return f'<script type="application/ld+json">{blob}</script>'
+
+
+def first_commit(path: pathlib.Path, root: pathlib.Path) -> str:
+    """When this page's source first appeared."""
+    try:
+        out = subprocess.run(
+            ["git", "log", "--diff-filter=A", "--format=%cs", "--", str(path)],
+            cwd=root, capture_output=True, text=True, timeout=10,
+        )
+        stamps = [line for line in out.stdout.split() if re.fullmatch(r"\d{4}-\d{2}-\d{2}", line)]
+        if stamps:
+            return stamps[-1]
+    except Exception:
+        pass
+    return ""
 
 
 def last_changed(path: pathlib.Path, root: pathlib.Path) -> str:
@@ -50,10 +253,15 @@ def last_changed(path: pathlib.Path, root: pathlib.Path) -> str:
     return datetime.date.today().isoformat()
 
 
+def canonical(base_url: str, slug: str) -> str:
+    """The front door is the directory, not the file. See build.py."""
+    return f"{base_url}/" if slug == "index" else f"{base_url}/{slug}.html"
+
+
 def sitemap(pages, base_url: str, dates: dict[str, str]) -> str:
     entries = []
     for page in pages:
-        loc = f"{base_url}/{page['slug']}.html"
+        loc = canonical(base_url, page['slug'])
         priority = "1.0" if page["slug"] == "index" else "0.8"
         entries.append(
             f"<url><loc>{html.escape(loc)}</loc>"
@@ -72,7 +280,7 @@ def llms(pages, doors, base_url: str, version: str, summaries: dict[str, str]) -
     choosing one page to read should be choosing from a shelf, not a list.
     """
     lines = [
-        "# pretium — learn",
+        "# pretium",
         "",
         "> A deterministic market simulator with a real limit order book. Give it a",
         "> seed and a roster of companies and it runs prices, a limit order book,",
@@ -90,7 +298,7 @@ def llms(pages, doors, base_url: str, version: str, summaries: dict[str, str]) -
     ]
     front = next(p for p in pages if p["slug"] == "index")
     lines += ["## Start", "",
-              f"- [{front['name']}]({base_url}/index.html): "
+              f"- [{front['name']}]({base_url}/): "
               f"{summaries.get('index', '')}", ""]
     for name, _short, _slug, entries in doors:
         lines.append(f"## {name}")
@@ -156,7 +364,7 @@ def page_text(page_html: str) -> str:
 def llms_full(pages, base_url: str, version: str, rendered: dict[str, str],
               summaries: dict[str, str]) -> str:
     out = [
-        "# pretium — learn",
+        "# pretium",
         "",
         "> A deterministic market simulator with a real limit order book.",
         f"> Version {version}. Every page of the learning path, in reading order.",
@@ -166,7 +374,7 @@ def llms_full(pages, base_url: str, version: str, rendered: dict[str, str],
         out.append("")
         out.append("=" * 70)
         out.append(f"# {page['name']}")
-        out.append(f"{base_url}/{page['slug']}.html")
+        out.append(canonical(base_url, page['slug']))
         if summaries.get(page["slug"]):
             out.append("")
             out.append(summaries[page["slug"]])

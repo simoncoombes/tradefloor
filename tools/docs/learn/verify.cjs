@@ -20,6 +20,7 @@
 'use strict';
 
 const { spawn } = require('child_process');
+const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -28,6 +29,41 @@ const CHROME = process.env.CHROME ||
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
 const outDir = path.resolve(process.argv[2] || 'docs');
+
+// ------------------------------------------------------------ a local server
+
+/* Serve the built site over http rather than opening it as a file.
+ *
+ * `file://` is not the protocol the site is published on and it differs in
+ * ways that produce both false failures and false passes: a web manifest is
+ * refused as a cross-origin request, a link one directory up resolves
+ * outside the site, and an absolute path means something else entirely.
+ * A few lines of static server is the difference between checking the site
+ * and checking a rehearsal of it.
+ */
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8', '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml',
+};
+
+function serve(root) {
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => {
+      let name = decodeURIComponent(req.url.split('?')[0]);
+      if (name.endsWith('/')) name += 'index.html';
+      const file = path.join(root, path.normalize(name).replace(/^(\.\.[/\\])+/, ''));
+      fs.readFile(file, (err, body) => {
+        if (err) { res.writeHead(404); res.end('not found'); return; }
+        res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream' });
+        res.end(body);
+      });
+    });
+    server.listen(0, '127.0.0.1', () => resolve(server));
+  });
+}
 
 // --------------------------------------------------------------- the browser
 
@@ -59,6 +95,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * page cannot leave state behind for the next one to trip over. */
 async function visit(port, fileUrl, opts) {
   opts = opts || {};
+  const origin = new URL(fileUrl).origin;
   const created = await fetch(
     `http://127.0.0.1:${port}/json/new?${encodeURIComponent('about:blank')}`,
     { method: 'PUT' }
@@ -66,6 +103,7 @@ async function visit(port, fileUrl, opts) {
 
   const ws = new WebSocket(created.webSocketDebuggerUrl);
   const problems = [];
+  const requested = new Map();
   let id = 0;
   const pending = new Map();
 
@@ -93,9 +131,21 @@ async function visit(port, fileUrl, opts) {
       problems.push(`exception: ${d.exception ? d.exception.description : d.text}`);
     } else if (m.method === 'Log.entryAdded') {
       const e = m.params.entry;
-      if (e.level === 'error') problems.push(`console: ${e.text}${e.url ? ' (' + e.url + ')' : ''}`);
+      const offsite = e.text && /googletagmanager|google-analytics|fonts\.g/.test(e.text);
+      if (e.level === 'error' && !offsite) {
+        problems.push(`console: ${e.text}${e.url ? ' (' + e.url + ')' : ''}`);
+      }
+    } else if (m.method === 'Network.requestWillBeSent') {
+      requested.set(m.params.requestId, m.params.request.url);
     } else if (m.method === 'Network.loadingFailed') {
-      problems.push(`request failed: ${m.params.errorText}`);
+      /* Only the site's own files. The analytics tag is fetched from
+       * googletagmanager.com and there is no network here, so it fails on
+       * every page — reporting that would train whoever runs this to ignore
+       * the output, which is the one thing a check must not do. */
+      const url = requested.get(m.params.requestId) || '';
+      if (url.startsWith(origin)) {
+        problems.push(`request failed: ${m.params.errorText} (${url.slice(origin.length)})`);
+      }
     }
   });
 
@@ -347,6 +397,8 @@ const WIDTHS = [360, 414, 620, 900];
   const pages = fs.readdirSync(outDir).filter((f) => f.endsWith('.html')).sort();
   if (!pages.length) { console.error(`no pages in ${outDir}`); process.exit(1); }
 
+  const server = await serve(outDir);
+  const origin = `http://127.0.0.1:${server.address().port}`;
   const { proc, profile, port } = await launch();
   let failures = 0;
   let redirects = 0;
@@ -385,7 +437,7 @@ const WIDTHS = [360, 414, 620, 900];
         continue;
       }
 
-      const res = await visit(port, 'file://' + full);
+      const res = await visit(port, `${origin}/${file}`);
       const findings = [...res.problems, ...((res.probe && res.probe.findings) || [])];
 
       if (res.error) findings.push('probe failed: ' + res.error.text);
@@ -399,7 +451,7 @@ const WIDTHS = [360, 414, 620, 900];
         }
       }
 
-      const plain = await visit(port, 'file://' + full, { noScript: true });
+      const plain = await visit(port, `${origin}/${file}`, { noScript: true });
       const before = plain.probe ? plain.probe.rootHTML : null;
       let notes = [];
       if (before !== null && res.probe) {
@@ -410,7 +462,7 @@ const WIDTHS = [360, 414, 620, 900];
 
       if (responsive) {
         for (const w of WIDTHS) {
-          const r = await visit(port, 'file://' + full, { width: w });
+          const r = await visit(port, `${origin}/${file}`, { width: w });
           const o = r.probe && r.probe.over;
           if (o && o.length) {
             findings.push(`overflows at ${w}px (page is ${r.probe.scrollWidth}px wide):`);
@@ -433,6 +485,7 @@ const WIDTHS = [360, 414, 620, 900];
       }
     }
   } finally {
+    server.close();
     proc.kill();
     // Chrome unlinks its lock files on the way out; give it a moment before
     // taking the directory out from under it.

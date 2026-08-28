@@ -1,4 +1,4 @@
-# pretium — learn
+# pretium
 
 > A deterministic market simulator with a real limit order book. Give it a
 > seed and a roster of companies and it runs prices, a limit order book,
@@ -15,7 +15,7 @@ every preset is frozen and named, and the numbers change between them.
 
 ## Start
 
-- [Learn pretium](https://simoncoombes.github.io/pretium/index.html): A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.
+- [Learn pretium](https://simoncoombes.github.io/pretium/): A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.
 
 ## Start here
 

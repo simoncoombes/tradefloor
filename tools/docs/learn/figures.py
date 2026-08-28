@@ -219,12 +219,18 @@ def kind_of(sentence: str) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--site", default=str(ROOT / "docs2" / "v2"))
+    ap.add_argument("--site", default=str(ROOT / "docs"))
     ap.add_argument("--out", default=str(HERE / "figures-todo.json"))
     args = ap.parse_args()
 
     site = pathlib.Path(args.site)
-    pages = {p.stem: p.read_text(encoding="utf-8") for p in sorted(site.glob("*.html"))}
+    # Redirect stubs carry no prose and would inflate the page count.
+    pages = {}
+    for path in sorted(site.glob("*.html")):
+        text = path.read_text(encoding="utf-8")
+        if '<meta http-equiv="refresh"' in text:
+            continue
+        pages[path.stem] = text
     if not pages:
         sys.exit(f"no pages in {site}")
 

@@ -1,4 +1,4 @@
-# pretium — learn
+# pretium
 
 > A deterministic market simulator with a real limit order book.
 > Version 0.3.0. Every page of the learning path, in reading order.
@@ -6,7 +6,7 @@
 
 ======================================================================
 # Learn pretium
-https://simoncoombes.github.io/pretium/index.html
+https://simoncoombes.github.io/pretium/
 
 A market simulator you can run a strategy against. Beginner to expert in one page, with real charts from the repository's own reference data.
 ======================================================================

@@ -176,7 +176,8 @@ RETIRED = {"atlas", "internals", "interrogate", "wasm"}
 #: Written by `tools/docs/learn/make_icons.py` from the design's own mark.
 #: The build checks they are present rather than generating them, because
 #: tracing the mark needs a browser and a build should not need one.
-ICONS = ["favicon.svg", "favicon.ico", "apple-touch-icon.png", "icon-512.png"]
+ICONS = ["favicon.svg", "favicon.ico", "apple-touch-icon.png",
+         "icon-512.png", "og-card.png", "site.webmanifest"]
 
 ASSETS = [
     "mark-pretium.png", "mark-pretium-dark.png",
@@ -499,20 +500,36 @@ PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
 <meta name="description" content="{description}">
-<link rel="canonical" href="{base}/{slug}.html">
+<link rel="canonical" href="{canonical}">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="pretium">
 <meta property="og:title" content="{title}">
 <meta property="og:description" content="{description}">
-<meta property="og:url" content="{base}/{slug}.html">
-<meta name="twitter:card" content="summary">
+<meta property="og:url" content="{canonical}">
+<meta property="og:image" content="{base}/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="pretium — a market you can run a strategy against">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{base}/og-card.png">
+<meta name="author" content="Simon Coombes">
+<meta name="theme-color" content="#FAFBFA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1312" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<!-- The measurements every claim on this site rests on, as data. -->
+<link rel="alternate" type="application/json" href="envelope.json"
+      title="the realism envelope">
+<!-- The same pages as plain text, for a reader that is a model. -->
+<link rel="alternate" type="text/plain" href="llms.txt" title="summary for language models">
+<link rel="alternate" type="text/plain" href="llms-full.txt" title="full text for language models">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="{fonts}">
 <link rel="stylesheet" href="learn.css">
+{structured_data}
 {theme_script}
 {analytics}
 </head>
@@ -708,6 +725,7 @@ def build(out_dir: pathlib.Path) -> set[str]:
     overlay = shell.search_overlay()
     check_analytics_id()
     analytics = ANALYTICS.format(gid=GA_MEASUREMENT_ID) if GA_MEASUREMENT_ID else ""
+    envelope = json.loads((ROOT / "docs" / "envelope.json").read_text(encoding="utf-8"))
     version = project_version()
     all_slugs = {p["slug"] for p in all_pages}
     carrying: list[str] = []
@@ -744,10 +762,12 @@ def build(out_dir: pathlib.Path) -> set[str]:
             title=esc(r["title"]),
             description=esc(r["description"]),
             base=BASE_URL,
+            canonical=canonical_url(page["slug"]),
             slug=page["slug"],
             fonts=FONTS,
             theme_script=THEME_SCRIPT,
             analytics=analytics,
+            structured_data=structured_data(page, r, version, envelope, emitted),
             body_class="pt-front" if page["slug"] == "index" else "pt-page",
             overlay=overlay,
             masthead=shell.masthead(DOORS, page["slug"]),
@@ -775,7 +795,7 @@ def build(out_dir: pathlib.Path) -> set[str]:
     owned.update(ASSETS)
     owned.update(["learn.css", "learn-runtime.js", "learn-shell.js",
                   "pt-data.js", "pt-search.js", "sitemap.xml",
-                  "llms.txt", "llms-full.txt"])
+                  "llms.txt", "llms-full.txt", "og-card.png", "site.webmanifest"])
     if AT_SITE_ROOT:
         owned.add("robots.txt")
     if carrying:
@@ -785,6 +805,57 @@ def build(out_dir: pathlib.Path) -> set[str]:
         print(f"  styles: {len(rendered['classes'])} classes replace "
               f"{lifted} inline style attributes")
     return owned
+
+
+def canonical_url(slug: str) -> str:
+    """One address per page.
+
+    GitHub Pages serves the front door at both `/pretium/` and
+    `/pretium/index.html`. Naming the directory form as canonical is what
+    stops the two being indexed as separate pages, and it is the one people
+    actually link to.
+    """
+    return f"{BASE_URL}/" if slug == "index" else f"{BASE_URL}/{slug}.html"
+
+
+def structured_data(page, rendered_page, version, envelope, emitted) -> str:
+    """The JSON-LD for one page.
+
+    The site it replaces carried this and it would be a plain regression to
+    drop it: without a SoftwareApplication node the PyPI package, the crate,
+    the repository and these pages are four unrelated things rather than one
+    product, and "pretium" is Latin for price, which is a crowded name to
+    have no disambiguation at all.
+
+    Two pages carry more. The realism envelope is the project's central
+    claim and is already published as JSON, so it is declared a Dataset with
+    each of the fourteen statistics as a measured variable and its band as
+    the range — which is the shape a question about it actually has. The
+    glossary becomes a DefinedTermSet, which is the difference between a
+    model paraphrasing a definition and citing one.
+    """
+    blocks = [seo.article_node(
+        page, BASE_URL, version, rendered_page["description"],
+        seo.first_commit(HANDOFF / page["src"], ROOT),
+        seo.last_changed(HANDOFF / page["src"], ROOT),
+    )]
+
+    crumb = seo.breadcrumb_node(page, BASE_URL)
+    if crumb:
+        blocks.append(crumb)
+    if page["slug"] == "index":
+        blocks.append(seo.website_node(BASE_URL))
+    if page["slug"] in ("realism-envelope", "metrics"):
+        blocks.append(seo.dataset_node(envelope, BASE_URL))
+    if page["slug"] == "glossary":
+        terms = seo.glossary_node(rendered_page.get("terms"), BASE_URL)
+        if terms:
+            blocks.append(terms)
+        else:
+            sys.exit("the glossary page no longer exposes its terms — "
+                     "the DefinedTermSet would silently disappear")
+
+    return "\n".join(seo.ld_script(b) for b in blocks)
 
 
 def write_seo(out_dir, all_pages, by_slug, emitted, version) -> None:

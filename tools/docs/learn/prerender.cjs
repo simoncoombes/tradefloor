@@ -485,7 +485,13 @@ for (const { page, piece, head, wiredDoors, themed, wrapped, stripped } of prepa
     wrapStyle: stripped.wrapStyle,
     script: piece.script,
     props: piece.props,
-    doorsWired: wiredDoors.changed
+    doorsWired: wiredDoors.changed,
+    /* The glossary holds its forty-odd definitions as data on the
+     * component. Handing that over is better than reading them back out of
+     * the rendered cards: the structured data then says what the page says
+     * because it came from the same place, not because a pattern happened
+     * to match. */
+    terms: Array.isArray(inst.TERMS) ? inst.TERMS : null
   });
 }
 

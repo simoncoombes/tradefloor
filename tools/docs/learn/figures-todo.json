@@ -3,7 +3,7 @@
  "figures": [
   {
    "id": "learn.conventions.0",
-   "file": "docs/learn/conventions.html",
+   "file": "docs/conventions.html",
    "label": "0.052 means 5.2 percent.",
    "published": 0.052,
    "unit": "",
@@ -13,7 +13,7 @@
   },
   {
    "id": "learn.conventions.1",
-   "file": "docs/learn/conventions.html",
+   "file": "docs/conventions.html",
    "label": "0.052 means 5.2 percent.",
    "published": 5.2,
    "unit": "",
@@ -23,7 +23,7 @@
   },
   {
    "id": "learn.conventions.2",
-   "file": "docs/learn/conventions.html",
+   "file": "docs/conventions.html",
    "label": "Passing 5.2 raises, with an error that says so.",
    "published": 5.2,
    "unit": "",
@@ -33,7 +33,7 @@
   },
   {
    "id": "learn.conventions.3",
-   "file": "docs/learn/conventions.html",
+   "file": "docs/conventions.html",
    "label": "Log-uniform between 0.4% and 30% of shares outstanding, so the median is the geometric mean of those bounds.",
    "published": 0.4,
    "unit": "%",
@@ -43,7 +43,7 @@
   },
   {
    "id": "learn.conventions.4",
-   "file": "docs/learn/conventions.html",
+   "file": "docs/conventions.html",
    "label": "Log-uniform between 0.4% and 30% of shares outstanding, so the median is the geometric mean of those bounds.",
    "published": 30.0,
    "unit": "%",
@@ -53,7 +53,7 @@
   },
   {
    "id": "learn.core-concepts.5",
-   "file": "docs/learn/core-concepts.html",
+   "file": "docs/core-concepts.html",
    "label": "Pin vix=30.0 after day 3.",
    "published": 30.0,
    "unit": "",
@@ -63,7 +63,7 @@
   },
   {
    "id": "learn.edgar.6",
-   "file": "docs/learn/edgar.html",
+   "file": "docs/edgar.html",
    "label": "Measured on the live SEC for CY2025, the top 150 by equity came back 27% financial services and 17% technology, against roughly 13% and 30% for the S&P 500, wit",
    "published": 27.0,
    "unit": "%",
@@ -73,7 +73,7 @@
   },
   {
    "id": "learn.edgar.7",
-   "file": "docs/learn/edgar.html",
+   "file": "docs/edgar.html",
    "label": "Measured on the live SEC for CY2025, the top 150 by equity came back 27% financial services and 17% technology, against roughly 13% and 30% for the S&P 500, wit",
    "published": 17.0,
    "unit": "%",
@@ -83,7 +83,7 @@
   },
   {
    "id": "learn.edgar.8",
-   "file": "docs/learn/edgar.html",
+   "file": "docs/edgar.html",
    "label": "Measured on the live SEC for CY2025, the top 150 by equity came back 27% financial services and 17% technology, against roughly 13% and 30% for the S&P 500, wit",
    "published": 13.0,
    "unit": "%",
@@ -93,7 +93,7 @@
   },
   {
    "id": "learn.edgar.9",
-   "file": "docs/learn/edgar.html",
+   "file": "docs/edgar.html",
    "label": "Measured on the live SEC for CY2025, the top 150 by equity came back 27% financial services and 17% technology, against roughly 13% and 30% for the S&P 500, wit",
    "published": 30.0,
    "unit": "%",
@@ -103,7 +103,7 @@
   },
   {
    "id": "learn.mcp.10",
-   "file": "docs/learn/mcp.html",
+   "file": "docs/mcp.html",
    "label": "Without the caveats in the payload it will report return_pct: 88.7 as \"the strategy made 88.7%\".",
    "published": 88.7,
    "unit": "",
@@ -113,7 +113,7 @@
   },
   {
    "id": "learn.mcp.11",
-   "file": "docs/learn/mcp.html",
+   "file": "docs/mcp.html",
    "label": "Without the caveats in the payload it will report return_pct: 88.7 as \"the strategy made 88.7%\".",
    "published": 88.7,
    "unit": "%",
@@ -123,7 +123,7 @@
   },
   {
    "id": "learn.parameters.12",
-   "file": "docs/learn/parameters.html",
+   "file": "docs/parameters.html",
    "label": "87 names.",
    "published": 87.0,
    "unit": "names",
@@ -133,7 +133,7 @@
   },
   {
    "id": "learn.principles.13",
-   "file": "docs/learn/principles.html",
+   "file": "docs/principles.html",
    "label": "A statistic measured over 504 days is scored against bands re-derived at 504 days, not against the 252-day bands.",
    "published": 504.0,
    "unit": "days",
@@ -143,7 +143,7 @@
   },
   {
    "id": "learn.principles.14",
-   "file": "docs/learn/principles.html",
+   "file": "docs/principles.html",
    "label": "A statistic measured over 504 days is scored against bands re-derived at 504 days, not against the 252-day bands.",
    "published": 504.0,
    "unit": "days",
@@ -153,7 +153,7 @@
   },
   {
    "id": "learn.principles.15",
-   "file": "docs/learn/principles.html",
+   "file": "docs/principles.html",
    "label": "Lifting it to 12.0 reads -0.2656 at 252 days and -0.2572 at 504, inside both bands.",
    "published": -0.2572,
    "unit": "",
@@ -163,7 +163,7 @@
   },
   {
    "id": "learn.realism-envelope.16",
-   "file": "docs/learn/realism-envelope.html",
+   "file": "docs/realism-envelope.html",
    "label": "Annualised volatility reads 33.89 against a band that ends at 34.0, which is thin headroom.",
    "published": 33.89,
    "unit": "",
@@ -173,7 +173,7 @@
   },
   {
    "id": "learn.realism-envelope.17",
-   "file": "docs/learn/realism-envelope.html",
+   "file": "docs/realism-envelope.html",
    "label": "Annualised volatility reads 33.89 against a band that ends at 34.0, which is thin headroom.",
    "published": 34.0,
    "unit": "",
@@ -183,7 +183,7 @@
   },
   {
    "id": "learn.realism-envelope.18",
-   "file": "docs/learn/realism-envelope.html",
+   "file": "docs/realism-envelope.html",
    "label": "At 2520 days the panel holds ten of the fourteen, graded against the 504-day bands, which are the wrong ruler for a ten-year window.",
    "published": 2520.0,
    "unit": "days",
@@ -193,7 +193,7 @@
   },
   {
    "id": "learn.release-notes.19",
-   "file": "docs/learn/release-notes.html",
+   "file": "docs/release-notes.html",
    "label": "One thing got worse: driven by a real macro path, daily swings now run 1.57x as wide as the real stock they are compared against, against 1.555x before.",
    "published": 1.555,
    "unit": "x",
@@ -203,7 +203,7 @@
   },
   {
    "id": "learn.rl-environment.20",
-   "file": "docs/learn/rl-environment.html",
+   "file": "docs/rl-environment.html",
    "label": "The log-log slope over lags 1 to 20 reads -0.953 against a real -0.436.",
    "published": -0.953,
    "unit": "",
@@ -213,7 +213,7 @@
   },
   {
    "id": "learn.rl-environment.21",
-   "file": "docs/learn/rl-environment.html",
+   "file": "docs/rl-environment.html",
    "label": "The log-log slope over lags 1 to 20 reads -0.953 against a real -0.436.",
    "published": -0.436,
    "unit": "",
@@ -223,7 +223,7 @@
   },
   {
    "id": "learn.running-a-market.22",
-   "file": "docs/learn/running-a-market.html",
+   "file": "docs/running-a-market.html",
    "label": "On Universe.random(20, seed=11) at sim seed 42, AAA closes day 5 at 143.03 in roster order and 134.88 reversed.",
    "published": 143.03,
    "unit": "",
@@ -233,7 +233,7 @@
   },
   {
    "id": "learn.running-a-market.23",
-   "file": "docs/learn/running-a-market.html",
+   "file": "docs/running-a-market.html",
    "label": "On Universe.random(20, seed=11) at sim seed 42, AAA closes day 5 at 143.03 in roster order and 134.88 reversed.",
    "published": 134.88,
    "unit": "",
@@ -243,7 +243,7 @@
   },
   {
    "id": "learn.scenarios.24",
-   "file": "docs/learn/scenarios.html",
+   "file": "docs/scenarios.html",
    "label": "The Fed's intermeeting cut of 3 March 2020 goes the wrong way, +9.9% against a real -1.4%, because an announcement channel is absent.",
    "published": 9.9,
    "unit": "%",
@@ -253,7 +253,7 @@
   },
   {
    "id": "learn.scenarios.25",
-   "file": "docs/learn/scenarios.html",
+   "file": "docs/scenarios.html",
    "label": "The Fed's intermeeting cut of 3 March 2020 goes the wrong way, +9.9% against a real -1.4%, because an announcement channel is absent.",
    "published": -1.4,
    "unit": "%",
