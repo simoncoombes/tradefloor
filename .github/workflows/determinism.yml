@@ -44,6 +44,13 @@ on:
         type: choice
         default: unverified
         options: [unverified, all]
+  # A pull request into a protected branch, because `all targets agree` is a
+  # REQUIRED check there and a required check that cannot run blocks the merge
+  # forever. No path filter: the required context has to report on every pull
+  # request, including a documentation-only one, or that pull request is
+  # unmergeable for a reason the UI states as "expected".
+  pull_request:
+    branches: [main, dev]
   push:
     tags: ["v*"]
     # main as well, now the repository is public and standard runners cost
@@ -87,7 +94,8 @@ jobs:
           # repository, so this is a latency choice, not a money one: ask for
           # `all` and you get it in about three and a half minutes.
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event_name }}" = "push" ] \
+             || [ "${{ github.event_name }}" = "pull_request" ]; then
             MODE=all
           else
             MODE="${{ github.event.inputs.targets || 'unverified' }}"
