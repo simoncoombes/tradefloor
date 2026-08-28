@@ -10,7 +10,7 @@ once. Here you run the same question on many markets, force events through
 them, and fork one state into several futures.
 
 The reason to be careful with it is published rather than implied. The default
-preset pt-v12 is measured on 14 statistics against real markets, certified to
+preset pt-v14 is measured on 14 statistics against real markets, certified to
 a horizon of 252 trading days, and it names 5 gaps, each ending in a plain
 rule about what the simulator must not be used for. Those measurements are at
 https://simoncoombes.github.io/pretium/envelope.json and described at
