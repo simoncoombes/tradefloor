@@ -217,15 +217,18 @@ summary::marker{color:var(--accent-line)}
 
 <section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:0.9rem">
 <h2 style="font-size:1.5rem">Presets and the era boundary</h2>
-<p style="color:var(--ink-2);margin:0">Twelve presets ship, <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">pt-v1</span> through <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">pt-v14</span>. You can select all of them, and all of them reproduce bit for bit.</p>
-<div style="display:flex;gap:3px;align-items:flex-end;padding:0.3rem 0 0">
-<sc-for list="{{ presets }}" as="p" hint-placeholder-count="12">
-<div style="flex:1;display:flex;flex-direction:column;gap:4px;align-items:center">
-<span style="width:100%;height:{{ p.h }};border-radius:3px 3px 0 0;background:{{ p.col }}"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:{{ p.label }}">{{ p.n }}</span>
+<p style="color:var(--ink-2);margin:0">Fourteen presets ship, <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">pt-v1</span> through <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:4px;padding:0.5px 5px;color:var(--accent-deep)">pt-v14</span>. You can select all of them, and all of them reproduce bit for bit.</p>
+<div style="display:flex;gap:0.5rem;align-items:flex-end;padding:0.3rem 0 0">
+<sc-for list="{{ eras }}" as="e" hint-placeholder-count="4">
+<div style="flex:1;display:flex;flex-direction:column;gap:5px;align-items:center">
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:{{ e.label }}">{{ e.score }}</span>
+<span style="width:100%;height:{{ e.h }};border-radius:3px 3px 0 0;background:{{ e.col }}"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:{{ e.label }}">{{ e.preset }}</span>
+<span style="font-size:0.625rem;color:var(--ink-3)">{{ e.rel }}</span>
 </div>
 </sc-for>
 </div>
+<p style="font-size:0.75rem;color:var(--ink-3);margin:0">Statistics in band over two years, thirty seeds, for whichever preset was the default at that release. Each step between bars is an era boundary.</p>
 <p style="color:var(--ink-2);margin:0.4rem 0 0">pt-v14 became the default on 2026-08-28. That date is an era boundary, because every trajectory from the default changed. You can not compare a run from before that date to a run from after it, unless each run names its preset.</p>
 
 <details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
@@ -488,13 +491,26 @@ class Component extends DCLogic {
           body: 'A RunManifest names the run: package version, preset, seed, universe fingerprint, macro conditions, scenario and strategy.' }
       ],
       wheels: ['linux-x86_64', 'linux-aarch64', 'macos-arm64', 'macos-x86_64', 'windows-x86_64'],
-      presets: Array.from({ length: 12 }, (_, i) => {
-        const n = i + 1;
-        const current = n === 12;
-        return { n: 'v' + n, h: (12 + i * 3) + 'px',
-          col: current ? 'var(--accent)' : 'var(--band)',
-          label: current ? 'var(--accent)' : 'var(--ink-3)' };
-      })
+      // The default preset at each release, and how much of the fourteen
+      // statistic panel it held over 504 days on thirty seeds. Measured,
+      // not decorative: this replaced a bar whose height was `12 + i * 3`,
+      // an index ramp that implied every preset improved on the one before
+      // it. That is not true -- pt-v8 is still recommended by name for
+      // correlation work, pt-v11 and pt-v13 were never defaults -- and the
+      // real series says something more useful, which is that the two-year
+      // panel saturated at pt-v12 and stopped being the measure that
+      // separates a new default from the old one.
+      eras: [
+        { rel: '0.1.x', preset: 'pt-v3',  n:  7 },
+        { rel: '0.2.0', preset: 'pt-v10', n: 13 },
+        { rel: '0.3.0', preset: 'pt-v12', n: 14 },
+        { rel: '0.4.0', preset: 'pt-v14', n: 14, current: true }
+      ].map(e => ({
+        rel: e.rel, preset: e.preset, score: e.n + '/14',
+        h: Math.round(14 + (e.n / 14) * 40) + 'px',
+        col: e.current ? 'var(--accent)' : 'var(--band)',
+        label: e.current ? 'var(--accent)' : 'var(--ink-2)'
+      }))
     });
   }
 }

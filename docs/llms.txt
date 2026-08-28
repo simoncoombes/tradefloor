@@ -60,7 +60,7 @@ every preset is frozen and named, and the numbers change between them.
 - [The nine factors](https://simoncoombes.github.io/pretium/factors.html): Every tick's change in mispricing decomposes into nine named components that sum to the move.
 - [Conventions](https://simoncoombes.github.io/pretium/conventions.html): Eight rules about units and inputs, worth reading before you hit them.
 - [Schemas](https://simoncoombes.github.io/pretium/schemas.html): Every column of the five Arrow tables, the constructor fields, and where each call refuses rather than guesses.
-- [Presets](https://simoncoombes.github.io/pretium/presets.html): Twelve named coefficient sets. Which one to use, what each one measured, and what a preset does not pin.
+- [Presets](https://simoncoombes.github.io/pretium/presets.html): Fourteen named coefficient sets. Which one to use, what each one measured, and what a preset does not pin.
 - [Release notes](https://simoncoombes.github.io/pretium/release-notes.html): What changed, what it means for a run you already have, and how to pin an old preset if you need the old behaviour.
 
 ## API

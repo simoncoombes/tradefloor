@@ -51,7 +51,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div id="pt-root"><main class="pt-s17">
 
 <div class="pt-s20">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">AGENTS</span>
+<a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">AGENTS</span>
 </div>
 
 <section class="pt-s33">
@@ -92,7 +92,7 @@ scores = pt.evaluate(
 
 scores["mine"].return_pct
 scores["mine"].impact_bps</pre>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">Three rules of the harness</h3>
 
 <div class="pt-s2">
@@ -116,7 +116,7 @@ scores["mine"].impact_bps</pre>
 
 <section id="see" class="pt-s34">
 <h2 class="pt-s7">The observation is narrow on purpose</h2>
-<p class="pt-s11">Everything in it is information available to a trader inside the simulated market. Nothing in it is something only the simulator knows.</p>
+<p class="pt-s8">Everything in it is information available to a trader inside the simulated market. Nothing in it is something only the simulator knows.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
 <h3 class="pt-s66">The agent sees</h3>
@@ -134,7 +134,7 @@ scores["mine"].impact_bps</pre>
 
 </div>
 </div>
-<div class="pt-s175">
+<div class="pt-s176">
 <h3 class="pt-s4">The agent never sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 
@@ -159,7 +159,7 @@ scores["mine"].impact_bps</pre>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red)">ONE MARKET EACH, NOT ONE SHARED BOOK</span>
 <p class="pt-s1">Ten agents in one <span class="pt-s26">evaluate</span> call get ten private engines, built from the same seed and roster. Each agent pays its own impact and sees nobody else's orders. That is what makes the comparison clean. It is also why there is no arena. To make agents take each other's depth, drive one engine yourself and combine their flow into each tick.</p>
 </div>
-<p class="pt-s11">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
+<p class="pt-s8">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
 
 <div class="pt-s28">
 <div style="display:flex;flex-direction:column;gap:0.8rem">
@@ -239,7 +239,7 @@ ranking.separation("mean_reversion",
 
 <section class="pt-s18">
 <h2 class="pt-s7">The shipped baselines</h2>
-<p class="pt-s11">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
+<p class="pt-s8">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
 <div class="pt-s12">
 
 <div class="pt-s103">
@@ -274,13 +274,13 @@ ranking.separation("mean_reversion",
 <h2 style="font-size:1.25rem">Read this before you conclude</h2>
 <details class="pt-s13">
 <summary class="pt-s27">Momentum can work here for a reason real markets do not supply</summary>
-<div class="pt-s167">
+<div class="pt-s168">
 <p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v14 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0114, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
 </div>
 </details>
 <details class="pt-s13">
 <summary class="pt-s27">No counterparty adapts to you</summary>
-<div class="pt-s167">
+<div class="pt-s168">
 <p class="pt-s1">You trade against a market maker and aggregate flow. Orders arrive instantly and there is one book per name. Nothing in the market learns your pattern and front-runs it.</p>
 </div>
 </details>
@@ -306,7 +306,7 @@ ranking.separation("mean_reversion",
 <script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
 
 <div class="pt-s20">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">AGENTS</span>
+<a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">AGENTS</span>
 </div>
 
 <section class="pt-s33">
@@ -337,7 +337,7 @@ scores = pt.evaluate(
 
 scores["mine"].return_pct
 scores["mine"].impact_bps</pre>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">Three rules of the harness</h3>
 <sc-for list="{{ rules }}" as="r">
 <div class="pt-s2">
@@ -351,7 +351,7 @@ scores["mine"].impact_bps</pre>
 
 <section id="see" class="pt-s34">
 <h2 class="pt-s7">The observation is narrow on purpose</h2>
-<p class="pt-s11">Everything in it is information available to a trader inside the simulated market. Nothing in it is something only the simulator knows.</p>
+<p class="pt-s8">Everything in it is information available to a trader inside the simulated market. Nothing in it is something only the simulator knows.</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem">
 <div style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.5rem">
 <h3 class="pt-s66">The agent sees</h3>
@@ -361,7 +361,7 @@ scores["mine"].impact_bps</pre>
 </sc-for>
 </div>
 </div>
-<div class="pt-s175">
+<div class="pt-s176">
 <h3 class="pt-s4">The agent never sees</h3>
 <div style="display:flex;flex-wrap:wrap;gap:0.3rem">
 <sc-for list="{{ hidden }}" as="s">
@@ -380,7 +380,7 @@ scores["mine"].impact_bps</pre>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.625rem;letter-spacing:0.07em;color:var(--red)">ONE MARKET EACH, NOT ONE SHARED BOOK</span>
 <p class="pt-s1">Ten agents in one <span class="pt-s26">evaluate</span> call get ten private engines, built from the same seed and roster. Each agent pays its own impact and sees nobody else's orders. That is what makes the comparison clean. It is also why there is no arena. To make agents take each other's depth, drive one engine yourself and combine their flow into each tick.</p>
 </div>
-<p class="pt-s11">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
+<p class="pt-s8">Run the pair across twelve seeded markets. Then read the pooled number and the paired number against each other. Here is the measurement the docs publish.</p>
 
 <div class="pt-s28">
 <div style="display:flex;flex-direction:column;gap:0.8rem">
@@ -426,7 +426,7 @@ ranking.separation("mean_reversion",
 
 <section class="pt-s18">
 <h2 class="pt-s7">The shipped baselines</h2>
-<p class="pt-s11">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
+<p class="pt-s8">Five reference agents ship. Each one is also a <a href="index.html#build">StrategySpec</a>, so you can cite it as data.</p>
 <div class="pt-s12">
 <sc-for list="{{ baselines }}" as="b">
 <div class="pt-s103">
@@ -441,13 +441,13 @@ ranking.separation("mean_reversion",
 <h2 style="font-size:1.25rem">Read this before you conclude</h2>
 <details class="pt-s13">
 <summary class="pt-s27">Momentum can work here for a reason real markets do not supply</summary>
-<div class="pt-s167">
+<div class="pt-s168">
 <p class="pt-s1">Returns trend, because the mispricing process has a herding term with a dial on it. pt-v14 turns that dial well down. <span style="font-family:'Spline Sans Mono',monospace;font-size:0.8125rem">momentum_theta</span> sits at 0.0186 and return autocorrelation at lag one reads +0.0114, against a real band of -0.08 to 0.06. pt-v1 ships the same knob at 0.25 and measures +0.249. The dial exists either way, and real markets have no equivalent.</p>
 </div>
 </details>
 <details class="pt-s13">
 <summary class="pt-s27">No counterparty adapts to you</summary>
-<div class="pt-s167">
+<div class="pt-s168">
 <p class="pt-s1">You trade against a market maker and aggregate flow. Orders arrive instantly and there is one book per name. Nothing in the market learns your pattern and front-runs it.</p>
 </div>
 </details>

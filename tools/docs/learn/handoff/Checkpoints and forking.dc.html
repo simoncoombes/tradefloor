@@ -71,11 +71,11 @@ hiked.pin_macro(corporate_bond_yield=0.09)
 </tbody>
 </table>
 </div>
-<p style="color:var(--ink-2);margin:0;max-width:70ch"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
+<p style="color:var(--ink-2);margin:0"><code>branch</code> copies engine state, every column plus the generator position, in constant time. <code>Checkpoint</code> replays the order log, three orders of magnitude slower, and is what you want when the fork has to outlive the process. Cite the log in a published result, since that is what someone else can re-run. Both figures are for a sixty-day, forty-instrument run; read them as an order of magnitude, since replay cost scales with the order log.</p>
 </section>
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem">
 <h2 style="font-size:1.5rem">Why it refuses instead of loading wrong</h2>
-<p style="color:var(--ink-2);margin:0;max-width:70ch">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
+<p style="color:var(--ink-2);margin:0">A <code>Checkpoint</code> records the universe fingerprint and refuses to load against a roster that changed, because restoring across two same-named universes gives right prices and wrong fair values: plausible everywhere visible, wrong in the one place that drives everything.</p>
 <details style="border:1px solid var(--line);border-radius:6px;background:var(--surface)">
 <summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--ink)">What restore_state cannot catch</summary>
 <div style="padding:0 0.9rem 0.9rem;border-top:1px solid var(--line-soft);padding-top:0.7rem">

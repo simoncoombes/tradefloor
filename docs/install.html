@@ -51,7 +51,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div id="pt-root"><main class="pt-s17">
 
 <div class="pt-s20">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">INSTALL</span>
+<a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">INSTALL</span>
 </div>
 
 <section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.3rem">
@@ -103,21 +103,21 @@ python -c "import pretium as pt; \
 
 <section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
 <h2 class="pt-s7">What a version promises</h2>
-<p class="pt-s11">The API can still move before 1.0. A published result can not. A change to a simulated trajectory arrives as a new preset with a new name. It is never an edit to a preset that ships. A run that you cited last month therefore reproduces this month.</p>
+<p class="pt-s8">The API can still move before 1.0. A published result can not. A change to a simulated trajectory arrives as a new preset with a new name. It is never an edit to a preset that ships. A run that you cited last month therefore reproduces this month.</p>
 
 <div class="pt-s68">
 
-<div class="pt-s8">
+<div class="pt-s9">
 <h3 class="pt-s4">A trajectory change is a breaking change</h3>
 <p class="pt-s1">Whatever its size. A market that runs differently from the same seed invalidates every published result that cited it.</p>
 </div>
 
-<div class="pt-s8">
+<div class="pt-s9">
 <h3 class="pt-s4">Old presets never move</h3>
 <p class="pt-s1">Every preset from pt-v1 onward stays selectable and reproduces bit for bit, so an old result replays under its own name.</p>
 </div>
 
-<div class="pt-s8">
+<div class="pt-s9">
 <h3 class="pt-s4">A citation names software, not a run</h3>
 <p class="pt-s1">A RunManifest names the run: package version, preset, seed, universe fingerprint, macro conditions, scenario and strategy.</p>
 </div>
@@ -127,34 +127,34 @@ python -c "import pretium as pt; \
 
 <section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
 <h2 class="pt-s7">The determinism check</h2>
-<p class="pt-s11">Every release builds five targets, runs one fixed simulation inside each, and compares the digests. A disagreement stops the release. This is why the crate ships its own <span class="pt-s26">exp</span>, <span class="pt-s26">log</span>, <span class="pt-s26">sin</span> and <span class="pt-s26">cos</span> The crate does not call the platform libm, because the platform libm does not agree with itself across operating systems.</p>
+<p class="pt-s8">Every release builds five targets, runs one fixed simulation inside each, and compares the digests. A disagreement stops the release. This is why the crate ships its own <span class="pt-s26">exp</span>, <span class="pt-s26">log</span>, <span class="pt-s26">sin</span> and <span class="pt-s26">cos</span> The crate does not call the platform libm, because the platform libm does not agree with itself across operating systems.</p>
 
 <div class="pt-s12">
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0">
 
-<div class="pt-s166">
+<div class="pt-s167">
 <span class="pt-s120">linux-x86_64</span>
-<span class="pt-s91"><span class="pt-s173"></span>digests match</span>
+<span class="pt-s91"><span class="pt-s174"></span>digests match</span>
 </div>
 
-<div class="pt-s166">
+<div class="pt-s167">
 <span class="pt-s120">linux-aarch64</span>
-<span class="pt-s91"><span class="pt-s173"></span>digests match</span>
+<span class="pt-s91"><span class="pt-s174"></span>digests match</span>
 </div>
 
-<div class="pt-s166">
+<div class="pt-s167">
 <span class="pt-s120">macos-arm64</span>
-<span class="pt-s91"><span class="pt-s173"></span>digests match</span>
+<span class="pt-s91"><span class="pt-s174"></span>digests match</span>
 </div>
 
-<div class="pt-s166">
+<div class="pt-s167">
 <span class="pt-s120">macos-x86_64</span>
-<span class="pt-s91"><span class="pt-s173"></span>digests match</span>
+<span class="pt-s91"><span class="pt-s174"></span>digests match</span>
 </div>
 
-<div class="pt-s166">
+<div class="pt-s167">
 <span class="pt-s120">windows-x86_64</span>
-<span class="pt-s91"><span class="pt-s173"></span>digests match</span>
+<span class="pt-s91"><span class="pt-s174"></span>digests match</span>
 </div>
 
 </div>
@@ -164,70 +164,39 @@ python -c "import pretium as pt; \
 
 <section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:0.9rem">
 <h2 class="pt-s7">Presets and the era boundary</h2>
-<p class="pt-s11">Twelve presets ship, <span class="pt-s26">pt-v1</span> through <span class="pt-s26">pt-v14</span>. You can select all of them, and all of them reproduce bit for bit.</p>
-<div style="display:flex;gap:3px;align-items:flex-end;padding:0.3rem 0 0">
+<p class="pt-s8">Fourteen presets ship, <span class="pt-s26">pt-v1</span> through <span class="pt-s26">pt-v14</span>. You can select all of them, and all of them reproduce bit for bit.</p>
+<div style="display:flex;gap:0.5rem;align-items:flex-end;padding:0.3rem 0 0">
 
 <div class="pt-s111">
-<span style="width:100%;height:12px;border-radius:3px 3px 0 0;background:var(--band)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v1</span>
-</div>
-
-<div class="pt-s111">
-<span style="width:100%;height:15px;border-radius:3px 3px 0 0;background:var(--band)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v2</span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:var(--ink-2)">7/14</span>
+<span style="width:100%;height:34px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-2)">pt-v3</span>
+<span class="pt-s149">0.1.x</span>
 </div>
 
 <div class="pt-s111">
-<span style="width:100%;height:18px;border-radius:3px 3px 0 0;background:var(--band)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v3</span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:var(--ink-2)">13/14</span>
+<span style="width:100%;height:51px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-2)">pt-v10</span>
+<span class="pt-s149">0.2.0</span>
 </div>
 
 <div class="pt-s111">
-<span style="width:100%;height:21px;border-radius:3px 3px 0 0;background:var(--band)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v4</span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:var(--ink-2)">14/14</span>
+<span style="width:100%;height:54px;border-radius:3px 3px 0 0;background:var(--band)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-2)">pt-v12</span>
+<span class="pt-s149">0.3.0</span>
 </div>
 
 <div class="pt-s111">
-<span style="width:100%;height:24px;border-radius:3px 3px 0 0;background:var(--band)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v5</span>
-</div>
-
-<div class="pt-s111">
-<span style="width:100%;height:27px;border-radius:3px 3px 0 0;background:var(--band)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v6</span>
-</div>
-
-<div class="pt-s111">
-<span style="width:100%;height:30px;border-radius:3px 3px 0 0;background:var(--band)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v7</span>
-</div>
-
-<div class="pt-s111">
-<span style="width:100%;height:33px;border-radius:3px 3px 0 0;background:var(--band)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v8</span>
-</div>
-
-<div class="pt-s111">
-<span style="width:100%;height:36px;border-radius:3px 3px 0 0;background:var(--band)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v9</span>
-</div>
-
-<div class="pt-s111">
-<span style="width:100%;height:39px;border-radius:3px 3px 0 0;background:var(--band)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v10</span>
-</div>
-
-<div class="pt-s111">
-<span style="width:100%;height:42px;border-radius:3px 3px 0 0;background:var(--band)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--ink-3)">v11</span>
-</div>
-
-<div class="pt-s111">
-<span style="width:100%;height:45px;border-radius:3px 3px 0 0;background:var(--accent)"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:var(--accent)">v12</span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:var(--accent)">14/14</span>
+<span style="width:100%;height:54px;border-radius:3px 3px 0 0;background:var(--accent)"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--accent)">pt-v14</span>
+<span class="pt-s149">0.4.0</span>
 </div>
 
 </div>
+<p style="font-size:0.75rem;color:var(--ink-3);margin:0">Statistics in band over two years, thirty seeds, for whichever preset was the default at that release. Each step between bars is an era boundary.</p>
 <p style="color:var(--ink-2);margin:0.4rem 0 0">pt-v14 became the default on 2026-08-28. That date is an era boundary, because every trajectory from the default changed. You can not compare a run from before that date to a run from after it, unless each run names its preset.</p>
 
 <details class="pt-s13">
@@ -258,7 +227,7 @@ python -c "import pretium as pt; \
 <script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
 
 <div class="pt-s20">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">INSTALL</span>
+<a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">INSTALL</span>
 </div>
 
 <section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.3rem">
@@ -289,11 +258,11 @@ python -c "import pretium as pt; \
 
 <section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
 <h2 class="pt-s7">What a version promises</h2>
-<p class="pt-s11">The API can still move before 1.0. A published result can not. A change to a simulated trajectory arrives as a new preset with a new name. It is never an edit to a preset that ships. A run that you cited last month therefore reproduces this month.</p>
+<p class="pt-s8">The API can still move before 1.0. A published result can not. A change to a simulated trajectory arrives as a new preset with a new name. It is never an edit to a preset that ships. A run that you cited last month therefore reproduces this month.</p>
 
 <div class="pt-s68">
 <sc-for list="{{ promises }}" as="p">
-<div class="pt-s8">
+<div class="pt-s9">
 <h3 class="pt-s4">{{ p.head }}</h3>
 <p class="pt-s1">{{ p.body }}</p>
 </div>
@@ -303,14 +272,14 @@ python -c "import pretium as pt; \
 
 <section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1.1rem">
 <h2 class="pt-s7">The determinism check</h2>
-<p class="pt-s11">Every release builds five targets, runs one fixed simulation inside each, and compares the digests. A disagreement stops the release. This is why the crate ships its own <span class="pt-s26">exp</span>, <span class="pt-s26">log</span>, <span class="pt-s26">sin</span> and <span class="pt-s26">cos</span> The crate does not call the platform libm, because the platform libm does not agree with itself across operating systems.</p>
+<p class="pt-s8">Every release builds five targets, runs one fixed simulation inside each, and compares the digests. A disagreement stops the release. This is why the crate ships its own <span class="pt-s26">exp</span>, <span class="pt-s26">log</span>, <span class="pt-s26">sin</span> and <span class="pt-s26">cos</span> The crate does not call the platform libm, because the platform libm does not agree with itself across operating systems.</p>
 
 <div class="pt-s12">
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:0">
 <sc-for list="{{ wheels }}" as="w">
-<div class="pt-s166">
+<div class="pt-s167">
 <span class="pt-s120">{{ w }}</span>
-<span class="pt-s91"><span class="pt-s173"></span>digests match</span>
+<span class="pt-s91"><span class="pt-s174"></span>digests match</span>
 </div>
 </sc-for>
 </div>
@@ -320,15 +289,18 @@ python -c "import pretium as pt; \
 
 <section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:0.9rem">
 <h2 class="pt-s7">Presets and the era boundary</h2>
-<p class="pt-s11">Twelve presets ship, <span class="pt-s26">pt-v1</span> through <span class="pt-s26">pt-v14</span>. You can select all of them, and all of them reproduce bit for bit.</p>
-<div style="display:flex;gap:3px;align-items:flex-end;padding:0.3rem 0 0">
-<sc-for list="{{ presets }}" as="p">
+<p class="pt-s8">Fourteen presets ship, <span class="pt-s26">pt-v1</span> through <span class="pt-s26">pt-v14</span>. You can select all of them, and all of them reproduce bit for bit.</p>
+<div style="display:flex;gap:0.5rem;align-items:flex-end;padding:0.3rem 0 0">
+<sc-for list="{{ eras }}" as="e">
 <div class="pt-s111">
-<span style="width:100%;height:{{ p.h }};border-radius:3px 3px 0 0;background:{{ p.col }}"></span>
-<span style="font-family:'Spline Sans Mono',monospace;font-size:0.5625rem;color:{{ p.label }}">{{ p.n }}</span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;color:{{ e.label }}">{{ e.score }}</span>
+<span style="width:100%;height:{{ e.h }};border-radius:3px 3px 0 0;background:{{ e.col }}"></span>
+<span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:{{ e.label }}">{{ e.preset }}</span>
+<span class="pt-s149">{{ e.rel }}</span>
 </div>
 </sc-for>
 </div>
+<p style="font-size:0.75rem;color:var(--ink-3);margin:0">Statistics in band over two years, thirty seeds, for whichever preset was the default at that release. Each step between bars is an era boundary.</p>
 <p style="color:var(--ink-2);margin:0.4rem 0 0">pt-v14 became the default on 2026-08-28. That date is an era boundary, because every trajectory from the default changed. You can not compare a run from before that date to a run from after it, unless each run names its preset.</p>
 
 <details class="pt-s13">
@@ -538,13 +510,26 @@ class Component extends DCLogic {
           body: 'A RunManifest names the run: package version, preset, seed, universe fingerprint, macro conditions, scenario and strategy.' }
       ],
       wheels: ['linux-x86_64', 'linux-aarch64', 'macos-arm64', 'macos-x86_64', 'windows-x86_64'],
-      presets: Array.from({ length: 12 }, (_, i) => {
-        const n = i + 1;
-        const current = n === 12;
-        return { n: 'v' + n, h: (12 + i * 3) + 'px',
-          col: current ? 'var(--accent)' : 'var(--band)',
-          label: current ? 'var(--accent)' : 'var(--ink-3)' };
-      })
+      // The default preset at each release, and how much of the fourteen
+      // statistic panel it held over 504 days on thirty seeds. Measured,
+      // not decorative: this replaced a bar whose height was `12 + i * 3`,
+      // an index ramp that implied every preset improved on the one before
+      // it. That is not true -- pt-v8 is still recommended by name for
+      // correlation work, pt-v11 and pt-v13 were never defaults -- and the
+      // real series says something more useful, which is that the two-year
+      // panel saturated at pt-v12 and stopped being the measure that
+      // separates a new default from the old one.
+      eras: [
+        { rel: '0.1.x', preset: 'pt-v3',  n:  7 },
+        { rel: '0.2.0', preset: 'pt-v10', n: 13 },
+        { rel: '0.3.0', preset: 'pt-v12', n: 14 },
+        { rel: '0.4.0', preset: 'pt-v14', n: 14, current: true }
+      ].map(e => ({
+        rel: e.rel, preset: e.preset, score: e.n + '/14',
+        h: Math.round(14 + (e.n / 14) * 40) + 'px',
+        col: e.current ? 'var(--accent)' : 'var(--band)',
+        label: e.current ? 'var(--accent)' : 'var(--ink-2)'
+      }))
     });
   }
 }

@@ -51,7 +51,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div id="pt-root"><main class="pt-s17">
 
 <div class="pt-s20">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">EXECUTION COST</span>
+<a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">EXECUTION COST</span>
 </div>
 
 <section class="pt-s33">
@@ -66,7 +66,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 ex.shortfall_bps()   # what it cost
 ex.by_step()         # where
 ex.partial_fills()   # asked vs got</pre>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">Two runs, one seed</h3>
 <div class="pt-s2">
 <span class="pt-s5">The run with your orders</span>
@@ -82,10 +82,10 @@ ex.partial_fills()   # asked vs got</pre>
 
 <section id="walk" class="pt-s34">
 <h2 class="pt-s7">Where the cost comes from</h2>
-<p class="pt-s11">There is no slippage formula in the code. A big order pays more because it takes the levels that rest above it. Below is one market buy for 175 shares, replayed from the engine's own reference program.</p>
+<p class="pt-s8">There is no slippage formula in the code. A big order pays more because it takes the levels that rest above it. Below is one market buy for 175 shares, replayed from the engine's own reference program.</p>
 
 <div class="pt-s28">
-<div class="pt-s175">
+<div class="pt-s176">
 <h3 class="pt-s4">The book before the order</h3>
 
 <div class="pt-s92">
@@ -136,17 +136,17 @@ ex.partial_fills()   # asked vs got</pre>
 
 <div class="pt-s101">
 <span>50 @ 101.00</span>
-<span class="pt-s9">from bob</span>
+<span class="pt-s10">from bob</span>
 </div>
 
 <div class="pt-s101">
 <span>110 @ 102.00</span>
-<span class="pt-s9">from mm</span>
+<span class="pt-s10">from mm</span>
 </div>
 
 <div class="pt-s101">
 <span>15 @ 103.00</span>
-<span class="pt-s9">from mm</span>
+<span class="pt-s10">from mm</span>
 </div>
 
 <div style="padding-top:0.5rem;border-top:1px solid var(--line-soft);display:flex;flex-direction:column;gap:2px">
@@ -159,7 +159,7 @@ ex.partial_fills()   # asked vs got</pre>
 
 <section id="counter" class="pt-s34">
 <h2 class="pt-s7">The number nobody else can measure</h2>
-<p class="pt-s11">Arrival price, VWAP and fitted impact models all stand in for a counterfactual that real data can not supply. Round-trip shortfall measured over eight simulation seeds:</p>
+<p class="pt-s8">Arrival price, VWAP and fitted impact models all stand in for a counterfactual that real data can not supply. Round-trip shortfall measured over eight simulation seeds:</p>
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.2rem 1.3rem;display:flex;flex-direction:column;gap:0.8rem">
 <div style="position:relative;height:44px">
@@ -170,7 +170,7 @@ ex.partial_fills()   # asked vs got</pre>
 </div>
 <div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--ink-2)">
 <span style="color:var(--red)">-17.72 bps</span>
-<span class="pt-s9">0</span>
+<span class="pt-s10">0</span>
 <span style="color:var(--green)">+2.03 bps</span>
 </div>
 <p class="pt-s1">The range crosses zero, so a round trip can end up ahead. This happens when the market moves your way during the order. It is the reason one run tells you nothing about your algorithm.</p>
@@ -178,7 +178,7 @@ ex.partial_fills()   # asked vs got</pre>
 
 <details class="pt-s13">
 <summary class="pt-s27">One known boundary: the fear gauge leaks</summary>
-<div class="pt-s167">
+<div class="pt-s168">
 <p class="pt-s1">VIX drives the market factor's variance, so the market prices fear of your flow. Names that you never touched can move a few basis points through that channel. That is impact, not an artefact of the measurement. If you need the subtraction to be exact, pin VIX in both worlds and the two runs match byte for byte.</p>
 </div>
 </details>
@@ -204,7 +204,7 @@ ex.partial_fills()   # asked vs got</pre>
 <script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
 
 <div class="pt-s20">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">EXECUTION COST</span>
+<a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">EXECUTION COST</span>
 </div>
 
 <section class="pt-s33">
@@ -219,7 +219,7 @@ ex.partial_fills()   # asked vs got</pre>
 ex.shortfall_bps()   # what it cost
 ex.by_step()         # where
 ex.partial_fills()   # asked vs got</pre>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">Two runs, one seed</h3>
 <div class="pt-s2">
 <span class="pt-s5">The run with your orders</span>
@@ -235,10 +235,10 @@ ex.partial_fills()   # asked vs got</pre>
 
 <section id="walk" class="pt-s34">
 <h2 class="pt-s7">Where the cost comes from</h2>
-<p class="pt-s11">There is no slippage formula in the code. A big order pays more because it takes the levels that rest above it. Below is one market buy for 175 shares, replayed from the engine's own reference program.</p>
+<p class="pt-s8">There is no slippage formula in the code. A big order pays more because it takes the levels that rest above it. Below is one market buy for 175 shares, replayed from the engine's own reference program.</p>
 
 <div class="pt-s28">
-<div class="pt-s175">
+<div class="pt-s176">
 <h3 class="pt-s4">The book before the order</h3>
 <sc-for list="{{ book }}" as="b">
 <div class="pt-s92">
@@ -254,7 +254,7 @@ ex.partial_fills()   # asked vs got</pre>
 <sc-for list="{{ fills }}" as="f">
 <div class="pt-s101">
 <span>{{ f.qty }} @ {{ f.price }}</span>
-<span class="pt-s9">from {{ f.maker }}</span>
+<span class="pt-s10">from {{ f.maker }}</span>
 </div>
 </sc-for>
 <div style="padding-top:0.5rem;border-top:1px solid var(--line-soft);display:flex;flex-direction:column;gap:2px">
@@ -267,7 +267,7 @@ ex.partial_fills()   # asked vs got</pre>
 
 <section id="counter" class="pt-s34">
 <h2 class="pt-s7">The number nobody else can measure</h2>
-<p class="pt-s11">Arrival price, VWAP and fitted impact models all stand in for a counterfactual that real data can not supply. Round-trip shortfall measured over eight simulation seeds:</p>
+<p class="pt-s8">Arrival price, VWAP and fitted impact models all stand in for a counterfactual that real data can not supply. Round-trip shortfall measured over eight simulation seeds:</p>
 
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.2rem 1.3rem;display:flex;flex-direction:column;gap:0.8rem">
 <div style="position:relative;height:44px">
@@ -278,7 +278,7 @@ ex.partial_fills()   # asked vs got</pre>
 </div>
 <div style="display:flex;justify-content:space-between;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--ink-2)">
 <span style="color:var(--red)">-17.72 bps</span>
-<span class="pt-s9">0</span>
+<span class="pt-s10">0</span>
 <span style="color:var(--green)">+2.03 bps</span>
 </div>
 <p class="pt-s1">The range crosses zero, so a round trip can end up ahead. This happens when the market moves your way during the order. It is the reason one run tells you nothing about your algorithm.</p>
@@ -286,7 +286,7 @@ ex.partial_fills()   # asked vs got</pre>
 
 <details class="pt-s13">
 <summary class="pt-s27">One known boundary: the fear gauge leaks</summary>
-<div class="pt-s167">
+<div class="pt-s168">
 <p class="pt-s1">VIX drives the market factor's variance, so the market prices fear of your flow. Names that you never touched can move a few basis points through that channel. That is impact, not an artefact of the measurement. If you need the subtraction to be exact, pin VIX in both worlds and the two runs match byte for byte.</p>
 </div>
 </details>

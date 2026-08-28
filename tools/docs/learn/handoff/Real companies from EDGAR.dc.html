@@ -51,7 +51,7 @@ universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)</pre>
 </section>
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem">
 <h2 style="font-size:1.5rem">Save the snapshot, cite that</h2>
-<p style="color:var(--ink-2);margin:0;max-width:70ch">EDGAR is not append-only: the same request returns different numbers next year. A snapshot is hashed and serialisable, so cite the file, not the query.</p>
+<p style="color:var(--ink-2);margin:0">EDGAR is not append-only: the same request returns different numbers next year. A snapshot is hashed and serialisable, so cite the file, not the query.</p>
 </section>
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem">
 <h2 style="font-size:1.5rem">Two ways to rank, two different biases</h2>
@@ -65,7 +65,7 @@ universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)</pre>
 <p style="margin:0;font-size:0.875rem;color:var(--ink-2)">Ranks by the one market-derived number EDGAR has, producing a roster that resembles a real index. Costs: stale by six to eighteen months, and understates founder-controlled companies since float excludes what insiders hold.</p>
 </div>
 </div>
-<p style="color:var(--ink-2);margin:0;max-width:70ch">Neither is a market-cap ranking, because EDGAR has no prices. For that, set <code>initial_price</code> yourself from a market data source. And this loads fundamentals, not behaviour: a loaded ticker gives you a stock with that company's fundamentals under this model's assumptions, not that company's volatility or microstructure.</p>
+<p style="color:var(--ink-2);margin:0">Neither is a market-cap ranking, because EDGAR has no prices. For that, set <code>initial_price</code> yourself from a market data source. And this loads fundamentals, not behaviour: a loaded ticker gives you a stock with that company's fundamentals under this model's assumptions, not that company's volatility or microstructure.</p>
 </section>
 <nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem">
 <a href="./Checkpoints and forking.dc.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>Checkpoints and forking</span></a>

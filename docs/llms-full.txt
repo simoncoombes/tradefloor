@@ -800,31 +800,29 @@ A person does a check of the WebAssembly build by hand, because it needs a toolc
 
 Presets and the era boundary
 
-Twelve presets ship, pt-v1 through pt-v14 . You can select all of them, and all of them reproduce bit for bit.
+Fourteen presets ship, pt-v1 through pt-v14 . You can select all of them, and all of them reproduce bit for bit.
 
-v1 
+7/14 
 
-v2 
+pt-v3 
+0.1.x 
 
-v3 
+13/14 
 
-v4 
+pt-v10 
+0.2.0 
 
-v5 
+14/14 
 
-v6 
+pt-v12 
+0.3.0 
 
-v7 
+14/14 
 
-v8 
+pt-v14 
+0.4.0 
 
-v9 
-
-v10 
-
-v11 
-
-v12 
+Statistics in band over two years, thirty seeds, for whichever preset was the default at that release. Each step between bars is an era boundary.
 
 pt-v14 became the default on 2026-08-28. That date is an era boundary, because every trajectory from the default changed. You can not compare a run from before that date to a run from after it, unless each run names its preset.
 
@@ -3365,7 +3363,7 @@ element, and that is
 # Presets
 https://simoncoombes.github.io/pretium/presets.html
 
-Twelve named coefficient sets. Which one to use, what each one measured, and what a preset does not pin.
+Fourteen named coefficient sets. Which one to use, what each one measured, and what a preset does not pin.
 ======================================================================
 
 LEARN/ PRESETS 

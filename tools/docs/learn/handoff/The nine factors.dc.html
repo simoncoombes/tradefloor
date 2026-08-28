@@ -46,7 +46,7 @@ table{border-collapse:collapse;width:100%}
 </section>
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem">
 <h2 style="font-size:1.5rem">The set, in order</h2>
-<p style="color:var(--ink-2);margin:0;max-width:70ch">The first three are the model's own dynamics, the next four are shocks, the last two are discrete events booked after the tick chain.</p>
+<p style="color:var(--ink-2);margin:0">The first three are the model's own dynamics, the next four are shocks, the last two are discrete events booked after the tick chain.</p>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);overflow:hidden">
 <table style="font-size:0.8125rem">
 <tbody>
@@ -62,7 +62,7 @@ table{border-collapse:collapse;width:100%}
 </section>
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem">
 <h2 style="font-size:1.5rem">They sum, and that is the point</h2>
-<p style="color:var(--ink-2);margin:0;max-width:70ch">Difference <code>mispricing_s</code> across two ticks, add the nine columns, and the residual sits near 1e-16. That is what makes this a dataset rather than a commentary: a label can be checked against the outcome instead of trusted.</p>
+<p style="color:var(--ink-2);margin:0">Difference <code>mispricing_s</code> across two ticks, add the nine columns, and the residual sits near 1e-16. That is what makes this a dataset rather than a commentary: a label can be checked against the outcome instead of trusted.</p>
 <pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">FACTORS = ["reversion", "momentum", "crowd_lean", "company_news",
            "order_flow_impact", "short_squeeze_effect", "random_noise",
            "circuit_breaker", "jump"]                 # Engine.FACTORS
@@ -80,7 +80,7 @@ print((delta[1:] - summed[1:]).abs().max())      # ~1e-16</pre>
 </section>
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.6rem">
 <h2 style="font-size:1.25rem">Scope</h2>
-<p style="color:var(--ink-2);margin:0;max-width:70ch">It decomposes the mispricing, the gap between price and fair value, not the price itself. Everything that moves fair value, such as a rate change repricing the discount, lives in <code>fundamental_value</code> instead. And it is per tick, deliberately: a day-level attribution can say order flow moved a price today, never when, and a label that cannot align to a bar is not a label.</p>
+<p style="color:var(--ink-2);margin:0">It decomposes the mispricing, the gap between price and fair value, not the price itself. Everything that moves fair value, such as a rate change repricing the discount, lives in <code>fundamental_value</code> instead. And it is per tick, deliberately: a day-level attribution can say order flow moved a price today, never when, and a label that cannot align to a bar is not a label.</p>
 </section>
 <nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem">
 <a href="./Internals.dc.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>Under the hood</span></a>

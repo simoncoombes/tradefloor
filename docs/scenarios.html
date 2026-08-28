@@ -51,7 +51,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div id="pt-root"><main class="pt-s17">
 
 <div class="pt-s20">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">SCENARIOS</span>
+<a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">SCENARIOS</span>
 </div>
 
 <section class="pt-s33">
@@ -69,7 +69,7 @@ pt.evaluate(agents, seed=7,
 # or move one field yourself
 engine.pin_macro(
     corporate_bond_yield=0.09)</pre>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">Two ways to move the economy</h3>
 <div class="pt-s2">
 <span class="pt-s5">A scenario</span>
@@ -85,7 +85,7 @@ engine.pin_macro(
 
 <section id="drive" class="pt-s34">
 <h2 class="pt-s7">Which field you drive decides the answer</h2>
-<p class="pt-s11">Measured on real 2022 data over six seeds, against a real S&amp;P 500 that fell 20.0%. The lever is inflation, not the policy rate.</p>
+<p class="pt-s8">Measured on real 2022 data over six seeds, against a real S&amp;P 500 that fell 20.0%. The lever is inflation, not the policy rate.</p>
 
 <div class="pt-s179">
 
@@ -94,9 +94,9 @@ engine.pin_macro(
 <span class="pt-s49">Real S&amp;P 500, 2022</span>
 <span class="pt-s22">what actually happened</span>
 </span>
-<span class="pt-s172">
+<span class="pt-s173">
 <span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--ink);width:38.5%"></span>
-<span class="pt-s168"></span>
+<span class="pt-s169"></span>
 </span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums">-20.0%</span>
 </div>
@@ -106,9 +106,9 @@ engine.pin_macro(
 <span class="pt-s49">Drive inflation_rate</span>
 <span class="pt-s22">the published CPI path</span>
 </span>
-<span class="pt-s172">
+<span class="pt-s173">
 <span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--accent);width:44.8%"></span>
-<span class="pt-s168"></span>
+<span class="pt-s169"></span>
 </span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--accent);text-align:right;font-variant-numeric:tabular-nums">-23.3%</span>
 </div>
@@ -118,9 +118,9 @@ engine.pin_macro(
 <span class="pt-s49">Drive federal_funds_rate</span>
 <span class="pt-s22">the real seven-hike path</span>
 </span>
-<span class="pt-s172">
+<span class="pt-s173">
 <span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--amber);width:25.2%"></span>
-<span class="pt-s168"></span>
+<span class="pt-s169"></span>
 </span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--amber);text-align:right;font-variant-numeric:tabular-nums">-13.1%</span>
 </div>
@@ -130,9 +130,9 @@ engine.pin_macro(
 <span class="pt-s49">No scenario at all</span>
 <span class="pt-s22">drift and nothing more</span>
 </span>
-<span class="pt-s172">
+<span class="pt-s173">
 <span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:var(--amber);width:24.2%"></span>
-<span class="pt-s168"></span>
+<span class="pt-s169"></span>
 </span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:var(--amber);text-align:right;font-variant-numeric:tabular-nums">-12.6%</span>
 </div>
@@ -145,7 +145,7 @@ engine.pin_macro(
 
 <section id="claim" class="pt-s34">
 <h2 class="pt-s7">Detect a scenario, do not size one</h2>
-<p class="pt-s11">The expected response is calibrated. The spread around it is not, and that is the whole gap.</p>
+<p class="pt-s8">The expected response is calibrated. The spread around it is not, and that is the whole gap.</p>
 
 <div class="pt-s68">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
@@ -178,14 +178,14 @@ engine.pin_macro(
 
 <details class="pt-s13">
 <summary class="pt-s27">An event study agrees on sign two times out of six</summary>
-<div class="pt-s167">
+<div class="pt-s168">
 <p class="pt-s1">Over the five sessions after each of six dated 2020-21 events, the model agrees with real Apple on direction twice. The two that agree are the two the macro path carries. The Fed's intermeeting cut of 3 March 2020 goes the wrong way, +9.9% against a real -1.4%, because an announcement channel is absent. The vaccine result and Omicron are single-name news, which a macro path can not know.</p>
 </div>
 </details>
 
 <details class="pt-s13">
 <summary class="pt-s27">The endogenous economy can not reach its own crisis regimes</summary>
-<div class="pt-s167">
+<div class="pt-s168">
 <p class="pt-s1">Left alone, inflation peaks at 4.0% on every seed over five years. Real US CPI peaked at 9.0% in June 2022. The central bank has a crisis cadence that pulls its next meeting in, and a default run can not reach it. So an inflation regime or a policy crisis must come from a scenario. A volatility crisis does not: on pt-v10 the preset's own VIX crossed its crisis threshold on 10.2% of days against a real 12.5%.</p>
 </div>
 </details>
@@ -211,7 +211,7 @@ engine.pin_macro(
 <script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
 
 <div class="pt-s20">
-<a href="index.html" class="pt-s9">LEARN</a><span>/</span><span class="pt-s10">SCENARIOS</span>
+<a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">SCENARIOS</span>
 </div>
 
 <section class="pt-s33">
@@ -229,7 +229,7 @@ pt.evaluate(agents, seed=7,
 # or move one field yourself
 engine.pin_macro(
     corporate_bond_yield=0.09)</pre>
-<div class="pt-s174">
+<div class="pt-s175">
 <h3 class="pt-s4">Two ways to move the economy</h3>
 <div class="pt-s2">
 <span class="pt-s5">A scenario</span>
@@ -245,7 +245,7 @@ engine.pin_macro(
 
 <section id="drive" class="pt-s34">
 <h2 class="pt-s7">Which field you drive decides the answer</h2>
-<p class="pt-s11">Measured on real 2022 data over six seeds, against a real S&amp;P 500 that fell 20.0%. The lever is inflation, not the policy rate.</p>
+<p class="pt-s8">Measured on real 2022 data over six seeds, against a real S&amp;P 500 that fell 20.0%. The lever is inflation, not the policy rate.</p>
 
 <div class="pt-s179">
 <sc-for list="{{ levers }}" as="l">
@@ -254,9 +254,9 @@ engine.pin_macro(
 <span class="pt-s49">{{ l.k }}</span>
 <span class="pt-s22">{{ l.note }}</span>
 </span>
-<span class="pt-s172">
+<span class="pt-s173">
 <span style="position:absolute;right:50%;height:16px;border-radius:3px 0 0 3px;background:{{ l.col }};width:{{ l.w }}"></span>
-<span class="pt-s168"></span>
+<span class="pt-s169"></span>
 </span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;color:{{ l.col }};text-align:right;font-variant-numeric:tabular-nums">{{ l.v }}</span>
 </div>
@@ -269,7 +269,7 @@ engine.pin_macro(
 
 <section id="claim" class="pt-s34">
 <h2 class="pt-s7">Detect a scenario, do not size one</h2>
-<p class="pt-s11">The expected response is calibrated. The spread around it is not, and that is the whole gap.</p>
+<p class="pt-s8">The expected response is calibrated. The spread around it is not, and that is the whole gap.</p>
 
 <div class="pt-s68">
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:0.6rem">
@@ -292,14 +292,14 @@ engine.pin_macro(
 
 <details class="pt-s13">
 <summary class="pt-s27">An event study agrees on sign two times out of six</summary>
-<div class="pt-s167">
+<div class="pt-s168">
 <p class="pt-s1">Over the five sessions after each of six dated 2020-21 events, the model agrees with real Apple on direction twice. The two that agree are the two the macro path carries. The Fed's intermeeting cut of 3 March 2020 goes the wrong way, +9.9% against a real -1.4%, because an announcement channel is absent. The vaccine result and Omicron are single-name news, which a macro path can not know.</p>
 </div>
 </details>
 
 <details class="pt-s13">
 <summary class="pt-s27">The endogenous economy can not reach its own crisis regimes</summary>
-<div class="pt-s167">
+<div class="pt-s168">
 <p class="pt-s1">Left alone, inflation peaks at 4.0% on every seed over five years. Real US CPI peaked at 9.0% in June 2022. The central bank has a crisis cadence that pulls its next meeting in, and a default run can not reach it. So an inflation regime or a policy crisis must come from a scenario. A volatility crisis does not: on pt-v10 the preset's own VIX crossed its crisis threshold on 10.2% of days against a real 12.5%.</p>
 </div>
 </details>

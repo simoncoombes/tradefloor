@@ -541,6 +541,25 @@ def check_presets(pages_html: dict[str, str]) -> None:
         for named in sorted(set(re.findall(r"pt-v\d+", html))):
             if named not in shipped:
                 problems.append(f"{slug}.html names {named}, which the crate does not ship")
+    # A written count goes stale the other way: the crate gains a preset and
+    # the sentence that counts them does not. 0.4.0 shipped "Twelve presets
+    # ship, pt-v1 through pt-v14" on the install page, and the bar chart
+    # beside it drew twelve bars, because both were hand-written and only the
+    # names were updated. Reported per page so the failure names the sentence.
+    words = {1:"one",2:"two",3:"three",4:"four",5:"five",6:"six",7:"seven",
+             8:"eight",9:"nine",10:"ten",11:"eleven",12:"twelve",
+             13:"thirteen",14:"fourteen",15:"fifteen",16:"sixteen",
+             17:"seventeen",18:"eighteen",19:"nineteen",20:"twenty"}
+    expected = words.get(len(shipped), str(len(shipped)))
+    counted = re.compile(
+        r"\b([A-Za-z]+|\d+)\s+(?:presets ship|named coefficient sets)", re.I)
+    for slug, html in pages_html.items():
+        for said in counted.findall(html):
+            if said.lower() != expected:
+                problems.append(
+                    f"{slug}.html says {said!r} presets ship; the crate ships "
+                    f"{len(shipped)} ({expected})")
+
     if problems:
         sys.exit("the site describes presets that are not released:\n  " + "\n  ".join(problems))
     print(f"  presets: {len(shipped)} shipped, default {default}")
