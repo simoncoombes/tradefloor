@@ -19,13 +19,11 @@ on:
       - 'rust/goldens/**'
       - 'examples/data/**'
       - '.github/workflows/docs.yml'
+  # No path filter, unlike the push trigger above. `build` is a REQUIRED check
+  # on main, and a required check that never runs blocks the merge rather than
+  # passing it, so it has to report on every pull request even one that
+  # touches no documentation.
   pull_request:
-    paths:
-      - 'docs/**'
-      - 'tools/docs/**'
-      - 'rust/goldens/**'
-      - 'examples/data/**'
-  workflow_dispatch:
 
 jobs:
   build:
