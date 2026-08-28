@@ -14,9 +14,28 @@ published site over to this one is an open decision — see §3.1 of
 ```
 python tools/docs/learn/build.py            # write docs/learn/
 python tools/docs/learn/build.py --check    # fail if docs/learn/ is stale
+python tools/docs/learn/data.py --check     # charts still match the goldens
+python tools/docs/learn/figures.py          # prose figures against remeasure
 node   tools/docs/learn/verify.cjs docs/learn
 node   tools/docs/learn/verify.cjs docs/learn --responsive
 ```
+
+Before and after a change that alters how something is drawn:
+
+```
+node tools/docs/learn/shots.cjs capture /tmp/before --site docs/learn
+# ... make the change, rebuild ...
+node tools/docs/learn/shots.cjs capture /tmp/after  --site docs/learn
+node tools/docs/learn/shots.cjs compare /tmp/before /tmp/after
+```
+
+`verify.cjs` proves the markup is the same. It cannot prove the page still
+looks the same, because a stylesheet change moves the built page and the
+mounted page together and the comparison stays happy. `shots.cjs` is the
+check for anything that changes drawing rather than content — it is what
+made extracting a thousand inline styles into classes a safe thing to try.
+It is not in CI, which would mean committing 75 screenshots as a baseline;
+run it by hand when the work warrants it.
 
 `build.py` needs only Python 3.9+ and `node`. `verify.cjs` needs Chrome; set
 `CHROME` if it is not in the usual place.
@@ -57,10 +76,19 @@ ISSUES.md.
 `docs/envelope.json` and `examples/data/`. `--check` diffs it against the
 vendored snapshot.
 
+**`seo.py`** writes `sitemap.xml`, `llms.txt` and `llms-full.txt`. The full
+text drops the charts and any table whose body is mostly numbers — those are
+generated from the goldens and read as a wall of digits — and keeps the
+reference tables, which are prose in a grid.
+
 **`verify.cjs`** loads every page in headless Chrome and fails on a thrown
 exception, a console error, a failed request, an unresolved binding, or any
 difference between the built markup and the mounted markup. It found five real
 faults during the rebuild and is the reason to keep it.
+
+**`shots.cjs`** screenshots and compares, for changes `verify.cjs` cannot
+see. **`figures.py`** checks the numbers the pages state in prose against
+what the repository measures.
 
 ## Changing something
 
@@ -72,6 +100,7 @@ faults during the rebuild and is the reason to keep it.
 | a colour, type scale or breakpoint | the `<style>` block in the design files; it is merged across pages |
 | a rule that no design file carries (print, narrow, theme) | the CSS constants in `build.py` |
 | a correction to a component's behaviour | `SCRIPT_FIXES` in `build.py` |
+| whether this site is the published one | `AT_SITE_ROOT` and `BASE_URL` in `build.py` |
 | what the charts plot | nothing here — change the golden |
 
 Every seam that patches a design asserts. A redrawn page that no longer

@@ -33,6 +33,7 @@ they are code, where the example either runs or does not.
 from __future__ import annotations
 
 import argparse
+import collections
 import html
 import json
 import pathlib
@@ -107,8 +108,38 @@ def claims(pages: dict[str, str]) -> list[dict]:
 
 
 def inventory() -> list[dict]:
+    """Every measured figure, from both places that hold one.
+
+    `tools/remeasure/inventory.json` is the claim inventory. `docs/envelope.json`
+    is the envelope the package itself publishes, and it carries each of the
+    fourteen statistics' measured value and the two edges of its band — all
+    of which the Trust it pages quote. Reading both is what stops a figure
+    being reported as unbacked when the package regenerates it on every
+    release.
+    """
     with INVENTORY.open(encoding="utf-8") as fh:
-        return json.load(fh)["figures"]
+        figures = list(json.load(fh)["figures"])
+
+    with (ROOT / "docs" / "envelope.json").open(encoding="utf-8") as fh:
+        env = json.load(fh)
+    for key, stat in env["statistics"].items():
+        figures.append({
+            "id": f"envelope.{key}", "file": "docs/envelope.json",
+            "label": f"{key} measured on the shipped preset at the certified horizon",
+            "published": stat["measured"], "source": "generated",
+        })
+        for edge, value in zip(("floor", "ceiling"), stat["band"]):
+            figures.append({
+                "id": f"envelope.{key}.{edge}", "file": "docs/envelope.json",
+                "label": f"{key} real band {edge}", "published": value,
+                "source": "generated",
+            })
+    figures.append({
+        "id": "envelope.horizon", "file": "docs/envelope.json",
+        "label": "the certified horizon in trading days",
+        "published": env["certified_horizon_days"], "source": "generated",
+    })
+    return figures
 
 
 def numeric(fig) -> float | None:
@@ -172,6 +203,20 @@ def classify(found: list[dict], figures: list[dict]) -> tuple[list, list, list]:
     return backed, conflicting, todo
 
 
+#: A first sort of the unbacked figures, so the worklist arrives grouped by
+#: what kind of work each one is rather than as a flat list of numbers.
+def kind_of(sentence: str) -> str:
+    low = sentence.lower()
+    if re.search(r"\braises\b|\bmeans\b|\berror\b|\brejects?\b", low):
+        return "contract"          # an API promise; a test, not a measurement
+    if re.search(r"\bpin\b|\bpassing\b|=\s*\d|\bfor example\b", low):
+        return "example"           # a value chosen to illustrate, not measured
+    if re.search(r"\bmeasured\b|\breads\b|\bagainst a real\b|\bruns\b|"
+                 r"\bcloses\b|\bholds\b|\bcame back\b", low):
+        return "measured"          # a claim about what the engine or the world did
+    return "unsorted"
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--site", default=str(ROOT / "docs" / "learn"))
@@ -192,6 +237,10 @@ def main() -> None:
     print(f"  {len(conflicting):3d} sit in a sentence about a measured figure and differ from it")
     print(f"  {len(todo):3d} have no measurement behind them yet")
 
+    kinds = collections.Counter(kind_of(c["sentence"]) for c in todo)
+    for kind, n in kinds.most_common():
+        print(f"        {n:3d} {kind}")
+
     if conflicting:
         print("\nworth reading first:")
         for c in conflicting[:12]:
@@ -208,7 +257,7 @@ def main() -> None:
         "figures": [
             {"id": f"learn.{c['page']}.{i}", "file": f"docs/learn/{c['page']}.html",
              "label": c["sentence"][:160], "published": c["value"], "unit": c["unit"],
-             "group": None, "key": None}
+             "kind": kind_of(c["sentence"]), "group": None, "key": None}
             for i, c in enumerate(todo)
         ],
     }

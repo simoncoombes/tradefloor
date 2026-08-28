@@ -197,68 +197,117 @@ still what GitHub Pages serves. Nothing about the relaunch has been published.
 
 The flip is deliberately a separate, reviewable step, and it is a decision
 about content rather than machinery: the new site is a different set of pages
-saying different things, not a restyling of the old one. What it needs:
+saying different things, not a restyling of the old one.
 
+Three of the four things it needed are done. `build.py` now writes
+`sitemap.xml`, `llms.txt` and `llms-full.txt`, and every page carries the
+analytics snippet — the same measurement ID as the published site, asserted
+against `build_site.py` so the duplicate cannot quietly diverge.
+`robots.txt` is written only when `AT_SITE_ROOT` is true, because a
+robots.txt in a subdirectory is read by nothing and one written there would
+look like a policy without being one.
+
+What remains is the decision and the redirects:
+
+- set `AT_SITE_ROOT = True` and `BASE_URL` to the project root;
 - a redirect from each old URL to its nearest new one, or a decision to let
-  them 404;
-- `llms.txt`, `llms-full.txt`, `sitemap.xml` and `robots.txt`, which
-  `build_site.py` generates today and `build.py` does not;
-- the analytics snippet (`G-1LBM3239ZF`), which the new pages do not carry;
+  them 404. The old site has 25 pages and the new one has 25, but they are
+  not the same 25 — `atlas.html`, `internals.html`, `wasm.html` and
+  `interrogate.html` have no successor, by the design review's decision;
 - README and repository links repointed.
 
-### 3.2 Eight components still carry a dead door table
+### 3.2 Nine components carried their own list of the pages — CLOSED
 
-`index`, `metrics`, `conventions`, `schemas`, `presets`, `core-types`,
-`evaluate` and `parameters` build their "All pages" section from a list of page
-names and links held in the component. That section is generated now, so the
-list is dead — but it is dead data that still asserts which pages exist, and
-dead data that disagrees with the site is how a stale menu finds its way back.
+Eight built the "All pages" section from a list of page names and links held
+in the component. The builder generates that section, so those were dead.
 
-Its links are rewritten so nothing can 404, and the build names the pages every
-time it runs. Deleting it means editing the vendored design sources, which is a
-change to the handoff rather than to the build, so it is left for a decision
-about whether those files stay a pristine reference.
+The ninth was not dead, and finding it is the reason this was worth doing:
+the **front door's "Start here" cards** are built from the same kind of
+hardcoded list, and it was **listing twenty-one pages of twenty-five** and
+filing the MCP page under a different door from the one the handoff's own
+table gives it. The four pages added after the design review were missing
+from the front door as well as from the menus.
 
-### 3.3 The prose figures are inventoried, not measured
+All nine now read the list from `props.doors`, which `build.py` derives from
+`DOORS`. A page added there appears in the front door's cards, the menus, the
+footer index, the prev/next chain and the search index, with nothing to keep
+in step by hand.
+
+### 3.3 The prose figures are inventoried and sorted, not measured
 
 `python tools/docs/learn/figures.py` finds 52 figures stated in prose across
-the 25 pages. Twenty repeat a value `tools/remeasure` already measures. None
-contradict one. The remaining 32 are written to `figures-todo.json` with the
-page, the sentence and the value, needing a `group` and a `key`.
+the 25 pages. Twenty-six repeat a value that is already measured — by
+`tools/remeasure/inventory.json`, or by `docs/envelope.json`, which the
+package regenerates on every release and which carries each statistic's
+measured value and both edges of its band. None contradict one.
+
+The remaining 26 are written to `figures-todo.json`, sorted by what kind of
+work each needs:
+
+| kind | n | what it needs |
+|---|---|---|
+| `measured` | 14 | a measurement group and key in `tools/remeasure` |
+| `unsorted` | 6 | reading, then one of the other three |
+| `contract` | 3 | a test, not a measurement — "passing 5.2 raises" |
+| `example` | 3 | nothing; a value chosen to illustrate, not measured |
 
 Assigning a measurement to a claim is a judgement about which computation
-reproduces it, which is why it stops here. The one worth reading first is on
-`edgar.html`: a sector mix quoted as "measured on the live SEC for CY2025",
-with nothing that re-measures it.
+reproduces it, which is why it stops here. Two are worth reading first:
+
+- **`edgar.html`** quotes a sector mix — 27% financial services, 17%, 13%,
+  30% — as "measured on the live SEC for CY2025". Nothing re-measures it,
+  and unlike the rest it depends on an external service that moves.
+- **`realism-envelope.html`** quotes the 504-day panel: annualised
+  volatility at 33.89 against a band ending at 34.0. That is not the
+  certified 252-day envelope, so `docs/envelope.json` does not cover it —
+  the 504-day panel and its re-derived bands have no published artifact at
+  all, and the page's argument for stopping the horizon at one year rests
+  on them.
 
 ---
 
 ## 4. Deliberately left
 
-### 4.1 Layout is still inline-styled
+### 4.1 Layout is still inline-styled — CLOSED
 
-The handoff asks for the token set to become CSS custom properties, and it has:
-every colour on every page is a `var(--token)`, and the tokens live in one
-`learn.css`. It also asks for the inline styles to become classes. They have
-not, beyond the handful the fixes above needed.
+Done in two halves, both checked by screenshotting all 25 pages at three
+viewports in both themes and comparing pixel by pixel
+(`tools/docs/learn/shots.cjs`). **75 of 75 views identical, for each half.**
 
-The reason is fidelity. The copy and the markup in those 25 files are final,
-and rewriting the 3,729 style attributes in those files by hand is a large
-opportunity to change one of them by accident. The inline styles already reference the tokens, so
-they theme and print correctly; what is lost is page weight and the ability to
-restyle without a rebuild. Worth doing as its own pass, against `verify.cjs`,
-which will fail on any element that moves.
+The shell — masthead, search overlay, door index, prev/next, repeated on
+every page — was rewritten by hand against the design, into `SHELL_CSS`.
+Every declaration is the design's, written once.
+
+The page templates were done mechanically, because rewriting the 3,729 style
+attributes in the design files by hand is a large chance to change one of
+them by accident. `prerender.cjs` counts every literal style across the
+whole site, weights the ones inside loops by eight — one attribute in a
+template is many in a rendered page — and lifts anything at or above a
+weight of six into a class. 191 classes now cover 1,006 attributes.
+
+The rules are written `#pt-root .pt-sN`, not `.pt-sN`. The declarations
+being moved were inline, and an inline style outranks every selector that is
+not `!important`; the id prefix preserves that ranking, so a rule that used
+to win still wins. The blocks that are *meant* to override — print, theme,
+the narrow-screen rules — say `!important`, which also fixed a print
+stylesheet that would otherwise have lost to the shell's new classes.
+
+What is left inline is a style used once or twice, which is where a class
+costs more than it saves.
 
 ### 4.2 Page weight
 
 A page carries its markup twice: once prerendered, once as the template the
-runtime re-renders from. That is 13% of total page bytes — less than it sounds,
-because the prerendered copy has every loop expanded. Typical page: 55KB raw,
-9KB gzipped. The front door is the outlier at 326KB raw, 39KB gzipped, most of
-it inline SVG for four charts.
+runtime re-renders from. The prerendered copy has every loop expanded, so
+the template is about a seventh of the bytes.
 
-First load now costs 28KB gzipped of shared CSS, runtime and chart data. The
-search index (32KB gzipped) is fetched only when someone opens search.
+Extracting the styles took the site's HTML from 1,679KB to 1,062KB for 27KB
+more CSS. Typical page: 48KB raw, 8KB gzipped. The front door is the outlier
+at 320KB raw, 37KB gzipped, most of it inline SVG for four charts.
+
+First load costs the shared CSS, runtime and chart data. The search index —
+the largest single file, because it holds the text of all 25 pages — is
+fetched only when someone opens search.
 
 ### 4.3 `measurements/real-panel.json` and `seed-sd-504.json` are not read
 
