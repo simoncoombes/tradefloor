@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="learn.css">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Learn pretium","description":"Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.","url":"https://simoncoombes.github.io/pretium/","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.4.2","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Learn pretium","description":"Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.","url":"https://simoncoombes.github.io/pretium/","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.4.3","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/","inLanguage":"en","publisher":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"potentialAction":{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://simoncoombes.github.io/pretium/index.html?q={search_term_string}"},"query-input":"required name=search_term_string"}}</script>
 <script>
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
@@ -280,7 +280,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s63">
 <span class="pt-s70">STEP 01 - SEE IT</span>
 <h2 class="pt-s74">The seed fixes every random number</h2>
-<p class="pt-s180">The same universe, macro state and seed give the same market on Linux, macOS and Windows, digit for digit. Every release does a check of this. It builds five wheel targets, runs one fixed simulation in each, and compares the digests. A disagreement stops the release. Determinism also makes a fork possible: checkpoint at day 100, then branch, and the two branches share one past. The two runs below are the repository's reference runs, and they have a different seed and a different roster.</p>
+<p class="pt-s181">The same universe, macro state and seed give the same market on Linux, macOS and Windows, digit for digit. Every release does a check of this. It builds five wheel targets, runs one fixed simulation in each, and compares the digests. A disagreement stops the release. Determinism also makes a fork possible: checkpoint at day 100, then branch, and the two branches share one past. The two runs below are the repository's reference runs, and they have a different seed and a different roster.</p>
 </div>
 
 <div style="display:flex;gap:0.5rem">
@@ -380,7 +380,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s63">
 <span class="pt-s70">STEP 02 - BUILD A UNIVERSE</span>
 <h2 class="pt-s74">Choose who exists</h2>
-<p class="pt-s180">A universe is the roster and its fundamentals. The generator fills twelve sectors round-robin, so a generated roster is more balanced than any real index. Set one up here and take the code.</p>
+<p class="pt-s181">A universe is the roster and its fundamentals. The generator fills twelve sectors round-robin, so a generated roster is more balanced than any real index. Set one up here and take the code.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:1.6rem;align-items:stretch">
@@ -482,7 +482,7 @@ e.run_days(252)   # one trading year</pre>
 <div class="pt-s63">
 <span class="pt-s70">STEP 03 - RUN YOUR STRATEGY</span>
 <h2 class="pt-s74">Write the strategy down</h2>
-<p class="pt-s180">A <span class="pt-s26">StrategySpec</span> is JSON with a <span class="pt-s26">sha256</span>, so someone else can check your result with the package and nothing else of yours. Compose one here and take it.</p>
+<p class="pt-s181">A <span class="pt-s26">StrategySpec</span> is JSON with a <span class="pt-s26">sha256</span>, so someone else can check your result with the package and nothing else of yours. Compose one here and take it.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,15rem) minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
@@ -717,7 +717,7 @@ scores["mine"].strategy_fingerprint
 <div class="pt-s63">
 <span class="pt-s70">STEP 04 - DRIVE IT</span>
 <h2 class="pt-s74">Three ways to use it</h2>
-<p class="pt-s180">Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote.</p>
+<p class="pt-s181">Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1.1rem">
@@ -782,7 +782,7 @@ ranking = pt.rank(
 <span class="pt-s70">COMING UP</span>
 <h2 class="pt-s74">Coming next: competitive multi-agent markets</h2>
 <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;margin:0.2rem 0 0"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.25rem 0.6rem">single-agent evaluation</span><span class="pt-s10">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">competitive agents</span><span class="pt-s10">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">emergent market behaviour</span></div>
-<p class="pt-s180">The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. <strong>It is not shipped.</strong> The primitives are public and composable in the meantime, and this is what building one takes.</p>
+<p class="pt-s181">The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. <strong>It is not shipped.</strong> The primitives are public and composable in the meantime, and this is what building one takes.</p>
 </div>
 
 <div class="pt-s28">
@@ -895,7 +895,7 @@ for day in range(days):
 <div class="pt-s63">
 <span class="pt-s70">STEP 05 - TRUST THE RESULT</span>
 <h2 class="pt-s74">How closely it reproduces measured behaviour</h2>
-<p class="pt-s180">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.</p>
+<p class="pt-s181">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:1.6rem;align-items:stretch">
@@ -1415,7 +1415,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s63">
 <span class="pt-s70">STEP 01 - SEE IT</span>
 <h2 class="pt-s74">The seed fixes every random number</h2>
-<p class="pt-s180">The same universe, macro state and seed give the same market on Linux, macOS and Windows, digit for digit. Every release does a check of this. It builds five wheel targets, runs one fixed simulation in each, and compares the digests. A disagreement stops the release. Determinism also makes a fork possible: checkpoint at day 100, then branch, and the two branches share one past. The two runs below are the repository's reference runs, and they have a different seed and a different roster.</p>
+<p class="pt-s181">The same universe, macro state and seed give the same market on Linux, macOS and Windows, digit for digit. Every release does a check of this. It builds five wheel targets, runs one fixed simulation in each, and compares the digests. A disagreement stops the release. Determinism also makes a fork possible: checkpoint at day 100, then branch, and the two branches share one past. The two runs below are the repository's reference runs, and they have a different seed and a different roster.</p>
 </div>
 
 <div style="display:flex;gap:0.5rem">
@@ -1467,7 +1467,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s63">
 <span class="pt-s70">STEP 02 - BUILD A UNIVERSE</span>
 <h2 class="pt-s74">Choose who exists</h2>
-<p class="pt-s180">A universe is the roster and its fundamentals. The generator fills twelve sectors round-robin, so a generated roster is more balanced than any real index. Set one up here and take the code.</p>
+<p class="pt-s181">A universe is the roster and its fundamentals. The generator fills twelve sectors round-robin, so a generated roster is more balanced than any real index. Set one up here and take the code.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:1.6rem;align-items:stretch">
@@ -1514,7 +1514,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s63">
 <span class="pt-s70">STEP 03 - RUN YOUR STRATEGY</span>
 <h2 class="pt-s74">Write the strategy down</h2>
-<p class="pt-s180">A <span class="pt-s26">StrategySpec</span> is JSON with a <span class="pt-s26">sha256</span>, so someone else can check your result with the package and nothing else of yours. Compose one here and take it.</p>
+<p class="pt-s181">A <span class="pt-s26">StrategySpec</span> is JSON with a <span class="pt-s26">sha256</span>, so someone else can check your result with the package and nothing else of yours. Compose one here and take it.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,15rem) minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
@@ -1616,7 +1616,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div class="pt-s63">
 <span class="pt-s70">STEP 04 - DRIVE IT</span>
 <h2 class="pt-s74">Three ways to use it</h2>
-<p class="pt-s180">Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote.</p>
+<p class="pt-s181">Three modes of agent interaction: observe the market, trade inside it, or train against it. A model over MCP, a reinforcement-learning policy, or trading logic you wrote.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1.1rem">
@@ -1681,7 +1681,7 @@ ranking = pt.rank(
 <span class="pt-s70">COMING UP</span>
 <h2 class="pt-s74">Coming next: competitive multi-agent markets</h2>
 <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;margin:0.2rem 0 0"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-deep);border-radius:5px;padding:0.25rem 0.6rem">single-agent evaluation</span><span class="pt-s10">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">competitive agents</span><span class="pt-s10">→</span><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;background:var(--surface);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;padding:0.25rem 0.6rem">emergent market behaviour</span></div>
-<p class="pt-s180">The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. <strong>It is not shipped.</strong> The primitives are public and composable in the meantime, and this is what building one takes.</p>
+<p class="pt-s181">The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. <strong>It is not shipped.</strong> The primitives are public and composable in the meantime, and this is what building one takes.</p>
 </div>
 
 <div class="pt-s28">
@@ -1758,7 +1758,7 @@ for day in range(days):
 <div class="pt-s63">
 <span class="pt-s70">STEP 05 - TRUST THE RESULT</span>
 <h2 class="pt-s74">How closely it reproduces measured behaviour</h2>
-<p class="pt-s180">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.</p>
+<p class="pt-s181">Real markets have habits. Prices jump by a typical amount. A calm week often comes after a calm week. Names move together in a panic. This page measures fourteen of those habits, each against the range that real equities hold. For the shipped preset, the thirty-seed median of each of the fourteen falls inside its range at 252 days, on the forty-name sector-balanced roster the certification was measured on and again on a held-out sixty-name universe. A median is not every seed: check the intervals before relying on one. There is no single score, because one number travels further than its caveats.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:1.6rem;align-items:stretch">

@@ -285,9 +285,10 @@ input{font-family:inherit}
 #pt-root .pt-s177{font-family:'Spline Sans Mono',monospace;font-size:0.8125rem;background:var(--chip-teal);border:1px solid var(--accent-line);border-radius:4px;padding:0.5px 5px}
 #pt-root .pt-s178{margin:0;font-size:0.8125rem;color:var(--ink-3)}
 #pt-root .pt-s179{border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:0.7rem}
-#pt-root .pt-s180{color:var(--ink-2);max-width:none;margin:0}
-#pt-root .pt-s181{padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem}
-#pt-root .pt-s182{text-align:right;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)}
+#pt-root .pt-s180{color:var(--ink)}
+#pt-root .pt-s181{color:var(--ink-2);max-width:none;margin:0}
+#pt-root .pt-s182{padding:2.5rem 0 0;display:flex;flex-direction:column;gap:0.8rem}
+#pt-root .pt-s183{text-align:right;padding:0.6rem 0.9rem;font:500 0.75rem/1.3 'Public Sans',sans-serif;color:var(--ink-3);border-bottom:1px solid var(--line)}
 
 body.pt-front{line-height:1.6}
 body.pt-front p{margin:0 0 0.85rem}

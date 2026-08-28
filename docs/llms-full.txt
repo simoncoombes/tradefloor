@@ -3,7 +3,7 @@
 > A reproducible evaluation environment for financial AI agents: a
 > deterministic market simulator with order-book execution, macro dynamics
 > and causal ground truth.
-> Version 0.4.2. Every page of the learning path, in reading order.
+> Version 0.4.3. Every page of the learning path, in reading order.
 
 
 ======================================================================
@@ -3520,6 +3520,16 @@ REFERENCE/ RELEASE NOTES
 Release notes
 
 What changed, what it means for a run you already have, and how to pin the old behaviour if you need it. Full history in CHANGELOG.md.
+
+0.4.3
+
+2026-08-28 
+
+0.4.2 changed pt-v13 and pt-v14, and it should not have. If you pinned either preset, this puts them back exactly as they were in 0.4.0 and 0.4.1: all fourteen certified statistics are bit-identical to their pre-0.4.2 values.
+
+The 0.4.2 fix pointed the dollar's safe-haven gate at crisis_vix_threshold, and both presets override that parameter, so their gate moved and their trajectories moved with it. No result computed under 0.4.2 is wrong, since every statistic stayed in band, but a run recorded under pt-v14 before 0.4.2 does not replay under it, and the preset name is what a citation carries.
+
+The dollar gate is its own dial now, usd_crisis_vix_threshold. A preset that wants both gates to move together sets both.
 
 0.4.2
 
