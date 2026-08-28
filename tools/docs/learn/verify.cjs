@@ -109,6 +109,11 @@ async function visit(port, fileUrl, opts) {
    * file's text would flag every fixup an HTML parser is required to make,
    * starting with the <tbody> it inserts into every table. */
   if (opts.noScript) await send('Emulation.setScriptExecutionDisabled', { value: true });
+  if (opts.width) {
+    await send('Emulation.setDeviceMetricsOverride', {
+      width: opts.width, height: 900, deviceScaleFactor: 1, mobile: opts.width < 700,
+    });
+  }
 
   const loaded = new Promise((resolve) => {
     const onMsg = (ev) => {
@@ -122,7 +127,7 @@ async function visit(port, fileUrl, opts) {
   await sleep(400);  // let the mount's first frame land
 
   const probe = await send('Runtime.evaluate', {
-    expression: opts.noScript ? ROOT_ONLY : PROBE,
+    expression: opts.width ? OVERFLOW : opts.noScript ? ROOT_ONLY : PROBE,
     returnByValue: true,
     awaitPromise: false,
     /* The probe has to run even with page scripts disabled. */
@@ -136,6 +141,43 @@ async function visit(port, fileUrl, opts) {
   const value = probe && probe.result && probe.result.value;
   return { problems, probe: value, error: probe && probe.exceptionDetails };
 }
+
+/* Find anything that pushes the page sideways.
+ *
+ * The handoff shipped the breakpoints coded but unverified — "not yet
+ * checked on a physical device" — so this checks them. A page may scroll
+ * down; it must not scroll across, because a reader on a phone who has to
+ * drag left and right to finish a sentence will not finish it.
+ *
+ * Wide content is allowed to scroll inside its own box, so an element is
+ * only reported when nothing between it and the body is a scroll container.
+ */
+const OVERFLOW = `(() => {
+  const vw = document.documentElement.clientWidth;
+  const over = [];
+  if (document.documentElement.scrollWidth <= vw + 1) return { width: vw, over };
+
+  const scrolls = (el) => {
+    const s = getComputedStyle(el);
+    return s.overflowX === 'auto' || s.overflowX === 'scroll' || s.overflow === 'auto' ||
+           s.overflow === 'scroll' || s.overflowX === 'hidden';
+  };
+  for (const el of document.querySelectorAll('#pt-root *, header *')) {
+    const r = el.getBoundingClientRect();
+    if (r.right <= vw + 1 && r.left >= -1) continue;
+    let p = el.parentElement, contained = false;
+    while (p && p !== document.body) {
+      if (scrolls(p)) { contained = true; break; }
+      p = p.parentElement;
+    }
+    if (contained) continue;
+    if (el.querySelector('*')) continue;          // report the leaf, not its wrappers
+    over.push(el.tagName.toLowerCase() + ' right=' + Math.round(r.right) +
+              ' "' + (el.textContent || '').trim().slice(0, 40) + '"');
+    if (over.length >= 4) break;
+  }
+  return { width: vw, scrollWidth: document.documentElement.scrollWidth, over };
+})()`;
 
 /* The no-script pass reads the built markup back as the browser parsed it.
  * It deliberately asserts nothing else: a page with scripts off is missing
@@ -274,7 +316,10 @@ function short(v) {
   return v.length > 46 ? '…' + v.slice(-42) : v;
 }
 
+const WIDTHS = [360, 414, 620, 900];
+
 (async () => {
+  const responsive = process.argv.includes('--responsive');
   const pages = fs.readdirSync(outDir).filter((f) => f.endsWith('.html')).sort();
   if (!pages.length) { console.error(`no pages in ${outDir}`); process.exit(1); }
 
@@ -296,6 +341,17 @@ function short(v) {
         const cmp = compare(before, res.probe.rootHTML);
         for (const e of cmp.errors) findings.push('built vs mounted: ' + e);
         notes = cmp.notes;
+      }
+
+      if (responsive) {
+        for (const w of WIDTHS) {
+          const r = await visit(port, 'file://' + full, { width: w });
+          const o = r.probe && r.probe.over;
+          if (o && o.length) {
+            findings.push(`overflows at ${w}px (page is ${r.probe.scrollWidth}px wide):`);
+            for (const line of o) findings.push('  ' + line);
+          }
+        }
       }
 
       const words = res.probe ? res.probe.words : 0;

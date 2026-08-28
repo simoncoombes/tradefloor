@@ -139,7 +139,14 @@ def search_overlay() -> str:
 # ----------------------------------------------------------------- page footer
 
 def door_index(doors, current_slug: str) -> str:
-    """The "All pages" grid that closes every page."""
+    """The "All pages" grid that closes every page.
+
+    Page names are kept on one line, as the design draws them, except on a
+    narrow screen where the longest of them — "Real companies from EDGAR",
+    a page added after the design was drawn — is wider than the column it
+    is given and pushes the whole page sideways. The class is where the
+    stylesheet lets it wrap.
+    """
     cols = []
     for name, short, _slug, entries in doors:
         links = []
@@ -149,7 +156,7 @@ def door_index(doors, current_slug: str) -> str:
                     '<span style="display:flex;gap:0.4rem;align-items:baseline;'
                     'font-size:0.8125rem;color:var(--accent)">'
                     f'<span style="font-family:{MONO};font-size:0.6875rem;flex:none">&gt;</span>'
-                    f'<span style="white-space:nowrap">{esc(page_name)}</span></span>'
+                    f'<span class="pt-door-name" style="white-space:nowrap">{esc(page_name)}</span></span>'
                 )
             else:
                 links.append(
@@ -157,7 +164,7 @@ def door_index(doors, current_slug: str) -> str:
                     'align-items:baseline;font-size:0.8125rem;color:var(--ink-2)">'
                     f'<span style="font-family:{MONO};font-size:0.6875rem;'
                     'color:var(--accent-line);flex:none">&gt;</span>'
-                    f'<span style="white-space:nowrap">{esc(page_name)}</span></a>'
+                    f'<span class="pt-door-name" style="white-space:nowrap">{esc(page_name)}</span></a>'
                 )
         cols.append(
             '<div style="display:flex;flex-direction:column;gap:0.5rem;min-width:0">'

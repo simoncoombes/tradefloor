@@ -164,6 +164,36 @@ function themeImages(ast) {
   return swapped;
 }
 
+/* Give every table its own horizontal scroll box.
+ *
+ * The front door prints a five-column truth table at its natural width. On
+ * a 360px screen that is 366px of table in 325px of column, and because
+ * nothing around it scrolls, the whole page scrolls instead — so a reader
+ * on a phone drags the masthead and the prose sideways to read one row.
+ * The wrapper goes in before either back end runs, so the built markup and
+ * the runtime's tree agree about it.
+ */
+function wrapTables(ast) {
+  let wrapped = 0;
+  walk(ast, (node) => {
+    if (!node.children) return;
+    // The walk descends into what this callback just built, so a wrapper
+    // must not be a candidate to be wrapped again.
+    if (node.kind === 'el' && attrRaw(node, 'class').split(/\s+/).includes('pt-scroll')) return;
+    node.children = node.children.map((child) => {
+      if (child.kind !== 'el' || child.tag !== 'table') return child;
+      if (/overflow-x\s*:\s*auto/.test(attrRaw(node, 'style'))) return child;
+      wrapped++;
+      return {
+        kind: 'el', tag: 'div',
+        attrs: [{ name: 'class', raw: 'pt-scroll', parts: ['pt-scroll'] }],
+        children: [child],
+      };
+    });
+  });
+  return wrapped;
+}
+
 function walk(nodes, fn) {
   for (const n of nodes) {
     fn(n);
@@ -281,6 +311,7 @@ for (const page of manifest.pages) {
 
   const parsed = PT.parse(piece.template);
   const swapped = themeImages(parsed);
+  const wrapped = wrapTables(parsed);
   const stripped = stripShell(parsed);
   const ast = PT.parse(stripped.template);
   const vals = (inst.renderVals || inst.render).call(inst);
@@ -295,6 +326,7 @@ for (const page of manifest.pages) {
     template: stripped.template,
     removed: stripped.removed,
     themeImages: swapped,
+    tablesWrapped: wrapped,
     wrapStyle: stripped.wrapStyle,
     script: piece.script,
     props: piece.props

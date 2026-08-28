@@ -37,6 +37,10 @@ input[type=range]{accent-color:var(--accent)}
 summary::marker{color:var(--accent-line)}
 table{border-collapse:collapse;width:100%}
 input{font-family:inherit}
+@media (prefers-color-scheme: dark){
+  html:not([data-theme="light"]){--ground:#0D1312;--surface:#151D1C;--card:#111917;--line:#2B3735;--line-soft:#202B2A;--ink:#E5ECEA;--ink-2:#B2C0BD;--ink-3:#8A9895;--accent:#5FC9BE;--accent-deep:#8ADDD4;--accent-soft:#10302E;--accent-line:#2E6B65;--chip-teal:#173B38;--chip-bg:#14201F;--chip-line:#2B3735;--band:#24413E;--red:#E2938E;--red-soft:#7A4340;--red-mid:#C97C7C;--green:#7FD3A6;--green-soft:#2F6B4A;--amber:#D3AC63;--series3:#7FB4D6;--series4:#CE93A6;--series5:#A5C77E;--header-bg:rgba(13,19,18,0.92)}
+}
+
 body.pt-front{line-height:1.6}
 body.pt-front p{margin:0 0 0.85rem}
 body.pt-front h1,body.pt-front h2,body.pt-front h3{line-height:1.12}
@@ -49,3 +53,37 @@ html[data-theme="dark"] .pt-light{display:none}
   html:not([data-theme="light"]) .pt-light{display:none}
 }
 #pt-search-open[hidden]{display:none}
+.pt-scroll{overflow-x:auto;max-width:100%}
+
+@media (max-width: 620px){
+  details.ptmenu{position:static !important}
+  .ptmenu > div{left:1.1rem !important;right:1.1rem !important;min-width:0 !important}
+  .pt-door-name{white-space:normal !important}
+  /* The control rows above the charts are flex rows that do not wrap. At
+     a phone's width a row of a label, a number and a slider is wider than
+     the screen, and because nothing between it and the body scrolls, the
+     page scrolls. Wrapping is what the design does with the masthead nav
+     at the same size; these rows were simply never given the same rule.
+     Wrapping is applied to rows only. A column flex container told to
+     wrap starts a second column instead of a second line, which widens
+     the very thing it was meant to narrow. The design writes its layout
+     inline, so the direction is readable from the attribute. */
+  #pt-root div:not([style*="flex-direction:column"]){flex-wrap:wrap}
+  /* A grid or flex item will not shrink below its content unless told to,
+     which is what keeps a code block or a table from fitting even inside a
+     box that scrolls. */
+  #pt-root *{min-width:0}
+  #pt-root input[type="range"]{max-width:100%}
+}
+
+@media print{
+  @page{margin:0.5cm}
+  html,body{background:#fff}
+  *{print-color-adjust:exact;-webkit-print-color-adjust:exact;backdrop-filter:none}
+  header{position:static;border-bottom:1px solid var(--line)}
+  header nav,#pt-search-open,#pt-theme,#pt-search{display:none}
+  #pt-root{height:auto}
+  figure,table,pre,details{break-inside:avoid}
+  h1,h2,h3{break-after:avoid}
+  a{text-decoration:none;color:inherit}
+}

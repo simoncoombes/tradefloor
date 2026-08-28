@@ -268,6 +268,42 @@ def rewrite_links(text: str, slug_of: dict[str, str]) -> str:
     return re.sub(r"\./([^\"'<>]+?)\.dc\.html", sub, text)
 
 
+def registered_presets() -> tuple[set[str], str]:
+    """The presets the crate actually ships, and which one is the default.
+
+    Read from `rust/src/params.rs` rather than kept in a list here, because
+    a list here is a second source that can fall behind the first.
+    """
+    src = (ROOT / "rust" / "src" / "params.rs").read_text(encoding="utf-8")
+    default = re.search(r'DEFAULT_PRESET_NAME:\s*&str\s*=\s*"([^"]+)"', src)
+    if not default:
+        sys.exit("cannot find DEFAULT_PRESET_NAME in rust/src/params.rs")
+    names = set(re.findall(r'"(pt-v\d+)"\s*=>\s*Some\(', src))
+    if not names:
+        sys.exit("cannot find the preset table in rust/src/params.rs")
+    return names, default.group(1)
+
+
+def check_presets(pages_html: dict[str, str]) -> None:
+    """Fail if the site names a preset the package does not ship.
+
+    The site is the front door for someone installing from PyPI or
+    crates.io. A page that mentions a preset registered only in the working
+    tree tells that reader to type a name the released package will reject.
+    This is the manual `grep pt-vNN` step, made part of the build so it
+    cannot be the step that gets skipped.
+    """
+    shipped, default = registered_presets()
+    problems = []
+    for slug, html in pages_html.items():
+        for named in sorted(set(re.findall(r"pt-v\d+", html))):
+            if named not in shipped:
+                problems.append(f"{slug}.html names {named}, which the crate does not ship")
+    if problems:
+        sys.exit("the site describes presets that are not released:\n  " + "\n  ".join(problems))
+    print(f"  presets: {len(shipped)} shipped, default {default}")
+
+
 def dead_door_table(script: str, slugs: set[str]) -> bool:
     """Does this component still carry its own copy of the door index?
 
@@ -376,6 +412,60 @@ html[data-theme="dark"] .pt-light{display:none}
   html:not([data-theme="light"]) .pt-light{display:none}
 }
 #pt-search-open[hidden]{display:none}
+.pt-scroll{overflow-x:auto;max-width:100%}
+"""
+
+#: What the handoff left open: "responsive behaviour below 620px is
+#: specified and coded but unverified on a device". Checked now, with
+#: `verify.cjs --responsive`, and it was not right.
+#:
+#: Each door's panel is absolutely positioned against its own <details>, so
+#: the panels belonging to the menus on the right of the bar start far
+#: enough across that a 14rem panel runs past the edge — and it counts
+#: toward the page width even closed, so every page scrolled sideways by
+#: 16px at 360px. Taking the positioning off the <details> at that size
+#: lets the panel resolve against the header instead and span it, which is
+#: the behaviour the design intends and the only one that fits.
+NARROW_CSS = """
+@media (max-width: 620px){
+  details.ptmenu{position:static !important}
+  .ptmenu > div{left:1.1rem !important;right:1.1rem !important;min-width:0 !important}
+  .pt-door-name{white-space:normal !important}
+  /* The control rows above the charts are flex rows that do not wrap. At
+     a phone's width a row of a label, a number and a slider is wider than
+     the screen, and because nothing between it and the body scrolls, the
+     page scrolls. Wrapping is what the design does with the masthead nav
+     at the same size; these rows were simply never given the same rule.
+     Wrapping is applied to rows only. A column flex container told to
+     wrap starts a second column instead of a second line, which widens
+     the very thing it was meant to narrow. The design writes its layout
+     inline, so the direction is readable from the attribute. */
+  #pt-root div:not([style*="flex-direction:column"]){flex-wrap:wrap}
+  /* A grid or flex item will not shrink below its content unless told to,
+     which is what keeps a code block or a table from fitting even inside a
+     box that scrolls. */
+  #pt-root *{min-width:0}
+  #pt-root input[type="range"]{max-width:100%}
+}
+"""
+
+#: The design's print block, which the handoff specifies page by page and no
+#: design file actually contains — 0.5cm margins, no page-break through a
+#: figure or a table, colours printed rather than dropped. The sticky
+#: masthead is unstuck and the controls that only work on screen are
+#: dropped, because a printed page cannot be searched or toggled.
+PRINT_CSS = """
+@media print{
+  @page{margin:0.5cm}
+  html,body{background:#fff}
+  *{print-color-adjust:exact;-webkit-print-color-adjust:exact;backdrop-filter:none}
+  header{position:static;border-bottom:1px solid var(--line)}
+  header nav,#pt-search-open,#pt-theme,#pt-search{display:none}
+  #pt-root{height:auto}
+  figure,table,pre,details{break-inside:avoid}
+  h1,h2,h3{break-after:avoid}
+  a{text-decoration:none;color:inherit}
+}
 """
 
 
@@ -406,7 +496,8 @@ def build(out_dir: pathlib.Path) -> None:
 
     css = merge_stylesheet([s["css"] for s in rendered["styles"]])
     (out_dir / "learn.css").write_text(
-        (css + FRONT_OVERRIDES + THEME_CSS).strip() + "\n", encoding="utf-8")
+        (css + system_dark(css) + FRONT_OVERRIDES + THEME_CSS + NARROW_CSS + PRINT_CSS).strip() + "\n",
+        encoding="utf-8")
 
     for name in ("learn-runtime.js", "learn-shell.js"):
         shutil.copy(SITE / name, out_dir / name)
@@ -417,6 +508,7 @@ def build(out_dir: pathlib.Path) -> None:
     overlay = shell.search_overlay()
     all_slugs = {p["slug"] for p in all_pages}
     carrying: list[str] = []
+    emitted: dict[str, str] = {}
 
     for page in all_pages:
         r = by_slug[page["slug"]]
@@ -461,9 +553,11 @@ def build(out_dir: pathlib.Path) -> None:
             props=json.dumps(r["props"]),
         )
         (out_dir / f"{page['slug']}.html").write_text(doc, encoding="utf-8")
+        emitted[page["slug"]] = doc
 
     write_search_index(out_dir, all_pages, by_slug)
     write_data(out_dir)
+    check_presets(emitted)
 
     print(f"built {len(all_pages)} pages into {out_dir}")
     if carrying:
@@ -513,6 +607,29 @@ def write_search_index(out_dir, all_pages, by_slug) -> None:
         "/* Generated by tools/docs/learn/build.py from the rendered pages.\n"
         "   Do not edit: rebuild instead. */\n"
         f"window.PT_SEARCH = {body};\n", encoding="utf-8")
+
+
+def system_dark(css: str) -> str:
+    """Follow the system when the reader has not chosen.
+
+    The design's dark palette hangs off `html[data-theme="dark"]`, and that
+    attribute is only ever set by the theme toggle — so a reader whose
+    system is dark, and who has never touched the toggle, is served the
+    light site. Restating the same tokens under `prefers-color-scheme`
+    gives the three states a theme needs: system by default, and an explicit
+    choice that wins in either direction.
+
+    The tokens are lifted from the rule that already exists rather than
+    written out again, so the two palettes cannot drift apart.
+    """
+    m = re.search(r'html\[data-theme="dark"\]\{([^}]*)\}', css)
+    if not m:
+        sys.exit("no dark palette in the merged stylesheet")
+    return (
+        "\n@media (prefers-color-scheme: dark){\n"
+        f'  html:not([data-theme="light"]){{{m.group(1)}}}\n'
+        "}\n"
+    )
 
 
 def esc(s: str) -> str:
