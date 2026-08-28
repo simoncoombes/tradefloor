@@ -635,7 +635,7 @@ On the twelve-market grid the docs measure, mean-reversion pools at +0.783 captu
 WHO IT IS FOR 
 Built for financial AI research
 
-LLM and agent researchers
+LLM agents
 
 Evaluate agents that reason, call tools, read state and make a sequence of trading decisions. The MCP server exposes the simulator as eleven tools.
 
