@@ -3,7 +3,7 @@
 > A reproducible evaluation environment for financial AI agents: a
 > deterministic market simulator with order-book execution, macro dynamics
 > and causal ground truth.
-> Version 0.4.0. Every page of the learning path, in reading order.
+> Version 0.4.1. Every page of the learning path, in reading order.
 
 
 ======================================================================
