@@ -356,3 +356,80 @@ def test_an_inconsistent_scenario_document_is_refused():
         mutate(broken)
         with pytest.raises(tradefloor.ValidationError, match=why):
             Scenario.from_json(json.dumps(broken))
+
+
+# --------------------------------------------------------------------------
+# What a divergence is blamed on
+# --------------------------------------------------------------------------
+
+
+def _diverging_manifest(**edits):
+    """A manifest whose recorded digest cannot be rebuilt, with the written
+    platform forced to whatever the test needs."""
+    import json
+
+    universe = tradefloor.Universe.random(4, seed=1)
+    engine = tradefloor.Engine(seed=1, universe=universe)
+    engine.run_days(3, record=False)
+    doc = json.loads(tradefloor.RunManifest.of(
+        engine, seed=1, universe=universe).to_json())
+    doc["result"]["digest"] = "0" * 64
+    for key, value in edits.items():
+        doc["written_by"]["platform"][key] = value
+    return tradefloor.RunManifest.from_json(json.dumps(doc))
+
+
+def test_a_divergence_on_one_platform_does_not_blame_the_platform():
+    """The message used to lead with "an unmeasured platform pair" and then
+    print the same platform twice, disproving itself in its own sentence.
+
+    It sent a real investigation into the Rust core. The cause was a
+    truncated order log.
+    """
+    import platform as _p
+
+    with pytest.raises(tradefloor.ValidationError) as raised:
+        _diverging_manifest(os=_p.system(), machine=_p.machine()).reproduce()
+    message = str(raised.value)
+    assert "platform difference is NOT the explanation" in message
+    # And it says what IS left, rather than stopping at a denial.
+    assert "build with different flags" in message
+    assert "until=n" in message
+
+
+def test_a_divergence_across_platforms_still_names_the_pair():
+    """The case the old message was written for, kept: same operations, same
+    draw counts, different machines. That IS the leading suspect there."""
+    with pytest.raises(tradefloor.ValidationError) as raised:
+        _diverging_manifest(os="Linux", machine="aarch64").reproduce()
+    message = str(raised.value)
+    assert "different platforms" in message
+    assert "Linux-aarch64 wrote it" in message
+
+
+def test_a_short_history_is_named_as_an_input_difference():
+    """The failure that produced this issue, given the diagnosis it needed.
+
+    An engine restored from a state snapshot has the state but not the
+    history, so a manifest taken on it carries a log that is self-consistent
+    -- it passes its own fingerprint -- and does not describe how the market
+    reached where it was. The draw counts say so immediately, and nothing
+    was reading them.
+    """
+    universe = tradefloor.Universe.random(4, seed=1)
+    source = tradefloor.Engine(seed=1, universe=universe)
+    source.run_days(5, record=False)
+
+    restored = tradefloor.Engine(seed=1, universe=universe)
+    restored.restore_state(source.state_snapshot())   # state, no history
+    restored.run_days(2, record=False)
+
+    manifest = tradefloor.RunManifest.of(restored, seed=1, universe=universe)
+    with pytest.raises(tradefloor.ValidationError) as raised:
+        manifest.reproduce()
+    message = str(raised.value)
+    assert "DRAW COUNTS DIFFER" in message
+    assert "not an arithmetic one" in message
+    assert "did not cover how it reached its state" in message
+    # And specifically NOT the platform, which is the same on both sides.
+    assert "different platforms" not in message
