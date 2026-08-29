@@ -106,7 +106,7 @@ correct; equal-weighting everything is a way of declining to have a view.\
 
 
 class ClaudeTrader:
-    """Implements pretium's agent protocol: act(), and the optional explain()."""
+    """Implements tradefloor's agent protocol: act(), and the optional explain()."""
 
     def __init__(
         self,
