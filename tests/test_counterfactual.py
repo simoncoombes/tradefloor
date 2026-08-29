@@ -293,6 +293,75 @@ def test_only_the_intervened_fields_differ_after_the_intervention():
     assert b["corporate_bond_yield"] == pytest.approx(0.075)
 
 
+def test_apply_rebases_a_scenario_onto_this_worlds_days():
+    """One file, one experiment, whichever arm it lands on.
+
+    A scenario counts `at` from where the run loop starts applying it. A
+    World counts days from the beginning of a history its sibling shares, so
+    an arm forked on day 20 is on day 20. Handing the same document to both
+    without rebasing would mean two different experiments.
+    """
+    _world, _mark, _control, shock, _agreement = experiment()
+    day_at_apply = shock.day
+
+    scenario = tf.Scenario(name="thin").shock(
+        "market.liquidity", operation="multiply", value=0.4, at=3, duration=4)
+    shock.apply(scenario)
+
+    assert [item.at for item in shock.applied] == [day_at_apply + 3]
+    # And the document itself is untouched, so it can be applied again.
+    assert [item.at for item in scenario.interventions] == [3]
+
+
+def test_apply_reaches_what_intervene_cannot():
+    """`intervene` writes macro fields and says so. A scenario reaches the
+    book, which is the only lever that separates a good decision from a good
+    outcome."""
+    _world, _mark, control, shock, _agreement = experiment()
+    before = shock.engine.column("avg_volume")
+
+    shock.apply(tf.Scenario(name="thin").shock(
+        "market.liquidity", operation="multiply", value=0.3, at=0, duration=3))
+    control.run(days=1)
+    shock.run(days=1)
+
+    assert shock.engine.column("avg_volume") != before
+    assert control.engine.column("avg_volume") == before
+    assert [f.target for f in shock.firings] == ["market.liquidity"]
+
+
+def test_apply_refuses_what_it_cannot_honour():
+    _world, _mark, _control, shock, _agreement = experiment()
+    with pytest.raises(tf.ValidationError):
+        shock.apply("liquidity_crisis")                 # not a Scenario
+    with pytest.raises(tf.ValidationError):
+        shock.apply(tf.Scenario(name="pins").hold(vix=20.0))   # no interventions
+
+
+def test_an_applied_scenario_reaches_the_manifest_and_the_comparison():
+    """The two places the experiment has to survive being handed over."""
+    _world, _mark, control, shock, agreement = experiment()
+    shock.apply(
+        tf.Scenario(name="thin", description="Example assumptions.")
+        .shock("market.liquidity", operation="multiply", value=0.35, at=0,
+               duration=4)
+        .assume("macro.corporate_yield", operation="add", value=0.01, at=0,
+                duration=4))
+    control.run(days=FORWARD)
+    shock.run(days=FORWARD)
+
+    doc = json.loads(shock.manifest(strategy="tests").to_json())["scenario"]
+    assert [s["target"] for s in doc["shocks"]] == ["market.liquidity"]
+    assert [t["target"] for t in doc["transmission"]] == \
+        ["macro.corporate_yield"]
+
+    # And the comparison can say WHEN, which it could not before: it read
+    # `intervene`'s list and an applied scenario is not in it.
+    result = compare(control, shock, agreement=agreement)
+    assert result.divergence.intervention_step is not None
+    assert result.divergence.intervention_day is not None
+
+
 def test_the_intervention_is_recorded_in_the_engines_own_log():
     """Not only in the Python object. A checkpoint that did not carry the
     intervention would replay the control and call it the treatment."""
