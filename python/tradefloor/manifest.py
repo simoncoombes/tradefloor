@@ -568,21 +568,73 @@ class RunManifest:
         recorded = self._doc["result"]
         digest = market_digest(engine)
         if digest != recorded["digest"]:
-            wrote = self._doc["written_by"]["platform"]
-            raise ValidationError(
-                "the replay ran but did not rebuild the recorded market: "
-                f"digest {digest[:12]}... against the manifest's "
-                f"{recorded['digest'][:12]}... (draws consumed "
-                f"{engine.draws_consumed} against {recorded['draws_consumed']}"
-                "). Every carried input matched its fingerprint and the era "
-                "probe agreed, so the divergence is in arithmetic the probe "
-                "does not exercise, on an unmeasured platform pair (written "
-                f"on {wrote['os']}-{wrote['machine']}, replayed on "
-                f"{_platform.system()}-{_platform.machine()}) that is the "
-                "leading suspect. Bisect with tradefloor.replay(log, ..., "
-                "until=n)."
-            )
+            raise ValidationError(self._divergence(engine, digest, recorded))
         return engine
+
+    def _divergence(self, engine: Engine, digest: str,
+                    recorded: dict[str, Any]) -> str:
+        """Why the replay did not rebuild the market, ranked by the evidence
+        already in hand.
+
+        This used to lead with "an unmeasured platform pair" in every case,
+        and print the pair -- which was often the SAME platform twice, so the
+        sentence disproved itself while sending the reader to the Rust core.
+        It happened for real: a manifest taken on a fork whose order log was
+        empty reported a suspected Windows-versus-Windows arithmetic
+        difference, and the cause was a truncated history.
+
+        Two facts are free here and neither was used. The draw counts say
+        whether the two runs executed the same sequence of operations at all,
+        which separates an input problem from an arithmetic one; and the two
+        platform strings say whether a platform difference is even available
+        as an explanation.
+        """
+        wrote = self._doc["written_by"]["platform"]
+        there = f"{wrote['os']}-{wrote['machine']}"
+        here = f"{_platform.system()}-{_platform.machine()}"
+        head = (
+            "the replay ran but did not rebuild the recorded market: "
+            f"digest {digest[:12]}... against the manifest's "
+            f"{recorded['digest'][:12]}... (draws consumed "
+            f"{engine.draws_consumed} against {recorded['draws_consumed']}). "
+        )
+        bisect = (" Bisect with tradefloor.replay(log, ..., until=n): replay "
+                  "both to step n and compare, and the first n that differs "
+                  "is the operation to look at.")
+
+        if engine.draws_consumed != recorded["draws_consumed"]:
+            return head + (
+                "The DRAW COUNTS DIFFER, so the two runs did not execute the "
+                "same sequence of operations. That is an input difference, "
+                "not an arithmetic one, and no platform explains it: this log "
+                "is not the log that produced the recorded result. It is "
+                "shorter or longer than the history it claims. The usual "
+                "cause is a manifest written on an engine whose order log "
+                "did not cover how it reached its state."
+            ) + bisect
+
+        if there != here:
+            return head + (
+                "Every carried input matched its fingerprint, the era probe "
+                "agreed, and the draw counts match, so the two runs executed "
+                "the same operations and disagreed about the arithmetic. "
+                f"They ran on different platforms ({there} wrote it, {here} "
+                "replayed it), which is the leading suspect: this is the "
+                "cross-platform bit-identity the release gate exists to "
+                "measure, and a pair it has not measured can differ."
+            ) + bisect
+
+        return head + (
+            "Every carried input matched its fingerprint, the era probe "
+            "agreed, and the draw counts match. Both runs are on "
+            f"{here}, so a platform difference is NOT the explanation. What "
+            "is left, in order: a build with different flags (float "
+            "reassociation, FMA contraction or target-cpu=native would each "
+            "do this, which is why the release profile forbids them); a "
+            "wheel that is not the one whose digest was recorded, despite "
+            "reporting the same version; or arithmetic the era probe does "
+            "not exercise."
+        ) + bisect
 
     def _model_for_replay(self) -> ModelParams | None:
         """The model the run was recorded under, rebuilt for the replay.
