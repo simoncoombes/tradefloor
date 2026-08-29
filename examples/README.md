@@ -1,6 +1,6 @@
 # Examples
 
-Eight notebooks and three scripts, numbered in reading order. The committed
+Eight notebooks and four scripts, numbered in reading order. The committed
 notebooks carry their output, so you can read them without running anything.
 Start at 00 if you have not used tradefloor before.
 
@@ -17,6 +17,7 @@ Start at 00 if you have not used tradefloor before.
 | [`07-research-workflow.py`](07-research-workflow.py) | A whole study in one file: sweep, evaluation, TCA, replay |
 | [`08-claude-agent.py`](08-claude-agent.py) | An LLM agent scored against the baselines |
 | [`10-forking-a-market.py`](10-forking-a-market.py) | Fork a market mid-flight, change the policy rate in one branch, compare |
+| [`11-scenario-fork.py`](11-scenario-fork.py) | Read a scenario from YAML, apply it to one branch of a fork, and price what it cost |
 
 Notebooks 05 and 06 cover the two audiences the project is built for, RL
 researchers and execution developers.

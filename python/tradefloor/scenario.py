@@ -15,6 +15,48 @@ shock = Scenario.rate_shock(start=0.025, end=0.05, over=30)
 scores = tf.evaluate(agents, seed=7, universe=u, days=60, scenario=shock)
 ```
 
+## Two mechanisms, and they answer different questions
+
+The above is a PATH: every day of the run, the policy rate is whatever the
+ramp says, and the endogenous chain does not get a vote. That is right when
+the path is the experiment.
+
+A `Scenario` also carries INTERVENTIONS, which are relative changes scheduled
+against the live market:
+
+```python
+scenario = Scenario.from_yaml("scenarios/liquidity_crisis.yml")
+control, stress = tf.branch(engine, 2)
+for day in range(80):
+    scenario.apply(stress, day)
+    ...
+```
+
+or, the same thing in Python:
+
+```python
+scenario = (Scenario(name="liquidity_crisis")
+            .shock("market.liquidity", operation="multiply", value=0.40,
+                   at=50, duration=25)
+            .assume("macro.corporate_yield", operation="add", value=0.005,
+                    at=50, duration=25))
+```
+
+`multiply` cannot be a path, because the value it multiplies is whatever the
+chain has reached by day 50. So an intervention reads the field, applies its
+operation and writes the result back, and the audit trail records the values
+it saw rather than the recipe. The registry of what may be moved, what each
+target actually reaches and what it was measured to be worth is
+:mod:`tradefloor.interventions`.
+
+`shock` and `assume` do the same thing and are deliberately different words.
+Nothing here derives a transmission: a scenario that assumes an oil shock
+raises inflation by 1.5 points says so under its own heading, and
+:meth:`Scenario.describe` prints it there.
+
+The two compose. Pins are written first each day, then interventions on top,
+so a scenario can hold VIX calm for sixty days and then spike it.
+
 ## The trap this exists to close
 
 Pinning `federal_funds_rate` on its own does **nothing inside the first
@@ -207,10 +249,27 @@ import warnings
 from typing import Any, Callable, Sequence
 
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
+from . import yaml_subset
+from .interventions import (
+    ROLES,
+    SCENARIO_SCHEMA,
+    TARGETS,
+    Firing,
+    Intervention,
+    ScenarioValidationError,
+    apply_operation,
+    canonical_json,
+    sha256_of,
+    summarise,
+)
 
 #: The macro fields a scenario may drive. Anything else is a typo, and a typo
 #: that silently did nothing would be the same class of failure this module
 #: exists to close.
+#:
+#: The last four reach a price only through the macro chain -- see
+#: :data:`tradefloor.interventions.TARGETS`, which records for every target
+#: what reads it and how long it takes to arrive.
 FIELDS = (
     "vix",
     "federal_funds_rate",
@@ -218,13 +277,18 @@ FIELDS = (
     "inflation_rate",
     "qe_pe_boost",
     "fear_greed_index",
+    "gdp_growth",
+    "unemployment_rate",
+    "tariff_rate",
+    "oil_price",
     "cycle",
 )
 
 #: Fields the engine validates as fractions in [-0.05, 0.50]. Listed so a
 #: scenario can reject 5.0-meaning-5% at construction, where the mistake is
 #: visible, rather than sixty days into a run.
-RATE_FIELDS = ("federal_funds_rate", "corporate_bond_yield", "inflation_rate")
+RATE_FIELDS = ("federal_funds_rate", "corporate_bond_yield", "inflation_rate",
+               "gdp_growth", "unemployment_rate", "tariff_rate")
 
 RATE_MIN, RATE_MAX = -0.05, 0.50
 
@@ -256,6 +320,13 @@ def _check(field: str, value: Any) -> None:
                 f"{field} = {value} is outside the plausible range "
                 f"[{RATE_MIN}, {RATE_MAX}]. Rates are FRACTIONS here: 5.2% is "
                 "0.052, not 5.2."
+            )
+    if field == "oil_price" and isinstance(value, (int, float)):
+        if value <= 0:
+            raise ValidationError(
+                f"oil_price = {value} is not a price. It is denominated in "
+                "dollars (the engine opens at 75.0), not as a fraction or a "
+                "multiplier, and the daily chain clamps it into [35, 150]."
             )
 
 
@@ -347,14 +418,114 @@ def _describe_call(name: str, *args: Any, **kwargs: Any) -> str:
     return f"{name}({', '.join(parts)})"
 
 
+def _wrap(text: str, width: int = 72) -> list[str]:
+    """Paragraphs at a readable width, for `describe`.
+
+    A description read out of a folded YAML block is one long line, and a
+    terminal is not one long line.
+    """
+    out: list[str] = []
+    for paragraph in text.strip().splitlines():
+        if not paragraph.strip():
+            out.append("")
+            continue
+        line = ""
+        for word in paragraph.split():
+            if line and len(line) + 1 + len(word) > width:
+                out.append(line)
+                line = word
+            else:
+                line = f"{line} {word}".strip()
+        if line:
+            out.append(line)
+    return out
+
+
+def _interpolate(start: Any, finish: Any, step: float) -> Any:
+    """One point on a ramp, over a scalar or over a whole column."""
+    if isinstance(start, tuple):
+        return tuple(_interpolate(a, b, step) for a, b in zip(start, finish))
+    return start + (finish - start) * step
+
+
+def _rerole(item: Intervention, role: str) -> Intervention:
+    """The same intervention filed under the other heading.
+
+    `Scenario(shocks=[...])` should not need every Intervention spelled with
+    `role="shock"`, and an intervention built for one list and passed to the
+    other is a mistake worth silently fixing rather than refusing: the role
+    is a property of where it was declared.
+    """
+    return Intervention(
+        item.target, operation=item.operation, value=item.value, at=item.at,
+        duration=item.duration, shape=item.shape, role=role,
+    )
+
+
 class Scenario:
-    """A macro path, built from segments and read a day at a time."""
+    """A macro path and a set of explicit interventions, applied a day at a time.
 
-    __slots__ = ("_drivers", "_label")
+    Two mechanisms, one object, and they are for different questions.
 
-    def __init__(self, label: str = "") -> None:
+    **Pins** -- :meth:`hold`, :meth:`ramp`, :meth:`step` -- state a whole
+    PATH for a field: every day of the run, that field is whatever the path
+    says, and the endogenous chain does not get a vote. That is the right
+    shape for "what does a hiking cycle do", where the cycle is the
+    experiment.
+
+    **Interventions** -- :meth:`shock`, :meth:`assume`, or a YAML file --
+    state a CHANGE relative to whatever the market had arrived at: multiply
+    oil by 1.40 on day 50 and let the chain carry it from there. That is the
+    right shape for a shock, and it is the only one that can express a
+    relative operation, because the value being multiplied is not knowable
+    until the day arrives.
+
+    They compose. Pins are written first on each day, then interventions on
+    top, so a scenario can hold VIX calm for sixty days and then spike it.
+
+    A scenario also carries a `name` and a `description`, and its
+    interventions are split into `shocks` and `transmission`. That split is a
+    claim about evidence rather than about mechanism: the engine treats both
+    identically, and the point of separating them is that a report can say
+    "this scenario ASSUMES a 1.5pp inflation pass-through" instead of
+    implying the simulator derived one. See :meth:`describe`.
+    """
+
+    __slots__ = ("_drivers", "_label", "_description", "_shocks",
+                 "_transmission", "_source", "_log", "_anchors", "_engine",
+                 "_day")
+
+    def __init__(self, label: str = "", *, name: str | None = None,
+                 description: str = "",
+                 interventions: Sequence[Intervention] = (),
+                 shocks: Sequence[Intervention] = (),
+                 transmission: Sequence[Intervention] = ()) -> None:
+        if name is not None and label and name != label:
+            raise ScenarioValidationError(
+                f"a scenario has one identity, and this one was given two: "
+                f"label={label!r} and name={name!r}. `name` is the spelling "
+                f"the YAML uses and `label` is the one the older Python "
+                f"surface uses; they are the same field."
+            )
         self._drivers: dict[str, list[_Pin]] = {}
-        self._label = label
+        self._label = name if name is not None else label
+        self._description = description
+        self._shocks: list[Intervention] = []
+        self._transmission: list[Intervention] = []
+        self._source: str | None = None
+        # The audit trail, and the state a hold or a ramp needs. Both belong
+        # to ONE run on ONE engine: see `apply`, which resets them when it
+        # sees a different engine or a restarted clock.
+        self._log: list[Firing] = []
+        self._anchors: dict[int, tuple[Any, Any]] = {}
+        self._engine: Engine | None = None
+        self._day = -1
+
+        for given, role in ((interventions, None), (shocks, "shock"),
+                            (transmission, "transmission")):
+            for item in given:
+                self.intervene(item if role is None or item.role == role
+                               else _rerole(item, role))
 
     # -- per-field composition --------------------------------------------
 
@@ -529,6 +700,223 @@ class Scenario:
         ))
         return self
 
+    # -- interventions ----------------------------------------------------
+
+    def intervene(self, intervention: Intervention) -> "Scenario":
+        """Add one built :class:`tradefloor.Intervention`.
+
+        Declared order is kept, and it is what breaks a tie: two
+        interventions on the same target on the same day compose in the order
+        they were written, the second reading what the first wrote. Shocks
+        run before transmission, always, because that is the order the
+        scenario claims they happen in.
+        """
+        if not isinstance(intervention, Intervention):
+            raise ScenarioValidationError(
+                f"expected an Intervention, got {type(intervention).__name__}. "
+                f"Build one with tf.Intervention(target=..., operation=..., "
+                f"value=..., at=...) or write the YAML."
+            )
+        bucket = (self._shocks if intervention.role == "shock"
+                  else self._transmission)
+        bucket.append(intervention)
+        return self
+
+    def shock(self, target: str, *, operation: str = "multiply",
+              value: Any = None, at: int = 0, duration: int | None = None,
+              shape: str | None = None) -> "Scenario":
+        """An exogenous shock: what this scenario asserts happened."""
+        return self.intervene(Intervention(
+            target, operation=operation, value=value, at=at,
+            duration=duration, shape=shape, role="shock"))
+
+    def assume(self, target: str, *, operation: str = "multiply",
+               value: Any = None, at: int = 0, duration: int | None = None,
+               shape: str | None = None) -> "Scenario":
+        """An assumed transmission: what the AUTHOR thinks the shock did next.
+
+        Identical machinery to :meth:`shock`, and deliberately a different
+        word. This library cannot tell you that a 40% oil shock raises
+        inflation by 1.5 percentage points. It can run a market in which
+        somebody assumed exactly that, and :meth:`describe` prints the
+        assumption under its own heading so a reader is never left to guess
+        which half was derived.
+        """
+        return self.intervene(Intervention(
+            target, operation=operation, value=value, at=at,
+            duration=duration, shape=shape, role="transmission"))
+
+    @property
+    def shocks(self) -> tuple[Intervention, ...]:
+        return tuple(self._shocks)
+
+    @property
+    def transmission(self) -> tuple[Intervention, ...]:
+        return tuple(self._transmission)
+
+    @property
+    def interventions(self) -> tuple[Intervention, ...]:
+        """Every intervention, in the order they fire: shocks, then assumptions."""
+        return tuple(self._shocks) + tuple(self._transmission)
+
+    @property
+    def name(self) -> str:
+        """The scenario's identity: what the YAML spells ``name`` and the
+        older Python surface calls ``label``. One field, two spellings."""
+        return self._label
+
+    @property
+    def description(self) -> str:
+        return self._description
+
+    @property
+    def source(self) -> str | None:
+        """Where this scenario was read from, if it was read from a file.
+
+        Provenance, not reproduction: a manifest replays the RESOLVED
+        scenario, so a run stays reproducible after the file is edited,
+        renamed or deleted. Only the file's NAME travels in the serialised
+        document -- a full path is machine-specific, and a fingerprint over
+        one would differ between two people running the same experiment.
+        """
+        return self._source
+
+    # -- the resolved document --------------------------------------------
+
+    def document(self) -> dict[str, Any]:
+        """The canonical resolved scenario: what gets fingerprinted and recorded.
+
+        Every key is present whether or not it was written, and every
+        intervention carries its defaults, because a fingerprint over a
+        document whose keys come and go is a fingerprint over the author's
+        typing habits rather than over the experiment.
+
+        Pins are represented by their DECLARED CALL rather than by their
+        realised values, because those depend on how many days you run. One
+        consequence worth knowing: a scenario rebuilt by :meth:`from_json`
+        declares a recorded path, so it fingerprints differently from the
+        constructor that produced it. The realised path and the recipe are
+        different statements, and :meth:`to_json` records the first.
+        """
+        return {
+            "schema": SCENARIO_SCHEMA,
+            "name": self._label,
+            "description": self._description,
+            "pins": [
+                {"field": field, "from_day": pin.begin,
+                 "declared": pin.describe}
+                for field in sorted(self._drivers)
+                for pin in self._drivers[field]
+            ],
+            "shocks": [item.as_dict() for item in self._shocks],
+            "transmission": [item.as_dict() for item in self._transmission],
+        }
+
+    @property
+    def fingerprint(self) -> str:
+        """sha256 over the resolved document. Cite this.
+
+        Two scenarios fingerprint the same when they are the same experiment,
+        so a scenario written in YAML fingerprints the same as the identical
+        one written in Python: both resolve to the same :meth:`document`, and
+        the hash is over that rather than over the file's bytes.
+        Reformatting the YAML, reordering its keys or changing its comments
+        does not move the fingerprint. Reordering the interventions does,
+        because order is what breaks a same-day tie.
+        """
+        return sha256_of(self.document())
+
+    def describe(self) -> str:
+        """The scenario as a reader needs to see it, shocks above assumptions."""
+        out = [f"SCENARIO  {self._label or '(unnamed)'}"]
+        if self._description:
+            out.append("")
+            out.extend(_wrap(self._description))
+        out.append("")
+        out.append(f"Schema      v{SCENARIO_SCHEMA}")
+        out.append(f"Fingerprint {self.fingerprint}")
+        if self._source:
+            out.append(f"Source      {self._source}")
+
+        if self._drivers:
+            out.append("")
+            out.append("Macro path")
+            out.append("-" * 58)
+            for field in sorted(self._drivers):
+                for pin in self._drivers[field]:
+                    out.append(f"  {field:<24} {pin.describe}")
+
+        for items, heading in (
+            (self._shocks, "Exogenous shocks"),
+            (self._transmission, "Assumed transmission"),
+        ):
+            if not items:
+                continue
+            out.append("")
+            out.append(heading)
+            out.append("-" * 58)
+            out.extend("  " + item.describe() for item in items)
+
+        if self._transmission:
+            out.append("")
+            out.extend(_wrap(
+                "The transmission entries are ASSUMPTIONS made by whoever "
+                "wrote this scenario. Nothing here derives them, and nothing "
+                "here is a forecast of how a real market would respond."
+            ))
+        return "\n".join(out)
+
+    def without_interventions(self) -> "Scenario":
+        """The same macro path with every intervention removed.
+
+        The counterfactual :func:`compare` wants: one world where the shock
+        happened and one where everything else was identical and it did not.
+        """
+        twin = Scenario(f"{self._label} (no interventions)" if self._label
+                        else "")
+        twin._drivers = {field: list(pins)
+                         for field, pins in self._drivers.items()}
+        twin._description = self._description
+        return twin
+
+    def copy(self) -> "Scenario":
+        """An independent scenario with the same declaration.
+
+        Needed to drive two runs AT ONCE from one recipe. A scenario carries
+        the audit trail and the hold anchors of the run it is applied to, and
+        a run is identified by its clock, so two interleaved runs would share
+        one. Sequential runs need no copy: the clock restarting is what
+        starts a new trail.
+        """
+        twin = Scenario(self._label, description=self._description)
+        twin._drivers = {field: list(pins)
+                         for field, pins in self._drivers.items()}
+        twin._shocks = list(self._shocks)
+        twin._transmission = list(self._transmission)
+        twin._source = self._source
+        return twin
+
+    # -- the audit trail ---------------------------------------------------
+
+    @property
+    def log(self) -> tuple[Firing, ...]:
+        """Every intervention that actually fired, with the values it saw.
+
+        The recipe says x1.40. What a reader needs afterwards is that oil
+        went from 82.14 to 115.00 on day 50, which depends on where the
+        endogenous chain had arrived. Each :class:`Firing` carries an
+        ``as_dict()`` for a machine and a ``str()`` for a person.
+
+        This is the LAST run's trail. A scenario applied to a different
+        engine, or to the same one from day zero again, starts a new one --
+        see :meth:`apply`.
+        """
+        return tuple(self._log)
+
+    def firing_table(self) -> list[dict[str, Any]]:
+        """The audit trail as plain dicts, for a manifest or a dataframe."""
+        return [entry.as_dict() for entry in self._log]
+
     # -- reading ----------------------------------------------------------
 
     def at(self, day: int) -> dict[str, Any]:
@@ -549,18 +937,147 @@ class Scenario:
         """
         return [{"day": day, **self.at(day)} for day in range(days)]
 
-    def apply(self, engine: Engine, day: int) -> None:
-        """Pin the engine's macro to this day's values."""
+    def apply(self, engine: Engine, day: int) -> list[Firing]:
+        """Drive one day of one run: pins first, then interventions.
+
+        Returns the interventions that actually fired, which is also what
+        lands in :attr:`log`.
+
+        # What `day` means, and why it is relative
+
+        `day` is whatever the run loop counts, and every loop in this library
+        starts at zero: :func:`run_scenario`, :func:`tradefloor.evaluate`, and
+        a loop you write yourself. So `at: 50` is fifty days after the
+        scenario starts being applied -- simulation day 50 for a fresh run,
+        and fifty days after the FORK for a branch that resumes from a
+        checkpoint.
+
+        That is the only reading under which one file means one experiment on
+        both sides of a checkpoint, which is the point of forking. The
+        alternative -- absolute simulation days -- would make the same YAML
+        fire on day 50 of the parent's history, which for a branch taken at
+        day 60 is a day that has already happened. Schema 1 therefore has one
+        interpretation, `at: {relative: N}` spells it out, and `absolute` is
+        refused by name rather than silently treated as relative.
+
+        # Order within a day
+
+        Pins, then shocks in declared order, then transmission in declared
+        order. Two interventions on one target on one day compose: the second
+        reads what the first wrote. Nothing here consults a set, a dict
+        ordering or the clock, so two runs of the same scenario fire in the
+        same sequence.
+
+        # One scenario, one run, identified by its clock
+
+        A `hold` and a `ramp` both need the value the field had on their
+        first day, so the scenario carries that anchor -- and the audit trail
+        -- for the run it is being applied to. A run is identified by its
+        CLOCK, not by the engine object: `day` going back to or below the
+        last day it saw starts a new run and clears both.
+
+        The engine deliberately does not identify the run, because a
+        checkpoint resume is a NEW engine continuing the SAME run. Days 0-59
+        on the original and 60-119 on the engine `Checkpoint.resume()`
+        returns is one experiment, and a hold that began on day 50 has to
+        survive the join. That is the §34 guarantee, and keying the anchor on
+        the engine would break it.
+
+        The cost of that choice, stated plainly: one scenario object driving
+        two runs AT ONCE shares one clock between them. Alternating
+        `apply(a, 0)`, `apply(b, 0)`, `apply(a, 1)` is not a pattern this
+        object supports -- give each run its own :meth:`copy`. A run that
+        joins a hold part-way through, which is the mistake this actually
+        catches, is refused by name rather than anchored to whatever it
+        happens to find.
+        """
+        if day <= self._day:
+            self._log = []
+            self._anchors = {}
+        self._engine = engine
+        self._day = day
+
         pins = self.at(day)
         if pins:
             engine.pin_macro(**pins)
+
+        fired: list[Firing] = []
+        for index, item in enumerate(self.interventions):
+            if not item.active_on(day):
+                continue
+            fired.append(self._fire(index, item, engine, day))
+        self._log.extend(fired)
+        return fired
+
+    def _fire(self, index: int, item: Intervention, engine: Engine,
+              day: int) -> Firing:
+        """Read the live value, apply the operation, write it back.
+
+        The anchor is what stops a `hold` compounding. `multiply` by 2.0 held
+        for twenty-five days does not mean 2^25: it means the value the field
+        had on the first day, doubled, and then that same number written
+        every day of the window. So the target is computed ONCE, on day
+        ``at``, from whatever the endogenous chain had reached, and the
+        window replays it.
+        """
+        target = TARGETS[item.target]
+        previous = target.read(engine)
+
+        if item.shape == "impulse":
+            new = apply_operation(item.operation, previous, item.value)
+        else:
+            if day == item.at:
+                anchor = (previous,
+                          apply_operation(item.operation, previous, item.value))
+                self._anchors[index] = anchor
+            else:
+                anchor = self._anchors.get(index)
+                if anchor is None:
+                    raise ScenarioValidationError(
+                        f"{item.target} is inside a {item.shape} that began "
+                        f"on day {item.at}, but this run never applied day "
+                        f"{item.at}: there is no value to hold. A hold and a "
+                        f"ramp are anchored to the level the field had on "
+                        f"their first day, so a run that joins one part-way "
+                        f"through has nothing to anchor to. Start the run at "
+                        f"or before day {item.at}, or move the intervention."
+                    )
+            start, finish = anchor
+            if item.shape == "ramp":
+                step = (day - item.at + 1) / item.duration
+                new = _interpolate(start, finish, step)
+            else:
+                new = finish
+
+        target.write(engine, new)
+        return Firing(
+            day=day, scenario=self._label, role=item.role, target=item.target,
+            operation=item.operation, value=item.value, shape=item.shape,
+            previous=summarise(previous), new=summarise(new),
+        )
 
     @property
     def fields(self) -> tuple[str, ...]:
         return tuple(sorted(self._drivers))
 
-    def to_json(self, days: int) -> str:
-        """The realised path as JSON, so a result can cite its scenario.
+    def to_json(self, days: int | None = None) -> str:
+        """The scenario as JSON, so a result can cite what it ran under.
+
+        Two documents, and which one you get depends on what the scenario is.
+
+        A scenario built only from pins serialises as it always has: schema
+        1, the realised PATH over ``days``. That is deliberate rather than
+        lazy -- every manifest already published carries this shape, and its
+        fingerprint has to keep meaning the same thing.
+
+        A scenario carrying interventions serialises as schema 2: the
+        resolved shocks and transmission, the name, the description, the
+        source file's name and the fingerprint, plus the path if it also has
+        pins. What is recorded is the RESOLVED experiment, not a reference to
+        a YAML file, so the run replays after the file is edited or deleted.
+
+        ``days`` may be omitted only when the scenario has no pins, because
+        then there is no path to realise.
 
         The PATH rather than the recipe. A recipe is only citable while the
         constructor that built it keeps behaving the same way; the realised
@@ -571,7 +1088,7 @@ class Scenario:
         NOTHING: a round trip that quietly discarded every field, and a
         reproduced run that applied no pins at all.
         """
-        if days < 1:
+        if self._drivers and (days is None or days < 1):
             raise ValidationError(
                 f"days must be at least 1 to serialise a scenario, got {days}. "
                 f"The serialised form is the realised PATH, so a zero-day "
@@ -580,11 +1097,44 @@ class Scenario:
                 f"{', '.join(self.fields) or 'nothing'}. Serialise the "
                 f"horizon the run actually uses."
             )
-        return json.dumps(
-            {"schema": 1, "label": self._label, "days": days,
-             "path": self.table(days)},
-            sort_keys=True, separators=(",", ":"),
-        )
+        if not (self._shocks or self._transmission):
+            # A pins-only scenario serialises exactly as it always has, byte
+            # for byte. Every published manifest and every fingerprint over
+            # one stays valid, which matters more than a uniform schema
+            # number: a result cited last month has to replay this month.
+            return json.dumps(
+                {"schema": 1, "label": self._label, "days": days,
+                 "path": self.table(days)},
+                sort_keys=True, separators=(",", ":"),
+            )
+
+        payload: dict[str, Any] = {
+            "schema": SCENARIO_SCHEMA + 1,
+            "label": self._label,
+            "name": self._label,
+            "description": self._description,
+            "source": self._source_name(),
+            "fingerprint": self.fingerprint,
+            "shocks": [item.as_dict() for item in self._shocks],
+            "transmission": [item.as_dict() for item in self._transmission],
+        }
+        if self._drivers:
+            payload["days"] = days
+            payload["path"] = self.table(days)
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+    def _source_name(self) -> str | None:
+        """The file's NAME, never its path.
+
+        A full path is machine-specific, and this document is fingerprinted
+        inside a `RunManifest` -- so a path would make two people running the
+        same experiment produce two different fingerprints. The name is the
+        part that identifies the scenario; `scenario.source` keeps the path
+        the caller actually gave.
+        """
+        if self._source is None:
+            return None
+        return self._source.replace("\\", "/").rsplit("/", 1)[-1]
 
     def from_json(cls, text: str) -> "Scenario":
         """Rebuild a scenario from :meth:`to_json` output.
@@ -605,14 +1155,23 @@ class Scenario:
         the original never applied.
         """
         payload = json.loads(text)
-        if not isinstance(payload, dict) or "path" not in payload:
+        if not isinstance(payload, dict):
             raise ValidationError("not a tradefloor scenario document")
         schema = payload.get("schema", 0)
-        if schema > 1:
+        if schema > SCENARIO_SCHEMA + 1:
             raise ValidationError(
                 f"scenario schema {schema} is newer than this version "
                 "understands. Upgrade tradefloor rather than reading it partially."
             )
+
+        scenario_out: "Scenario | None" = None
+        if schema >= SCENARIO_SCHEMA + 1:
+            scenario_out = cls._from_schema_2(payload)
+            if "path" not in payload:
+                return scenario_out
+        elif "path" not in payload:
+            raise ValidationError("not a tradefloor scenario document")
+
         path = payload["path"]
         days = payload.get("days")
         if not isinstance(path, list) or days != len(path):
@@ -656,7 +1215,8 @@ class Scenario:
                 _check(field, row[field])
                 values[field].append(row[field])
 
-        scenario = cls(label=payload.get("label", ""))
+        scenario = scenario_out if scenario_out is not None else cls(
+            label=payload.get("label", ""))
         last = len(path) - 1
         for field, series in values.items():
             scenario._pin(field, _Pin(
@@ -667,6 +1227,178 @@ class Scenario:
             ))
         return scenario
 
+    @classmethod
+    def _from_schema_2(cls, payload: dict[str, Any]) -> "Scenario":
+        """The intervention half of a recorded scenario.
+
+        The recorded fingerprint is checked where checking it means
+        something. For a document with no path the round trip is exact, so a
+        mismatch is a document somebody edited and it is refused. For a
+        document that also carries a realised path it is not: the rebuilt
+        pins declare a RECORDED PATH where the original declared a ramp or a
+        step, which is a different statement about the same run and
+        fingerprints differently. Checking there would fail on every honest
+        document, so it does not check.
+        """
+        scenario = cls(
+            label=payload.get("label", payload.get("name", "")),
+            description=payload.get("description", "") or "",
+        )
+        source = payload.get("source")
+        if source is not None:
+            scenario._source = str(source)
+        for role, key in (("shock", "shocks"),
+                          ("transmission", "transmission")):
+            for index, item in enumerate(payload.get(key) or ()):
+                scenario.intervene(Intervention.from_dict(
+                    item, role=role, where=f"{key}[{index}]"))
+
+        recorded = payload.get("fingerprint")
+        if recorded is not None and "path" not in payload:
+            if recorded != scenario.fingerprint:
+                raise ValidationError(
+                    f"this scenario document records fingerprint {recorded} "
+                    f"and resolves to {scenario.fingerprint}. The two "
+                    f"disagree, so the document was edited after it was "
+                    f"written and no longer describes the run that produced "
+                    f"it."
+                )
+        return scenario
+
+    def from_yaml(cls, source: str) -> "Scenario":
+        """Read a scenario from a YAML file, or from YAML text.
+
+        ```python
+        scenario = tf.Scenario.from_yaml("scenarios/liquidity_crisis.yml")
+        ```
+
+        A string that names a readable file is read as one; anything else is
+        treated as the document itself, so a scenario can be written inline
+        in a notebook or a test.
+
+        The reader is :mod:`tradefloor.yaml_subset`, which implements the
+        block-style subset this schema uses and REFUSES everything else by
+        name -- tags, anchors, flow collections, multiple documents. It has
+        no constructor to reach, so a scenario file cannot name a Python
+        type, and the loader then rejects every key outside the schema. The
+        library keeps its promise of no dependencies, and a configuration
+        file stays configuration.
+
+        The YAML and the Python forms resolve to the same object: the same
+        interventions in the same order, and therefore the same
+        :attr:`fingerprint`.
+        """
+        text = source
+        path: str | None = None
+        if "\n" not in source and len(source) < 4096:
+            try:
+                with open(source, "r", encoding="utf-8") as handle:
+                    text = handle.read()
+                path = source
+            except OSError:
+                text = source
+        return cls.from_document(yaml_subset.read(text), source=path)
+
+    from_yaml = _constructor(from_yaml, (
+        "there is nothing to add: from_yaml builds a whole scenario from a "
+        "document. Load it on the class, or read the file and add its "
+        "interventions to this one with .intervene(...)."
+    ))
+
+    def from_document(cls, document: Any, *,
+                      source: str | None = None) -> "Scenario":
+        """Build a scenario from an already-parsed configuration mapping.
+
+        The layer under :meth:`from_yaml`, and the one that decides what a
+        scenario document may say. Everything outside the schema is refused
+        rather than ignored: an unknown key is either a typo or a newer
+        schema, and running it either way applies an experiment nobody wrote.
+        """
+        if not isinstance(document, dict):
+            raise ScenarioValidationError(
+                f"a scenario document is a mapping with `version` and "
+                f"`scenario` keys, got {type(document).__name__}."
+            )
+        version = document.get("version")
+        if version is None:
+            raise ScenarioValidationError(
+                "the document has no `version`. Add `version: 1` at the top: "
+                "an unversioned configuration format cannot be changed "
+                "without silently changing what old files mean."
+            )
+        if version != SCENARIO_SCHEMA:
+            raise ScenarioValidationError(
+                f"scenario schema version {version!r} is not one this build "
+                f"reads (it reads version {SCENARIO_SCHEMA}). "
+                + ("Upgrade tradefloor rather than reading it partially."
+                   if isinstance(version, int) and version > SCENARIO_SCHEMA
+                   else "Check the `version` line.")
+            )
+        extra = sorted(set(document) - {"version", "scenario"})
+        if extra:
+            raise ScenarioValidationError(
+                f"unknown top-level key(s) {', '.join(repr(k) for k in extra)}. "
+                f"A scenario document has exactly `version` and `scenario`."
+            )
+        body = document.get("scenario")
+        if not isinstance(body, dict):
+            raise ScenarioValidationError(
+                "the document has no `scenario:` block."
+            )
+        allowed = {"name", "description", "shocks", "transmission"}
+        extra = sorted(set(body) - allowed)
+        if extra:
+            raise ScenarioValidationError(
+                f"unknown key(s) in the scenario block: "
+                f"{', '.join(repr(k) for k in extra)}. A scenario has "
+                f"{', '.join(sorted(allowed))} and nothing else."
+                + ("\n\nInterventions go under `shocks:` (what the scenario "
+                   "asserts happened) or `transmission:` (what it assumes "
+                   "happened next)."
+                   if "interventions" in extra else "")
+            )
+        name = body.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ScenarioValidationError(
+                "the scenario block needs a `name`. A run recorded under an "
+                "unnamed scenario cannot be told apart from any other."
+            )
+        description = body.get("description") or ""
+        if not isinstance(description, str):
+            raise ScenarioValidationError(
+                f"description must be text, got {type(description).__name__}."
+            )
+
+        scenario = cls(name=name.strip(), description=description.strip())
+        scenario._source = source
+        total = 0
+        for role, key in (("shock", "shocks"),
+                          ("transmission", "transmission")):
+            items = body.get(key)
+            if items is None:
+                continue
+            if not isinstance(items, list):
+                raise ScenarioValidationError(
+                    f"`{key}` must be a list of interventions, got "
+                    f"{type(items).__name__}."
+                )
+            for index, item in enumerate(items):
+                scenario.intervene(Intervention.from_dict(
+                    item, role=role, where=f"{key}[{index}]"))
+                total += 1
+        if total == 0:
+            raise ScenarioValidationError(
+                f"scenario {name!r} declares no interventions, so applying it "
+                f"produces a market indistinguishable from one that ran "
+                f"without it. Give it at least one `shocks:` entry."
+            )
+        return scenario
+
+    from_document = _constructor(from_document, (
+        "there is nothing to add: from_document builds a whole scenario. "
+        "Load it on the class and use the result."
+    ))
+
     from_json = _constructor(from_json, (
         "there is nothing to add: from_json rebuilds a complete recorded "
         "path. Load it on the class and use the result, or take the fields "
@@ -674,11 +1406,21 @@ class Scenario:
     ))
 
     def __bool__(self) -> bool:
-        return bool(self._drivers)
+        return bool(self._drivers or self._shocks or self._transmission)
 
     def __repr__(self) -> str:
         label = f"{self._label!r}, " if self._label else ""
-        return f"Scenario({label}driving {', '.join(self.fields) or 'nothing'})"
+        parts = []
+        if self._drivers:
+            parts.append(f"driving {', '.join(self.fields)}")
+        if self._shocks:
+            parts.append(f"{len(self._shocks)} shock(s)")
+        if self._transmission:
+            parts.append(f"{len(self._transmission)} assumption(s)")
+        return f"Scenario({label}{'; '.join(parts) or 'driving nothing'})"
+
+    def __str__(self) -> str:
+        return self.describe()
 
     # -- ready-made shapes ------------------------------------------------
 
@@ -864,6 +1606,23 @@ def _refuse_self_comparison(scenario: Scenario, days: int) -> None:
     wrong, it is confident, it is quoted to three decimal places, and there
     is nothing about it a careful reader could catch.
     """
+    if scenario.interventions:
+        # An intervention scenario is compared against ITSELF WITHOUT THE
+        # INTERVENTIONS, so the question is not whether the path moves but
+        # whether anything fires inside the horizon. Nothing firing is the
+        # same confident zero by a different route.
+        fires = [item for item in scenario.interventions if item.at < days]
+        if fires:
+            return
+        earliest = min(item.at for item in scenario.interventions)
+        raise ValidationError(
+            f"compare() would report exactly 0.00% on every instrument: no "
+            f"intervention in {scenario.name or 'this scenario'} fires inside "
+            f"a {days}-day run. The earliest is on day {earliest}, so both "
+            f"worlds are the baseline. Run at least {earliest + 1} days, or "
+            f"move the shock earlier."
+        )
+
     day_zero = scenario.at(0)
     if any(scenario.at(day) != day_zero for day in range(1, days)):
         return
@@ -942,8 +1701,15 @@ def compare(
 
     if baseline is None:
         _refuse_self_comparison(scenario, days)
-        baseline = Scenario(label="flat").hold(**scenario.at(0))
-    elif scenario.table(days) == baseline.table(days):
+        # For an intervention scenario the counterfactual is the same world
+        # with the interventions removed: same pins, same seed, same draws,
+        # and the shock is the only difference. For a pins-only scenario it
+        # is the day-zero levels held flat, which is what isolates a PATH
+        # from the level it starts at.
+        baseline = (scenario.without_interventions() if scenario.interventions
+                    else Scenario(label="flat").hold(**scenario.at(0)))
+    elif (scenario.table(days) == baseline.table(days)
+          and scenario.interventions == baseline.interventions):
         # An explicit baseline that realises the same path is the same
         # defect arriving by a different route: two runs of one world,
         # differenced, reported as a clean zero.
@@ -961,7 +1727,11 @@ def compare(
                             **kwargs)
 
     shocked = run(scenario)
+    firings = scenario.firing_table()
     flat = run(baseline)
+    # `run` on the baseline may reset the scenario's own trail if the two
+    # objects are the same one, which an explicit baseline can make them.
+    # Hold the shocked world's trail rather than reading it back afterwards.
 
     n = len(shocked.tickers)
     after = struct.unpack("<%dd" % n, shocked.prices())
@@ -1017,6 +1787,12 @@ def compare(
         "seed": seed,
         "days": days,
         "scenario": repr(scenario),
+        # The scenario's own identity, so a comparison can be cited without
+        # the object that produced it, and the days its interventions
+        # actually fired -- which is where to start looking when the
+        # divergence in `move_pct` needs a cause.
+        "scenario_fingerprint": scenario.fingerprint,
+        "interventions": firings,
         # Both worlds ran it, so one value names the model for the whole
         # comparison -- the same provenance rule as Scorecard's.
         "model_fingerprint": shocked.model_fingerprint,

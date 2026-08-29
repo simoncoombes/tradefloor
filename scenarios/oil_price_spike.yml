@@ -1,0 +1,61 @@
+# Example experimental assumptions. This scenario is not a forecast, and not
+# a claim about how a real market responds to a real supply disruption.
+#
+# This is the scenario that shows why the shock/transmission split exists.
+#
+# The engine really does model an oil price, and it really does have one
+# channel out of it: oil above $80 adds (price - 80) * 0.01 to the MONTHLY
+# inflation step, and inflation reaches equities through the central bank's
+# next meeting and then the curve. That channel is genuine and it is weak.
+# Measured on `Universe.random(20, seed=101)` over 120 days, seeds 3/11/29:
+# oil x1.40 sustained from day 20 moved the median instrument +0.09%, and
+# even oil pinned at $140 for a hundred days moved it -0.83%.
+#
+# So the `shocks` block below states what happened to oil, and the
+# `transmission` block states -- as an ASSUMPTION, in the author's own
+# numbers -- what that is taken to do to inflation and to credit. The
+# assumption is larger than the engine's own oil-to-inflation channel, and
+# that is deliberate and visible rather than hidden inside a class called
+# OilCrisis. Change the transmission numbers and you are changing the
+# experiment, which is the point.
+#
+# What you must NOT read into this file: that a 40% oil shock causes
+# inflation to rise 1.5 percentage points. It does not say that. It says
+# this scenario assumes it.
+
+version: 1
+
+scenario:
+  name: oil_price_spike
+
+  description: >
+    A sustained supply disruption: crude 40% higher from day 50, with an
+    assumed pass-through into inflation and credit. Example experimental
+    assumptions, not a forecast.
+
+  shocks:
+
+    - target: commodity.oil
+      operation: multiply
+      value: 1.40
+      at: 50
+      shape: permanent
+
+  transmission:
+
+    # Assumed pass-through: 150 basis points of inflation, arriving over
+    # twenty days rather than at once, because a supply shock reaching a
+    # price index is not an event.
+    - target: macro.inflation
+      operation: add
+      value: 0.015
+      at: 55
+      duration: 20
+      shape: ramp
+
+    # Assumed credit response: 50 basis points wider, held.
+    - target: macro.corporate_yield
+      operation: add
+      value: 0.005
+      at: 55
+      shape: permanent

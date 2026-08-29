@@ -241,6 +241,10 @@ class Engine:
     draws_consumed: int
     len: int
     macro_state: Macro
+    # Every field `pin_macro` writes, in the units it takes. Distinct from
+    # `macro_state`, which is the seven-field `Macro` object, and from
+    # `state_snapshot()["economy"]`, which is the core's percent form.
+    macro_fields: dict[str, Any]
     model: ModelParams
     model_fingerprint: str
     model_params: dict[str, Any]
@@ -316,8 +320,11 @@ class Engine:
         self, *, vix: float | None = ..., federal_funds_rate: float | None = ...,
         corporate_bond_yield: float | None = ..., inflation_rate: float | None = ...,
         qe_pe_boost: float | None = ..., fear_greed_index: float | None = ...,
+        gdp_growth: float | None = ..., unemployment_rate: float | None = ...,
+        tariff_rate: float | None = ..., oil_price: float | None = ...,
         cycle: CycleName | None = ...,
     ) -> None: ...
+    def set_avg_volume(self, values: Sequence[float]) -> None: ...
     def draw_uniform(self) -> float: ...
     def draw_normal(self) -> float: ...
     def draws_by_stream(self) -> dict[str, int]: ...

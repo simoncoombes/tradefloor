@@ -2,6 +2,75 @@
 
 ## Unreleased
 
+**Scenarios are now a file you can hand to somebody else.** `tf.Scenario`
+gains a second half: a named, inspectable collection of explicit
+interventions, written in YAML or in Python, with a fingerprint over the
+resolved experiment rather than over the file's bytes.
+
+```yaml
+version: 1
+scenario:
+  name: liquidity_crisis
+  shocks:
+    - target: market.liquidity
+      operation: multiply
+      value: 0.40
+      at: 50
+      duration: 25
+```
+
+```python
+scenario = tf.Scenario.from_yaml("scenarios/liquidity_crisis.yml")
+control, stress = tf.branch(engine, 2)
+for day in range(80):
+    scenario.apply(stress, day)
+    ...
+```
+
+There is no `start_war()` and there will not be one. A scenario names
+targets from an explicit registry of eleven fields the engine actually
+reads, applies one of three operations (`set`, `add`, `multiply`) on one of
+four shapes (`impulse`, `hold`, `ramp`, `permanent`), and keeps its
+EXOGENOUS SHOCKS apart from its ASSUMED TRANSMISSION -- because this library
+cannot tell you that a 40% oil shock raises inflation 1.5 points, only run a
+market in which somebody assumed it did.
+
+Every registered target carries a MEASURED note saying what it is worth.
+Four of the eleven are honest mechanisms with effects too small to see over a
+hundred days, and `macro.fear_greed` measures at exactly 0.00% on every
+instrument: nothing in the market reads it. Knowing which is which is the
+difference between an experiment and a number.
+
+- `Engine.pin_macro` gains `gdp_growth`, `unemployment_rate`, `tariff_rate`
+  and `oil_price`, which the economy has always carried and the binding never
+  exposed. Fractional like every other rate here; `oil_price` is dollars.
+- `Engine.macro_fields` is the read side of `pin_macro`, field for field and
+  unit for unit, so a relative intervention cannot be a factor of a hundred
+  out.
+- `Engine.set_avg_volume` writes the column the market maker quotes off,
+  which is what a liquidity shock is here: measured, quoted depth scales
+  exactly with the multiplier and sweeping 50,000 shares costs 6.08bp at
+  full depth and 14.59bp at a tenth of it. It is recorded in the order log
+  like any other input, so a replay, a checkpoint and a fork all carry it.
+- `tradefloor scenario validate|show|diff|targets` reads a scenario file
+  without running a market. `python -m tradefloor ...` is the same tree.
+- `RunManifest` records the RESOLVED scenario -- every intervention, its
+  fingerprint and the source file's name -- so a run replays after the YAML
+  is edited or deleted.
+- `tf.compare` on an intervention scenario now differences it against the
+  same world WITHOUT the interventions, and reports the firing trail.
+- YAML is read by `tradefloor.yaml_subset`, which implements the block-style
+  subset the schema uses and refuses everything else by name. No dependency,
+  no tags, no anchors, no flow style, and nothing a scenario file could use
+  to construct a Python object.
+- Six scenarios ship in `scenarios/`, each carrying its measured effect and
+  the statement that it is not a forecast. None names a political actor.
+- `examples/11-scenario-fork.py` is the whole workflow in one file.
+
+A scenario built only from pins serialises exactly as it always has, schema
+1, byte for byte, so every published manifest and every fingerprint over one
+still means what it meant.
+
 **Forking is now a copy of the engine, and four ways it was not exact are
 fixed.** `tf.branch` rebuilt a fork by writing a hand-maintained list of
 fields into a fresh engine, and the list was incomplete. Most seriously, it

@@ -1,0 +1,60 @@
+# Example experimental assumptions. This scenario is not a forecast, and not
+# a claim about how a real market responds to a real conflict.
+#
+# There is no `war: true` here and there will not be one. A narrative is not
+# a mechanism, and a simulator that accepted one would be inventing the part
+# a researcher is supposed to state.
+#
+# So the narrative "elevated geopolitical risk" is written out as what it is
+# assumed to DO: volatility rises and stays up, quoted depth thins, credit
+# widens, and crude catches a risk bid a couple of days later. Every one of
+# those is a number somebody chose, and every one is visible and editable.
+#
+# Measured on `Universe.random(20, seed=101)` over 120 days, seeds 3/11/29:
+# macro.vix x2.0 held for twenty-five days moved the median instrument
+# -2.23%, with the worst name -9.64%. VIX is the strongest short-horizon
+# stress lever here, because it reaches the market factor's variance target,
+# the quoted spread and cross-sectional correlation at once.
+
+version: 1
+
+scenario:
+  name: geopolitical_conflict
+
+  description: >
+    Elevated and persistent risk: volatility 80% higher for thirty days,
+    quoted depth down a third for twenty, credit wider, and an assumed bid
+    under crude. Example experimental assumptions, not a forecast.
+
+  shocks:
+
+    - target: macro.vix
+      operation: multiply
+      value: 1.80
+      at: 50
+      duration: 30
+
+    - target: market.liquidity
+      operation: multiply
+      value: 0.65
+      at: 50
+      duration: 20
+
+  transmission:
+
+    # Assumed risk repricing. There is no equity risk premium term in this
+    # model -- valuation discounts off the corporate bond yield -- so a
+    # wider required return is written as a wider corporate yield, which is
+    # the same statement in the units the engine actually has.
+    - target: macro.corporate_yield
+      operation: add
+      value: 0.020
+      at: 50
+      duration: 30
+
+    # Assumed commodity response, two days behind the risk move.
+    - target: commodity.oil
+      operation: multiply
+      value: 1.25
+      at: 52
+      shape: permanent
