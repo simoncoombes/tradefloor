@@ -1,0 +1,139 @@
+# The whole test suite, on a schedule.
+#
+# `determinism.yml` is what a pull request gates on: five wheel targets, the
+# known-answer digest, and the reproducibility chain. That is about four
+# minutes and it is deliberately narrow -- it covers what can move a market
+# and what a wheel is allowed to contain.
+#
+# The other ~1,240 tests ran nowhere automatic. They take over half an hour in
+# one process, which is why they were never put in front of a pull request,
+# and "too slow for a PR" quietly became "runs on nobody's machine but the
+# author's". Split four ways they finish in about ten minutes, which is fine
+# for a nightly.
+#
+# Nightly rather than weekly because the runners are free on a public
+# repository and the value is finding a regression next to the change that
+# caused it, not seven changes later.
+name: suite
+
+on:
+  schedule:
+    # 04:17 UTC. Off the hour on purpose: GitHub's scheduler queues the top of
+    # every hour heavily and a job asking for 04:00 can wait twenty minutes for
+    # a runner it did not need to wait for.
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  wheel:
+    name: build the wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        shell: bash
+        run: |
+          # Once, and shared. Four batches building their own wheel would
+          # spend four compiles to test one artefact, and could in principle
+          # test four different ones.
+          python -m pip install --upgrade pip maturin
+          maturin build --release --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suite-wheel
+          path: dist/*.whl
+
+  batch:
+    name: tests ${{ matrix.batch }}
+    needs: wheel
+    runs-on: ubuntu-latest
+    strategy:
+      # A failure in one batch must not cancel the others: the useful output
+      # of a nightly is the whole picture, not the first thing to break.
+      fail-fast: false
+      matrix:
+        batch: [a-e, f-p, q-z, facts]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: suite-wheel
+          path: dist
+      - name: Install the wheel and everything the optional lanes need
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip pytest
+          # --no-index so the package under test is the one just built and
+          # never a resolution from PyPI.
+          python -m pip install --no-index --find-links dist tradefloor
+          # By name, so the extras' own dependencies can resolve. Every one of
+          # these gates an `importorskip`, and a lane that skips is a lane
+          # that reports green by not running.
+          python -m pip install pyarrow numpy gymnasium mcp anthropic pydantic
+          python -c "import pyarrow, numpy, gymnasium, mcp; print('optional surfaces present')"
+      - name: Run
+        shell: bash
+        run: |
+          cd "${{ github.workspace }}"
+          # The batch definition lives in one place, and
+          # tests/test_packaging.py asserts it covers every file. A test file
+          # in no batch would run nowhere and nothing would say so.
+          FILES=$(python tools/ci/batches.py "${{ matrix.batch }}")
+          echo "batch ${{ matrix.batch }}: $FILES"
+          python -m pytest -q -rf $FILES
+
+  versions:
+    name: python ${{ matrix.python }}
+    needs: wheel
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The two nobody runs. The wheel is abi3-py311, the gate builds and
+        # tests on 3.11, and development happens on the newest release, so the
+        # floor and the ceiling are covered and the middle is covered by
+        # neither. One wheel serves all of them, so this is a few seconds to
+        # find out that it does.
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: suite-wheel
+          path: dist
+      - name: Install and check the guarantees hold
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip pytest pyarrow
+          python -m pip install --no-index --find-links dist tradefloor
+          cd "${{ runner.temp }}"
+          python -c "import tradefloor as tf; print('import ok on', tf.__version__)"
+          cd "${{ github.workspace }}"
+          python -m pytest -q \
+            tests/test_forking.py \
+            tests/test_checkpoint.py \
+            tests/test_replay.py \
+            tests/test_packaging.py
+
+  complete:
+    name: the suite is green
+    needs: [batch, versions]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report
+        shell: bash
+        run: |
+          # `needs` already fails this job if any batch failed. The step exists
+          # so there is one name to look at, and one to require if this is ever
+          # promoted from a nightly to a gate.
+          echo "every batch and every python version passed"
