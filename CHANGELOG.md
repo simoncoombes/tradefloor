@@ -10,9 +10,12 @@ quieter VIX cycle), and a 0.86x joint trim of every noise source, which
 preserves correlations and ratios while bringing the volatility level
 to real scale. Judged on twenty-six blocks -- thirteen of them never
 touched by any search -- at one hundred seeds per block: 504-day
-full-house 26/26 with no out-of-band row anywhere, crisis co-movement
-and lever 26/26 each, and the driven noise ratio at 1.1246 against
-pt-v15's ~1.46. Selectable by name; not the default, which remains
+panel in band on every statistic on all 26 blocks, crisis co-movement
+and lever 26/26 each, the driven noise ratio at 1.1246 against
+pt-v15's ~1.46, and the 252-day panel in band everywhere except one
+statistic on two blocks (volume-|return| correlation, within 0.009 of
+its floor) -- reproduced identically across two independent
+qualification runs. Selectable by name; not the default, which remains
 pt-v14.
 
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
