@@ -1,23 +1,21 @@
 """The FinRobot integration, without FinRobot.
 
-CI does not call an LLM. It cannot: a live decision needs an API key, costs
-money and answers differently every time, so a suite that depended on one
-would be neither reproducible nor free. What is checked here instead is
-everything the integration is actually responsible for -- the observation
-mapping, the ground-truth boundary, the validation of generated output, the
-execution of a validated decision, the fork, and the replay of a genuine
-recorded run.
+CI does not call an LLM. A live decision needs an API key, costs money and
+answers differently every time, so a suite depending on one would be neither
+reproducible nor free. What gets checked here is everything the integration is
+responsible for: the observation mapping, the ground-truth boundary, the
+validation of generated output, the execution of a validated decision, the
+fork, and the replay of a genuine recorded run.
 
-The recorded run is the load-bearing part. `tests/fixtures/finrobot/` holds
-real interactions from a real FinRobot agent, and
+The recorded run carries the weight. `tests/fixtures/finrobot/` holds real
+interactions from a real FinRobot agent, and
 `test_the_recorded_run_replays_end_to_end` re-executes the whole experiment
-against them. That is a stronger test than a mock: the responses were not
-written to make the parser happy, they are what the model actually said,
-including the code fences and the trailing sentences the mandate asked it not
-to produce.
+against them. That beats a mock. Nobody wrote those responses to make the
+parser happy; they are what the model said, code fences and trailing
+sentences included, both of which the mandate asked it to leave out.
 
-Nothing in this file imports `finrobot`, and one of the tests asserts that
-the adapter does not either until it is asked to go live.
+Nothing in this file imports `finrobot`, and one of the tests asserts the
+adapter does not either until it is asked to go live.
 """
 
 from __future__ import annotations
@@ -37,8 +35,8 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 FIXTURE = REPO / "tests" / "fixtures" / "finrobot" / "rate-shock.json"
 EXAMPLE = REPO / "examples" / "finrobot" / "rate_shock.py"
 
-#: A two-name market, deliberately not the example's four. The example is the
-#: experiment; these are unit tests, and a smaller roster makes an assertion
+#: A two-name market, where the example uses four. The example runs the
+#: experiment; these are unit tests, and a smaller roster keeps an assertion
 #: about a rendered block readable.
 ROSTER = [
     ("TECH_A", "technology", 100.0, 0.30),
@@ -59,16 +57,15 @@ def universe() -> list:
 class Scripted(fr.FinRobotAdapter):
     """A FinRobotAdapter whose answers are supplied rather than generated.
 
-    It replaces `_ask`, which is the ONE method that reaches outside the
-    process. Everything below it -- the observation mapping, the render, the
-    parse, the validation, the execution, the fork -- is the shipped code
-    running unmodified, which is the point: a double that reimplemented any of
-    that would be testing itself.
+    It replaces `_ask`, the ONE method that reaches outside the process.
+    Everything below it runs unmodified: the observation mapping, the render,
+    the parse, the validation, the execution, the fork. A double that
+    reimplemented any of those would be testing itself.
 
-    ``script`` is keyword-defaulted because `FinRobotAdapter.fork` rebuilds
-    the agent as ``type(self)(**keyword_args)``, so a subclass with a
-    required positional cannot be forked. That constraint is real and is why
-    the base class is keyword-only throughout.
+    ``script`` is keyword-defaulted because `FinRobotAdapter.fork` rebuilds the
+    agent as ``type(self)(**keyword_args)``, so a subclass with a required
+    positional cannot be forked. That constraint is why the base class is
+    keyword-only throughout.
     """
 
     def __init__(self, script=None, **kwargs):
@@ -117,9 +114,9 @@ def one_observation(agent=None, *, days: int = 1) -> tuple[World, object]:
 def test_the_adapter_imports_without_finrobot():
     """The whole reason the import is inside a method.
 
-    A reader replaying a recorded run should never be asked to install a
-    dependency tree whose current pins reach `torch`, and `import tradefloor`
-    must not be breakable by a third party's packaging at all.
+    Replaying a recorded run should never require a dependency tree whose
+    current pins reach `torch`, and no third party's packaging should be able
+    to break `import tradefloor`.
     """
     assert "finrobot" not in sys.modules, (
         "importing tradefloor.integrations.finrobot pulled in FinRobot. The "
@@ -168,9 +165,9 @@ def test_an_unknown_mode_is_refused():
 # -- the observation mapping ------------------------------------------------
 
 
-#: The contract, written down. A new key in the payload is a new thing the
-#: agent can see, which is a decision about the experiment and not a detail,
-#: so it should require editing this list.
+#: The contract, written down. A new key in the payload gives the agent
+#: something new to see. That is a decision about the experiment, so it should
+#: require editing this list.
 PAYLOAD_KEYS = {"step", "day", "steps_per_day", "macro", "assets", "portfolio"}
 ASSET_KEYS = {"symbol", "price", "return_1d", "return_5d", "volatility",
               "best_bid", "best_ask", "avg_daily_volume", "max_order_shares",
@@ -187,8 +184,8 @@ def test_the_payload_carries_exactly_the_allowlisted_keys():
 
 
 def test_the_macro_allowlist_is_the_librarys_own():
-    """Not a copy of it. Two lists that agree today are two lists that can
-    disagree after one edit, and the one that would silently widen is this."""
+    """The same object, not a copy. Two lists agreeing today can disagree
+    after one edit, and a widening here would go unnoticed."""
     from tradefloor.counterfactual import MACRO_FIELDS
     assert fr.OBSERVABLE_MACRO is MACRO_FIELDS
     assert "qe_pe_boost" not in fr.OBSERVABLE_MACRO, (
@@ -238,9 +235,9 @@ class Sealed:
     """An engine that raises if the simulator's own knowledge is touched.
 
     Stronger than scanning the rendered text for a leaked number, and kept
-    alongside that scan rather than instead of it. This one fails on the
-    ACCESS, so a future edit that reads `engine.attribution` and then rounds
-    it, scales it or uses it to pick a word fails here too.
+    alongside that scan. This one fails on the ACCESS, so a future edit that
+    reads `engine.attribution` and then rounds it, scales it or uses it to
+    pick a word fails here too.
     """
 
     def __init__(self, engine):
@@ -257,8 +254,7 @@ class Sealed:
 
 def _observation(world: World, engine=None):
     """An Observation over a world's current state, as `World.run` builds
-    one. Rebuilt here rather than captured so a test can substitute the
-    engine."""
+    one. Rebuilt here, not captured, so a test can substitute the engine."""
     import struct
 
     from tradefloor.harness import Observation
@@ -279,8 +275,9 @@ def test_the_mapping_never_touches_simulator_ground_truth():
 
 
 def test_no_hidden_value_appears_in_the_text_finrobot_receives():
-    """The complementary check: not whether the adapter ASKED, but whether
-    the answer is in the block anyway, by some route nobody predicted."""
+    """The complementary check. The proxy above catches the adapter asking;
+    this catches the answer arriving in the block by a route nobody
+    predicted."""
     world, agent = one_observation(days=4)
     payload = fr.observe(_observation(world), history=agent.history)
     text = fr.render(payload)
@@ -342,15 +339,15 @@ def test_an_empty_action_list_means_change_nothing():
 
 
 def test_lowercase_sides_are_accepted():
-    """Case is formatting, not meaning, and rejecting it would score a
-    correct decision as a failure."""
+    """Case carries no meaning here. Rejecting it would score a correct
+    decision as a failure."""
     assert fr.parse(answer(act("TECH_A", "buy", 5))).actions[0].side == "BUY"
 
 
 def test_a_fenced_answer_is_accepted():
     """Models add code fences and closing sentences whatever the mandate
-    says, and this integration measures portfolio decisions rather than
-    instruction compliance."""
+    says. This integration measures portfolio decisions, not instruction
+    compliance."""
     text = ('Here is my decision:\n```json\n'
             '{"actions": [{"symbol": "TECH_A", "side": "SELL", '
             '"quantity": 30}], "rationale": "rates"}\n```\nLet me know.')
@@ -464,7 +461,7 @@ def test_both_arms_start_identical_with_a_finrobot_agent():
     """The claim the experiment rests on, with this adapter in the loop.
 
     `tests/test_counterfactual.py` already proves `agree` for the market and
-    the portfolio. What is new here is the AGENT half of it: an adapter whose
+    the portfolio. The AGENT half is what this adds. An adapter whose
     `state()` under-reported would let the arms differ while the agreement
     passed.
     """
@@ -492,9 +489,8 @@ def test_a_forked_adapter_is_independent():
 
 
 def test_a_fork_keeps_the_subclass():
-    """`fork` builds `type(self)`, not the base class. The version that did
-    not completed the run and compared two agents that were not the one under
-    test."""
+    """`fork` builds `type(self)`. Hard-coding the base class let the run
+    complete and compare two agents, neither of them the one under test."""
     agent = Scripted(answer())
     world = World(seed=7, universe=universe(), agent=agent, cash=1_000_000.0)
     world.run(days=1)
@@ -544,17 +540,17 @@ def test_a_rate_reading_agent_diverges_at_the_first_decision_after_the_fork():
     report = compare(control, shock, agreement=agreement)
     assert report.divergence.intervention_step == fork_step
     assert report.divergence.decision == fork_step, (
-        "the agent reads the rate, so its first post-fork decision is the "
-        "first one that should differ")
+        "the agent reads the rate, so its first post-fork decision should "
+        "be the first one to differ")
     assert report.divergence.orders == fork_step
     assert report.control["label"] == "control"
     assert report.treatment["turnover"] > 0
 
 
 def test_an_agent_that_ignores_the_rate_never_diverges_in_its_decisions():
-    """The negative case, which is a finding rather than a gap: a comparison
-    has to be able to report that the intervention changed the market and not
-    the agent."""
+    """The negative case. A comparison has to be able to report that the
+    intervention moved the market and left the agent unmoved, which is a
+    finding in its own right."""
     agent = Scripted(answer(act("TECH_A", "BUY", 2_000)))
     world = World(seed=7, universe=universe(), agent=agent, cash=1_000_000.0,
                   pins={"federal_funds_rate": 0.04,
@@ -592,7 +588,7 @@ def test_the_replay_key_is_the_input():
 def test_replay_reproduces_a_recorded_decision_without_a_network():
     world, agent = one_observation(days=2)
     obs = _observation(world)
-    # `act` appends the prices it is shown before it renders, so the prompt a
+    # `act` appends the prices it is shown before rendering, so the prompt a
     # replay looks up is built from the history INCLUDING this step.
     history = agent.history + [list(obs.prices)]
     prompt = fr.render(fr.observe(obs, history=history))
@@ -643,8 +639,8 @@ def test_the_fixture_records_what_a_replay_cannot_reconstruct():
 def test_the_fixture_carries_no_credential_or_provider_metadata():
     text = FIXTURE.read_text(encoding="utf-8")
     # Prefixes and header names, not bare fragments. `sk-` on its own matched
-    # "risk-adjusted" in the mandate, which is the failure mode of a secret
-    # scanner nobody trusts after the first false positive.
+    # "risk-adjusted" in the mandate. One false positive is all it takes for a
+    # secret scanner to stop being trusted.
     for secret in ("sk-ant-", "sk-proj-", "api_key", "api-key", "Bearer ",
                    "Authorization", "anthropic-version", "request_id"):
         assert secret not in text, f"the fixture contains {secret!r}"
@@ -658,9 +654,9 @@ def test_the_fixture_carries_no_credential_or_provider_metadata():
 
 @needs_fixture
 def test_the_recorded_responses_are_a_real_models_and_still_validate():
-    """Not hand-authored. The recorded text is what the model said, fences
-    and all, so parsing it is a real test of the parser rather than of a
-    fixture written to suit it."""
+    """Nobody hand-authored these. The recorded text is what the model said,
+    fences and all, so parsing it tests the parser and not a fixture written
+    to suit it."""
     entries = json.loads(FIXTURE.read_text(encoding="utf-8"))["entries"]
     decisions = [fr.parse(e["response"]) for e in entries]
     assert decisions, "the fixture is empty"
@@ -673,9 +669,9 @@ def test_the_recorded_responses_are_a_real_models_and_still_validate():
 def test_the_recorded_run_replays_end_to_end(tmp_path):
     """The whole experiment, from the shipped fixture, with no key.
 
-    This is the test the integration exists to pass: shared history, a
-    checkpoint, a fork proved identical, one intervention, both arms
-    continued, and a comparison that finds where they came apart.
+    The test the integration exists to pass: shared history, a checkpoint, a
+    fork proved identical, one intervention, both arms continued, and a
+    comparison that finds where they came apart.
     """
     example = _load_example()
     result = example.main(live=False, out=tmp_path / "artifacts",

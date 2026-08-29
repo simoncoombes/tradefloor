@@ -46,9 +46,9 @@ researchers and execution developers.
 
 ## The studies
 
-One directory each, self-contained, no reading order. A study asks one
-question, keeps its script and its notebook together because they are the same
-experiment in two presentations, and writes its output to its own git-ignored
+One directory each, self-contained, in no particular order. A study asks one
+question, keeps its script and its notebook together because they present the
+same experiment two ways, and writes its output to its own git-ignored
 `artifacts/`.
 
 | | what it asks |
