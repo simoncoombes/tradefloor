@@ -251,14 +251,12 @@ from typing import Any, Callable, Sequence
 from ._core import Engine, Instrument, Macro, ModelParams, ValidationError
 from . import yaml_subset
 from .interventions import (
-    ROLES,
     SCENARIO_SCHEMA,
     TARGETS,
     Firing,
     Intervention,
     ScenarioValidationError,
     apply_operation,
-    canonical_json,
     sha256_of,
     summarise,
 )
@@ -444,7 +442,8 @@ def _wrap(text: str, width: int = 72) -> list[str]:
 def _interpolate(start: Any, finish: Any, step: float) -> Any:
     """One point on a ramp, over a scalar or over a whole column."""
     if isinstance(start, tuple):
-        return tuple(_interpolate(a, b, step) for a, b in zip(start, finish))
+        return tuple(_interpolate(a, b, step)
+                     for a, b in zip(start, finish, strict=True))
     return start + (finish - start) * step
 
 
@@ -492,7 +491,8 @@ class Scenario:
     """
 
     __slots__ = ("_drivers", "_label", "_description", "_shocks",
-                 "_transmission", "_source", "_log", "_anchors", "_day")
+                 "_transmission", "_source", "_log", "_anchors", "_baselines",
+                 "_day")
 
     def __init__(self, label: str = "", *, name: str | None = None,
                  description: str = "",
@@ -517,6 +517,9 @@ class Scenario:
         # sees a different engine or a restarted clock.
         self._log: list[Firing] = []
         self._anchors: dict[int, tuple[Any, Any]] = {}
+        # Per TARGET, for the two whose value nothing in the engine puts
+        # back. See `_release`.
+        self._baselines: dict[str, Any] = {}
         self._day = -1
 
         for given, role in ((interventions, None), (shocks, "shock"),
@@ -960,11 +963,13 @@ class Scenario:
 
         # Order within a day
 
-        Pins, then shocks in declared order, then transmission in declared
-        order. Two interventions on one target on one day compose: the second
-        reads what the first wrote. Nothing here consults a set, a dict
-        ordering or the clock, so two runs of the same scenario fire in the
-        same sequence.
+        Pins, then any window that ENDED yesterday is released, then shocks
+        in declared order, then transmission in declared order. Two
+        interventions on one target on one day compose: the second reads what
+        the first wrote. Releases go first so that a window closing on the
+        same day another opens does not undo the one that opens. Nothing here
+        consults a set, a dict ordering or the clock, so two runs of the same
+        scenario fire in the same sequence.
 
         # One scenario, one run, identified by its clock
 
@@ -994,6 +999,7 @@ class Scenario:
         if day <= self._day:
             self._log = []
             self._anchors = {}
+            self._baselines = {}
         self._day = day
 
         pins = self.at(day)
@@ -1001,12 +1007,73 @@ class Scenario:
             engine.pin_macro(**pins)
 
         fired: list[Firing] = []
+        # Releases first, so that a window ending on the same day another
+        # begins does not undo the one that begins.
+        for item in self.interventions:
+            released = self._release(item, engine, day)
+            if released is not None:
+                fired.append(released)
         for index, item in enumerate(self.interventions):
             if not item.active_on(day):
                 continue
             fired.append(self._fire(index, item, engine, day))
         self._log.extend(fired)
         return fired
+
+    def _release(self, item: Intervention, engine: Engine,
+                 day: int) -> Firing | None:
+        """Put a field back when the last window on it ends.
+
+        A `hold` says the shock lasts twenty-five days. For a macro field
+        that is true without any help: the daily chain recomputes it, or
+        mean-reverts it, or the central bank does, so releasing means simply
+        not writing any more.
+
+        Two targets have no such dynamics. Nothing in the engine writes
+        `avg_volume` -- the shipped close policy is `Hold` -- and nothing
+        moves `tariff_rate` at all. On those, "not writing any more" left the
+        shock in place for the rest of the run: quoted depth thinned to 25%
+        on day 2 was still at 25% on day 14, under a scenario whose own
+        description said the window ended on day 7. The measurement was
+        right, the window was fiction, and nothing raised.
+
+        # Why this is per TARGET and not per intervention
+
+        Because two holds on one field overlap, and restoring what each one
+        personally found is wrong for the second. Holds on days 1-4 and 3-6:
+        the first correctly puts back full depth on day 5, and the second
+        then puts back HALF depth on day 7, because half is what it found on
+        day 3 while the first was running. The run ends at half depth with
+        nothing raised -- the same defect this method exists to fix, one
+        level further in.
+
+        So the level to restore is the one the field had before ANY hold on
+        it began (:attr:`_baselines`, set once), and it goes back when the
+        LAST of them ends. A `permanent` on the same target re-asserts itself
+        afterwards, because releases run before the day's firings.
+        """
+        if item.shape not in ("hold", "ramp") or item.last_day is None:
+            return None
+        if day != item.last_day + 1:
+            return None
+        target = TARGETS[item.target]
+        if target.restores:
+            return None
+        if any(other.target == item.target
+               and other.shape in ("hold", "ramp")
+               and other.active_on(day)
+               for other in self.interventions):
+            return None
+        baseline = self._baselines.pop(item.target, None)
+        if baseline is None:
+            return None
+        previous = target.read(engine)
+        target.write(engine, baseline)
+        return Firing(
+            day=day, scenario=self._label, role=item.role, target=item.target,
+            operation="release", value=item.value, shape=item.shape,
+            previous=summarise(previous), new=summarise(baseline),
+        )
 
     def _fire(self, index: int, item: Intervention, engine: Engine,
               day: int) -> Firing:
@@ -1029,6 +1096,12 @@ class Scenario:
                 anchor = (previous,
                           apply_operation(item.operation, previous, item.value))
                 self._anchors[index] = anchor
+                if not target.restores:
+                    # The level to put back when the LAST window on this
+                    # target closes. `setdefault`, so an overlapping second
+                    # hold does not adopt the first one's shocked level as
+                    # the thing to restore.
+                    self._baselines.setdefault(item.target, previous)
             else:
                 anchor = self._anchors.get(index)
                 if anchor is None:
@@ -1047,6 +1120,24 @@ class Scenario:
                 new = _interpolate(start, finish, step)
             else:
                 new = finish
+
+        # The result, not the recipe, is what the engine has to be able to
+        # carry. `check` saw the multiplier at construction and could not see
+        # what it would produce, because that depends on where the chain had
+        # arrived -- so `add -500` on macro.vix wrote a VIX of -485 and the
+        # market traded a session against it, since (vix/15)^2 squares the
+        # sign away rather than raising anything.
+        reason = target.outside_domain(new)
+        if reason is not None:
+            raise ScenarioValidationError(
+                f"{self._label or 'this scenario'} would write {reason} to "
+                f"{item.target} on day {day}: {item.operation} "
+                f"{item.value!r} applied to {target.show(summarise(previous))} "
+                f"gives {target.show(summarise(new))}. A relative operation is "
+                f"relative to whatever the endogenous chain has reached, so "
+                f"its result cannot be checked when the scenario is written "
+                f"-- only here. Use `set` if you mean an absolute level."
+            )
 
         target.write(engine, new)
         return Firing(
@@ -1253,15 +1344,14 @@ class Scenario:
                     item, role=role, where=f"{key}[{index}]"))
 
         recorded = payload.get("fingerprint")
-        if recorded is not None and "path" not in payload:
-            if recorded != scenario.fingerprint:
-                raise ValidationError(
-                    f"this scenario document records fingerprint {recorded} "
-                    f"and resolves to {scenario.fingerprint}. The two "
-                    f"disagree, so the document was edited after it was "
-                    f"written and no longer describes the run that produced "
-                    f"it."
-                )
+        if (recorded is not None and "path" not in payload
+                and recorded != scenario.fingerprint):
+            raise ValidationError(
+                f"this scenario document records fingerprint {recorded} "
+                f"and resolves to {scenario.fingerprint}. The two disagree, "
+                f"so the document was edited after it was written and no "
+                f"longer describes the run that produced it."
+            )
         return scenario
 
     def from_yaml(cls, source: str) -> "Scenario":
@@ -1603,7 +1693,7 @@ def _run_in_lockstep(
 
     first_divergence: int | None = None
     for day in range(days):
-        for scenario, engine in zip((left, right), engines):
+        for scenario, engine in zip((left, right), engines, strict=True):
             scenario.apply(engine, day)
             engine.open_market()
             engine.run_session(hour, minute, day_of_week, ticks_per_day)

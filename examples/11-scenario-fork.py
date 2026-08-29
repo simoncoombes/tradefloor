@@ -31,6 +31,12 @@ the market you describe; the description is yours.
 That is also why the depth shock barely moves prices and moves fills a lot.
 An evaluation that reads only the price series will score an agent as though
 it traded for free.
+
+The book is read twice, inside the window and after it. Both readings matter:
+the first is what the shock cost, and the second is that the shock ENDED.
+Nothing in the engine writes `avg_volume` back, so the scenario restores it
+when the window closes -- and until it did, a twenty-five day crisis quietly
+lasted for the rest of the run.
 """
 
 import pathlib
@@ -120,14 +126,24 @@ def main() -> dict:
     #    The control branch gets nothing at all. It is not a scenario with
     #    the values turned down; it is the same world without the shock.
     first = min(item.at for item in scenario.interventions)
+    last = max(item.last_day or 0 for item in scenario.interventions)
     print(f"  scenario applied   to the stress branch only, firing at "
           f"step {DAYS_BEFORE_FORK + first} of the parent's history")
 
+    # Read the book twice: once inside the window and once after it. The
+    # first says what the shock did; the second says whether it ended.
+    during = after = None
     for i in range(DAYS_AFTER_FORK):
         day = DAYS_BEFORE_FORK + i
         scenario.apply(stress, i)
         trading_day(control, day, universe)
         trading_day(stress, day, universe)
+        if i == (first + last) // 2:
+            during = (sweep_cost_bps(control, universe),
+                      sweep_cost_bps(stress, universe))
+        if i == last + 3:
+            after = (sweep_cost_bps(control, universe),
+                     sweep_cost_bps(stress, universe))
 
     # 5. What actually fired, with the values it saw. Not the recipe: the
     #    trail records that depth went from N shares to 0.4N on the day it
@@ -141,18 +157,18 @@ def main() -> dict:
 
     # 6. What the scenario did.
     moves = sorted(s / c - 1.0 for s, c in
-                   zip(prices(stress, universe), prices(control, universe)))
+                   zip(prices(stress, universe),
+                       prices(control, universe), strict=True))
     median = moves[len(moves) // 2]
     report["median_move_pct"] = median * 100.0
-    control_cost = sweep_cost_bps(control, universe)
-    stress_cost = sweep_cost_bps(stress, universe)
-    report["sweep_cost_bps"] = stress_cost
-    report["sweep_cost_bps_control"] = control_cost
+    report["sweep_cost_bps_in_window"] = during
+    report["sweep_cost_bps_after"] = after
 
     print("\n  WHAT IT DID")
     print(f"    median name        {median * 100:+.2f}%")
-    print(f"    cost to buy 50k    {control_cost:.2f}bp control, "
-          f"{stress_cost:.2f}bp stress")
+    print("    cost to buy 50k    control  stress")
+    print(f"      inside the window  {during[0]:5.2f}bp  {during[1]:5.2f}bp")
+    print(f"      three days after   {after[0]:5.2f}bp  {after[1]:5.2f}bp")
     print(f"    fingerprint        {scenario.fingerprint}")
 
     ok = True
@@ -162,8 +178,14 @@ def main() -> dict:
     # The point of this scenario: depth, not price. A liquidity shock that
     # showed up mostly in prices would mean the lever is reaching valuation,
     # which it is not supposed to.
-    ok &= check("it cost more to trade in the stress branch",
-                stress_cost > control_cost)
+    ok &= check("trading cost more inside the window",
+                during[1] > during[0])
+    # And the window ENDED. Nothing in the engine writes `avg_volume` back,
+    # so the scenario does it: without that, a twenty-five day crisis quietly
+    # lasted for the rest of the run and this check read the same either way.
+    ok &= check("the book came back after it",
+                scenario.log[-1].operation == "release"
+                and abs(after[1] - after[0]) < abs(during[1] - during[0]))
     ok &= check("both branches stayed on one draw schedule",
                 control.draws_by_stream()["market"]
                 == stress.draws_by_stream()["market"])

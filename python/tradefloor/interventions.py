@@ -90,6 +90,16 @@ OPERATIONS = ("set", "add", "multiply")
 #: ``duration`` always means DAYS THE INTERVENTION IS ACTIVE, so a `hold` at
 #: day 50 for 25 days owns days 50 to 74 and day 75 belongs to the chain
 #: again, and a one-day `ramp` is an `impulse`.
+#:
+#: "Belongs to the chain again" is doing real work in that sentence. For a
+#: macro field, ending a window means simply not writing any more: the daily
+#: chain recomputes the field, or mean-reverts it, or the central bank does.
+#: Two targets have no such dynamics -- nothing in the engine writes
+#: `avg_volume` or `tariff_rate` -- so for those the scenario puts the level
+#: back itself when the last window on that target closes, and records the
+#: restore in the audit trail. Without that, a twenty-five day liquidity
+#: crisis lasted for the rest of the run while its own description said it
+#: ended. See :meth:`tradefloor.Scenario._release`.
 SHAPES = ("impulse", "permanent", "hold", "ramp")
 
 #: Shapes that need a duration, and shapes that refuse one.
@@ -135,15 +145,16 @@ class Target:
     be read without the reader having to know the engine.
     """
 
-    __slots__ = ("name", "units", "note", "numeric", "_read", "_write",
-                 "_check", "_format")
+    __slots__ = ("name", "units", "note", "numeric", "restores", "_read",
+                 "_write", "_check", "_domain", "_format")
 
     def __init__(self, name: str, *, units: str, note: str,
                  read: Callable[[Engine], Any],
                  write: Callable[[Engine, Any], None],
                  check: Callable[[str, Any], None],
                  format: Callable[[float], str],
-                 numeric: bool = True) -> None:
+                 domain: Callable[[Any], str | None] | None = None,
+                 numeric: bool = True, restores: bool = True) -> None:
         self.name = name
         self.units = units
         self.note = note
@@ -153,9 +164,18 @@ class Target:
         # bare TypeError from inside the run rather than being refused where
         # it was written.
         self.numeric = numeric
+        # Whether the engine's own dynamics move this field back on their
+        # own. Every macro field does -- the daily chain recomputes it, or
+        # mean-reverts it, or the central bank does. Two do not: nothing in
+        # the engine writes `avg_volume` (the close policy is Hold) or
+        # `tariff_rate`. For those, "held for twenty-five days" has to be
+        # made true by writing the level back, or a temporary shock is a
+        # permanent one that says otherwise.
+        self.restores = restores
         self._read = read
         self._write = write
         self._check = check
+        self._domain = domain
         self._format = format
 
     def read(self, engine: Engine) -> Any:
@@ -167,6 +187,30 @@ class Target:
     def check(self, operation: str, value: Any) -> None:
         """Refuse a value this target cannot take, at construction time."""
         self._check(operation, value)
+
+    def outside_domain(self, value: Any) -> str | None:
+        """Why this COMPUTED value cannot be written, or None.
+
+        The other half of `check`, and the half that matters for a relative
+        operation. `check` sees the multiplier; it cannot see what the
+        multiplier will produce, because that depends on where the endogenous
+        chain has arrived. So the result is checked too, on the day it is
+        written -- which is the only place the answer exists.
+
+        Without this, `add -500` on macro.vix wrote a VIX of -485 and the
+        market traded a session against it: `(vix/15)^2` squares away the
+        sign, so the variance target rose instead of anything raising an
+        error.
+        """
+        if self._domain is None:
+            return None
+        if isinstance(value, tuple):
+            for item in value:
+                reason = self._domain(item)
+                if reason is not None:
+                    return reason
+            return None
+        return self._domain(value)
 
     def show(self, value: float) -> str:
         return self._format(value)
@@ -237,6 +281,37 @@ def _positive_check(what: str) -> Callable[[str, Any], None]:
     return check
 
 
+def _range_check(low: float, high: float, what: str) -> Callable[[str, Any], None]:
+    """A `set` inside the range, and any multiplier that is a multiplier.
+
+    Separate from `_positive_check` because a range can legitimately include
+    zero: fear and greed runs 0 to 100, and refusing `set 0` would refuse
+    the most extreme fear the index can express.
+    """
+    def check(operation: str, value: Any) -> None:
+        _finite(value)
+        if operation == "multiply":
+            _positive_multiplier(value)
+        elif operation == "set" and not low <= value <= high:
+            raise ScenarioValidationError(
+                f"set {value} is outside the {what} range [{low:g}, {high:g}]."
+            )
+
+    return check
+
+
+def _finite_check(operation: str, value: Any) -> None:
+    """Any finite number, including zero and negatives.
+
+    For a target whose neutral value IS zero. `qe_pe_boost` opens at 0.0, so
+    a check that refused `set 0` refused the one value a scenario is most
+    likely to want: turning the boost off.
+    """
+    _finite(value)
+    if operation == "multiply":
+        _positive_multiplier(value)
+
+
 def _finite(value: Any) -> None:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise ScenarioValidationError(
@@ -253,6 +328,43 @@ def _positive_multiplier(value: Any) -> None:
             f"does not scale a level, it replaces it with a different sign or "
             f"with zero -- say what you mean with `set`."
         )
+
+
+def _domain_positive(what: str) -> Callable[[Any], str | None]:
+    def domain(value: Any) -> str | None:
+        if not isinstance(value, (int, float)) or value != value:
+            return f"{value!r} is not a number"
+        if value <= 0:
+            return f"{value:g} is not a positive {what}"
+        return None
+    return domain
+
+
+def _domain_between(low: float, high: float, what: str) -> Callable[[Any], str | None]:
+    def domain(value: Any) -> str | None:
+        if not isinstance(value, (int, float)) or value != value:
+            return f"{value!r} is not a number"
+        if not low <= value <= high:
+            return f"{value:g} is outside the {what} range [{low:g}, {high:g}]"
+        return None
+    return domain
+
+
+def _domain_rate(value: Any) -> str | None:
+    if not isinstance(value, (int, float)) or value != value:
+        return f"{value!r} is not a number"
+    if not _RATE_MIN <= value <= _RATE_MAX:
+        return (f"{value:g} is outside the plausible rate band "
+                f"[{_RATE_MIN}, {_RATE_MAX}]")
+    return None
+
+
+def _domain_finite(value: Any) -> str | None:
+    if not isinstance(value, (int, float)) or value != value:
+        return f"{value!r} is not a number"
+    if value in (float("inf"), float("-inf")):
+        return "infinity is not a value the engine can carry"
+    return None
 
 
 def _cycle_check(operation: str, value: Any) -> None:
@@ -312,10 +424,12 @@ def _liquidity_check(operation: str, value: Any) -> None:
 def _make_macro_target(name: str, field: str, *, units: str, note: str,
                        check: Callable[[str, Any], None],
                        format: Callable[[float], str],
-                       numeric: bool = True) -> Target:
+                       domain: Callable[[Any], str | None] | None = None,
+                       numeric: bool = True, restores: bool = True) -> Target:
     read, write = _macro(field)
     return Target(name, units=units, note=note, read=read, write=write,
-                  check=check, format=format, numeric=numeric)
+                  check=check, format=format, domain=domain, numeric=numeric,
+                  restores=restores)
 
 
 #: Every intervention target this build supports, and nothing else.
@@ -356,7 +470,7 @@ _register(_make_macro_target(
         "central bank's next MEETING, so a one-shot write is erased. "
         "Measured, +200bp: -0.23% as an impulse, -3.50% as a permanent."
     ),
-    check=_rate_check(), format=_pp,
+    check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
 
 _register(_make_macro_target(
@@ -371,7 +485,7 @@ _register(_make_macro_target(
         "between. Measured, +200bp: -3.57%, the same as a permanent, "
         "because for this field an impulse already is one."
     ),
-    check=_rate_check(), format=_pp,
+    check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
 
 _register(_make_macro_target(
@@ -389,6 +503,7 @@ _register(_make_macro_target(
         "duration for a crisis."
     ),
     check=_positive_check("VIX level"), format=_points,
+    domain=_domain_positive("VIX level"),
 ))
 
 _register(_make_macro_target(
@@ -399,7 +514,7 @@ _register(_make_macro_target(
         "strongest lever in the registry: it moves valuation without "
         "touching a rate. Measured, set to 3.0: +19.78%."
     ),
-    check=_positive_check("boost"), format=_plain,
+    check=_finite_check, format=_plain, domain=_domain_finite,
 ))
 
 _register(_make_macro_target(
@@ -428,11 +543,19 @@ _register(Target(
         "70,019 at x0.40), and sweeping 50,000 shares costs 6.08bp at x1.0, "
         "8.57bp at x0.40 and 14.59bp at x0.10. The quoted SPREAD does not "
         "move -- that is VIX's job. `multiply` is the only form that means "
-        "anything across a mixed roster."
+        "anything across a mixed roster. Nothing in the engine writes this "
+        "column back, so a `hold` on it restores the pre-shock depth itself "
+        "when its window closes."
     ),
     read=_liquidity_read,
     write=_liquidity_write,
     check=_liquidity_check,
+    domain=_domain_positive("share count"),
+    # Nothing in the engine writes this column back: the shipped close
+    # policy is AvgVolumePolicy::Hold. So a hold has to put the depth
+    # back itself, or a twenty-five day liquidity crisis quietly lasts
+    # for the rest of the run.
+    restores=False,
     format=_shares,
 ))
 
@@ -448,7 +571,7 @@ _register(_make_macro_target(
         "to target, so a pinned level persists for weeks rather than days. "
         "Measured, +150bp: -0.60% as an impulse, -1.27% held."
     ),
-    check=_rate_check(), format=_pp,
+    check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
 
 _register(_make_macro_target(
@@ -466,6 +589,7 @@ _register(_make_macro_target(
         "assumption -- see scenarios/oil_price_spike.yml."
     ),
     check=_positive_check("oil price"), format=_dollars,
+    domain=_domain_positive("oil price"),
 ))
 
 _register(_make_macro_target(
@@ -480,7 +604,7 @@ _register(_make_macro_target(
         "and that sign is the rates channel, not a defect. `macro.cycle` is "
         "the lever a downturn scenario actually wants."
     ),
-    check=_rate_check(), format=_pp,
+    check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
 
 _register(_make_macro_target(
@@ -491,7 +615,7 @@ _register(_make_macro_target(
         "curve's gap term. Monthly, and it reaches prices through the bank. "
         "Measured, +200bp held: +1.17%, again the dovish-response sign."
     ),
-    check=_rate_check(), format=_pp,
+    check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
 
 _register(_make_macro_target(
@@ -503,9 +627,15 @@ _register(_make_macro_target(
         "construction: an impulse stays. It adds (rate-5pp)*0.01 to the "
         "monthly inflation step and drags the trade balance. Measured, "
         "+800bp: 0.00% median (worst -0.25%, best +0.37%), which at three "
-        "seeds is indistinguishable from noise."
+        "seeds is indistinguishable from noise. Being unmoved by the engine "
+        "cuts both ways: a `hold` on it restores the old rate itself when its "
+        "window closes, because nothing else would."
     ),
-    check=_rate_check(), format=_pp,
+    check=_rate_check(), format=_pp, domain=_domain_rate,
+    # The one macro field nothing in the engine moves, which is what
+    # makes an impulse on it permanent -- and what means a HOLD on it
+    # has to put the old rate back when its window ends.
+    restores=False,
 ))
 
 _register(_make_macro_target(
@@ -519,7 +649,8 @@ _register(_make_macro_target(
         "price. Registered because it is pinnable and because a target that "
         "silently did nothing would be worse than one that says so."
     ),
-    check=_positive_check("sentiment level"), format=_points,
+    check=_range_check(0.0, 100.0, "sentiment"), format=_points,
+    domain=_domain_between(0.0, 100.0, "sentiment"),
 ))
 
 
@@ -915,11 +1046,17 @@ def _resolve_shape(shape: str | None, duration: Any, target: str) -> str:
 
 
 class Firing:
-    """One intervention, on the day it actually wrote, with real values.
+    """One write the scenario made, on the day it made it, with real values.
 
     The point of recording this rather than the recipe: a `multiply` says
     x1.40, and what a reader needs to know afterwards is that oil went from
     82.14 to 115.00 -- which depends on where the endogenous chain had got to.
+
+    ``operation`` is the intervention's own operation, with one addition:
+    ``"release"`` is the write that puts a level back when the last window on
+    a target the engine never restores closes. It is in the trail rather than
+    silent, because a reader comparing two runs needs to see the depth come
+    back as much as they need to see it go.
 
     A column target (there is one, `market.liquidity`) reports the column
     TOTAL before and after, because forty per-instrument pairs in a log is not

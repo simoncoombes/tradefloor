@@ -37,8 +37,10 @@ scenario:
 
   description: >
     A funding event: quoted depth collapses to 40% and volatility doubles for
-    twenty-five days, then both are released back to the endogenous chain.
-    Example experimental assumptions, not a forecast.
+    twenty-five days, and then both end. Volatility is released back to the
+    endogenous chain, which mean-reverts it; depth is written back, because
+    nothing in the engine writes that column at all. Example experimental
+    assumptions, not a forecast.
 
   shocks:
 
