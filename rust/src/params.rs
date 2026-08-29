@@ -472,6 +472,26 @@ pub struct ModelParams {
     /// stationarity limit as the per-name one, and to the same
     /// reparameterisation in the survey.
     pub market_vol_beta: f64,
+    /// GJR leverage on the MARKET factor's variance update. Zero recovers
+    /// the symmetric update bit for bit; every preset before this dial
+    /// sets it.
+    ///
+    /// A down day loads `market_vol_alpha + market_vol_gamma` on the
+    /// squared shock where an up day loads `market_vol_alpha` alone, and
+    /// omega compensates by `gamma/2` so the unconditional level stays on
+    /// target: the dial redistributes variance between down and up states
+    /// rather than adding any. The per-name asymmetry (`garch_gamma`) has
+    /// existed since pt-v2; the COMMON factor has run symmetric forever,
+    /// which is why the model cannot produce correlation asymmetry --
+    /// correlations that rise in falling markets are the common factor's
+    /// leverage effect, and this model's corr_asymmetry sits at -0.016
+    /// against a real +0.015 with nothing measured able to move it
+    /// (rounds 93/95). This is the wire for exactly that statistic.
+    ///
+    /// Applies to the FAST component only: the leverage effect is a
+    /// same-week phenomenon, and the slow component carries long-horizon
+    /// clustering, not asymmetry.
+    pub market_vol_gamma: f64,
     /// Cap on the market factor's variance, as a multiple of its calm
     /// level. A CAP, not a lever: it does nothing until the variance
     /// reaches it, so raising it above where it already binds changes
@@ -1265,6 +1285,7 @@ impl ModelParams {
             garch_floor_multiple: garch::FLOOR_MULTIPLE,
             market_vol_alpha: factor_vol::MARKET_VOL_ALPHA,
             market_vol_beta: factor_vol::MARKET_VOL_BETA,
+            market_vol_gamma: 0.0,
             market_vol_ceiling_multiple: factor_vol::MARKET_VOL_CEILING_MULTIPLE,
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
             market_vol_vix_coupling: factor_vol::MARKET_VOL_VIX_COUPLING,
@@ -2215,6 +2236,7 @@ impl ModelParams {
             "garch_floor_multiple" => self.garch_floor_multiple,
             "market_vol_alpha" => self.market_vol_alpha,
             "market_vol_beta" => self.market_vol_beta,
+            "market_vol_gamma" => self.market_vol_gamma,
             "market_vol_ceiling_multiple" => self.market_vol_ceiling_multiple,
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
             "market_vol_vix_coupling" => self.market_vol_vix_coupling,
@@ -2344,6 +2366,7 @@ impl ModelParams {
             "garch_floor_multiple" => out.garch_floor_multiple = value,
             "market_vol_alpha" => out.market_vol_alpha = value,
             "market_vol_beta" => out.market_vol_beta = value,
+            "market_vol_gamma" => out.market_vol_gamma = value,
             "market_vol_ceiling_multiple" => out.market_vol_ceiling_multiple = value,
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
             "market_vol_vix_coupling" => out.market_vol_vix_coupling = value,
@@ -2541,6 +2564,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_factor_sigma",
         "market_vol_alpha",
         "market_vol_beta",
+        "market_vol_gamma",
         "market_vol_ceiling_multiple",
         "market_vol_floor_multiple",
         "market_vol_slow_gain",
