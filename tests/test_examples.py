@@ -163,7 +163,7 @@ def test_the_claude_example_refuses_without_its_extra():
     done = subprocess.run([sys.executable, str(script)],
                           capture_output=True, text=True, timeout=120, env=env)
     combined = done.stdout + done.stderr
-    assert "pretium[claude]" in combined or "ANTHROPIC_API_KEY" in combined, (
+    assert "tradefloor[claude]" in combined or "ANTHROPIC_API_KEY" in combined, (
         f"expected a readable refusal, got:\n{combined[-1500:]}"
     )
     assert "Traceback" not in done.stdout

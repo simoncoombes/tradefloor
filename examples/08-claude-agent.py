@@ -2,7 +2,7 @@
 
 Run:
 
-    pip install "pretium[claude]"
+    pip install "tradefloor[claude]"
     export ANTHROPIC_API_KEY=...          # or: ant auth login
     python examples/08-claude-agent.py
 
@@ -37,7 +37,7 @@ try:
     import anthropic
     from pydantic import BaseModel, Field
 except ImportError:
-    sys.exit('This example needs the extra: pip install "pretium[claude]"')
+    sys.exit('This example needs the extra: pip install "tradefloor[claude]"')
 
 
 # The nine components the engine decomposes every price move into. Claude

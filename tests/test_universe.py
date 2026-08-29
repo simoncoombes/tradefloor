@@ -142,7 +142,7 @@ def test_a_missing_required_field_names_itself():
 
 
 def test_nonsense_input_is_refused():
-    with pytest.raises(tradefloor.ValidationError, match="not a pretium universe"):
+    with pytest.raises(tradefloor.ValidationError, match="not a tradefloor universe"):
         tradefloor.Universe.from_json('{"hello": 1}')
 
 
