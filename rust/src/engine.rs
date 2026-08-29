@@ -617,6 +617,7 @@ impl Engine {
             &mut self.companies,
             &TickInputs {
                 economy: &self.economy,
+                prev_day_down: self.market_vol.prev_day_down(),
                 universe_stress: self.universe_stress,
                 volume_state: self.volume_state,
                 volume_idio: &self.volume_idio,
@@ -795,7 +796,7 @@ impl Engine {
     /// close its first day on a truncated innovation — pricing differently
     /// from the parent it forked from, the exact failure class
     /// [`Engine::restore_day_state`] exists for.
-    pub fn market_variance_state(&self) -> (f64, f64, f64, f64) {
+    pub fn market_variance_state(&self) -> (f64, f64, f64, f64, f64) {
         self.market_vol.snapshot()
     }
 
@@ -813,9 +814,10 @@ impl Engine {
         day_factor: f64,
         fast_variance: f64,
         slow_variance: f64,
+        prev_day_factor: f64,
     ) {
         self.market_vol = MarketVarianceState::restore_with_components(
-            variance, day_factor, fast_variance, slow_variance);
+            variance, day_factor, fast_variance, slow_variance, prev_day_factor);
     }
 
     /// One attribution column across all companies, by index 0..7.

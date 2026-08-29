@@ -113,6 +113,9 @@ pub struct SharedFactors {
     /// The crisis correlation blend weight this tick, 0.0 below the crisis
     /// threshold. Read only when `crisis_blend_source` is nonzero.
     pub crisis_spike: f64,
+    /// Yesterday's session closed with a down market factor. Read only by
+    /// the lagged transmission wire (`market_beta_down_asym_lag`).
+    pub prev_day_down: bool,
 }
 
 impl SharedFactors {
@@ -361,6 +364,17 @@ pub fn calculate_live_factors(
         beta * shared.market_factor
     } else {
         beta * shared.market_factor * (1.0 + params.market_beta_down_asym)
+    };
+    // The LAGGED wire (block 1201's signature, round 110's interim): on the
+    // session AFTER a down day, transmission is boosted regardless of the
+    // tick's own sign -- down moves continue into the next day. A branch,
+    // so 0.0 is bit-identical.
+    let factor_through = if params.market_beta_down_asym_lag == 0.0
+        || !shared.prev_day_down
+    {
+        factor_through
+    } else {
+        factor_through * (1.0 + params.market_beta_down_asym_lag)
     };
     let market_component = if params.crisis_blend_source == 0.0 {
         factor_through
@@ -615,6 +629,7 @@ mod tests {
             market_factor: 0.0,
             sector_factors: vec![("technology".into(), 0.0)],
             crisis_spike: 0.0,
+            prev_day_down: false,
         }
     }
 

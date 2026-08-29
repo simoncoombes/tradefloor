@@ -395,6 +395,10 @@ pub struct MarketVarianceState {
     /// `market_vol_vix_smooth` is on. `None` until the first smoothed
     /// close, and never touched while the dial is 0.0.
     smoothed_vix: Option<f64>,
+    /// Yesterday's accumulated day factor, recorded at close for the
+    /// lagged transmission wire. Purely observational: nothing in the
+    /// variance process reads it.
+    prev_day_factor: f64,
 }
 
 impl Default for MarketVarianceState {
@@ -424,7 +428,14 @@ impl MarketVarianceState {
             fast_variance: base,
             slow_variance: base,
             smoothed_vix: None,
+            prev_day_factor: 0.0,
         }
+    }
+
+    /// Whether yesterday's session accumulated a DOWN market factor. For
+    /// the lagged transmission wire; false before the first close.
+    pub fn prev_day_down(&self) -> bool {
+        self.prev_day_factor < 0.0
     }
 
     /// Today's factor sigma at DAILY scale — what the tick multiplies by
@@ -488,6 +499,7 @@ impl MarketVarianceState {
             self.variance = update_market_variance_with(
                 params, self.variance, self.day_factor, vix);
             self.fast_variance = self.variance;
+            self.prev_day_factor = self.day_factor;
             self.day_factor = 0.0;
             return;
         }
@@ -532,14 +544,15 @@ impl MarketVarianceState {
         // autocorrelation is the weighted sum of two decay rates rather
         // than one decay plus a level.
         self.variance = clamp_variance(params, (1.0 - w) * fast + w * slow);
+        self.prev_day_factor = self.day_factor;
         self.day_factor = 0.0;
     }
 
     /// The four state numbers, for checkpoints:
     /// `(variance, day_factor, fast_variance, slow_variance)`.
-    pub fn snapshot(&self) -> (f64, f64, f64, f64) {
+    pub fn snapshot(&self) -> (f64, f64, f64, f64, f64) {
         (self.variance, self.day_factor, self.fast_variance,
-         self.slow_variance)
+         self.slow_variance, self.prev_day_factor)
     }
 
     /// Restore from a checkpoint. Values are adopted verbatim, like every
@@ -558,6 +571,7 @@ impl MarketVarianceState {
             // Pre-dial checkpoints carry no smoothed fear; the EMA
             // re-seeds from the first smoothed close after restore.
             smoothed_vix: None,
+            prev_day_factor: 0.0,
         }
     }
 
@@ -567,8 +581,13 @@ impl MarketVarianceState {
         day_factor: f64,
         fast_variance: f64,
         slow_variance: f64,
+        prev_day_factor: f64,
     ) -> Self {
-        Self { variance, day_factor, fast_variance, slow_variance, smoothed_vix: None }
+        // A checkpoint from before the lagged wire carries no
+        // prev_day_factor; the caller passes 0.0 and the wire simply does
+        // not fire on the first restored session, which is what those
+        // checkpoints' era did anyway.
+        Self { variance, day_factor, fast_variance, slow_variance, smoothed_vix: None, prev_day_factor }
     }
 }
 
@@ -817,8 +836,8 @@ mod tests {
         state.accumulate(0.007);
         state.close_day(22.0);
         state.accumulate(-0.003);
-        let (v, df, fast, slow) = state.snapshot();
-        let restored = MarketVarianceState::restore_with_components(v, df, fast, slow);
+        let (v, df, fast, slow, pdf) = state.snapshot();
+        let restored = MarketVarianceState::restore_with_components(v, df, fast, slow, pdf);
         assert_eq!(state, restored);
     }
 
@@ -839,7 +858,7 @@ mod tests {
         original.close_day_with(params, 31.0);
         original.accumulate(-0.004);
 
-        let (v, df, _fast, _slow) = original.snapshot();
+        let (v, df, _fast, _slow, _pdf) = original.snapshot();
         let mut restored = MarketVarianceState::restore(v, df);
 
         for day in 0..12 {

@@ -305,6 +305,11 @@ pub struct TickInputs<'a> {
     /// Sector keys in the order `SECTOR_CONFIGS` enumerates them. The ORDER
     /// is contractual: one normal is drawn per key, in this order.
     pub sector_keys: &'a [String],
+    /// Whether yesterday's session accumulated a DOWN market factor.
+    /// Read only by the lagged transmission wire
+    /// (`market_beta_down_asym_lag`); false everywhere that dial is 0.0,
+    /// including every recorded reference stream.
+    pub prev_day_down: bool,
     /// Today's market-factor sigma at DAILY scale — the conditional level
     /// of the factor's variance process ([`super::factor_vol`]), fixed for
     /// the whole session at the previous close's update.
@@ -439,6 +444,7 @@ pub fn simulate_market_tick(
                 market_factor: 0.0,
                 sector_factors: Vec::new(),
                 crisis_spike: 0.0,
+                prev_day_down: false,
             },
         };
     }
@@ -532,6 +538,7 @@ pub fn simulate_market_tick(
         market_factor,
         sector_factors,
         crisis_spike: vix_correlation_spike,
+        prev_day_down: inputs.prev_day_down,
     };
 
     let intraday_vol_mult = intraday_vol(inputs.intraday_t);

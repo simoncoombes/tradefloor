@@ -543,6 +543,13 @@ pub struct ModelParams {
     /// some volatility asymmetry with it; the leverage_effect row is the
     /// stated side-channel to watch.
     pub market_beta_down_asym: f64,
+    /// The LAGGED downside transmission: on the session after a down day,
+    /// every name receives `beta * factor * (1 + this)` whatever the
+    /// tick's own sign. 0.0 -- every shipped preset -- is bit-identical.
+    /// Block 1201's deep-trim signature (the wire landing a day late on
+    /// its structure) is the measured motivation: real down-moves
+    /// continue, and the contemporaneous wire alone cannot express that.
+    pub market_beta_down_asym_lag: f64,
     /// Persistence of the SLOW variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -1332,6 +1339,7 @@ impl ModelParams {
             market_vol_vix_smooth: 0.0,
             market_vol_vix_exponent: 2.0,
             market_beta_down_asym: 0.0,
+            market_beta_down_asym_lag: 0.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
@@ -2347,6 +2355,7 @@ impl ModelParams {
             "market_vol_vix_smooth" => self.market_vol_vix_smooth,
             "market_vol_vix_exponent" => self.market_vol_vix_exponent,
             "market_beta_down_asym" => self.market_beta_down_asym,
+            "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
@@ -2481,6 +2490,7 @@ impl ModelParams {
             "market_vol_vix_smooth" => out.market_vol_vix_smooth = value,
             "market_vol_vix_exponent" => out.market_vol_vix_exponent = value,
             "market_beta_down_asym" => out.market_beta_down_asym = value,
+            "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
@@ -2685,6 +2695,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_vix_smooth",
         "market_vol_vix_exponent",
         "market_beta_down_asym",
+        "market_beta_down_asym_lag",
         "market_vol_vix_coupling",
         "mispricing_cap",
         "mispricing_half_life_days",
