@@ -3,9 +3,15 @@
 Five minutes, one command, no keys and no network.
 
 ```
+git clone https://github.com/simoncoombes/tradefloor
+cd tradefloor
 pip install tradefloor
 python examples/rate_shock_counterfactual.py
 ```
+
+The wheel carries the library, not the examples, so the clone is what puts
+the script on disk. `matplotlib` is optional and only decides whether you get
+the chart.
 
 It runs in about two seconds and answers one question:
 
