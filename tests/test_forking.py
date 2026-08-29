@@ -975,6 +975,267 @@ def test_a_snapshot_carries_the_dormant_engine_dials():
     assert target.column("volume") == parent.column("volume")
 
 
+#: A market with nothing dormant in it.
+#:
+#: A snapshot that forgets a field is invisible while that field is inert,
+#: and every latent omission this project has had was found the hard way: the
+#: common log-volume state was missing and harmless until pt-v10 turned it on.
+#: So the guard below runs on a model where nothing is off, in a market where
+#: nothing is quiet.
+#:
+#: Three deliberate departures from the shipped preset, each because a dial
+#: that never fires is a dial the guard cannot see:
+#:
+#: - every parameter shipped at zero, at 0.05. Measured to keep prices finite
+#:   and positive over this horizon.
+#: - endogenous news at 0.9 rather than the shipped 0.05, so every day HAS
+#:   news. At 0.05 across twelve names a given day is newsless about half the
+#:   time, which is exactly how the missing-news defect hid from the suite.
+#: - universe stress with weight and decay, under a crisis VIX, because the
+#:   stress term ratchets on the VIX above a threshold and stays at zero in a
+#:   calm market however large its weight.
+def _nothing_dormant():
+    shipped = tf.ModelParams.from_preset().to_dict()
+    dormant = {name: 0.05 for name in tf.ModelParams.settable()
+               if float(shipped[name]) == 0.0}
+    assert dormant, "no dial ships at zero; this model is not testing anything"
+    dormant.update(endogenous_news_intensity=0.9,
+                   universe_stress_weight=0.5,
+                   universe_stress_decay=0.9)
+    return tf.ModelParams.from_preset(**dormant)
+
+
+#: A crisis, so the stress term has something to remember.
+CRISIS = tf.Macro(vix=45.0, federal_funds_rate=0.05, cycle="contraction")
+
+#: What a snapshot claims to carry: the market, not the history. The log, the
+#: recorded tape, the recorded day count and the draw counters are documented
+#: omissions and are excluded rather than silently passing.
+def market_only(engine):
+    skip = {"draws", "draws_by_stream", "digest", "log_entries",
+            "recorded_days"}
+    return {k: v for k, v in state(engine).items() if k not in skip}
+
+
+def tape_from(engine, first_day, last_day):
+    """The recorded tape over days both engines have.
+
+    A restored engine starts with an EMPTY tape -- that is one of the
+    snapshot's documented omissions -- so comparing whole tapes against a fork
+    would report a difference that is by design and hide the ones that are
+    not. Only the days recorded after the restore are comparable, and those
+    are the ones that say whether the two engines are running the same market.
+
+    The tape is worth comparing at all because two of the fields a snapshot
+    carries (`tick_fundamental` and `tick_anchor`) reach nothing else: they
+    are the labelled-dataset output, which is the library's headline product,
+    and a fork that lost them would print identical prices.
+    """
+    pyarrow = pytest.importorskip("pyarrow")
+    out = {}
+    for d in range(first_day, last_day):
+        table = pyarrow.table(engine.truth(day=d))
+        for column in table.column_names:
+            out[f"tape:{d}:{column}"] = table.column(column).to_pylist()
+    return out
+
+
+def _mid_day_parent(model, macro):
+    """A parent stopped between two sessions of one day.
+
+    Mid-day on purpose: every field the snapshot's list has lost was per-day
+    state, and an engine stopped on a day boundary has none of it to lose.
+    """
+    engine = tf.Engine(seed=SEED, universe=UNIVERSE, macro_state=macro,
+                       model=model)
+    run(engine, 4)
+    engine.open_market()
+    engine.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    return engine
+
+
+#: The day the parent was interrupted on, and how far both engines run after
+#: it. Twenty-five days because the central bank's meeting calendar and the
+#: day counter that drives it are state whose effect is weeks away, not
+#: tomorrow, and a shorter run cannot see them.
+SPLIT_DAY = 4
+CONTINUE_DAYS = 25
+
+
+def _continue(engine):
+    """Finish the open day, then run on."""
+    engine.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    engine.record(SPLIT_DAY)
+    engine.close_market()
+    run(engine, CONTINUE_DAYS, first=SPLIT_DAY + 1)
+    return engine
+
+
+def _split_day_tail(engine):
+    """The split day's tape, restricted to the session both engines ran.
+
+    The split day is half recorded when the snapshot is taken and a restored
+    engine does not carry the day's accumulated ticks -- one of the omissions
+    the snapshot documents -- so the fork's day-4 tape is two sessions and the
+    restored engine's is one. The LAST session is the comparable part, and it
+    is the most informative rows in the whole comparison: it is the first
+    thing either engine does after the restore, so a field that is missing
+    shows up there before anything has had a chance to wash out.
+    """
+    pyarrow = pytest.importorskip("pyarrow")
+    rows = TICKS_PER_DAY * len(UNIVERSE)
+    table = pyarrow.table(engine.truth(day=SPLIT_DAY))
+    # Every column but `tick`, which is the row's INDEX within the day and so
+    # counts from the start of whatever each engine recorded: the fork's day
+    # is two sessions and the restored engine's is one, so the same session
+    # is numbered 26-51 in one and 0-25 in the other. That is the labelling
+    # consequence of the day buffer the snapshot does not carry, not a
+    # divergence, and comparing it would make this guard fail always and
+    # therefore mean nothing.
+    return {f"split:{c}": table.column(c).to_pylist()[-rows:]
+            for c in table.column_names if c != "tick"}
+
+
+def _diverged(left, right):
+    """Where two continuations disagree: market state, the session they both
+    recorded on the split day, and every whole day after it."""
+    first = SPLIT_DAY + 1
+    last = first + CONTINUE_DAYS
+
+    def everything(engine):
+        return {**market_only(engine), **_split_day_tail(engine),
+                **tape_from(engine, first, last)}
+
+    return differences(everything(left), everything(right))
+
+
+@pytest.mark.parametrize("lively", [False, True],
+                         ids=["shipped-default", "nothing-dormant"])
+def test_a_restored_snapshot_continues_like_a_copy(lively):
+    """The drift guard for `state_snapshot`, asked as behaviour.
+
+    `branch` copies the engine, so a fork is complete by construction and is
+    the reference. `state_snapshot` is a hand-written list of fields, and that
+    list has been wrong six times: the per-day accumulators, the market-open
+    flag, the market factor's variance, the common log-volume state, the day
+    counter, and the day's endogenous news.
+
+    Nothing in the library uses the snapshot any more, which removes the
+    pressure that kept catching those and leaves the drift free to continue.
+    So this compares the two mechanisms directly and CONTINUES them: a field
+    that only matters tomorrow -- the GARCH variance was exactly that -- shows
+    up nowhere in today's prices, and a state comparison alone would pass.
+    """
+    model = _nothing_dormant() if lively else None
+    macro = CRISIS if lively else None
+
+    parent = _mid_day_parent(model, macro)
+    reference, = tf.branch(parent, 1)
+    restored = tf.Engine(seed=SEED, universe=UNIVERSE, macro_state=macro,
+                         model=model)
+    restored.restore_state(parent.state_snapshot())
+
+    gap = differences(market_only(restored), market_only(parent))
+    assert gap == [], (
+        f"a snapshot no longer restores the market it captured: {gap}. "
+        "state_snapshot is a written list of fields and the engine has grown "
+        "past it again."
+    )
+
+    _continue(reference)
+    _continue(restored)
+    gap = _diverged(restored, reference)
+    assert gap == [], (
+        f"a restored snapshot diverged from a copy: {gap}. Something the "
+        "engine carries drives the market and is not in the snapshot."
+    )
+
+
+#: The keys `restore_state` requires outright, refusing rather than silently
+#: restoring half a market. Each has its own test; dropping one here would
+#: measure the refusal, not the field.
+REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
+
+#: Snapshot fields this scenario cannot reach, each with the condition its
+#: effect waits on. Same shape as `PERTURBATIONS` in `test_model_params.py`,
+#: and for the same reason: a field that moves nothing WITHOUT a named reason
+#: is a field the guard below is not guarding, and the difference between
+#: those two cases is the whole value of the check.
+UNREACHED_SNAPSHOT_FIELDS = {
+    "model_fingerprint":
+        "not state. It is the guard that refuses a snapshot restored onto an "
+        "engine running other coefficients, which has its own test; dropping "
+        "it removes a check rather than a value.",
+    "tick_fundamental":
+        "per-tick scratch. The valuation is recomputed every tick before "
+        "anything reads it, so a continuation never depends on the value "
+        "carried. It is in the snapshot for the tape's current row.",
+    "tick_anchor":
+        "per-tick scratch, exactly as tick_fundamental.",
+    "universe_stress":
+        "the remembered stress contributes only where it EXCEEDS the instant "
+        "stress -- market/tick.rs computes max(remembered - instant, 0) -- so "
+        "it needs a market whose VIX was high and is now held low. This "
+        "scenario keeps the VIX in crisis throughout, which is what makes "
+        "every OTHER dial live.",
+    "central_bank":
+        "the meeting calendar runs off day_count, which IS restored, so both "
+        "engines schedule the same meetings. A difference needs a run that "
+        "crosses a meeting whose decision depends on carried bank state "
+        "rather than on the calendar.",
+}
+
+
+def test_the_drift_guard_notices_every_field_the_snapshot_carries():
+    """Guards the guard, and it needs guarding.
+
+    A test that compares two engines proves nothing unless the comparison can
+    fail. Written first without the crisis macro and with the shipped news
+    rate, this same guard saw only six of the fourteen optional fields -- it
+    would have passed a snapshot that had lost the day's news, which is the
+    defect the whole forking pass was about.
+
+    So each field is dropped from the snapshot in turn and the divergence must
+    be caught, or the field must appear in `UNREACHED_SNAPSHOT_FIELDS` with
+    the condition its effect waits on. Asserted as an equality in both
+    directions: a NEW field that nothing reaches fails here, and a field that
+    becomes reachable fails here too, which is the prompt to delete its note
+    rather than let a stale excuse accumulate.
+    """
+    model = _nothing_dormant()
+    carried = [k for k in _mid_day_parent(model, CRISIS).state_snapshot()
+               if k not in REQUIRED_SNAPSHOT_KEYS]
+    assert len(carried) >= 10, carried
+
+    invisible = []
+    for key in carried:
+        parent = _mid_day_parent(model, CRISIS)
+        reference, = tf.branch(parent, 1)
+        damaged = parent.state_snapshot()
+        damaged.pop(key)
+        restored = tf.Engine(seed=SEED, universe=UNIVERSE, macro_state=CRISIS,
+                             model=model)
+        restored.restore_state(damaged)
+        _continue(reference)
+        _continue(restored)
+        if not _diverged(restored, reference):
+            invisible.append(key)
+
+    unnamed = sorted(set(invisible) - set(UNREACHED_SNAPSHOT_FIELDS))
+    assert unnamed == [], (
+        f"dropping {unnamed} from a snapshot changed nothing this scenario "
+        "can see, so the guard above is not guarding those fields. Either "
+        "give the scenario a market that exercises them, or add them to "
+        "UNREACHED_SNAPSHOT_FIELDS with the condition their effect waits on."
+    )
+    stale = sorted(set(UNREACHED_SNAPSHOT_FIELDS) - set(invisible))
+    assert stale == [], (
+        f"{stale} are recorded as out of this scenario's reach and the "
+        "scenario now reaches them. Delete the note: an excuse that is no "
+        "longer true is how a list of known gaps stops being read."
+    )
+
+
 def test_a_snapshot_does_not_carry_history_and_says_so():
     """The documented limit of `state_snapshot`, pinned.
 
