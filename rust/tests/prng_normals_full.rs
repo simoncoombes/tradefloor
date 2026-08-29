@@ -12,7 +12,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use pretium::GameRng;
+use tradefloor::GameRng;
 use serde::Deserialize;
 
 #[derive(Deserialize)]

@@ -11,20 +11,20 @@ import struct
 
 import pytest
 
-import pretium
-from pretium import SPEC_VERSION, StrategySpec, ValidationError
-from pretium.baselines import (
+import tradefloor
+from tradefloor import SPEC_VERSION, StrategySpec, ValidationError
+from tradefloor.baselines import (
     BuyAndHold,
     MeanReversion,
     Momentum,
     Oracle,
     RandomTrader,
 )
-from pretium.harness import Observation
-from pretium.portfolio import Portfolio
-from pretium.spec import _BlendAgent
+from tradefloor.harness import Observation
+from tradefloor.portfolio import Portfolio
+from tradefloor.spec import _BlendAgent
 
-UNIVERSE = pretium.Universe.random(12, seed=3)
+UNIVERSE = tradefloor.Universe.random(12, seed=3)
 
 
 def _f64(buf):
@@ -365,8 +365,8 @@ def test_spec_built_baselines_score_identically_to_hand_built_ones():
         "mean_reversion": MeanReversion(lookback_days=1.0),
         "oracle": Oracle(),
     }
-    from_specs = pretium.evaluate(specs, seed=2026, universe=UNIVERSE, days=3)
-    from_classes = pretium.evaluate(classes, seed=2026, universe=UNIVERSE,
+    from_specs = tradefloor.evaluate(specs, seed=2026, universe=UNIVERSE, days=3)
+    from_classes = tradefloor.evaluate(classes, seed=2026, universe=UNIVERSE,
                                     days=3)
     for name in specs:
         a, b = from_specs[name].as_dict(), from_classes[name].as_dict()
@@ -390,9 +390,9 @@ def test_a_blend_of_one_trades_exactly_like_the_baseline():
         top_k=5, gross=1.0, max_participation=0.02, seed=None)
     shipped = Momentum(lookback_days=1.0)
 
-    a = pretium.evaluate({"agent": blend}, seed=2026, universe=UNIVERSE,
+    a = tradefloor.evaluate({"agent": blend}, seed=2026, universe=UNIVERSE,
                          days=3)["agent"]
-    b = pretium.evaluate({"agent": shipped}, seed=2026, universe=UNIVERSE,
+    b = tradefloor.evaluate({"agent": shipped}, seed=2026, universe=UNIVERSE,
                          days=3)["agent"]
     assert a.pnl == b.pnl
     assert a.trades == b.trades
@@ -404,7 +404,7 @@ def test_a_real_blend_runs_and_is_its_own_strategy():
         {"kind": "momentum", "weight": 0.6, "lookback_days": 1.0},
         {"kind": "mean_reversion", "weight": 0.4, "lookback_days": 2.0},
     ])
-    scores = pretium.evaluate(
+    scores = tradefloor.evaluate(
         {"blend": blend,
          "momentum": StrategySpec.momentum(),
          "mean_reversion": StrategySpec.mean_reversion(lookback_days=2.0)},
@@ -446,7 +446,7 @@ def test_the_cadence_wrapper_forwards_explain():
 
 
 def test_daily_cadence_decides_only_at_the_open():
-    engine = pretium.Engine(seed=5, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE)
     portfolio = Portfolio(cash=1_000_000.0, max_leverage=2.0)
     adv = [inst.avg_volume for inst in UNIVERSE]
     agent = StrategySpec.momentum(cadence="daily").build()
@@ -474,7 +474,7 @@ def test_daily_cadence_resolves_lookback_in_days_not_steps():
     # harness's step count into the wrapped agent, a lookback of one day
     # would become six daily observations and the strategy would quietly
     # mean something else.
-    engine = pretium.Engine(seed=5, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE)
     portfolio = Portfolio(cash=1_000_000.0, max_leverage=2.0)
     adv = [inst.avg_volume for inst in UNIVERSE]
     agent = StrategySpec.momentum(cadence="daily", lookback_days=1.0).build()
@@ -499,7 +499,7 @@ def test_step_cadence_is_the_default_and_matches_the_shipped_agents():
 
 def test_evaluate_accepts_specs_and_stamps_the_fingerprint():
     spec = StrategySpec.oracle(top_k=2)
-    scores = pretium.evaluate({"oracle": spec}, seed=2026, universe=UNIVERSE,
+    scores = tradefloor.evaluate({"oracle": spec}, seed=2026, universe=UNIVERSE,
                               days=2)
     card = scores["oracle"]
     assert card.strategy_fingerprint == spec.fingerprint
@@ -515,14 +515,14 @@ def test_a_hand_written_agent_carries_no_fingerprint():
         def act(self, obs):
             return {}
 
-    scores = pretium.evaluate({"custom": Custom()}, seed=2026,
+    scores = tradefloor.evaluate({"custom": Custom()}, seed=2026,
                               universe=UNIVERSE, days=1)
     assert scores["custom"].strategy_fingerprint == ""
 
 
 def test_a_built_agent_still_carries_its_spec_through_evaluate():
     spec = StrategySpec.momentum()
-    scores = pretium.evaluate({"m": spec.build()}, seed=2026,
+    scores = tradefloor.evaluate({"m": spec.build()}, seed=2026,
                               universe=UNIVERSE, days=2)
     assert scores["m"].strategy_fingerprint == spec.fingerprint
 
@@ -533,22 +533,22 @@ def test_specs_are_safe_to_reuse_where_agents_are_not():
     # call, so reuse is safe -- this is the trap that made rank() refuse
     # plain mappings, closed at the source.
     spec = StrategySpec.hold()
-    first = pretium.evaluate({"hold": spec}, seed=2026, universe=UNIVERSE,
+    first = tradefloor.evaluate({"hold": spec}, seed=2026, universe=UNIVERSE,
                              days=2)
-    second = pretium.evaluate({"hold": spec}, seed=2026, universe=UNIVERSE,
+    second = tradefloor.evaluate({"hold": spec}, seed=2026, universe=UNIVERSE,
                               days=2)
     assert first["hold"].as_dict() == second["hold"].as_dict()
     assert first["hold"].trades > 0
 
     instance = BuyAndHold()
-    pretium.evaluate({"hold": instance}, seed=2026, universe=UNIVERSE, days=2)
-    again = pretium.evaluate({"hold": instance}, seed=2026, universe=UNIVERSE,
+    tradefloor.evaluate({"hold": instance}, seed=2026, universe=UNIVERSE, days=2)
+    again = tradefloor.evaluate({"hold": instance}, seed=2026, universe=UNIVERSE,
                              days=2)
     assert again["hold"].trades == 0  # the instance already spent itself
 
 
 def test_rank_accepts_a_factory_of_specs():
-    ranking = pretium.rank(
+    ranking = tradefloor.rank(
         lambda: {"momentum": StrategySpec.momentum(),
                  "oracle": StrategySpec.oracle()},
         seeds=range(2), universe=UNIVERSE, days=2)

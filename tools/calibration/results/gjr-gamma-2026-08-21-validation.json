@@ -135,5 +135,5 @@
    "volume_change_acf1": -0.4447611667578883
   }
  },
- "method": "pretium.facts.measure at GAMMA=0.34 ALPHA=0.02 BETA=0.80 (fingerprint 7c33b571b3913b06)"
+ "method": "tradefloor.facts.measure at GAMMA=0.34 ALPHA=0.02 BETA=0.80 (fingerprint 7c33b571b3913b06)"
 }

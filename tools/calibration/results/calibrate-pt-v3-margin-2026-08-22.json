@@ -6494,7 +6494,7 @@
   "days": 252,
   "factor_persistence_cap": null,
   "lambda": 10.0,
-  "loss": "pretium.loss.band_distance_loss (the shipped objective) + lambda * sum_j dev_j^2 (\u00a76.3)",
+  "loss": "tradefloor.loss.band_distance_loss (the shipped objective) + lambda * sum_j dev_j^2 (\u00a76.3)",
   "optimiser": {
    "compass_steps": "0.1,0.05,0.025",
    "confirm_steps": "0.025",
@@ -6715,7 +6715,7 @@
    "source": "re-measured on the shipped preset: facts.measure() on Universe.random(40, seed=111), 252 days, seeds 101-130, sample sd across seeds",
    "universe_fingerprint": "5d8de78b55aad75230774001879154c0f29aa8fc0c63f3c6a4ac791165ca7380"
   },
-  "seed_sd_source": "pretium.facts.SEED_SD",
+  "seed_sd_source": "tradefloor.facts.SEED_SD",
   "subset_offsets_at_pt_v1": {
    "abs_return_acf1": 0.007641647659476336,
    "abs_return_acf20": -0.0026630869122827635,

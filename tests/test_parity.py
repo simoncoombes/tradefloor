@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-import pretium
+import tradefloor
 
 GOLDENS = Path(__file__).resolve().parent.parent / "rust" / "goldens"
 
@@ -81,23 +81,23 @@ def load(name):
 # --------------------------------------------------------------------------
 
 def test_same_seed_same_draws():
-    a = pretium.GameRng(42, 99)
-    b = pretium.GameRng(42, 99)
+    a = tradefloor.GameRng(42, 99)
+    b = tradefloor.GameRng(42, 99)
     assert [a.next_float() for _ in range(64)] == [b.next_float() for _ in range(64)]
 
 
 def test_different_seed_diverges():
-    a = pretium.GameRng(42, 99)
-    b = pretium.GameRng(43, 99)
+    a = tradefloor.GameRng(42, 99)
+    b = tradefloor.GameRng(43, 99)
     assert a.next_float() != b.next_float()
 
 
 def test_streams_are_independent():
     # Two generators in one process must not share state. If they did,
     # "same seed, same market" would hold only for the first one constructed.
-    a = pretium.GameRng(1, 99)
+    a = tradefloor.GameRng(1, 99)
     first = a.next_float()
-    b = pretium.GameRng(1, 99)  # constructed AFTER a has drawn
+    b = tradefloor.GameRng(1, 99)  # constructed AFTER a has drawn
     assert b.next_float() == first
 
 
@@ -116,15 +116,15 @@ def test_normal_draws_carry_the_box_muller_spare():
     normals, shifting every subsequent draw and changing every market -- while
     still passing any test that only ever drew normals.
     """
-    fresh = pretium.GameRng(7, 99)
+    fresh = tradefloor.GameRng(7, 99)
     uniforms = [fresh.next_float() for _ in range(4)]
 
-    one = pretium.GameRng(7, 99)
+    one = tradefloor.GameRng(7, 99)
     one.next_normal()
     # The first normal consumed exactly two uniforms.
     assert one.next_float() == uniforms[2]
 
-    two = pretium.GameRng(7, 99)
+    two = tradefloor.GameRng(7, 99)
     two.next_normal()
     two.next_normal()
     # The second consumed none: the stream is in the same place.
@@ -140,7 +140,7 @@ def test_uniform_draws_match_the_reference_bit_for_bit():
     checked = 0
     for series in golden["series"]:
         spec = series["input"]
-        rng = pretium.GameRng(spec["seed"], spec["sequence"])
+        rng = tradefloor.GameRng(spec["seed"], spec["sequence"])
         for expected in series.get("decimalPreview") or []:
             assert bits(rng.next_float()) == expected["bits"].lower()
             checked += 1
@@ -180,7 +180,7 @@ def test_fair_value_matches_the_reference_bit_for_bit():
         )
 
         try:
-            got = pretium.fair_value(**kwargs)
+            got = tradefloor.fair_value(**kwargs)
         except ValueError:
             rejected += 1
             continue
@@ -202,16 +202,16 @@ def test_rates_are_fractional_not_percent():
     # The whole point of the convention. 4.5 means 450%, not 4.5%, and must
     # be refused with a message that says so.
     with pytest.raises(ValueError, match="percent"):
-        pretium.fair_value(eps=4.0, sector="technology", federal_funds_rate=4.5)
+        tradefloor.fair_value(eps=4.0, sector="technology", federal_funds_rate=4.5)
 
 
 def test_growth_is_not_a_rate_and_is_not_rescaled():
     # revenue_growth is fractional in BOTH denominations. If the boundary
     # scaled it like a rate, 22% growth would become 2200% and produce a
     # large, finite, entirely wrong multiple -- with no error anywhere.
-    low = pretium.fair_value(eps=4.0, sector="technology", revenue_growth=0.0,
+    low = tradefloor.fair_value(eps=4.0, sector="technology", revenue_growth=0.0,
                              federal_funds_rate=0.05)
-    high = pretium.fair_value(eps=4.0, sector="technology", revenue_growth=0.22,
+    high = tradefloor.fair_value(eps=4.0, sector="technology", revenue_growth=0.22,
                               federal_funds_rate=0.05)
     # Growth raises duration, which deepens the rate penalty above neutral.
     assert high.rate_adjustment < low.rate_adjustment
@@ -220,9 +220,9 @@ def test_growth_is_not_a_rate_and_is_not_rescaled():
 
 def test_absent_yield_falls_through_but_zero_does_not():
     # Absence versus zero, the distinction the binding must not collapse.
-    absent = pretium.fair_value(eps=4.0, sector="technology",
+    absent = tradefloor.fair_value(eps=4.0, sector="technology",
                                 federal_funds_rate=0.08, corporate_bond_yield=None)
-    zero = pretium.fair_value(eps=4.0, sector="technology",
+    zero = tradefloor.fair_value(eps=4.0, sector="technology",
                               federal_funds_rate=0.08, corporate_bond_yield=0.0)
     assert absent.rate_adjustment != zero.rate_adjustment
 
@@ -237,27 +237,27 @@ def test_nan_is_refused_at_the_boundary():
     # fair value freezes a book rather than raising anything.
     for field in ("eps", "revenue_growth", "qe_pe_boost", "book_value_per_share"):
         with pytest.raises(ValueError, match="finite"):
-            pretium.fair_value(**{
+            tradefloor.fair_value(**{
                 "eps": 4.0, "sector": "technology", field: float("nan")
             })
 
 
 def test_unknown_sector_lists_the_valid_ones():
     with pytest.raises(ValueError, match="technology"):
-        pretium.fair_value(eps=4.0, sector="tecnology")
+        tradefloor.fair_value(eps=4.0, sector="tecnology")
 
 
 def test_negative_eps_is_legal_and_uses_the_book_path():
     # A universe without loss-makers is unrealistic; validation must not
     # "fix" a negative EPS.
-    got = pretium.fair_value(eps=-2.0, sector="technology",
+    got = tradefloor.fair_value(eps=-2.0, sector="technology",
                              book_value_per_share=10.0, federal_funds_rate=0.04)
     assert got.book_value_path is True
     assert got.fair_value > 0
 
 
 def test_sectors_are_the_twelve_in_declared_order():
-    keys = pretium.sectors()
+    keys = tradefloor.sectors()
     assert len(keys) == 12
     assert keys[0] == "technology"
     assert keys[-1] == "transportation"
@@ -294,8 +294,8 @@ def test_daily_step_matches_the_reference_bit_for_bit():
         )
         if not all(math.isfinite(v) for v in (s, s_prev, innovation, shock)):
             continue
-        got = pretium.step_mispricing_daily(
-            pretium.MispricingState(s, s_prev), innovation=innovation, shock=shock
+        got = tradefloor.step_mispricing_daily(
+            tradefloor.MispricingState(s, s_prev), innovation=innovation, shock=shock
         )
         assert bits(got.s) == row[ix["outS"]].lower(), row
         assert bits(got.s_prev) == row[ix["outSPrev"]].lower(), row
@@ -323,9 +323,9 @@ def test_hundred_thousand_step_trajectories_do_not_drift(name):
     innovations = _series(golden["innovations"], n)
     shocks = _series(golden["shocks"], n)
 
-    state = pretium.MispricingState(f64(golden["trajectory"]["initialSInput"]["bits"]))
+    state = tradefloor.MispricingState(f64(golden["trajectory"]["initialSInput"]["bits"]))
     for i in range(n):
-        state = pretium.step_mispricing_daily(
+        state = tradefloor.step_mispricing_daily(
             state, innovation=innovations[i], shock=shocks[i]
         )
         if bits(state.s) != expected[i].lower():
@@ -339,7 +339,7 @@ def test_model_constants_match_the_reference():
     # DEFAULT preset here made a parity check against a fixed reference depend
     # on which era ships, so moving the default to pt-v3 broke a test that has
     # nothing to do with the default. Parity is against pt-v1 forever.
-    preset = pretium.model_preset("pt-v1")
+    preset = tradefloor.model_preset("pt-v1")
     pairs = {
         "MISPRICING_PHI": "mispricing_phi",
         "MOMENTUM_THETA": "momentum_theta",
@@ -352,7 +352,7 @@ def test_model_constants_match_the_reference():
 
 
 def test_the_preset_is_named_and_carries_only_live_coefficients():
-    preset = pretium.model_preset()
+    preset = tradefloor.model_preset()
     # The default preset must name the model an engine actually runs. This
     # assertion used to read `== "pt-v1"`, which locked the reported default
     # to a literal: when the engine's default became pt-v3 the library went on
@@ -360,7 +360,7 @@ def test_the_preset_is_named_and_carries_only_live_coefficients():
     # manifest.py folded those wrong coefficients into the run digest whose
     # purpose is catching exactly that substitution. Comparing against the
     # engine instead of a literal is the contract that was being violated.
-    engine = pretium.Engine(seed=1, universe=pretium.Universe.random(2, seed=1))
+    engine = tradefloor.Engine(seed=1, universe=tradefloor.Universe.random(2, seed=1))
     assert preset["name"] == engine.model_fingerprint
     # Dead coefficients must not appear. A preset listing knobs wired to
     # nothing is a documentation lie, and this model has two such constants
@@ -371,15 +371,15 @@ def test_the_preset_is_named_and_carries_only_live_coefficients():
 def test_the_daily_process_is_provably_stationary():
     # The reason the daily step is the public model rather than the tick
     # variant: this is provable in closed form, not merely observed.
-    moduli = pretium.characteristic_root_moduli()
+    moduli = tradefloor.characteristic_root_moduli()
     assert len(moduli) == 2
     assert all(m < 1.0 for m in moduli), moduli
     # Crowd feedback must not push it outside the unit circle either.
-    assert all(m < 1.0 for m in pretium.crowd_adjusted_root_moduli())
+    assert all(m < 1.0 for m in tradefloor.crowd_adjusted_root_moduli())
 
 
 def test_impulse_response_decays():
-    ir = pretium.impulse_response(400)
+    ir = tradefloor.impulse_response(400)
     assert ir[0] == 1.0
     # Momentum makes it rise before it falls, so the assertion is about the
     # tail, not monotonicity.
@@ -388,25 +388,25 @@ def test_impulse_response_decays():
 
 
 def test_apply_mispricing_never_returns_a_negative_price():
-    assert pretium.apply_mispricing(-50.0, 0.1) > 0
-    assert pretium.apply_mispricing(0.0, 0.0) > 0
+    assert tradefloor.apply_mispricing(-50.0, 0.1) > 0
+    assert tradefloor.apply_mispricing(0.0, 0.0) > 0
 
 
 def test_resuming_a_trajectory_preserves_momentum():
     # The reason `s_prev` is constructible. Rebuilding a mid-trajectory state
     # through the single-argument constructor zeroes the momentum term and
     # produces a different path -- silently.
-    state = pretium.MispricingState(0.0)
+    state = tradefloor.MispricingState(0.0)
     for _ in range(5):
-        state = pretium.step_mispricing_daily(state, innovation=0.01)
+        state = tradefloor.step_mispricing_daily(state, innovation=0.01)
 
-    resumed_correctly = pretium.step_mispricing_daily(
-        pretium.MispricingState(state.s, state.s_prev), innovation=0.01
+    resumed_correctly = tradefloor.step_mispricing_daily(
+        tradefloor.MispricingState(state.s, state.s_prev), innovation=0.01
     )
-    resumed_wrongly = pretium.step_mispricing_daily(
-        pretium.MispricingState(state.s), innovation=0.01
+    resumed_wrongly = tradefloor.step_mispricing_daily(
+        tradefloor.MispricingState(state.s), innovation=0.01
     )
-    continued = pretium.step_mispricing_daily(state, innovation=0.01)
+    continued = tradefloor.step_mispricing_daily(state, innovation=0.01)
 
     assert resumed_correctly.s == continued.s
     assert resumed_wrongly.s != continued.s
@@ -435,7 +435,7 @@ def test_order_book_replays_the_reference_exactly():
     anyway rather than skipped.
     """
     golden = load("orderbook.json")
-    book = pretium.OrderBook("ACME")
+    book = tradefloor.OrderBook("ACME")
     rejected = 0
 
     for step in golden["steps"]:
@@ -477,7 +477,7 @@ def test_order_book_replays_the_reference_exactly():
                     assert bits(got.average_price) == want["averagePrice"].lower(), step
                     assert bits(got.worst_price) == want["worstPrice"].lower(), step
                     assert bits(got.filled) == want["filled"].lower(), step
-        except (pretium.ValidationError, pretium.OrderError):
+        except (tradefloor.ValidationError, tradefloor.OrderError):
             rejected += 1
 
         state = step["state"]
@@ -497,14 +497,14 @@ def test_slippage_is_emergent_not_a_coefficient():
     large one, and the large one's average price must be strictly worse -- and
     worse specifically because it reached deeper levels.
     """
-    book = pretium.OrderBook("ACME")
+    book = tradefloor.OrderBook("ACME")
     for i in range(10):
         book.post_limit("sell", 100.0 + i, 100, owner="mm")
 
     small = book.submit("buy", 50)
     assert small.average_price == 100.0  # entirely inside the best level
 
-    book2 = pretium.OrderBook("ACME")
+    book2 = tradefloor.OrderBook("ACME")
     for i in range(10):
         book2.post_limit("sell", 100.0 + i, 100, owner="mm")
     large = book2.submit("buy", 550)
@@ -516,7 +516,7 @@ def test_slippage_is_emergent_not_a_coefficient():
 
 
 def test_fills_take_the_resting_price_not_the_incoming_one():
-    book = pretium.OrderBook("ACME")
+    book = tradefloor.OrderBook("ACME")
     book.post_limit("sell", 100.0, 100, owner="mm")
     # A buyer willing to pay 110 still fills at the maker's 100.
     result = book.submit("buy", 50, limit_price=110.0)
@@ -524,7 +524,7 @@ def test_fills_take_the_resting_price_not_the_incoming_one():
 
 
 def test_sweep_cost_does_not_execute():
-    book = pretium.OrderBook("ACME")
+    book = tradefloor.OrderBook("ACME")
     book.post_limit("sell", 100.0, 100, owner="mm")
     before = book.depth("sell")
     cost = book.sweep_cost("buy", 50)
@@ -533,7 +533,7 @@ def test_sweep_cost_does_not_execute():
 
 
 def test_market_order_remainder_never_rests():
-    book = pretium.OrderBook("ACME")
+    book = tradefloor.OrderBook("ACME")
     book.post_limit("sell", 100.0, 10, owner="mm")
     result = book.submit("buy", 100, post_remainder=True)  # market order
     assert result.unfilled == 90
@@ -545,26 +545,26 @@ def test_the_boundary_refuses_what_the_core_silently_ignores():
     # The core returns an empty result for these, reproducing the reference.
     # A silently ignored order is the worst failure available: the caller
     # believes they traded and nothing disagrees out loud.
-    book = pretium.OrderBook("ACME")
+    book = tradefloor.OrderBook("ACME")
     for bad in (0, -10, float("nan"), float("inf")):
-        with pytest.raises(pretium.ValidationError):
+        with pytest.raises(tradefloor.ValidationError):
             book.submit("buy", bad)
-        with pytest.raises(pretium.ValidationError):
+        with pytest.raises(tradefloor.ValidationError):
             book.post_limit("buy", 100.0, bad, owner="x")
 
 
 def test_unknown_side_is_rejected():
-    book = pretium.OrderBook("ACME")
-    with pytest.raises(pretium.ValidationError, match="buy"):
+    book = tradefloor.OrderBook("ACME")
+    with pytest.raises(tradefloor.ValidationError, match="buy"):
         book.submit("BUY", 10)
 
 
 def test_order_error_is_distinct_from_validation_error():
     # Both subclass ValueError, but they mean different things: a malformed
     # scenario versus a market rule hit during a run.
-    assert issubclass(pretium.OrderError, ValueError)
-    assert issubclass(pretium.ValidationError, ValueError)
-    assert not issubclass(pretium.OrderError, pretium.ValidationError)
+    assert issubclass(tradefloor.OrderError, ValueError)
+    assert issubclass(tradefloor.ValidationError, ValueError)
+    assert not issubclass(tradefloor.OrderError, tradefloor.ValidationError)
 
 
 def test_append_and_post_diverge_at_the_depth_cap():
@@ -576,11 +576,11 @@ def test_append_and_post_diverge_at_the_depth_cap():
     other desynchronises every subsequent order id -- and nothing about the
     level counts reveals it, so the symptom appears far from the cause.
     """
-    appended = pretium.OrderBook("A")
+    appended = tradefloor.OrderBook("A")
     for i in range(40):
         appended.append_maker_level("sell", 100.0 + i, 10, owner="mm")
 
-    posted = pretium.OrderBook("A")
+    posted = tradefloor.OrderBook("A")
     for i in range(40):
         posted.post_limit("sell", 100.0 + i, 10, owner="mm")
 

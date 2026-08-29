@@ -352,7 +352,7 @@ def evaluate(
 
     One market. Every agent meets the same one, which is what makes the
     comparison exact -- but a verdict from a single seed is a measurement of
-    that seed as much as of the agents. See :func:`pretium.rank` for the
+    that seed as much as of the agents. See :func:`tradefloor.rank` for the
     across-seed version, and :func:`leaderboard` for the measured size of the
     effect.
 
@@ -362,7 +362,7 @@ def evaluate(
     always available and "trade everything" wins. Pass ``None`` deliberately if
     that is what you want to study.
 
-    A value in ``agents`` may be a :class:`pretium.StrategySpec` instead of a
+    A value in ``agents`` may be a :class:`tradefloor.StrategySpec` instead of a
     built agent. The spec is built HERE, freshly, on every call, which is
     both what makes a spec-carrying result citable (the scorecard's
     ``strategy_fingerprint`` names exactly what ran) and what closes a real
@@ -372,7 +372,7 @@ def evaluate(
     instruction for building one.
 
     ``model`` selects the coefficient set every engine in the evaluation
-    runs, either a preset name or a :class:`pretium.ModelParams`, and defaults
+    runs, either a preset name or a :class:`tradefloor.ModelParams`, and defaults
     to the shipped preset. One model for the whole evaluation, baseline
     included: scoring agents across different models would compare markets,
     not agents. Each scorecard records ``model_fingerprint``.
@@ -595,7 +595,7 @@ def leaderboard(scores: dict[str, Scorecard], by: str = "pnl") -> list[Scorecard
        says that leader is worth ranges from a capture of +0.007 to +2.834
        depending only on which market it drew.
 
-       Use this to read one market. To rank agents, use :func:`pretium.rank`,
+       Use this to read one market. To rank agents, use :func:`tradefloor.rank`,
        which takes the verdict across seeds and reports a paired sign test
        saying whether the ordering is established at all -- because even the
        across-seed aggregate can order two agents that a paired test cannot

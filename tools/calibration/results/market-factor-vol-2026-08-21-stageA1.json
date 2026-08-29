@@ -13,7 +13,7 @@
   "idio=0.85,sigma=0.014": {
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -247,7 +247,7 @@
   "idio=0.9,sigma=0.012": {
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -481,7 +481,7 @@
   "idio=1.0,sigma=0.0075": {
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,

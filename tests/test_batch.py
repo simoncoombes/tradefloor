@@ -4,9 +4,9 @@ import struct
 
 import pytest
 
-import pretium
+import tradefloor
 
-UNIVERSE = pretium.Universe.random(8, seed=5)
+UNIVERSE = tradefloor.Universe.random(8, seed=5)
 
 
 def grid(buf, rows, cols):
@@ -19,7 +19,7 @@ def flat(buf, n):
 
 
 def batch(seeds=range(8), ticks=200):
-    b = pretium.EngineBatch(seeds=list(seeds), universe=UNIVERSE)
+    b = tradefloor.EngineBatch(seeds=list(seeds), universe=UNIVERSE)
     b.open_market()
     b.run_session(9, 30, 3, ticks)
     return b
@@ -41,7 +41,7 @@ def test_every_member_equals_that_seed_run_alone():
     b = batch(seeds)
     rows = grid(b.prices(), *b.shape)
     for i, seed in enumerate(seeds):
-        alone = pretium.Engine(seed=seed, universe=UNIVERSE)
+        alone = tradefloor.Engine(seed=seed, universe=UNIVERSE)
         alone.open_market()
         alone.run_session(9, 30, 3, 200)
         assert flat(alone.prices(), len(UNIVERSE)) == rows[i], f"seed {seed}"
@@ -62,7 +62,7 @@ def test_members_are_ordered_by_seed_position():
     assert b.seeds == seeds
     rows = grid(b.prices(), *b.shape)
     for i, seed in enumerate(seeds):
-        alone = pretium.Engine(seed=seed, universe=UNIVERSE)
+        alone = tradefloor.Engine(seed=seed, universe=UNIVERSE)
         alone.open_market()
         alone.run_session(9, 30, 3, 200)
         assert flat(alone.prices(), len(UNIVERSE)) == rows[i]
@@ -95,7 +95,7 @@ def test_columns_have_the_same_shape_as_prices():
 
 def test_an_unknown_column_is_refused():
     b = batch(range(2))
-    with pytest.raises(pretium.ValidationError, match="unknown field"):
+    with pytest.raises(tradefloor.ValidationError, match="unknown field"):
         b.column("close")
 
 
@@ -103,7 +103,7 @@ def test_a_single_member_batch_matches_a_single_engine():
     # The default macro must be shared, or EngineBatch([s]) and Engine(s)
     # would be different markets -- silently, because both look reasonable.
     b = batch([42])
-    alone = pretium.Engine(seed=42, universe=UNIVERSE)
+    alone = tradefloor.Engine(seed=42, universe=UNIVERSE)
     alone.open_market()
     alone.run_session(9, 30, 3, 200)
     assert grid(b.prices(), *b.shape)[0] == flat(alone.prices(), len(UNIVERSE))
@@ -114,7 +114,7 @@ def test_a_single_member_batch_matches_a_single_engine():
 # --------------------------------------------------------------------------
 
 def test_tick_advances_every_member():
-    b = pretium.EngineBatch(seeds=[1, 2, 3], universe=UNIVERSE)
+    b = tradefloor.EngineBatch(seeds=[1, 2, 3], universe=UNIVERSE)
     b.open_market()
     before = grid(b.prices(), *b.shape)
     for i in range(30):
@@ -124,11 +124,11 @@ def test_tick_advances_every_member():
 
 
 def test_a_batched_tick_loop_matches_a_batched_session():
-    fast = pretium.EngineBatch(seeds=[5, 6], universe=UNIVERSE)
+    fast = tradefloor.EngineBatch(seeds=[5, 6], universe=UNIVERSE)
     fast.open_market()
     fast.run_session(9, 30, 3, 60)
 
-    slow = pretium.EngineBatch(seeds=[5, 6], universe=UNIVERSE)
+    slow = tradefloor.EngineBatch(seeds=[5, 6], universe=UNIVERSE)
     slow.open_market()
     for i in range(60):
         slow.tick(9 + (30 + i) // 60, (30 + i) % 60, 3)
@@ -150,22 +150,22 @@ def test_draws_are_reported_per_member():
 def test_duplicate_seeds_are_refused():
     # Two members with the same seed are the same market twice: the results
     # read as two samples and are one, silently.
-    with pytest.raises(pretium.ValidationError, match="distinct"):
-        pretium.EngineBatch(seeds=[1, 1, 2], universe=UNIVERSE)
+    with pytest.raises(tradefloor.ValidationError, match="distinct"):
+        tradefloor.EngineBatch(seeds=[1, 1, 2], universe=UNIVERSE)
 
 
 def test_degenerate_construction_is_refused():
-    with pytest.raises(pretium.ValidationError, match="no seeds"):
-        pretium.EngineBatch(seeds=[], universe=UNIVERSE)
-    with pytest.raises(pretium.ValidationError, match="empty"):
-        pretium.EngineBatch(seeds=[1], universe=[])
+    with pytest.raises(tradefloor.ValidationError, match="no seeds"):
+        tradefloor.EngineBatch(seeds=[], universe=UNIVERSE)
+    with pytest.raises(tradefloor.ValidationError, match="empty"):
+        tradefloor.EngineBatch(seeds=[1], universe=[])
 
 
 def test_invalid_stepping_is_refused():
-    b = pretium.EngineBatch(seeds=[1], universe=UNIVERSE)
-    with pytest.raises(pretium.ValidationError, match="invalid time"):
+    b = tradefloor.EngineBatch(seeds=[1], universe=UNIVERSE)
+    with pytest.raises(tradefloor.ValidationError, match="invalid time"):
         b.tick(25, 0, 3)
-    with pytest.raises(pretium.ValidationError, match="greater than zero"):
+    with pytest.raises(tradefloor.ValidationError, match="greater than zero"):
         b.run_session(9, 30, 3, 0)
 
 
@@ -175,7 +175,7 @@ def test_invalid_stepping_is_refused():
 
 
 def _solo(seed, universe, sessions):
-    engine = pretium.Engine(seed=seed, universe=universe)
+    engine = tradefloor.Engine(seed=seed, universe=universe)
     engine.open_market()
     for step in range(sessions):
         hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
@@ -202,9 +202,9 @@ def test_a_batch_member_matches_a_standalone_engine(sessions):
     and would have gone on passing while the fast path drifted into being a
     different market.
     """
-    universe = pretium.Universe.random(8, seed=5)
+    universe = tradefloor.Universe.random(8, seed=5)
     seeds = [1, 2, 3]
-    batch = pretium.EngineBatch(seeds=seeds, universe=universe)
+    batch = tradefloor.EngineBatch(seeds=seeds, universe=universe)
     batch.open_market()
     for step in range(sessions):
         hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
@@ -218,11 +218,11 @@ def test_a_batch_member_matches_a_standalone_engine(sessions):
 def test_a_batch_opens_the_day_the_way_an_engine_does():
     # Neither requires an explicit open_market, and both must give the same
     # market when it is left out.
-    universe = pretium.Universe.random(8, seed=5)
-    batch = pretium.EngineBatch(seeds=[1, 2], universe=universe)
+    universe = tradefloor.Universe.random(8, seed=5)
+    batch = tradefloor.EngineBatch(seeds=[1, 2], universe=universe)
     batch.run_session(9, 30, 3, 60)
 
-    engine = pretium.Engine(seed=1, universe=universe)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     engine.run_session(9, 30, 3, 60)
     assert _member(batch, 0, len(universe)) == engine.prices()
 
@@ -240,12 +240,12 @@ def test_run_days_is_the_explicit_loop():
     differently would replay differently.
     """
     pa = pytest.importorskip("pyarrow")
-    universe = pretium.Universe.random(8, seed=5)
+    universe = tradefloor.Universe.random(8, seed=5)
 
-    shorthand = pretium.Engine(seed=3, universe=universe)
+    shorthand = tradefloor.Engine(seed=3, universe=universe)
     shorthand.run_days(3, record=True, ticks_per_day=120)
 
-    by_hand = pretium.Engine(seed=3, universe=universe)
+    by_hand = tradefloor.Engine(seed=3, universe=universe)
     for day in range(3):
         by_hand.open_market()
         by_hand.run_session(9, 30, 3, 120)

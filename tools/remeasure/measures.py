@@ -29,10 +29,10 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
-import pretium as pt
+import tradefloor as pt
 import pyarrow as pa
-from pretium.baselines import BuyAndHold, Momentum, Oracle, capture_ratio, reference_agents
-from pretium.scenario import Scenario, compare, run_scenario
+from tradefloor.baselines import BuyAndHold, Momentum, Oracle, capture_ratio, reference_agents
+from tradefloor.scenario import Scenario, compare, run_scenario
 
 
 @dataclass
@@ -89,7 +89,7 @@ def g_determinism(ctx: Ctx) -> dict:
     custom = pt.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
     custom_fp = pt.Engine(seed=42, universe=_u(6, 7), model=custom).model_fingerprint
 
-    from pretium.facts import MARGINAL, REAL_MARKETS
+    from tradefloor.facts import MARGINAL, REAL_MARKETS
     return {
         "kat_digest": digest,
         "kat_digest_elided": f"{digest[:8]}...{digest[-7:]}",
@@ -328,7 +328,7 @@ def g_realism_heldout(ctx: Ctx) -> dict:
 
 def g_rebalance(ctx: Ctx) -> dict:
     """README's rebalance-frequency table. Method from the docstring at
-    python/pretium/baselines.py:254-261 and tests/test_baselines.py:370."""
+    python/tradefloor/baselines.py:254-261 and tests/test_baselines.py:370."""
     u = _u(40, 7)
     out = {}
     for steps in (3, 6, 12):
@@ -965,7 +965,7 @@ def g_drawdiv(ctx: Ctx) -> dict:
     """scenarios.md: the macro-counterfactual draw divergence is zero in every
     comparison run -- four scenarios at seed 3 plus three of them repeated
     across seeds 1 to 8, twenty instruments, forty days. The four scenarios
-    are named in the docstring at python/pretium/scenario.py:110-117; the
+    are named in the docstring at python/tradefloor/scenario.py:110-117; the
     universe is reconstructed as random(20, seed=4) from tests/test_scenario.py."""
     u = _u(20, 4)
     scenarios = {

@@ -1,6 +1,6 @@
 """An MCP server, so an LLM agent can drive the simulator.
 
-`pretium` is a Python library, which means its audience is a person writing
+`tradefloor` is a Python library, which means its audience is a person writing
 code. An MCP server adds a second audience that cannot write code against
 it: a model that calls tools and reads back JSON. Everything here follows
 from that one difference.
@@ -10,7 +10,7 @@ from that one difference.
 `evaluate` accepts any object with an `act` method. A tool call cannot
 carry one, and the alternative -- accepting a string of Python and running
 it -- would make this server a remote code execution endpoint with a market
-simulator attached. :class:`pretium.StrategySpec` already closed this gap
+simulator attached. :class:`tradefloor.StrategySpec` already closed this gap
 for citability, and its module docstring anticipated this exact use:
 
     It is also what an MCP server needs -- a tool cannot accept a callable
@@ -75,16 +75,16 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal
 
-import pretium as pt
-from pretium import baselines, envelope
-from pretium.facts import REAL_MARKETS, band_distance
+import tradefloor as pt
+from tradefloor import baselines, envelope
+from tradefloor.facts import REAL_MARKETS, band_distance
 
 try:
     from mcp.server import MCPServer
 except ImportError as exc:  # pragma: no cover - exercised by the install path
     raise ImportError(
-        "The MCP server needs the `mcp` package, which pretium does not "
-        "depend on by default:\n\n    pip install 'pretium[mcp]'\n"
+        "The MCP server needs the `mcp` package, which tradefloor does not "
+        "depend on by default:\n\n    pip install 'tradefloor[mcp]'\n"
     ) from exc
 
 
@@ -520,7 +520,7 @@ def _scorecard_row(s: Any) -> dict[str, Any]:
 # -- the server ------------------------------------------------------------
 
 INSTRUCTIONS = """\
-`pretium` is a deterministic equity market simulator with a real limit order
+`tradefloor` is a deterministic equity market simulator with a real limit order
 book. Orders match against real depth, so trading moves the price.
 
 Start with `describe_simulator`. It reports what this market is certified to
@@ -530,7 +530,7 @@ Strategies are DATA, not code: build one with `validate_strategy`, then run it
 with `evaluate_strategies`. There is no way to submit Python here.
 
 Every result carries a `caveats` list. It is computed for that specific call
-and is part of the result, not decoration -- a summary of a pretium result
+and is part of the result, not decoration -- a summary of a tradefloor result
 that drops the caveats is a misreport.
 
 A single seed measures the seed as much as the strategy. `rank_strategies` is
@@ -538,8 +538,8 @@ the honest version of `evaluate_strategies`.
 """
 
 server = MCPServer(
-    name="pretium",
-    title="pretium market simulator",
+    name="tradefloor",
+    title="tradefloor market simulator",
     version=pt.__version__,
     instructions=INSTRUCTIONS,
 )
@@ -1345,7 +1345,7 @@ JOBBABLE = ("evaluate_strategies", "rank_strategies", "run_stress_scenario")
 _jobs: dict[str, dict[str, Any]] = {}
 _jobs_lock = threading.Lock()
 _pool = ThreadPoolExecutor(max_workers=MAX_RUNNING_JOBS,
-                           thread_name_prefix="pretium-mcp-job")
+                           thread_name_prefix="tradefloor-mcp-job")
 _job_counter = 0
 
 
@@ -1480,7 +1480,7 @@ def check_job(job_id: str | None = None) -> dict[str, Any]:
 
 
 def main() -> None:
-    """Entry point for `pretium-mcp`. Speaks MCP over stdio."""
+    """Entry point for `tradefloor-mcp`. Speaks MCP over stdio."""
     server.run("stdio")
 
 

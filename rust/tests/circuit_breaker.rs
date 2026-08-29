@@ -30,12 +30,12 @@
 //! and not the tape is not a breaker. Both are asserted here, via the printed
 //! price, which is what a player and a backtest actually see.
 
-use pretium::economy::{create_initial_economy_state, InitialEconomyOptions};
-use pretium::market::{
+use tradefloor::economy::{create_initial_economy_state, InitialEconomyOptions};
+use tradefloor::market::{
     simulate_market_tick, MarketStatus, SettleDrawPolicy, TickCompany, TickInputs, TickStock,
     MARKET_FACTOR_SIGMA,
 };
-use pretium::rng::Rng;
+use tradefloor::rng::Rng;
 
 /// A generator that returns whatever is most likely to break the bound.
 ///
@@ -84,7 +84,7 @@ fn company(price: f64, previous_close: f64, eps: f64, s: Option<f64>) -> TickCom
             mispricing_momentum: Some(0.0),
             maker_inventory: None,
             garch_variance: 0.015 * 0.015,
-            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
+            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
             last_daily_return: Some(0.0),
             beta: Some(1.0),
             short_interest: 0.0,
@@ -119,7 +119,7 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
             // variance process and pin behaviour at its baseline level.
             market_sigma_daily: MARKET_FACTOR_SIGMA,
             settle_draws: SettleDrawPolicy::FourAlways,
-                params: &pretium::params::PT_V1,
+                params: &tradefloor::params::PT_V1,
         },
         &mut rng,
     );
@@ -247,7 +247,7 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
                     settle_draws: SettleDrawPolicy::FourAlways,
-                params: &pretium::params::PT_V1,
+                params: &tradefloor::params::PT_V1,
                 },
                 &mut rng,
             );
@@ -289,7 +289,7 @@ fn the_band_holds_in_extended_hours_too() {
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
                     settle_draws: SettleDrawPolicy::FourAlways,
-                params: &pretium::params::PT_V1,
+                params: &tradefloor::params::PT_V1,
                 },
                 &mut rng,
             );
@@ -341,7 +341,7 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
                     // variance process and pin behaviour at its baseline level.
                     market_sigma_daily: MARKET_FACTOR_SIGMA,
                     settle_draws: SettleDrawPolicy::FourAlways,
-                params: &pretium::params::PT_V1,
+                params: &tradefloor::params::PT_V1,
                 },
                 &mut rng,
             );

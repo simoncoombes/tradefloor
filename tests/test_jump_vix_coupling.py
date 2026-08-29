@@ -18,8 +18,8 @@ from __future__ import annotations
 import pyarrow as pa
 import pytest
 
-import pretium as pt
-from pretium import Scenario
+import tradefloor as pt
+from tradefloor import Scenario
 
 
 def _prices(vix: float, days: int = 12, **over) -> list[float]:

@@ -55,6 +55,6 @@ Allow: /
 User-agent: MistralAI-User
 Allow: /
 
-Sitemap: https://simoncoombes.github.io/pretium/sitemap.xml
-# Summary for language models: https://simoncoombes.github.io/pretium/llms.txt
-# Full text for language models: https://simoncoombes.github.io/pretium/llms-full.txt
+Sitemap: https://tradefloor.dev/sitemap.xml
+# Summary for language models: https://tradefloor.dev/llms.txt
+# Full text for language models: https://tradefloor.dev/llms-full.txt

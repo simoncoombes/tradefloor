@@ -8,7 +8,7 @@ knowing them first will save you a wasted afternoon.
 **A change to the simulated trajectory is a breaking change**, whatever its
 size.
 
-Given a seed, a roster and a macro state, `pretium` produces one market and
+Given a seed, a roster and a macro state, `tradefloor` produces one market and
 the same market on every platform. Published results cite a seed and a model
 fingerprint; if the same fingerprint starts producing a different market,
 every one of those results silently becomes unreproducible. There is no
@@ -25,8 +25,8 @@ In practice:
 ## Setup
 
 ```bash
-git clone https://github.com/simoncoombes/pretium
-cd pretium
+git clone https://github.com/simoncoombes/tradefloor
+cd tradefloor
 uv venv && source .venv/bin/activate
 uv pip install maturin pytest pyarrow numpy
 maturin develop --release
@@ -139,7 +139,7 @@ Numbers in prose carry their measurement. "Roughly a quarter" is a
 convention; "0.0239 against a band of -0.08 to 0.06, thirty seeds at 252
 days" is a measurement. Only the second kind belongs in a docstring. That
 one is `return_acf1` on the shipped preset, and you can read both halves of
-it back out of `pretium.envelope.CERTIFIED` and `pretium.facts.REAL_MARKETS`
+it back out of `tradefloor.envelope.CERTIFIED` and `tradefloor.facts.REAL_MARKETS`
 rather than taking this file's word for it.
 
 Punctuation is ASCII. No em dashes, en dashes, typographic minus signs or
@@ -151,5 +151,5 @@ one in the number beside it.
 
 This is the most valuable bug you can find. If two platforms disagree on
 `python tests/known_answer.py`, please open an issue with both digests, both
-platforms, and the output of `pretium.version()`. That is enough to start;
+platforms, and the output of `tradefloor.version()`. That is enough to start;
 we can reproduce the rest.

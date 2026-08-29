@@ -10,8 +10,8 @@ import struct
 
 import pytest
 
-import pretium
-from pretium.baselines import (
+import tradefloor
+from tradefloor.baselines import (
     BuyAndHold,
     MeanReversion,
     Momentum,
@@ -21,11 +21,11 @@ from pretium.baselines import (
     rebalance,
     reference_agents,
 )
-from pretium.harness import Observation
+from tradefloor.harness import Observation
 
 
-UNIVERSE = pretium.Universe.random(40, seed=7)
-SMALL = pretium.Universe.random(12, seed=3)
+UNIVERSE = tradefloor.Universe.random(40, seed=7)
+SMALL = tradefloor.Universe.random(12, seed=3)
 
 
 @pytest.fixture(scope="module")
@@ -34,11 +34,11 @@ def scores():
     # the avg_volume fix re-rolled every trajectory). On the previous
     # fixture seed (2026) momentum now outruns the oracle, 63,962 against
     # 21,473 -- a live demonstration that the oracle ceilings MISPRICING
-    # capture, not trend capture, and of why `pretium.rank` exists: one
+    # capture, not trend capture, and of why `tradefloor.rank` exists: one
     # seed picks the top agent about half the time. The oracle tops 4 of 5
     # probed seeds (7, 11, 42, 99; not 2026); the fixture records one of
     # the typical ones.
-    return pretium.evaluate(reference_agents(seed=3), seed=7,
+    return tradefloor.evaluate(reference_agents(seed=3), seed=7,
                             universe=UNIVERSE, days=5)
 
 
@@ -69,7 +69,7 @@ def test_the_oracle_sets_the_ceiling(scores):
 
 
 def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
-    ranked = [card.name for card in pretium.leaderboard(scores)]
+    ranked = [card.name for card in tradefloor.leaderboard(scores)]
     # The oracle on top is the robust part. The rest are separated by small
     # margins and have now swapped three times under model changes that left
     # everything else intact -- most recently when a stepped day stopped
@@ -79,7 +79,7 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # Pinned as a full order anyway, because a leaderboard IS an ordering and
     # this is the canary for it changing. If it fails on a deliberate change,
     # re-measure rather than assuming a regression -- and remember the order
-    # belongs to THIS seed. `pretium.rank` exists because one seed picks the
+    # belongs to THIS seed. `tradefloor.rank` exists because one seed picks the
     # top agent about half the time.
     #
     # Re-measured at the 2026-08 era boundary, on the fixture's new seed --
@@ -139,7 +139,7 @@ def test_random_trading_is_close_to_flat_over_a_short_run(scores):
     import statistics
     ratios = []
     for seed in (7, 11, 42, 99, 3, 5):
-        sc = pretium.evaluate(reference_agents(seed=3), seed=seed,
+        sc = tradefloor.evaluate(reference_agents(seed=3), seed=seed,
                               universe=UNIVERSE, days=5)
         ratios.append(abs(sc["random"].return_pct) / sc["oracle"].return_pct)
     assert statistics.median(ratios) < 0.2, f"median ratio {statistics.median(ratios):.3f}"
@@ -157,7 +157,7 @@ def test_random_trading_bleeds_over_a_longer_run():
     # (mean -45,437 across the eight). Moved to the fixture's seed 7
     # (-50,496) rather than weakened to a tolerance: a coin flip that PROFITS
     # on the pinned seed would still deserve a failure here.
-    long_run = pretium.evaluate({"random": RandomTrader(seed=3)}, seed=7,
+    long_run = tradefloor.evaluate({"random": RandomTrader(seed=3)}, seed=7,
                                 universe=UNIVERSE, days=60)
     assert long_run["random"].pnl < 0
 
@@ -195,9 +195,9 @@ def test_a_capture_ratio_is_meaningless_without_its_horizon():
     """
     gaps = []
     for seed in (7, 11, 42, 99):
-        short = pretium.evaluate({"oracle": Oracle(), "momentum": Momentum()},
+        short = tradefloor.evaluate({"oracle": Oracle(), "momentum": Momentum()},
                                  seed=seed, universe=UNIVERSE, days=5)
-        long = pretium.evaluate({"oracle": Oracle(), "momentum": Momentum()},
+        long = tradefloor.evaluate({"oracle": Oracle(), "momentum": Momentum()},
                                 seed=seed, universe=UNIVERSE, days=60)
         assert long["oracle"].pnl > short["oracle"].pnl
         near = capture_ratio(short)["momentum"]
@@ -259,15 +259,15 @@ def test_the_oracle_explains_nothing_before_it_has_acted():
 
 
 def test_the_whole_evaluation_is_reproducible():
-    a = pretium.evaluate(reference_agents(seed=3), seed=11, universe=SMALL, days=3)
-    b = pretium.evaluate(reference_agents(seed=3), seed=11, universe=SMALL, days=3)
+    a = tradefloor.evaluate(reference_agents(seed=3), seed=11, universe=SMALL, days=3)
+    b = tradefloor.evaluate(reference_agents(seed=3), seed=11, universe=SMALL, days=3)
     assert {k: v.pnl for k, v in a.items()} == {k: v.pnl for k, v in b.items()}
 
 
 def test_the_random_baseline_is_seeded_not_random():
-    a = pretium.evaluate({"r": RandomTrader(seed=5)}, seed=11, universe=SMALL, days=3)
-    b = pretium.evaluate({"r": RandomTrader(seed=5)}, seed=11, universe=SMALL, days=3)
-    c = pretium.evaluate({"r": RandomTrader(seed=6)}, seed=11, universe=SMALL, days=3)
+    a = tradefloor.evaluate({"r": RandomTrader(seed=5)}, seed=11, universe=SMALL, days=3)
+    b = tradefloor.evaluate({"r": RandomTrader(seed=5)}, seed=11, universe=SMALL, days=3)
+    c = tradefloor.evaluate({"r": RandomTrader(seed=6)}, seed=11, universe=SMALL, days=3)
     assert a["r"].pnl == b["r"].pnl
     assert a["r"].pnl != c["r"].pnl
 
@@ -285,8 +285,8 @@ def test_no_agent_perturbs_the_market_s_draw_schedule():
     """
     counts = set()
     for agent in list(reference_agents(seed=3).values()) + [None]:
-        engine = pretium.Engine(seed=99, universe=SMALL)
-        portfolio = pretium.Portfolio(cash=1_000_000.0, max_leverage=2.0)
+        engine = tradefloor.Engine(seed=99, universe=SMALL)
+        portfolio = tradefloor.Portfolio(cash=1_000_000.0, max_leverage=2.0)
         adv = [i.avg_volume for i in SMALL]
         for day in range(3):
             engine.open_market()
@@ -299,7 +299,7 @@ def test_no_agent_perturbs_the_market_s_draw_schedule():
                     for ticker, quantity in agent.act(obs).items():
                         try:
                             portfolio.execute(engine, ticker, quantity)
-                        except (pretium.OrderError, pretium.ValidationError):
+                        except (tradefloor.OrderError, tradefloor.ValidationError):
                             pass
                 engine.run_session(9, 30, 3, 65,
                                    order_flow=portfolio.pending_flow())
@@ -323,8 +323,8 @@ def test_buy_and_hold_trades_once_and_stops(scores):
 
 def test_a_trend_agent_holds_cash_through_its_warm_up():
     agent = Momentum(lookback=3)
-    engine = pretium.Engine(seed=1, universe=SMALL)
-    portfolio = pretium.Portfolio()
+    engine = tradefloor.Engine(seed=1, universe=SMALL)
+    portfolio = tradefloor.Portfolio()
     prices = list(struct.unpack("<%dd" % len(SMALL), engine.prices()))
     adv = [i.avg_volume for i in SMALL]
     for step in range(3):
@@ -341,8 +341,8 @@ def test_momentum_and_reversion_are_exact_opposites():
     # Driven with synthetic prices rather than a live engine, so the returns
     # are known: AAA..AAF rise by increasing amounts, AAG..AAL fall. Whoever
     # momentum goes long, reversion must go short.
-    engine = pretium.Engine(seed=4, universe=SMALL)
-    portfolio = pretium.Portfolio()
+    engine = tradefloor.Engine(seed=4, universe=SMALL)
+    portfolio = tradefloor.Portfolio()
     adv = [i.avg_volume for i in SMALL]
     tickers = list(engine.tickers)
     first = [100.0] * len(tickers)
@@ -379,8 +379,8 @@ def test_only_the_oracle_is_marked_privileged():
 
 
 def test_rebalance_caps_at_the_participation_limit():
-    engine = pretium.Engine(seed=1, universe=SMALL)
-    portfolio = pretium.Portfolio(cash=1e12)   # enough to want far too much
+    engine = tradefloor.Engine(seed=1, universe=SMALL)
+    portfolio = tradefloor.Portfolio(cash=1e12)   # enough to want far too much
     prices = list(struct.unpack("<%dd" % len(SMALL), engine.prices()))
     adv = [i.avg_volume for i in SMALL]
     obs = Observation(0, 0, list(engine.tickers), prices, portfolio, engine, adv)
@@ -390,8 +390,8 @@ def test_rebalance_caps_at_the_participation_limit():
 
 
 def test_rebalance_ignores_dust():
-    engine = pretium.Engine(seed=1, universe=SMALL)
-    portfolio = pretium.Portfolio()
+    engine = tradefloor.Engine(seed=1, universe=SMALL)
+    portfolio = tradefloor.Portfolio()
     prices = list(struct.unpack("<%dd" % len(SMALL), engine.prices()))
     adv = [i.avg_volume for i in SMALL]
     obs = Observation(0, 0, list(engine.tickers), prices, portfolio, engine, adv)
@@ -434,8 +434,8 @@ def test_lookback_is_counted_in_steps_not_days():
     # default, so the default agent is a one-day trader by two defaults
     # happening to match rather than by contract.
     agent = Momentum(lookback=3)
-    engine = pretium.Engine(seed=1, universe=SMALL)
-    portfolio = pretium.Portfolio()
+    engine = tradefloor.Engine(seed=1, universe=SMALL)
+    portfolio = tradefloor.Portfolio()
     prices = list(struct.unpack("<%dd" % len(SMALL), engine.prices()))
     adv = [i.avg_volume for i in SMALL]
     for step in range(3):
@@ -455,8 +455,8 @@ def test_lookback_days_holds_a_horizon_across_cadences():
     """
     for steps_per_day, expected in ((3, 3), (6, 6), (12, 12)):
         agent = Momentum(lookback_days=1.0)
-        engine = pretium.Engine(seed=1, universe=SMALL)
-        portfolio = pretium.Portfolio()
+        engine = tradefloor.Engine(seed=1, universe=SMALL)
+        portfolio = tradefloor.Portfolio()
         prices = list(struct.unpack("<%dd" % len(SMALL), engine.prices()))
         adv = [i.avg_volume for i in SMALL]
         agent.act(Observation(0, 0, list(engine.tickers), prices, portfolio,
@@ -485,7 +485,7 @@ def test_trading_more_often_loses_money_on_the_same_signal():
     """
     returns = []
     for steps_per_day in (3, 6, 12):
-        scores = pretium.evaluate(
+        scores = tradefloor.evaluate(
             {"m": Momentum(lookback_days=1.0)}, seed=2026, universe=UNIVERSE,
             days=30, steps_per_day=steps_per_day,
             ticks_per_step=390 // steps_per_day)
@@ -514,7 +514,7 @@ def test_the_observation_carries_the_cadence():
             seen.append(obs.steps_per_day)
             return {}
 
-    pretium.evaluate({"p": Probe()}, seed=1, universe=SMALL, days=2,
+    tradefloor.evaluate({"p": Probe()}, seed=1, universe=SMALL, days=2,
                      steps_per_day=4, ticks_per_step=20)
     assert set(seen) == {4}
 
@@ -551,9 +551,9 @@ def test_the_oracle_is_beaten_only_by_agents_that_trade_a_signal():
     signal_traders = 0
     non_traders = 0
     for useed in (3, 42):
-        universe = pretium.Universe.random(20, seed=useed)
+        universe = tradefloor.Universe.random(20, seed=useed)
         for seed in range(4):
-            scores = pretium.evaluate(reference_agents(seed=3), seed=seed,
+            scores = tradefloor.evaluate(reference_agents(seed=3), seed=seed,
                                       universe=universe, days=30)
             ratios = capture_ratio(scores)
             if not ratios:
@@ -589,10 +589,10 @@ def test_an_agent_can_beat_the_oracle():
     exists rather than a specific count, because the count is a property of
     the seeds.
     """
-    universe = pretium.Universe.random(30, seed=11)
+    universe = tradefloor.Universe.random(30, seed=11)
     beaten = 0
     for seed in range(8):
-        scores = pretium.evaluate(reference_agents(seed=3), seed=seed,
+        scores = tradefloor.evaluate(reference_agents(seed=3), seed=seed,
                                   universe=universe, days=10)
         ceiling = scores["oracle"].pnl
         if any(card.pnl > ceiling for name, card in scores.items()
@@ -612,12 +612,12 @@ def test_the_oracle_is_capital_limited_not_information_limited():
     gross makes it dominate. That is the evidence for calling it a reference
     portfolio rather than a maximum.
     """
-    universe = pretium.Universe.random(30, seed=11)
+    universe = tradefloor.Universe.random(30, seed=11)
 
     def median_pnl(make_oracle):
         pnls = []
         for seed in range(4):
-            scores = pretium.evaluate({"o": make_oracle()}, seed=seed,
+            scores = tradefloor.evaluate({"o": make_oracle()}, seed=seed,
                                       universe=universe, days=10)
             pnls.append(scores["o"].pnl)
         return statistics.median(pnls)

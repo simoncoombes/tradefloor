@@ -135,9 +135,9 @@ def masthead(doors, current_slug: str) -> str:
     return (
         '<header class="pt-head"><div class="pt-head-row">'
         '<a class="pt-brand" href="index.html">'
-        '<img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22">'
-        '<img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22">'
-        '<span class="pt-wordmark">pretium</span></a>'
+        '<img class="pt-light" src="mark-tradefloor.png" alt="tradefloor" width="15" height="22">'
+        '<img class="pt-dark" src="mark-tradefloor-dark.png" alt="tradefloor" width="15" height="22">'
+        '<span class="pt-wordmark">tradefloor</span></a>'
         f'<nav class="pt-nav">{menus}</nav>'
         '<span class="pt-spacer"></span>'
         '<button id="pt-search-open" class="pt-searchbtn" type="button" hidden '

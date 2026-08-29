@@ -13,7 +13,7 @@
   "alpha=0.2,beta=0.75,idio=0.85,sigma=0.014": {
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -249,7 +249,7 @@
   "idio=0.8,sigma=0.016": {
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,

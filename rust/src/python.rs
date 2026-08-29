@@ -26,7 +26,7 @@ use pyo3::prelude::*;
 /// all: a uniform drawn after one normal and after two normals is the same
 /// value. Draw accounting is therefore not one-uniform-per-value, which
 /// matters to anyone reasoning about where a stream is.
-#[pyclass(name = "GameRng", module = "pretium._core")]
+#[pyclass(name = "GameRng", module = "tradefloor._core")]
 pub struct PyGameRng {
     inner: crate::GameRng,
 }
@@ -120,7 +120,7 @@ fn check_rate(name: &str, fraction: f64) -> PyResult<f64> {
 
 /// The compiled extension.
 ///
-/// Named `_core` because a Python package wraps it: `pretium/__init__.py`
+/// Named `_core` because a Python package wraps it: `tradefloor/__init__.py`
 /// re-exports everything here and adds the parts that are better written in
 /// Python than in Rust -- JSON round-trips, and multiprocessing for seed
 /// sweeps. Forcing those into the extension would mean hand-rolling JSON
@@ -175,7 +175,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// The decomposition is the point, not a debugging aid: the simulator knows
 /// the multiple it applied and why, which no historical-data backtest can
 /// tell you.
-#[pyclass(name = "FairValue", module = "pretium._core", frozen, get_all)]
+#[pyclass(name = "FairValue", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone, Copy)]
 pub struct PyFairValue {
     /// Fair value per share.
@@ -349,7 +349,7 @@ fn sectors() -> Vec<String> {
 /// yesterday's, which the momentum term needs. Immutable: a step returns a new
 /// state rather than mutating, so a trajectory is a list of values you can
 /// keep rather than a thing you have to copy defensively.
-#[pyclass(name = "MispricingState", module = "pretium._core", frozen, get_all)]
+#[pyclass(name = "MispricingState", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone, Copy)]
 pub struct PyMispricingState {
     /// Current log-mispricing.
@@ -502,7 +502,7 @@ fn impulse_response(horizon_days: i64, phi: Option<f64>, theta: Option<f64>) -> 
 ///
 /// This dict is the mispricing coefficient table it has always been, and
 /// its shape is LOAD-BEARING: `tests/known_answer.py` section 6 and
-/// `pretium.manifest.era_fingerprint` both hash every value in it, so
+/// `tradefloor.manifest.era_fingerprint` both hash every value in it, so
 /// growing it moves the committed v8 digest without a simulation change,
 /// exactly what the KAT versioning rule forbids. The FULL preset surface
 /// (CALIBRATION.md Appendix A) lives on `ModelParams.from_preset(name)`

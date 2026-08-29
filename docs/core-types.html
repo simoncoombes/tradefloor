@@ -3,20 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Core types · pretium</title>
+<title>Core types Â· tradefloor</title>
 <meta name="description" content="Engine, Universe, Instrument, Macro and OrderBook: the signatures you need to run a market.">
-<link rel="canonical" href="https://simoncoombes.github.io/pretium/core-types.html">
+<link rel="canonical" href="https://tradefloor.dev/core-types.html">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium">
-<meta property="og:title" content="Core types · pretium">
+<meta property="og:site_name" content="tradefloor">
+<meta property="og:title" content="Core types Â· tradefloor">
 <meta property="og:description" content="Engine, Universe, Instrument, Macro and OrderBook: the signatures you need to run a market.">
-<meta property="og:url" content="https://simoncoombes.github.io/pretium/core-types.html">
-<meta property="og:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta property="og:url" content="https://tradefloor.dev/core-types.html">
+<meta property="og:image" content="https://tradefloor.dev/og-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="pretium - a market you can run a strategy against">
+<meta property="og:image:alt" content="tradefloor - a market you can run a strategy against">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta name="twitter:image" content="https://tradefloor.dev/og-card.png">
 <meta name="author" content="Simon Coombes">
 <meta name="theme-color" content="#FAFBFA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0D1312" media="(prefers-color-scheme: dark)">
@@ -34,8 +34,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="learn.css">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Core types","description":"Engine, Universe, Instrument, Macro and OrderBook: the signatures you need to run a market.","url":"https://simoncoombes.github.io/pretium/core-types.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.4.3","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-27"}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"API"},{"@type":"ListItem","position":3,"name":"Core types","item":"https://simoncoombes.github.io/pretium/core-types.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Core types","description":"Engine, Universe, Instrument, Macro and OrderBook: the signatures you need to run a market.","url":"https://tradefloor.dev/core-types.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"tradefloor documentation","url":"https://tradefloor.dev/"},"about":{"@type":"SoftwareApplication","name":"tradefloor","alternateName":"tradefloor market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.5.0","codeRepository":"https://github.com/simoncoombes/tradefloor","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/tradefloor","https://pypi.org/project/tradefloor/","https://crates.io/crates/tradefloor"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-27"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"tradefloor","item":"https://tradefloor.dev/index.html"},{"@type":"ListItem","position":2,"name":"API"},{"@type":"ListItem","position":3,"name":"Core types","item":"https://tradefloor.dev/core-types.html"}]}</script>
 <script>
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
 if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
@@ -47,16 +47,16 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <body class="pt-page">
 <div style="min-height:100vh;padding:0 0 5rem">
 <div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
-<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">EDGAR companies</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu pt-here"><summary>API<span class="pt-caret">▼</span></summary><div><span class="pt-current">Core types</span><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main class="pt-s17">
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-tradefloor.png" alt="tradefloor" width="15" height="22"><img class="pt-dark" src="mark-tradefloor-dark.png" alt="tradefloor" width="15" height="22"><span class="pt-wordmark">tradefloor</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">EDGAR companies</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu pt-here"><summary>API<span class="pt-caret">▼</span></summary><div><span class="pt-current">Core types</span><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
 
-<div class="pt-s20">
+<div class="pt-s21">
 <a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">CORE TYPES</span>
 </div>
 
 <section class="pt-s33">
 <h1 class="pt-s29">Core types</h1>
-<p class="pt-s23">The five types you need to run a market. Every keyword below is keyword-only unless the signature shows otherwise.</p>
+<p class="pt-s17">The five types you need to run a market. Every keyword below is keyword-only unless the signature shows otherwise.</p>
 </section>
 
 <section style="padding:2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
@@ -70,7 +70,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
        universe: Sequence[Instrument],
        macro_state: Macro | None = None,
        model: str | ModelParams | None = None)</pre>
-<div class="pt-s162">
+<div class="pt-s163">
 
 <div class="pt-s43">
 <span class="pt-s6">run_days(n)</span>
@@ -151,7 +151,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 Universe.random(n: int, *, seed: int)
 Universe.from_edgar(snapshot)
 Universe.from_json(text)</pre>
-<div class="pt-s162">
+<div class="pt-s163">
 
 <div class="pt-s43">
 <span class="pt-s6">fingerprint</span>
@@ -191,7 +191,7 @@ Universe.from_json(text)</pre>
            avg_volume: float = ...,
            beta: float = ...,
            short_interest: float = ...)</pre>
-<div class="pt-s162">
+<div class="pt-s163">
 
 <div class="pt-s43">
 <span class="pt-s6">short_interest</span>
@@ -234,7 +234,7 @@ Universe.from_json(text)</pre>
       qe_pe_boost: float = ...,
       fear_greed_index: float = ...,
       cycle: CycleName = ...)</pre>
-<div class="pt-s162">
+<div class="pt-s163">
 
 <div class="pt-s43">
 <span class="pt-s6">Rates are fractional</span>
@@ -266,7 +266,7 @@ book.best_bid / book.best_ask
 book.mid_price / book.spread
 book.depth_buy / book.depth_sell
 book.bids / book.asks</pre>
-<div class="pt-s162">
+<div class="pt-s163">
 
 <div class="pt-s43">
 <span class="pt-s6">bids / asks</span>
@@ -294,9 +294,9 @@ book.bids / book.asks</pre>
 
 </section>
 
-<section class="pt-s18">
+<section class="pt-s19">
 <h2 class="pt-s7">Two errors, and what each one means</h2>
-<div class="pt-s68">
+<div class="pt-s69">
 <div class="pt-s9">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.9375rem;color:var(--red)">ValidationError</span>
 <p class="pt-s1">A malformed input: a rate passed as a percentage, a short interest between 0 and 1 on a real share count, an unknown sector key, a scenario that chains a shape onto a built scenario.</p>
@@ -325,15 +325,15 @@ book.bids / book.asks</pre>
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
 
-<div class="pt-s20">
+<div class="pt-s21">
 <a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">CORE TYPES</span>
 </div>
 
 <section class="pt-s33">
 <h1 class="pt-s29">Core types</h1>
-<p class="pt-s23">The five types you need to run a market. Every keyword below is keyword-only unless the signature shows otherwise.</p>
+<p class="pt-s17">The five types you need to run a market. Every keyword below is keyword-only unless the signature shows otherwise.</p>
 </section>
 
 <section style="padding:2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
@@ -344,7 +344,7 @@ book.bids / book.asks</pre>
 <span class="pt-s0">{{ ty.lede }}</span>
 </div>
 <pre class="pt-s50">{{ ty.sig }}</pre>
-<div class="pt-s162">
+<div class="pt-s163">
 <sc-for list="{{ ty.members }}" as="m">
 <div class="pt-s43">
 <span class="pt-s6">{{ m.k }}</span>
@@ -357,9 +357,9 @@ book.bids / book.asks</pre>
 </sc-for>
 </section>
 
-<section class="pt-s18">
+<section class="pt-s19">
 <h2 class="pt-s7">Two errors, and what each one means</h2>
-<div class="pt-s68">
+<div class="pt-s69">
 <div class="pt-s9">
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.9375rem;color:var(--red)">ValidationError</span>
 <p class="pt-s1">A malformed input: a rate passed as a percentage, a short interest between 0 and 1 on a real share count, an unknown sector key, a scenario that chains a shape onto a built scenario.</p>

@@ -7,7 +7,7 @@ short: Scenario recipes
 
 # Scenario recipes
 
-`pretium` has no `.financial_crisis()`, no `.pandemic()`, no `.war()`, and it
+`tradefloor` has no `.financial_crisis()`, no `.pandemic()`, no `.war()`, and it
 is not going to grow one. The reason is recorded in the design decisions and
 is worth restating here, because it is also the reason this page exists: a
 named event has to encode somebody's opinion about what that event does to
@@ -110,8 +110,8 @@ A `Scenario` holds a *list* of pins per field, and they lie end to end:
   keeps a lone `ramp` or `step` defined on day zero.
 
 ```python
-import pretium as pt
-from pretium import Scenario
+import tradefloor as pt
+from tradefloor import Scenario
 
 # calm at 15, a jump to 48 on day 60, a plateau, then a decay to 22.
 segments = (Scenario("spike, plateau, decay")
@@ -287,7 +287,7 @@ An explicit baseline that realises the same path as the scenario is refused on
 the same grounds: two runs of one world, differenced, is a zero either way.
 
 ```python
-from pretium.scenario import compare
+from tradefloor.scenario import compare
 
 u = pt.Universe.random(20, seed=4)
 held = Scenario("held crisis").hold(vix=45.0)
@@ -322,7 +322,7 @@ and credit scenarios, which move fair value directionally, with
 ## How the measured effects below were produced
 
 Every "in this model" figure on this page was measured on engine commit
-`9b485a0`, pretium 0.1.0, under model preset `pt-v1`, which was the default
+`9b485a0`, tradefloor 0.1.0, under model preset `pt-v1`, which was the default
 at the time and is not any more. The shipped default is now `pt-v12`, so
 these figures describe an earlier era, and by now a distant one. `pt-v1` is
 still selectable and still reproduces bit for bit, which is why every block on
@@ -361,9 +361,9 @@ dispersion across seeds is generally larger than the effects.
 ## Recipe 1: A rate-hiking cycle
 
 ```python
-import pretium as pt
-from pretium import Scenario
-from pretium.scenario import compare
+import tradefloor as pt
+from tradefloor import Scenario
+from tradefloor.scenario import compare
 
 hiking = Scenario.rate_shock(start=0.00125, end=0.0538, over=90,
                              credit_spread=0.02)
@@ -435,9 +435,9 @@ name at 40 days, and a median −8.07% at 120.
 ## Recipe 2: An inflation shock
 
 ```python
-import pretium as pt
-from pretium import Scenario
-from pretium.scenario import compare
+import tradefloor as pt
+from tradefloor import Scenario
+from tradefloor.scenario import compare
 
 inflation = Scenario("inflation shock").ramp(
     "inflation_rate", start=0.014, end=0.091, over=100, begin=5)
@@ -498,8 +498,8 @@ thirty-eight-fold understatement of where the path ends up.
 ## Recipe 3: A liquidity crisis
 
 ```python
-import pretium as pt
-from pretium import Scenario
+import tradefloor as pt
+from tradefloor import Scenario
 
 crisis = (Scenario.vix_shock(calm=18.0, peak=80.0, at=20, over=60)
           .ramp("corporate_bond_yield", start=0.055, end=0.095,
@@ -620,9 +620,9 @@ sign; the volatility and correlation numbers are the claim.
 ## Recipe 4: A contraction regime
 
 ```python
-import pretium as pt
-from pretium import Scenario
-from pretium.scenario import compare
+import tradefloor as pt
+from tradefloor import Scenario
+from tradefloor.scenario import compare
 
 contraction = (Scenario("contraction")
                .hold(cycle="contraction")
@@ -718,9 +718,9 @@ recipe works when the path comes out of a spreadsheet instead of a loop:
 
 ```python
 import json
-import pretium as pt
-from pretium import Scenario
-from pretium.scenario import compare
+import tradefloor as pt
+from tradefloor import Scenario
+from tradefloor.scenario import compare
 
 
 def pandemic_shape(days=120):

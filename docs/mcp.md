@@ -9,44 +9,44 @@ short: MCP server
 
 **Give a coding agent the simulator as a set of tools.**
 
-`pretium` is a Python library, so its usual audience is a person writing
+`tradefloor` is a Python library, so its usual audience is a person writing
 code. The MCP server adds an audience that cannot: a model that calls tools
 and reads back JSON. Point Claude Code, Claude Desktop or any MCP client at
 it and ask questions in English: *does a momentum strategy beat buy-and-hold
 here, and is the difference real?*
 
 ```
-pip install "pretium[mcp]"
+pip install "tradefloor[mcp]"
 ```
 
-Then register it with your client. The command is `pretium-mcp`, it takes no
+Then register it with your client. The command is `tradefloor-mcp`, it takes no
 arguments, and it speaks MCP over stdio:
 
 ```json
 {
   "mcpServers": {
-    "pretium": {
-      "command": "pretium-mcp"
+    "tradefloor": {
+      "command": "tradefloor-mcp"
     }
   }
 }
 ```
 
-In Claude Code, `claude mcp add pretium -- pretium-mcp` does the same thing.
+In Claude Code, `claude mcp add tradefloor -- tradefloor-mcp` does the same thing.
 
 ### If the client cannot find it
 
-This is the usual first failure, and it is not a pretium problem: a desktop
+This is the usual first failure, and it is not a tradefloor problem: a desktop
 MCP client does not inherit your shell's `PATH`, so `"command":
-"pretium-mcp"` resolves only if the script sits somewhere the client already
+"tradefloor-mcp"` resolves only if the script sits somewhere the client already
 looks. If you installed into a virtual environment, which you should, give
 the absolute path instead:
 
 ```json
 {
   "mcpServers": {
-    "pretium": {
-      "command": "/path/to/.venv/bin/pretium-mcp"
+    "tradefloor": {
+      "command": "/path/to/.venv/bin/tradefloor-mcp"
     }
   }
 }
@@ -55,7 +55,7 @@ the absolute path instead:
 To find that path, ask the interpreter you installed into:
 
 ```
-python -c "import sys, pathlib; print(pathlib.Path(sys.prefix) / ('Scripts' if sys.platform == 'win32' else 'bin') / 'pretium-mcp')"
+python -c "import sys, pathlib; print(pathlib.Path(sys.prefix) / ('Scripts' if sys.platform == 'win32' else 'bin') / 'tradefloor-mcp')"
 ```
 
 Derived from `sys.prefix` rather than looked up on `PATH` deliberately.
@@ -63,7 +63,7 @@ Derived from `sys.prefix` rather than looked up on `PATH` deliberately.
 unless the environment happens to be activated, which is exactly the
 situation someone hits this problem in.
 
-Running `pretium-mcp` in a terminal is a useful check on its own. With the
+Running `tradefloor-mcp` in a terminal is a useful check on its own. With the
 extra missing it says so and names the fix; with everything present it
 waits silently for a client to speak to it over stdin, which looks like a
 hang and is the server working.
@@ -281,12 +281,12 @@ that, and it sits outside the band rather than inside it. A hardcoded caveat
 is how a caveat becomes false, and a false caveat told to a model is worse
 than none.
 
-A summary of a pretium result that drops the caveats is a misreport.
+A summary of a tradefloor result that drops the caveats is a misreport.
 
 ## Provenance on every result
 
 Every successful call returns what someone else needs to re-run it: the
-pretium version, the model preset by name, the spec version, the seed, the
+tradefloor version, the model preset by name, the spec version, the seed, the
 universe document and its fingerprint, and the horizon. The preset name is
 what pins the coefficients, because a preset is never edited in place: a
 coefficient change arrives as a new name.

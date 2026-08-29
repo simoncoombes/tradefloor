@@ -282,7 +282,7 @@ def main() -> int:
         if err:
             errors[name] = err
 
-    import pretium as pt
+    import tradefloor as pt
     commit = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
                             capture_output=True, text=True).stdout.strip()
     meta = {

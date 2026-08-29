@@ -128,7 +128,7 @@ Everything above, in one JSON-serialisable dictionary:
 
 ```python
 import json
-import pretium as pt
+import tradefloor as pt
 
 universe = pt.Universe.random(20, seed=11)
 macro = pt.Macro()

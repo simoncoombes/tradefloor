@@ -14,7 +14,7 @@
 //! port where implementation-defined maths (`ln`, `sin`, `cos`) is involved,
 //! and therefore the first place V8 and Rust can legitimately disagree.
 
-use pretium::GameRng;
+use tradefloor::GameRng;
 
 /// Parse the `f64` bit patterns emitted by the reference implementation's probe.
 fn f64s(hex_csv: &str) -> Vec<f64> {

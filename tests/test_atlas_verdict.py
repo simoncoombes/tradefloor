@@ -153,7 +153,7 @@ def test_the_coupling_is_symmetric():
 
 def test_the_refuted_registry_names_real_parameters():
     # A typo here would silently disable a refutation.
-    import pretium as pt
+    import tradefloor as pt
 
     settable = set(pt.ModelParams.settable())
     for param in verdict.REFUTED_DIRECTION:

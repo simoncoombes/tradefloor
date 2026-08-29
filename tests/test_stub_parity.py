@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-import pretium._core as core
+import tradefloor._core as core
 
 STUB = Path(__file__).resolve().parent.parent / "python" / "pretium" / "_core.pyi"
 

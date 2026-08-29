@@ -1,4 +1,4 @@
-//! # pretium - the engine core
+//! # tradefloor - the engine core
 //!
 //! The price model, in Rust, compiled once and consumed twice: as WebAssembly
 //! inside a browser, and as a Python extension module for backtesting.

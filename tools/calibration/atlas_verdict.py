@@ -55,7 +55,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from pretium import atlas  # noqa: E402
+from tradefloor import atlas  # noqa: E402
 
 #: The seven mechanisms that ship inert, and what is already known about
 #: each. The `status` line is not decoration: a survey verdict has to be

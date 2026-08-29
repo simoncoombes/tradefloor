@@ -1,7 +1,7 @@
 """This market has never had news, and its news machinery has never fired.
 
 News is caller-supplied: `SessionRequest.news` is a slice the engine never
-filled, and the only populated path is `pretium.replay`, which feeds a
+filled, and the only populated path is `tradefloor.replay`, which feeds a
 recorded log's news back in. So `company_news` contributed exactly zero in
 every simulation the panel measures, 0 nonzero day-cells out of 30240 at
 every pinned VIX (CALIBRATION-FOLLOWUPS.md §85), and `news_sector_weight`,
@@ -21,7 +21,7 @@ from __future__ import annotations
 import pyarrow as pa
 import pytest
 
-import pretium as pt
+import tradefloor as pt
 
 
 def _news_column(model, days: int = 20, n: int = 25) -> list[float]:

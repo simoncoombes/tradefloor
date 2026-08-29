@@ -18,8 +18,8 @@
 //! Both halves are asserted, because a reader who assumes the first will build
 //! something that quietly depends on it.
 
-use pretium::engine::{Engine, TickRequest};
-use pretium::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany, TickStock};
+use tradefloor::engine::{Engine, TickRequest};
+use tradefloor::market::{GameTime, NewsEvent, NewsImpactEntry, OrderVolume, TickCompany, TickStock};
 
 fn company(id: &str, price: f64) -> TickCompany {
     TickCompany {
@@ -44,7 +44,7 @@ fn company(id: &str, price: f64) -> TickCompany {
             mispricing_momentum: None,
             maker_inventory: None,
             garch_variance: 0.000625,
-            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
+            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
             last_daily_return: None,
             beta: Some(1.0),
             short_interest: 0.0,
@@ -65,9 +65,9 @@ fn engine(seed: u32, n: usize) -> Engine {
     Engine::new(
         seed,
         companies,
-        pretium::economy::create_initial_economy_state(&Default::default()),
-        pretium::economy::create_initial_central_bank_state(0),
-        pretium::sectors::keys().iter().map(|s| s.to_string()).collect(),
+        tradefloor::economy::create_initial_economy_state(&Default::default()),
+        tradefloor::economy::create_initial_central_bank_state(0),
+        tradefloor::sectors::keys().iter().map(|s| s.to_string()).collect(),
     )
 }
 

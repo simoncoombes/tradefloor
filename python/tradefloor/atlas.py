@@ -79,7 +79,7 @@ describe; they do not certify.
   filter on `sensitivity` and `profile`, deliberately one hypothesis at a
   time.
 - **A feasibility gate inside `survey`.** Which vectors a model is
-  stationary over is the caller's knowledge (for pretium it lives in
+  stationary over is the caller's knowledge (for tradefloor it lives in
   `tools/calibration/instrumentlib.feasibility_violation`, not in the
   type). `plan` exists so a caller can check the vectors before spending
   anything, and a `measure` that raises is recorded rather than fatal.
@@ -207,7 +207,7 @@ def axes_for(names: Iterable[str], preset: str = "pt-v3",
     suspicious enough to say out loud, because such a survey cannot anchor
     anything it finds to the model actually being run.
     """
-    import pretium
+    import tradefloor
 
     names = list(names)
     if len(set(names)) != len(names):
@@ -224,7 +224,7 @@ def axes_for(names: Iterable[str], preset: str = "pt-v3",
                 "default box silently in place, which is how a search "
                 "excluded its own optimum."
             )
-    shipped = pretium.ModelParams.from_preset(preset)
+    shipped = tradefloor.ModelParams.from_preset(preset)
     out = []
     for name in names:
         value = getattr(shipped, name, None)
@@ -417,7 +417,7 @@ class Survey:
         noisier sample, which the returned counts make visible).
 
         Returns the correlations with their basis attached, following the
-        same discipline as `pretium.loss`: the numbers ride inside the
+        same discipline as `tradefloor.loss`: the numbers ride inside the
         provenance rather than travelling bare::
 
             {"output", "correlations": {param: rho, ...},   # sorted by |rho|
@@ -1041,7 +1041,7 @@ def survey(axes: Sequence[Axis],
     vectors = plan(axes, samples, seed)
     out = Survey(axes=list(axes), meta={"samples": samples, "seed": seed})
     for i, vector in enumerate(vectors):
-        # `measure` alone is inside the try: pretium's own refusals
+        # `measure` alone is inside the try: tradefloor's own refusals
         # (ValidationError included) are facts about the vector's region
         # and belong in the record, while a malformed row from `record`
         # itself is a bug here and must raise.

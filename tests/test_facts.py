@@ -16,8 +16,8 @@ import pytest
 
 pytest.importorskip("pyarrow")
 
-import pretium
-from pretium.facts import compare_to_real_markets, measure, report
+import tradefloor
+from tradefloor.facts import compare_to_real_markets, measure, report
 
 # Forty names, not thirty. Excess kurtosis is a fourth-moment estimate and it
 # needs the sample: at 30 names x 180 days (5,370 returns) it read +2.79, just
@@ -25,7 +25,7 @@ from pretium.facts import compare_to_real_markets, measure, report
 # comfortably inside. The property did not change -- the estimator was noisy.
 # Measuring a tail statistic on too few observations and calling the result a
 # model property is the mistake this comment exists to prevent repeating.
-UNIVERSE = pretium.Universe.random(40, seed=111)
+UNIVERSE = tradefloor.Universe.random(40, seed=111)
 
 
 @pytest.fixture(scope="module")
@@ -131,13 +131,13 @@ def test_the_autocorrelation_is_the_mispricing_process_showing_through():
     same mechanism, which is what makes it an explanation instead of an
     observation.
     """
-    response = pretium.impulse_response(12)
+    response = tradefloor.impulse_response(12)
     assert response[0] == pytest.approx(1.0)
     assert response[1] > response[0]
     assert max(response) > 1.2
     # And it is still stationary, so the amplification reverts rather than
     # running away.
-    assert all(modulus < 1.0 for modulus in pretium.characteristic_root_moduli())
+    assert all(modulus < 1.0 for modulus in tradefloor.characteristic_root_moduli())
 
 
 def test_volatility_clustering_is_in_band_at_short_lags_and_dies_too_fast():
@@ -223,7 +223,7 @@ def test_the_report_covers_dependence_and_not_only_marginals(facts):
         assert key in facts, key
         assert facts[key] is not None, key
     text = report(facts)
-    for label in pretium.facts.LABELS.values():
+    for label in tradefloor.facts.LABELS.values():
         assert label in text, label
 
 
@@ -360,9 +360,9 @@ def test_volume_is_measured_in_changes_because_the_level_says_nothing():
 
     import pyarrow as pa
 
-    from pretium.facts import _autocorrelation, _correlation, _daily_series
+    from tradefloor.facts import _autocorrelation, _correlation, _daily_series
 
-    engine = pretium.Engine(seed=5, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE)
     engine.run_days(120, record=True)
     bars = pa.table(engine.bars(grain="day")).to_pydict()
 
@@ -391,9 +391,9 @@ def test_the_bars_table_is_grouped_before_it_is_differenced():
     """
     import pyarrow as pa
 
-    from pretium.facts import _daily_series
+    from tradefloor.facts import _daily_series
 
-    engine = pretium.Engine(seed=5, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE)
     engine.run_days(60, record=True)
     bars = pa.table(engine.bars(grain="day")).to_pydict()
 
@@ -413,7 +413,7 @@ def test_a_statistic_that_cannot_be_measured_is_absent_rather_than_zero():
     # One instrument has no pairwise correlation. Zero would be a lie of
     # exactly the shape the module warns about elsewhere: it is a real
     # reading, and here it would land close to what the model actually scores.
-    facts = measure(seed=2, universe=pretium.Universe.random(1, seed=9), days=60)
+    facts = measure(seed=2, universe=tradefloor.Universe.random(1, seed=9), days=60)
     assert facts["cross_sectional_corr"] is None
     assert "cross_sectional_corr" not in compare_to_real_markets(facts)
     assert "n/a" in report(facts)
@@ -441,7 +441,7 @@ def test_autocorrelation_is_a_median_across_instruments_not_a_pooled_series():
 
     import pyarrow as pa
 
-    engine = pretium.Engine(seed=5, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE)
     engine.run_days(60, record=True)
     bars = pa.table(engine.bars(grain="day")).to_pydict()
     spliced = []
@@ -459,9 +459,9 @@ def test_autocorrelation_is_a_median_across_instruments_not_a_pooled_series():
 
 
 def test_a_run_too_short_to_measure_is_refused():
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         measure(seed=1, universe=UNIVERSE, days=1)
-    with pytest.raises(pretium.ValidationError, match="more days"):
+    with pytest.raises(tradefloor.ValidationError, match="more days"):
         measure(seed=1, universe=UNIVERSE, days=5, min_observations=100)
 
 
@@ -492,15 +492,15 @@ def test_correlation_persistence_is_reported_and_judged_with_its_noise_stated():
     year = measure(seed=2, universe=UNIVERSE, days=252)
     assert isinstance(year["corr_persistence_acf1"], float)
     assert -1.0 <= year["corr_persistence_acf1"] <= 1.0
-    lo, hi = pretium.facts.REAL_MARKETS["corr_persistence_acf1"]
+    lo, hi = tradefloor.facts.REAL_MARKETS["corr_persistence_acf1"]
     assert lo < 0.0 < hi, "the 252-day band is wide by measurement, and pinned so"
-    assert pretium.facts.REAL_MARKETS_504["corr_persistence_acf1"][0] > 0.0
+    assert tradefloor.facts.REAL_MARKETS_504["corr_persistence_acf1"][0] > 0.0
     # The largest seed sd of any correlation-type statistic at both horizons
     # (volatility and kurtosis are in other units). Relative to its band it
     # is NOT the noisiest: abs_return_acf5 is, because the 252-day band here
     # is so wide. Both facts are why it sits outside the objective.
-    corr_type = [k for k in pretium.facts.REAL_MARKETS
+    corr_type = [k for k in tradefloor.facts.REAL_MARKETS
                  if k not in ("annualised_vol_pct", "excess_kurtosis")]
-    for table in (pretium.facts.SEED_SD, pretium.facts.SEED_SD_504):
+    for table in (tradefloor.facts.SEED_SD, tradefloor.facts.SEED_SD_504):
         assert max(corr_type, key=table.get) == "corr_persistence_acf1"
     assert "corr_persistence_acf1" in compare_to_real_markets(year)

@@ -4,7 +4,7 @@ Six calibration searches were rejected in two days, and the mechanical
 pattern is now understood: a scalar objective picks a trade for you and
 hides it, so the optimiser sells whatever the objective cannot see. Every
 one of those searches was a flashlight in an unsurveyed room. This driver
-runs the survey -- `pretium.atlas` -- over the whole settable surface at
+runs the survey -- `tradefloor.atlas` -- over the whole settable surface at
 both certified horizons plus the two scenario gates, so the next search
 direction is read off a map instead of guessed.
 
@@ -13,7 +13,7 @@ What it measures, per sampled vector:
 - the ten-statistic realism panel at 252 days AND at 504 days, six seeds
   each under common random numbers (same seed list for every vector, so a
   cross-vector difference at a fixed seed is a parameter effect);
-- `loss_252` / `loss_504` / `loss` via `pretium.loss.dual_horizon_loss`,
+- `loss_252` / `loss_504` / `loss` via `tradefloor.loss.dual_horizon_loss`,
   which scores each horizon against ITS OWN bands and seed sds
   (`REAL_MARKETS`+`SEED_SD` at 252, `REAL_MARKETS_504`+`SEED_SD_504` at
   504). Pairing one horizon's measurement with the other's ruler is a
@@ -44,7 +44,7 @@ calibration_box`: ~[1/4x, 4x] around pt-v3, intersected with hard
 ranges), with three classes of deliberate exception:
 
 - **The 19 parameters shipped inert at 0.0** have no multiplicative box
-  (`pretium.atlas` refuses to invent one) and get explicit ranges in
+  (`tradefloor.atlas` refuses to invent one) and get explicit ranges in
   `ZERO_SHIPPED_RANGES`, each justified in place.
 - **The crisis dials get ranges far past the convention.** The most
   recent 96-core search found nothing because the [1/4x, 4x] box capped
@@ -123,14 +123,14 @@ import instrumentlib as lib               # noqa: E402
 import scenario_response as sr            # noqa: E402
 from calibrate import calibration_box     # noqa: E402
 
-import pretium                            # noqa: E402
-from pretium import atlas                 # noqa: E402
-from pretium.facts import REAL_MARKETS    # noqa: E402
+import tradefloor                            # noqa: E402
+from tradefloor import atlas                 # noqa: E402
+from tradefloor.facts import REAL_MARKETS    # noqa: E402
 
 #: Measured by `facts.measure`, judged by nothing yet, recorded per horizon
 #: as `<stat>_<days>` beside the thirteen. See CALIBRATION-FOLLOWUPS.md §64.
 DIAGNOSTIC_STATS = ("corr_persistence_acf1",)
-from pretium.loss import dual_horizon_loss  # noqa: E402
+from tradefloor.loss import dual_horizon_loss  # noqa: E402
 
 #: Ranges centred here. The vectors themselves set every parameter, so the
 #: pt-v1 base inside `instrumentlib.evaluate_panel` and the scenario jobs
@@ -450,8 +450,8 @@ def params_to_vector(params: dict[str, float]) -> dict[str, float]:
 
 def survey_axes() -> list[atlas.Axis]:
     """The 54 survey axes, deterministic order, every range accounted for."""
-    settable = pretium.ModelParams.settable()
-    ship = pretium.ModelParams.from_preset(BASE_PRESET).to_dict()
+    settable = tradefloor.ModelParams.settable()
+    ship = tradefloor.ModelParams.from_preset(BASE_PRESET).to_dict()
     zeros = {n for n in settable if float(ship[n]) == 0.0}
     # These guards are raises, not asserts, on purpose: they are the same
     # registry-drift class this project added tests for AFTER a missing
@@ -476,8 +476,8 @@ def survey_axes() -> list[atlas.Axis]:
     # where pt-v3 ships it at one. Pinning the check to one preset would
     # either refuse a legitimate range or force a base-specific registry.
     zero_on_any = set()
-    for preset in ("pt-v3", pretium.ModelParams.from_preset().fingerprint):
-        d = pretium.ModelParams.from_preset(preset).to_dict()
+    for preset in ("pt-v3", tradefloor.ModelParams.from_preset().fingerprint):
+        d = tradefloor.ModelParams.from_preset(preset).to_dict()
         zero_on_any |= {n for n in settable if float(d[n]) == 0.0}
     stale = set(ZERO_SHIPPED_RANGES) - zero_on_any
     if stale:
@@ -596,7 +596,7 @@ def error_kind(exc: BaseException) -> str:
     Everything else is "unclassified" and retried with infrastructure,
     because the safe default for an unknown failure is to look again.
     """
-    if isinstance(exc, (pretium.ValidationError, pretium.OrderError)):
+    if isinstance(exc, (tradefloor.ValidationError, tradefloor.OrderError)):
         return "model"
     if isinstance(exc, (MemoryError, OSError, TimeoutError,
                         ConnectionError)):
@@ -731,8 +731,8 @@ def build_plan(samples: int, plan_seed: int):
         # Complete every vector with the base preset's coordinates on the
         # axes not surveyed, so `vector_to_params` yields the full override
         # set and nothing falls through to evaluate_panel's pt-v1 base.
-        base = pretium.ModelParams.from_preset(BASE_PRESET).to_dict()
-        pinned = params_to_vector({n: base[n] for n in pretium.ModelParams.settable()})
+        base = tradefloor.ModelParams.from_preset(BASE_PRESET).to_dict()
+        pinned = params_to_vector({n: base[n] for n in tradefloor.ModelParams.settable()})
         vectors = [dict({k: v for k, v in pinned.items() if k not in ONLY}, **vec)
                    for vec in vectors]
     ship = lib.shipped_values()
@@ -747,9 +747,9 @@ def build_plan(samples: int, plan_seed: int):
 
 def cmd_plan(args) -> int:
     axes, vectors, feasibility = build_plan(args.samples, args.plan_seed)
-    ship = pretium.ModelParams.from_preset(BASE_PRESET).to_dict()
+    ship = tradefloor.ModelParams.from_preset(BASE_PRESET).to_dict()
     ship_vector = params_to_vector(
-        {n: ship[n] for n in pretium.ModelParams.settable()})
+        {n: ship[n] for n in tradefloor.ModelParams.settable()})
     print(f"{'axis':30s} {'low':>12s} {'high':>12s} {'scale':>6s} "
           f"{BASE_PRESET:>12s}")
     for a in axes:
@@ -1103,9 +1103,9 @@ def write_report(survey: atlas.Survey, outdir: Path) -> Path:
                                      "vol_lever": "max"}))
 
     def candidate_attribution() -> str:
-        ship = pretium.ModelParams.from_preset(BASE_PRESET).to_dict()
+        ship = tradefloor.ModelParams.from_preset(BASE_PRESET).to_dict()
         base = params_to_vector(
-            {n: ship[n] for n in pretium.ModelParams.settable()})
+            {n: ship[n] for n in tradefloor.ModelParams.settable()})
         candidate = dict(base, crisis_blend_ramp=6.0, crisis_blend_cap=0.98)
         return survey.attribution(base, candidate, "loss")["summary"]
 

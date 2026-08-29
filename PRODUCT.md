@@ -37,7 +37,7 @@ package and runs something.
 
 ## Product Purpose
 
-`pretium` simulates an equity market that a strategy can be run against. Given
+`tradefloor` simulates an equity market that a strategy can be run against. Given
 a seed, a roster of companies and a macro state, it runs prices, a limit order
 book, fills and macro state forward. Orders match against real depth, so
 trading moves the price.
@@ -82,7 +82,7 @@ published result can be re-run by someone else.
 Confirmed in the shipped package: `Engine`, `EngineBatch`, `Universe`, `Macro`,
 `Scenario`, `Checkpoint`, agent evaluation with reference baselines and an
 Oracle, ranking with paired sign tests, TCA, sweeps, replay, an SEC EDGAR
-loader, a Gymnasium environment, an MCP server (`pretium.mcp`), and five
+loader, a Gymnasium environment, an MCP server (`tradefloor.mcp`), and five
 Arrow output tables. Twelve model presets ship, `pt-v1` through `pt-v12`, all
 selectable and all reproducing bit for bit; `pt-v12` is the default.
 
@@ -95,7 +95,7 @@ Stated limitations, which the documentation must keep visible rather than bury:
 - The realism envelope is certified to 252 trading days and no further
   (`envelope.CERTIFIED_HORIZON_DAYS`). Five gaps stand behind that number:
   horizon, decay-shape, scenario-magnitude, macro-range and
-  roster-concentration, each enumerated in `pretium.envelope.GAPS` with what
+  roster-concentration, each enumerated in `tradefloor.envelope.GAPS` with what
   it forbids.
 - Volatility memory decays exponentially rather than hyperbolically. The
   log-log slope over lags 1 to 20 measures -0.953 against real markets'
@@ -107,12 +107,12 @@ Stated limitations, which the documentation must keep visible rather than bury:
 
 Rates are fractional. Roster order is contractual. Every numeric column is f64.
 
-Published on PyPI as `pretium` and on crates.io as the `pretium` crate. The
+Published on PyPI as `tradefloor` and on crates.io as the `tradefloor` crate. The
 API may still move before 1.0.
 
 ## Brand Commitments
 
-Name: `pretium`, lowercase. Latin for *price*.
+Name: `tradefloor`, lowercase. Latin for *price*.
 
 Voice, established and approved across the README: direct, concrete,
 measurement-led, and willing to state limitations in the same breath as

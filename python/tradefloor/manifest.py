@@ -449,12 +449,12 @@ class RunManifest:
         payload = json.loads(text)
         if not isinstance(payload, dict) or "order_log" not in payload \
                 or "fingerprints" not in payload or "result" not in payload:
-            raise ValidationError("not a pretium run manifest document")
+            raise ValidationError("not a tradefloor run manifest document")
         schema = payload.get("schema", 0)
         if schema > MANIFEST_SCHEMA:
             raise ValidationError(
                 f"manifest schema {schema} is newer than this version "
-                "understands. Upgrade pretium rather than reading it "
+                "understands. Upgrade tradefloor rather than reading it "
                 "partially."
             )
 
@@ -579,7 +579,7 @@ class RunManifest:
                 "does not exercise, on an unmeasured platform pair (written "
                 f"on {wrote['os']}-{wrote['machine']}, replayed on "
                 f"{_platform.system()}-{_platform.machine()}) that is the "
-                "leading suspect. Bisect with pretium.replay(log, ..., "
+                "leading suspect. Bisect with tradefloor.replay(log, ..., "
                 "until=n)."
             )
         return engine
@@ -685,7 +685,7 @@ class RunManifest:
             raise ValidationError(
                 f"this manifest's era probe (v{era.get('probe')}) is not the "
                 f"one this build runs (v{ERA_PROBE}), so their digests "
-                "cannot be compared. Upgrade pretium rather than concluding "
+                "cannot be compared. Upgrade tradefloor rather than concluding "
                 "anything from two different measurements."
             )
         mine = era_fingerprint()
@@ -695,9 +695,9 @@ class RunManifest:
                 "this build does not reproduce the manifest's era: the "
                 f"fixed probe simulation digests {mine[:12]}... against the "
                 f"recorded {str(era.get('digest'))[:12]}.... Written under "
-                f"pretium {wrote.get('pretium_version')} on "
+                f"tradefloor {wrote.get('pretium_version')} on "
                 f"{platform_info.get('os')}-{platform_info.get('machine')}; "
-                f"this is pretium {version()} on {_platform.system()}-"
+                f"this is tradefloor {version()} on {_platform.system()}-"
                 f"{_platform.machine()}. An engine, calibration or platform "
                 "difference has moved the trajectories, so the run cannot "
                 "be reproduced on this build, and running it anyway would "
@@ -717,7 +717,7 @@ class RunManifest:
 
     @property
     def universe(self):
-        """The embedded roster, as a :class:`pretium.Universe`."""
+        """The embedded roster, as a :class:`tradefloor.Universe`."""
         from . import Universe
 
         return Universe.from_json(json.dumps(self._doc["universe"]))
@@ -830,7 +830,7 @@ class RunManifest:
             f"{len(doc['universe']['instruments'])} instruments, "
             f"{doc['result']['days']} days, "
             f"{len(doc['order_log'])} log entries",
-            f"  written by pretium {wrote['pretium_version']} on "
+            f"  written by tradefloor {wrote['pretium_version']} on "
             f"{wrote['platform']['os']}-{wrote['platform']['machine']}, "
             f"model {wrote['model'].get('name')!r}, "
             f"era {wrote['era']['digest'][:12]}...",

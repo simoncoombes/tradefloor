@@ -13,7 +13,7 @@ those sections measured.
 
 from __future__ import annotations
 
-import pretium as pt
+import tradefloor as pt
 
 
 def test_it_is_exactly_pt_v5_with_theta_halved() -> None:

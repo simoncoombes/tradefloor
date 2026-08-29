@@ -9,12 +9,12 @@ when the order crosses a level and not before.
 
 import pytest
 
-import pretium
+import tradefloor
 
 
 def book_after_a_session(n=6, seed=3, ticks=30):
-    universe = pretium.Universe.random(n, seed=2)
-    engine = pretium.Engine(seed=seed, universe=universe)
+    universe = tradefloor.Universe.random(n, seed=2)
+    engine = tradefloor.Engine(seed=seed, universe=universe)
     engine.open_market()
     engine.run_session(9, 30, 3, ticks)
     return engine, engine.book(engine.tickers[0])
@@ -96,8 +96,8 @@ def test_sizing_by_participation_is_what_makes_impact_comparable():
     This is why `Observation.participation` exists and why the baselines size
     by ADV rather than by share count.
     """
-    universe = pretium.Universe.random(12, seed=2)
-    engine = pretium.Engine(seed=3, universe=universe)
+    universe = tradefloor.Universe.random(12, seed=2)
+    engine = tradefloor.Engine(seed=3, universe=universe)
     engine.open_market()
     engine.run_session(9, 30, 3, 30)
 
@@ -129,16 +129,16 @@ def test_sweep_cost_predicts_exactly_what_the_portfolio_pays():
     Checked at sizes either side of the first level, so it covers both the
     case that rests inside the touch and the case that walks the book.
     """
-    universe = pretium.Universe.random(6, seed=5)
+    universe = tradefloor.Universe.random(6, seed=5)
     ticker = universe[0].ticker
     walked = 0
     for size in (1_000.0, 100_000.0, 5_000_000.0, 50_000_000.0):
-        engine = pretium.Engine(seed=1, universe=universe)
+        engine = tradefloor.Engine(seed=1, universe=universe)
         engine.open_market()
         engine.run_session(9, 30, 3, 60)
 
         quote = engine.book(ticker).sweep_cost("buy", size)
-        portfolio = pretium.Portfolio(cash=1e12)
+        portfolio = tradefloor.Portfolio(cash=1e12)
         portfolio.stamp(0, 0, 0)
         fill = portfolio.execute(engine, ticker, size)
 
@@ -156,8 +156,8 @@ def test_walking_the_book_costs_more_than_resting_inside_it():
     # The mechanism, stated as an ordering rather than a magnitude. A large
     # order reaches further up the book and pays for it; that is impact
     # emerging from depth rather than from a formula.
-    universe = pretium.Universe.random(6, seed=5)
-    engine = pretium.Engine(seed=1, universe=universe)
+    universe = tradefloor.Universe.random(6, seed=5)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     engine.open_market()
     engine.run_session(9, 30, 3, 60)
     book = engine.book(universe[0].ticker)

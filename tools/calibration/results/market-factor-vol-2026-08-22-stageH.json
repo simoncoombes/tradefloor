@@ -15,7 +15,7 @@
    "installed_core": "dbde88288e885388",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -254,7 +254,7 @@
    "installed_core": "4c40ae7731481af5",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -493,7 +493,7 @@
    "installed_core": "4b4b54d24a193356",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,

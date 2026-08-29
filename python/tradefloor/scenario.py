@@ -129,7 +129,7 @@ year without its hiking cycle, because your only observation is the one that
 happened. Here both are runnable.
 
 Before the RNG stream split (2026-08) this was a weaker guarantee than the
-ORDER-FLOW counterfactual in :mod:`pretium.tca`, and this docstring said so:
+ORDER-FLOW counterfactual in :mod:`tradefloor.tca`, and this docstring said so:
 a macro path changes prices, prices changed which settlement branch drew
 four uniforms, and the shared draw schedule could shift. An older build measured
 -4 draws in 425,600 on an older build. The split closed that mechanism. The
@@ -606,12 +606,12 @@ class Scenario:
         """
         payload = json.loads(text)
         if not isinstance(payload, dict) or "path" not in payload:
-            raise ValidationError("not a pretium scenario document")
+            raise ValidationError("not a tradefloor scenario document")
         schema = payload.get("schema", 0)
         if schema > 1:
             raise ValidationError(
                 f"scenario schema {schema} is newer than this version "
-                "understands. Upgrade pretium rather than reading it partially."
+                "understands. Upgrade tradefloor rather than reading it partially."
             )
         path = payload["path"]
         days = payload.get("days")
@@ -813,7 +813,7 @@ def run_scenario(
     the engine was constructed with.
 
     ``model`` selects the coefficient set, either a preset name or a
-    :class:`pretium.ModelParams`, defaulting to the shipped preset. The
+    :class:`tradefloor.ModelParams`, defaulting to the shipped preset. The
     returned engine reports it as ``model_fingerprint``, like any other.
     """
     if days < 1:

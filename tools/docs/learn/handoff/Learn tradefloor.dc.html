@@ -8,7 +8,7 @@
 <body>
 <x-dc>
 <helmet>
-<title>pretium: a reproducible market for evaluating AI agents</title>
+<title>tradefloor: a reproducible market for evaluating AI agents</title>
 <meta name="description" content="Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
@@ -76,7 +76,7 @@ input[type=range]{accent-color:var(--accent)}
 </style>
 </helmet>
 
-<div data-screen-label="Learn pretium" style="min-height:100vh;padding:0 0 6rem">
+<div data-screen-label="Learn tradefloor" style="min-height:100vh;padding:0 0 6rem">
 
 <div style="position:fixed;inset:0;z-index:80;display:{{ searchShow }};align-items:flex-start;justify-content:center;padding:5rem 1.5rem 1.5rem;background:rgba(16,26,24,0.32)" onClick="{{ closeSearch }}">
 <div style="width:100%;max-width:34rem;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,0.28);overflow:hidden">
@@ -101,8 +101,8 @@ input[type=range]{accent-color:var(--accent)}
 <header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)">
 <div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem">
 <span style="display:flex;align-items:center;gap:0.5rem">
-<img src="./mark-pretium.png" alt="pretium" width="15" height="22" style="display:{{ showLight }};flex:none"></img><img src="./mark-pretium-dark.png" alt="pretium" width="15" height="22" style="display:{{ showDark }};flex:none"></img>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span>
+<img src="./mark-tradefloor.png" alt="tradefloor" width="15" height="22" style="display:{{ showLight }};flex:none"></img><img src="./mark-tradefloor-dark.png" alt="tradefloor" width="15" height="22" style="display:{{ showDark }};flex:none"></img>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">tradefloor</span>
 </span>
 <nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap">
 <details class="ptmenu" style="position:relative">
@@ -127,7 +127,7 @@ input[type=range]{accent-color:var(--accent)}
 <summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Trust it<span style="font-size:0.5rem;color:var(--accent-line)">&#9660;</span></summary>
 <div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60">
 <a href="./Realism envelope.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Realism envelope</a>
-<a href="https://github.com/simoncoombes/pretium/blob/main/docs/realism-metrics.md" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The metrics</a>
+<a href="https://github.com/simoncoombes/tradefloor/blob/main/docs/realism-metrics.md" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">The metrics</a>
 <a href="./Principles.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Principles</a>
 <a href="./Citing a run.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Citing a run</a>
 </div>
@@ -136,17 +136,17 @@ input[type=range]{accent-color:var(--accent)}
 <summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">Reference<span style="font-size:0.5rem;color:var(--accent-line)">&#9660;</span></summary>
 <div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60">
 <a href="./Glossary.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Glossary</a>
-<a href="https://github.com/simoncoombes/pretium/blob/main/docs/conventions.md" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a>
-<a href="https://simoncoombes.github.io/pretium/schemas.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a>
-<a href="https://simoncoombes.github.io/pretium/change.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Presets</a>
+<a href="https://github.com/simoncoombes/tradefloor/blob/main/docs/conventions.md" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Conventions</a>
+<a href="https://tradefloor.dev/schemas.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Schemas</a>
+<a href="https://tradefloor.dev/change.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Presets</a>
 </div>
 </details>
 <details class="ptmenu" style="position:relative">
 <summary style="display:flex;align-items:center;gap:0.3rem;font-size:0.875rem;color:var(--ink-2);cursor:pointer;list-style:none;padding:0.2rem 0">API<span style="font-size:0.5rem;color:var(--accent-line)">&#9660;</span></summary>
 <div style="position:absolute;top:100%;left:-0.6rem;margin-top:0.35rem;min-width:11rem;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,0.14);padding:0.35rem;display:flex;flex-direction:column;gap:1px;z-index:60">
-<a href="https://simoncoombes.github.io/pretium/api-core.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a>
-<a href="https://simoncoombes.github.io/pretium/api-run.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a>
-<a href="https://simoncoombes.github.io/pretium/api-params.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a>
+<a href="https://tradefloor.dev/api-core.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Core types</a>
+<a href="https://tradefloor.dev/api-run.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Evaluate</a>
+<a href="https://tradefloor.dev/api-params.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">Parameters</a>
 <a href="./The MCP server.dc.html" style="display:block;padding:0.35rem 0.6rem;border-radius:5px;font-size:0.8125rem;color:var(--ink-2);white-space:nowrap">MCP server</a>
 </div>
 </details>
@@ -165,13 +165,13 @@ input[type=range]{accent-color:var(--accent)}
 <h1 style="font-size:clamp(1.85rem,3.4vw,2.25rem);max-width:none;text-wrap:balance">A reproducible evaluation environment for financial AI agents</h1>
 <p style="font-size:1.1875rem;color:var(--ink-2);max-width:none;margin:0">Run controlled, reproducible experiments on trading agents in a market with realistic execution - not a backtest over historical prices. A deterministic market simulator with order-book execution, macro dynamics, causal ground truth and agent-native interfaces.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
-<a href="https://pypi.org/project/pretium/" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--accent-deep);text-decoration:none"><img src="./logo-python.png" alt="" width="16" height="16" style="display:{{ showLight }};flex:none"></img><img src="./logo-python-dark.png" alt="" width="16" height="16" style="display:{{ showDark }};flex:none"></img>pip install pretium</a>
-<a href="https://crates.io/crates/pretium" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;border:1px solid var(--line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--ink-2);text-decoration:none"><img src="./logo-rust.png" alt="" width="16" height="16" style="display:{{ showLight }};flex:none"></img><img src="./logo-rust-dark.png" alt="" width="16" height="16" style="display:{{ showDark }};flex:none"></img>cargo add pretium</a>
+<a href="https://pypi.org/project/tradefloor/" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--accent-deep);text-decoration:none"><img src="./logo-python.png" alt="" width="16" height="16" style="display:{{ showLight }};flex:none"></img><img src="./logo-python-dark.png" alt="" width="16" height="16" style="display:{{ showDark }};flex:none"></img>pip install tradefloor</a>
+<a href="https://crates.io/crates/tradefloor" style="display:flex;align-items:center;gap:0.55rem;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.875rem;border:1px solid var(--line);border-radius:6px;padding:0.55rem 0.9rem;color:var(--ink-2);text-decoration:none"><img src="./logo-rust.png" alt="" width="16" height="16" style="display:{{ showLight }};flex:none"></img><img src="./logo-rust-dark.png" alt="" width="16" height="16" style="display:{{ showDark }};flex:none"></img>cargo add tradefloor</a>
 </div>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,24rem) minmax(0,1fr);gap:1.6rem;align-items:stretch">
-<pre style="margin:0;height:100%;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import pretium as pt
+<pre style="margin:0;height:100%;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as pt
 
 # you name the companies yourself
 u = pt.Universe([
@@ -197,7 +197,7 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <span>index, 100 = day 0 close</span>
 <span>{{ chart.rangeLabel }}</span>
 </div>
-<svg viewBox="0 0 900 330" role="img" aria-label="Thirty days of daily closes for five companies from a pretium reference run, indexed to 100 at day zero, with the volatility index below." style="display:block;width:100%;height:auto">
+<svg viewBox="0 0 900 330" role="img" aria-label="Thirty days of daily closes for five companies from a tradefloor reference run, indexed to 100 at day zero, with the volatility index below." style="display:block;width:100%;height:auto">
 <g style="stroke:var(--ink)" stroke-opacity="0.09" stroke-width="1">
 <line x1="52" y1="20" x2="890" y2="20"></line>
 <line x1="52" y1="215" x2="890" y2="215"></line>
@@ -543,18 +543,18 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1.1rem">
 <div style="border:1px solid var(--line);border-radius:6px;padding:0.9rem;background:var(--card);display:flex;flex-direction:column;gap:0.6rem">
 <h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0">Agents over MCP</h3>
-<p style="margin:0;font-size:0.8125rem;color:var(--ink-2)">No simulator integration code. Claude or another model calls pretium through MCP, observes the market and submits trades as tool calls. Eleven tools, everything composed as data.</p>
-<pre style="margin:0.2rem 0 0;margin-top:auto;background:var(--surface);border:1px solid var(--line-soft);border-radius:5px;padding:0.7rem;font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;line-height:1.65;color:var(--ink-2);overflow-x:auto">pip install "pretium[mcp]"
+<p style="margin:0;font-size:0.8125rem;color:var(--ink-2)">No simulator integration code. Claude or another model calls tradefloor through MCP, observes the market and submits trades as tool calls. Eleven tools, everything composed as data.</p>
+<pre style="margin:0.2rem 0 0;margin-top:auto;background:var(--surface);border:1px solid var(--line-soft);border-radius:5px;padding:0.7rem;font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;line-height:1.65;color:var(--ink-2);overflow-x:auto">pip install "tradefloor[mcp]"
 
-claude mcp add pretium \
-  -- pretium-mcp
+claude mcp add tradefloor \
+  -- tradefloor-mcp
 
 # then just ask it a question</pre>
 </div>
 <div style="border:1px solid var(--line);border-radius:6px;padding:0.9rem;background:var(--card);display:flex;flex-direction:column;gap:0.6rem">
 <h3 style="font-size:0.9375rem;font-family:'Public Sans',sans-serif;font-weight:600;margin:0">Reinforcement learning</h3>
 <p style="margin:0;font-size:0.8125rem;color:var(--ink-2)">Passes gymnasium's env_checker. Actions are target weights in [-1, 1]. Reward is measured after the market moves, so it already carries the cost of the agent's own footprint.</p>
-<pre style="margin:0.2rem 0 0;margin-top:auto;background:var(--surface);border:1px solid var(--line-soft);border-radius:5px;padding:0.7rem;font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;line-height:1.65;color:var(--ink-2);overflow-x:auto">import pretium.gym as ptg
+<pre style="margin:0.2rem 0 0;margin-top:auto;background:var(--surface);border:1px solid var(--line-soft);border-radius:5px;padding:0.7rem;font-family:'Spline Sans Mono',monospace;font-size:0.6875rem;line-height:1.65;color:var(--ink-2);overflow-x:auto">import tradefloor.gym as ptg
 
 env = ptg.TradingEnv(universe=u,
     seed=42, days=20)
@@ -1094,7 +1094,7 @@ class Component extends DCLogic {
       setTopK: set('topK'), setPart: set('partRaw'),
       setEnvDays: set('envDays'),
       setBookStepManual: (e) => this.setState({ bookStep: +e.target.value, bookPlaying: false }),
-      markLogo: this.state.dark ? './mark-pretium-dark.png' : './mark-pretium.png',
+      markLogo: this.state.dark ? './mark-tradefloor-dark.png' : './mark-tradefloor.png',
       pyLogo: this.state.dark ? './logo-python-dark.png' : './logo-python.png',
       rsLogo: this.state.dark ? './logo-rust-dark.png' : './logo-rust.png',
       showLight: this.state.dark ? 'none' : 'block',
@@ -1150,8 +1150,8 @@ class Component extends DCLogic {
       doors: (function () {
         // The published site, so every link resolves from here. Swap SITE for
         // './' if this page is served from inside docs/ itself.
-        const SITE = 'https://simoncoombes.github.io/pretium/';
-        const SRC = 'https://github.com/simoncoombes/pretium/blob/main/docs/';
+        const SITE = 'https://tradefloor.dev/';
+        const SRC = 'https://github.com/simoncoombes/tradefloor/blob/main/docs/';
         const d = (label, page) => ({ label: label, href: (/\.md$/.test(page) ? SRC : SITE) + page });
         return [
           { title: 'Start', links: [
@@ -1205,7 +1205,7 @@ class Component extends DCLogic {
       defensive: 'u = pt.Universe.random(' + s.uSize + ', seed=' + s.uSeed + ')\n# then filter to defensive sectors'
     }[s.uShape];
     const top = mix.slice(0, 2).map(m => m.raw + ' ' + m.n).join(', ');
-    out.uCode = 'import pretium as pt\n\n' + shapeCode +
+    out.uCode = 'import tradefloor as pt\n\n' + shapeCode +
       '\n\nlen(u)            # ' + s.uSize +
       '\nu.fingerprint     # sha256, order included' +
       '\nu[0].ticker, u[0].sector' +
@@ -1459,7 +1459,7 @@ const yrs = s.envDays / 252;
     out.setCVix = (e) => this.setState({ cVix: +e.target.value });
     out.setCYield = (e) => this.setState({ cYield: +e.target.value });
     out.setCOver = (e) => this.setState({ cOver: +e.target.value });
-    out.crisisCode = 'import pretium as pt\n\nu = pt.Universe.random(40, seed=7)\n\nshock = pt.Scenario.rate_shock(\n    start=0.045, end=' + cYield + ', over=' + cOver + ')\n\npt.evaluate(agents, seed=7,\n    universe=u, days=' + m + ',\n    scenario=shock)\n\n# leave corporate_bond_yield free:\n# pinning it severs the channel\n# the shock is travelling down.';
+    out.crisisCode = 'import tradefloor as pt\n\nu = pt.Universe.random(40, seed=7)\n\nshock = pt.Scenario.rate_shock(\n    start=0.045, end=' + cYield + ', over=' + cOver + ')\n\npt.evaluate(agents, seed=7,\n    universe=u, days=' + m + ',\n    scenario=shock)\n\n# leave corporate_bond_yield free:\n# pinning it severs the channel\n# the shock is travelling down.';
 
     return out;
   }

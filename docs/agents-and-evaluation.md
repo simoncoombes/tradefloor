@@ -11,7 +11,7 @@ fair value, mispricing or the attribution - inferring those is the task, and
 they are used for scoring on the other side of the wall.
 
 ```python
-from pretium.baselines import Momentum, MeanReversion
+from tradefloor.baselines import Momentum, MeanReversion
 
 scores = pt.evaluate({"momentum": Momentum(), "mean_reversion": MeanReversion()},
                      seed=2026, universe=universe, days=5, max_leverage=2.0)
@@ -20,8 +20,8 @@ for s in pt.leaderboard(scores):
     print(s.name, s.pnl, s.impact_bps, s.explanation_accuracy)
 ```
 
-The baseline classes live in `pretium.baselines`, not on the top-level
-`pretium` namespace. On `Universe.random(30, seed=11)` that block prints:
+The baseline classes live in `tradefloor.baselines`, not on the top-level
+`tradefloor` namespace. On `Universe.random(30, seed=11)` that block prints:
 
 ```
 mean_reversion 23732.512000050978 10.323275734330448 None
@@ -35,7 +35,7 @@ read as a wrong answer rather than as no answer.
 
 ### Reference points
 
-A P&L of $61,000 means nothing alone. `pretium.baselines` ships buy-and-hold,
+A P&L of $61,000 means nothing alone. `tradefloor.baselines` ships buy-and-hold,
 random, momentum and mean-reversion agents, plus an **Oracle** that reads the
 true mispricing and trades it without estimation error.
 

@@ -60,7 +60,7 @@ fn f64_bytes(py: Python<'_>, values: &[f64]) -> Py<PyBytes> {
 /// inconsistent triple and the liquidity of a name would quietly disagree with
 /// its priced value. So price and shares are the inputs; market cap follows,
 /// and keeps following as price moves.
-#[pyclass(name = "Instrument", module = "pretium._core", get_all)]
+#[pyclass(name = "Instrument", module = "tradefloor._core", get_all)]
 #[derive(Debug, Clone)]
 pub struct PyInstrument {
     pub ticker: String,
@@ -212,7 +212,7 @@ impl PyInstrument {
 /// The macro state the price loop reads.
 ///
 /// Rates are FRACTIONAL here and converted once, in `to_core`.
-#[pyclass(name = "Macro", module = "pretium._core", get_all)]
+#[pyclass(name = "Macro", module = "tradefloor._core", get_all)]
 #[derive(Debug, Clone)]
 pub struct PyMacro {
     pub vix: f64,
@@ -564,7 +564,7 @@ impl PyMacro {
 }
 
 /// What one tick produced.
-#[pyclass(name = "TickResult", module = "pretium._core", frozen, get_all)]
+#[pyclass(name = "TickResult", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone)]
 pub struct PyTickResult {
     /// "open", "pre_market", "after_hours" or "closed".
@@ -660,7 +660,7 @@ impl DayBuffer {
 }
 
 /// A whole market, stepped through time.
-#[pyclass(name = "Engine", module = "pretium._core")]
+#[pyclass(name = "Engine", module = "tradefloor._core")]
 pub struct PyEngine {
     inner: Engine,
     buffer: SessionBuffer,
@@ -2450,7 +2450,7 @@ fn cycle_name(p: CyclePhase) -> &'static str {
 /// So an event with no ticker and no sector is not "unscoped and inert", it is
 /// the broadest possible event. That is the reference behaviour and it
 /// surprises people, which is why it is written down here.
-#[pyclass(name = "News", module = "pretium._core", frozen, get_all)]
+#[pyclass(name = "News", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone)]
 pub struct PyNews {
     pub ticker: Option<String>,
@@ -2492,7 +2492,7 @@ impl PyNews {
 /// Distinct from [`PyNews`]: news is an impulse arriving now, this is the
 /// residue of one still working through the tape. It also drives the volume
 /// amplifier, which is why a name in the middle of a story trades heavier.
-#[pyclass(name = "NewsImpact", module = "pretium._core", frozen, get_all)]
+#[pyclass(name = "NewsImpact", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone)]
 pub struct PyNewsImpact {
     pub ticker: Option<String>,

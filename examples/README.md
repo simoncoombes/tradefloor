@@ -2,7 +2,7 @@
 
 Eight notebooks and two scripts, numbered in reading order. The committed
 notebooks carry their output, so you can read them without running anything.
-Start at 00 if you have not used pretium before.
+Start at 00 if you have not used tradefloor before.
 
 | | what it covers |
 |---|---|
@@ -23,16 +23,16 @@ researchers and execution developers.
 ## Running them
 
 ```
-pip install pretium jupyter
+pip install tradefloor jupyter
 jupyter lab
 ```
 
 Notebooks 00, 03 and 09 also need `matplotlib` for their charts, and 05 needs
-`pretium[rl]` for the Gymnasium environment. The core library has no
+`tradefloor[rl]` for the Gymnasium environment. The core library has no
 dependencies.
 
 `07-research-workflow.py` runs in about five seconds and needs nothing
-extra. `08-claude-agent.py` needs `pretium[claude]` and an API key, and
+extra. `08-claude-agent.py` needs `tradefloor[claude]` and an API key, and
 spends money per decision, so it's the one file here that isn't run
 automatically.
 

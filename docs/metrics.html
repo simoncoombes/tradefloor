@@ -3,20 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The metrics · pretium</title>
+<title>The metrics Â· tradefloor</title>
 <meta name="description" content="What each of the fourteen realism statistics measures, where its band came from, and how wide the spread around it is.">
-<link rel="canonical" href="https://simoncoombes.github.io/pretium/metrics.html">
+<link rel="canonical" href="https://tradefloor.dev/metrics.html">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium">
-<meta property="og:title" content="The metrics · pretium">
+<meta property="og:site_name" content="tradefloor">
+<meta property="og:title" content="The metrics Â· tradefloor">
 <meta property="og:description" content="What each of the fourteen realism statistics measures, where its band came from, and how wide the spread around it is.">
-<meta property="og:url" content="https://simoncoombes.github.io/pretium/metrics.html">
-<meta property="og:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta property="og:url" content="https://tradefloor.dev/metrics.html">
+<meta property="og:image" content="https://tradefloor.dev/og-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="pretium - a market you can run a strategy against">
+<meta property="og:image:alt" content="tradefloor - a market you can run a strategy against">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta name="twitter:image" content="https://tradefloor.dev/og-card.png">
 <meta name="author" content="Simon Coombes">
 <meta name="theme-color" content="#FAFBFA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0D1312" media="(prefers-color-scheme: dark)">
@@ -34,9 +34,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="learn.css">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The metrics","description":"What each of the fourteen realism statistics measures, where its band came from, and how wide the spread around it is.","url":"https://simoncoombes.github.io/pretium/metrics.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.4.3","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"Trust it"},{"@type":"ListItem","position":3,"name":"The metrics","item":"https://simoncoombes.github.io/pretium/metrics.html"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"pretium realism envelope","alternateName":"pretium pt-v14 realism measurement","description":"The 14 statistics pretium's default preset pt-v14 is measured on, each with the real-market band it was scored against, a certified horizon of 252 trading days, and the named gaps stating what the simulator must not be used for.","url":"https://simoncoombes.github.io/pretium/realism-envelope.html","identifier":"https://simoncoombes.github.io/pretium/envelope.json","license":"https://opensource.org/licenses/MIT","isAccessibleForFree":true,"creator":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isBasedOn":"https://github.com/simoncoombes/pretium","measurementTechnique":"Thirty-seed median of each statistic over a 252-day run on the certified roster, scored against bands derived from published real-market measurements.","variableMeasured":[{"@type":"PropertyValue","name":"annualised_vol_pct","value":28.3103,"minValue":15.0,"maxValue":36.0,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"excess_kurtosis","value":10.0043,"minValue":1.6,"maxValue":41.0,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"return_acf1","value":0.0114,"minValue":-0.08,"maxValue":0.06,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"abs_return_acf1","value":0.0769,"minValue":0.02,"maxValue":0.22,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"abs_return_acf5","value":0.0305,"minValue":0.01,"maxValue":0.12,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"abs_return_acf20","value":0.0096,"minValue":-0.04,"maxValue":0.08,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"cross_sectional_corr","value":0.2616,"minValue":0.08,"maxValue":0.56,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"volume_abs_return_corr","value":0.5108,"minValue":0.46,"maxValue":0.66,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"leverage_effect","value":-0.0258,"minValue":-0.16,"maxValue":0.0,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"volume_change_acf1","value":-0.2794,"minValue":-0.32,"maxValue":-0.2,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"corr_asymmetry","value":-0.0018,"minValue":-0.25,"maxValue":0.45,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"corr_asymmetry_lagged","value":-0.0327,"minValue":-0.2,"maxValue":0.55,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"sector_excess_corr","value":0.2081,"minValue":0.11,"maxValue":0.23,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"corr_persistence_acf1","value":0.1771,"minValue":-0.19,"maxValue":0.54,"description":"measured on the shipped preset; the range is the band real equities hold"}],"distribution":[{"@type":"DataDownload","encodingFormat":"application/json","contentUrl":"https://simoncoombes.github.io/pretium/envelope.json"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The metrics","description":"What each of the fourteen realism statistics measures, where its band came from, and how wide the spread around it is.","url":"https://tradefloor.dev/metrics.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"tradefloor documentation","url":"https://tradefloor.dev/"},"about":{"@type":"SoftwareApplication","name":"tradefloor","alternateName":"tradefloor market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.5.0","codeRepository":"https://github.com/simoncoombes/tradefloor","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/tradefloor","https://pypi.org/project/tradefloor/","https://crates.io/crates/tradefloor"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"tradefloor","item":"https://tradefloor.dev/index.html"},{"@type":"ListItem","position":2,"name":"Trust it"},{"@type":"ListItem","position":3,"name":"The metrics","item":"https://tradefloor.dev/metrics.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"tradefloor realism envelope","alternateName":"tradefloor pt-v14 realism measurement","description":"The 14 statistics tradefloor's default preset pt-v14 is measured on, each with the real-market band it was scored against, a certified horizon of 252 trading days, and the named gaps stating what the simulator must not be used for.","url":"https://tradefloor.dev/realism-envelope.html","identifier":"https://tradefloor.dev/envelope.json","license":"https://opensource.org/licenses/MIT","isAccessibleForFree":true,"creator":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isBasedOn":"https://github.com/simoncoombes/tradefloor","measurementTechnique":"Thirty-seed median of each statistic over a 252-day run on the certified roster, scored against bands derived from published real-market measurements.","variableMeasured":[{"@type":"PropertyValue","name":"annualised_vol_pct","value":28.3103,"minValue":15.0,"maxValue":36.0,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"excess_kurtosis","value":10.0043,"minValue":1.6,"maxValue":41.0,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"return_acf1","value":0.0114,"minValue":-0.08,"maxValue":0.06,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"abs_return_acf1","value":0.0769,"minValue":0.02,"maxValue":0.22,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"abs_return_acf5","value":0.0305,"minValue":0.01,"maxValue":0.12,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"abs_return_acf20","value":0.0096,"minValue":-0.04,"maxValue":0.08,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"cross_sectional_corr","value":0.2616,"minValue":0.08,"maxValue":0.56,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"volume_abs_return_corr","value":0.5108,"minValue":0.46,"maxValue":0.66,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"leverage_effect","value":-0.0258,"minValue":-0.16,"maxValue":0.0,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"volume_change_acf1","value":-0.2794,"minValue":-0.32,"maxValue":-0.2,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"corr_asymmetry","value":-0.0018,"minValue":-0.25,"maxValue":0.45,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"corr_asymmetry_lagged","value":-0.0327,"minValue":-0.2,"maxValue":0.55,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"sector_excess_corr","value":0.2081,"minValue":0.11,"maxValue":0.23,"description":"measured on the shipped preset; the range is the band real equities hold"},{"@type":"PropertyValue","name":"corr_persistence_acf1","value":0.1771,"minValue":-0.19,"maxValue":0.54,"description":"measured on the shipped preset; the range is the band real equities hold"}],"distribution":[{"@type":"DataDownload","encodingFormat":"application/json","contentUrl":"https://tradefloor.dev/envelope.json"}]}</script>
 <script>
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
 if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
@@ -48,25 +48,25 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <body class="pt-page">
 <div style="min-height:100vh;padding:0 0 5rem">
 <div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
-<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">EDGAR companies</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu pt-here"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><span class="pt-current">The metrics</span><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main class="pt-s17">
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-tradefloor.png" alt="tradefloor" width="15" height="22"><img class="pt-dark" src="mark-tradefloor-dark.png" alt="tradefloor" width="15" height="22"><span class="pt-wordmark">tradefloor</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">EDGAR companies</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu pt-here"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><span class="pt-current">The metrics</span><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><a href="factors.html">The nine factors</a><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
 
-<div class="pt-s20">
+<div class="pt-s21">
 <a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">THE METRICS</span>
 </div>
 
 <section class="pt-s33">
 <h1 class="pt-s29">The metrics</h1>
-<p class="pt-s23">Fourteen statistics. What each one measures, why it matters to a strategy, and where its band came from.</p>
+<p class="pt-s17">Fourteen statistics. What each one measures, why it matters to a strategy, and where its band came from.</p>
 
-<div class="pt-s179">
+<div class="pt-s180">
 <h3 class="pt-s4">Where every band came from</h3>
 <p class="pt-s1">Ten consecutive 252-day windows of 40 US large caps, 2015 to 2025, measured with this module's own estimators. Nine windows set each band. The tenth, the window that straddles the COVID crash, is reported separately as that band's crisis window.</p>
 <p class="pt-s1">So the panel is a claim about a typical year. Crisis behaviour is measured under pinned scenarios instead.</p>
 </div>
 </section>
 
-<section class="pt-s18">
+<section class="pt-s19">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
 <h2 class="pt-s7">The fourteen</h2>
 <div style="display:flex;gap:0.35rem;flex-wrap:wrap">
@@ -83,17 +83,17 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">annualised_vol_pct</span>
-<span class="pt-s114">How violent the market is</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">annualised_vol_pct</span>
+<span class="pt-s115">How violent the market is</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(63.4% - 7.0px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>15.00</span>
 <span class="pt-s11">28.3103</span>
 <span>36.00</span>
@@ -101,23 +101,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">It sets the scale of every gain and every loss. Too high and every Sharpe ratio you measure is depressed and every stop is hit too often. Too low and risk looks free.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">18.3 / 25.9 / 30.7</span>
+<span class="pt-s141">18.3 / 25.9 / 30.7</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">excess_kurtosis</span>
-<span class="pt-s114">How fat the tails are</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">excess_kurtosis</span>
+<span class="pt-s115">How fat the tails are</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(21.3% - 2.3px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>1.60</span>
 <span class="pt-s11">10.0043</span>
 <span>41.00</span>
@@ -125,23 +125,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">How often a day lands far from typical. Zero is a normal distribution, and real markets are strongly positive, because crashes and melt-ups happen far more often than a bell curve allows. This one decides whether tail risk means anything in your results.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">5.6 / 11.1 / 36.7</span>
+<span class="pt-s141">5.6 / 11.1 / 36.7</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">return_acf1</span>
-<span class="pt-s114">Does yesterday predict today</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">return_acf1</span>
+<span class="pt-s115">Does yesterday predict today</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(65.3% - 7.2px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>-0.08</span>
 <span class="pt-s11">0.0114</span>
 <span>0.06</span>
@@ -149,23 +149,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">Near zero in a real market. A positive value is free money for a momentum rule, so this is the row that decides whether a trend result here is a finding or an artifact.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band -0.08 to 0.06</span>
+<span class="pt-s141">band -0.08 to 0.06</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">abs_return_acf1</span>
-<span class="pt-s114">Does a wild day follow a wild day</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">abs_return_acf1</span>
+<span class="pt-s115">Does a wild day follow a wild day</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(28.4% - 3.1px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>0.02</span>
 <span class="pt-s11">0.0769</span>
 <span>0.22</span>
@@ -173,23 +173,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">Volatility clustering at one day. Present in every real market, and the reason a calm week is a poor forecast of the next one.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band 0.02 to 0.22</span>
+<span class="pt-s141">band 0.02 to 0.22</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">abs_return_acf5</span>
-<span class="pt-s114">The same, one week apart</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">abs_return_acf5</span>
+<span class="pt-s115">The same, one week apart</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(18.6% - 2.0px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>0.01</span>
 <span class="pt-s11">0.0305</span>
 <span>0.12</span>
@@ -197,23 +197,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">Clustering at lag five. Whether a volatile spell persists long enough for a weekly risk model to see it.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band 0.02 to 0.09</span>
+<span class="pt-s141">band 0.02 to 0.09</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">abs_return_acf20</span>
-<span class="pt-s114">The same, one month apart</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">abs_return_acf20</span>
+<span class="pt-s115">The same, one month apart</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(41.3% - 4.5px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>-0.04</span>
 <span class="pt-s11">0.0096</span>
 <span>0.08</span>
@@ -221,23 +221,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">Clustering at lag twenty. This is where the decay-shape gap lives: the model holds the level here but reaches it with the wrong curve.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band -0.04 to 0.08</span>
+<span class="pt-s141">band -0.04 to 0.08</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">cross_sectional_corr</span>
-<span class="pt-s114">How much names move together</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">cross_sectional_corr</span>
+<span class="pt-s115">How much names move together</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(37.8% - 4.2px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>0.08</span>
 <span class="pt-s11">0.2616</span>
 <span>0.56</span>
@@ -245,23 +245,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">The average pairwise correlation. It decides whether a diversified book is actually diversified, and it is the row that concentration moves first.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band 0.08 to 0.56</span>
+<span class="pt-s141">band 0.08 to 0.56</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">volume_abs_return_corr</span>
-<span class="pt-s114">Do big moves come with volume</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">volume_abs_return_corr</span>
+<span class="pt-s115">Do big moves come with volume</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(25.4% - 2.8px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>0.46</span>
 <span class="pt-s11">0.5108</span>
 <span>0.66</span>
@@ -269,23 +269,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">Volume and absolute return move together in every real market. An execution algorithm that assumes constant depth is wrong in exactly the moments that matter.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band 0.46 to 0.66</span>
+<span class="pt-s141">band 0.46 to 0.66</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">leverage_effect</span>
-<span class="pt-s114">Do falls raise volatility</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">leverage_effect</span>
+<span class="pt-s115">Do falls raise volatility</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(83.9% - 9.2px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>-0.16</span>
 <span class="pt-s11">-0.0258</span>
 <span>0.00</span>
@@ -293,23 +293,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">Negative returns raise future volatility more than positive ones do. A symmetric model gets the shape of a drawdown wrong.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band -0.16 to 0.00</span>
+<span class="pt-s141">band -0.16 to 0.00</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">volume_change_acf1</span>
-<span class="pt-s114">Does volume mean-revert</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">volume_change_acf1</span>
+<span class="pt-s115">Does volume mean-revert</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(33.8% - 3.7px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>-0.32</span>
 <span class="pt-s11">-0.2794</span>
 <span>-0.20</span>
@@ -317,23 +317,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">Negative in real markets: a heavy day is followed by a lighter one. Participation caps read against ADV depend on it.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band -0.32 to -0.20</span>
+<span class="pt-s141">band -0.32 to -0.20</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">corr_asymmetry</span>
-<span class="pt-s114">Do names couple more when falling</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">corr_asymmetry</span>
+<span class="pt-s115">Do names couple more when falling</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(35.5% - 3.9px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>-0.25</span>
 <span class="pt-s11">-0.0018</span>
 <span>0.45</span>
@@ -341,23 +341,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">Correlation rises in a selloff, which is when diversification is most wanted and least available.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band -0.25 to 0.45</span>
+<span class="pt-s141">band -0.25 to 0.45</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">corr_asymmetry_lagged</span>
-<span class="pt-s114">The same, one day later</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">corr_asymmetry_lagged</span>
+<span class="pt-s115">The same, one day later</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(22.3% - 2.5px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>-0.20</span>
 <span class="pt-s11">-0.0327</span>
 <span>0.55</span>
@@ -365,23 +365,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">Whether that coupling survives into the next session rather than being a one-day artifact.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band -0.20 to 0.55</span>
+<span class="pt-s141">band -0.20 to 0.55</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">sector_excess_corr</span>
-<span class="pt-s114">Do industries move together</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">sector_excess_corr</span>
+<span class="pt-s115">Do industries move together</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(81.8% - 9.0px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>0.11</span>
 <span class="pt-s11">0.2081</span>
 <span>0.23</span>
@@ -389,23 +389,23 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">How much more a name moves with its own industry than with the market. Undefined on a single-sector roster, because those are the same thing.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band 0.11 to 0.23</span>
+<span class="pt-s141">band 0.11 to 0.23</span>
 </div>
 </div>
 
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">corr_persistence_acf1</span>
-<span class="pt-s114">Does correlation stay high after a panic</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">corr_persistence_acf1</span>
+<span class="pt-s115">Does correlation stay high after a panic</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:calc(50.3% - 5.5px)"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>-0.19</span>
 <span class="pt-s11">0.1771</span>
 <span>0.54</span>
@@ -413,9 +413,9 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">Correlation does not snap back the day after a crash. The single row pt-v14 misses on held-out seeds.</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">band -0.19 to 0.54</span>
+<span class="pt-s141">band -0.19 to 0.54</span>
 </div>
 </div>
 
@@ -423,47 +423,47 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <section class="pt-s34">
 <h2 class="pt-s7">What one run actually shows you</h2>
-<p class="pt-s8">Every banded number is a median across seeds. The spread around it is wide enough to change the answer, and <span class="pt-s26">pretium.envelope.intervals()</span> reports it per statistic.</p>
+<p class="pt-s8">Every banded number is a median across seeds. The spread around it is wide enough to change the answer, and <span class="pt-s26">tradefloor.envelope.intervals()</span> reports it per statistic.</p>
 
 <div class="pt-s28">
 <div class="pt-s12">
 
-<div class="pt-s110">
+<div class="pt-s111">
 <span class="pt-s6">median</span>
 <span class="pt-s3">The point estimate a single panel would report.</span>
 </div>
 
-<div class="pt-s110">
+<div class="pt-s111">
 <span class="pt-s6">low, high</span>
 <span class="pt-s3">The actual minimum and maximum across seeds.</span>
 </div>
 
-<div class="pt-s110">
+<div class="pt-s111">
 <span class="pt-s6">p10, p90</span>
 <span class="pt-s3">The tenth and ninetieth percentiles.</span>
 </div>
 
-<div class="pt-s110">
+<div class="pt-s111">
 <span class="pt-s6">sd</span>
 <span class="pt-s3">Across-seed standard deviation, measured on these panels.</span>
 </div>
 
-<div class="pt-s110">
+<div class="pt-s111">
 <span class="pt-s6">shipped_sd</span>
 <span class="pt-s3">facts.SEED_SD, measured once at the baseline.</span>
 </div>
 
-<div class="pt-s110">
+<div class="pt-s111">
 <span class="pt-s6">distance</span>
 <span class="pt-s3">Band distance, and sd_out gives that distance in units of noise.</span>
 </div>
 
-<div class="pt-s110">
+<div class="pt-s111">
 <span class="pt-s6">extremes_straddle</span>
 <span class="pt-s3">The minimum or maximum crosses a band edge.</span>
 </div>
 
-<div class="pt-s110">
+<div class="pt-s111">
 <span class="pt-s6">typical_straddles</span>
 <span class="pt-s3">The p10 to p90 range crosses a band edge. This is the one to read.</span>
 </div>
@@ -478,25 +478,25 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </section>
 
-<section class="pt-s18">
+<section class="pt-s19">
 <h2 class="pt-s7">Three bands are not raw measurements</h2>
 <p class="pt-s8">A band is what this measurement returns on real data, with three documented exceptions. Each names itself on its own provenance row.</p>
-<div class="pt-s68">
+<div class="pt-s69">
 
 <div class="pt-s9">
-<span class="pt-s145">annualised_vol_pct</span>
+<span class="pt-s146">annualised_vol_pct</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:var(--amber)">EXTENDED OUTWARD</span>
 <p class="pt-s1">The ceiling moves from the windows' 34 to 36, so the band admits a slightly more violent year than the sample held.</p>
 </div>
 
 <div class="pt-s9">
-<span class="pt-s145">abs_return_acf1</span>
+<span class="pt-s146">abs_return_acf1</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:var(--accent)">CLAMPED INWARD</span>
 <p class="pt-s1">The floor is held at +0.02. Zero volatility clustering appears in no retrieved source and no observed window.</p>
 </div>
 
 <div class="pt-s9">
-<span class="pt-s145">leverage_effect</span>
+<span class="pt-s146">leverage_effect</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:var(--accent)">CLAMPED INWARD</span>
 <p class="pt-s1">The ceiling is held at 0.00. A top above zero would certify a reversed leverage effect as real-market behaviour.</p>
 </div>
@@ -521,24 +521,24 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
 
-<div class="pt-s20">
+<div class="pt-s21">
 <a href="index.html" class="pt-s10">LEARN</a><span>/</span><span class="pt-s11">THE METRICS</span>
 </div>
 
 <section class="pt-s33">
 <h1 class="pt-s29">The metrics</h1>
-<p class="pt-s23">Fourteen statistics. What each one measures, why it matters to a strategy, and where its band came from.</p>
+<p class="pt-s17">Fourteen statistics. What each one measures, why it matters to a strategy, and where its band came from.</p>
 
-<div class="pt-s179">
+<div class="pt-s180">
 <h3 class="pt-s4">Where every band came from</h3>
 <p class="pt-s1">Ten consecutive 252-day windows of 40 US large caps, 2015 to 2025, measured with this module's own estimators. Nine windows set each band. The tenth, the window that straddles the COVID crash, is reported separately as that band's crisis window.</p>
 <p class="pt-s1">So the panel is a claim about a typical year. Crisis behaviour is measured under pinned scenarios instead.</p>
 </div>
 </section>
 
-<section class="pt-s18">
+<section class="pt-s19">
 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap">
 <h2 class="pt-s7">The fourteen</h2>
 <div style="display:flex;gap:0.35rem;flex-wrap:wrap">
@@ -549,17 +549,17 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 
 <sc-for list="{{ stats }}" as="s">
-<div class="pt-s85">
-<div class="pt-s109">
-<div class="pt-s21">
-<span class="pt-s146">{{ s.k }}</span>
-<span class="pt-s114">{{ s.plain }}</span>
+<div class="pt-s86">
+<div class="pt-s110">
+<div class="pt-s22">
+<span class="pt-s147">{{ s.k }}</span>
+<span class="pt-s115">{{ s.plain }}</span>
 </div>
 <div class="pt-s60">
 <span class="pt-s25">
 <span style="position:absolute;top:1px;width:11px;height:11px;border-radius:50%;background:var(--accent);left:{{ s.left }}"></span>
 </span>
-<div class="pt-s100">
+<div class="pt-s101">
 <span>{{ s.lo }}</span>
 <span class="pt-s11">{{ s.m }}</span>
 <span>{{ s.hi }}</span>
@@ -567,9 +567,9 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </div>
 <p class="pt-s1">{{ s.why }}</p>
-<div class="pt-s98">
+<div class="pt-s99">
 <span class="pt-s47">REAL WINDOWS</span>
-<span class="pt-s140">{{ s.windows }}</span>
+<span class="pt-s141">{{ s.windows }}</span>
 </div>
 </div>
 </sc-for>
@@ -577,12 +577,12 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <section class="pt-s34">
 <h2 class="pt-s7">What one run actually shows you</h2>
-<p class="pt-s8">Every banded number is a median across seeds. The spread around it is wide enough to change the answer, and <span class="pt-s26">pretium.envelope.intervals()</span> reports it per statistic.</p>
+<p class="pt-s8">Every banded number is a median across seeds. The spread around it is wide enough to change the answer, and <span class="pt-s26">tradefloor.envelope.intervals()</span> reports it per statistic.</p>
 
 <div class="pt-s28">
 <div class="pt-s12">
 <sc-for list="{{ intervals }}" as="i">
-<div class="pt-s110">
+<div class="pt-s111">
 <span class="pt-s6">{{ i.k }}</span>
 <span class="pt-s3">{{ i.v }}</span>
 </div>
@@ -597,13 +597,13 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 </section>
 
-<section class="pt-s18">
+<section class="pt-s19">
 <h2 class="pt-s7">Three bands are not raw measurements</h2>
 <p class="pt-s8">A band is what this measurement returns on real data, with three documented exceptions. Each names itself on its own provenance row.</p>
-<div class="pt-s68">
+<div class="pt-s69">
 <sc-for list="{{ edges }}" as="e">
 <div class="pt-s9">
-<span class="pt-s145">{{ e.k }}</span>
+<span class="pt-s146">{{ e.k }}</span>
 <span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.06em;color:{{ e.col }}">{{ e.dir }}</span>
 <p class="pt-s1">{{ e.why }}</p>
 </div>

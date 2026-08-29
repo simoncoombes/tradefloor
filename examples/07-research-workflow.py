@@ -20,8 +20,8 @@ run.
 import struct
 import time
 
-import pretium as pt
-from pretium.baselines import Momentum, capture_ratio, reference_agents
+import tradefloor as pt
+from tradefloor.baselines import Momentum, capture_ratio, reference_agents
 
 
 def main() -> dict:
@@ -256,7 +256,7 @@ def main() -> dict:
     #    difference between the branches is the shock and nothing else. This
     #    is the counterfactual a real market cannot give you: you cannot
     #    re-run a year without its hiking cycle.
-    from pretium.scenario import Scenario
+    from tradefloor.scenario import Scenario
 
     mark = time.time()
     calm, hiked = pt.branch(engine, 2, universe=universe, seed=7)

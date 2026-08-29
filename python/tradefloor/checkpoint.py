@@ -223,7 +223,7 @@ class Checkpoint:
         if schema > CHECKPOINT_SCHEMA:
             raise ValidationError(
                 f"checkpoint schema {schema} is newer than this version "
-                "understands. Upgrade pretium rather than reading it partially."
+                "understands. Upgrade tradefloor rather than reading it partially."
             )
         universe = Universe.from_json(json.dumps(payload["universe"]))
         recorded = payload.get("universe_fingerprint")

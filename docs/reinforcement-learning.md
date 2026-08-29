@@ -8,7 +8,7 @@ short: Reinforcement learning
 # Reinforcement learning
 
 ```python
-from pretium.gym import TradingEnv
+from tradefloor.gym import TradingEnv
 
 env = TradingEnv(universe=universe, seed=42, days=20)
 obs, info = env.reset(seed=42)
@@ -21,5 +21,5 @@ price range first. Reward is the step's P&L measured after the market moves,
 which includes the cost of the agent's own footprint.
 
 ```
-pip install pretium[rl]
+pip install tradefloor[rl]
 ```

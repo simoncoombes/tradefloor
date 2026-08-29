@@ -4,7 +4,7 @@ Phase 2 builds three measurements on top of the phase-1 seam, and this
 module is what they share:
 
 - **The evaluation core**: one (parameter vector, seed) panel measurement
-  through `pretium.facts.measure` under `Engine(model=...)`, in a worker
+  through `tradefloor.facts.measure` under `Engine(model=...)`, in a worker
   process, with the two runtime assertions Appendix B specifies (distinct
   fingerprints per vector; `draws_consumed` equal across vectors per
   seed — the CRN guard that makes panel differences parameter effects
@@ -22,7 +22,7 @@ module is what they share:
 
 `facts.measure` builds its engine internally and does not (yet) take
 `model=` — `facts.py` belongs to another stream. Until it grows the
-argument, the worker substitutes the `Engine` symbol in `pretium.facts`
+argument, the worker substitutes the `Engine` symbol in `tradefloor.facts`
 with a partial application that adds `model=`, calls the UNMODIFIED
 `measure`, and restores the symbol in a `finally:`. Every statistic is
 computed by the library's own code; only the constructor call is
@@ -476,9 +476,9 @@ LEGACY_OVERRIDES: dict[str, float] = {
 
 def shipped_values() -> dict[str, float]:
     """The pt-v1 values of every settable parameter, read from the wheel."""
-    import pretium
+    import tradefloor
 
-    full = pretium.ModelParams.from_preset("pt-v1").to_dict()
+    full = tradefloor.ModelParams.from_preset("pt-v1").to_dict()
     return {name: float(full[name]) for name in PARAM_SPECS}
 
 
@@ -585,11 +585,11 @@ def evaluate_panel(job: tuple) -> dict:
     engine's total `draws_consumed`.
     """
     overrides, seed, days, universe_n, universe_seed = job
-    import pretium
-    import pretium.facts as facts
+    import tradefloor
+    import tradefloor.facts as facts
 
-    model = pretium.ModelParams.from_preset("pt-v1", **overrides)
-    universe = pretium.Universe.random(universe_n, seed=universe_seed)
+    model = tradefloor.ModelParams.from_preset("pt-v1", **overrides)
+    universe = tradefloor.Universe.random(universe_n, seed=universe_seed)
 
     # The seam the header's caveat was waiting for: `facts.measure` takes
     # `model=` now, so the vector goes in through the library's own

@@ -6,15 +6,15 @@ skip cleanly rather than pretending the surface is untested.
 
 import pytest
 
-import pretium
+import tradefloor
 
 np = pytest.importorskip("numpy", reason="numpy is optional")
 
-UNIVERSE = pretium.Universe.random(5, seed=5)
+UNIVERSE = tradefloor.Universe.random(5, seed=5)
 
 
 def make(**kw):
-    from pretium.gym import TradingEnv
+    from tradefloor.gym import TradingEnv
 
     params = dict(universe=UNIVERSE, seed=42, days=2, steps_per_day=3,
                   ticks_per_step=40, cash=2_000_000)
@@ -131,15 +131,15 @@ def test_out_of_range_actions_are_clipped_not_rejected():
 def test_a_malformed_action_is_refused():
     env = make()
     env.reset(seed=1)
-    with pytest.raises(pretium.ValidationError, match="expected"):
+    with pytest.raises(tradefloor.ValidationError, match="expected"):
         env.step(np.zeros(len(UNIVERSE) + 3))
-    with pytest.raises(pretium.ValidationError, match="non-finite"):
+    with pytest.raises(tradefloor.ValidationError, match="non-finite"):
         env.step(np.full(len(UNIVERSE), np.nan))
 
 
 def test_stepping_before_reset_is_refused():
     env = make()
-    with pytest.raises(pretium.ValidationError, match="reset"):
+    with pytest.raises(tradefloor.ValidationError, match="reset"):
         env.step(np.zeros(len(UNIVERSE)))
 
 

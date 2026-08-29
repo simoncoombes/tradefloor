@@ -52,11 +52,11 @@ import statistics
 import sys
 import time
 
-import pretium
-import pretium.facts as facts
-from pretium import Scenario, envelope
+import tradefloor
+import tradefloor.facts as facts
+from tradefloor import Scenario, envelope
 
-#: The published method. Both are what `pretium.envelope` certifies against.
+#: The published method. Both are what `tradefloor.envelope` certifies against.
 ROSTER_N, ROSTER_SEED = 40, 111
 HELDOUT_N, HELDOUT_SEED = 60, 909
 
@@ -81,7 +81,7 @@ def presets() -> list[str]:
     for i in range(1, 200):
         name = f"pt-v{i}"
         try:
-            pretium.model_preset(name)
+            tradefloor.model_preset(name)
         except Exception:
             if out:
                 break
@@ -91,7 +91,7 @@ def presets() -> list[str]:
 
 
 def _roster(n: int, seed: int):
-    return pretium.Universe.random(n, seed=seed)
+    return tradefloor.Universe.random(n, seed=seed)
 
 
 def _job(spec):
@@ -212,7 +212,7 @@ def main() -> None:
               f"lever:{r['crisis_lever']:.2f}x", flush=True)
 
     out = {
-        "pretium_version": pretium.version(),
+        "pretium_version": tradefloor.version(),
         "default_preset": envelope.PRESET,
         "wall_s": time.time() - started,
         "workers": args.workers,

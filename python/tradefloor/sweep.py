@@ -98,8 +98,8 @@ def sweep(
     (``list(sweep(...))``) puts it all back.
 
     ``model`` selects the coefficient set, either a preset name or a
-    :class:`pretium.ModelParams`, and every seed runs it, for the reason
-    :func:`pretium.run_many` gives: a sweep is many draws of one market.
+    :class:`tradefloor.ModelParams`, and every seed runs it, for the reason
+    :func:`tradefloor.run_many` gives: a sweep is many draws of one market.
     The tables carry no provenance columns (they never have; the engine is
     dropped as each yields), so a caller sweeping a custom model should
     record ``model.fingerprint`` beside whatever it keeps.

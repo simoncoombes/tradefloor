@@ -19,7 +19,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pretium
+import tradefloor
 
 PARAMS_RS = Path(__file__).resolve().parent.parent / "rust" / "src" / "params.rs"
 
@@ -33,7 +33,7 @@ def test_every_settable_parameter_has_a_doc_comment() -> None:
             at.setdefault(m.group(1), i)
 
     missing = []
-    for name in pretium.ModelParams.settable():
+    for name in tradefloor.ModelParams.settable():
         i = at.get(name)
         if i is None:
             missing.append(f"{name}: no `pub {name}: f64,` field in params.rs")

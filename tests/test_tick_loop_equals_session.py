@@ -24,10 +24,10 @@ every spelling of a minute passes through exactly once.
 import numpy as np
 import pytest
 
-import pretium
+import tradefloor
 
 
-UNIVERSE = pretium.Universe.random(8, seed=7)
+UNIVERSE = tradefloor.Universe.random(8, seed=7)
 PRESETS = ["pt-v%d" % i for i in range(1, 13)]
 
 
@@ -38,13 +38,13 @@ def _prices(engine):
 @pytest.mark.parametrize("preset", PRESETS)
 @pytest.mark.parametrize("seed", [5, 6, 7])
 def test_a_tick_loop_is_the_same_day_as_one_session(preset, seed):
-    model = pretium.ModelParams.from_preset(preset)
+    model = tradefloor.ModelParams.from_preset(preset)
 
-    session = pretium.Engine(seed=seed, universe=UNIVERSE, model=model)
+    session = tradefloor.Engine(seed=seed, universe=UNIVERSE, model=model)
     session.open_market()
     session.run_session(9, 30, 3, 60)
 
-    stepped = pretium.Engine(seed=seed, universe=UNIVERSE, model=model)
+    stepped = tradefloor.Engine(seed=seed, universe=UNIVERSE, model=model)
     stepped.open_market()
     for i in range(60):
         stepped.tick(9 + (30 + i) // 60, (30 + i) % 60, 3)
@@ -67,17 +67,17 @@ def test_a_tick_driven_day_gets_the_endogenous_news_a_session_gets(preset):
     wrong markets. This one asserts the mechanism is actually live wherever
     the preset turns it on.
     """
-    model = pretium.ModelParams.from_preset(preset)
+    model = tradefloor.ModelParams.from_preset(preset)
     if model.endogenous_news_intensity == 0.0:
         pytest.skip(f"{preset} ships the mechanism switched off")
 
     # Enough names that at least one event lands: 40 at intensity 0.05.
-    universe = pretium.Universe.random(40, seed=3)
-    off = pretium.ModelParams.from_preset(preset, endogenous_news_intensity=0.0,
+    universe = tradefloor.Universe.random(40, seed=3)
+    off = tradefloor.ModelParams.from_preset(preset, endogenous_news_intensity=0.0,
                                           endogenous_news_sigma=0.0)
 
     def stepped(m):
-        e = pretium.Engine(seed=11, universe=universe, model=m)
+        e = tradefloor.Engine(seed=11, universe=universe, model=m)
         e.open_market()
         for i in range(60):
             e.tick(9 + (30 + i) // 60, (30 + i) % 60, 3)

@@ -6,7 +6,7 @@ carries -- but it tests the server the way no client ever uses it. Those
 tests pass with tool registration broken, schema generation broken, or a
 result that cannot be JSON-encoded, because none of that code runs.
 
-This file closes that gap. It spawns `python -m pretium.mcp` as a real
+This file closes that gap. It spawns `python -m tradefloor.mcp` as a real
 subprocess, performs the MCP handshake, and calls **every** tool over the
 wire. What it is really checking is the seam:
 
@@ -70,7 +70,7 @@ def _structured(result):
 
 async def _drive():
     params = StdioServerParameters(command=sys.executable,
-                                   args=["-m", "pretium.mcp"])
+                                   args=["-m", "tradefloor.mcp"])
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             init = await session.initialize()
@@ -192,7 +192,7 @@ def test_a_bad_argument_comes_back_as_a_result_not_a_crash():
     exception reaches it as a transport error with no guidance."""
     async def go():
         params = StdioServerParameters(command=sys.executable,
-                                       args=["-m", "pretium.mcp"])
+                                       args=["-m", "tradefloor.mcp"])
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()

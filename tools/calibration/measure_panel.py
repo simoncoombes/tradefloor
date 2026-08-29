@@ -5,7 +5,7 @@ runs in a fresh interpreter against whatever `pretium` wheel is installed,
 which is the point: the sweep driver rebuilds and reinstalls the wheel
 between calls, and a fresh process cannot be holding a stale module.
 
-The panel is `pretium.facts.measure` — the library's own instrument, not a
+The panel is `tradefloor.facts.measure` — the library's own instrument, not a
 reimplementation — at the published method: `Universe.random(40, seed=111)`,
 252 days, per seed. Two supplements ride along:
 
@@ -51,10 +51,10 @@ def trajectory_fingerprint() -> str:
     repr(float) can differ for reasons that have nothing to do with the
     simulation.
     """
-    import pretium
+    import tradefloor
 
-    universe = pretium.Universe.random(8, seed=7)
-    engine = pretium.Engine(seed=7, universe=universe)
+    universe = tradefloor.Universe.random(8, seed=7)
+    engine = tradefloor.Engine(seed=7, universe=universe)
     buf = bytearray()
     for day in range(2):
         engine.open_market()
@@ -94,10 +94,10 @@ def per_instrument_vol_median(seed: int, universe, days: int) -> float:
     """
     import pyarrow as pa
 
-    import pretium
-    from pretium.facts import _daily_series, _log_returns
+    import tradefloor
+    from tradefloor.facts import _daily_series, _log_returns
 
-    engine = pretium.Engine(seed=seed, universe=universe)
+    engine = tradefloor.Engine(seed=seed, universe=universe)
     for day in range(days):
         engine.open_market()
         engine.run_session(9, 30, 3, 390)
@@ -120,10 +120,10 @@ def measure_all(
     pin_vix: list[float],
     pin_days: int,
 ) -> dict:
-    import pretium
-    from pretium.facts import measure
+    import tradefloor
+    from tradefloor.facts import measure
 
-    universe = pretium.Universe.random(universe_n, seed=universe_seed)
+    universe = tradefloor.Universe.random(universe_n, seed=universe_seed)
 
     panels = {}
     for seed in seeds:
@@ -156,7 +156,7 @@ def measure_all(
             "seeds": seeds,
             "pin_vix": pin_vix,
             "pin_days": pin_days,
-            "panel": "pretium.facts.measure, per seed",
+            "panel": "tradefloor.facts.measure, per seed",
         },
         "trajectory_fingerprint": trajectory_fingerprint(),
         "panels": panels,

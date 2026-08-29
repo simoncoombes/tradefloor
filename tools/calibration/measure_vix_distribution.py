@@ -52,12 +52,12 @@ def fingerprint() -> str:
 
 
 def endogenous(seeds: list[int], days: int) -> dict[str, list[tuple[float, str]]]:
-    import pretium
+    import tradefloor
 
-    universe = pretium.Universe.random(40, seed=111)
+    universe = tradefloor.Universe.random(40, seed=111)
     out: dict[str, list[tuple[float, str]]] = {}
     for seed in seeds:
-        engine = pretium.Engine(seed=seed, universe=universe)
+        engine = tradefloor.Engine(seed=seed, universe=universe)
         rows = []
         for _ in range(days):
             engine.open_market()
@@ -79,10 +79,10 @@ class PinVix:
 
 
 def pinned_corr(pins: list[float], seeds: list[int], days: int) -> dict:
-    import pretium
-    from pretium.facts import measure
+    import tradefloor
+    from tradefloor.facts import measure
 
-    universe = pretium.Universe.random(40, seed=111)
+    universe = tradefloor.Universe.random(40, seed=111)
     out: dict[str, dict[str, float]] = {}
     for vix in pins:
         rows = {}

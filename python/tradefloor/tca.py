@@ -77,7 +77,7 @@ which is why this is quoted as a range.
 What it means is that shortfall answers "what did each execution cost against a
 market where I never traded", which is the execution desk's question. It does
 not answer "did this strategy make money". For that, read `pnl` from
-:func:`pretium.evaluate`, which marks the portfolio to the market the agent
+:func:`tradefloor.evaluate`, which marks the portfolio to the market the agent
 actually created. A strategy that round-trips can show a negative shortfall and
 still lose, and the two numbers are not in conflict because they are answers to
 different questions.
@@ -336,7 +336,7 @@ def analyse(
     trading and not the regime.
 
     ``model`` selects the coefficient set, either a preset name or a
-    :class:`pretium.ModelParams`, and BOTH worlds run it, for the same
+    :class:`tradefloor.ModelParams`, and BOTH worlds run it, for the same
     reason they share a scenario: a shortfall priced against a baseline
     under a different model would measure the model gap, not the trading.
     The :class:`Execution` records ``model_fingerprint``.

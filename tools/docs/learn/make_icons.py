@@ -1,4 +1,4 @@
-"""Build the site's icons from the pretium mark.
+"""Build the site's icons from the tradefloor mark.
 
     python tools/docs/learn/make_icons.py
 
@@ -7,7 +7,7 @@ to the previous identity: the learning path's mark is a stylised P and its
 accent is a desaturated teal, so the tab icon and the page it opens were
 showing two different products.
 
-This traces `mark-pretium.png` - the mark as the design ships it - into a
+This traces `mark-tradefloor.png` - the mark as the design ships it - into a
 vector outline, sets it on the brand's accent the way the old icon set its
 glyph, and writes the four files a browser asks for:
 
@@ -43,7 +43,7 @@ import zlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
-MARK = HERE / "handoff" / "mark-pretium.png"
+MARK = HERE / "handoff" / "mark-tradefloor.png"
 
 #: The accent and the ground, from the design's token set. The icon is the
 #: mark knocked out of a rounded square in the accent - the shape the old
@@ -345,8 +345,8 @@ def svg(size=32) -> str:
     ty = (size - height * scale) / 2
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" '
-        f'role="img" aria-label="pretium">\n'
-        f'  <!-- Traced from tools/docs/learn/handoff/mark-pretium.png by\n'
+        f'role="img" aria-label="tradefloor">\n'
+        f'  <!-- Traced from tools/docs/learn/handoff/mark-tradefloor.png by\n'
         f'       tools/docs/learn/make_icons.py. Do not edit: regenerate. -->\n'
         f'  <rect width="{size}" height="{size}" rx="{size * RADIUS:.2f}" fill="{ACCENT}"/>\n'
         f'  <g transform="translate({tx:.3f} {ty:.3f}) scale({scale:.5f})">\n'
@@ -437,7 +437,7 @@ p{{font-family:'Spline Sans Mono',monospace;font-size:23px;letter-spacing:0.04em
 .rule{{height:10px;background:{accent};width:150px;border-radius:5px}}
 </style>
 <main>
-  <div class="row"><img src="mark.png"><span class="mark">pretium</span></div>
+  <div class="row"><img src="mark.png"><span class="mark">tradefloor</span></div>
   <h1>{headline}</h1>
   <div>
     <div class="rule" style="margin-bottom:26px"></div>
@@ -473,8 +473,8 @@ def write_manifest(out: pathlib.Path) -> None:
     """A web app manifest, so the icons have somewhere to be declared and an
     installed copy gets the right name rather than the page title."""
     (out / "site.webmanifest").write_text(json.dumps({
-        "name": "pretium documentation",
-        "short_name": "pretium",
+        "name": "tradefloor documentation",
+        "short_name": "tradefloor",
         "start_url": "index.html",
         "display": "minimal-ui",
         "background_color": GROUND,
@@ -490,7 +490,7 @@ def write_manifest(out: pathlib.Path) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", default=str(ROOT / "docs2" / "v2"),
+    ap.add_argument("--out", default=str(ROOT / "docs"),
                     help="where to write the icons")
     ap.add_argument("--chrome", default=os.environ.get(
         "CHROME", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))

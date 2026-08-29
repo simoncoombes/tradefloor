@@ -7,7 +7,7 @@ certified 252-day horizon, on training seeds and on a held-out universe
 
 from __future__ import annotations
 
-import pretium as pt
+import tradefloor as pt
 
 MOVED = {
     "garch_vix_coupling": 0.3,
@@ -65,7 +65,7 @@ def test_it_is_no_longer_the_default() -> None:
     day (§114). Still selectable and still bit-reproducing: anything recorded
     under pt-v10 replays exactly by naming it, which is the whole point of
     the preset table."""
-    from pretium import envelope
+    from tradefloor import envelope
     assert envelope.PRESET != "pt-v10"
     assert pt.ModelParams.from_preset().fingerprint != "pt-v10"
     assert pt.ModelParams.from_preset("pt-v10").fingerprint == "pt-v10"

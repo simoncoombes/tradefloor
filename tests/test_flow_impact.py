@@ -8,9 +8,9 @@ runnable.
 
 import pytest
 
-import pretium
+import tradefloor
 
-UNIVERSE = pretium.Universe.random(6, seed=3)
+UNIVERSE = tradefloor.Universe.random(6, seed=3)
 TRADED = UNIVERSE[0].ticker
 
 
@@ -41,7 +41,7 @@ IMPACT_SEEDS = range(1, 33)
 def _mean_impact_and_cost_bps(flow):
     impact = cost = 0.0
     for seed in IMPACT_SEEDS:
-        cf = pretium.flow_impact(
+        cf = tradefloor.flow_impact(
             seed=seed, universe=UNIVERSE, order_flow={TRADED: flow}, ticks=390
         )
         impact += cf.impact_bps[cf.tickers.index(TRADED)]
@@ -72,7 +72,7 @@ def test_impact_is_isolated_to_the_names_actually_traded():
     followed. If that ever stopped being true, impact would be buried in a
     shifted market and this whole measurement would become an estimate.
     """
-    cf = pretium.flow_impact(
+    cf = tradefloor.flow_impact(
         seed=1, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
     )
     assert cf.untouched_moved() == []
@@ -95,7 +95,7 @@ def test_order_flow_consumes_no_draws():
     # The mechanism behind the test above, asserted directly so a change to it
     # fails here with an obvious cause rather than there with a subtle one.
     def draws(flow):
-        e = pretium.Engine(seed=42, universe=UNIVERSE)
+        e = tradefloor.Engine(seed=42, universe=UNIVERSE)
         e.open_market()
         e.run_session(9, 30, 3, 390, order_flow=flow)
         return e.draws_consumed
@@ -108,8 +108,8 @@ def test_a_roster_edit_is_not_a_counterfactual():
     # before/after comparison across roster sizes measures the schedule shift
     # rather than anything about trading.
     def draws(n):
-        u = pretium.Universe.random(n, seed=3)
-        e = pretium.Engine(seed=42, universe=u)
+        u = tradefloor.Universe.random(n, seed=3)
+        e = tradefloor.Engine(seed=42, universe=u)
         e.open_market()
         e.run_session(9, 30, 3, 100)
         return e.draws_consumed
@@ -120,10 +120,10 @@ def test_a_roster_edit_is_not_a_counterfactual():
 def test_bigger_size_costs_more():
     # Emergent, not modelled: a larger order pushes further because it applies
     # more pressure, not because a coefficient scales with size.
-    small = pretium.flow_impact(
+    small = tradefloor.flow_impact(
         seed=42, universe=UNIVERSE, order_flow={TRADED: (1e6, 0.0)}, ticks=390
     )
-    large = pretium.flow_impact(
+    large = tradefloor.flow_impact(
         seed=42, universe=UNIVERSE, order_flow={TRADED: (8e6, 0.0)}, ticks=390
     )
     assert large.cost_bps(TRADED) >= small.cost_bps(TRADED)
@@ -133,10 +133,10 @@ def test_the_two_worlds_differ_only_by_the_flow():
     # Baseline must be exactly the market that would have happened. If it were
     # not, the subtraction would be measuring the difference between two
     # unrelated runs.
-    cf = pretium.flow_impact(
+    cf = tradefloor.flow_impact(
         seed=7, universe=UNIVERSE, order_flow={TRADED: (2e6, 0.0)}, ticks=200
     )
-    plain = pretium.Engine(seed=7, universe=UNIVERSE)
+    plain = tradefloor.Engine(seed=7, universe=UNIVERSE)
     plain.open_market()
     plain.run_session(9, 30, 3, 200)
     plain.close_market()
@@ -147,9 +147,9 @@ def test_the_two_worlds_differ_only_by_the_flow():
 
 
 def test_it_is_reproducible():
-    a = pretium.flow_impact(seed=9, universe=UNIVERSE,
+    a = tradefloor.flow_impact(seed=9, universe=UNIVERSE,
                                order_flow={TRADED: (3e6, 0.0)}, ticks=150)
-    b = pretium.flow_impact(seed=9, universe=UNIVERSE,
+    b = tradefloor.flow_impact(seed=9, universe=UNIVERSE,
                                order_flow={TRADED: (3e6, 0.0)}, ticks=150)
     assert a.impact == b.impact
 
@@ -157,7 +157,7 @@ def test_it_is_reproducible():
 def test_impact_bps_is_relative_so_names_are_comparable():
     # A penny on a $3 stock and a penny on a $600 stock are not the same
     # event, so currency impact alone is not comparable across a roster.
-    cf = pretium.flow_impact(
+    cf = tradefloor.flow_impact(
         seed=42, universe=UNIVERSE, order_flow={TRADED: (6e6, 0.0)}, ticks=390
     )
     i = cf.tickers.index(TRADED)
@@ -167,5 +167,5 @@ def test_impact_bps_is_relative_so_names_are_comparable():
 
 
 def test_no_trading_is_refused():
-    with pytest.raises(pretium.ValidationError, match="nothing to measure"):
-        pretium.flow_impact(seed=1, universe=UNIVERSE, order_flow={})
+    with pytest.raises(tradefloor.ValidationError, match="nothing to measure"):
+        tradefloor.flow_impact(seed=1, universe=UNIVERSE, order_flow={})

@@ -51,7 +51,7 @@ now carries its own conditional-variance process at a baseline sigma of
 0.016 against the reference's 0.003, funded by scaling per-name
 idiosyncratic noise by 0.84 rather than added on top. The crisis half is
 the VIX coupling: pinned VIX 45 takes the same correlation to +0.68 (see
-`pretium.scenario`); the real crisis reading is +0.63.
+`tradefloor.scenario`); the real crisis reading is +0.63.
 
 **Fat tails survive the correlation -- at the thin end of a wide band.**
 Excess kurtosis is **+3.1** (+2.4 to +5.7 across seeds), inside the
@@ -201,7 +201,7 @@ clustering floor, the leverage top) are named on their rows and decide
 no current verdict. One band is marked INDICATIVE (volume-change
 autocorrelation: own measurement only, no published figure for the
 estimator was recoverable). The full derivation record, window tables
-and verdict moves are in pretium-design/REALISM-BANDS.md.
+and verdict moves are in tradefloor-design/REALISM-BANDS.md.
 
 ## Why there are fourteen statistics and not four
 
@@ -319,7 +319,7 @@ REAL_MARKETS = {
     "volume_abs_return_corr": (0.46, 0.66),
     "leverage_effect": (-0.16, 0.00),
     "volume_change_acf1": (-0.32, -0.20),
-    # Conditional correlation, added 2026-08-25 (pretium-design/REALISM-BANDS.md,
+    # Conditional correlation, added 2026-08-25 (tradefloor-design/REALISM-BANDS.md,
     # "Conditional correlation"). The unconditional mean over all pairs cannot
     # see sign, sector or time, and a search cannot preserve what it cannot see.
     "corr_asymmetry": (-0.25, 0.45),
@@ -335,7 +335,7 @@ REAL_MARKETS = {
 #: Where each band comes from, carried as data so a reader can ask the
 #: library rather than trust a docstring. The full derivation -- the window
 #: table, the retrieved sources with what each actually measured, and the
-#: verdict moves -- is recorded in pretium-design/REALISM-BANDS.md.
+#: verdict moves -- is recorded in tradefloor-design/REALISM-BANDS.md.
 #:
 #: The shared derivation, applied blind to every statistic before any
 #: verdict was looked at: the reference panel is 40 US large-cap stocks
@@ -589,7 +589,7 @@ REAL_MARKETS_PROVENANCE = {
         "windows": (-0.154, 0.083, 0.348),
         "crisis_window": 0.167,
         "sources": (
-            "pretium-design/realism_bands_reference_panel.py, run 2026-08-25; "
+            "tradefloor-design/realism_bands_reference_panel.py, run 2026-08-25; "
             "no literature reconciliation applied, the record carries no "
             "verified exceedance-correlation number for single stocks",
         ),
@@ -600,7 +600,7 @@ REAL_MARKETS_PROVENANCE = {
         "windows": (-0.092, 0.111, 0.438),
         "crisis_window": 0.074,
         "sources": (
-            "pretium-design/realism_bands_reference_panel.py, run 2026-08-25",
+            "tradefloor-design/realism_bands_reference_panel.py, run 2026-08-25",
         ),
     },
     "sector_excess_corr": {
@@ -609,7 +609,7 @@ REAL_MARKETS_PROVENANCE = {
         "windows": (0.133, 0.164, 0.200),
         "crisis_window": 0.103,
         "sources": (
-            "pretium-design/realism_bands_reference_panel.py, run 2026-08-25. "
+            "tradefloor-design/realism_bands_reference_panel.py, run 2026-08-25. "
             "Every one of ten windows including the 2020 crisis sits between "
             "+0.10 and +0.20; trimmed noise scale 0.021",
         ),
@@ -621,7 +621,7 @@ REAL_MARKETS_PROVENANCE = {
         "windows": (-0.050, 0.229, 0.402),
         "crisis_window": 0.374,
         "sources": (
-            "pretium-design/real_corr_persistence_bands.py, run 2026-08-25, "
+            "tradefloor-design/real_corr_persistence_bands.py, run 2026-08-25, "
             "same roster and estimator as facts.measure; the 252-day band is "
             "wide enough to admit every preset and is recorded as such.",
         ),
@@ -634,7 +634,7 @@ REAL_MARKETS_PROVENANCE = {
 #: sampling noise: pooled volatility runs ~40 on a band of width ~20 while
 #: every autocorrelation is measured in hundredths, and any comparison that
 #: ignores the scales silently becomes a comparison of volatility alone.
-#: `pretium.loss` consumes these as its diagonal weighting.
+#: `tradefloor.loss` consumes these as its diagonal weighting.
 #:
 #: Provenance, and the history behind the values. These are measured on the
 #: CURRENT model (pt-v1) over THIRTY seeds (101-130), at the published
@@ -658,7 +658,7 @@ REAL_MARKETS_PROVENANCE = {
 #: figures. The values are re-derivable in-repo (the engine is
 #: deterministic per seed); tests/test_loss.py pins them to a live
 #: re-measurement rather than to a committed artifact.
-#: `pretium.loss.seed_sd_from_panels` remains the estimator, and the loss
+#: `tradefloor.loss.seed_sd_from_panels` remains the estimator, and the loss
 #: takes a replacement as a parameter rather than requiring an edit here.
 SEED_SD = {
     "annualised_vol_pct": 6.46066,
@@ -715,12 +715,12 @@ REAL_MARKETS_504 = {
     "volume_abs_return_corr": (0.48, 0.65),
     "leverage_effect": (-0.13, 0.02),
     "volume_change_acf1": (-0.29, -0.21),
-    # Five non-crisis 505-bar windows, same rule; pretium-design/bands-504-conditional-corr.json.
+    # Five non-crisis 505-bar windows, same rule; tradefloor-design/bands-504-conditional-corr.json.
     "corr_asymmetry": (-0.04, 0.13),
     "corr_asymmetry_lagged": (-0.10, 0.47),
     "sector_excess_corr": (0.11, 0.22),
     # Twenty-four sub-windows; four non-crisis windows +0.25 to +0.43,
-    # median +0.31 (pretium-design/real-corr-persistence-bands.json).
+    # median +0.31 (tradefloor-design/real-corr-persistence-bands.json).
     "corr_persistence_acf1": (0.19, 0.49),
 }
 
@@ -757,7 +757,7 @@ SEED_SD_504_PROVENANCE = {
               "seeds 101-130, sample sd across seeds",
     "date": "2026-08-23",
     "model_fingerprint": "pt-v3",
-    "bands": "pretium-design/bands-504-noncrisis.json, five non-crisis "
+    "bands": "tradefloor-design/bands-504-noncrisis.json, five non-crisis "
              "505-bar windows of the same 40-name reference roster",
 }
 
@@ -990,7 +990,7 @@ def _dependence(
             # non-overlapping 21-day windows, then the lag-1 autocorrelation
             # of that series. Real markets on the 40-name reference roster
             # read 0.388 with a half-life near fifteen days
-            # (pretium-design/real-corr-persistence.json, 126 windows). A
+            # (tradefloor-design/real-corr-persistence.json, 126 windows). A
             # model whose correlation is a lookup on today's VIX reads near
             # zero here: the cross-section decouples the tick VIX falls.
             # Non-overlapping windows on purpose; overlapping ones
@@ -1117,7 +1117,7 @@ def measure(
     `report` prints it in two sections.
 
     ``model`` selects the coefficient set the market runs, either a preset
-    name or a :class:`pretium.ModelParams`, defaulting to the shipped preset. This
+    name or a :class:`tradefloor.ModelParams`, defaulting to the shipped preset. This
     is the seam the calibration search evaluates through: the panel at a
     candidate vector is ``measure(model=candidate)``, no rebuild. The result
     carries ``model_fingerprint`` beside ``universe_fingerprint`` for the
@@ -1156,8 +1156,8 @@ def measure(
         import pyarrow as pa
     except ImportError as exc:  # pragma: no cover
         raise ImportError(
-            "pretium.facts.measure reads the daily bars table and needs "
-            "pyarrow. Install it with: pip install pretium[arrow]"
+            "tradefloor.facts.measure reads the daily bars table and needs "
+            "pyarrow. Install it with: pip install tradefloor[arrow]"
         ) from exc
 
     bars = pa.table(table).to_pydict()

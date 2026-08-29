@@ -125,7 +125,7 @@ that as current behaviour rather than leaving it to be rediscovered; wiring
 sentiment to price would be a new mechanism needing calibration.
 
 Worked through end to end, on real 2020-21 data, in
-[notebook 09](https://github.com/simoncoombes/pretium/blob/main/examples/09-a-pandemic-shaped-market.ipynb),
+[notebook 09](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb),
 which got this wrong first and shows the diagnosis.
 
 ## The second trap, retired: VIX drives volatility now

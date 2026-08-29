@@ -31,7 +31,7 @@ import os
 import sys
 from typing import Literal
 
-import pretium as pt
+import tradefloor as pt
 
 try:
     import anthropic

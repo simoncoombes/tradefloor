@@ -24,7 +24,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent
                        / "tools" / "calibration"))
 
-import pretium as pt  # noqa: E402
+import tradefloor as pt  # noqa: E402
 
 lib = pytest.importorskip("instrumentlib",
                           reason="calibration tooling is not packaged")

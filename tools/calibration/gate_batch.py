@@ -54,7 +54,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "python"))
 
 import gate_pick  # noqa: E402
-from pretium import envelope, facts  # noqa: E402
+from tradefloor import envelope, facts  # noqa: E402
 
 #: The real range for crisis co-movement, from the `scenario-magnitude` gap's
 #: own text: "crisis co-movement reads 0.696 against a real 0.664 to 0.727".

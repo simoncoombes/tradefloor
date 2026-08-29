@@ -114,8 +114,8 @@ def main() -> None:
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
-    import pretium.facts as facts
-    import pretium.loss as loss_mod
+    import tradefloor.facts as facts
+    import tradefloor.loss as loss_mod
 
     ship = lib.shipped_values()
     base: dict[str, float] = {}

@@ -19,9 +19,9 @@ import pytest
 
 pytest.importorskip("mcp", reason="the MCP server is an opt-in extra")
 
-import pretium as pt  # noqa: E402
-from pretium import envelope, mcp  # noqa: E402
-from pretium.facts import REAL_MARKETS  # noqa: E402
+import tradefloor as pt  # noqa: E402
+from tradefloor import envelope, mcp  # noqa: E402
+from tradefloor.facts import REAL_MARKETS  # noqa: E402
 
 MOMENTUM = {"signal": {"kind": "momentum", "lookback_days": 1.0},
             "portfolio": {"top_k": 5}}

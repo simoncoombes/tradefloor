@@ -8,7 +8,7 @@ default.
 
 from __future__ import annotations
 
-import pretium as pt
+import tradefloor as pt
 
 MOVED = {
     "market_factor_sigma": 0.008829098749522557,
@@ -72,7 +72,7 @@ def test_the_earlier_presets_are_untouched() -> None:
 
 
 def test_it_is_not_the_default() -> None:
-    from pretium import envelope
+    from tradefloor import envelope
     # The PROPERTY, not the literal: what this test is named for is that
     # pt-v8 is not the certified preset, and that survives an era boundary
     # where a hard-coded successor's name does not.

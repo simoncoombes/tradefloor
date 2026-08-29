@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from pretium.atlas import Survey
+from tradefloor.atlas import Survey
 
 #: Real markets read -0.436 against pt-v6's -0.917, and closer to zero is
 #: better, so the frontier below maximises this rather than minimising it.
@@ -58,7 +58,7 @@ def show(label: str, obj: object, chars: int) -> None:
 def attempt(label: str, fn, chars: int) -> None:
     """Run one query, reporting a refusal rather than dying on it.
 
-    `pretium.atlas` refuses a rank correlation over too few usable rows, which
+    `tradefloor.atlas` refuses a rank correlation over too few usable rows, which
     is correct: five points describe the sample rather than the model. But
     `atlas_survey.py collect` builds a readable survey from whatever is on
     disk, ON PURPOSE, so that a run can be read mid-flight, and that is exactly

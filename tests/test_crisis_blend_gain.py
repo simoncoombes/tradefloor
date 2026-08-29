@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import pytest
 
-import pretium as pt
-from pretium import Scenario, facts
+import tradefloor as pt
+from tradefloor import Scenario, facts
 
 
 def _prices(preset: str, vix: float = 45.0, days: int = 10, **over) -> list[float]:

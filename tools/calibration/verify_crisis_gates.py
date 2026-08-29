@@ -45,15 +45,15 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
-    import pretium
+    import tradefloor
 
     seeds = [int(s) for s in args.seeds.split(",")]
     threshold = args.threshold
-    universe = pretium.Universe.random(40, seed=111)
+    universe = tradefloor.Universe.random(40, seed=111)
 
     daily: dict[str, list[tuple[float, float, float, float, str]]] = {}
     for seed in seeds:
-        engine = pretium.Engine(seed=seed, universe=universe)
+        engine = tradefloor.Engine(seed=seed, universe=universe)
         rows = []
         for _ in range(args.days):
             engine.open_market()

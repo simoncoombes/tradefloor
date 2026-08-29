@@ -4,9 +4,9 @@ import struct
 
 import pytest
 
-import pretium
+import tradefloor
 
-UNIVERSE = pretium.Universe.random(6, seed=5)
+UNIVERSE = tradefloor.Universe.random(6, seed=5)
 
 
 def arr(buf):
@@ -14,7 +14,7 @@ def arr(buf):
 
 
 def engine(seed=2026):
-    return pretium.Engine(seed=seed, universe=UNIVERSE)
+    return tradefloor.Engine(seed=seed, universe=UNIVERSE)
 
 
 # --------------------------------------------------------------------------
@@ -76,15 +76,15 @@ def test_run_days_appears_in_the_log_as_its_constituent_calls():
     # traded under.
     assert ops == ["open_market", "run_session", "record", "close_market"] * 2
 
-    replayed = pretium.replay(e.order_log, seed=2026, universe=UNIVERSE)
+    replayed = tradefloor.replay(e.order_log, seed=2026, universe=UNIVERSE)
     assert arr(replayed.prices()) == arr(e.prices())
 
 
 def test_degenerate_spans_are_refused():
     e = engine()
-    with pytest.raises(pretium.ValidationError, match="days must be"):
+    with pytest.raises(tradefloor.ValidationError, match="days must be"):
         e.run_days(0)
-    with pytest.raises(pretium.ValidationError, match="ticks_per_day"):
+    with pytest.raises(tradefloor.ValidationError, match="ticks_per_day"):
         e.run_days(1, ticks_per_day=0)
 
 
@@ -143,7 +143,7 @@ def test_a_condition_is_required():
     # would hide a caller's mistake.
     e = engine()
     e.open_market()
-    with pytest.raises(pretium.ValidationError, match="at least one"):
+    with pytest.raises(tradefloor.ValidationError, match="at least one"):
         e.run_until(ticker=e.tickers[0])
 
 
@@ -152,21 +152,21 @@ def test_an_inverted_band_is_refused():
     # anyone meant.
     e = engine()
     e.open_market()
-    with pytest.raises(pretium.ValidationError, match="inverted band"):
+    with pytest.raises(tradefloor.ValidationError, match="inverted band"):
         e.run_until(ticker=e.tickers[0], above=10.0, below=20.0)
 
 
 def test_an_unknown_ticker_is_refused():
     e = engine()
     e.open_market()
-    with pytest.raises(pretium.ValidationError, match="NOPE"):
+    with pytest.raises(tradefloor.ValidationError, match="NOPE"):
         e.run_until(ticker="NOPE", above=100.0)
 
 
 def test_nonsense_bounds_are_refused():
     e = engine()
     e.open_market()
-    with pytest.raises(pretium.ValidationError, match="finite and positive"):
+    with pytest.raises(tradefloor.ValidationError, match="finite and positive"):
         e.run_until(ticker=e.tickers[0], above=float("nan"))
-    with pytest.raises(pretium.ValidationError, match="max_ticks"):
+    with pytest.raises(tradefloor.ValidationError, match="max_ticks"):
         e.run_until(ticker=e.tickers[0], above=100.0, max_ticks=0)

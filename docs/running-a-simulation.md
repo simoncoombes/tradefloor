@@ -19,7 +19,7 @@ decision.
 
 ```python
 import numpy as np
-import pretium as pt
+import tradefloor as pt
 
 engine = pt.Engine(seed=42, universe=pt.Universe.random(20, seed=11))
 

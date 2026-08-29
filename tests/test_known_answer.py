@@ -88,7 +88,7 @@ def test_the_script_runs_as_the_gate_runs_it(tmp_path):
 
     Everything above imports the module and calls into it. That left the
     ``__main__`` path -- the only path the determinism gate ever takes --
-    completely uncovered, and it was broken: it called ``pretium.version()``,
+    completely uncovered, and it was broken: it called ``tradefloor.version()``,
     which the package had never re-exported. Every test passed and the gate
     failed on all five platforms at once.
 

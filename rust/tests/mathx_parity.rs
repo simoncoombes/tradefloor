@@ -101,7 +101,7 @@ fn evaluate(v: &Vector) -> (Stats, Stats) {
             let exponent = parse_bits(&pair[1]);
             let want = parse_bits(want_hex);
             std_stats.record(base.powf(exponent), want);
-            libm_stats.record(pretium::mathx::pow(base, exponent), want);
+            libm_stats.record(tradefloor::mathx::pow(base, exponent), want);
         }
         return (std_stats, libm_stats);
     }
@@ -121,11 +121,11 @@ fn evaluate(v: &Vector) -> (Stats, Stats) {
         let x = parse_bits(in_hex);
         let want = parse_bits(want_hex);
         let (std_val, libm_val) = match v.function.as_str() {
-            "exp" => (x.exp(), pretium::mathx::exp(x)),
-            "log" => (x.ln(), pretium::mathx::log(x)),
-            "sin" => (x.sin(), pretium::mathx::sin(x)),
-            "cos" => (x.cos(), pretium::mathx::cos(x)),
-            "sqrt" => (x.sqrt(), pretium::mathx::sqrt(x)),
+            "exp" => (x.exp(), tradefloor::mathx::exp(x)),
+            "log" => (x.ln(), tradefloor::mathx::log(x)),
+            "sin" => (x.sin(), tradefloor::mathx::sin(x)),
+            "cos" => (x.cos(), tradefloor::mathx::cos(x)),
+            "sqrt" => (x.sqrt(), tradefloor::mathx::sqrt(x)),
             other => panic!("unhandled function {other}"),
         };
         std_stats.record(std_val, want);
@@ -236,10 +236,10 @@ fn implementation_is_deterministic() {
         if let Some(pairs) = &v.pairs {
             for pair in pairs {
                 let (b, e) = (parse_bits(&pair[0]), parse_bits(&pair[1]));
-                let first = pretium::mathx::pow(b, e);
+                let first = tradefloor::mathx::pow(b, e);
                 for _ in 0..3 {
                     assert_eq!(
-                        pretium::mathx::pow(b, e).to_bits(),
+                        tradefloor::mathx::pow(b, e).to_bits(),
                         first.to_bits(),
                         "pow({b}, {e}) is not stable across calls"
                     );
@@ -250,11 +250,11 @@ fn implementation_is_deterministic() {
         for in_hex in v.inputs.as_ref().expect("no inputs") {
             let x = parse_bits(in_hex);
             let f = |x: f64| match v.function.as_str() {
-                "exp" => pretium::mathx::exp(x),
-                "log" => pretium::mathx::log(x),
-                "sin" => pretium::mathx::sin(x),
-                "cos" => pretium::mathx::cos(x),
-                "sqrt" => pretium::mathx::sqrt(x),
+                "exp" => tradefloor::mathx::exp(x),
+                "log" => tradefloor::mathx::log(x),
+                "sin" => tradefloor::mathx::sin(x),
+                "cos" => tradefloor::mathx::cos(x),
+                "sqrt" => tradefloor::mathx::sqrt(x),
                 other => panic!("unhandled {other}"),
             };
             let first = f(x);

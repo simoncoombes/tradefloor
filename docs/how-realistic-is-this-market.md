@@ -8,7 +8,7 @@ short: Realism
 # How realistic is this market
 
 **The numbers live in [the realism envelope](realism-envelope.md).** That
-page is the authoritative statement: which statistics pretium matches, at
+page is the authoritative statement: which statistics tradefloor matches, at
 what measurement horizon, on which held-out axes, and every gap that has
 been measured rather than assumed. It is regenerated from a machine-readable
 artifact, [`envelope.json`](envelope.json), whenever the shipped preset
@@ -23,7 +23,7 @@ itself, and this one did exactly that for a while, describing a model two
 presets old.
 
 The short version: at a 252-day horizon the shipped preset matches **all
-fourteen** statistics pretium measures and holds that on a universe the
+fourteen** statistics tradefloor measures and holds that on a universe the
 calibration never saw. Against bands re-derived at 504 days it holds all
 fourteen there too, which is the first two-year clean sheet this project has
 measured; on a held-out set of seeds it holds thirteen. Beyond 252 days it
@@ -183,7 +183,7 @@ can move any of this. `measure()` takes the same arguments as the rest of the
 library, so a realism claim can be re-checked rather than inherited:
 
 ```python
-import pretium as pt
+import tradefloor as pt
 
 universe = pt.Universe.random(40, seed=111)
 print(pt.facts.report(pt.facts.measure(seed=3, universe=universe)))
@@ -199,8 +199,8 @@ across-seed spread beside each median, which is what a claim should be read
 against:
 
 ```python
-import pretium as pt
-from pretium import envelope
+import tradefloor as pt
+from tradefloor import envelope
 
 universe = pt.Universe.random(40, seed=111)
 panels = [pt.facts.measure(seed=s, universe=universe) for s in range(5)]
@@ -222,7 +222,7 @@ digest, so the check that the envelope is describing the model you are
 running is a one-liner, run from wherever you keep the file:
 
 ```python
-import json, pretium as pt
+import json, tradefloor as pt
 
 print(pt.model_preset()["name"] == json.load(open("envelope.json"))["preset"])
 ```

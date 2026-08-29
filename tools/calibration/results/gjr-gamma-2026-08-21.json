@@ -11,7 +11,7 @@
    },
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -246,7 +246,7 @@
    },
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -481,7 +481,7 @@
    },
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -717,7 +717,7 @@
    "git_rev": "9225e5f-dirty",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -952,7 +952,7 @@
    },
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -1188,7 +1188,7 @@
    "git_rev": "9225e5f-dirty",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -1423,7 +1423,7 @@
    },
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -1659,7 +1659,7 @@
    "git_rev": "3820fa6",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -1894,7 +1894,7 @@
    },
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -2130,7 +2130,7 @@
    "git_rev": "3820fa6",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -2366,7 +2366,7 @@
    "git_rev": "ed1b25c",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -2602,7 +2602,7 @@
    "git_rev": "2bdd4c5",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -2838,7 +2838,7 @@
    "git_rev": "ed1b25c",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -3074,7 +3074,7 @@
    "git_rev": "2bdd4c5",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -3310,7 +3310,7 @@
    "git_rev": "2bdd4c5-dirty",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -3546,7 +3546,7 @@
    "git_rev": "2bdd4c5",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,
@@ -3782,7 +3782,7 @@
    "git_rev": "2bdd4c5-dirty",
    "method": {
     "days": 252,
-    "panel": "pretium.facts.measure, per seed",
+    "panel": "tradefloor.facts.measure, per seed",
     "pin_days": 120,
     "pin_vix": [
      15.0,

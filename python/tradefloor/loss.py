@@ -1,6 +1,6 @@
 """The calibration objective: band distance, noise-scaled, diagonally weighted.
 
-This module turns the realism panel of `pretium.facts` into the number a
+This module turns the realism panel of `tradefloor.facts` into the number a
 calibration search minimises:
 
     d_k    = max(0, lo_k - m_k, m_k - hi_k)      # zero inside the band
@@ -54,7 +54,7 @@ the re-derived band showed it in band, so it moved to `CONSTRAINTS`; the
 instrument's lag-5 finding moved `abs_return_acf5` into `LIVE_TARGETS`.
 The structural set is derived as the complement, so nothing else moves;
 a promoted statistic's band, verdict wording and seed sd already ship in
-`pretium.facts`.
+`tradefloor.facts`.
 
 ## What this module is not
 
@@ -82,7 +82,7 @@ from .facts import (REAL_MARKETS, REAL_MARKETS_504, SEED_SD, SEED_SD_504,
 #: The statistics the calibration search is trying to move into band. This
 #: is the ONE tuple to edit when a model change makes a structural statistic
 #: reachable: append its key here and it enters the loss with the band,
-#: verdict wording and seed sd it already has in `pretium.facts`.
+#: verdict wording and seed sd it already has in `tradefloor.facts`.
 #: `abs_return_acf5` joined at the band re-derivation: phase 2's instrument
 #: found a parameter corner with lag-1 clustering in band and lag-5 memory
 #: at -0.001, so lag 5 is banded and live to price that hole out of the

@@ -53,7 +53,7 @@ fn check_size(name: &str, value: f64) -> PyResult<()> {
 }
 
 /// One executed trade.
-#[pyclass(name = "Fill", module = "pretium._core", frozen, get_all)]
+#[pyclass(name = "Fill", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone)]
 pub struct PyFill {
     /// Always the RESTING order's price, never the incoming one. That is what
@@ -78,7 +78,7 @@ impl PyFill {
 }
 
 /// The outcome of submitting an order.
-#[pyclass(name = "MatchResult", module = "pretium._core", frozen, get_all)]
+#[pyclass(name = "MatchResult", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone)]
 pub struct PyMatchResult {
     pub fills: Vec<PyFill>,
@@ -107,7 +107,7 @@ impl PyMatchResult {
 }
 
 /// One aggregated price level.
-#[pyclass(name = "PriceLevel", module = "pretium._core", frozen, get_all)]
+#[pyclass(name = "PriceLevel", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone, Copy)]
 pub struct PyPriceLevel {
     pub price: f64,
@@ -126,7 +126,7 @@ impl PyPriceLevel {
 }
 
 /// What sweeping a given size would cost, without executing it.
-#[pyclass(name = "SweepCost", module = "pretium._core", frozen, get_all)]
+#[pyclass(name = "SweepCost", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone, Copy)]
 pub struct PySweepCost {
     pub average_price: f64,
@@ -160,7 +160,7 @@ impl PySweepCost {
 /// NaN size, reproducing the reference exactly. This binding raises instead. A
 /// silently ignored order is the worst failure available: the caller believes
 /// they traded, the book disagrees, and nothing reports the disagreement.
-#[pyclass(name = "OrderBook", module = "pretium._core")]
+#[pyclass(name = "OrderBook", module = "tradefloor._core")]
 pub struct PyOrderBook {
     inner: crate::order_book::OrderBook,
 }

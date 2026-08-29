@@ -20,7 +20,7 @@ and duckdb all read them zero-copy, and the package depends on none of them.
 
 ```python
 import polars as pl
-import pretium as pt
+import tradefloor as pt
 
 engine = pt.Engine(seed=42, universe=pt.Universe.random(10, seed=3))
 engine.run_days(5)

@@ -43,7 +43,7 @@ import numpy as np
 
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "python"))
 
-import pretium as pt  # noqa: E402
+import tradefloor as pt  # noqa: E402
 
 DAYS = 2520
 NAMES = 40

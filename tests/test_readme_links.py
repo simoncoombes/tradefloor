@@ -3,7 +3,7 @@
 `readme = "README.md"` in pyproject means this file becomes the project page
 body on PyPI. That page lives at pypi.org, so a relative target like
 `examples/01-first-simulation.ipynb` resolves to
-pypi.org/project/pretium/examples/01-first-simulation.ipynb and 404s. On
+pypi.org/project/tradefloor/examples/01-first-simulation.ipynb and 404s. On
 GitHub the identical markup works, which is exactly why the defect survived
 a release: the file renders correctly everywhere the author looks at it.
 
@@ -39,7 +39,7 @@ def test_every_readme_link_survives_pypi() -> None:
     assert not relative, (
         "README.md carries relative links, which are dead on the PyPI project "
         f"page: {relative}. Use the full "
-        "https://github.com/simoncoombes/pretium/blob/main/... form."
+        "https://github.com/simoncoombes/tradefloor/blob/main/... form."
     )
 
 
@@ -59,7 +59,7 @@ def test_every_readme_image_survives_pypi() -> None:
         {
             t
             for t in _targets(LINK)
-            if t.startswith("https://github.com/simoncoombes/pretium/")
+            if t.startswith("https://github.com/simoncoombes/tradefloor/")
         }
     ),
 )

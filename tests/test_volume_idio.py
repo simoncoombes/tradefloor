@@ -24,7 +24,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pytest
 
-import pretium as pt
+import tradefloor as pt
 
 ON = dict(volume_idio_persistence=0.8, volume_idio_sigma=0.25)
 

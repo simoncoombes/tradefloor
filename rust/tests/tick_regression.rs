@@ -46,15 +46,15 @@
 //!    reordered or dropped on one path but not the other, or any draw from
 //!    an unseeded source.
 
-use pretium::economy::{
+use tradefloor::economy::{
     create_initial_central_bank_state, create_initial_economy_state, InitialEconomyOptions,
 };
-use pretium::engine::{DayAdvanceRequest, DayCloseRequest, Engine, PriceField, TickRequest};
-use pretium::market::{
+use tradefloor::engine::{DayAdvanceRequest, DayCloseRequest, Engine, PriceField, TickRequest};
+use tradefloor::market::{
     simulate_market_tick, AvgVolumePolicy, GameTime, MarketStatus, SettleDrawPolicy, TickCompany,
     TickInputs, TickStock, MARKET_FACTOR_SIGMA,
 };
-use pretium::rng::Rng;
+use tradefloor::rng::Rng;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -81,7 +81,7 @@ fn company(id: &str, price: f64) -> TickCompany {
             mispricing_momentum: None,
             maker_inventory: None,
             garch_variance: 0.000625,
-            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
+            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
             last_daily_return: None,
             beta: Some(1.0),
             short_interest: 0.0,
@@ -96,7 +96,7 @@ fn company(id: &str, price: f64) -> TickCompany {
 }
 
 fn sector_keys() -> Vec<String> {
-    pretium::sectors::keys()
+    tradefloor::sectors::keys()
         .iter()
         .map(|s| s.to_string())
         .collect()
@@ -165,7 +165,7 @@ fn run_tick(companies: &mut [TickCompany], status: MarketStatus, vix: f64) -> St
             // sigma at all.
             market_sigma_daily: MARKET_FACTOR_SIGMA,
             settle_draws: SettleDrawPolicy::FourAlways,
-                params: &pretium::params::PT_V1,
+                params: &tradefloor::params::PT_V1,
         },
         &mut rng,
     );

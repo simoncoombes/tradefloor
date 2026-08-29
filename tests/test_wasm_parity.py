@@ -20,8 +20,8 @@ toolchain and node; the digest below is the value both produced on
 2026-08-24.
 """
 
-import pretium as pt
-from pretium import _core
+import tradefloor as pt
+from tradefloor import _core
 
 #: One fixed simulation: twelve instruments, universe seed 7, sim seed 3,
 #: five days at 65 ticks. Small enough to run in milliseconds and long

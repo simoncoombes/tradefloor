@@ -24,7 +24,7 @@ import html
 import json
 import pathlib
 
-from pretium import facts
+from tradefloor import facts
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PANEL_JSON = ROOT / "tools" / "docs" / "preset-panel.json"
