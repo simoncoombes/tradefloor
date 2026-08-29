@@ -8,9 +8,8 @@ Example 10 forks a market and changes one variable by hand. This does the
 same thing with a scenario read off disk, which is the difference between an
 experiment you can run and one you can hand to somebody else.
 
-    scenarios/liquidity_crisis.yml
+    Scenario.load("liquidity_crisis")   # ships in the wheel
               |
-        Scenario.from_yaml
               |
         checkpoint.branch(2)
          /            \\
@@ -39,14 +38,12 @@ when the window closes -- and until it did, a twenty-five day crisis quietly
 lasted for the rest of the run.
 """
 
-import pathlib
 import struct
 import time
 
 import tradefloor as tf
 
-SCENARIO = (pathlib.Path(__file__).resolve().parent.parent
-            / "scenarios" / "liquidity_crisis.yml")
+SCENARIO = "liquidity_crisis"
 
 UNIVERSE_SIZE = 24
 SEED = 7
@@ -99,7 +96,7 @@ def main() -> dict:
     # 1. The scenario is a file. Read it, look at it, and cite its
     #    fingerprint -- which covers the resolved experiment rather than the
     #    file's bytes, so reformatting the YAML does not move it.
-    scenario = tf.Scenario.from_yaml(str(SCENARIO))
+    scenario = tf.Scenario.load(SCENARIO)
     print(scenario.describe())
     print()
     print(f"  library            {tf.__version__}")

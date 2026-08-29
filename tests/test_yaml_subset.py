@@ -33,7 +33,9 @@ from tradefloor.yaml_subset import YamlSubsetError, read
 yaml = pytest.importorskip("yaml", reason="pyyaml is a dev-only cross-check")
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-SHIPPED = sorted((REPO / "scenarios").glob("*.yml"))
+#: The pack ships inside the package now, so it reaches a pip install.
+SHIPPED = sorted((REPO / "python" / "tradefloor" / "scenarios")
+                 .glob("*.yml"))
 
 #: Every shape the scenario schema uses, and a few it does not but a person
 #: might reasonably write. Each is read by both parsers and compared.
@@ -292,7 +294,8 @@ def test_the_reader_never_disagrees_with_a_real_parser():
 
 
 def test_the_reader_builds_only_plain_data():
-    document = read((REPO / "scenarios" / "liquidity_crisis.yml")
+    document = read((REPO / "python" / "tradefloor" / "scenarios"
+                     / "liquidity_crisis.yml")
                     .read_text(encoding="utf-8"))
     seen = set()
 

@@ -28,6 +28,8 @@ import sys
 
 import pytest
 
+import tradefloor as tf
+
 pytest.importorskip("mcp", reason="the MCP server is an opt-in extra")
 
 from mcp import ClientSession, StdioServerParameters, stdio_client  # noqa: E402
@@ -43,13 +45,20 @@ CALLS = {
     "check_envelope": {"horizon_days": 252},
     "validate_strategy": {"spec": MOMENTUM},
     "build_universe": {"size": 8, "seed": 111},
-    "build_scenario": {"steps": [{"kind": "ramp", "field": "vix",
-                                  "start": 15.0, "end": 40.0, "over": 3}]},
+    "list_scenarios": {},
+    # Authored as INTERVENTIONS rather than as a path, so the wire carries
+    # the grammar that arrived with the scenario framework. The path form is
+    # exercised by `test_mcp.py`, which calls the function directly.
+    "build_scenario": {"shocks": [{"target": "market.liquidity",
+                                   "operation": "multiply", "value": 0.4,
+                                   "at": 1, "duration": 2}]},
     "evaluate_strategies": {"strategies": {"m": MOMENTUM}, "days": 1,
                             "universe_size": 8},
     "rank_strategies": {"strategies": {"m": MOMENTUM}, "seeds": [1, 2],
                         "days": 1, "universe_size": 8},
-    "run_stress_scenario": {"scenario": "vix_shock", "days": 2,
+    # By NAME, from the pack that ships inside the wheel -- the path a model
+    # takes when it has no clone to read files from.
+    "run_stress_scenario": {"scenario": "liquidity_crisis", "days": 2,
                             "universe_size": 8},
     "explain_price_move": {"universe_size": 8, "day": 1, "top_n": 2},
     "start_job": {"tool": "evaluate_strategies",
@@ -106,6 +115,50 @@ def test_the_server_advertises_its_instructions(live):
         "the instructions must tell a client the caveats are part of the "
         "result, because that is the one thing a summary tends to drop"
     )
+
+
+def test_the_catalogue_reaches_a_client_with_its_measurements(live):
+    """What an agent reads before authoring anything.
+
+    Not that it lists names -- that every target arrives with what it was
+    MEASURED to be worth. A model choosing between twelve targets whose
+    effect sizes differ by three orders of magnitude has nothing else to go
+    on: `macro.qe_pe_boost` moves the median instrument 19.78% and
+    `macro.fear_greed` moves it exactly 0.00%, and both are legitimate to
+    write.
+    """
+    _init, _tools, results = live
+    _res, out = results["list_scenarios"]
+    assert out["ok"] is True
+    assert {entry["name"] for entry in out["shipped"]} == set(
+        tf.Scenario.available())
+    assert set(out["targets"]) == set(tf.TARGETS)
+    for name, target in out["targets"].items():
+        assert "easured" in target["note"], name
+    # The refusals travel too: "there is no volatility level to set in this
+    # model" is a more useful answer to a client than a schema error.
+    assert "market.volatility" in out["not_supported"]
+
+
+def test_a_shipped_scenario_runs_by_name_over_the_wire(live):
+    """The pack is in the wheel, so a client with no clone can name one."""
+    _init, _tools, results = live
+    _res, out = results["run_stress_scenario"]
+    assert out["ok"] is True, out
+    # The shocked arm and the control, which is what makes the number
+    # readable: a return under a scenario alone could be the scenario or
+    # could be the market.
+    assert out["comparison"]
+    assert out["scenario"] == "liquidity_crisis"
+
+
+def test_an_authored_intervention_survives_the_round_trip(live):
+    _init, _tools, results = live
+    _res, out = results["build_scenario"]
+    assert out["ok"] is True, out
+    assert out["fingerprint"].startswith("sha256:")
+    assert out["shocks"][0]["target"] == "market.liquidity"
+    assert out["shocks"][0]["shape"] == "hold"
 
 
 def test_every_registered_tool_is_exercised_here(live):

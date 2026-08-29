@@ -146,6 +146,18 @@ MAX_SEEDS = 12
 #: a preset name or an authored document.
 SCENARIOS = ("rate_shock", "vix_shock", "vol_shock")
 
+
+def _packaged() -> tuple[str, ...]:
+    """The scenario files that ship inside the wheel, by name.
+
+    Read from the package rather than listed, so the pack and this server
+    cannot disagree about what exists. Distinct from `SCENARIOS` above, which
+    are CONSTRUCTORS -- shapes built from arguments. These are documents: a
+    named collection of explicit interventions somebody wrote down, with a
+    fingerprint, which is what makes one citable.
+    """
+    return tf.Scenario.available()
+
 #: The macro fields a scenario may pin. Read from the engine rather than
 #: typed, so this cannot drift from what `Scenario` actually accepts.
 def _macro_fields() -> list[str]:
@@ -605,10 +617,15 @@ def describe_simulator() -> dict[str, Any]:
         },
         "baselines": list(baselines.reference_agents(seed=0)),
         "scenarios": {
-            "presets": list(SCENARIOS),
-            "macro_fields": _macro_fields(),
-            "custom": "build_scenario composes one from hold/ramp/step "
-                      "instructions; run_stress_scenario takes either.",
+            "catalogue": "list_scenarios returns the shipped documents, the "
+                         "constructors, and every intervention target with "
+                         "what it was measured to be worth.",
+            "shipped": "named documents with fingerprints -- pass the name "
+                       "to run_stress_scenario.",
+            "custom": "build_scenario composes one, from hold/ramp/step "
+                      "instructions (a macro path) or from shocks and "
+                      "transmission (explicit interventions); "
+                      "run_stress_scenario takes either.",
         },
         "universes": {
             "generated": "build_universe(size, seed)",
@@ -959,14 +976,47 @@ def _scenario_from(doc: Any, days: int) -> Any:
         except tf.ValidationError as exc:
             raise ValueError(f"not a readable scenario document: {exc}") from exc
 
+    # An INTERVENTION document, in either of its two shapes: the authoring
+    # form a person writes in YAML (`version` + `scenario`), and the resolved
+    # form `Scenario.to_json` produces (`schema` + `shocks`). Both are the
+    # same experiment, and both route through the library's own loaders
+    # rather than being re-implemented here -- a second opinion about what a
+    # scenario means is a second thing to keep right.
+    if "version" in doc and "scenario" in doc:
+        try:
+            return tf.Scenario.from_document(doc)
+        except tf.ValidationError as exc:
+            raise ValueError(str(exc)) from exc
+    if "shocks" in doc or "transmission" in doc:
+        try:
+            if "schema" in doc:
+                return tf.Scenario.from_json(json.dumps(doc))
+            return tf.Scenario.from_document(
+                {"version": 1, "scenario": {
+                    "name": doc.get("name") or doc.get("label") or "authored",
+                    "description": doc.get("description", ""),
+                    **{k: doc[k] for k in ("shocks", "transmission")
+                       if k in doc},
+                }})
+        except tf.ValidationError as exc:
+            raise ValueError(str(exc)) from exc
+
     steps = doc.get("steps")
     if not steps:
         raise ValueError(
-            'a scenario needs a non-empty "steps" list. Each step is one of '
+            'a scenario document needs either "steps" (a macro PATH) or '
+            '"shocks"/"transmission" (explicit INTERVENTIONS), and this has '
+            'neither.\n\n'
+            'A path pins fields for the whole run. Each step is one of '
             '{"kind":"hold","fields":{...}}, '
             '{"kind":"ramp","field":F,"start":X,"end":Y,"over":N}, or '
             '{"kind":"step","field":F,"before":X,"after":Y,"at":N}. '
-            f'Fields: {_macro_fields()}')
+            f'Fields: {_macro_fields()}\n\n'
+            'An intervention is a change relative to whatever the market has '
+            'reached: {"target":T,"operation":"set|add|multiply",'
+            '"value":V,"at":N,"duration":D,"shape":"impulse|hold|ramp|'
+            'permanent"}. Targets and what each one actually reaches: call '
+            '`list_scenarios`.')
     sc = tf.Scenario(str(doc.get("label", "")))
     for i, st in enumerate(steps):
         if not isinstance(st, dict) or "kind" not in st:
@@ -992,12 +1042,73 @@ def _scenario_from(doc: Any, days: int) -> Any:
 
 
 @server.tool(
-    description="Author a custom macro scenario from hold/ramp/step "
-                "instructions over the pinnable macro fields, and see its "
-                "day-by-day table before running it."
+    description="What scenarios exist and what each intervention target "
+                "actually reaches -- read this before authoring one, because "
+                "four of the targets are honest mechanisms with effects too "
+                "small to see over a hundred days."
 )
-def build_scenario(steps: list[dict[str, Any]], label: str = "",
-                   days: int = 20) -> dict[str, Any]:
+def list_scenarios() -> dict[str, Any]:
+    """The catalogue: shipped documents, constructors, and the registry.
+
+    A model authoring a scenario is choosing between twelve targets whose
+    effect sizes differ by three orders of magnitude, and nothing on the wire
+    told it which. `macro.qe_pe_boost` moves the median instrument 19.78%;
+    `macro.fear_greed` moves it exactly 0.00%, measured, because nothing in
+    the market reads it. Both are legitimate to write and only one of them is
+    an experiment.
+
+    So every target here carries the note the library carries: what reads it,
+    how long it takes to arrive, and what it was MEASURED to be worth. The
+    refusals come too, because "there is no volatility level to set in this
+    model" is a more useful answer than a schema error.
+    """
+    shipped = []
+    for name in _packaged():
+        sc = tf.Scenario.load(name)
+        shipped.append({
+            "name": name,
+            "description": sc.description,
+            "fingerprint": sc.fingerprint,
+            "shocks": [item.as_dict() for item in sc.shocks],
+            "transmission": [item.as_dict() for item in sc.transmission],
+        })
+    return {
+        "ok": True,
+        "shipped": shipped,
+        "constructors": list(SCENARIOS),
+        "targets": {
+            name: {"units": target.units, "note": target.note}
+            for name, target in sorted(tf.TARGETS.items())
+        },
+        "not_supported": dict(sorted(tf.UNSUPPORTED_TARGETS.items())),
+        "operations": list(tf.interventions.OPERATIONS),
+        "shapes": list(tf.interventions.SHAPES),
+        "note": ("Pass a shipped name straight to `run_stress_scenario`. To "
+                 "author one, call `build_scenario` with `shocks` (what the "
+                 "scenario asserts happened) and `transmission` (what it "
+                 "ASSUMES happened next -- this simulator derives neither). "
+                 "`at` counts days from the start of the run."),
+        "caveats": [
+            "Scenario MAGNITUDE is outside the certified envelope: the "
+            "DIRECTION of a shock's effect is certified, the SIZE is not.",
+            "The measured figures in each target note come from one "
+            "universe over three seeds at 120 days. They size the LEVER, "
+            "not any particular experiment.",
+        ],
+        "provenance": _provenance(),
+    }
+
+
+@server.tool(
+    description="Author a custom scenario -- a macro PATH from hold/ramp/step "
+                "instructions, or explicit INTERVENTIONS as shocks and "
+                "assumed transmission -- and see what it resolves to before "
+                "running it."
+)
+def build_scenario(steps: list[dict[str, Any]] | None = None,
+                   shocks: list[dict[str, Any]] | None = None,
+                   transmission: list[dict[str, Any]] | None = None,
+                   label: str = "", days: int = 20) -> dict[str, Any]:
     """Compose a scenario as data, and check it before spending anything.
 
     Separate from `run_stress_scenario` for the same reason
@@ -1012,19 +1123,38 @@ def build_scenario(steps: list[dict[str, Any]], label: str = "",
             + ("" if cap > MAX_DAYS else
                f". For a longer run use `start_job`, which allows up to "
                f"{MAX_DAYS_ASYNC} days -- the certified horizon."))
+    doc: dict[str, Any] = {"label": label}
+    if steps:
+        doc["steps"] = steps
+    if shocks:
+        doc["shocks"] = shocks
+    if transmission:
+        doc["transmission"] = transmission
+    if "steps" in doc and ("shocks" in doc or "transmission" in doc):
+        return _fail(
+            "a scenario can carry a macro path AND interventions, but this "
+            "tool takes one at a time so that a mistake in either is "
+            "reported on its own. Build the path first, then add the "
+            "interventions to the document it returns.")
     try:
-        sc = _scenario_from({"label": label, "steps": steps}, days)
-        table = sc.table(days)
+        sc = _scenario_from(doc, days)
+        table = sc.table(days) if sc.fields else []
     except (ValueError, tf.ValidationError) as exc:
         return _fail(str(exc))
     return {
         "ok": True,
-        "scenario": json.loads(sc.to_json(days)),
+        "scenario": json.loads(sc.to_json(days if sc.fields else None)),
+        "fingerprint": sc.fingerprint,
         "fields_pinned": list(sc.fields),
+        "shocks": [item.as_dict() for item in sc.shocks],
+        "transmission": [item.as_dict() for item in sc.transmission],
+        "describe": sc.describe(),
         "table": table,
         "note": ("Pass this document straight to `run_stress_scenario` as "
                  "`scenario`. A day absent from the table is a day the "
-                 "scenario does not pin, and the engine's own dynamics run."),
+                 "scenario does not pin, and the engine's own dynamics run. "
+                 "`transmission` entries are ASSUMPTIONS the author is "
+                 "making, not effects this simulator derives."),
         "caveats": [
             "Scenario MAGNITUDE is outside the certified envelope: the "
             "DIRECTION of a shock's effect is certified, the SIZE is not. "
@@ -1066,11 +1196,12 @@ def run_stress_scenario(
             + ("" if cap > MAX_DAYS else
                f". For a longer run use `start_job`, which allows up to "
                f"{MAX_DAYS_ASYNC} days -- the certified horizon."))
-    if isinstance(scenario, str) and scenario not in SCENARIOS:
+    if (isinstance(scenario, str) and scenario not in SCENARIOS
+            and scenario not in _packaged()):
         return _fail(
-            f"unknown scenario {scenario!r}. Presets: {list(SCENARIOS)}. "
-            f"For anything else, author one with `build_scenario` and pass "
-            f"the document here.")
+            f"unknown scenario {scenario!r}. Constructors: {list(SCENARIOS)}. "
+            f"Shipped scenarios: {list(_packaged())}. For anything else, "
+            f"author one with `build_scenario` and pass the document here.")
     try:
         specs, assumed = (_specs_from(strategies) if strategies else ({}, []))
         roster, concentrated, uni_doc = _resolve_universe(
@@ -1089,7 +1220,17 @@ def run_stress_scenario(
             if peak_day is not None:
                 kwargs["peak_day" if scenario != "rate_shock"
                        else "over"] = peak_day
-            built = getattr(tf.Scenario, scenario)(**kwargs)
+            if scenario in _packaged():
+                if peak_day is not None:
+                    return _fail(
+                        f"{scenario!r} is a shipped scenario, not a "
+                        f"constructor, so peak_day means nothing to it: its "
+                        f"timing is written into the document. Read it with "
+                        f"`list_scenarios`, or author your own with "
+                        f"`build_scenario`.")
+                built = tf.Scenario.load(scenario)
+            else:
+                built = getattr(tf.Scenario, scenario)(**kwargs)
             label = scenario
     except (ValueError, tf.ValidationError) as exc:
         return _fail(f"building scenario: {exc}")
@@ -1110,8 +1251,15 @@ def run_stress_scenario(
     try:
         shocked = tf.evaluate(entrants(), seed=seed, universe=roster,
                               days=days, scenario=built)
+        # The control is the same world WITHOUT the thing being tested. For a
+        # macro PATH that is no scenario at all. For a scenario carrying
+        # INTERVENTIONS it is the same pins with the interventions removed --
+        # otherwise a scenario that both holds a level and shocks it would
+        # have its level counted as part of the shock.
+        against = (built.without_interventions() if built.interventions
+                   else None)
         control = tf.evaluate(entrants(), seed=seed, universe=roster,
-                              days=days)
+                              days=days, scenario=against or None)
     except tf.ValidationError as exc:
         return _fail(str(exc))
 

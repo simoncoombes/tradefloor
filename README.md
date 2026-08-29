@@ -79,7 +79,7 @@ strategy. `tf.rank` runs many seeds and compares them with a paired sign test.
 | `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
-| MCP server | eleven read-only tools for a coding agent |
+| MCP server | twelve read-only tools for a coding agent, scenarios included |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, a browser build |
 
 No historical dataset carries the labels `truth()` gives you. Real data shows
@@ -99,7 +99,7 @@ code. Each result carries its own caveats. See
 ## Controlled scenarios
 
 ```python
-scenario = tf.Scenario.from_yaml("scenarios/liquidity_crisis.yml")
+scenario = tf.Scenario.load("liquidity_crisis")   # ships with the package
 
 control, stress = tf.branch(engine, 2)
 for day in range(80):
@@ -125,10 +125,13 @@ Assumed transmission
 
 tradefloor does not claim what a war, an election, an oil shock or a
 recession will do to markets. It lets you state those assumptions and measure
-how an agent behaves under them. Six examples ship in
-[`scenarios/`](https://github.com/simoncoombes/tradefloor/tree/main/scenarios),
-each recording what it was measured to be worth. `tradefloor scenario
-targets` lists every target and what it actually reaches.
+how an agent behaves under them.
+
+Six scenarios ship inside the package, so `Scenario.load` works on a plain
+`pip install` -- each one recording what it was measured to be worth. Their
+[source is here](https://github.com/simoncoombes/tradefloor/tree/main/python/tradefloor/scenarios).
+`tradefloor scenario list` names them, and `tradefloor scenario targets`
+lists every target and what it actually reaches.
 
 ## How real it is
 
