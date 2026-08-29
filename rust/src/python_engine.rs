@@ -284,6 +284,61 @@ impl PyMacro {
 }
 
 impl PyEngine {
+    /// Which recorded days a table call covers.
+    ///
+    /// `None` is all of them, which is what a streaming consumer wants and
+    /// what these tables have always returned. `Some(d)` is that day alone.
+    ///
+    /// A day that was never recorded is an ERROR rather than an empty table.
+    /// The whole reason `day` needed fixing is that it looked like a filter
+    /// and silently was not, and answering a question about day 7 with a
+    /// well-formed table of nothing would be the same failure wearing a
+    /// different shape.
+    fn select_recorded(
+        &self,
+        day: Option<u32>,
+    ) -> PyResult<Vec<crate::python_arrow::RecordedDay>> {
+        let Some(wanted) = day else {
+            return Ok(self.recorded.clone());
+        };
+        let hit: Vec<_> = self
+            .recorded
+            .iter()
+            .filter(|r| r.day == wanted)
+            .cloned()
+            .collect();
+        if hit.is_empty() {
+            let mut days: Vec<u32> = self.recorded.iter().map(|r| r.day).collect();
+            days.sort_unstable();
+            days.dedup();
+            let recorded = match (days.first(), days.last()) {
+                (Some(lo), Some(hi)) if days.len() as u32 == hi - lo + 1 => {
+                    format!("{lo} to {hi}")
+                }
+                (Some(_), Some(_)) => days
+                    .iter()
+                    .map(|d| d.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                _ => "none".to_string(),
+            };
+            return Err(ValidationError::new_err(format!(
+                // Positional rather than captured: `concat!` expands
+                // after `format!` has read its inline captures, so
+                // {wanted} inside it resolves to nothing.
+                concat!(
+                    "day {} was not recorded; recorded days are {}. ",
+                    "A day reaches these tables through `record(day)`, ",
+                    "and the label it was given there is what this ",
+                    "selects on."
+                ),
+                wanted,
+                recorded
+            )));
+        }
+        Ok(hit)
+    }
+
     /// Resolve a ticker to the engine's internal company id.
     ///
     /// Needed because the two tick inputs key differently: order volumes match
@@ -2370,16 +2425,21 @@ impl PyEngine {
     ///
     /// Every recorded day is a separate batch, so a year streams rather than
     /// materialising. With nothing recorded it falls back to the last session.
-    #[pyo3(signature = (*, day = 0, minutes = None, grain = None))]
+    ///
+    /// `day = None`, the default, is every recorded day; `day = N` is that day
+    /// alone. Like `truth`, it used to be discarded once anything had been
+    /// recorded and only labelled the un-recorded fallback.
+    #[pyo3(signature = (*, day = None, minutes = None, grain = None))]
     fn bars(
         &self,
-        day: u32,
+        day: Option<u32>,
         minutes: Option<usize>,
         grain: Option<&str>,
     ) -> PyResult<crate::python_arrow::PyArrowStream> {
         let days: Vec<crate::python_arrow::RecordedDay> = if self.recorded.is_empty() {
             vec![crate::python_arrow::RecordedDay {
-                day,
+                // The label, as it has always been on this path.
+                day: day.unwrap_or(0),
                 ticks: self.buffer.ticks_written,
                 instruments: self.buffer.companies,
                 prices: self.written(&self.buffer.prices).to_vec(),
@@ -2393,7 +2453,7 @@ impl PyEngine {
                 components: std::array::from_fn(|_| Vec::new()),
             }]
         } else {
-            self.recorded.clone()
+            self.select_recorded(day)?
         };
 
         // `None` means tick grain, which uses the narrow schema.
@@ -2460,11 +2520,24 @@ impl PyEngine {
     /// The log deviation from fair value that produced each print. No
     /// historical dataset carries this column, because no historical dataset
     /// knows what fair value was.
-    #[pyo3(signature = (*, day = 0))]
-    fn truth(&self, day: u32) -> PyResult<crate::python_arrow::PyArrowStream> {
+    ///
+    /// # `day` selects, and used not to
+    ///
+    /// `day = None`, the default, is every recorded day: one batch each, so a
+    /// year streams. `day = N` is that day alone.
+    ///
+    /// It was ignored entirely once anything had been recorded -- the argument
+    /// only ever labelled the un-recorded fallback -- so `truth(day=4)` on a
+    /// hundred-day run returned all hundred days and looked like it had
+    /// answered. The table had the right schema and plausible values, which is
+    /// why nothing noticed for as long as it did.
+    #[pyo3(signature = (*, day = None))]
+    fn truth(&self, day: Option<u32>) -> PyResult<crate::python_arrow::PyArrowStream> {
         let batches = if self.recorded.is_empty() {
             vec![crate::python_arrow::truth_batch(
-                day,
+                // Nothing is recorded, so there is no day to select and the
+                // argument is what it always was here: the label on the rows.
+                day.unwrap_or(0),
                 self.buffer.ticks_written,
                 self.buffer.companies,
                 self.written(&self.buffer.mispricing_s),
@@ -2484,8 +2557,9 @@ impl PyEngine {
             )
             .map_err(crate::python_arrow::arrow_err)?]
         } else {
-            let mut out = Vec::with_capacity(self.recorded.len());
-            for d in &self.recorded {
+            let selected = self.select_recorded(day)?;
+            let mut out = Vec::with_capacity(selected.len());
+            for d in &selected {
                 out.push(
                     crate::python_arrow::truth_batch(
                         d.day,
