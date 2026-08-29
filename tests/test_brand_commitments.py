@@ -99,6 +99,8 @@ ASCII_PROSE = (
     # and the stub path that also kept pointing at where things used to be.
     # The commitment for those pages belongs in the repository that now holds
     # them; widening this list is still how it widens for anything here.
+    # And the counterfactual tutorial, written after the commitment.
+    "examples/your-first-counterfactual-experiment.md",
 )
 
 NON_ASCII_PUNCTUATION = {

@@ -58,3 +58,6 @@ Thumbs.db
 *~
 .idea/
 .vscode/
+
+# Experiment artifacts written by examples/rate_shock_counterfactual.py
+examples/artifacts/

@@ -1,5 +1,24 @@
 # Examples
 
+## Start here
+
+**[`rate_shock_counterfactual.py`](rate_shock_counterfactual.py)** is the
+canonical demo: one market, one agent, twenty days of shared history, a
+checkpoint, a fork into two identical worlds, +200bps in one of them, and a
+comparison of what the same agent did next. It runs in about two seconds and
+needs nothing installed beyond the library.
+
+```
+python examples/rate_shock_counterfactual.py
+```
+
+The five-minute walkthrough is
+[**Your first counterfactual experiment**](your-first-counterfactual-experiment.md).
+The agent it runs is [`macro_aware_agent.py`](macro_aware_agent.py), which is
+a parameter -- swap it for your own and nothing else in the experiment moves.
+
+## The reading order
+
 Eight notebooks and four scripts, numbered in reading order. The committed
 notebooks carry their output, so you can read them without running anything.
 Start at 00 if you have not used tradefloor before.
@@ -33,15 +52,22 @@ Notebooks 00, 03 and 09 also need `matplotlib` for their charts, and 05 needs
 `tradefloor[rl]` for the Gymnasium environment. The core library has no
 dependencies.
 
-`07-research-workflow.py` runs in about five seconds and
-`10-forking-a-market.py` in about two, and neither needs anything extra. `08-claude-agent.py` needs `tradefloor[claude]` and an API key, and
+`rate_shock_counterfactual.py` runs in about two seconds, `07-research-workflow.py` in about five and
+`10-forking-a-market.py` in about two, and none of them needs anything extra. The
+first writes a chart if `matplotlib` is installed and says so if it is not.
+`08-claude-agent.py` needs `tradefloor[claude]` and an API key, and
 spends money per decision, so it's the one file here that isn't run
 automatically.
 
 ## How they're kept working
 
 `tests/test_examples.py` checks them. The scripts are syntax-checked on every
-test run, which catches a rename that missed a reference. The rest is opt-in,
+test run, which catches a rename that missed a reference.
+`rate_shock_counterfactual.py` gets more than that: `tests/test_rate_shock_demo.py`
+runs it end to end on every test run and checks its claims, not only its exit
+code -- that the arms started identical, that nothing diverged before the
+intervention, that the experiment reruns to the bit, and that both manifests
+reproduce. The rest is opt-in,
 because executing eight notebooks takes about a minute:
 
 ```
