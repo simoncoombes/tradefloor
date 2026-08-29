@@ -260,7 +260,7 @@ def _roster_inputs(roster_path):
     return dates, closes, vols, (crash[0], crash[-1])
 
 
-def driven_basket(m, seed: int, roster_path) -> dict:
+def driven_basket(m, seed: int, roster_path, freeze=()) -> dict:
     """Four cross-sectional statistics, sim vs real, along the real path.
 
     Basket noise ratio (the driven ratio, de-AAPLed), dispersion path
@@ -277,6 +277,16 @@ def driven_basket(m, seed: int, roster_path) -> dict:
     path = [{"day": i, "vix": raw["vix"][i], "federal_funds_rate": policy[i],
              "corporate_bond_yield": credit[i], "qe_pe_boost": qe[i]}
             for i in range(n)]
+    if freeze:
+        # Round 76's channel attribution, on the basket: a frozen channel
+        # holds its day-zero value for the whole window.
+        keys = {"vix": "vix", "policy": "federal_funds_rate",
+                "credit": "corporate_bond_yield"}
+        for ch in freeze:
+            k = keys[ch]
+            v0 = path[0][k]
+            for i in range(n):
+                path[i][k] = v0
     scen = pt.Scenario.from_json(json.dumps(
         {"schema": 1, "label": "covid-basket", "days": n, "path": path}))
     names = sorted(closes)
