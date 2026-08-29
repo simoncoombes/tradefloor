@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import statistics
 import statistics as st
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -105,11 +106,31 @@ def qe_measured():
     return meas["qe_pe_boost"]
 
 
-def driven_window(m, seed: int, qe_series=None) -> dict:
+_QE_ASSETS = Path(__file__).resolve().parent / "data" / "qe-assets-2020-2021.json"
+
+
+def qe_assets_measured():
+    """The measured holdings RATIO, daily, aligned to the covid window.
+
+    FRED securities held outright over the window's first day, for the
+    stock channel (`qe_pe_stock_gain`). This is the input the redesigned
+    channel is calibrated against; the flow proxy stays what the certified
+    gate runs.
+    """
+    raw = json.loads(_COVID.read_text(encoding="utf-8"))
+    meas = json.loads(_QE_ASSETS.read_text(encoding="utf-8"))
+    assert meas["dates"] == raw["dates"], "the assets series must align by date"
+    return meas["qe_assets_ratio"]
+
+
+def driven_window(m, seed: int, qe_series=None, qe_assets=None, freeze=()) -> dict:
     """Daily return sd and the VIX-channel gain, against real AAPL's own.
 
     `qe_series` replaces the proxy `qe_pe_boost` input day for day when
     given (see `qe_measured`); None runs the shipped proxy, bit for bit.
+    `qe_assets` pins the holdings ratio day for day (see
+    `qe_assets_measured`) for models whose stock channel is on; None
+    leaves the ratio neutral.
     """
     import pyarrow as pa
     import pyarrow.compute as pc
@@ -121,6 +142,22 @@ def driven_window(m, seed: int, qe_series=None) -> dict:
     path = [{"day": i, "vix": raw["vix"][i], "federal_funds_rate": policy[i],
              "corporate_bond_yield": credit[i], "qe_pe_boost": qe[i]}
             for i in range(n)]
+    if qe_assets is not None:
+        assert len(qe_assets) == n, "qe_assets must cover the window"
+        for i in range(n):
+            path[i]["qe_assets_ratio"] = qe_assets[i]
+    if freeze:
+        # Channel attribution, round 76's method: a frozen channel holds its
+        # day-zero value for the whole window, so the difference against the
+        # full run is that channel's contribution. "vix" freezes the fear
+        # path; "policy" the funds rate; "credit" the bond yield.
+        keys = {"vix": "vix", "policy": "federal_funds_rate",
+                "credit": "corporate_bond_yield"}
+        for ch in freeze:
+            k = keys[ch]
+            v0 = path[0][k]
+            for i in range(n):
+                path[i][k] = v0
     scen = pt.Scenario.from_json(json.dumps(
         {"schema": 1, "label": "covid", "days": n, "path": path}))
     aapl = pt.Instrument("AAPL", "technology", initial_price=raw["aapl"][0],
@@ -149,6 +186,170 @@ def driven_window(m, seed: int, qe_series=None) -> dict:
     return {"ret_sd": _sd(r_sim), "real_ret_sd": _sd(r_real),
             "noise_ratio": _sd(r_sim) / _sd(r_real),
             "vix_beta": beta(r_sim, d_vix), "real_vix_beta": beta(r_real, d_vix)}
+
+
+# ── The multi-name driven axis (MULTINAME-DRIVEN.md, item 6) ──────────────
+#
+# The certified driven gate rides one name. This instrument runs the SAME
+# 2020-2021 scenario path into a universe built from the reference-panel
+# roster's real 2020 openings and asks whether the CROSS-SECTION behaves
+# like the real one did. REPORTED, not banded: bands wait until seed and
+# block noise are characterized (the deepseed lesson, applied in advance).
+#
+# Fundamentals are approximations and say so: eps values each name AT its
+# sector anchor (zero initial mispricing — this instrument measures
+# dynamics, not valuation), caps are order-correct 2020-02 figures, betas
+# are sector volatilities. Real per name: sector, initial price, Jan-2020
+# average volume.
+
+_ROSTER_SECTOR = {
+    "AAPL": "technology", "MSFT": "technology", "NVDA": "technology",
+    "GOOGL": "telecommunications", "META": "telecommunications",
+    "DIS": "telecommunications", "CMCSA": "telecommunications",
+    "T": "telecommunications", "VZ": "telecommunications",
+    "AMZN": "consumer_discretionary", "HD": "consumer_discretionary",
+    "MCD": "consumer_discretionary", "NKE": "consumer_discretionary",
+    "JPM": "financial_services", "BAC": "financial_services",
+    "WFC": "financial_services", "GS": "financial_services",
+    "C": "financial_services", "V": "financial_services",
+    "MA": "financial_services",
+    "XOM": "energy", "CVX": "energy", "COP": "energy",
+    "JNJ": "healthcare", "PFE": "healthcare", "MRK": "healthcare",
+    "UNH": "healthcare", "LLY": "healthcare", "ABT": "healthcare",
+    "PG": "consumer_staples", "KO": "consumer_staples",
+    "PEP": "consumer_staples", "WMT": "consumer_staples",
+    "COST": "consumer_staples",
+    "BA": "industrials", "CAT": "industrials", "GE": "industrials",
+    "HON": "industrials",
+    "UPS": "transportation", "UNP": "transportation",
+}
+
+# Approximate 2020-02 market caps, billions USD, order-correct from memory
+# and recorded as approximations (they set cap weights, nothing else).
+_ROSTER_CAP_B = {
+    "AAPL": 1400, "MSFT": 1400, "GOOGL": 1000, "AMZN": 1000, "META": 600,
+    "NVDA": 160, "JPM": 430, "BAC": 300, "WFC": 200, "GS": 80, "C": 160,
+    "V": 420, "MA": 320, "XOM": 260, "CVX": 210, "COP": 60, "JNJ": 390,
+    "PFE": 200, "MRK": 210, "UNH": 280, "LLY": 130, "ABT": 150, "PG": 310,
+    "KO": 250, "PEP": 190, "WMT": 330, "COST": 130, "HD": 250, "MCD": 160,
+    "NKE": 140, "DIS": 250, "CMCSA": 200, "T": 270, "VZ": 240, "BA": 190,
+    "CAT": 75, "GE": 95, "HON": 120, "UPS": 90, "UNP": 120,
+}
+
+_SECTOR_PE = {"technology": 32.0, "financial_services": 12.0,
+              "healthcare": 24.0, "energy": 10.0,
+              "consumer_discretionary": 20.0, "consumer_staples": 20.0,
+              "industrials": 17.0, "materials": 14.0, "real_estate": 35.0,
+              "utilities": 16.0, "telecommunications": 14.0,
+              "transportation": 15.0}
+_SECTOR_BETA = {"technology": 1.2, "financial_services": 1.1,
+                "healthcare": 0.9, "energy": 1.3,
+                "consumer_discretionary": 1.0, "consumer_staples": 0.7,
+                "industrials": 1.0, "materials": 1.2, "real_estate": 0.9,
+                "utilities": 0.6, "telecommunications": 0.8,
+                "transportation": 1.1}
+
+
+def _roster_inputs(roster_path):
+    raw = json.loads(Path(roster_path).read_text())
+    dates = raw["dates"]
+    closes = raw["closes"]
+    vols = raw["avg_volume_2020_01"]
+    # crash window: 2020-02-19 peak to 2020-03-23 trough, by calendar date
+    crash = [i for i, d in enumerate(dates) if "2020-02-19" <= d <= "2020-03-23"]
+    return dates, closes, vols, (crash[0], crash[-1])
+
+
+def driven_basket(m, seed: int, roster_path) -> dict:
+    """Four cross-sectional statistics, sim vs real, along the real path.
+
+    Basket noise ratio (the driven ratio, de-AAPLed), dispersion path
+    ratio at the crash trough and at window end, crash co-movement (mean
+    pairwise correlation over the drawdown sessions), and the IQR of the
+    per-name noise ratios.
+    """
+    import pyarrow as pa
+    import pyarrow.compute as pc
+    raw, policy, credit, qe = _covid_inputs()
+    dates, closes, avg_vols, (c0, c1) = _roster_inputs(roster_path)
+    assert dates == raw["dates"], "roster must align to the covid window"
+    n = len(dates)
+    path = [{"day": i, "vix": raw["vix"][i], "federal_funds_rate": policy[i],
+             "corporate_bond_yield": credit[i], "qe_pe_boost": qe[i]}
+            for i in range(n)]
+    scen = pt.Scenario.from_json(json.dumps(
+        {"schema": 1, "label": "covid-basket", "days": n, "path": path}))
+    names = sorted(closes)
+    instruments = []
+    for tk in names:
+        sec = _ROSTER_SECTOR[tk]
+        p0 = closes[tk][0]
+        shares = _ROSTER_CAP_B[tk] * 1e9 / p0
+        eps = p0 / _SECTOR_PE[sec]
+        instruments.append(pt.Instrument(
+            tk, sec, initial_price=p0, shares_outstanding=shares,
+            eps=eps, book_value_per_share=eps * 4.0, revenue_growth=0.05,
+            avg_volume=avg_vols[tk], beta=_SECTOR_BETA[sec],
+            short_interest=shares * 0.01))
+    u = pt.Universe(instruments)
+    e = pt.Engine(seed=seed, universe=u, model=m)
+    for i in range(n):
+        scen.apply(e, i)
+        e.run_days(1, first_day=i)
+    b = pa.table(e.bars(grain="day"))
+
+    def rets(x):
+        return [x[i] / x[i - 1] - 1 for i in range(1, len(x))]
+
+    sim_r, real_r = {}, {}
+    for iid, tk in enumerate(names):
+        close = pc.filter(b, pc.equal(b["instrument_id"], iid))["close"].to_pylist()
+        sim_r[tk] = rets(close)
+        real_r[tk] = rets(closes[tk])
+
+    ratios = sorted(_sd(sim_r[tk]) / _sd(real_r[tk]) for tk in names)
+    k = len(ratios)
+    basket_ratio = statistics.median(ratios)
+    iqr = ratios[(3 * k) // 4] - ratios[k // 4]
+
+    def cum(r, upto):
+        c = 1.0
+        for x in r[:upto]:
+            c *= 1 + x
+        return c - 1.0
+
+    def disp(rmap, upto):
+        vals = [cum(rmap[tk], upto) for tk in names]
+        return _sd(vals)
+
+    disp_trough = disp(sim_r, c1) / disp(real_r, c1)
+    disp_end = disp(sim_r, n - 1) / disp(real_r, n - 1)
+
+    def mean_pairwise(rmap, i0, i1):
+        # mean pairwise correlation via the standardized-sum identity
+        seg = {tk: rmap[tk][i0:i1] for tk in names}
+        zs = []
+        for tk in names:
+            s = seg[tk]
+            mu = statistics.mean(s)
+            sd = _sd(s)
+            zs.append([(x - mu) / sd for x in s] if sd > 0 else [0.0] * len(s))
+        m_ = len(zs)
+        t_ = len(zs[0])
+        tot = [sum(z[j] for z in zs) for j in range(t_)]
+        var_tot = sum(x * x for x in tot) / t_
+        # var(sum of standardized) = m + m(m-1)*rbar
+        return (var_tot - m_) / (m_ * (m_ - 1.0)) if m_ > 1 else 0.0
+
+    co_sim = mean_pairwise(sim_r, c0, c1)
+    co_real = mean_pairwise(real_r, c0, c1)
+
+    return {"basket_noise_ratio": basket_ratio,
+            "noise_ratio_iqr": iqr,
+            "dispersion_trough_ratio": disp_trough,
+            "dispersion_end_ratio": disp_end,
+            "crash_comovement_sim": co_sim,
+            "crash_comovement_real": co_real}
 
 
 def one(job):

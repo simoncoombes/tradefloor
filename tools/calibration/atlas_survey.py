@@ -160,6 +160,23 @@ DEFAULT_PLAN_SEED = atlas.DEFAULT_SEED
 #: `tests/test_model_params.py` (values proven to move the market),
 #: `instrumentlib.PARAM_SPECS` hard ranges, and the mechanism's own units.
 ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
+    # The down-transmission wire and its lagged twin (rounds 108-119).
+    # pt-v16 folds the contemporaneous wire at 0.025; the campaign screened
+    # both to 0.04 and the mechanism reads as a per-tick transmission
+    # multiplier, so 0.1 is far past anything measured useful and bounds
+    # the box the way ramp=50 does above: strong-to-implausible.
+    "market_beta_down_asym": (0.0, 0.1),
+    "market_beta_down_asym_lag": (0.0, 0.1),
+    # EMA days on the VIX the market variance target reads (round 99).
+    # Measured dead at 3 and 10 along the driven window; 20 trading days
+    # is a month of smoothing, past which the fear response is no longer
+    # a response. Sampled to there so the map shows the whole slope.
+    "market_vol_vix_smooth": (0.0, 20.0),
+    # Gain on ln(holdings ratio) in the target P/E (round 103's stock
+    # formulation). The measured covid ratio peaks at ~1.9 (ln ~0.64), and
+    # the era's P/E premium peaked at ~1.29x fair, so gain ~7 reproduces
+    # the whole premium through this channel alone; 10 bounds the box.
+    "qe_pe_stock_gain": (0.0, 10.0),
     # The VIX's feedback weight (§68): a share, so its box is the unit
     # interval. At 1.0 the loop gain is exactly one by construction, since
     # the implied VIX is the forward coupling's own inverse, so the top of

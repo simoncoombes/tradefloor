@@ -208,6 +208,15 @@ pub struct ModelParams {
     /// channel has one — but any value fitted to the current driven test
     /// carries that qualification with it.
     pub qe_pe_gain: f64,
+    /// Gain on the QE STOCK channel: the target P/E takes
+    /// `+ qe_pe_stock_gain * ln(qe_assets_ratio)`, concave in the level of
+    /// holdings, zero at the neutral baseline. 0.0 -- every preset when the
+    /// dial shipped -- is bit-inert. The flow channel above it is linear in
+    /// monthly purchases and overshoots when fed the measured series; this
+    /// is the formulation that can take real data. See `corpus/qe` in the
+    /// design record for the measured Fed series and the -0.485 proxy
+    /// anticorrelation that motivated it.
+    pub qe_pe_stock_gain: f64,
     /// Scale on the per-name idiosyncratic GARCH sigma — the funding side
     /// of the factor-variance reallocation. Bit-inert at 1.0.
     pub idio_sigma_scale: f64,
@@ -508,6 +517,39 @@ pub struct ModelParams {
     pub market_vol_vix_coupling: f64,
     /// VIX level at which a coupled target equals the baseline variance.
     pub market_vol_vix_anchor: f64,
+    /// Days of EMA smoothing on the VIX the MARKET variance target reads.
+    /// 0 -- every shipped preset -- reads each day's print raw, bit for
+    /// bit. Round 99: with QE silenced, the entire remaining driven-window
+    /// excess is the fear response transmitting print-to-print VIX churn
+    /// into the variance target; real volatility follows sustained fear.
+    /// Affects the market factor only; the per-name GARCH VIX coupling
+    /// still reads the print.
+    pub market_vol_vix_smooth: f64,
+    /// Exponent on the market variance target's VIX ratio. 2.0 -- every
+    /// shipped preset -- is the literal square, bit for bit. Round 100
+    /// measured the square too convex through mid-VIX along real paths;
+    /// a lower exponent with the coupling re-fit to hold T(45)/T(5)
+    /// flattens the middle while preserving the certified crisis lever's
+    /// backbone. Below one the target at very low VIX can go negative and
+    /// the variance floor clamps it; the vix5 instrument must be checked,
+    /// not assumed.
+    pub market_vol_vix_exponent: f64,
+    /// Downside transmission asymmetry: on a down tick of the market
+    /// factor, every name receives `beta * factor * (1 + this)`. 0.0 --
+    /// every shipped preset -- is bit-identical. The direct wire for
+    /// correlation asymmetry: names co-moving harder on the way down IS
+    /// the exceedance correlation real markets show and the panel's
+    /// corr_asymmetry statistic measures. Raises down-day co-movement and
+    /// some volatility asymmetry with it; the leverage_effect row is the
+    /// stated side-channel to watch.
+    pub market_beta_down_asym: f64,
+    /// The LAGGED downside transmission: on the session after a down day,
+    /// every name receives `beta * factor * (1 + this)` whatever the
+    /// tick's own sign. 0.0 -- every shipped preset -- is bit-identical.
+    /// Block 1201's deep-trim signature (the wire landing a day late on
+    /// its structure) is the measured motivation: real down-moves
+    /// continue, and the contemporaneous wire alone cannot express that.
+    pub market_beta_down_asym_lag: f64,
     /// Persistence of the SLOW variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -1205,6 +1247,9 @@ pub const PT_V14: ModelParams = ModelParams::pt_v14();
 /// pt-v14 with the slow variance component switched on and the credit
 /// floor enforced -- see [`ModelParams::pt_v15`].
 pub const PT_V15: ModelParams = ModelParams::pt_v15();
+/// pt-v15 with the QE valuation channel silenced -- see
+/// [`ModelParams::pt_v16`].
+pub const PT_V16: ModelParams = ModelParams::pt_v16();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -1258,6 +1303,7 @@ impl ModelParams {
             sector_loading_beta_slope: 0.0,
             crisis_blend_variance_damp: 0.0,
             qe_pe_gain: 1.0,
+            qe_pe_stock_gain: 0.0,
             idio_sigma_scale: factor_vol::IDIO_SIGMA_SCALE,
             idio_sigma_beta_exponent: 0.0,
             order_flow_coefficient: factors::ORDER_FLOW_COEFFICIENT,
@@ -1290,6 +1336,10 @@ impl ModelParams {
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
             market_vol_vix_coupling: factor_vol::MARKET_VOL_VIX_COUPLING,
             market_vol_vix_anchor: factor_vol::MARKET_VOL_VIX_ANCHOR,
+            market_vol_vix_smooth: 0.0,
+            market_vol_vix_exponent: 2.0,
+            market_beta_down_asym: 0.0,
+            market_beta_down_asym_lag: 0.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
@@ -2155,6 +2205,72 @@ impl ModelParams {
         p
     }
 
+    /// pt-v15 re-levelled: the QE channel silenced, the asymmetry
+    /// composition, and the 0.86x joint volatility trim.
+    ///
+    /// **The first preset to hold the complete card at the deepest
+    /// standard this programme runs** -- twenty-six blocks spanning both
+    /// the qualification corpus and thirteen blocks no search ever
+    /// touched, one hundred seeds per block:
+    ///
+    /// | | pt-v16 | the pre-trim candidate |
+    /// |---|---|---|
+    /// | 504 full-house | **26/26** | 24/26 |
+    /// | crisis co-movement in range | 26/26 (spread 0.0406) | 26/26 |
+    /// | crisis lever in tolerance | 26/26 (median 6.241) | 26/26 |
+    /// | driven noise ratio | **1.1246** | 1.2995 |
+    /// | out-of-band rows, anywhere | **none** | corr_asymmetry x2 |
+    ///
+    /// Three ideas compose. `qe_pe_gain` 0.0 silences a channel whose
+    /// driven input is a proxy anticorrelated with measured Fed purchases
+    /// (-0.485) and which subtracts realism with either input.
+    /// `vix_cycle_amplitude` 0.85, `sector_loading_beta_slope` 0.7 and
+    /// `market_beta_down_asym` 0.025 are the correlation-asymmetry
+    /// composition: down ticks of the factor transmit harder (exceedance
+    /// correlation, the mechanism the statistic is about), funded by
+    /// sector-loading dispersion, seasoned by pulling the business-cycle
+    /// share of the VIX in. And the six noise sources scale together by
+    /// 0.86, which round 101 measured as the model running 20-25% hot at
+    /// both held-VIX ends with the ratio immaculate, and round 107 proved
+    /// must be trimmed JOINTLY -- any single source alone re-balances the
+    /// market/idio split and collapses correlations instead of
+    /// re-levelling.
+    ///
+    /// Scope, stated: corr_asymmetry's median (-0.022) is band-complete
+    /// and still below every real reference window; the driven window at
+    /// 1.12 is the closest this model has been to real (1.00) and is not
+    /// there. The gaps that remain are real, smaller than they have ever
+    /// been, and named in the record.
+    ///
+    /// NOT the default. pt-v14 holds that and the envelope certifies
+    /// pt-v14.
+    pub const fn pt_v16() -> ModelParams {
+        let mut p = ModelParams::pt_v15();
+        p.qe_pe_gain = 0.0;
+        p.vix_cycle_amplitude = 0.85;
+        p.sector_loading_beta_slope = 0.7;
+        p.market_beta_down_asym = 0.025;
+        // The 0.86x joint level trim: every noise source scaled together,
+        // which preserves correlations and ratios while bringing the
+        // volatility LEVEL to real scale. Trimming any one source alone
+        // re-balances instead of re-levelling (round 107).
+        p.market_factor_sigma = 0.007593024924589399;
+        p.idio_sigma_scale = 0.5125981926;
+        p.jump_sigma_idio = 0.0752080062;
+        p.jump_sigma_market = 0.0024597567320385947;
+        p.endogenous_news_sigma = 0.01751004376;
+        p.sector_factor_sigma = 0.008583053614;
+        // The same-day volume coupling, raised off the 252-day floor. The
+        // response term is the only one tying a name's volume to the size
+        // of TODAY'S move (see the field's docstring); at the shipped 0.6
+        // the 252-day volume-|return| correlation sat below the weakest
+        // real reference window on every block measured. At 1.0 all 26
+        // qualification blocks clear the floor and the union card is
+        // clean on both panels (volqual, 100 seeds).
+        p.volume_move_response = 1.0;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -2184,6 +2300,7 @@ impl ModelParams {
             "pt-v13" => Some(PT_V13),
             "pt-v14" => Some(PT_V14),
             "pt-v15" => Some(PT_V15),
+            "pt-v16" => Some(PT_V16),
             _ => None,
         }
     }
@@ -2191,7 +2308,8 @@ impl ModelParams {
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
-          "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15"]
+          "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
+          "pt-v16"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -2209,6 +2327,7 @@ impl ModelParams {
             "sector_loading_beta_slope" => self.sector_loading_beta_slope,
             "crisis_blend_variance_damp" => self.crisis_blend_variance_damp,
             "qe_pe_gain" => self.qe_pe_gain,
+            "qe_pe_stock_gain" => self.qe_pe_stock_gain,
             "idio_sigma_scale" => self.idio_sigma_scale,
             "idio_sigma_beta_exponent" => self.idio_sigma_beta_exponent,
             "order_flow_coefficient" => self.order_flow_coefficient,
@@ -2241,6 +2360,10 @@ impl ModelParams {
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
             "market_vol_vix_coupling" => self.market_vol_vix_coupling,
             "market_vol_vix_anchor" => self.market_vol_vix_anchor,
+            "market_vol_vix_smooth" => self.market_vol_vix_smooth,
+            "market_vol_vix_exponent" => self.market_vol_vix_exponent,
+            "market_beta_down_asym" => self.market_beta_down_asym,
+            "market_beta_down_asym_lag" => self.market_beta_down_asym_lag,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
@@ -2339,6 +2462,7 @@ impl ModelParams {
             "sector_loading_beta_slope" => out.sector_loading_beta_slope = value,
             "crisis_blend_variance_damp" => out.crisis_blend_variance_damp = value,
             "qe_pe_gain" => out.qe_pe_gain = value,
+            "qe_pe_stock_gain" => out.qe_pe_stock_gain = value,
             "idio_sigma_scale" => out.idio_sigma_scale = value,
             "idio_sigma_beta_exponent" => out.idio_sigma_beta_exponent = value,
             "order_flow_coefficient" => out.order_flow_coefficient = value,
@@ -2371,6 +2495,10 @@ impl ModelParams {
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
             "market_vol_vix_coupling" => out.market_vol_vix_coupling = value,
             "market_vol_vix_anchor" => out.market_vol_vix_anchor = value,
+            "market_vol_vix_smooth" => out.market_vol_vix_smooth = value,
+            "market_vol_vix_exponent" => out.market_vol_vix_exponent = value,
+            "market_beta_down_asym" => out.market_beta_down_asym = value,
+            "market_beta_down_asym_lag" => out.market_beta_down_asym_lag = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
@@ -2572,6 +2700,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_slow_vix_damp",
         "market_vol_slow_weight",
         "market_vol_vix_anchor",
+        "market_vol_vix_smooth",
+        "market_vol_vix_exponent",
+        "market_beta_down_asym",
+        "market_beta_down_asym_lag",
         "market_vol_vix_coupling",
         "mispricing_cap",
         "mispricing_half_life_days",
@@ -2585,6 +2717,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "price_breaker_fraction",
         "price_hard_cap",
         "qe_pe_gain",
+        "qe_pe_stock_gain",
         "regime_stress_points",
         "sector_factor_sigma",
         "sector_loading",
@@ -2877,7 +3010,31 @@ mod tests {
         assert!(PT_V1.with_override("garch_alpha", f64::NAN).is_err());
     }
 
+    /// pt-v16's qualification is asymqual's `cand` cell: thirteen
+    /// certified blocks measured on pt-v15 plus these four overrides. The
+    /// frozen preset inherits those measurements only if it is that vector
+    /// to the bit, which this asserts. If it ever fails, the preset has
+    /// drifted from the evidence that qualified it.
     #[test]
+    fn pt_v16_is_the_measured_cand_cell_to_the_bit() {
+        let measured = ModelParams::preset("pt-v15")
+            .unwrap()
+            .with_override("qe_pe_gain", 0.0)
+            .and_then(|m| m.with_override("vix_cycle_amplitude", 0.85))
+            .and_then(|m| m.with_override("sector_loading_beta_slope", 0.7))
+            .and_then(|m| m.with_override("market_beta_down_asym", 0.025))
+            .and_then(|m| m.with_override("market_factor_sigma", 0.007593024924589399))
+            .and_then(|m| m.with_override("idio_sigma_scale", 0.5125981926))
+            .and_then(|m| m.with_override("jump_sigma_idio", 0.0752080062))
+            .and_then(|m| m.with_override("jump_sigma_market", 0.0024597567320385947))
+            .and_then(|m| m.with_override("endogenous_news_sigma", 0.01751004376))
+            .and_then(|m| m.with_override("sector_factor_sigma", 0.008583053614))
+            .and_then(|m| m.with_override("volume_move_response", 1.0))
+            .expect("every folded dial is settable");
+        assert_eq!(crate::params::PT_V16.digest(), measured.digest());
+        assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");
+    }
+
     #[test]
     fn every_preset_runs_the_half_life_it_reports() {
         // The gap this closes. `with_override` recomputes `mispricing_phi`

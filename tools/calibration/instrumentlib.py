@@ -133,6 +133,20 @@ PARAM_SPECS: dict[str, dict] = {
     # these was settable and unreachable by any search, because a missing
     # spec is a KeyError in `shipped_values()` -- which is how the first
     # crisis search died one minute in.
+    # The pt-v16-era dials (rounds 96-119). All four ship at zero and are
+    # bounded shares/levels, so "abs" with steps matched to their measured
+    # useful neighbourhoods (asym folded at 0.025, screened to 0.04; the
+    # smooth measured at 3 and 10 days; the stock gain's premium-matching
+    # value is ~7, see atlas ZERO_SHIPPED_RANGES).
+    # The response-curve exponent ships at 2.0 (the vix-squared target).
+    # Rounds 112-114 measured 2.15-3.5 with closed-form endpoint pinning;
+    # every cell broke the lever, co-movement, or the p252 volume floor,
+    # so the surveyed box brackets the shipped value tightly on purpose.
+    "market_vol_vix_exponent": {"kind": "abs", "step_unit": 0.05, "hard_range": (1.0, 4.0)},
+    "market_beta_down_asym": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
+    "market_beta_down_asym_lag": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
+    "market_vol_vix_smooth": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 60.0)},
+    "qe_pe_stock_gain": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 20.0)},
     "universe_stress_weight": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 2.0)},
     "universe_stress_decay": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.0, 0.995)},
     # Also a level rather than a share, and shipped at 0.0 -- which a log

@@ -220,6 +220,7 @@ pub struct PyMacro {
     pub corporate_bond_yield: Option<f64>,
     pub inflation_rate: f64,
     pub qe_pe_boost: f64,
+    pub qe_assets_ratio: f64,
     pub fear_greed_index: f64,
     pub cycle: String,
 }
@@ -229,7 +230,7 @@ impl PyMacro {
     #[new]
     #[pyo3(signature = (
         *, vix = 15.0, federal_funds_rate = 0.025, corporate_bond_yield = None,
-        inflation_rate = 0.02, qe_pe_boost = 0.0, fear_greed_index = 50.0,
+        inflation_rate = 0.02, qe_pe_boost = 0.0, qe_assets_ratio = 1.0, fear_greed_index = 50.0,
         cycle = "expansion"
     ))]
     fn new(
@@ -238,6 +239,7 @@ impl PyMacro {
         corporate_bond_yield: Option<f64>,
         inflation_rate: f64,
         qe_pe_boost: f64,
+        qe_assets_ratio: f64,
         fear_greed_index: f64,
         cycle: &str,
     ) -> PyResult<Self> {
@@ -256,6 +258,8 @@ impl PyMacro {
         for (name, v) in [
             ("vix", vix),
             ("qe_pe_boost", qe_pe_boost),
+            ("qe_assets_ratio", qe_assets_ratio),
+            ("qe_assets_ratio", qe_assets_ratio),
             ("fear_greed_index", fear_greed_index),
         ] {
             if !v.is_finite() {
@@ -270,6 +274,7 @@ impl PyMacro {
             corporate_bond_yield,
             inflation_rate,
             qe_pe_boost,
+            qe_assets_ratio,
             fear_greed_index,
             cycle: cycle.to_string(),
         })
@@ -589,7 +594,7 @@ pub fn economy_from(
 ) -> PyResult<crate::economy::EconomyState> {
     Ok(match macro_state {
         Some(m) => m.to_core(),
-        None => PyMacro::new(15.0, 0.025, None, 0.02, 0.0, 50.0, "expansion")?.to_core(),
+        None => PyMacro::new(15.0, 0.025, None, 0.02, 0.0, 1.0, 50.0, "expansion")?.to_core(),
     })
 }
 
@@ -612,6 +617,7 @@ impl PyMacro {
             .unwrap_or(e.corporate_bond_yield);
         // NOT converted: a multiplier delta, fractional in both.
         e.qe_pe_boost = self.qe_pe_boost;
+        e.qe_assets_ratio = self.qe_assets_ratio;
         e.fear_greed_index = self.fear_greed_index;
         e.cycle_phase = CyclePhase::from_name(&self.cycle).expect("validated at construction");
         e
@@ -1479,6 +1485,7 @@ impl PyEngine {
             corporate_bond_yield: Some(crate::units::percent_to_fraction(e.corporate_bond_yield)),
             inflation_rate: crate::units::percent_to_fraction(e.inflation_rate),
             qe_pe_boost: e.qe_pe_boost,
+            qe_assets_ratio: e.qe_assets_ratio,
             fear_greed_index: e.fear_greed_index,
             cycle: cycle_name(e.cycle_phase).to_string(),
         }
@@ -1525,7 +1532,7 @@ impl PyEngine {
     /// step, so a pin outside that band survives only the day it is written.
     #[pyo3(signature = (
         *, vix = None, federal_funds_rate = None, corporate_bond_yield = None,
-        inflation_rate = None, qe_pe_boost = None, fear_greed_index = None,
+        inflation_rate = None, qe_pe_boost = None, qe_assets_ratio = None, fear_greed_index = None,
         gdp_growth = None, unemployment_rate = None, tariff_rate = None,
         oil_price = None, cycle = None
     ))]
@@ -1537,6 +1544,7 @@ impl PyEngine {
         corporate_bond_yield: Option<f64>,
         inflation_rate: Option<f64>,
         qe_pe_boost: Option<f64>,
+        qe_assets_ratio: Option<f64>,
         fear_greed_index: Option<f64>,
         gdp_growth: Option<f64>,
         unemployment_rate: Option<f64>,
@@ -1563,6 +1571,7 @@ impl PyEngine {
         for (name, v) in [
             ("vix", vix),
             ("qe_pe_boost", qe_pe_boost),
+            ("qe_assets_ratio", qe_assets_ratio),
             ("fear_greed_index", fear_greed_index),
         ] {
             if let Some(v) = v {
@@ -1602,6 +1611,7 @@ impl PyEngine {
             ("corporate_bond_yield", corporate_bond_yield),
             ("inflation_rate", inflation_rate),
             ("qe_pe_boost", qe_pe_boost),
+            ("qe_assets_ratio", qe_assets_ratio),
             ("fear_greed_index", fear_greed_index),
             ("gdp_growth", gdp_growth),
             ("unemployment_rate", unemployment_rate),
@@ -1632,6 +1642,9 @@ impl PyEngine {
         }
         if let Some(v) = qe_pe_boost {
             e.qe_pe_boost = v;
+        }
+        if let Some(v) = qe_assets_ratio {
+            e.qe_assets_ratio = v;
         }
         if let Some(v) = fear_greed_index {
             e.fear_greed_index = v;
@@ -1940,11 +1953,13 @@ impl PyEngine {
         // fork that lost it would re-open at the baseline factor sigma
         // mid-regime and diverge from its parent at the next close.
         let (market_variance, market_day_factor, market_fast_variance,
-             market_slow_variance) = self.inner.market_variance_state();
+             market_slow_variance, market_prev_day_factor, market_smoothed_vix) =
+            self.inner.market_variance_state();
         out.set_item(
             "market_variance",
             vec![market_variance, market_day_factor, market_fast_variance,
-                 market_slow_variance],
+                 market_slow_variance, market_prev_day_factor,
+                 market_smoothed_vix],
         )?;
         // The common log-volume state. Same reason as the variance above, and
         // the same failure: omitted, a fork re-opens at volume 1.0 mid-regime
@@ -2240,23 +2255,32 @@ impl PyEngine {
         if let Some(raw) = snapshot.get_item("market_variance")? {
             let vals: Vec<f64> = raw.extract()?;
             // Two values is a checkpoint written before the slow component
-            // existed; three is one written after. Both replay.
-            if vals.len() != 2 && vals.len() != 3 && vals.len() != 4 {
+            // existed; three is one written after; four adds the mixture
+            // components; five carries the lagged-wire memory. All replay.
+            if vals.len() < 2 || vals.len() > 6 {
                 return Err(ValidationError::new_err(format!(
-                    "market_variance must be [variance, day_factor], or that \
-                     plus the two component levels, got {} values",
+                    "market_variance must be [variance, day_factor], optionally \
+                     plus the component levels and the lagged-wire memory, \
+                     got {} values",
                     vals.len()
                 )));
             }
             match vals.len() {
-                // Four is a pt-v4 checkpoint. Three predates the mixture
-                // and carried an additive slow level; adopting it as both
-                // components is the only reading that leaves a legacy
-                // preset replaying identically, where neither is read.
+                // Five carries the lagged-wire memory. Four is a pt-v4
+                // checkpoint (no lag memory; the wire skips one session,
+                // which is what that era did anyway). Three predates the
+                // mixture and carried an additive slow level; adopting it
+                // as both components is the only reading that leaves a
+                // legacy preset replaying identically, where neither is
+                // read.
+                6 => self.inner.set_market_variance_state_with_components(
+                    vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]),
+                5 => self.inner.set_market_variance_state_with_components(
+                    vals[0], vals[1], vals[2], vals[3], vals[4], -1.0),
                 4 => self.inner.set_market_variance_state_with_components(
-                    vals[0], vals[1], vals[2], vals[3]),
+                    vals[0], vals[1], vals[2], vals[3], 0.0, -1.0),
                 3 => self.inner.set_market_variance_state_with_components(
-                    vals[0], vals[1], vals[0], vals[2]),
+                    vals[0], vals[1], vals[0], vals[2], 0.0, -1.0),
                 _ => self.inner.set_market_variance_state(vals[0], vals[1]),
             }
         }

@@ -113,6 +113,9 @@ pub struct SharedFactors {
     /// The crisis correlation blend weight this tick, 0.0 below the crisis
     /// threshold. Read only when `crisis_blend_source` is nonzero.
     pub crisis_spike: f64,
+    /// Yesterday's session closed with a down market factor. Read only by
+    /// the lagged transmission wire (`market_beta_down_asym_lag`).
+    pub prev_day_down: bool,
 }
 
 impl SharedFactors {
@@ -349,8 +352,32 @@ pub fn calculate_live_factors(
     // it (0.5 times the spike times the factor) is added here instead, and
     // the sector draw arrives intact. A branch, not arithmetic, so 0.0 is
     // bit-identical.
-    let market_component = if params.crisis_blend_source == 0.0 {
+    // Downside transmission asymmetry (§round 102). Real correlation rises
+    // in falling markets because names co-move harder on the way down --
+    // exceedance correlation, the direct mechanism corr_asymmetry measures.
+    // On a down tick of the factor the transmission is scaled by
+    // (1 + market_beta_down_asym); up ticks are untouched. At 0.0 neither
+    // branch below multiplies, so every shipped preset is bit-identical.
+    let factor_through = if params.market_beta_down_asym == 0.0
+        || shared.market_factor >= 0.0
+    {
         beta * shared.market_factor
+    } else {
+        beta * shared.market_factor * (1.0 + params.market_beta_down_asym)
+    };
+    // The LAGGED wire (block 1201's signature, round 110's interim): on the
+    // session AFTER a down day, transmission is boosted regardless of the
+    // tick's own sign -- down moves continue into the next day. A branch,
+    // so 0.0 is bit-identical.
+    let factor_through = if params.market_beta_down_asym_lag == 0.0
+        || !shared.prev_day_down
+    {
+        factor_through
+    } else {
+        factor_through * (1.0 + params.market_beta_down_asym_lag)
+    };
+    let market_component = if params.crisis_blend_source == 0.0 {
+        factor_through
     } else {
         // At a held VIX the crisis spike is pinned at `crisis_blend_cap`, so
         // the only thing varying block to block in this injection is
@@ -378,7 +405,7 @@ pub fn calculate_live_factors(
             injection * mathx::clamp(
                 mathx::pow(rel, -params.crisis_blend_variance_damp), 0.1, 10.0)
         };
-        beta * shared.market_factor + injection
+        factor_through + injection
     };
     // The sector loading (§108). It was the literal 0.5 for every member of
     // every sector: a name's exposure to its own industry was the one
@@ -602,6 +629,7 @@ mod tests {
             market_factor: 0.0,
             sector_factors: vec![("technology".into(), 0.0)],
             crisis_spike: 0.0,
+            prev_day_down: false,
         }
     }
 

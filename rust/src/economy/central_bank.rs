@@ -21,6 +21,11 @@
 //! parity harness prove the draw happened at the right point with the right
 //! value.
 
+/// Neutral Fed portfolio for the QE stock channel, in $B. `qe_assets_ratio`
+/// is holdings over this. See `qe_pe_stock_gain`.
+const QE_ASSETS_BASELINE_B: f64 = 5000.0;
+
+
 use super::state::*;
 use crate::mathx::{self, clamp_via_min_max as clamp};
 use crate::rng::Rng;
@@ -323,6 +328,15 @@ pub fn update_central_bank(
     // module can read it without a central-bank reference.
     if new_cb.qe_active && new_cb.qe_monthly_purchases > 0.0 {
         new_economy.qe_pe_boost = 0.10 * (new_cb.qe_monthly_purchases / 120.0);
+        // The STOCK the flow accumulates into, per trading day, over a
+        // neutral baseline of $5,000B -- roughly the pre-2020 portfolio.
+        // Consumed only by `qe_pe_stock_gain`, which ships at 0.0, so this
+        // integration is invisible until a preset turns that dial. No
+        // runoff is modelled: the engine's cycle has QE start and taper,
+        // and balance-sheet reduction is future work, stated rather than
+        // faked.
+        new_economy.qe_assets_ratio +=
+            (new_cb.qe_monthly_purchases / 21.0) / QE_ASSETS_BASELINE_B;
     } else {
         new_economy.qe_pe_boost = 0.0;
     }

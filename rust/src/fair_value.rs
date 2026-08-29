@@ -88,6 +88,12 @@ pub struct EconomyValuationInputs {
     pub corporate_bond_yield: Option<f64>,
     pub federal_funds_rate: f64,
     pub qe_pe_boost: Option<f64>,
+    /// Fed securities held outright over a neutral baseline. `1.0` is
+    /// neutral and contributes nothing; `None` means the caller does not
+    /// model the stock and is treated as neutral. Consumed only by the
+    /// stock channel (`qe_pe_stock_gain`), which every preset before
+    /// pt-v16-era work ships at 0.0.
+    pub qe_assets_ratio: Option<f64>,
 }
 
 /// The decomposition, as the attribution UI renders it.
@@ -141,11 +147,33 @@ fn discount_rate(economy: &EconomyValuationInputs) -> f64 {
     yield_pct / 100.0
 }
 
+/// The STOCK channel of QE valuation: concave in the level of holdings.
+///
+/// The flow channel above it is linear in monthly purchases and measured
+/// against a proxy; fed the real series it overshoots (the 2020 peak reads
+/// 1.29 on a scale built for 0.10). The portfolio-balance literature puts
+/// the valuation effect on the STOCK of holdings, with diminishing returns,
+/// so this term is `gain * ln(holdings / baseline)`: zero at the neutral
+/// baseline, concave above it, and symmetric-in-log below. Gain 0.0 -- every
+/// preset today -- contributes literal `+0.0`, which is bit-inert.
+fn qe_stock_term(gain: f64, ratio: Option<f64>) -> f64 {
+    if gain == 0.0 {
+        return 0.0;
+    }
+    match ratio {
+        // Floored away from zero so a malformed ratio cannot mint a NaN
+        // that would freeze every book downstream.
+        Some(r) => gain * mathx::log(mathx::max(r, 1e-6)),
+        None => 0.0,
+    }
+}
+
 /// Company-specific target PE: anchor x rate adjustment x QE adjustment.
 pub fn compute_target_pe(
     company: &CompanyValuationInputs,
     economy: &EconomyValuationInputs,
     qe_gain: f64,
+    qe_stock_gain: f64,
 ) -> TargetPe {
     let sector_anchor_pe = sector_anchor_pe(company.sector_avg_pe);
     let discount = discount_rate(economy);
@@ -164,7 +192,8 @@ pub fn compute_target_pe(
     // there. It exists because this is the only macro channel in the model
     // with no gain between input and response, and round 76 measured it
     // carrying more of the driven-window excess than the VIX channel does.
-    let qe_adjustment = 1.0 + qe_gain * economy.qe_pe_boost.unwrap_or(0.0);
+    let qe_adjustment = 1.0 + qe_gain * economy.qe_pe_boost.unwrap_or(0.0)
+        + qe_stock_term(qe_stock_gain, economy.qe_assets_ratio);
 
     TargetPe {
         target_pe: sector_anchor_pe * rate_adjustment * qe_adjustment,
@@ -184,7 +213,7 @@ pub fn compute_fair_value(
     company: &CompanyValuationInputs,
     economy: &EconomyValuationInputs,
 ) -> FairValueBreakdown {
-    compute_fair_value_with(company, economy, 0.0, 1.0)
+    compute_fair_value_with(company, economy, 0.0, 1.0, 0.0)
 }
 
 /// [`compute_fair_value`] with the book floor extended to profitable companies.
@@ -228,11 +257,12 @@ pub fn compute_fair_value_with(
     economy: &EconomyValuationInputs,
     book_floor: f64,
     qe_gain: f64,
+    qe_stock_gain: f64,
 ) -> FairValueBreakdown {
     let eps = company.eps.unwrap_or(0.0);
 
     if eps > 0.0 {
-        let pe = compute_target_pe(company, economy, qe_gain);
+        let pe = compute_target_pe(company, economy, qe_gain, qe_stock_gain);
         // The floor is a BRANCH at zero, not arithmetic, for the same reason
         // `market_vol_slow_weight` is: every preset before this parameter
         // existed must reproduce bit for bit, and that is the only spelling
@@ -280,6 +310,7 @@ mod tests {
             corporate_bond_yield: y,
             federal_funds_rate: fed,
             qe_pe_boost: qe,
+            qe_assets_ratio: None,
         }
     }
     fn co(
@@ -330,16 +361,52 @@ mod tests {
         // 1.0 is what every preset before the dial carried, and the whole
         // channel is `1 + gain * boost`, so this must be bit-identical to
         // the arithmetic it replaced.
-        let shipped = compute_target_pe(&c, &e, 1.0);
+        let shipped = compute_target_pe(&c, &e, 1.0, 0.0);
         assert_eq!(shipped.qe_adjustment.to_bits(), (1.20f64).to_bits());
 
         // Half the gain is half the boost.
-        assert_eq!(compute_target_pe(&c, &e, 0.5).qe_adjustment.to_bits(),
+        assert_eq!(compute_target_pe(&c, &e, 0.5, 0.0).qe_adjustment.to_bits(),
                    (1.10f64).to_bits());
         // Zero removes the channel without removing the valuation.
-        let off = compute_target_pe(&c, &e, 0.0);
+        let off = compute_target_pe(&c, &e, 0.0, 0.0);
         assert_eq!(off.qe_adjustment.to_bits(), (1.0f64).to_bits());
         assert!(off.target_pe > 0.0);
+    }
+
+    /// The stock channel: off is bit-inert whatever the ratio says, the
+    /// neutral ratio contributes nothing at any gain, and the response is
+    /// concave -- doubling holdings adds less the second time.
+    #[test]
+    fn qe_stock_channel_is_inert_off_and_concave_on() {
+        let base = econ(Some(10.0), 3.5, Some(0.05));
+        let mut high = base.clone();
+        high.qe_assets_ratio = Some(2.2);
+        let c = co(Some(20.0), Some(4.0), None, Some(0.1));
+
+        // gain 0.0: the ratio cannot matter, to the bit
+        let off_base = compute_target_pe(&c, &base, 1.0, 0.0);
+        let off_high = compute_target_pe(&c, &high, 1.0, 0.0);
+        assert_eq!(off_base.qe_adjustment.to_bits(), off_high.qe_adjustment.to_bits());
+
+        // neutral ratio: no contribution at any gain
+        let mut neutral = base.clone();
+        neutral.qe_assets_ratio = Some(1.0);
+        assert_eq!(
+            compute_target_pe(&c, &neutral, 1.0, 0.13).qe_adjustment.to_bits(),
+            off_base.qe_adjustment.to_bits(),
+        );
+
+        // concave: 1.0 -> 2.0 adds more than 2.0 -> 4.0... no: ln doubles
+        // equally per doubling; concavity in the LEVEL: equal increments of
+        // ratio add less and less.
+        let term = |r: f64| {
+            let mut e = base.clone();
+            e.qe_assets_ratio = Some(r);
+            compute_target_pe(&c, &e, 1.0, 0.13).qe_adjustment
+        };
+        let d1 = term(2.0) - term(1.0);
+        let d2 = term(3.0) - term(2.0);
+        assert!(d1 > d2 && d2 > 0.0, "equal level steps must add less: {d1} then {d2}");
     }
 
     #[test]
@@ -348,11 +415,13 @@ mod tests {
             &co(Some(20.0), Some(1.0), None, Some(-0.9)),
             &econ(Some(10.0), 3.5, None),
             1.0,
+            0.0,
         );
         let flat = compute_target_pe(
             &co(Some(20.0), Some(1.0), None, Some(0.0)),
             &econ(Some(10.0), 3.5, None),
             1.0,
+            0.0,
         );
         assert_eq!(
             shrinking.rate_adjustment.to_bits(),
@@ -366,6 +435,7 @@ mod tests {
             &co(Some(32.0), Some(4.0), None, Some(0.5)),
             &econ(Some(40.0), 3.5, None),
             1.0,
+            0.0,
         );
         assert_eq!(extreme.rate_adjustment, RATE_ADJUSTMENT_FLOOR);
     }

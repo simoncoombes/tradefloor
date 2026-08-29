@@ -252,7 +252,7 @@ pub fn update_market_variance_with(
     let vix_ratio = vix / params.market_vol_vix_anchor;
     let target = base
         * (1.0 - params.market_vol_vix_coupling
-            + params.market_vol_vix_coupling * (vix_ratio * vix_ratio));
+            + params.market_vol_vix_coupling * vix_response(params, vix_ratio));
     update_toward_with(params, current_variance, day_factor, target)
 }
 
@@ -329,6 +329,21 @@ fn clamp_variance(params: &crate::params::ModelParams, v: f64) -> f64 {
     )
 }
 
+
+/// The VIX ratio raised to the response exponent. At exactly 2.0 -- every
+/// preset before the dial -- this is the literal `r * r` the shipped
+/// update has always computed, bit for bit; `powf` never runs there.
+/// Round 100: along the real covid path the square is too convex through
+/// mid-VIX, and the exponent (with the coupling re-fit to preserve the
+/// held-VIX ratio) is the shape the driven window asks for.
+fn vix_response(params: &crate::params::ModelParams, vix_ratio: f64) -> f64 {
+    if params.market_vol_vix_exponent == 2.0 {
+        vix_ratio * vix_ratio
+    } else {
+        mathx::pow(vix_ratio, params.market_vol_vix_exponent)
+    }
+}
+
 fn update_toward_with(
     params: &crate::params::ModelParams,
     current_variance: f64,
@@ -376,6 +391,14 @@ pub struct MarketVarianceState {
     fast_variance: f64,
     /// The slow component's own level.
     slow_variance: f64,
+    /// EMA of the VIX the variance target reads, when
+    /// `market_vol_vix_smooth` is on. `None` until the first smoothed
+    /// close, and never touched while the dial is 0.0.
+    smoothed_vix: Option<f64>,
+    /// Yesterday's accumulated day factor, recorded at close for the
+    /// lagged transmission wire. Purely observational: nothing in the
+    /// variance process reads it.
+    prev_day_factor: f64,
 }
 
 impl Default for MarketVarianceState {
@@ -404,7 +427,15 @@ impl MarketVarianceState {
             day_factor: 0.0,
             fast_variance: base,
             slow_variance: base,
+            smoothed_vix: None,
+            prev_day_factor: 0.0,
         }
+    }
+
+    /// Whether yesterday's session accumulated a DOWN market factor. For
+    /// the lagged transmission wire; false before the first close.
+    pub fn prev_day_down(&self) -> bool {
+        self.prev_day_factor < 0.0
     }
 
     /// Today's factor sigma at DAILY scale — what the tick multiplies by
@@ -436,11 +467,27 @@ impl MarketVarianceState {
     /// calls; at [`crate::params::PT_V1`] it is the shipped update bit for
     /// bit.
     pub fn close_day_with(&mut self, params: &crate::params::ModelParams, vix: f64) {
+        // The fear the target reads, not necessarily today's print. Real
+        // volatility follows sustained fear with inertia; a model that
+        // transmits every VIX print one-for-one into the variance target
+        // injects the print-to-print churn straight into daily returns,
+        // which round 99 measured as the whole of the driven excess. At
+        // `market_vol_vix_smooth` = 0 -- every shipped preset -- the print
+        // is read raw and this state never updates, bit for bit.
+        let vix = if params.market_vol_vix_smooth == 0.0 {
+            vix
+        } else {
+            let alpha = 2.0 / (params.market_vol_vix_smooth + 1.0);
+            let prev = self.smoothed_vix.unwrap_or(vix);
+            let sm = prev + alpha * (vix - prev);
+            self.smoothed_vix = Some(sm);
+            sm
+        };
         let base = params.market_factor_sigma * params.market_factor_sigma;
         let vix_ratio = vix / params.market_vol_vix_anchor;
         let target = base
             * (1.0 - params.market_vol_vix_coupling
-                + params.market_vol_vix_coupling * (vix_ratio * vix_ratio));
+                + params.market_vol_vix_coupling * vix_response(params, vix_ratio));
 
         let w = params.market_vol_slow_weight;
 
@@ -452,6 +499,7 @@ impl MarketVarianceState {
             self.variance = update_market_variance_with(
                 params, self.variance, self.day_factor, vix);
             self.fast_variance = self.variance;
+            self.prev_day_factor = self.day_factor;
             self.day_factor = 0.0;
             return;
         }
@@ -482,7 +530,7 @@ impl MarketVarianceState {
         } else {
             let c = params.market_vol_vix_coupling
                 * (1.0 - params.market_vol_slow_vix_damp);
-            base * (1.0 - c + c * (vix_ratio * vix_ratio))
+            base * (1.0 - c + c * vix_response(params, vix_ratio))
         };
         let (sa, sb) = slow_alpha_beta(params);
         let slow = clamp_variance(
@@ -496,14 +544,18 @@ impl MarketVarianceState {
         // autocorrelation is the weighted sum of two decay rates rather
         // than one decay plus a level.
         self.variance = clamp_variance(params, (1.0 - w) * fast + w * slow);
+        self.prev_day_factor = self.day_factor;
         self.day_factor = 0.0;
     }
 
-    /// The four state numbers, for checkpoints:
-    /// `(variance, day_factor, fast_variance, slow_variance)`.
-    pub fn snapshot(&self) -> (f64, f64, f64, f64) {
+    /// The state numbers, for checkpoints: `(variance, day_factor,
+    /// fast_variance, slow_variance, prev_day_factor, smoothed_vix)`.
+    /// `smoothed_vix` is a VIX-scale positive number while primed;
+    /// a negative value is the None sentinel (JSON carries no NaN).
+    pub fn snapshot(&self) -> (f64, f64, f64, f64, f64, f64) {
         (self.variance, self.day_factor, self.fast_variance,
-         self.slow_variance)
+         self.slow_variance, self.prev_day_factor,
+         self.smoothed_vix.unwrap_or(-1.0))
     }
 
     /// Restore from a checkpoint. Values are adopted verbatim, like every
@@ -519,6 +571,10 @@ impl MarketVarianceState {
             day_factor,
             fast_variance: variance,
             slow_variance: variance,
+            // Pre-dial checkpoints carry no smoothed fear; the EMA
+            // re-seeds from the first smoothed close after restore.
+            smoothed_vix: None,
+            prev_day_factor: 0.0,
         }
     }
 
@@ -528,8 +584,21 @@ impl MarketVarianceState {
         day_factor: f64,
         fast_variance: f64,
         slow_variance: f64,
+        prev_day_factor: f64,
+        smoothed_vix: f64,
     ) -> Self {
-        Self { variance, day_factor, fast_variance, slow_variance }
+        // A checkpoint from before the lagged wire carries no
+        // prev_day_factor; the caller passes 0.0 and the wire simply does
+        // not fire on the first restored session, which is what those
+        // checkpoints' era did anyway. Same for the smoothed fear: a
+        // negative sentinel means unprimed, and the EMA re-seeds from the
+        // first smoothed close -- bit-identical for every checkpoint
+        // written while the dial was inert.
+        Self {
+            variance, day_factor, fast_variance, slow_variance,
+            smoothed_vix: if smoothed_vix < 0.0 { None } else { Some(smoothed_vix) },
+            prev_day_factor,
+        }
     }
 }
 
@@ -778,8 +847,8 @@ mod tests {
         state.accumulate(0.007);
         state.close_day(22.0);
         state.accumulate(-0.003);
-        let (v, df, fast, slow) = state.snapshot();
-        let restored = MarketVarianceState::restore_with_components(v, df, fast, slow);
+        let (v, df, fast, slow, pdf, sv) = state.snapshot();
+        let restored = MarketVarianceState::restore_with_components(v, df, fast, slow, pdf, sv);
         assert_eq!(state, restored);
     }
 
@@ -800,7 +869,7 @@ mod tests {
         original.close_day_with(params, 31.0);
         original.accumulate(-0.004);
 
-        let (v, df, _fast, _slow) = original.snapshot();
+        let (v, df, _fast, _slow, _pdf, _sv) = original.snapshot();
         let mut restored = MarketVarianceState::restore(v, df);
 
         for day in 0..12 {

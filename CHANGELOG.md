@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+**pt-v16 registered: the complete card.** pt-v15 re-levelled and
+re-coupled: the QE valuation channel silenced (its driven input was a
+proxy anticorrelated with measured Fed purchases), the
+correlation-asymmetry composition (down ticks transmit harder, funded
+by sector-loading dispersion and a quieter VIX cycle), a 0.86x joint
+trim of every noise source (preserves correlations and ratios while
+bringing the volatility level to real scale), and the same-day volume
+coupling raised (volume_move_response 0.6 to 1.0) -- at the shipped
+value the 252-day volume-|return| correlation sat below the weakest
+real reference window on every block measured. Judged on twenty-six
+blocks -- thirteen of them never touched by any search -- at one
+hundred seeds per block: BOTH panels in band on every statistic on
+all twenty-six blocks, no out-of-band row anywhere, crisis
+co-movement and lever 26/26 each, and the driven noise ratio at 1.13
+against pt-v15's ~1.46. Selectable by name; not the default, which remains
+pt-v14.
+
 **Scenarios are now a file you can hand to somebody else.** `tf.Scenario`
 gains a second half: a named, inspectable collection of explicit
 interventions, written in YAML or in Python, with a fingerprint over the
@@ -206,6 +223,7 @@ run/checkpoint/fork/intervene/compare chain, including a cross-process
 checkpoint resume), `tests/test_packaging.py`, and
 `examples/10-forking-a-market.py`, a two-second runnable fork demonstration.
 The reproducibility tests now run in CI on all five wheel targets.
+>>>>>>> origin/main
 
 **`tradefloor.counterfactual`: run one agent in two worlds that differ by
 one variable.** The library had both halves of a controlled experiment and
