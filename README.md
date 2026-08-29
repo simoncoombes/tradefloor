@@ -191,8 +191,8 @@ Twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tree/ma
 | [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
 | [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
 
-Beside them, one directory per self-contained study. These are not lessons and
-have no reading order.
+Beside them, one directory per self-contained study. Each asks one question,
+and they come in no particular order.
 
 | | |
 |---|---|
@@ -204,7 +204,7 @@ have no reading order.
 Evaluate a [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
 financial AI agent inside a controlled Tradefloor market. Run shared history,
 checkpoint the world, fork it, raise rates by 200bps in one branch, and compare
-how the same agent responds. It is the canonical rate-shock experiment with the
+how the same agent responds. The canonical rate-shock experiment, with the
 agent swapped and nothing else moved.
 
 ```bash
@@ -220,8 +220,8 @@ no network and no FinRobot install.
 - [`examples/finrobot/rate_shock.ipynb`](https://github.com/simoncoombes/tradefloor/blob/main/examples/finrobot/rate_shock.ipynb)
 
 FinRobot is a project of the AI4Finance Foundation, Apache-2.0. This is a
-Tradefloor integration for FinRobot; it is not an official FinRobot interface
-and there is no affiliation with or endorsement by AI4Finance.
+Tradefloor integration for FinRobot. AI4Finance neither maintains nor endorses
+it. It is no part of FinRobot's own interface.
 
 ## More
 

@@ -19,16 +19,15 @@ what the agent does when the world changes. The agent is a parameter of the
 experiment, and swapping it changes no line of the market, the fork, the
 intervention or the comparison.
 
-This is an agent-EVALUATION experiment. The question is not which arm made
-more money -- one seed cannot answer that, and the comparison reports
-behaviour before it reports P&L for exactly that reason. The question is what
-the same agent, holding the same book, did differently when one number
-changed.
+This is an agent-EVALUATION experiment. One seed cannot say which arm was the
+better investor, so the comparison reports behaviour before P&L. It can say
+exactly what the same agent, holding the same book, did differently when one
+number changed.
 
 ## Replay by default
 
-The market is deterministic. FinRobot is not: it is an LLM behind an API, and
-running this twice live gives two different agents. So the default run
+The market is deterministic. FinRobot is an LLM behind an API, so running
+this twice live gives two different agents. The default run therefore
 replays a genuine recorded FinRobot run from
 `tests/fixtures/finrobot/rate-shock.json` -- no API key, no network, and
 FinRobot itself does not need to be installed. `--live` calls the real thing
@@ -116,11 +115,11 @@ ROSTER = [
      2.60, 17.0, 0.01, 4.0e6, 0.60, 3.0e6),
 ]
 
-#: Public company facts handed to FinRobot beside the market data. Passed in
-#: rather than read off the engine: these are what an analyst reads off a
-#: filing, and the adapter's job is to stay auditable about what it exposes.
-#: The valuation these feed is NOT included -- that is the simulator's answer
-#: key. See `tradefloor/integrations/finrobot.py`.
+#: Public company facts handed to FinRobot beside the market data. Supplied
+#: here instead of read off the engine, so the adapter stays auditable about
+#: what it exposes. An analyst reads all five off a filing. The valuation they
+#: feed stays out: that is the simulator's answer key. See
+#: `tradefloor/integrations/finrobot.py`.
 FUNDAMENTALS = {
     row[0]: {
         "sector": row[1],
@@ -191,11 +190,11 @@ def rule(text: str) -> None:
 def llm_config() -> dict:
     """The autogen configuration FinRobot runs under, in `--live`.
 
-    Temperature zero because the experiment wants the agent's response to the
-    OBSERVATION, and sampling noise is a second source of difference between
-    the arms that the design cannot separate from the intervention. It does
-    not make the agent deterministic, and this file does not claim it does --
-    see the provenance block in the printed report.
+    Temperature zero: the experiment measures the agent's response to the
+    OBSERVATION, and sampling noise would add a second source of difference
+    between the arms that the design cannot separate from the intervention.
+    Zero does not make the agent deterministic, and nothing here claims it
+    does. See the provenance block in the printed report.
     """
     key = os.environ.get(LIVE_KEY_VAR)
     if not key:
@@ -351,11 +350,11 @@ def _provenance(live: bool, agent: FinRobotAdapter,
                 recorder: Transcript | None) -> dict:
     """What has to be recorded for the run to mean anything later.
 
-    Tradefloor's market is deterministic and FinRobot's agent is not, and the
-    two facts must not be allowed to blur. Everything here describes the
-    AGENT: which framework, which version, which provider, which model, which
-    generation parameters, which mandate. The market's own provenance is in
-    the manifest and the checkpoint.
+    Tradefloor's market is deterministic. FinRobot's agent is not, and the two
+    facts must not blur together. Everything here describes the AGENT: which
+    framework, which version, which provider, which model, which generation
+    parameters, which mandate. The market's own provenance sits in the
+    manifest and the checkpoint.
     """
     version = "not installed"
     entry_point = "finrobot.agents.workflow.SingleAssistant"
@@ -480,10 +479,10 @@ def _sides(world: World) -> dict[str, int]:
 def _behaviour(control: World, shock: World) -> str:
     """Exposure and decisions per name, which `Comparison` does not carry.
 
-    `Comparison.render` reports the portfolio in aggregate, which is the right
-    default and hides the thing this experiment is about: WHICH names the
-    agent moved. Duration order, because the claim is that the response is
-    monotone in it.
+    `Comparison.render` reports the portfolio in aggregate. That is the right
+    default, and it hides what this experiment is about: WHICH names the agent
+    moved. Duration order, because the claim under test is that the response
+    is monotone in it.
     """
     left, right = _weights(control), _weights(shock)
     lines = [f"  {'final weight':<26}{'CONTROL':>16}{'RATE SHOCK':>16}"
@@ -508,11 +507,11 @@ def _action_divergence(control: World, shock: World) -> int | None:
     """The first step at which the agent's ACTIONS differ, ignoring wording.
 
     Separate from `Divergence.decision`, which compares the whole recorded
-    decision including the rationale. Both numbers are worth having: the
-    rationale changing says the agent read the world differently, and the
-    actions changing says it traded on that reading. They are not always the
-    same step, and reporting only the first would let a change of mind that
-    never reached the market read as a change of behaviour.
+    decision including the rationale. Both numbers earn their place. A changed
+    rationale says the agent read the world differently; changed actions say
+    it traded on that reading. The two often land on different steps, and
+    reporting only the first lets a change of mind that never reached the
+    market read as a change of behaviour.
     """
     by_step = {e["step"]: e for e in shock.agent.record}
     for entry in control.agent.record:
@@ -541,8 +540,8 @@ def _first_after_fork(world: World) -> dict | None:
 def _divergence_story(control: World, shock: World) -> str:
     """The two decisions, side by side, at the first post-fork decision point.
 
-    The strongest single output of the experiment: one agent, one book, two
-    worlds that were identical a step earlier, and what it said in each.
+    One agent, one book, two worlds that were identical a step earlier, and
+    what it said in each. The clearest single output of the run.
     """
     a, b = _first_after_fork(control), _first_after_fork(shock)
     if a is None or b is None:
@@ -575,12 +574,11 @@ def _divergence_story(control: World, shock: World) -> str:
 def _ground_truth(control: World, shock: World) -> str:
     """What the simulator knows and the agent was never shown.
 
-    Printed AFTER the experiment, never before: the point of the boundary is
-    that the decisions were taken without it. Fair value is the model's own
+    Printed AFTER the experiment, never before. The boundary means the
+    decisions above were taken without it. Fair value is the model's own
     valuation, computed from the same public fundamentals the agent had and
-    the discount rate it could see -- so this is not information the agent
-    could not in principle have derived, it is the answer key, and an agent
-    handed it would be inverting the simulator rather than trading in it.
+    the discount rate it could see, so in principle the agent could derive it.
+    Handed it directly, the agent would be inverting the simulator.
     """
     lines = ["  FinRobot did not receive any of this.", "",
              f"  {'model fair value':<26}{'CONTROL':>16}{'RATE SHOCK':>16}"
@@ -635,16 +633,16 @@ def _save(out: Path, world: World, mark, control: World, shock: World,
 def _arm(world: World) -> dict:
     """One arm's evaluation trace, whole.
 
-    The chain the experiment is evidence for, joined up per decision rather
-    than left in two structures a reader has to line up by step:
+    The chain the experiment is evidence for, joined up per decision instead
+    of left in two structures a reader has to line up by step:
 
         observation -> FinRobot input -> response -> validated action
                     -> Tradefloor order -> fill -> position -> exposure
 
-    The prompt is dropped here and only here: it is the same text, verbatim,
-    in the replay fixture, and duplicating forty of them into an artifact that
-    is regenerated on every run would be a second copy that can drift from the
-    recording it came from. Everything else is the run's own.
+    The prompt is dropped here and only here. The replay fixture holds the
+    same text verbatim, and copying forty of them into an artifact that every
+    run regenerates would give the recording a second copy to drift from.
+    Everything else below is the run's own.
     """
     by_step = {row["step"]: row for row in world.trace}
     decisions = []

@@ -2,9 +2,9 @@
 
 FinRobot is an open-source financial-AI agent platform from the AI4Finance
 Foundation (https://github.com/AI4Finance-Foundation/FinRobot, Apache-2.0).
-This module is a Tradefloor integration FOR FinRobot. It is not affiliated
-with, endorsed by, or produced in partnership with AI4Finance, and nothing
-here is an official FinRobot interface.
+This module is a Tradefloor integration for FinRobot. There is no affiliation
+with or endorsement by AI4Finance, and nothing here is an official FinRobot
+interface.
 
     Tradefloor observation
             |
@@ -16,98 +16,92 @@ here is an official FinRobot interface.
             |
     Tradefloor execution
 
-The adapter is deliberately thin, and everything interesting about it is a
-boundary rather than a behaviour.
-
-## What FinRobot decides, and what it is never allowed to touch
+## Ownership
 
 FinRobot owns interpretation, the portfolio decision and a one-line
 rationale. Tradefloor owns the market, the macro path, execution, the order
 book, fills, accounting, checkpoints, forks, interventions and the
-comparison. FinRobot never mutates engine state: it returns JSON, and
-:func:`orders_from` turns validated JSON into the share deltas
-:class:`~tradefloor.counterfactual.World` executes. There is no path from a
-model response to the engine that does not pass through :func:`parse` and
-:func:`orders_from`.
+comparison.
 
-## The observation is an ALLOWLIST, not a filter
+FinRobot never mutates engine state. It returns JSON, and
+:func:`orders_from` turns validated JSON into the share deltas
+:class:`~tradefloor.counterfactual.World` executes. Every path from a model
+response to the engine runs through :func:`parse` and :func:`orders_from`.
+
+## The observation allowlist
 
 :class:`~tradefloor.harness.Observation` carries ``.engine``, and the engine
 knows the answer key: :func:`tradefloor.fair_value`, the nine-way factor
 :meth:`~tradefloor.Engine.attribution` of every price move, each company's
 ``mispricing_s``, and -- through a :class:`~tradefloor.Scenario` -- the macro
-path the run has not reached yet. An agent that read any of those would be
-inverting the simulator rather than trading in it, and the resulting
-experiment would measure nothing.
+path the run has not reached yet. An agent reading any of those inverts the
+simulator, and the experiment around it measures nothing.
 
 So :func:`observe` names every field it emits, one at a time, and reads
-nothing by reflection. Adding a field is a deliberate edit here, which is the
-only version of this boundary that survives the engine gaining a new
-attribute. ``OBSERVABLE_MACRO`` is the macro half of that allowlist, and it
-is ``counterfactual.MACRO_FIELDS`` on purpose: the library already decided
-which macro fields a run is ABOUT, and that set excludes ``qe_pe_boost``,
-which is a model coefficient rather than a published number.
-``tests/test_finrobot.py`` runs the mapping against an engine proxy that
-raises on the forbidden attributes, so a future edit that reaches for one
-fails rather than leaks.
+nothing by reflection. Adding a field takes a deliberate edit here. A
+denylist would go stale the first time the engine gained an attribute; an
+allowlist survives that.
 
-Company fundamentals -- sector, EPS, book value, revenue growth, beta -- are
-NOT read off the engine either. They are passed in by the caller as
-``fundamentals``, because they are facts about the roster that a real analyst
-reads off a filing, and because an adapter that pulled them out of the
-simulator would have one more line to audit. The distinction that matters:
-the INPUTS to a valuation are public, the valuation itself is the answer key.
+``OBSERVABLE_MACRO`` is the macro half of the list, bound to
+``counterfactual.MACRO_FIELDS`` on purpose: the library has already settled
+which macro fields a run is ABOUT, and that set leaves out ``qe_pe_boost``, a
+model coefficient no exchange publishes. ``tests/test_finrobot.py`` runs the
+mapping against an engine proxy that raises on the forbidden attributes, so a
+future edit reaching for one fails on the access.
 
-## Which FinRobot abstraction, and why
+Company fundamentals -- sector, EPS, book value, revenue growth, beta -- do
+not come off the engine either. The caller supplies them as ``fundamentals``.
+An analyst reads all five off a filing, and keeping them out of the adapter
+leaves one less line to audit. The inputs to a valuation are public. The
+valuation is the answer key.
 
-:class:`finrobot.agents.workflow.SingleAssistant` -- the real class, driven
-through the real ``autogen`` chat plumbing. It assembles a
-``finrobot.agents.workflow.FinRobot`` assistant (an ``autogen.AssistantAgent``
-subclass, including FinRobot's own role-prompt preprocessing) opposite an
-``autogen.UserProxyAgent``, which is FinRobot's supported single-agent entry
-point.
+## Which FinRobot abstraction
 
-Two things are set deliberately when constructing it:
+:class:`finrobot.agents.workflow.SingleAssistant`, FinRobot's supported
+single-agent entry point, driven through the real ``autogen`` chat plumbing.
+It assembles a ``finrobot.agents.workflow.FinRobot`` assistant -- an
+``autogen.AssistantAgent`` subclass, including FinRobot's own role-prompt
+preprocessing -- opposite an ``autogen.UserProxyAgent``.
 
-- ``toolkits=[]``. Every FinRobot library role that carries toolkits carries
-  ones that fetch REAL market data -- FinnHub company news, Yahoo Finance
-  prices, SEC filings. In a simulated market those describe a different world,
-  and handing them to the agent would break the controlled comparison in the
-  most confusing possible way: the agent would be reasoning about securities
-  that are not the ones it is trading. The roster here is synthetic and its
-  tickers are not real ones.
+Two constructor arguments matter:
+
+- ``toolkits=[]``. Every FinRobot library role carrying toolkits carries ones
+  that fetch REAL market data: FinnHub company news, Yahoo Finance prices,
+  SEC filings. Those describe a different world from the simulated one. An
+  agent given them reasons about securities it is not trading, and the roster
+  here is synthetic down to its tickers.
 - ``code_execution_config=False``. The ``SingleAssistant`` default gives the
   user proxy a working directory and lets it run model-authored code. This
-  integration wants one JSON object, not a shell.
+  integration needs one JSON object.
 
-``MultiAssistant`` and ``MultiAssistantWithLeader`` were the alternative. They
-are group chats whose value is division of labour across a research report,
-and a portfolio decision every simulated day is one question to one role. A
-group chat would multiply the cost per decision by the number of participants
-without changing what is being measured, which is how the agent responds when
-the world changes.
+``MultiAssistant`` and ``MultiAssistantWithLeader`` were the alternative.
+Both are group chats, and their value is division of labour across a research
+report. A portfolio decision every simulated day is one question to one role.
+A group chat multiplies the cost per decision by the number of participants
+and measures the same thing.
 
-FinRobot has no structured-output mechanism of its own -- no Pydantic response
-model, no schema binding -- so the contract is a JSON object requested in the
-mandate and validated here. :func:`parse` is strict and total: anything it
-cannot turn into a well-formed :class:`Decision` raises
-:class:`DecisionError`, and the caller decides whether that ends the run or
-costs the agent a step.
+FinRobot ships no structured-output mechanism: no Pydantic response model, no
+schema binding. So the contract is a JSON object requested in the mandate and
+validated here. :func:`parse` is strict and total. Anything it cannot turn
+into a well-formed :class:`Decision` raises :class:`DecisionError`, and the
+caller decides whether that ends the run or costs the agent a step.
 
-## Replay, and why the default has no API key in it
+## Replay
 
-A live decision costs money and is not reproducible: the market is
-deterministic, the model is not. So the adapter has two modes over one code
-path. ``mode="live"`` calls FinRobot and, with a recorder attached, writes
-every interaction to a :class:`Transcript`. ``mode="replay"`` reads that
-transcript back, keyed by the SHA-256 of the exact text FinRobot was sent.
+A live decision costs money, and running one twice gives two answers.
+Tradefloor's market is deterministic; an LLM behind an API is not. The
+adapter has two modes over one code path. ``mode="live"`` calls FinRobot and,
+with a recorder attached, writes every interaction to a :class:`Transcript`.
+``mode="replay"`` reads that transcript back, keyed by the SHA-256 of the
+exact text FinRobot was sent.
 
-Keying on the input rather than on (arm, step) is what makes a replay honest.
-If the observation mapping changes, the digest changes, the key is missing,
-and the replay RAISES naming the step -- rather than answering a question
-nobody asked with a response recorded for a different one. Replay needs
-neither FinRobot nor an API key nor a network, which is why the shipped
-example and notebook default to it and why CI can run them.
+The key is a hash of the input. Change the observation mapping and the digest
+changes, the key goes missing, and the replay RAISES naming the step. Keyed
+by (arm, step) it would answer the new question with a response given to the
+old one.
+
+Replay needs no FinRobot, no API key and no network. The shipped example and
+notebook default to it, and CI runs them.
 """
 
 from __future__ import annotations
@@ -122,41 +116,37 @@ from typing import Any, Sequence
 from .._core import ValidationError
 from ..counterfactual import MACRO_FIELDS
 
-#: The macro fields FinRobot is shown. ``counterfactual.MACRO_FIELDS``, and
-#: the same object rather than a copy of the list, so the two cannot drift
-#: into disagreeing about what a macro experiment is about.
+#: The macro fields FinRobot is shown. Bound to ``counterfactual.MACRO_FIELDS``
+#: itself, so the two cannot drift apart over what a macro experiment covers.
 OBSERVABLE_MACRO = MACRO_FIELDS
 
 #: The sides a decision may name. HOLD carries no quantity and produces no
-#: order, which is what lets the agent decline a decision period rather than
-#: being forced to trade one.
+#: order, so the agent can decline a decision period.
 SIDES = ("BUY", "SELL", "HOLD")
 
 #: Price rows kept for the recent-return and volatility lines. Five days at
-#: the library's six steps a day. Long enough for a realised-volatility number
-#: to mean something, short enough that the agent is reading recent conditions
-#: rather than the whole run.
+#: the library's six steps a day: long enough for a realised-volatility number
+#: to mean something, short enough to describe recent conditions.
 HISTORY_STEPS = 30
 
 #: Fraction of an instrument's average daily volume one order may take.
 #: ``tradefloor.baselines.rebalance`` uses the same 2% for every shipped
-#: baseline, and an integration that let an agent name an arbitrary share
-#: count would be measuring market impact rather than the agent: one
-#: mis-scaled number would move the price more than the intervention did.
-#: Requests above the cap are clipped and RECORDED as clipped, never silently
-#: obeyed and never refused -- being unable to size a position is information
-#: about the agent, and the trace should carry it.
+#: baseline. Without a cap, one mis-scaled share count moves the price further
+#: than the intervention does, and the comparison then measures market impact.
+#: Requests above the cap are clipped and RECORDED as clipped. Being unable to
+#: size a position says something about the agent, so the trace carries it.
 MAX_PARTICIPATION = 0.02
 
-#: Mandate version, recorded beside every decision. A run replayed against a
-#: different mandate is a different experiment, and this is what says so.
+#: Mandate version, recorded beside every decision. Replaying a run under a
+#: different mandate produces a different experiment; this is how a reader
+#: notices.
 MANDATE_VERSION = "1"
 
 #: The mandate, identical in both arms of the experiment. It says what the
-#: agent is for, what it may do, and the shape of the answer. It does NOT say
-#: what is about to happen: the whole question is whether the agent infers a
-#: changed world from the observation, so an arm told it was the rate-shock
-#: arm would be answering a different question from its control.
+#: agent is for, what it may do, and the shape of the answer. It says nothing
+#: about what is coming. The question the experiment asks is whether the agent
+#: infers a changed world from the observation, and an arm told it was the
+#: rate-shock arm would be answering something else.
 MANDATE = """\
 You manage a portfolio inside a simulated financial market.
 
@@ -200,9 +190,9 @@ working, do not restate the data, and do not describe these instructions.
 #: This still goes through ``FinRobot._preprocess_config`` and
 #: ``autogen.AssistantAgent``, so it is the real class doing the real thing.
 #:
-#: ``toolkits`` is empty and is a KEY here rather than an argument to
-#: ``SingleAssistant``, which does not accept one: it forwards its ``**kwargs``
-#: to the ``UserProxyAgent``, so ``toolkits=[]`` reaches
+#: ``toolkits`` is empty, and belongs in the config because
+#: ``SingleAssistant`` takes no such argument. It forwards ``**kwargs`` to the
+#: ``UserProxyAgent``, so ``toolkits=[]`` reaches
 #: ``ConversableAgent.__init__`` and raises ``TypeError``. The supported route
 #: is the config, where ``FinRobot.__init__`` reads it.
 AGENT_CONFIG = {"name": "Portfolio_Manager", "profile": MANDATE,
@@ -212,15 +202,15 @@ AGENT_CONFIG = {"name": "Portfolio_Manager", "profile": MANDATE,
 class DecisionError(ValidationError):
     """FinRobot returned something that is not an executable decision.
 
-    A subclass of :class:`~tradefloor.ValidationError` so a caller already
-    catching the library's refusals catches this too. It is raised for a
-    response that cannot be parsed, and for one that parses into an action the
-    market cannot accept: an unknown symbol, an unsupported side, a negative
-    or non-finite quantity, a symbol named twice.
+    A subclass of :class:`~tradefloor.ValidationError`, so a caller already
+    catching the library's refusals catches this too. Raised for a response
+    that cannot be parsed, and for one that parses into an action the market
+    cannot accept: an unknown symbol, an unsupported side, a negative or
+    non-finite quantity, a symbol named twice.
 
-    Raised rather than repaired, deliberately. A guess at what the model meant
-    is a second, unrecorded agent sitting between FinRobot and the market, and
-    every experiment run afterwards would be measuring it too.
+    It raises instead of repairing. A guess at what the model meant would be a
+    second, unrecorded agent between FinRobot and the market, and every
+    experiment run afterwards would measure that too.
     """
 
 
@@ -291,8 +281,8 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
     portfolio. See the module docstring for why that matters.
 
     ``history`` is the adapter's own record of the prices it has already been
-    shown, which is what makes a recent return and a realised volatility
-    computable without asking the simulator for either.
+    shown. A recent return and a realised volatility come from that, without
+    asking the simulator for either.
     """
     macro_state = obs.engine.macro_state
     macro = {field: getattr(macro_state, field) for field in OBSERVABLE_MACRO}
@@ -338,10 +328,9 @@ def _window_return(rows: Sequence[Sequence[float]], i: int,
                    steps: int) -> float | None:
     """Return over the last ``steps`` observations, or None if unseen.
 
-    None rather than 0.0 for a window the agent has not lived through yet.
-    Zero would be a claim that the price did not move, which on day one is a
-    statement about the market rather than about the record, and the agent
-    cannot tell the two apart from a number alone.
+    None, for a window the agent has not lived through yet. Zero would claim
+    the price did not move, and on day one that describes the record and not
+    the market. From the number alone the agent cannot tell the two apart.
     """
     if len(rows) < 2:
         return None
@@ -364,11 +353,10 @@ def _volatility(rows: Sequence[Sequence[float]], i: int) -> float | None:
 def render(payload: dict[str, Any], *, objective: str = "") -> str:
     """The payload as the text FinRobot receives.
 
-    Text rather than raw JSON because the assistant is a chat agent and reads
-    prose better than it reads a nested object, and because a rendered block
-    is what a reader of the recorded transcript has to be able to audit. It is
-    generated from ``payload`` alone, so anything not in the allowlist cannot
-    appear here by accident.
+    Text and not raw JSON: the assistant is a chat agent and reads prose
+    better than a nested object, and a rendered block is what somebody
+    auditing the recorded transcript has to read. Generated from ``payload``
+    alone, so nothing outside the allowlist can appear here by accident.
     """
     macro = payload["macro"]
     out = [
@@ -445,10 +433,9 @@ def _qty(value: Any) -> str:
 # -- FinRobot -> Tradefloor -------------------------------------------------
 
 #: A JSON object anywhere in the response. Models wrap answers in code fences
-#: and add a closing sentence however firmly the mandate asks them not to, and
-#: a strictness that failed on a fence would be measuring formatting
-#: compliance rather than the portfolio decision. The BRACES are what has to
-#: be found; everything inside them is then parsed by ``json``, not by this.
+#: and add a closing sentence however firmly the mandate asks them not to.
+#: Failing on a fence would score formatting compliance instead of the
+#: portfolio decision. This finds the BRACES; ``json`` parses what is inside.
 _OBJECT = re.compile(r"\{.*\}", re.DOTALL)
 
 
@@ -456,9 +443,8 @@ def parse(text: str) -> Decision:
     """Turn a FinRobot response into a validated :class:`Decision`.
 
     Structural validation only: this checks that the answer is a decision.
-    Whether the symbols exist and the sizes are executable is
-    :func:`orders_from`'s question, because it needs the observation to answer
-    it.
+    Whether the symbols exist and the sizes are executable belongs to
+    :func:`orders_from`, which has the observation needed to answer it.
     """
     if not isinstance(text, str) or not text.strip():
         raise DecisionError(
@@ -561,14 +547,13 @@ def orders_from(decision: Decision, obs: Any, *,
     """Validated share deltas, plus a note for anything that was adjusted.
 
     The second half of validation, and the only thing that ever reaches
-    ``World._execute``. An unknown symbol raises: it means the model is
-    trading an instrument this market does not list, and executing the rest of
-    the decision would be executing half of a plan the agent did not make.
+    ``World._execute``. An unknown symbol raises: the model is trading an
+    instrument this market does not list, and executing the remaining actions
+    would execute half a plan the agent never made.
 
     A size above the participation cap does not raise. It is clipped to the
-    cap and the clip is returned as a note, because an oversized request is a
-    real thing the agent did and the trace should say so. See
-    ``MAX_PARTICIPATION``.
+    cap and the clip comes back as a note. An oversized request is something
+    the agent did, so the trace says so. See ``MAX_PARTICIPATION``.
     """
     listed = list(obs.tickers)
     orders: dict[str, float] = {}
@@ -602,9 +587,8 @@ def orders_from(decision: Decision, obs: Any, *,
 def digest(prompt: str) -> str:
     """The replay key: SHA-256 of the exact text FinRobot was sent.
 
-    Sixteen hex characters, which is far more than enough to separate the few
-    dozen decision points of one experiment and short enough to print in an
-    error message a reader has to compare by eye.
+    Sixteen hex characters: ample for the few dozen decision points of one
+    experiment, and short enough to compare by eye in an error message.
     """
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
 
@@ -612,16 +596,16 @@ def digest(prompt: str) -> str:
 class Transcript:
     """Recorded FinRobot interactions, keyed by the input that produced them.
 
-    A file of these is what makes ``python rate_shock.py`` reproduce a real
-    agent run with no API key, no network and no FinRobot installed. It holds
-    what is needed to re-execute the experiment and to audit it -- the prompt,
-    the raw response, the parsed decision -- and deliberately nothing else. No
-    API keys, no account identifiers, no request IDs, no provider headers.
+    A file of these lets ``python rate_shock.py`` reproduce a real agent run
+    with no API key, no network and no FinRobot install. It holds what
+    re-executing and auditing the experiment need -- the prompt, the raw
+    response, the parsed decision -- and nothing else. No API keys, no account
+    identifiers, no request IDs, no provider headers.
 
     ``meta`` records what the run cannot reconstruct: the FinRobot version,
     the provider and model, the generation parameters and the mandate version.
-    A transcript replayed under a different mandate is a different experiment,
-    and this is what lets a reader notice.
+    Replaying a transcript under a different mandate produces a different
+    experiment, and ``meta`` is how a reader notices.
     """
 
     __slots__ = ("meta", "entries", "_by_digest")
@@ -634,9 +618,8 @@ class Transcript:
 
     def record(self, entry: dict[str, Any]) -> None:
         self.entries.append(dict(entry))
-        # Last write wins, which is right: an identical prompt has to have an
-        # identical answer available, and re-recording one is a re-run of the
-        # same question rather than a second question.
+        # Last write wins. An identical prompt must have one answer
+        # available, and re-recording one re-runs the same question.
         self._by_digest[entry["digest"]] = self.entries[-1]
 
     def response_for(self, key: str) -> str | None:
@@ -688,15 +671,15 @@ class FinRobotAdapter:
     ```
 
     ``every`` is the decision cadence in steps. At the library's six steps a
-    day the default of six is one decision per day, which is what a portfolio
-    manager does and what keeps the bill proportional to the experiment rather
-    than to the tick rate. It MUST be identical across the arms of a
-    comparison, and it is: :meth:`fork` copies it.
+    day, the default of six gives one decision per simulated day. That matches
+    how often a portfolio manager decides, and it keeps the bill proportional
+    to the experiment instead of to the tick rate. The two arms of a
+    comparison MUST run the same cadence, and :meth:`fork` copies it.
 
     ``mode`` is ``"replay"`` or ``"live"``. Replay imports nothing from
     FinRobot, so a reader without the extra installed can still run the
-    experiment; ``"live"`` imports it inside :meth:`_finrobot` and says which
-    extra installs it if that fails.
+    experiment. ``"live"`` imports it inside :meth:`_finrobot`, and names the
+    extra if that import fails.
     """
 
     def __init__(self, *, mode: str = "replay",
@@ -753,9 +736,9 @@ class FinRobotAdapter:
         """Share deltas for this step. Empty on the steps between decisions.
 
         The market advances every step; FinRobot is asked every ``every``
-        steps. On the steps in between this records the prices it saw and
-        returns nothing, which is the same shape a human manager has: the book
-        is watched continuously and revisited on a schedule.
+        steps. On the steps in between, this records the prices it saw and
+        returns nothing. A human manager watches the book continuously and
+        revisits it on a schedule.
         """
         self.history.append(list(obs.prices))
         if len(self.history) > HISTORY_STEPS:
@@ -792,22 +775,21 @@ class FinRobotAdapter:
     def decision(self) -> dict[str, Any] | None:
         """The last validated decision, as ``World`` records it every step.
 
-        The actions and the rationale, and not the prompt, the raw response or
-        the arm: :func:`~tradefloor.counterfactual.compare` finds the first
-        step at which two arms' decisions differ by comparing these
-        dictionaries, so anything in here that differed for a reason other
-        than the agent deciding differently would report a divergence that did
-        not happen.
+        The actions and the rationale. The prompt, the raw response and the
+        arm stay out: :func:`~tradefloor.counterfactual.compare` finds the
+        first step at which two arms' decisions differ by comparing these
+        dictionaries, so a field varying for any other reason would report a
+        divergence that never happened.
         """
         return self._decision
 
     def state(self) -> dict[str, Any]:
         """What a fork has to agree on, for :func:`tradefloor.agree`.
 
-        The price memory and the last decision -- everything that survives
-        from one step to the next and could make two arms behave differently
-        for a reason other than the intervention. NOT the ``llm_config``: it
-        carries an API key, and this dictionary is printed.
+        The price memory and the last decision: everything surviving from one
+        step to the next that could make two arms behave differently for some
+        reason other than the intervention. The ``llm_config`` stays out. It
+        carries an API key, and this dictionary gets printed.
         """
         return {
             "history": [list(row) for row in self.history],
@@ -819,20 +801,19 @@ class FinRobotAdapter:
     def fork(self) -> "FinRobotAdapter":
         """An independent copy, for :meth:`World.fork`.
 
-        Explicit rather than left to ``copy.deepcopy`` because in live mode
-        this object holds a FinRobot assistant holding an HTTP client, and
-        deep-copying one is at best wasteful and at worst a shared socket. The
-        copy carries the decision state and SHARES the transcript and the
-        recorder, which is correct in both directions: a replay of one arm
-        must read the same recorded run as the other, and a live recording of
-        both arms belongs in one file.
+        Written out instead of left to ``copy.deepcopy``: in live mode this
+        object holds a FinRobot assistant holding an HTTP client, and copying
+        one is wasteful at best and a shared socket at worst. The copy takes
+        the decision state and SHARES the transcript and the recorder. Both
+        directions want that -- a replay of one arm must read the same
+        recorded run as the other, and a live recording of both arms belongs
+        in one file.
 
-        ``type(self)`` rather than the class name, so a subclass forks into
-        its own type. Written the other way round first, a subclass that
-        overrode how a decision is obtained kept that override in the shared
-        history and lost it in both arms -- which is the worst possible
-        version of the bug, because the run completes and the comparison it
-        prints is between two agents that are not the one that was tested.
+        ``type(self)``, so a subclass forks into its own type. Hard-coding the
+        class name broke this: a subclass overriding how a decision is
+        obtained kept the override through the shared history and lost it in
+        both arms. The run then completes, and the comparison it prints is
+        between two agents neither of which was the one under test.
         """
         twin = type(self)(
             mode=self.mode, transcript=self.transcript,
@@ -901,7 +882,7 @@ class FinRobotAdapter:
     def _finrobot(self) -> Any:
         """The real FinRobot ``SingleAssistant``, built once and reused.
 
-        Imported here rather than at module scope so that replay mode -- and
+        Imported here instead of at module scope, so that replay mode -- and
         ``import tradefloor`` -- never require FinRobot to be installed.
         """
         if self._assistant is not None:
@@ -920,17 +901,17 @@ class FinRobotAdapter:
         config = dict(self.agent_config)
         config["profile"] = config.get("profile") or self.mandate
         # See the module docstring. The library roles' toolkits fetch REAL
-        # market data, which describes a different world from the one being
-        # simulated. `setdefault` rather than an assignment: a caller who
-        # deliberately supplies toolkits keeps them and owns what that means
-        # for the ground-truth boundary, but a config that never mentions
-        # them gets none rather than inheriting a role's.
+        # market data, describing a different world from the simulated one.
+        # `setdefault` and not an assignment: a caller who supplies toolkits
+        # on purpose keeps them, and owns what that does to the ground-truth
+        # boundary. A config that never mentions them gets none.
         config.setdefault("toolkits", [])
         self._assistant = SingleAssistant(
             agent_config=config,
             llm_config=self.llm_config,
-            # Not a shell: the SingleAssistant default gives the user proxy a
-            # working directory and lets it run model-authored code.
+            # The SingleAssistant default gives the user proxy a working
+            # directory and lets it run model-authored code. This wants one
+            # JSON object.
             code_execution_config=False,
             max_consecutive_auto_reply=0,
             human_input_mode="NEVER",

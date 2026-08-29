@@ -138,12 +138,12 @@ Bindings own conversion, error translation and bookkeeping. Nothing else.
 ## Where examples, integrations and fixtures go
 
 `examples/` used to mean one thing: a numbered series read in order. It now
-means two, and keeping them in one flat directory cost something real. The
-example test globbed `0*`, so the first unnumbered example added to
-`examples/` was invisible to CI on the day it landed -- it compiled nowhere,
-executed nowhere, and nothing said so.
+means two, and keeping both flat has already cost something. The example test
+globbed `0*`, so the first unnumbered example added to `examples/` was
+invisible to CI on the day it landed. It compiled nowhere, executed nowhere,
+and nothing said so.
 
-Three tiers, and the rule for each is about who owns it.
+Three tiers, each with a rule about who owns it.
 
 ```
 examples/
@@ -165,36 +165,36 @@ tests/
     fixtures/<name>/            recorded input, committed, one copy
 ```
 
-**The numbers are a curriculum, not an index.** `00` to `09` are steps a
-reader takes in order, they use the core library and at most an extra the
-project itself ships, and adding to them is adding a lesson. A study is not
-a lesson. It has one question, it may need an optional extra, and there is no
-sense in which it comes after `09`, so it gets a name and a directory instead
-of the next number.
+**The numbers are a curriculum.** `00` onward are steps a reader takes in
+order. They use the core library and at most an extra this project ships, and
+adding one adds a lesson. A study teaches nothing in particular. It asks one
+question, it may need an optional extra, and nothing about it follows from
+the example before it, so it gets a name and a directory.
 
 **A study is one directory.** The script and the notebook for one experiment
-are the same experiment in two presentations; splitting them across
-`examples/` and a top-level `notebooks/` puts two halves of one thing in two
-places and makes `notebooks/` a second unordered pile on the day a second one
-arrives. The notebook imports the module; the module is the source of truth.
+present the same experiment two ways. Splitting them across `examples/` and a
+top-level `notebooks/` puts two halves of one thing in two places, and
+`notebooks/` becomes a second unordered pile the day a second one arrives. The
+notebook imports the module; the module is the source of truth.
 
-**Artifacts are output, fixtures are input, and they do not live together.**
-An artifact is written by a run, describes that run, and is regenerable by
-running it again -- so it sits beside the run that wrote it, in
-`examples/<study>/artifacts/`, and is git-ignored. A fixture is recorded once
-and replayed forever; it is the thing under test, and the test suite and the
-example both read the SAME one, because two copies of a recording are two
-recordings that can drift. So fixtures are committed, under
-`tests/fixtures/<name>/`, whoever reads them.
+**Artifacts are output, fixtures are input, and they live apart.** A run
+writes an artifact, the artifact describes that run, and running again
+regenerates it. So it sits beside the run that wrote it, in
+`examples/<study>/artifacts/`, git-ignored. A fixture is recorded
+once and replayed forever. It is the thing under test, and the test suite and
+the example read the SAME one, because two copies of a recording can drift
+apart. So fixtures are committed, under `tests/fixtures/<name>/`, whoever
+reads them.
 
 **An integration is a subpackage member, an optional extra, and a study.**
-See `python/tradefloor/integrations/__init__.py` for the rules the adapter
-itself follows -- lazy import, never reached by `import tradefloor`, one
-extra named after the framework. The runnable half is a study like any other.
+The adapter follows three rules, set out in
+`python/tradefloor/integrations/__init__.py`: lazy import, never reached by
+`import tradefloor`, one extra named after the framework. Its runnable half
+is a study like any other.
 
 **Every example is checked.** `tests/test_examples.py` walks `examples/`
-rather than globbing `0*`, so a new example cannot be added invisible again.
-Scripts are syntax-checked on every run; notebooks are executed behind
+instead of globbing, so a new example cannot arrive invisible again. Scripts
+are syntax-checked on every run; notebooks are executed behind
 `TRADEFLOOR_SLOW_TESTS=1`.
 
 ## Style
