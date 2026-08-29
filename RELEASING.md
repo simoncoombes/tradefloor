@@ -261,21 +261,30 @@ write the preset beside it.
 `tools/remeasure/inventory.json`, which lives in this repository and was never
 vendored, so the prose-figure check does not run there at all.
 
-### 5c. Held for the next release after 0.5.0
+### 5c. Document the API this release makes public
 
-`tf.branch` is a copy of the engine and forks carry the parent's order log
-(#64); `Engine.fork`, the narrower `state_snapshot` promise, and a
-`Checkpoint` that records its version and era and refuses across an
-arithmetic change. From #74: `truth(day=)` and `bars(day=)` select a day
-where the argument was previously discarded, `Checkpoint.fingerprint`,
-`RunManifest.of(..., derived_from=)` with `verify_lineage`, and a three-way
-divergence error.
+The site describes the published wheel, not `main`. So API that merges
+between releases is deliberately left undocumented until it ships, and the
+release is when that debt comes due: read the changelog section written in
+step 2 and document everything in it that is public surface.
 
-None of it is documented, deliberately: it was unreleased, and the site does
-not describe API the published wheel does not have. Once this release ships,
-that is one docs pass against the new wheel. Say plainly that `day=` changed
-meaning -- code passing it has been getting every recorded day while
-believing it filtered.
+This is not optional tidying. A reader who installs the new version and
+finds the site describing the previous one has no way to tell which is
+wrong, and the pages carry no version of their own to warn them.
+
+Two things to check while doing it, because both have been wrong before:
+
+- **An argument that changed meaning is not a new feature.** Say so
+  plainly. Code that already passes it is now doing something different,
+  and its author will not think to re-read a page about a call they
+  already use.
+- **A signature that gained an optional argument still changes the docs**,
+  because the API pages publish signatures from the vendored stub and a
+  stale stub publishes the old one.
+
+If a release ships nothing public, say so in the docs PR rather than
+skipping the step, so the next person can tell the difference between
+"nothing to do" and "not done".
 
 ### 6. Check the README survives PyPI
 
