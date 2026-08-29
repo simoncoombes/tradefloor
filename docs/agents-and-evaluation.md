@@ -13,10 +13,10 @@ they are used for scoring on the other side of the wall.
 ```python
 from tradefloor.baselines import Momentum, MeanReversion
 
-scores = pt.evaluate({"momentum": Momentum(), "mean_reversion": MeanReversion()},
+scores = tf.evaluate({"momentum": Momentum(), "mean_reversion": MeanReversion()},
                      seed=2026, universe=universe, days=5, max_leverage=2.0)
 
-for s in pt.leaderboard(scores):
+for s in tf.leaderboard(scores):
     print(s.name, s.pnl, s.impact_bps, s.explanation_accuracy)
 ```
 
@@ -40,8 +40,8 @@ random, momentum and mean-reversion agents, plus an **Oracle** that reads the
 true mispricing and trades it without estimation error.
 
 ```python
-scores = pt.evaluate(pt.reference_agents(), seed=2026, universe=universe, days=60)
-pt.capture_ratio(scores)     # each agent's P&L as a fraction of the Oracle's
+scores = tf.evaluate(tf.reference_agents(), seed=2026, universe=universe, days=60)
+tf.capture_ratio(scores)     # each agent's P&L as a fraction of the Oracle's
 ```
 
 The Oracle measures what knowing fair value earns under these constraints, a
@@ -97,7 +97,7 @@ Two things affect the denominator, so quote both with any ratio:
   at `top_k=15`. Ratios computed with different Oracle settings are not
   comparable.
 - **Horizon.** Mispricing reverts on a 60-day half-life, so the Oracle's
-  earnings grow with the run: evaluating `pt.reference_agents(seed=3)` on
+  earnings grow with the run: evaluating `tf.reference_agents(seed=3)` on
   seed 2026 over `Universe.random(40, seed=7)` at the `evaluate` defaults,
   it makes $77.4k in five days and $565.4k in sixty. The same mean-reversion
   agent scores a capture ratio of 0.066 against the first denominator and
@@ -127,7 +127,7 @@ capturing nine tenths of it. One seed can miss the winner outright, and even
 when it names it, miss the size of the verdict by its whole width.
 
 ```python
-ranking = pt.rank(lambda: pt.reference_agents(seed=3), seeds=range(12),
+ranking = tf.rank(lambda: tf.reference_agents(seed=3), seeds=range(12),
                   universe=universe, days=10, workers=4)
 print(ranking.report())
 ranking.separation("mean_reversion", "momentum")   # 9-3,  p = 0.15

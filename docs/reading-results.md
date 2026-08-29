@@ -20,9 +20,9 @@ and duckdb all read them zero-copy, and the package depends on none of them.
 
 ```python
 import polars as pl
-import tradefloor as pt
+import tradefloor as tf
 
-engine = pt.Engine(seed=42, universe=pt.Universe.random(10, seed=3))
+engine = tf.Engine(seed=42, universe=tf.Universe.random(10, seed=3))
 engine.run_days(5)
 
 bars = pl.DataFrame(engine.bars(grain="day"))

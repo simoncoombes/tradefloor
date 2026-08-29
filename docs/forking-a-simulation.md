@@ -11,7 +11,7 @@ Run to day sixty, then ask two questions of the same market, with everything
 before the fork identical rather than statistically similar.
 
 ```python
-mark = pt.Checkpoint.of(engine, universe=universe, seed=42)
+mark = tf.Checkpoint.of(engine, universe=universe, seed=42)
 calm, hiked = mark.branch(2)
 ```
 
@@ -19,7 +19,7 @@ Two mechanisms for different jobs:
 
 | | cost | survives the process |
 |---|---|---|
-| `pt.branch(engine, 2, ...)` | < 1 ms | no |
+| `tf.branch(engine, 2, ...)` | < 1 ms | no |
 | `Checkpoint.resume()` | 2.7 s | yes |
 
 `branch` copies engine state - every column plus the generator position - in

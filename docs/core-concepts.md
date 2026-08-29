@@ -11,11 +11,11 @@ fundamentals are), a **macro** state (rates, inflation, the cycle), and a
 **seed**.
 
 ```python
-import tradefloor as pt
+import tradefloor as tf
 
-universe = pt.Universe.random(108, seed=7)
-macro = pt.Macro(federal_funds_rate=0.025, corporate_bond_yield=0.052, vix=16.0)
-engine = pt.Engine(seed=42, universe=universe, macro_state=macro)
+universe = tf.Universe.random(108, seed=7)
+macro = tf.Macro(federal_funds_rate=0.025, corporate_bond_yield=0.052, vix=16.0)
+engine = tf.Engine(seed=42, universe=universe, macro_state=macro)
 ```
 
 ### Universe
@@ -42,10 +42,10 @@ estimation.
 Four constructors:
 
 ```python
-pt.Universe.random(108, seed=7)                  # generated, plausible per sector
-pt.Universe([pt.Instrument(...), ...])           # explicit roster
-pt.Universe.from_edgar(snapshot)                 # real SEC fundamentals
-pt.Universe.from_json(saved)                     # one saved with to_json
+tf.Universe.random(108, seed=7)                  # generated, plausible per sector
+tf.Universe([tf.Instrument(...), ...])           # explicit roster
+tf.Universe.from_edgar(snapshot)                 # real SEC fundamentals
+tf.Universe.from_json(saved)                     # one saved with to_json
 ```
 
 ### Macro

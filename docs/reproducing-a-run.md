@@ -18,7 +18,7 @@ does not guarantee about the result.
 
 | what | where it lives | in the order log? |
 |---|---|---|
-| package version and model preset | `pt.version()`, `pt.model_preset()["name"]` | no |
+| package version and model preset | `tf.version()`, `tf.model_preset()["name"]` | no |
 | simulation seed | you chose it | **no, pass it explicitly** |
 | universe | `universe.fingerprint`, plus how it was built | **no, pass it explicitly** |
 | macro initial conditions | the `Macro` you constructed the engine with | **no, pass it explicitly** |
@@ -33,8 +33,8 @@ recorded under a custom coefficient set has to name it back.
 ### 1. Version and preset
 
 ```python
-pt.version()                      # '0.4.1'
-pt.model_preset()["name"]         # 'pt-v12', the shipped default
+tf.version()                      # '0.4.1'
+tf.model_preset()["name"]         # 'pt-v12', the shipped default
 ```
 
 Coefficients ship as a named preset rather than as constructor keywords, so
@@ -58,7 +58,7 @@ Every result object carries the universe fingerprint alongside the seed -
 roster is a different market.
 
 ```python
-universe = pt.Universe.random(108, seed=7)
+universe = tf.Universe.random(108, seed=7)
 universe.fingerprint      # 64 hex characters
 ```
 
@@ -66,9 +66,9 @@ The fingerprint **verifies** a universe; it does not reconstruct one. Publish
 whichever of these built yours, and the fingerprint so a reader can check they
 rebuilt the same thing:
 
-- `pt.Universe.random(n, seed=k)` - the two integers are the whole recipe.
+- `tf.Universe.random(n, seed=k)` - the two integers are the whole recipe.
 - An explicit roster of `Instrument`s - publish the roster.
-- `pt.Universe.from_edgar(snapshot)` - publish the snapshot, not the query.
+- `tf.Universe.from_edgar(snapshot)` - publish the snapshot, not the query.
   See [SEC EDGAR](real-fundamentals-from-sec-edgar.md).
 
 Roster **order** is contractual. A re-sorted universe is a different market,
@@ -85,7 +85,7 @@ realised path is reproduced by the replay, not published by hand. The seven
 fields are small enough to publish verbatim:
 
 ```python
-macro = pt.Macro(vix=15.0, federal_funds_rate=0.025,
+macro = tf.Macro(vix=15.0, federal_funds_rate=0.025,
                  corporate_bond_yield=None, inflation_rate=0.02,
                  qe_pe_boost=0.0, fear_greed_index=50.0, cycle="expansion")
 ```
@@ -108,7 +108,7 @@ later version does.
 
 ```python
 log = engine.order_log                    # plain dicts, JSON-serialisable
-same = pt.replay(log, seed=42, universe=universe, macro=macro)
+same = tf.replay(log, seed=42, universe=universe, macro=macro)
 ```
 
 The log holds every input the engine consumed: `open_market`, `run_session`
@@ -128,16 +128,16 @@ Everything above, in one JSON-serialisable dictionary:
 
 ```python
 import json
-import tradefloor as pt
+import tradefloor as tf
 
-universe = pt.Universe.random(20, seed=11)
-macro = pt.Macro()
-engine = pt.Engine(seed=42, universe=universe, macro_state=macro)
+universe = tf.Universe.random(20, seed=11)
+macro = tf.Macro()
+engine = tf.Engine(seed=42, universe=universe, macro_state=macro)
 engine.run_days(20)
 
 archive = {
-    "pretium_version": pt.version(),
-    "model_preset": pt.model_preset()["name"],
+    "pretium_version": tf.version(),
+    "model_preset": tf.model_preset()["name"],
     "seed": 42,
     "universe": {"constructor": "random", "n": 20, "seed": 11,
                  "fingerprint": universe.fingerprint},
@@ -156,12 +156,12 @@ json.dumps(archive)                       # archivable as data
 And the check a reviewer runs:
 
 ```python
-rebuilt = pt.Universe.random(archive["universe"]["n"],
+rebuilt = tf.Universe.random(archive["universe"]["n"],
                              seed=archive["universe"]["seed"])
 assert rebuilt.fingerprint == archive["universe"]["fingerprint"]
 
-replayed = pt.replay(archive["order_log"], seed=archive["seed"],
-                     universe=rebuilt, macro=pt.Macro(**archive["macro"]),
+replayed = tf.replay(archive["order_log"], seed=archive["seed"],
+                     universe=rebuilt, macro=tf.Macro(**archive["macro"]),
                      model=archive["model_preset"])
 assert replayed.prices() == engine.prices()
 assert replayed.draws_consumed == engine.draws_consumed
@@ -178,8 +178,8 @@ Everything on this page, constructed and checked by the library rather than
 by hand:
 
 ```python
-manifest = pt.RunManifest.of(engine, seed=42, universe=universe, macro=macro)
-same = pt.RunManifest.from_json(manifest.to_json()).reproduce()
+manifest = tf.RunManifest.of(engine, seed=42, universe=universe, macro=macro)
+same = tf.RunManifest.from_json(manifest.to_json()).reproduce()
 ```
 
 `RunManifest` embeds every component above, fingerprints each one, carries

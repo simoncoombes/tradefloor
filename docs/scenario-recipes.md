@@ -110,7 +110,7 @@ A `Scenario` holds a *list* of pins per field, and they lie end to end:
   keeps a lone `ramp` or `step` defined on day zero.
 
 ```python
-import tradefloor as pt
+import tradefloor as tf
 from tradefloor import Scenario
 
 # calm at 15, a jump to 48 on day 60, a plateau, then a decay to 22.
@@ -155,7 +155,7 @@ try:
     (Scenario("looks right, is not")
      .step("vix", before=15.0, after=48.0, at=60)
      .ramp("vix", start=48.0, end=18.0, over=40, begin=60))
-except pt.ValidationError as exc:
+except tf.ValidationError as exc:
     print(textwrap.fill(str(exc), 76))
 ```
 
@@ -289,7 +289,7 @@ the same grounds: two runs of one world, differenced, is a zero either way.
 ```python
 from tradefloor.scenario import compare
 
-u = pt.Universe.random(20, seed=4)
+u = tf.Universe.random(20, seed=4)
 held = Scenario("held crisis").hold(vix=45.0)
 
 r = compare(held, seed=5, universe=u, days=30, model="pt-v1",
@@ -315,7 +315,7 @@ prices go up. Run the same comparison across sim seeds 1 to 8, still on
 volatility scenario: what a
 VIX pin changes is the *variance* of the shared market factor, and one seed's
 realisation of a higher variance is a coin flip with a wide edge. Measure
-volatility scenarios with `pt.facts.measure`, as recipe 3 does. Measure rate
+volatility scenarios with `tf.facts.measure`, as recipe 3 does. Measure rate
 and credit scenarios, which move fair value directionally, with
 `compare()`.
 
@@ -353,7 +353,7 @@ set of habits covers both pages:
 - **price effects** use `Universe.random(20, seed=4)` at sim seed 5, via
   `compare()`, reported as the median across the twenty instruments;
 - **volatility effects** use `Universe.random(20, seed=11)` at sim seed 3,
-  via `pt.facts.measure` over 120 days.
+  via `tf.facts.measure` over 120 days.
 
 Single seeds, stated. Nothing on this page is a distribution, and the
 dispersion across seeds is generally larger than the effects.
@@ -361,14 +361,14 @@ dispersion across seeds is generally larger than the effects.
 ## Recipe 1: A rate-hiking cycle
 
 ```python
-import tradefloor as pt
+import tradefloor as tf
 from tradefloor import Scenario
 from tradefloor.scenario import compare
 
 hiking = Scenario.rate_shock(start=0.00125, end=0.0538, over=90,
                              credit_spread=0.02)
 
-u = pt.Universe.random(20, seed=4)
+u = tf.Universe.random(20, seed=4)
 r = compare(hiking, seed=5, universe=u, days=120, model="pt-v1")
 print(f"median {r['median_pct']:+.2f}%  worst {r['worst_pct']:+.2f}%  "
       f"best {r['best_pct']:+.2f}%  exact={r['exact']}")
@@ -435,14 +435,14 @@ name at 40 days, and a median −8.07% at 120.
 ## Recipe 2: An inflation shock
 
 ```python
-import tradefloor as pt
+import tradefloor as tf
 from tradefloor import Scenario
 from tradefloor.scenario import compare
 
 inflation = Scenario("inflation shock").ramp(
     "inflation_rate", start=0.014, end=0.091, over=100, begin=5)
 
-u = pt.Universe.random(20, seed=4)
+u = tf.Universe.random(20, seed=4)
 early = compare(inflation, seed=5, universe=u, days=40, model="pt-v1")
 late = compare(inflation, seed=5, universe=u, days=120, model="pt-v1")
 print(f"40 days:  largest absolute move {max(abs(x) for x in early['move_pct']):.2f}%")
@@ -498,17 +498,17 @@ thirty-eight-fold understatement of where the path ends up.
 ## Recipe 3: A liquidity crisis
 
 ```python
-import tradefloor as pt
+import tradefloor as tf
 from tradefloor import Scenario
 
 crisis = (Scenario.vix_shock(calm=18.0, peak=80.0, at=20, over=60)
           .ramp("corporate_bond_yield", start=0.055, end=0.095,
                 over=40, begin=20))
 
-u = pt.Universe.random(20, seed=11)
-shocked = pt.facts.measure(seed=3, universe=u, days=120, scenario=crisis,
+u = tf.Universe.random(20, seed=11)
+shocked = tf.facts.measure(seed=3, universe=u, days=120, scenario=crisis,
                            model="pt-v1")
-calm = pt.facts.measure(seed=3, universe=u, days=120, model="pt-v1",
+calm = tf.facts.measure(seed=3, universe=u, days=120, model="pt-v1",
                         scenario=Scenario("calm").hold(vix=18.0))
 print(f"annualised vol: {calm['annualised_vol_pct']:.2f}% calm -> "
       f"{shocked['annualised_vol_pct']:.2f}% crisis")
@@ -620,7 +620,7 @@ sign; the volatility and correlation numbers are the claim.
 ## Recipe 4: A contraction regime
 
 ```python
-import tradefloor as pt
+import tradefloor as tf
 from tradefloor import Scenario
 from tradefloor.scenario import compare
 
@@ -636,7 +636,7 @@ baseline = (Scenario("expansion baseline")
             .hold(cycle="expansion")
             .hold(fear_greed_index=50.0))
 
-u = pt.Universe.random(20, seed=4)
+u = tf.Universe.random(20, seed=4)
 r = compare(contraction, seed=5, universe=u, days=120, baseline=baseline,
             model="pt-v1")
 print(f"median {r['median_pct']:+.2f}%  exact={r['exact']}")
@@ -718,7 +718,7 @@ recipe works when the path comes out of a spreadsheet instead of a loop:
 
 ```python
 import json
-import tradefloor as pt
+import tradefloor as tf
 from tradefloor import Scenario
 from tradefloor.scenario import compare
 
@@ -759,7 +759,7 @@ def pandemic_shape(days=120):
 
 
 compound = pandemic_shape()
-u = pt.Universe.random(20, seed=4)
+u = tf.Universe.random(20, seed=4)
 r = compare(compound, seed=5, universe=u, days=120, model="pt-v1")
 print(f"median {r['median_pct']:+.2f}%  worst {r['worst_pct']:+.2f}%  "
       f"best {r['best_pct']:+.2f}%  exact={r['exact']}")

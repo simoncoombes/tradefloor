@@ -74,7 +74,7 @@ page: they are a list of things this documentation does not currently explain.
 | known-answer test | One fixed simulation run inside each of five wheel targets and hashed, compared target against target and against the `sha256` committed in `tests/known_answer.json`, so a disagreement stops the upload rather than merely reporting one. | [reproducing a run](reproducing-a-run.md) |
 | RunManifest | The five things that identify a run as one object, embedding the roster, the macro initial conditions, the realised scenario path, the order log and the strategy; `reproduce()` raises with the disagreeing component named, because every component travels with its own fingerprint rather than one hash over the file. | [sharing a run](sharing-a-run.md) |
 | order log | `engine.order_log`, every input the engine consumed as JSON-serialisable dicts and the only one of the five run identifiers it carries; an unknown operation raises on replay, because skipping one would produce a market the log does not describe and it would look like a success. | [reproducing a run](reproducing-a-run.md) |
-| era boundary | A change that moves every seeded trajectory, caught by a probe digest rather than by a version string, because one calendar day brought three trajectory-changing fixes while `pt.version()` stayed 0.1.0 and the preset stayed `pt-v1`. | [sharing a run](sharing-a-run.md) |
+| era boundary | A change that moves every seeded trajectory, caught by a probe digest rather than by a version string, because one calendar day brought three trajectory-changing fixes while `tf.version()` stayed 0.1.0 and the preset stayed `pt-v1`. | [sharing a run](sharing-a-run.md) |
 | era_fingerprint() | The digest of a small fixed probe simulation, recomputed before every replay, so two builds that agree on the probe agree on the arithmetic it exercises and the manifest refuses by name when they do not. | [sharing a run](sharing-a-run.md) |
 
 ## Model configuration
@@ -87,7 +87,7 @@ page: they are a list of things this documentation does not currently explain.
 | derived coefficient | `mispricing_phi` and `s_phi_tick`, the two coefficients carried as recorded bit patterns and refused as a direct override; overriding `mispricing_half_life_days` recomputes both, deterministically on a given build but not bit-identically to any recorded constant. | [model presets](model-presets.md) |
 | compile-time constant | One of the 28 preset entries visible in `ModelParams.to_dict()` and covered by the fingerprint but refused as an override, because accepting an override the engine would ignore would make the fingerprint a lie. | [model presets](model-presets.md) |
 | promotion | Moving a coefficient off its compiled literal onto the settable surface, the way `volume_move_cap` came off its `4.0` in `tick.rs` for `pt-v12`; `settable()` went from 70 names at 0.2.0 to 87 at 0.3.0, and every earlier preset still runs the literal, which is why they replay unchanged. | `no owning page` |
-| `model_preset()` | Returns the nine-key mispricing and crowd dictionary for the preset in force, `pt-v14` by default; the GARCH parameters and the factor sigmas are live and none of them appear, so quote `pt.version()` beside the name because the version is what pins the build. | [conventions](conventions.md) |
+| `model_preset()` | Returns the nine-key mispricing and crowd dictionary for the preset in force, `pt-v14` by default; the GARCH parameters and the factor sigmas are live and none of them appear, so quote `tf.version()` beside the name because the version is what pins the build. | [conventions](conventions.md) |
 | `ModelParams.from_preset()` | Builds a `ModelParams` from a shipped preset plus keyword overrides, `from_preset("pt-v1", garch_alpha=0.12)`; an unknown or non-settable key is refused by name, and the refusal prints the whole settable surface beside it. | [model presets](model-presets.md) |
 
 ## Evaluation
@@ -182,7 +182,7 @@ page: they are a list of things this documentation does not currently explain.
 
 | term | where the definition actually lives |
 |---|---|
-| `Instrument` | no docs/*.md defines it. core-concepts.md names it once inside a code comment (`pt.Universe([pt.Instrument(...), ...])`, line 46) and reproducing-a-ru. |
+| `Instrument` | no docs/*.md defines it. core-concepts.md names it once inside a code comment (`tf.Universe([tf.Instrument(...), ...])`, line 46) and reproducing-a-ru. |
 | `Engine` | no docs/*.md says what an Engine is. core-concepts.md has `### Universe` and `### Macro` sections but no `### Engine` section, despite constructing on. |
 | `market maker` | the phrase appears in no docs/*.md at all. |
 | `ADV` | used in three docs pages as an established term and expanded in none of them. transaction-cost-analysis.md:26 and :45 quote a name's ADV as 9,713 shar. |

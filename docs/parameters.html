@@ -139,7 +139,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <section class="pt-s19">
 <h2 class="pt-s7">What the settable surface covers</h2>
-<p class="pt-s8">Read the list rather than a summary of it, with <span class="pt-s26">pt.ModelParams.settable()</span>. The shape of it:</p>
+<p class="pt-s8">Read the list rather than a summary of it, with <span class="pt-s26">tf.ModelParams.settable()</span>. The shape of it:</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.7rem">
 
 <div class="pt-s82">
@@ -198,11 +198,11 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <section class="pt-s19">
 <h2 class="pt-s7">Change one, and the name changes</h2>
 <div class="pt-s28">
-<pre class="pt-s30">params = pt.ModelParams.from_preset(
+<pre class="pt-s30">params = tf.ModelParams.from_preset(
     "pt-v14",
     momentum_theta=0.05)
 
-e = pt.Engine(seed=42, universe=u,
+e = tf.Engine(seed=42, universe=u,
               model=params)
 
 e.model_fingerprint
@@ -272,7 +272,7 @@ e.model_fingerprint
 
 <section class="pt-s19">
 <h2 class="pt-s7">What the settable surface covers</h2>
-<p class="pt-s8">Read the list rather than a summary of it, with <span class="pt-s26">pt.ModelParams.settable()</span>. The shape of it:</p>
+<p class="pt-s8">Read the list rather than a summary of it, with <span class="pt-s26">tf.ModelParams.settable()</span>. The shape of it:</p>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:0.7rem">
 <sc-for list="{{ surface }}" as="s">
 <div class="pt-s82">
@@ -286,11 +286,11 @@ e.model_fingerprint
 <section class="pt-s19">
 <h2 class="pt-s7">Change one, and the name changes</h2>
 <div class="pt-s28">
-<pre class="pt-s30">params = pt.ModelParams.from_preset(
+<pre class="pt-s30">params = tf.ModelParams.from_preset(
     "pt-v14",
     momentum_theta=0.05)
 
-e = pt.Engine(seed=42, universe=u,
+e = tf.Engine(seed=42, universe=u,
               model=params)
 
 e.model_fingerprint

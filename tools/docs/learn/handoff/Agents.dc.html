@@ -180,7 +180,7 @@ summary::marker{color:var(--accent-line)}
         # target weights, one per name
         return {"AAA": 0.2, "AAB": -0.1}
 
-scores = pt.evaluate(
+scores = tf.evaluate(
     {"mine": Mine()}, seed=7,
     universe=u, days=10)
 
@@ -233,8 +233,8 @@ scores["mine"].impact_bps</pre>
 
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
 <div style="display:flex;flex-direction:column;gap:0.8rem">
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">ranking = pt.rank(
-    lambda: pt.reference_agents(seed=3),
+<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">ranking = tf.rank(
+    lambda: tf.reference_agents(seed=3),
     seeds=range(12), universe=u,
     days=10, workers=4)
 

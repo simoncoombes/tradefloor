@@ -256,7 +256,7 @@ lose.
 | **Core concepts** | 917 | The universe/macro/seed triad, with the roster-order warning as an inline callout — it is the one thing that silently changes results. |
 | **The two loops** | 791 | A two-column diagram: the research loop against the calibration loop, and where they touch. |
 | **Running a market** | 1,600 | A tabbed preview of the five output tables — Bars, Truth, Macro, Fills, Book — with real rows under real column names. `130ms` fade on tab swap. Plus the rebalance-cadence bars (+37.55% / +9.79% / −27.46%). |
-| **Agents** | 907 | The twelve-market tally: `pt.rank` output, twelve squares showing the 9–3 split, three readouts stating what the numbers do and do not support. |
+| **Agents** | 907 | The twelve-market tally: `tf.rank` output, twelve squares showing the 9–3 split, three readouts stating what the numbers do and do not support. |
 | **Scenarios** | 883 | Three scenario shapes, each with the code that drives it and an animated chart of the resulting macro path. |
 | **Execution cost** | 757 | The counterfactual: the same seed with and without your orders, and where the shortfall accrues. |
 | **RL environment** | 868 | The Gymnasium loop, the observation and action shapes, and what size costs. |

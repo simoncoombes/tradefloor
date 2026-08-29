@@ -164,10 +164,10 @@ summary::marker{color:var(--accent-line)}
 <p style="font-size:1.125rem;color:var(--ink-2);margin:0">A scenario drives the macro path. Without one, the economy finds its own path from day zero.</p>
 
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">shock = pt.Scenario.rate_shock(
+<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">shock = tf.Scenario.rate_shock(
     start=0.025, end=0.05, over=15)
 
-pt.evaluate(agents, seed=7,
+tf.evaluate(agents, seed=7,
             universe=u, days=20,
             scenario=shock)
 

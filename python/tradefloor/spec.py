@@ -13,8 +13,8 @@ an exposure (``gross``) and a participation cap) and a
 :class:`StrategySpec` writes that grammar down:
 
 ```python
-spec = pt.StrategySpec.momentum(lookback_days=1.0, top_k=5)
-scores = pt.evaluate({"momentum": spec}, seed=7, universe=u)
+spec = tf.StrategySpec.momentum(lookback_days=1.0, top_k=5)
+scores = tf.evaluate({"momentum": spec}, seed=7, universe=u)
 scores["momentum"].strategy_fingerprint    # cite this
 ```
 
@@ -481,7 +481,7 @@ class StrategySpec:
         own parameters:
 
         ```python
-        pt.StrategySpec.blend([
+        tf.StrategySpec.blend([
             {"kind": "momentum",       "weight": 0.6, "lookback_days": 1.0},
             {"kind": "mean_reversion", "weight": 0.4, "lookback_days": 5.0},
         ], top_k=10)

@@ -25,15 +25,15 @@ else.
 
 ```python
 import polars as pl
-import tradefloor as pt
+import tradefloor as tf
 
-engine = pt.Engine(seed=42, universe=pt.Universe.random(20, seed=3))
+engine = tf.Engine(seed=42, universe=tf.Universe.random(20, seed=3))
 engine.run_days(5)
 truth = pl.DataFrame(engine.truth())
 
 d = truth.sort("instrument_id", "day", "tick").with_columns(
     pl.col("mispricing_s").diff().over("instrument_id").alias("move"),
-    sum(pl.col(name) for name in pt.Engine.FACTORS).alias("sum_factors"),
+    sum(pl.col(name) for name in tf.Engine.FACTORS).alias("sum_factors"),
 )
 print((d["move"] - d["sum_factors"]).drop_nulls().abs().max())
 # 1.9147010366094008e-16

@@ -20,7 +20,7 @@ run.
 import struct
 import time
 
-import tradefloor as pt
+import tradefloor as tf
 from tradefloor.baselines import Momentum, capture_ratio, reference_agents
 
 
@@ -31,7 +31,7 @@ def main() -> dict:
     # 1. A universe. Pin it by serialising: `random(60, seed=11)` is only a
     #    citable specification while the generator is versioned with the model,
     #    and to_json() pins the exact roster regardless.
-    universe = pt.Universe.random(60, seed=11)
+    universe = tf.Universe.random(60, seed=11)
     report["universe"] = len(universe)
     print(f"1. universe: {len(universe)} instruments")
 
@@ -41,7 +41,7 @@ def main() -> dict:
     #    one fixed order across the roster, so there is still no decomposition
     #    WITHIN a run that preserves the draw schedule.
     mark = time.time()
-    sweep = pt.run_many(seeds=list(range(20)), universe=universe, days=5,
+    sweep = tf.run_many(seeds=list(range(20)), universe=universe, days=5,
                         workers=8, collect="summary")
     report["sweep"] = len(sweep)
     print(f"2. swept {len(sweep)} seeds x 5 days in {time.time() - mark:.1f}s")
@@ -50,10 +50,10 @@ def main() -> dict:
     #    comparison is between strategies rather than between markets, so order
     #    flow consumes no RNG draws, which is what makes that exact.
     mark = time.time()
-    scores = pt.evaluate(reference_agents(seed=3), seed=7, universe=universe,
+    scores = tf.evaluate(reference_agents(seed=3), seed=7, universe=universe,
                          days=10)
     print(f"3. evaluated {len(scores)} agents in {time.time() - mark:.1f}s")
-    for card in pt.leaderboard(scores):
+    for card in tf.leaderboard(scores):
         print(f"     {card.name:16s} {card.return_pct:+7.2f}%  "
               f"impact {card.impact_bps:+8.2f} bps")
 
@@ -81,7 +81,7 @@ def main() -> dict:
     # `rank` takes a factory rather than built agents: agents are stateful, and
     # reusing them would carry seed 0's history into seed 1 invisibly.
     mark = time.time()
-    ranking = pt.rank(lambda: reference_agents(seed=3), seeds=range(8),
+    ranking = tf.rank(lambda: reference_agents(seed=3), seeds=range(8),
                       universe=universe, days=5, workers=8)
     report["ranking"] = {r.name: r.pooled_capture for r in ranking.table()}
     print(f"     ranked across 8 seeds in {time.time() - mark:.1f}s")
@@ -115,7 +115,7 @@ def main() -> dict:
     # 4. What did the winner's trading cost? Every fill priced against a market
     #    where it never traded, the benchmark real TCA cannot have.
     mark = time.time()
-    execution = pt.tca.analyse(Momentum(), seed=7, universe=universe, days=10)
+    execution = tf.tca.analyse(Momentum(), seed=7, universe=universe, days=10)
     report["shortfall_bps"] = execution.shortfall_bps()
     print(f"4. shortfall {execution.shortfall_bps():+.2f} bps over "
           f"{len(execution.fills)} fills ({time.time() - mark:.1f}s)")
@@ -160,8 +160,8 @@ def main() -> dict:
     # And with VIX pinned the macro channel is closed, so the subtraction is
     # byte-exact, the guarantee the RNG stream split actually makes, now
     # demonstrated at the boundary where it holds.
-    pinned = pt.tca.analyse(Momentum(), seed=7, universe=universe, days=10,
-                            scenario=pt.Scenario().hold(vix=15.0))
+    pinned = tf.tca.analyse(Momentum(), seed=7, universe=universe, days=10,
+                            scenario=tf.Scenario().hold(vix=15.0))
     report["leaked_pinned"] = pinned.untouched_moved()
     assert not report["leaked_pinned"], (
         f"impact leaked into untraded names under a pinned VIX: "
@@ -173,7 +173,7 @@ def main() -> dict:
     #     to a size -- it is depth being consumed, so it can be watched
     #     happening. `sweep_cost` asks what an order WOULD pay before placing
     #     it, and it reads the same book the fill does.
-    probe = pt.Engine(seed=7, universe=universe)
+    probe = tf.Engine(seed=7, universe=universe)
     probe.open_market()
     probe.run_session(9, 30, 3, 65)
     ticker = universe[0].ticker
@@ -217,7 +217,7 @@ def main() -> dict:
 
     # And the quote is not a separate model from the fill: what the portfolio
     # actually pays is what the book said it would.
-    wallet = pt.Portfolio(cash=1e12)
+    wallet = tf.Portfolio(cash=1e12)
     wallet.stamp(0, 0, 0)
     paid = wallet.execute(probe, ticker, 5e6)
     report["quote_matches_fill"] = paid["price"] == quoted[-1][1].average_price
@@ -230,7 +230,7 @@ def main() -> dict:
     #    and the nine components sum to the change in mispricing, so the
     #    label can be checked rather than trusted.
     mark = time.time()
-    engine = pt.Engine(seed=7, universe=universe)
+    engine = tf.Engine(seed=7, universe=universe)
     engine.run_days(10, record=True)
     truth = engine.truth()
     report["truth_rows"] = truth.num_rows
@@ -244,7 +244,7 @@ def main() -> dict:
     totals = {
         factor: sum(abs(x) for x in struct.unpack(
             "<%dd" % len(universe), engine.attribution(factor)))
-        for factor in pt.Engine.FACTORS
+        for factor in tf.Engine.FACTORS
     }
     ranked = sorted(totals.items(), key=lambda kv: -kv[1])
     report["dominant"] = ranked[0][0]
@@ -259,7 +259,7 @@ def main() -> dict:
     from tradefloor.scenario import Scenario
 
     mark = time.time()
-    calm, hiked = pt.branch(engine, 2, universe=universe, seed=7)
+    calm, hiked = tf.branch(engine, 2, universe=universe, seed=7)
     flat = Scenario().hold(federal_funds_rate=0.025, corporate_bond_yield=0.045)
     shock = Scenario.rate_shock(start=0.025, end=0.06, over=5)
     for branch_engine, path in ((calm, flat), (hiked, shock)):
@@ -301,8 +301,8 @@ def main() -> dict:
     #    and printing "above" for a missing effect says the opposite of what
     #    was measured.
     mark = time.time()
-    facts = pt.facts.measure(seed=7, universe=universe, days=60)
-    verdicts = pt.facts.compare_to_real_markets(facts)
+    facts = tf.facts.measure(seed=7, universe=universe, days=60)
+    verdicts = tf.facts.compare_to_real_markets(facts)
     report["realism"] = {k: v["verdict"] for k, v in verdicts.items()}
     print(f"8. stylised facts in {time.time() - mark:.1f}s: "
           + ", ".join(f"{k.replace('_', ' ')} {v['verdict']}"
@@ -338,9 +338,9 @@ def main() -> dict:
     blob = json.dumps(archive)
     report["archive_bytes"] = len(blob)
     restored = json.loads(blob)
-    replayed = pt.replay(
+    replayed = tf.replay(
         restored["log"], seed=restored["seed"],
-        universe=pt.Universe.from_json(json.dumps(restored["universe"])),
+        universe=tf.Universe.from_json(json.dumps(restored["universe"])),
     )
     assert replayed.prices() == engine.prices(), "replay diverged"
     print(f"10. archived {len(blob):,} bytes and replayed it to identical prices")

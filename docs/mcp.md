@@ -234,7 +234,7 @@ job has hung.
 This is the part worth understanding before you trust anything the server
 tells you.
 
-A person calling `pt.evaluate` has the docstrings and this documentation in
+A person calling `tf.evaluate` has the docstrings and this documentation in
 reach. A model calling `evaluate_strategies` has the tool result and nothing
 else, and it will summarise that result to a human who has even less. Hand
 a model `{"return_pct": 88.7}` and it will report that the strategy made

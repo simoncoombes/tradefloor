@@ -429,7 +429,7 @@ class Component extends DCLogic {
     const t = this.state.target;
     const INSTALL = {
       py: {
-        code: 'pip install tradefloor\n\npython -c "import tradefloor as pt; \\\n  print(pt.__version__)"',
+        code: 'pip install tradefloor\n\npython -c "import tradefloor as tf; \\\n  print(tf.__version__)"',
         title: 'From PyPI',
         facts: [
           { k: 'No dependencies', v: 'The core package pulls nothing in. Read results into polars, pandas, pyarrow or duckdb if you want them.' },

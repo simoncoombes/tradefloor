@@ -59,14 +59,14 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <p class="pt-s17">Build a universe, run a market, and do a test of a strategy. For most people this page is the whole library.</p>
 
 <div class="pt-s28">
-<pre class="pt-s30">import tradefloor as pt
+<pre class="pt-s30">import tradefloor as tf
 
-universe = pt.Universe.random(108, seed=7)
-macro = pt.Macro(federal_funds_rate=0.025,
+universe = tf.Universe.random(108, seed=7)
+macro = tf.Macro(federal_funds_rate=0.025,
                  corporate_bond_yield=0.052,
                  vix=16.0)
 
-engine = pt.Engine(seed=42, universe=universe,
+engine = tf.Engine(seed=42, universe=universe,
                    macro_state=macro)
 engine.run_days(252)</pre>
 <div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
@@ -94,10 +94,10 @@ engine.run_days(252)</pre>
 <section id="run" style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <h2 class="pt-s7">Pick who exists</h2>
 <p style="color:var(--ink-2);margin:0;max-width:none">There are four constructors. A generated roster uses synthetic tickers, AAA to AAZ and on. The generator assigns them by position.</p>
-<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">pt.Universe.random(108, seed=7)          # generated, plausible per sector
-pt.Universe([pt.Instrument(...), ...])   # your own roster
-pt.Universe.from_edgar(snapshot)         # real SEC fundamentals
-pt.Universe.from_json(saved)             # one you saved earlier</pre>
+<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">tf.Universe.random(108, seed=7)          # generated, plausible per sector
+tf.Universe([tf.Instrument(...), ...])   # your own roster
+tf.Universe.from_edgar(snapshot)         # real SEC fundamentals
+tf.Universe.from_json(saved)             # one you saved earlier</pre>
 
 <details style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);margin-top:0.3rem">
 <summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--accent-deep)">One thing that will bite you: roster order is contractual</summary>
@@ -277,8 +277,8 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <h2 class="pt-s7">One market is one sample</h2>
 <p style="color:var(--ink-2);margin:0;max-width:none">Before you call a winner, run the comparison across twelve seeded markets. Then do a check of how often the lead holds.</p>
 <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<pre class="pt-s30">ranking = pt.rank(
-    lambda: pt.reference_agents(seed=3),
+<pre class="pt-s30">ranking = tf.rank(
+    lambda: tf.reference_agents(seed=3),
     seeds=range(12), universe=universe,
     days=10, workers=4)
 
@@ -297,11 +297,11 @@ ranking.separation("mean_reversion",
 <section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <h2 class="pt-s7">A year from start to finish</h2>
 <p style="color:var(--ink-2);margin:0;max-width:none">Build a universe, run a year, and read the results. Score a strategy, then run the same comparison across twelve markets. Each step prints something.</p>
-<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as pt
+<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as tf
 
 # 1. a universe and a market
-universe = pt.Universe.random(30, seed=11)
-engine = pt.Engine(seed=42, universe=universe)
+universe = tf.Universe.random(30, seed=11)
+engine = tf.Engine(seed=42, universe=universe)
 engine.run_days(252)                        # one trading year
 
 # 2. what happened, and what was actually true
@@ -309,12 +309,12 @@ bars = engine.bars(grain="day")             # OHLCV for every name
 truth = engine.truth()                      # true value + what drove each move
 
 # 3. score a strategy against a fresh market
-spec = pt.StrategySpec.momentum(lookback_days=1.0, top_k=5)
-scores = pt.evaluate({"momentum": spec}, seed=7, universe=universe, days=10)
+spec = tf.StrategySpec.momentum(lookback_days=1.0, top_k=5)
+scores = tf.evaluate({"momentum": spec}, seed=7, universe=universe, days=10)
 print(scores["momentum"].return_pct, scores["momentum"].strategy_fingerprint)
 
 # 4. the same comparison across twelve markets
-ranking = pt.rank(lambda: pt.reference_agents(seed=3), seeds=range(12),
+ranking = tf.rank(lambda: tf.reference_agents(seed=3), seeds=range(12),
                   universe=universe, days=10, workers=4)
 print(ranking.separation("momentum", "mean_reversion"))</pre>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden;margin-top:0.2rem">
@@ -388,14 +388,14 @@ print(ranking.separation("momentum", "mean_reversion"))</pre>
 <p class="pt-s17">Build a universe, run a market, and do a test of a strategy. For most people this page is the whole library.</p>
 
 <div class="pt-s28">
-<pre class="pt-s30">import tradefloor as pt
+<pre class="pt-s30">import tradefloor as tf
 
-universe = pt.Universe.random(108, seed=7)
-macro = pt.Macro(federal_funds_rate=0.025,
+universe = tf.Universe.random(108, seed=7)
+macro = tf.Macro(federal_funds_rate=0.025,
                  corporate_bond_yield=0.052,
                  vix=16.0)
 
-engine = pt.Engine(seed=42, universe=universe,
+engine = tf.Engine(seed=42, universe=universe,
                    macro_state=macro)
 engine.run_days(252)</pre>
 <div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
@@ -413,10 +413,10 @@ engine.run_days(252)</pre>
 <section id="run" style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <h2 class="pt-s7">Pick who exists</h2>
 <p style="color:var(--ink-2);margin:0;max-width:none">There are four constructors. A generated roster uses synthetic tickers, AAA to AAZ and on. The generator assigns them by position.</p>
-<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">pt.Universe.random(108, seed=7)          # generated, plausible per sector
-pt.Universe([pt.Instrument(...), ...])   # your own roster
-pt.Universe.from_edgar(snapshot)         # real SEC fundamentals
-pt.Universe.from_json(saved)             # one you saved earlier</pre>
+<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">tf.Universe.random(108, seed=7)          # generated, plausible per sector
+tf.Universe([tf.Instrument(...), ...])   # your own roster
+tf.Universe.from_edgar(snapshot)         # real SEC fundamentals
+tf.Universe.from_json(saved)             # one you saved earlier</pre>
 
 <details style="border:1px solid var(--accent-line);border-radius:6px;background:var(--accent-soft);margin-top:0.3rem">
 <summary style="cursor:pointer;padding:0.7rem 0.9rem;font-size:0.875rem;font-weight:500;color:var(--accent-deep)">One thing that will bite you: roster order is contractual</summary>
@@ -490,8 +490,8 @@ pt.Universe.from_json(saved)             # one you saved earlier</pre>
 <h2 class="pt-s7">One market is one sample</h2>
 <p style="color:var(--ink-2);margin:0;max-width:none">Before you call a winner, run the comparison across twelve seeded markets. Then do a check of how often the lead holds.</p>
 <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<pre class="pt-s30">ranking = pt.rank(
-    lambda: pt.reference_agents(seed=3),
+<pre class="pt-s30">ranking = tf.rank(
+    lambda: tf.reference_agents(seed=3),
     seeds=range(12), universe=universe,
     days=10, workers=4)
 
@@ -510,11 +510,11 @@ ranking.separation("mean_reversion",
 <section style="padding:2.8rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <h2 class="pt-s7">A year from start to finish</h2>
 <p style="color:var(--ink-2);margin:0;max-width:none">Build a universe, run a year, and read the results. Score a strategy, then run the same comparison across twelve markets. Each step prints something.</p>
-<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as pt
+<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as tf
 
 # 1. a universe and a market
-universe = pt.Universe.random(30, seed=11)
-engine = pt.Engine(seed=42, universe=universe)
+universe = tf.Universe.random(30, seed=11)
+engine = tf.Engine(seed=42, universe=universe)
 engine.run_days(252)                        # one trading year
 
 # 2. what happened, and what was actually true
@@ -522,12 +522,12 @@ bars = engine.bars(grain="day")             # OHLCV for every name
 truth = engine.truth()                      # true value + what drove each move
 
 # 3. score a strategy against a fresh market
-spec = pt.StrategySpec.momentum(lookback_days=1.0, top_k=5)
-scores = pt.evaluate({"momentum": spec}, seed=7, universe=universe, days=10)
+spec = tf.StrategySpec.momentum(lookback_days=1.0, top_k=5)
+scores = tf.evaluate({"momentum": spec}, seed=7, universe=universe, days=10)
 print(scores["momentum"].return_pct, scores["momentum"].strategy_fingerprint)
 
 # 4. the same comparison across twelve markets
-ranking = pt.rank(lambda: pt.reference_agents(seed=3), seeds=range(12),
+ranking = tf.rank(lambda: tf.reference_agents(seed=3), seeds=range(12),
                   universe=universe, days=10, workers=4)
 print(ranking.separation("momentum", "mean_reversion"))</pre>
 <div style="border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden;margin-top:0.2rem">

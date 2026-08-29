@@ -11,8 +11,8 @@ agent holds positions through it. Setting the rate to 5% from the start gives
 you a different market instead of an event.
 
 ```python
-shock = pt.Scenario.rate_shock(start=0.025, end=0.05, over=15)
-pt.evaluate(agents, seed=7, universe=universe, days=20, scenario=shock)
+shock = tf.Scenario.rate_shock(start=0.025, end=0.05, over=15)
+tf.evaluate(agents, seed=7, universe=universe, days=20, scenario=shock)
 ```
 
 `over=` is the whole event, so write it out rather than taking the
@@ -20,7 +20,7 @@ constructor's default of 30. The same call at `over=30` is a gentler cycle
 spread over more of the horizon, and it costs buy-and-hold 2.17 points here
 against the 2.56 in the table below.
 
-Measured on the reference agents (`pt.reference_agents(seed=3)`) over
+Measured on the reference agents (`tf.reference_agents(seed=3)`) over
 `Universe.random(20, seed=4)`, seed 7, 20 days, on the shipped `pt-v12` --
 calm is the same call with no scenario. Same market, same agents, only the
 macro path differs:
@@ -229,10 +229,10 @@ was true up to pt-v9 and is not true now.
 ## Scenarios reach every entry point
 
 ```python
-calm  = pt.tca.analyse(agent, seed=s, universe=u, days=10,
-                       scenario=pt.Scenario().hold(vix=15))
-spike = pt.tca.analyse(agent, seed=s, universe=u, days=10,
-                       scenario=pt.Scenario().hold(vix=45))
+calm  = tf.tca.analyse(agent, seed=s, universe=u, days=10,
+                       scenario=tf.Scenario().hold(vix=15))
+spike = tf.tca.analyse(agent, seed=s, universe=u, days=10,
+                       scenario=tf.Scenario().hold(vix=45))
 ```
 
 Does execution cost more when VIX is high? Measured with `BuyAndHold` over

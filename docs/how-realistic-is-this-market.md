@@ -183,10 +183,10 @@ can move any of this. `measure()` takes the same arguments as the rest of the
 library, so a realism claim can be re-checked rather than inherited:
 
 ```python
-import tradefloor as pt
+import tradefloor as tf
 
-universe = pt.Universe.random(40, seed=111)
-print(pt.facts.report(pt.facts.measure(seed=3, universe=universe)))
+universe = tf.Universe.random(40, seed=111)
+print(tf.facts.report(tf.facts.measure(seed=3, universe=universe)))
 ```
 
 That is one seed, and every figure in the envelope is a median across
@@ -199,11 +199,11 @@ across-seed spread beside each median, which is what a claim should be read
 against:
 
 ```python
-import tradefloor as pt
+import tradefloor as tf
 from tradefloor import envelope
 
-universe = pt.Universe.random(40, seed=111)
-panels = [pt.facts.measure(seed=s, universe=universe) for s in range(5)]
+universe = tf.Universe.random(40, seed=111)
+panels = [tf.facts.measure(seed=s, universe=universe) for s in range(5)]
 row = envelope.intervals(panels)["return_acf1"]
 print(row["median"], row["band"], row["typical_straddles"])
 ```
@@ -224,7 +224,7 @@ running is a one-liner, run from wherever you keep the file:
 ```python
 import json, tradefloor as pt
 
-print(pt.model_preset()["name"] == json.load(open("envelope.json"))["preset"])
+print(tf.model_preset()["name"] == json.load(open("envelope.json"))["preset"])
 ```
 
 If those differ, the envelope describes a different model than the one you

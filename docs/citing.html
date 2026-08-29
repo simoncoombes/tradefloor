@@ -119,16 +119,16 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <section class="pt-s19">
 <h2 class="pt-s7">Write it down, then check it</h2>
 <div class="pt-s28">
-<pre class="pt-s30">manifest = pt.RunManifest.of(
+<pre class="pt-s30">manifest = tf.RunManifest.of(
     engine, spec, seed=7)
 
 manifest.to_json("study.json")
 
 # somewhere else, later
-saved = pt.RunManifest.from_json(
+saved = tf.RunManifest.from_json(
     open("study.json").read())
 
-pt.reproduce(saved)   # or it raises</pre>
+tf.reproduce(saved)   # or it raises</pre>
 <div class="pt-s176">
 <h3 class="pt-s4">Why it raises instead of a warning</h3>
 <p class="pt-s1">A manifest that quietly reproduced a different market would be worse than no manifest. So <span class="pt-s26">reproduce()</span> compares the digest it got against the digest the manifest expected, and names the field that differs.</p>
@@ -216,16 +216,16 @@ pt.reproduce(saved)   # or it raises</pre>
 <section class="pt-s19">
 <h2 class="pt-s7">Write it down, then check it</h2>
 <div class="pt-s28">
-<pre class="pt-s30">manifest = pt.RunManifest.of(
+<pre class="pt-s30">manifest = tf.RunManifest.of(
     engine, spec, seed=7)
 
 manifest.to_json("study.json")
 
 # somewhere else, later
-saved = pt.RunManifest.from_json(
+saved = tf.RunManifest.from_json(
     open("study.json").read())
 
-pt.reproduce(saved)   # or it raises</pre>
+tf.reproduce(saved)   # or it raises</pre>
 <div class="pt-s176">
 <h3 class="pt-s4">Why it raises instead of a warning</h3>
 <p class="pt-s1">A manifest that quietly reproduced a different market would be worse than no manifest. So <span class="pt-s26">reproduce()</span> compares the digest it got against the digest the manifest expected, and names the field that differs.</p>
