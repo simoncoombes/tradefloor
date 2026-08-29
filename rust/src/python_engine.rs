@@ -660,7 +660,12 @@ impl DayBuffer {
 }
 
 /// A whole market, stepped through time.
+///
+/// `Clone` is what [`PyEngine::fork`] is made of, and it is derived rather
+/// than written so that a field added here is carried into a fork without
+/// anyone remembering to carry it. See the note on [`Engine`].
 #[pyclass(name = "Engine", module = "tradefloor._core")]
+#[derive(Clone)]
 pub struct PyEngine {
     inner: Engine,
     buffer: SessionBuffer,
@@ -1587,6 +1592,44 @@ impl PyEngine {
         Ok(f64_bytes(py, &self.inner.attribution_column(index)))
     }
 
+    /// `count` independent engines at exactly this state.
+    ///
+    /// A deep copy of the whole engine, so the branches share no memory and
+    /// driving one cannot perturb another. That is what makes a fork a
+    /// controlled experiment rather than two runs that started similarly.
+    ///
+    /// # Why a copy and not a rebuilt snapshot
+    ///
+    /// Forking used to mean building a fresh engine and writing a
+    /// hand-maintained list of fields into it. The list was incomplete every
+    /// time the engine grew: the per-day attribution accumulators and the
+    /// market-open flag went missing first, then the market factor's variance
+    /// state, then the common log-volume state, then the day counter, then the
+    /// day's endogenous news -- and that last one made a mid-day fork price
+    /// DIFFERENTLY from the parent it was supposed to be a copy of, on the
+    /// shipped default preset, with nothing to indicate it.
+    ///
+    /// Each of those was a real divergence found after the fact. The list
+    /// cannot be trusted, so this does not keep one: `#[derive(Clone)]` copies
+    /// whatever the struct holds, and a field added tomorrow is carried
+    /// without anyone remembering to carry it.
+    ///
+    /// Unlike [`PyEngine::state_snapshot`] this also carries the run's ORDER
+    /// LOG, so a fork can itself be checkpointed, forked again, or written to
+    /// a `RunManifest`. Reconstructing a fork from a snapshot left its log
+    /// empty, and a `Checkpoint` taken on one then replayed a market that
+    /// began at day zero -- silently, because a checkpoint has no way to know
+    /// the history it was handed is short.
+    #[pyo3(signature = (count = 2))]
+    fn fork(&self, count: i64) -> PyResult<Vec<PyEngine>> {
+        if count < 1 {
+            return Err(ValidationError::new_err(format!(
+                "count must be at least 1, got {count}"
+            )));
+        }
+        Ok((0..count).map(|_| self.clone()).collect())
+    }
+
     /// Every column plus the generator position, as one dict.
     ///
     /// A market's complete state, in constant time. The alternative already
@@ -1599,8 +1642,26 @@ impl PyEngine {
     /// exhaustively on `PriceField`, so a new variant fails to compile until
     /// it is handled, and a snapshot cannot silently omit it.
     ///
-    /// NOT a substitute for the order log. A snapshot reproduces a STATE; the
-    /// log reproduces a HISTORY, and a published result cites the second.
+    /// # What it does NOT carry
+    ///
+    /// Everything here drives the market. Three things that do not are left
+    /// out deliberately, and each of them makes a restored engine differ from
+    /// the one it copied in a way no price will show:
+    ///
+    /// - **The order log.** A snapshot reproduces a STATE; the log reproduces
+    ///   a HISTORY, and a published result cites the second. An engine
+    ///   restored from a snapshot has an EMPTY log, so a `Checkpoint` or
+    ///   `RunManifest` taken on it describes a run that began at day zero.
+    /// - **The day's recorded tape.** `record` accumulates the day's ticks;
+    ///   a restore starts that accumulation empty, so a day half-recorded
+    ///   before the snapshot comes back half as long.
+    /// - **The pending daily jump**, which is the previous close's jump
+    ///   waiting for the first row of the next day's tape (§74).
+    ///
+    /// All three are recording and history rather than market state, which is
+    /// the line this method draws. [`PyEngine::fork`] carries them, because it
+    /// copies the engine rather than rebuilding one, and it is what
+    /// `tradefloor.branch` uses.
     fn state_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let out = PyDict::new_bound(py);
         let columns = PyDict::new_bound(py);
@@ -1671,6 +1732,28 @@ impl PyEngine {
         // the same failure: omitted, a fork re-opens at volume 1.0 mid-regime
         // and diverges through the book (§74).
         out.set_item("volume_state", self.inner.volume_state())?;
+        // The universe's remembered stress and the per-name volume states.
+        // Both are engine-level dials that are INERT under every preset
+        // through pt-v15, which is exactly the position `volume_state` above
+        // was in before pt-v10 turned it on and a restored engine started
+        // trading different volume. `set_universe_stress` was written for
+        // this and nothing called it. Carried now, while it is free.
+        out.set_item("universe_stress", self.inner.universe_stress())?;
+        out.set_item("volume_idio", f64_bytes(py, self.inner.volume_idio()))?;
+        // The day's endogenous news, generated once in `open_market` and read
+        // by every tick of that day. Per-DAY state, not a per-tick input, and
+        // omitting it made a mid-day restore run the rest of the day with the
+        // news missing -- a divergence in PRICE, on the shipped default
+        // preset, with nothing to indicate it.
+        let news = pyo3::types::PyList::empty_bound(py);
+        for event in self.inner.session_news() {
+            let item = PyDict::new_bound(py);
+            item.set_item("ticker", event.company_id.clone())?;
+            item.set_item("sector", event.sector.clone())?;
+            item.set_item("price_impact", event.price_impact)?;
+            news.append(item)?;
+        }
+        out.set_item("session_news", news)?;
 
         // The macro chain's state. The chain advances at every close now, so
         // a fork that did not carry these would snap back to the initial
@@ -1893,6 +1976,48 @@ impl PyEngine {
         }
         if let Some(raw) = snapshot.get_item("volume_state")? {
             self.inner.set_volume_state(raw.extract::<f64>()?);
+        }
+        if let Some(raw) = snapshot.get_item("universe_stress")? {
+            self.inner.set_universe_stress(raw.extract::<f64>()?);
+        }
+        if let Some(raw) = snapshot.get_item("volume_idio")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_volume_idio(&values)
+                .map_err(ValidationError::new_err)?;
+        }
+        // Absent in a snapshot written before this was carried. Such a
+        // snapshot described a day whose news this engine cannot know, so the
+        // honest restore is the empty day it recorded -- which is what those
+        // archives already replay to.
+        if let Some(raw) = snapshot.get_item("session_news")? {
+            let items = raw.downcast::<pyo3::types::PyList>()?;
+            let mut events = Vec::with_capacity(items.len());
+            for item in items.iter() {
+                let d = item.downcast::<PyDict>()?;
+                let get = |key: &str| -> PyResult<Option<Bound<'_, PyAny>>> {
+                    Ok(d.get_item(key)?)
+                };
+                events.push(NewsEvent {
+                    company_id: match get("ticker")? {
+                        Some(v) => v.extract()?,
+                        None => None,
+                    },
+                    sector: match get("sector")? {
+                        Some(v) => v.extract()?,
+                        None => None,
+                    },
+                    price_impact: match get("price_impact")? {
+                        Some(v) => v.extract()?,
+                        None => None,
+                    },
+                });
+            }
+            self.inner.set_session_news(events);
         }
         if let Some(raw) = snapshot.get_item("market_variance")? {
             let vals: Vec<f64> = raw.extract()?;

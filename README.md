@@ -124,7 +124,7 @@ eng = tf.Engine(seed=42, universe=u, model="pt-v10")
 
 ## Examples
 
-Ten [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples) in reading order, run by the test suite:
+Eleven [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples) in reading order, run by the test suite:
 
 | | |
 |---|---|
@@ -138,6 +138,7 @@ Ten [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples)
 | [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It runs in about five seconds |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
 | [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit |
+| [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
 
 ## More
 
