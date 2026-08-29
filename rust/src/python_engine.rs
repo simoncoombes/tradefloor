@@ -2254,11 +2254,13 @@ impl PyEngine {
         if let Some(raw) = snapshot.get_item("market_variance")? {
             let vals: Vec<f64> = raw.extract()?;
             // Two values is a checkpoint written before the slow component
-            // existed; three is one written after. Both replay.
-            if vals.len() != 2 && vals.len() != 3 && vals.len() != 4 {
+            // existed; three is one written after; four adds the mixture
+            // components; five carries the lagged-wire memory. All replay.
+            if vals.len() < 2 || vals.len() > 5 {
                 return Err(ValidationError::new_err(format!(
-                    "market_variance must be [variance, day_factor], or that \
-                     plus the two component levels, got {} values",
+                    "market_variance must be [variance, day_factor], optionally \
+                     plus the component levels and the lagged-wire memory, \
+                     got {} values",
                     vals.len()
                 )));
             }
