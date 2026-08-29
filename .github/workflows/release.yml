@@ -265,10 +265,26 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         # `--no-verify` because the package was already built and tested
         # above; re-verifying compiles the whole crate a second time for no
-        # additional signal. Not idempotent the way PyPI's skip-existing is:
-        # crates.io refuses a version that already exists, and that refusal is
-        # the correct outcome for a re-run rather than something to swallow.
-        run: cargo publish --no-verify
+        # additional signal.
+        #
+        # TRANSITION GUARD, remove after v0.5.0: the tradefloor crate's
+        # first publish had to be manual (crates.io cannot configure a
+        # Trusted Publisher for a crate that does not exist), so the
+        # rename tag finds its version already uploaded. That one refusal
+        # is expected and treated as published; any other failure still
+        # fails, and a re-run refusal on a NORMAL release still fails,
+        # which is the correct outcome this guard must give back after
+        # this tag.
+        run: |
+          set -o pipefail
+          if cargo publish --no-verify 2>&1 | tee publish.log; then
+            exit 0
+          fi
+          if grep -qi "already uploaded\|already exists" publish.log; then
+            echo "version already on crates.io -- the transition tag's expected state"
+            exit 0
+          fi
+          exit 1
 
   github_release:
     name: GitHub release
