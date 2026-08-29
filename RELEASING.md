@@ -178,39 +178,104 @@ either.
 The gate is worth reading only once it comes back clean. 0.3.0 finished at 285
 figures, 199 reproduced, zero MOVED.
 
-### 5. Rebuild the documentation site
+### 5. Update the documentation site
+
+**The site is not in this repository.** It is `simoncoombes/tradefloor-docs`,
+private, and Vercel serves its `docs/` directory verbatim from `main` with no
+build step, so a push there is a deploy that is live in about a minute.
+`docs/`, `tools/docs/learn/` and `build_site.py` all left with it. The four
+commands this step used to give you have not existed here since that move,
+which is the same failure this step already carries a warning about: a step
+that names paths nobody has is worse than no step, because it reads as done.
+
+Documentation does not follow a release on its own. In the docs repo, on a
+branch:
+
+**5.1 Re-vendor what the site checks itself against**, from this tag:
+`pyproject.toml`, `rust/src/params.rs`, `python/tradefloor/_core.pyi`,
+`measurements/`, `rust/goldens/*.json`, `examples/data/`. That repo's README
+lists each one and why it is there. The site builds its parameter and API
+reference out of these, so a stale copy is a page that describes the previous
+release.
+
+**5.2 Regenerate the two inventories against the RELEASED wheel.**
+
+```
+python -m venv /tmp/rel && /tmp/rel/bin/pip install tradefloor==X.Y.Z
+python tools/docs/learn/params.py --python /tmp/rel/bin/python
+python tools/docs/learn/api.py
+```
+
+`--python` is not a courtesy. A local development build reports the same
+version string as the release and can expose parameters the release does not:
+on 2026-08-29 this machine's system interpreter carried a build calling itself
+0.5.0 with 98 settable parameters against the published wheel's 93,
+`qe_pe_stock_gain` among them. Generating from it would have published
+unreleased dials as shipped, under a version that agreed. `params.py` digests
+the settable list beside the version for exactly this reason, and `--check`
+reports the difference in those terms.
+
+**5.3 Build, and pass all five checks** before opening the PR:
 
 ```
 python tools/docs/learn/build.py
-python tools/docs/learn/build.py --check
-python tools/docs/learn/data.py  --check
+python tools/docs/learn/build.py  --check
+python tools/docs/learn/data.py   --check
+python tools/docs/learn/params.py --check --python /tmp/rel/bin/python
+python tools/docs/learn/api.py    --check
 node   tools/docs/learn/verify.cjs docs
+node   tools/docs/learn/wraps.cjs  docs
 ```
 
-`docs/` is the learning path, and `tools/docs/learn/build.py` is what writes
-it. **`tools/docs/build_site.py` is not the site any more.** It built the
-previous one from `design-bundle.html`, it is kept because that bundle is the
-only copy of that design, and it now exits unless given
-`--i-know-this-is-retired` and refuses `--out docs/` outright. This step told
-you to run it for three releases after that stopped being true, which is how
-a release nearly put the old site back over the new one.
+`build.py --check` needs two runs to settle: each page's `dateModified` comes
+from the last commit touching its sources, so committing moves the date the
+next build writes. A tree still dirty on the third run is a bug, not churn.
 
-Build it, commit, then `--check`. Each page's `dateModified` comes from the
-last commit touching its sources, which include `CHANGELOG.md`, so committing
-moves the date the next build writes. `--check` is the no-op that proves it
-settled; a tree still dirty on the third run is a bug rather than churn.
+**5.4 Open a PR.** Main is production there; it is merged, never pushed to.
 
-`data.py --check` proves the charts still match `rust/goldens`, which is the
-step that catches a new default preset moving a drawn line. Run
-`tools/docs/learn/figures.py` after step 4 as well: it grades the prose
-figures against the fresh `tools/remeasure/out/figures.json`.
+### 5b. If this release moves the default preset
 
-Adding a page needs a `.dc.html` in `tools/docs/learn/handoff/` and an entry
-in `build.py`; a page that is neither built nor redirected fails the build,
-so one cannot be dropped by forgetting it. Old URLs answer from `REDIRECTS`.
+Almost every measured figure the site publishes was measured under one preset,
+and almost none of them say which. When the default moved from `pt-v12` to
+`pt-v14`, nothing re-measured: six pages went on quoting pt-v12 numbers until
+2026-08-29, reporting a pooled capture of +0.783 where the shipped default
+gives +0.878, and a sign test of 9-3 where it is 11-1. Two pages also printed
+a `separation()` shape the function has never returned.
 
-It reads the version from `pyproject.toml`, so the nav badge and the BibTeX
-block follow automatically.
+So when `model_preset()` changes, re-measure the published grid and sweep the
+docs repo for what it replaces:
+
+```python
+u = tf.Universe.random(30, seed=11)
+r = tf.rank(lambda: tf.reference_agents(seed=3), seeds=range(12),
+            universe=u, days=10, workers=4)
+r.separation("mean_reversion", "momentum")
+```
+
+Then grep for the figures it supersedes. `data.py --check` catches a moved
+chart because the charts are generated; nothing catches a moved sentence, so
+this one is on the person doing the release. Where a figure is written down,
+write the preset beside it.
+
+`figures.py` in the docs repo cannot help here: it wants
+`tools/remeasure/inventory.json`, which lives in this repository and was never
+vendored, so the prose-figure check does not run there at all.
+
+### 5c. Held for the next release after 0.5.0
+
+`tf.branch` is a copy of the engine and forks carry the parent's order log
+(#64); `Engine.fork`, the narrower `state_snapshot` promise, and a
+`Checkpoint` that records its version and era and refuses across an
+arithmetic change. From #74: `truth(day=)` and `bars(day=)` select a day
+where the argument was previously discarded, `Checkpoint.fingerprint`,
+`RunManifest.of(..., derived_from=)` with `verify_lineage`, and a three-way
+divergence error.
+
+None of it is documented, deliberately: it was unreleased, and the site does
+not describe API the published wheel does not have. Once this release ships,
+that is one docs pass against the new wheel. Say plainly that `day=` changed
+meaning -- code passing it has been getting every recorded day while
+believing it filtered.
 
 ### 6. Check the README survives PyPI
 
@@ -412,6 +477,8 @@ one still 404s after ten minutes, the build failed and the crate page says why.
 | the re-measurement gate ran 3 of 30 groups and reported "Full run" | reading `meta.groups_run` after the report looked too clean | a partial run prints `PARTIAL RUN: n of N` |
 | 106 figures reported as MOVED, none of them a documentation defect | checking three of them against the page by hand | `resync.py`, run before the gate is believed |
 | two gate rows measured a different pair, and a different agent, from the ones the page names | the rows disagreeing with prose that was right | the measurement follows the call the page prints |
+| the docs quoted the previous default preset's figures | reading a published number after a preset change | step 5b re-measures the grid and names the preset beside the figure |
+| the docs inventory was generated from a development build | two builds reporting one version | `params.py --check` digests the settable list; step 5.2 requires `--python` |
 | `CITATION.cff` shipped the previous release's date | reading the field at the tag | it is named in step 1 as the field that goes stale |
 | a push reported `Everything up-to-date` while the fix sat on another branch | comparing SHAs rather than reading the push output | the branch check in the shipping list |
 
