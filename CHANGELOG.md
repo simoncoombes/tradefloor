@@ -86,6 +86,64 @@ A scenario built only from pins serialises exactly as it always has, schema
 1, byte for byte, so every published manifest and every fingerprint over one
 still means what it meant.
 
+**`truth(day=N)` and `bars(day=N)` select a day.** They discarded the
+argument once anything had been recorded, returning every recorded day with
+the right schema and plausible values -- so `truth(day=4)` on a hundred-day
+run answered with all hundred and looked like it had answered the question.
+`day` is now optional: omitted is every recorded day, which is what these
+tables have always returned and what a streaming consumer wants, so no
+existing call changes. A day that was never recorded raises and names the
+days that were, as a range when they are contiguous and a list when they are
+not.
+
+**A fork's manifest can name the checkpoint it began at.**
+`Checkpoint.fingerprint` is a digest over the canonical serialisation, and
+`RunManifest.of(..., derived_from=checkpoint)` records it with the
+checkpoint's label and its log length. `derived_from` reads it back,
+`describe()` prints it, and `verify_lineage(checkpoint)` checks the claim for
+a reader who holds both. Lineage was previously derivable -- two branches
+share a log prefix -- but only by comparing two manifests, so a reader
+holding one could not tell it was a branch of anything.
+
+The claim is checked when it is made, on identity before history. That order
+is forced: an order log records inputs, so a run of the same sessions on
+another seed carries a log that compares equal entry for entry, and a prefix
+check alone would have accepted a checkpoint of an entirely different world.
+
+**A failed `reproduce()` blames what the evidence supports.** The message led
+with "an unmeasured platform pair" in every case and then printed the pair,
+which was frequently the same platform twice -- a sentence that disproved its
+own hypothesis while sending the reader to the Rust core. It now separates
+the three cases the evidence already distinguishes: differing draw counts are
+an input difference and no platform explains them; matching draws across two
+machines are the cross-platform case the release gate exists to measure; and
+matching draws on one machine leave build flags, a substituted wheel, or
+arithmetic the era probe does not exercise.
+
+**A corrupted checkpoint, a stale calibration surface, and the guards that
+had stopped guarding.** `market_vol_gamma` was settable with no calibration
+spec, which failed fifteen tests across five files and put the parameter out
+of reach of any search; it now joins the reparameterised set, and the
+market-factor stationarity check gained the gamma term it was missing, so a
+survey can no longer plan a non-stationary factor variance. The MCP, gym and
+Arrow surfaces are installed and run in CI rather than skipping. Six
+documented environment knobs accept `TRADEFLOOR_` alongside the old
+`PRETIUM_` spelling.
+
+**The whole suite runs nightly.** `suite.yml` builds one wheel and runs the
+~1,300 tests in four parallel batches, with every optional dependency
+installed, plus Python 3.12 and 3.13 -- which the abi3 wheel serves and
+nothing was testing. `tools/ci/batches.py` is the single definition of the
+split and a test asserts it covers every file exactly once.
+
+**`state_snapshot` drift is detectable.** It is a hand-written list of fields
+that has been wrong six times, and since forking became a copy nothing in the
+library uses it. A guard now restores a snapshot, compares it to a fork of
+the same parent, and continues both -- in a market with every dormant dial
+live, because a snapshot that forgets an inert field is invisible until a
+preset turns it on. The guard is itself guarded: each field is dropped in
+turn and must be caught, or must carry the condition its effect waits on.
+
 **Forking is now a copy of the engine, and four ways it was not exact are
 fixed.** `tf.branch` rebuilt a fork by writing a hand-maintained list of
 fields into a fresh engine, and the list was incomplete. Most seriously, it
