@@ -11,7 +11,7 @@ measured on a single agent.
 
 ## 0.5.0
 
-**The library is now `tradefloor`** — formerly `pretium`, which published
+**The library is now `tradefloor`**, formerly `pretium`, which published
 through 0.4.3 and stays on PyPI and crates.io forever, because published
 results cite those versions and reproducibility is the point. Install
 `tradefloor`, `import tradefloor`, crate `tradefloor`, MCP server
