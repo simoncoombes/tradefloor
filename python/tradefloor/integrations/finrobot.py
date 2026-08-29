@@ -1,0 +1,924 @@
+"""Run a FinRobot agent inside a Tradefloor market, and record what it did.
+
+FinRobot is an open-source financial-AI agent platform from the AI4Finance
+Foundation (https://github.com/AI4Finance-Foundation/FinRobot, Apache-2.0).
+This module is a Tradefloor integration for FinRobot. There is no affiliation
+with or endorsement by AI4Finance, and nothing here is an official FinRobot
+interface.
+
+    Tradefloor observation
+            |
+      FinRobotAdapter        allowlist -> text
+            |
+        FinRobot             the real SingleAssistant, over autogen
+            |
+      FinRobotAdapter        parse -> validate -> share deltas
+            |
+    Tradefloor execution
+
+## Ownership
+
+FinRobot owns interpretation, the portfolio decision and a one-line
+rationale. Tradefloor owns the market, the macro path, execution, the order
+book, fills, accounting, checkpoints, forks, interventions and the
+comparison.
+
+FinRobot never mutates engine state. It returns JSON, and
+:func:`orders_from` turns validated JSON into the share deltas
+:class:`~tradefloor.counterfactual.World` executes. Every path from a model
+response to the engine runs through :func:`parse` and :func:`orders_from`.
+
+## The observation allowlist
+
+:class:`~tradefloor.harness.Observation` carries ``.engine``, and the engine
+knows the answer key: :func:`tradefloor.fair_value`, the nine-way factor
+:meth:`~tradefloor.Engine.attribution` of every price move, each company's
+``mispricing_s``, and -- through a :class:`~tradefloor.Scenario` -- the macro
+path the run has not reached yet. An agent reading any of those inverts the
+simulator, and the experiment around it measures nothing.
+
+So :func:`observe` names every field it emits, one at a time, and reads
+nothing by reflection. Adding a field takes a deliberate edit here. A
+denylist would go stale the first time the engine gained an attribute; an
+allowlist survives that.
+
+``OBSERVABLE_MACRO`` is the macro half of the list, bound to
+``counterfactual.MACRO_FIELDS`` on purpose: the library has already settled
+which macro fields a run is ABOUT, and that set leaves out ``qe_pe_boost``, a
+model coefficient no exchange publishes. ``tests/test_finrobot.py`` runs the
+mapping against an engine proxy that raises on the forbidden attributes, so a
+future edit reaching for one fails on the access.
+
+Company fundamentals -- sector, EPS, book value, revenue growth, beta -- do
+not come off the engine either. The caller supplies them as ``fundamentals``.
+An analyst reads all five off a filing, and keeping them out of the adapter
+leaves one less line to audit. The inputs to a valuation are public. The
+valuation is the answer key.
+
+## Which FinRobot abstraction
+
+:class:`finrobot.agents.workflow.SingleAssistant`, FinRobot's supported
+single-agent entry point, driven through the real ``autogen`` chat plumbing.
+It assembles a ``finrobot.agents.workflow.FinRobot`` assistant -- an
+``autogen.AssistantAgent`` subclass, including FinRobot's own role-prompt
+preprocessing -- opposite an ``autogen.UserProxyAgent``.
+
+Two constructor arguments matter:
+
+- ``toolkits=[]``. Every FinRobot library role carrying toolkits carries ones
+  that fetch REAL market data: FinnHub company news, Yahoo Finance prices,
+  SEC filings. Those describe a different world from the simulated one. An
+  agent given them reasons about securities it is not trading, and the roster
+  here is synthetic down to its tickers.
+- ``code_execution_config=False``. The ``SingleAssistant`` default gives the
+  user proxy a working directory and lets it run model-authored code. This
+  integration needs one JSON object.
+
+``MultiAssistant`` and ``MultiAssistantWithLeader`` were the alternative.
+Both are group chats, and their value is division of labour across a research
+report. A portfolio decision every simulated day is one question to one role.
+A group chat multiplies the cost per decision by the number of participants
+and measures the same thing.
+
+FinRobot ships no structured-output mechanism: no Pydantic response model, no
+schema binding. So the contract is a JSON object requested in the mandate and
+validated here. :func:`parse` is strict and total. Anything it cannot turn
+into a well-formed :class:`Decision` raises :class:`DecisionError`, and the
+caller decides whether that ends the run or costs the agent a step.
+
+## Replay
+
+A live decision costs money, and running one twice gives two answers.
+Tradefloor's market is deterministic; an LLM behind an API is not. The
+adapter has two modes over one code path. ``mode="live"`` calls FinRobot and,
+with a recorder attached, writes every interaction to a :class:`Transcript`.
+``mode="replay"`` reads that transcript back, keyed by the SHA-256 of the
+exact text FinRobot was sent.
+
+The key is a hash of the input. Change the observation mapping and the digest
+changes, the key goes missing, and the replay RAISES naming the step. Keyed
+by (arm, step) it would answer the new question with a response given to the
+old one.
+
+Replay needs no FinRobot, no API key and no network. The shipped example and
+notebook default to it, and CI runs them.
+"""
+
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+import re
+import statistics
+from typing import Any, Sequence
+
+from .._core import ValidationError
+from ..counterfactual import MACRO_FIELDS
+
+#: The macro fields FinRobot is shown. Bound to ``counterfactual.MACRO_FIELDS``
+#: itself, so the two cannot drift apart over what a macro experiment covers.
+OBSERVABLE_MACRO = MACRO_FIELDS
+
+#: The sides a decision may name. HOLD carries no quantity and produces no
+#: order, so the agent can decline a decision period.
+SIDES = ("BUY", "SELL", "HOLD")
+
+#: Price rows kept for the recent-return and volatility lines. Five days at
+#: the library's six steps a day: long enough for a realised-volatility number
+#: to mean something, short enough to describe recent conditions.
+HISTORY_STEPS = 30
+
+#: Fraction of an instrument's average daily volume one order may take.
+#: ``tradefloor.baselines.rebalance`` uses the same 2% for every shipped
+#: baseline. Without a cap, one mis-scaled share count moves the price further
+#: than the intervention does, and the comparison then measures market impact.
+#: Requests above the cap are clipped and RECORDED as clipped. Being unable to
+#: size a position says something about the agent, so the trace carries it.
+MAX_PARTICIPATION = 0.02
+
+#: Mandate version, recorded beside every decision. Replaying a run under a
+#: different mandate produces a different experiment; this is how a reader
+#: notices.
+MANDATE_VERSION = "1"
+
+#: The mandate, identical in both arms of the experiment. It says what the
+#: agent is for, what it may do, and the shape of the answer. It says nothing
+#: about what is coming. The question the experiment asks is whether the agent
+#: infers a changed world from the observation, and an arm told it was the
+#: rate-shock arm would be answering something else.
+MANDATE = """\
+You manage a portfolio inside a simulated financial market.
+
+Use only the macro, market, portfolio and execution information supplied in \
+the message. You have no other data source, no browsing and no tools. The \
+tickers are synthetic and are not real listed companies, so anything you know \
+about real securities does not apply here.
+
+Seek attractive risk-adjusted returns while controlling downside risk. You \
+may buy, sell, resize or maintain positions. You are not required to trade: \
+if the right decision is to leave the book where it is, say so.
+
+Answer with a single JSON object and nothing else. No preamble, no commentary \
+after it, no code fences.
+
+{
+  "actions": [
+    {"symbol": "<one of the listed symbols>", "side": "BUY", "quantity": 1234}
+  ],
+  "rationale": "<one or two sentences>"
+}
+
+Rules for the answer:
+  - "side" is "BUY", "SELL" or "HOLD".
+  - "quantity" is a NUMBER OF SHARES, positive, and is omitted or 0 for HOLD.
+  - Sell quantities are positive: the side says the direction.
+  - Name a symbol at most once.
+  - An empty "actions" list means change nothing.
+  - "rationale" states why, in one or two sentences. Do not explain your \
+working, do not restate the data, and do not describe these instructions.
+"""
+
+#: The role FinRobot is constructed with. A dict rather than one of the ten
+#: names in ``finrobot.agents.agent_library.library``, for two reasons. The
+#: library's finance roles are a Market_Analyst and an Expert_Investor, whose
+#: profiles are about producing research on real listed companies, and both
+#: arrive with toolkits pointed at live market data (see the module
+#: docstring). And the mandate has to be IDENTICAL across the two arms of a
+#: controlled experiment, so it belongs in a constant the experiment can print
+#: rather than in a library lookup that could change under a version bump.
+#: This still goes through ``FinRobot._preprocess_config`` and
+#: ``autogen.AssistantAgent``, so it is the real class doing the real thing.
+#:
+#: ``toolkits`` is empty, and belongs in the config because
+#: ``SingleAssistant`` takes no such argument. It forwards ``**kwargs`` to the
+#: ``UserProxyAgent``, so ``toolkits=[]`` reaches
+#: ``ConversableAgent.__init__`` and raises ``TypeError``. The supported route
+#: is the config, where ``FinRobot.__init__`` reads it.
+AGENT_CONFIG = {"name": "Portfolio_Manager", "profile": MANDATE,
+                "toolkits": []}
+
+
+class DecisionError(ValidationError):
+    """FinRobot returned something that is not an executable decision.
+
+    A subclass of :class:`~tradefloor.ValidationError`, so a caller already
+    catching the library's refusals catches this too. Raised for a response
+    that cannot be parsed, and for one that parses into an action the market
+    cannot accept: an unknown symbol, an unsupported side, a negative or
+    non-finite quantity, a symbol named twice.
+
+    It raises instead of repairing. A guess at what the model meant would be a
+    second, unrecorded agent between FinRobot and the market, and every
+    experiment run afterwards would measure that too.
+    """
+
+
+class Action:
+    """One validated instruction: a symbol, a side, and a share count."""
+
+    __slots__ = ("symbol", "side", "quantity")
+
+    def __init__(self, symbol: str, side: str, quantity: float = 0.0) -> None:
+        self.symbol = symbol
+        self.side = side
+        self.quantity = float(quantity)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"symbol": self.symbol, "side": self.side,
+                "quantity": self.quantity}
+
+    def signed(self) -> float:
+        """The share delta this action asks for. HOLD is zero."""
+        if self.side == "BUY":
+            return self.quantity
+        if self.side == "SELL":
+            return -self.quantity
+        return 0.0
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, Action) and self.as_dict() == other.as_dict()
+
+    def __repr__(self) -> str:
+        if self.side == "HOLD":
+            return f"HOLD {self.symbol}"
+        return f"{self.side} {self.quantity:,.0f} {self.symbol}"
+
+
+class Decision:
+    """What FinRobot decided at one decision point, after validation."""
+
+    __slots__ = ("actions", "rationale")
+
+    def __init__(self, actions: Sequence[Action], rationale: str = "") -> None:
+        self.actions = list(actions)
+        self.rationale = rationale
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"actions": [a.as_dict() for a in self.actions],
+                "rationale": self.rationale}
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, Decision) and self.as_dict() == other.as_dict()
+
+    def __repr__(self) -> str:
+        if not self.actions:
+            return "Decision(no change)"
+        return "Decision(" + ", ".join(repr(a) for a in self.actions) + ")"
+
+
+# -- observation -> FinRobot ------------------------------------------------
+
+
+def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
+            fundamentals: dict[str, dict[str, Any]] | None = None,
+            max_participation: float = MAX_PARTICIPATION) -> dict[str, Any]:
+    """The observable state, as a JSON-able payload. An allowlist.
+
+    Every key below is written out by hand. Nothing is copied off the engine
+    by reflection, and ``obs.engine`` is read for exactly two things: the
+    macro fields in ``OBSERVABLE_MACRO``, and the marks that price the
+    portfolio. See the module docstring for why that matters.
+
+    ``history`` is the adapter's own record of the prices it has already been
+    shown. A recent return and a realised volatility come from that, without
+    asking the simulator for either.
+    """
+    macro_state = obs.engine.macro_state
+    macro = {field: getattr(macro_state, field) for field in OBSERVABLE_MACRO}
+
+    rows = [list(row) for row in history]
+    facts = fundamentals or {}
+    assets = []
+    for i, ticker in enumerate(obs.tickers):
+        book = obs.book(ticker)
+        adv = obs.avg_volume(ticker)
+        assets.append({
+            "symbol": ticker,
+            "price": obs.price(ticker),
+            "return_1d": _window_return(rows, i, obs.steps_per_day),
+            "return_5d": _window_return(rows, i, obs.steps_per_day * 5),
+            "volatility": _volatility(rows, i),
+            "best_bid": book.best_bid,
+            "best_ask": book.best_ask,
+            "avg_daily_volume": adv,
+            "max_order_shares": max_participation * adv,
+            "position": obs.position(ticker),
+            # Public company facts, supplied by the caller rather than read
+            # off the simulator. Absent is fine and renders as absent.
+            "fundamentals": dict(facts.get(ticker, {})),
+        })
+
+    portfolio = obs.portfolio
+    return {
+        "step": obs.step,
+        "day": obs.day,
+        "steps_per_day": obs.steps_per_day,
+        "macro": macro,
+        "assets": assets,
+        "portfolio": {
+            "cash": portfolio.cash,
+            "net_worth": portfolio.net_worth(obs.engine),
+            "gross_exposure": portfolio.leverage(obs.engine),
+        },
+    }
+
+
+def _window_return(rows: Sequence[Sequence[float]], i: int,
+                   steps: int) -> float | None:
+    """Return over the last ``steps`` observations, or None if unseen.
+
+    None, for a window the agent has not lived through yet. Zero would claim
+    the price did not move, and on day one that describes the record and not
+    the market. From the number alone the agent cannot tell the two apart.
+    """
+    if len(rows) < 2:
+        return None
+    window = rows[-(steps + 1):]
+    if len(window) < 2:
+        return None
+    first, last = window[0][i], window[-1][i]
+    return None if first <= 0 else (last / first) - 1.0
+
+
+def _volatility(rows: Sequence[Sequence[float]], i: int) -> float | None:
+    """Realised volatility of the step returns held in ``rows``."""
+    if len(rows) < 3:
+        return None
+    steps = [rows[k][i] / rows[k - 1][i] - 1.0
+             for k in range(1, len(rows)) if rows[k - 1][i] > 0]
+    return statistics.pstdev(steps) if len(steps) >= 2 else None
+
+
+def render(payload: dict[str, Any], *, objective: str = "") -> str:
+    """The payload as the text FinRobot receives.
+
+    Text and not raw JSON: the assistant is a chat agent and reads prose
+    better than a nested object, and a rendered block is what somebody
+    auditing the recorded transcript has to read. Generated from ``payload``
+    alone, so nothing outside the allowlist can appear here by accident.
+    """
+    macro = payload["macro"]
+    out = [
+        "SIMULATED MARKET",
+        "",
+        f"Day {payload['day']}, decision step {payload['step']}.",
+        "",
+        "Macro",
+        "-----",
+    ]
+    for field in OBSERVABLE_MACRO:
+        out.append(f"{field:<22} {_num(macro.get(field))}")
+
+    out += ["", "Assets", "------"]
+    for asset in payload["assets"]:
+        out.append("")
+        out.append(asset["symbol"])
+        out.append(f"  price                {_money(asset['price'])}")
+        out.append(f"  return, 1 day        {_pct(asset['return_1d'])}")
+        out.append(f"  return, 5 days       {_pct(asset['return_5d'])}")
+        out.append(f"  step volatility      {_pct(asset['volatility'])}")
+        out.append(f"  bid / ask            {_money(asset['best_bid'])}"
+                   f" / {_money(asset['best_ask'])}")
+        out.append(f"  avg daily volume     {_qty(asset['avg_daily_volume'])}")
+        out.append(f"  your position        {_qty(asset['position'])} shares")
+        out.append(f"  max order this step  {_qty(asset['max_order_shares'])}"
+                   " shares")
+        for key, value in sorted(asset["fundamentals"].items()):
+            out.append(f"  {key:<20} {_num(value)}")
+
+    book = payload["portfolio"]
+    out += [
+        "",
+        "Portfolio",
+        "---------",
+        f"cash                   {_money(book['cash'])}",
+        f"net worth              {_money(book['net_worth'])}",
+        f"gross exposure         {_num(book['gross_exposure'])}x",
+        "",
+        "Positions:",
+    ]
+    held = [a for a in payload["assets"] if a["position"]]
+    if not held:
+        out.append("  none")
+    for asset in held:
+        out.append(f"  {asset['symbol']:<8} {_qty(asset['position'])} shares"
+                   f"  ({_money(asset['position'] * asset['price'])})")
+
+    if objective:
+        out += ["", "Objective", "---------", objective]
+    return "\n".join(out)
+
+
+def _num(value: Any) -> str:
+    if value is None:
+        return "not available"
+    if isinstance(value, float):
+        return f"{value:.4f}"
+    return str(value)
+
+
+def _money(value: Any) -> str:
+    return "not available" if value is None else f"{value:,.2f}"
+
+
+def _pct(value: Any) -> str:
+    return "not available" if value is None else f"{value * 100:+.2f}%"
+
+
+def _qty(value: Any) -> str:
+    return "not available" if value is None else f"{value:,.0f}"
+
+
+# -- FinRobot -> Tradefloor -------------------------------------------------
+
+#: A JSON object anywhere in the response. Models wrap answers in code fences
+#: and add a closing sentence however firmly the mandate asks them not to.
+#: Failing on a fence would score formatting compliance instead of the
+#: portfolio decision. This finds the BRACES; ``json`` parses what is inside.
+_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
+
+
+def parse(text: str) -> Decision:
+    """Turn a FinRobot response into a validated :class:`Decision`.
+
+    Structural validation only: this checks that the answer is a decision.
+    Whether the symbols exist and the sizes are executable belongs to
+    :func:`orders_from`, which has the observation needed to answer it.
+    """
+    if not isinstance(text, str) or not text.strip():
+        raise DecisionError(
+            "FinRobot returned an empty response, so there is no decision to "
+            "validate. An empty answer is not the same as HOLD, and treating "
+            "it as one would score a failed call as a considered choice.")
+
+    # The exact contract first, so a compliant answer is parsed as written
+    # and never through the brace search, which cannot tell a top-level list
+    # from an object and would report the wrong thing about it.
+    try:
+        raw = json.loads(text.strip())
+    except json.JSONDecodeError:
+        match = _OBJECT.search(text)
+        if match is None:
+            raise DecisionError(
+                "no JSON object in the FinRobot response. The mandate asks "
+                f"for one object and nothing else; got {text.strip()[:200]!r}"
+            ) from None
+        try:
+            raw = json.loads(match.group(0))
+        except json.JSONDecodeError as exc:
+            raise DecisionError(
+                "the JSON object in the FinRobot response does not parse: "
+                f"{exc}. Got {match.group(0)[:200]!r}") from exc
+
+    if not isinstance(raw, dict):
+        raise DecisionError(
+            "expected a JSON object with an 'actions' key, got a "
+            f"{type(raw).__name__}")
+
+    actions_raw = raw.get("actions", [])
+    if actions_raw is None:
+        actions_raw = []
+    if not isinstance(actions_raw, list):
+        raise DecisionError(
+            f"'actions' must be a list, got a {type(actions_raw).__name__}")
+
+    actions: list[Action] = []
+    for i, item in enumerate(actions_raw):
+        if not isinstance(item, dict):
+            raise DecisionError(
+                f"action {i} is a {type(item).__name__}, not an object with "
+                "'symbol' and 'side'")
+        symbol = item.get("symbol")
+        if not isinstance(symbol, str) or not symbol.strip():
+            raise DecisionError(
+                f"action {i} has no usable 'symbol': {item.get('symbol')!r}")
+        side = item.get("side")
+        if not isinstance(side, str) or side.upper() not in SIDES:
+            raise DecisionError(
+                f"action {i} names side {side!r}, which is not one of "
+                f"{', '.join(SIDES)}")
+        side = side.upper()
+
+        quantity = item.get("quantity", 0)
+        if quantity is None:
+            quantity = 0
+        if isinstance(quantity, bool) or not isinstance(quantity, (int, float)):
+            raise DecisionError(
+                f"action {i} has quantity {quantity!r}, which is not a number "
+                "of shares")
+        quantity = float(quantity)
+        if quantity != quantity or quantity in (float("inf"), float("-inf")):
+            raise DecisionError(
+                f"action {i} has a non-finite quantity ({quantity})")
+        if quantity < 0:
+            raise DecisionError(
+                f"action {i} has quantity {quantity}, which is negative. The "
+                "side carries the direction, so a sell is SELL with a "
+                "positive quantity; a negative one is ambiguous about which "
+                "of the two the model meant.")
+        if side == "HOLD" and quantity:
+            raise DecisionError(
+                f"action {i} is a HOLD carrying quantity {quantity}. HOLD "
+                "means no trade; a quantity beside it does not say whether "
+                "the model wanted to buy it or to keep it.")
+        actions.append(Action(symbol.strip(), side, quantity))
+
+    seen = [a.symbol for a in actions]
+    duplicated = sorted({s for s in seen if seen.count(s) > 1})
+    if duplicated:
+        raise DecisionError(
+            f"symbols named more than once: {', '.join(duplicated)}. Two "
+            "instructions for one symbol have no defined order, so which one "
+            "reaches the market would depend on dict iteration.")
+
+    rationale = raw.get("rationale", "")
+    if rationale is None:
+        rationale = ""
+    if not isinstance(rationale, str):
+        raise DecisionError(
+            f"'rationale' must be a string, got a {type(rationale).__name__}")
+    return Decision(actions, rationale.strip())
+
+
+def orders_from(decision: Decision, obs: Any, *,
+                max_participation: float = MAX_PARTICIPATION,
+                ) -> tuple[dict[str, float], list[str]]:
+    """Validated share deltas, plus a note for anything that was adjusted.
+
+    The second half of validation, and the only thing that ever reaches
+    ``World._execute``. An unknown symbol raises: the model is trading an
+    instrument this market does not list, and executing the remaining actions
+    would execute half a plan the agent never made.
+
+    A size above the participation cap does not raise. It is clipped to the
+    cap and the clip comes back as a note. An oversized request is something
+    the agent did, so the trace says so. See ``MAX_PARTICIPATION``.
+    """
+    listed = list(obs.tickers)
+    orders: dict[str, float] = {}
+    notes: list[str] = []
+
+    for action in decision.actions:
+        if action.symbol not in listed:
+            raise DecisionError(
+                f"{action.symbol!r} is not listed in this market. The "
+                f"universe is {', '.join(listed)}.")
+        delta = action.signed()
+        if not delta:
+            continue
+        cap = max_participation * obs.avg_volume(action.symbol)
+        if cap > 0 and abs(delta) > cap:
+            notes.append(
+                f"{action.symbol}: asked for {abs(delta):,.0f} shares, "
+                f"clipped to {cap:,.0f} ({max_participation:.1%} of average "
+                "daily volume)")
+            delta = cap if delta > 0 else -cap
+        # Below one share is dust: it generates a trade every step and turns
+        # turnover, which the comparison reports, into noise.
+        if abs(delta) >= 1.0:
+            orders[action.symbol] = delta
+    return orders, notes
+
+
+# -- recording and replay ---------------------------------------------------
+
+
+def digest(prompt: str) -> str:
+    """The replay key: SHA-256 of the exact text FinRobot was sent.
+
+    Sixteen hex characters: ample for the few dozen decision points of one
+    experiment, and short enough to compare by eye in an error message.
+    """
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+
+
+class Transcript:
+    """Recorded FinRobot interactions, keyed by the input that produced them.
+
+    A file of these lets ``python rate_shock.py`` reproduce a real agent run
+    with no API key, no network and no FinRobot install. It holds what
+    re-executing and auditing the experiment need -- the prompt, the raw
+    response, the parsed decision -- and nothing else. No API keys, no account
+    identifiers, no request IDs, no provider headers.
+
+    ``meta`` records what the run cannot reconstruct: the FinRobot version,
+    the provider and model, the generation parameters and the mandate version.
+    Replaying a transcript under a different mandate produces a different
+    experiment, and ``meta`` is how a reader notices.
+    """
+
+    __slots__ = ("meta", "entries", "_by_digest")
+
+    def __init__(self, meta: dict[str, Any] | None = None,
+                 entries: Sequence[dict[str, Any]] = ()) -> None:
+        self.meta = dict(meta or {})
+        self.entries = [dict(e) for e in entries]
+        self._by_digest = {e["digest"]: e for e in self.entries}
+
+    def record(self, entry: dict[str, Any]) -> None:
+        self.entries.append(dict(entry))
+        # Last write wins. An identical prompt must have one answer
+        # available, and re-recording one re-runs the same question.
+        self._by_digest[entry["digest"]] = self.entries[-1]
+
+    def response_for(self, key: str) -> str | None:
+        entry = self._by_digest.get(key)
+        return None if entry is None else entry["response"]
+
+    def __len__(self) -> int:
+        return len(self.entries)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"meta": self.meta, "entries": self.entries}
+
+    def to_json(self) -> str:
+        return json.dumps(self.as_dict(), indent=2) + "\n"
+
+    @classmethod
+    def from_json(cls, text: str) -> "Transcript":
+        raw = json.loads(text)
+        return cls(meta=raw.get("meta", {}), entries=raw.get("entries", []))
+
+    @classmethod
+    def load(cls, path: Any) -> "Transcript":
+        import pathlib
+        return cls.from_json(pathlib.Path(path).read_text(encoding="utf-8"))
+
+    def save(self, path: Any) -> None:
+        import pathlib
+        target = pathlib.Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(self.to_json(), encoding="utf-8")
+
+
+# -- the adapter ------------------------------------------------------------
+
+
+class FinRobotAdapter:
+    """A FinRobot agent, in the shape :class:`World` runs.
+
+    Implements the four methods the counterfactual harness looks for:
+    :meth:`act`, and the optional :meth:`decision`, :meth:`state` and
+    :meth:`fork`. Nothing else about the experiment changes when this replaces
+    a native policy.
+
+    ```python
+    agent = FinRobotAdapter(mode="replay",
+                            transcript=Transcript.load(FIXTURE),
+                            fundamentals=FUNDAMENTALS)
+    world = World(seed=4242, universe=roster, agent=agent, pins=PINS)
+    ```
+
+    ``every`` is the decision cadence in steps. At the library's six steps a
+    day, the default of six gives one decision per simulated day. That matches
+    how often a portfolio manager decides, and it keeps the bill proportional
+    to the experiment instead of to the tick rate. The two arms of a
+    comparison MUST run the same cadence, and :meth:`fork` copies it.
+
+    ``mode`` is ``"replay"`` or ``"live"``. Replay imports nothing from
+    FinRobot, so a reader without the extra installed can still run the
+    experiment. ``"live"`` imports it inside :meth:`_finrobot`, and names the
+    extra if that import fails.
+    """
+
+    def __init__(self, *, mode: str = "replay",
+                 transcript: Transcript | None = None,
+                 recorder: Transcript | None = None,
+                 llm_config: dict[str, Any] | None = None,
+                 fundamentals: dict[str, dict[str, Any]] | None = None,
+                 objective: str = "",
+                 mandate: str = MANDATE,
+                 agent_config: dict[str, Any] | None = None,
+                 every: int = 6,
+                 max_participation: float = MAX_PARTICIPATION,
+                 arm: str = "") -> None:
+        if mode not in ("replay", "live"):
+            raise ValidationError(
+                f"mode must be 'replay' or 'live', got {mode!r}")
+        if mode == "replay" and transcript is None:
+            raise ValidationError(
+                "replay mode needs a transcript to replay. Load one with "
+                "Transcript.load(path), or pass mode='live' to call FinRobot.")
+        if mode == "live" and not llm_config:
+            raise ValidationError(
+                "live mode needs an llm_config -- the autogen config that "
+                "says which provider and model FinRobot talks to. See "
+                "examples/finrobot/rate_shock.py for one.")
+        if every < 1:
+            raise ValidationError(f"every must be >= 1 step, got {every}")
+
+        self.mode = mode
+        self.transcript = transcript
+        self.recorder = recorder
+        self.llm_config = llm_config
+        self.fundamentals = dict(fundamentals or {})
+        self.objective = objective
+        self.mandate = mandate
+        self.agent_config = dict(agent_config or AGENT_CONFIG)
+        self.every = int(every)
+        self.max_participation = float(max_participation)
+        self.arm = arm
+
+        #: Prices this adapter has been shown, oldest first. The agent's own
+        #: memory, and the only reason it can quote a return or a volatility
+        #: without asking the simulator for one.
+        self.history: list[list[float]] = []
+        #: Every decision point, for the example and the notebook. Not state:
+        #: :meth:`state` publishes the parts a fork has to agree on.
+        self.record: list[dict[str, Any]] = []
+        self._decision: dict[str, Any] | None = None
+        self._assistant: Any = None
+
+    # -- the agent protocol ----------------------------------------------
+
+    def act(self, obs: Any) -> dict[str, float]:
+        """Share deltas for this step. Empty on the steps between decisions.
+
+        The market advances every step; FinRobot is asked every ``every``
+        steps. On the steps in between, this records the prices it saw and
+        returns nothing. A human manager watches the book continuously and
+        revisits it on a schedule.
+        """
+        self.history.append(list(obs.prices))
+        if len(self.history) > HISTORY_STEPS:
+            self.history.pop(0)
+
+        if obs.step % self.every:
+            return {}
+
+        payload = observe(obs, history=self.history,
+                          fundamentals=self.fundamentals,
+                          max_participation=self.max_participation)
+        prompt = render(payload, objective=self.objective)
+        key = digest(prompt)
+        response = self._ask(prompt, key, obs)
+
+        decision = parse(response)
+        orders, notes = orders_from(
+            decision, obs, max_participation=self.max_participation)
+
+        self._decision = {"step": obs.step, **decision.as_dict()}
+        self.record.append({
+            "arm": self.arm,
+            "step": obs.step,
+            "day": obs.day,
+            "digest": key,
+            "prompt": prompt,
+            "response": response,
+            "decision": decision.as_dict(),
+            "orders": dict(orders),
+            "clipped": notes,
+        })
+        return orders
+
+    def decision(self) -> dict[str, Any] | None:
+        """The last validated decision, as ``World`` records it every step.
+
+        The actions and the rationale. The prompt, the raw response and the
+        arm stay out: :func:`~tradefloor.counterfactual.compare` finds the
+        first step at which two arms' decisions differ by comparing these
+        dictionaries, so a field varying for any other reason would report a
+        divergence that never happened.
+        """
+        return self._decision
+
+    def state(self) -> dict[str, Any]:
+        """What a fork has to agree on, for :func:`tradefloor.agree`.
+
+        The price memory and the last decision: everything surviving from one
+        step to the next that could make two arms behave differently for some
+        reason other than the intervention. The ``llm_config`` stays out. It
+        carries an API key, and this dictionary gets printed.
+        """
+        return {
+            "history": [list(row) for row in self.history],
+            "decision": copy.deepcopy(self._decision),
+            "every": self.every,
+            "mandate_version": MANDATE_VERSION,
+        }
+
+    def fork(self) -> "FinRobotAdapter":
+        """An independent copy, for :meth:`World.fork`.
+
+        Written out instead of left to ``copy.deepcopy``: in live mode this
+        object holds a FinRobot assistant holding an HTTP client, and copying
+        one is wasteful at best and a shared socket at worst. The copy takes
+        the decision state and SHARES the transcript and the recorder. Both
+        directions want that -- a replay of one arm must read the same
+        recorded run as the other, and a live recording of both arms belongs
+        in one file.
+
+        ``type(self)``, so a subclass forks into its own type. Hard-coding the
+        class name broke this: a subclass overriding how a decision is
+        obtained kept the override through the shared history and lost it in
+        both arms. The run then completes, and the comparison it prints is
+        between two agents neither of which was the one under test.
+        """
+        twin = type(self)(
+            mode=self.mode, transcript=self.transcript,
+            recorder=self.recorder, llm_config=self.llm_config,
+            fundamentals=self.fundamentals, objective=self.objective,
+            mandate=self.mandate, agent_config=self.agent_config,
+            every=self.every, max_participation=self.max_participation,
+            arm=self.arm)
+        twin.history = [list(row) for row in self.history]
+        twin.record = copy.deepcopy(self.record)
+        twin._decision = copy.deepcopy(self._decision)
+        return twin
+
+    # -- FinRobot ---------------------------------------------------------
+
+    def _ask(self, prompt: str, key: str, obs: Any) -> str:
+        if self.mode == "replay":
+            response = self.transcript.response_for(key)
+            if response is None:
+                raise DecisionError(
+                    f"no recorded FinRobot response for step {obs.step} "
+                    f"(day {obs.day}, digest {key}). The transcript holds "
+                    f"{len(self.transcript)} interactions, none for this "
+                    "input. A replay is keyed by the exact text FinRobot was "
+                    "sent, so this means the observation mapping, the mandate "
+                    "or the market configuration has changed since the "
+                    "recording -- replaying anyway would answer this question "
+                    "with a response given to a different one. Re-record with "
+                    "--live --record.")
+            return response
+
+        response = self._live(prompt)
+        if self.recorder is not None:
+            self.recorder.record({
+                "arm": self.arm, "step": obs.step, "day": obs.day,
+                "digest": key, "prompt": prompt, "response": response,
+            })
+        return response
+
+    def _live(self, prompt: str) -> str:
+        """One real FinRobot decision.
+
+        ``SingleAssistant.chat`` prints its conversation and resets the agents
+        without returning anything, so the response is unreachable through it.
+        This drives the SAME two agents it builds through the same
+        ``initiate_chat`` it calls, and keeps the result. Nothing is
+        reimplemented: ``.assistant`` is ``finrobot.agents.workflow.FinRobot``
+        and ``.user_proxy`` is an ``autogen.UserProxyAgent``, both assembled
+        by FinRobot's own constructor.
+        """
+        assistant = self._finrobot()
+        result = assistant.user_proxy.initiate_chat(
+            assistant.assistant,
+            message=prompt,
+            max_turns=1,
+            clear_history=True,
+            silent=True,
+        )
+        assistant.reset()
+        if not result.chat_history:
+            raise DecisionError(
+                "FinRobot returned an empty conversation, so there is no "
+                "response to parse.")
+        return result.chat_history[-1].get("content") or ""
+
+    def _finrobot(self) -> Any:
+        """The real FinRobot ``SingleAssistant``, built once and reused.
+
+        Imported here instead of at module scope, so that replay mode -- and
+        ``import tradefloor`` -- never require FinRobot to be installed.
+        """
+        if self._assistant is not None:
+            return self._assistant
+        try:
+            from finrobot.agents.workflow import SingleAssistant
+        except ImportError as exc:
+            raise ImportError(
+                "live mode needs FinRobot, which is an optional extra:\n"
+                '    pip install "tradefloor[finrobot]"\n'
+                "FinRobot supports Python 3.10 and 3.11 only, and Tradefloor "
+                "needs 3.11 or later, so the two overlap at 3.11 exactly. "
+                f"Original error: {exc}"
+            ) from exc
+
+        config = dict(self.agent_config)
+        config["profile"] = config.get("profile") or self.mandate
+        # See the module docstring. The library roles' toolkits fetch REAL
+        # market data, describing a different world from the simulated one.
+        # `setdefault` and not an assignment: a caller who supplies toolkits
+        # on purpose keeps them, and owns what that does to the ground-truth
+        # boundary. A config that never mentions them gets none.
+        config.setdefault("toolkits", [])
+        self._assistant = SingleAssistant(
+            agent_config=config,
+            llm_config=self.llm_config,
+            # The SingleAssistant default gives the user proxy a working
+            # directory and lets it run model-authored code. This wants one
+            # JSON object.
+            code_execution_config=False,
+            max_consecutive_auto_reply=0,
+            human_input_mode="NEVER",
+            is_termination_msg=lambda message: True,
+        )
+        return self._assistant
+
+    def __repr__(self) -> str:
+        return (f"FinRobotAdapter(mode={self.mode!r}, arm={self.arm!r}, "
+                f"every={self.every}, decisions={len(self.record)})")

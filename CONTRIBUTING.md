@@ -72,11 +72,11 @@ results), or `TRADEFLOOR_SLOW_TESTS` being unset. Only the last is a choice you
 made.
 
 `TRADEFLOOR_SLOW_TESTS=1` adds two things: the example notebooks, which are
-executed rather than read (`tests/test_examples.py` holds 21 tests over eight
-notebooks and two scripts, 19 of them behind the flag -- the two script
-syntax checks run on every pass, because a rename that missed a reference
-should fail whether or not you remembered the flag), and the one MCP test
-that runs a full 252-day evaluation. That test costs what it costs because
+executed rather than read (`tests/test_examples.py` walks `examples/` and
+parametrises over what it finds, so its count moves when an example is added
+-- the script syntax checks run on every pass, because a rename that missed a
+reference should fail whether or not you remembered the flag), and the one
+MCP test that runs a full 252-day evaluation. That test costs what it costs because
 the only way to show a result AT the certified horizon is not a slice of a
 shorter one is to reach the horizon.
 
@@ -134,6 +134,68 @@ until the browser build needed it too; moving it was a day's work that
 should not have to happen twice.
 
 Bindings own conversion, error translation and bookkeeping. Nothing else.
+
+## Where examples, integrations and fixtures go
+
+`examples/` used to mean one thing: a numbered series read in order. It now
+means two, and keeping both flat has already cost something. The example test
+globbed `0*`, so the first unnumbered example added to `examples/` was
+invisible to CI on the day it landed. It compiled nowhere, executed nowhere,
+and nothing said so.
+
+Three tiers, each with a rule about who owns it.
+
+```
+examples/
+    00-...ipynb .. 09-...py     the curriculum. Reading order. Core library.
+    README.md
+    data/
+    <study>/                    one self-contained study per directory
+        <name>.py
+        <name>.ipynb
+        README.md
+        artifacts/              output, git-ignored, regenerable
+
+python/tradefloor/
+    integrations/
+        <framework>.py          one adapter per third-party framework
+
+tests/
+    test_<name>.py              flat, as everything else here is
+    fixtures/<name>/            recorded input, committed, one copy
+```
+
+**The numbers are a curriculum.** `00` onward are steps a reader takes in
+order. They use the core library and at most an extra this project ships, and
+adding one adds a lesson. A study teaches nothing in particular. It asks one
+question, it may need an optional extra, and nothing about it follows from
+the example before it, so it gets a name and a directory.
+
+**A study is one directory.** The script and the notebook for one experiment
+present the same experiment two ways. Splitting them across `examples/` and a
+top-level `notebooks/` puts two halves of one thing in two places, and
+`notebooks/` becomes a second unordered pile the day a second one arrives. The
+notebook imports the module; the module is the source of truth.
+
+**Artifacts are output, fixtures are input, and they live apart.** A run
+writes an artifact, the artifact describes that run, and running again
+regenerates it. So it sits beside the run that wrote it, in
+`examples/<study>/artifacts/`, git-ignored. A fixture is recorded
+once and replayed forever. It is the thing under test, and the test suite and
+the example read the SAME one, because two copies of a recording can drift
+apart. So fixtures are committed, under `tests/fixtures/<name>/`, whoever
+reads them.
+
+**An integration is a subpackage member, an optional extra, and a study.**
+The adapter follows three rules, set out in
+`python/tradefloor/integrations/__init__.py`: lazy import, never reached by
+`import tradefloor`, one extra named after the framework. Its runnable half
+is a study like any other.
+
+**Every example is checked.** `tests/test_examples.py` walks `examples/`
+instead of globbing, so a new example cannot arrive invisible again. Scripts
+are syntax-checked on every run; notebooks are executed behind
+`TRADEFLOOR_SLOW_TESTS=1`.
 
 ## Style
 

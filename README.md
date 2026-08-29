@@ -37,6 +37,21 @@ The API can still change before 1.0. A published result cannot: new
 coefficients ship as a new preset, so a run you cited last month replays this
 month.
 
+## The demo
+
+```
+python examples/rate-shock/counterfactual.py
+```
+
+Run an agent in a controlled market. Checkpoint the world. Fork it. Raise
+rates by 200bps in one branch. Compare what the exact same agent does next.
+
+**Same world. Same agent. One changed variable.** Two seconds, no keys, no
+network. It prints the nine checks that prove the two branches started
+identical, the step at which the agent's behaviour changed, and the
+side-by-side. The walkthrough is
+[Your first counterfactual experiment](https://github.com/simoncoombes/tradefloor/blob/main/examples/rate-shock/README.md).
+
 ## First run
 
 ```python
@@ -63,6 +78,7 @@ strategy. `tf.rank` runs many seeds and compares them with a paired sign test.
 | counterfactual TCA | the same seed with your orders and without them |
 | `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
+| `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
 | MCP server | eleven read-only tools for a coding agent |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, a browser build |
 
@@ -158,7 +174,7 @@ eng = tf.Engine(seed=42, universe=u, model="pt-v10")
 
 ## Examples
 
-Eleven [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples) in reading order, run by the test suite:
+Twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples) in reading order, run by the test suite:
 
 | | |
 |---|---|
@@ -172,8 +188,40 @@ Eleven [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/exampl
 | [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It runs in about five seconds |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
 | [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit |
-| [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
 | [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
+| [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
+
+Beside them, one directory per self-contained study. Each asks one question,
+and they come in no particular order.
+
+| | |
+|---|---|
+| [`rate-shock/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/rate-shock) | The canonical demo: checkpoint, fork, +200bps in one branch, compare |
+| [`finrobot/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/finrobot) | The same experiment with a real FinRobot agent |
+
+## FinRobot integration
+
+Evaluate a [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
+financial AI agent inside a controlled Tradefloor market. Run shared history,
+checkpoint the world, fork it, raise rates by 200bps in one branch, and compare
+how the same agent responds. The canonical rate-shock experiment, with the
+agent swapped and nothing else moved.
+
+```bash
+pip install "tradefloor[finrobot]"
+python examples/finrobot/rate_shock.py            # replays a real recorded run
+python examples/finrobot/rate_shock.py --live     # calls FinRobot
+```
+
+The default run replays a genuine recorded FinRobot run and needs no API key,
+no network and no FinRobot install.
+
+- [`examples/finrobot/rate_shock.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/finrobot/rate_shock.py)
+- [`examples/finrobot/rate_shock.ipynb`](https://github.com/simoncoombes/tradefloor/blob/main/examples/finrobot/rate_shock.ipynb)
+
+FinRobot is a project of the AI4Finance Foundation, Apache-2.0. This is a
+Tradefloor integration for FinRobot. AI4Finance neither maintains nor endorses
+it. It is no part of FinRobot's own interface.
 
 ## More
 

@@ -225,6 +225,72 @@ checkpoint resume), `tests/test_packaging.py`, and
 The reproducibility tests now run in CI on all five wheel targets.
 >>>>>>> origin/main
 
+**`tradefloor.counterfactual`: run one agent in two worlds that differ by
+one variable.** The library had both halves of a controlled experiment and
+no way to join them -- `branch` forks a running engine, `evaluate` runs an
+agent, and `evaluate` runs start to finish with no moment inside it to
+stop, fork, change one thing and continue. A `World` is that run loop:
+market, agent, portfolio and macro path advancing a day at a time, with
+`checkpoint()`, `fork()` and `intervene()` between days. `agree()` verifies
+that two arms started identical across nine checks rather than asserting
+it, and `compare()` finds the first step at which the macro, the agent's
+decision, its orders, the prices and the portfolios came apart. The agent
+is a parameter throughout, so swapping a deterministic policy for an LLM
+or a third-party framework changes no line of the experiment.
+
+**The canonical demo: `examples/rate-shock/counterfactual.py`.** Four
+companies of differing duration, a macro-aware deterministic agent, twenty
+days of shared history, a checkpoint, a fork, +200bps in one branch, and
+twenty more days in each. Runs in about two seconds with no keys, no
+network and no data files, writes a checkpoint, a `RunManifest` per arm, a
+comparison and a chart, and is covered by `tests/test_rate_shock_demo.py`.
+The tutorial is `examples/rate-shock/README.md`.
+
+**Evaluate a real FinRobot agent: `tradefloor.integrations.finrobot`.** The
+canonical rate-shock experiment, with the agent swapped and nothing else
+moved: same seed, same roster, same pins, same twenty days of shared history,
+same checkpoint, same fork, same +200bps, same comparison. The agent is a real
+[FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
+`SingleAssistant` running over `autogen`. `FinRobotAdapter` implements the
+four methods `World` looks for and stays thin. FinRobot owns interpretation,
+the portfolio decision and a rationale; Tradefloor owns the market,
+execution, accounting, the fork and the comparison. FinRobot never mutates
+engine state. It returns JSON, which the adapter parses, validates against the
+listed universe and the supported sides, and refuses if it cannot be executed.
+The observation is an allowlist, written out field by field, so fair value,
+the factor attribution, the mispricing and the macro path ahead stay on the
+Tradefloor side of the line. Two tests prove it: one against an engine that
+raises when the forbidden surface is touched, one that computes the hidden
+values and scans the agent's input for them.
+
+`examples/finrobot/` is the study, script and notebook together. Both default
+to replaying a genuine recorded run from `tests/fixtures/finrobot/`, keyed by
+the SHA-256 of the exact text FinRobot was sent, so they need no API key, no
+network and no FinRobot install. Change the observation mapping and the key
+goes missing and the replay refuses, loudly, instead of serving an answer
+recorded for a different question. `--live` calls the real thing behind
+`pip install "tradefloor[finrobot]"`, which needs Python 3.11 exactly:
+FinRobot declares `>=3.10, <3.12` and this project needs `>=3.11`.
+
+**`examples/` now has two tiers.** The numbered files are a curriculum with a
+reading order; a study is a directory. `examples/rate-shock/` and
+`examples/finrobot/` each hold their script, their notebook, their README and
+their own git-ignored `artifacts/`, because the script and the notebook for
+one experiment present the same experiment two ways. A run regenerates its
+artifacts, so they sit beside the run that wrote them. Recorded inputs a study
+replays are committed once under `tests/fixtures/`, because two copies of a
+recording can drift apart. `tests/test_examples.py` now walks `examples/`
+instead of globbing `0*`, which is how the first unnumbered example arrived
+with nothing checking it at all. `CONTRIBUTING.md` has the rule.
+
+**Fixed: a forked world's log held the shared history twice.** `World`
+carried its parent's order log across a fork because a branched engine's began
+empty. `Engine.fork` then started copying the engine, which carries the log
+for the same reason. Two fixes for one defect, and between them a manifest
+built from a forked arm replayed the first days over again, reproducibly, into
+a market nobody ran -- the outcome the first fix existed to prevent.
+`World.order_log` is the engine's own now, on a root and a fork alike.
+
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
 give each agent its own copy of the market, which is what makes the
 comparison clean. The next step is one book with several agents in it,
