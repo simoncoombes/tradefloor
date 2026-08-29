@@ -19,6 +19,212 @@ co-movement and lever 26/26 each, and the driven noise ratio at 1.13
 against pt-v15's ~1.46. Selectable by name; not the default, which remains
 pt-v14.
 
+**Scenarios are now a file you can hand to somebody else.** `tf.Scenario`
+gains a second half: a named, inspectable collection of explicit
+interventions, written in YAML or in Python, with a fingerprint over the
+resolved experiment rather than over the file's bytes.
+
+```yaml
+version: 1
+scenario:
+  name: liquidity_crisis
+  shocks:
+    - target: market.liquidity
+      operation: multiply
+      value: 0.40
+      at: 50
+      duration: 25
+```
+
+```python
+scenario = tf.Scenario.from_yaml("scenarios/liquidity_crisis.yml")
+control, stress = tf.branch(engine, 2)
+for day in range(80):
+    scenario.apply(stress, day)
+    ...
+```
+
+There is no `start_war()` and there will not be one. A scenario names
+targets from an explicit registry of twelve things the engine actually
+reads, applies one of three operations (`set`, `add`, `multiply`) on one of
+four shapes (`impulse`, `hold`, `ramp`, `permanent`), and keeps its
+EXOGENOUS SHOCKS apart from its ASSUMED TRANSMISSION -- because this library
+cannot tell you that a 40% oil shock raises inflation 1.5 points, only run a
+market in which somebody assumed it did.
+
+Every registered target carries a MEASURED note saying what it is worth.
+Four of the twelve are honest mechanisms with effects too small to see over a
+hundred days, and `macro.fear_greed` measures at exactly 0.00% on every
+instrument: nothing in the market reads it. Knowing which is which is the
+difference between an experiment and a number.
+
+- `Engine.pin_macro` gains `gdp_growth`, `unemployment_rate`, `tariff_rate`
+  and `oil_price`, which the economy has always carried and the binding never
+  exposed. Fractional like every other rate here; `oil_price` is dollars.
+- `Engine.macro_fields` is the read side of `pin_macro`, field for field and
+  unit for unit, so a relative intervention cannot be a factor of a hundred
+  out.
+- `Engine.set_avg_volume` writes the column the market maker quotes off,
+  which is what a liquidity shock is here: measured, quoted depth scales
+  exactly with the multiplier and sweeping 50,000 shares costs 6.08bp at
+  full depth and 14.59bp at a tenth of it. It is recorded in the order log
+  like any other input, so a replay, a checkpoint and a fork all carry it.
+- `tradefloor scenario validate|show|diff|targets` reads a scenario file
+  without running a market. `python -m tradefloor ...` is the same tree.
+- `RunManifest` records the RESOLVED scenario -- every intervention, its
+  fingerprint and the source file's name -- so a run replays after the YAML
+  is edited or deleted.
+- `tf.compare` on an intervention scenario now differences it against the
+  same world WITHOUT the interventions, and reports the firing trail.
+- YAML is read by `tradefloor.yaml_subset`, which implements the block-style
+  subset the schema uses and refuses everything else by name. No dependency,
+  no tags, no anchors, no flow style, and nothing a scenario file could use
+  to construct a Python object. It agrees with `yaml.safe_load` on every
+  document it accepts, checked by a differential fuzz over sixteen thousand
+  generated documents; the classes that fuzz found -- `0x1f` is thirty-one,
+  `1_000` is a thousand, and `operation: -` is a syntax error rather than the
+  string `-` -- are all refused now.
+- A `hold` ends when it says it does, on every target. For a macro field
+  that needs no help -- the chain recomputes it. Nothing in the engine writes
+  `avg_volume` or `tariff_rate`, so on those the scenario puts the level back
+  itself, once, when the LAST window on that target closes; the restore is in
+  the audit trail as a `release`. Until it was, a twenty-five day liquidity
+  crisis quietly lasted for the rest of the run.
+- A relative operation cannot write a value its target cannot mean. `check`
+  sees the multiplier and only the run sees the result, so the result is
+  checked on the day it is written: `add -500` on `macro.vix` wrote a VIX of
+  -485 and the market traded a session against it, because `(vix/15)^2`
+  squares the sign away and nothing else looked.
+- Six scenarios ship in `scenarios/`, each carrying its measured effect and
+  the statement that it is not a forecast. None names a political actor.
+- `examples/11-scenario-fork.py` is the whole workflow in one file.
+
+A scenario built only from pins serialises exactly as it always has, schema
+1, byte for byte, so every published manifest and every fingerprint over one
+still means what it meant.
+
+**`truth(day=N)` and `bars(day=N)` select a day.** They discarded the
+argument once anything had been recorded, returning every recorded day with
+the right schema and plausible values -- so `truth(day=4)` on a hundred-day
+run answered with all hundred and looked like it had answered the question.
+`day` is now optional: omitted is every recorded day, which is what these
+tables have always returned and what a streaming consumer wants, so no
+existing call changes. A day that was never recorded raises and names the
+days that were, as a range when they are contiguous and a list when they are
+not.
+
+**A fork's manifest can name the checkpoint it began at.**
+`Checkpoint.fingerprint` is a digest over the canonical serialisation, and
+`RunManifest.of(..., derived_from=checkpoint)` records it with the
+checkpoint's label and its log length. `derived_from` reads it back,
+`describe()` prints it, and `verify_lineage(checkpoint)` checks the claim for
+a reader who holds both. Lineage was previously derivable -- two branches
+share a log prefix -- but only by comparing two manifests, so a reader
+holding one could not tell it was a branch of anything.
+
+The claim is checked when it is made, on identity before history. That order
+is forced: an order log records inputs, so a run of the same sessions on
+another seed carries a log that compares equal entry for entry, and a prefix
+check alone would have accepted a checkpoint of an entirely different world.
+
+**A failed `reproduce()` blames what the evidence supports.** The message led
+with "an unmeasured platform pair" in every case and then printed the pair,
+which was frequently the same platform twice -- a sentence that disproved its
+own hypothesis while sending the reader to the Rust core. It now separates
+the three cases the evidence already distinguishes: differing draw counts are
+an input difference and no platform explains them; matching draws across two
+machines are the cross-platform case the release gate exists to measure; and
+matching draws on one machine leave build flags, a substituted wheel, or
+arithmetic the era probe does not exercise.
+
+**A corrupted checkpoint, a stale calibration surface, and the guards that
+had stopped guarding.** `market_vol_gamma` was settable with no calibration
+spec, which failed fifteen tests across five files and put the parameter out
+of reach of any search; it now joins the reparameterised set, and the
+market-factor stationarity check gained the gamma term it was missing, so a
+survey can no longer plan a non-stationary factor variance. The MCP, gym and
+Arrow surfaces are installed and run in CI rather than skipping. Six
+documented environment knobs accept `TRADEFLOOR_` alongside the old
+`PRETIUM_` spelling.
+
+**The whole suite runs nightly.** `suite.yml` builds one wheel and runs the
+~1,300 tests in four parallel batches, with every optional dependency
+installed, plus Python 3.12 and 3.13 -- which the abi3 wheel serves and
+nothing was testing. `tools/ci/batches.py` is the single definition of the
+split and a test asserts it covers every file exactly once.
+
+**`state_snapshot` drift is detectable.** It is a hand-written list of fields
+that has been wrong six times, and since forking became a copy nothing in the
+library uses it. A guard now restores a snapshot, compares it to a fork of
+the same parent, and continues both -- in a market with every dormant dial
+live, because a snapshot that forgets an inert field is invisible until a
+preset turns it on. The guard is itself guarded: each field is dropped in
+turn and must be caught, or must carry the condition its effect waits on.
+
+**Forking is now a copy of the engine, and four ways it was not exact are
+fixed.** `tf.branch` rebuilt a fork by writing a hand-maintained list of
+fields into a fresh engine, and the list was incomplete. Most seriously, it
+did not carry the day's endogenous news, which is generated once at
+`open_market` and read by every tick of that day: a fork taken MID-DAY ran
+the rest of the day with the news missing and priced differently from the
+parent it was supposed to be a copy of. That was live on the shipped default
+preset, `pt-v14`, and on every preset from `pt-v11`.
+
+The other three were silent in a different way. A fork's order log was empty,
+so a `Checkpoint` taken on a fork recorded a history that began at the fork
+and resumed to a market that began at day zero, with nothing raised; a
+`RunManifest` taken on one failed its own digest check and blamed a suspected
+platform arithmetic difference between Windows and Windows. A mid-day fork
+lost the day's already-recorded ticks, so `record` wrote a day half as long as
+its parent's, well-formed and short. And a fork lost the previous close's
+pending jump, so the first row of its next recorded day attributed nothing to
+a move that happened.
+
+All four had one cause and one fix: `Engine.fork` copies the engine, so there
+is no list of fields to be incomplete and a field added later is carried
+without anyone remembering to carry it. `tf.branch` calls it. Forks can now be
+checkpointed, forked again, and written to a manifest, which they could not be
+before. `universe` and `seed` become optional on `tf.branch` -- a copy cannot
+land on the wrong roster, which is what they were there to prevent -- and a
+`universe` that is passed is checked against the engine's own tickers.
+
+No trajectory moves: the known-answer digest is unchanged on every target.
+
+**`state_snapshot` carries three more pieces of engine state**: the day's
+endogenous news, the universe's remembered stress and the per-name volume
+states. The last two are inert under every shipped preset, which is exactly
+the position the common log-volume state was in before `pt-v10` turned it on
+and a restored engine started trading different volume. `set_universe_stress`
+existed for this and nothing called it. What a snapshot does NOT carry -- the
+order log, the recorded tape, the pending jump -- is now written on the method
+rather than left to be discovered.
+
+**A corrupted checkpoint says it is corrupted.** `Checkpoint.from_json` on a
+truncated or non-checkpoint payload raised `KeyError: 'seed'` or a `TypeError`
+about string indices. It now names what is missing.
+
+**`pretium.pdb` no longer ships inside the wheel.** `.gitignore` still named
+`python/pretium/` after the rename, so `maturin develop` wrote an unignored
+1.1 MB extension and a 1.0 MB Windows debug database into the source tree,
+both were committed, and maturin packaged the debug database into every wheel
+built from such a tree -- including the published 0.5.0. The stale committed
+extension also shadowed the real one for anyone importing from `python/`.
+The ignore rules name the directory that exists, the artefacts are untracked,
+`[tool.maturin] exclude` stops a developer's build sweeping them up, and
+`tests/test_packaging.py` checks all three.
+
+**`tests/test_stub_parity.py` runs again.** Its `STUB` path still pointed at
+`python/pretium/_core.pyi`, so its `skipif` skipped all ninety-nine of its
+tests and reported green while the type stub went unread. A missing stub is
+now an error rather than a skip.
+
+**New:** `tests/test_forking.py` (38 invariant tests over the whole
+run/checkpoint/fork/intervene/compare chain, including a cross-process
+checkpoint resume), `tests/test_packaging.py`, and
+`examples/10-forking-a-market.py`, a two-second runnable fork demonstration.
+The reproducibility tests now run in CI on all five wheel targets.
+>>>>>>> origin/main
+
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
 give each agent its own copy of the market, which is what makes the
 comparison clean. The next step is one book with several agents in it,

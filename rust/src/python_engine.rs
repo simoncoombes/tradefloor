@@ -289,6 +289,61 @@ impl PyMacro {
 }
 
 impl PyEngine {
+    /// Which recorded days a table call covers.
+    ///
+    /// `None` is all of them, which is what a streaming consumer wants and
+    /// what these tables have always returned. `Some(d)` is that day alone.
+    ///
+    /// A day that was never recorded is an ERROR rather than an empty table.
+    /// The whole reason `day` needed fixing is that it looked like a filter
+    /// and silently was not, and answering a question about day 7 with a
+    /// well-formed table of nothing would be the same failure wearing a
+    /// different shape.
+    fn select_recorded(
+        &self,
+        day: Option<u32>,
+    ) -> PyResult<Vec<crate::python_arrow::RecordedDay>> {
+        let Some(wanted) = day else {
+            return Ok(self.recorded.clone());
+        };
+        let hit: Vec<_> = self
+            .recorded
+            .iter()
+            .filter(|r| r.day == wanted)
+            .cloned()
+            .collect();
+        if hit.is_empty() {
+            let mut days: Vec<u32> = self.recorded.iter().map(|r| r.day).collect();
+            days.sort_unstable();
+            days.dedup();
+            let recorded = match (days.first(), days.last()) {
+                (Some(lo), Some(hi)) if days.len() as u32 == hi - lo + 1 => {
+                    format!("{lo} to {hi}")
+                }
+                (Some(_), Some(_)) => days
+                    .iter()
+                    .map(|d| d.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                _ => "none".to_string(),
+            };
+            return Err(ValidationError::new_err(format!(
+                // Positional rather than captured: `concat!` expands
+                // after `format!` has read its inline captures, so
+                // {wanted} inside it resolves to nothing.
+                concat!(
+                    "day {} was not recorded; recorded days are {}. ",
+                    "A day reaches these tables through `record(day)`, ",
+                    "and the label it was given there is what this ",
+                    "selects on."
+                ),
+                wanted,
+                recorded
+            )));
+        }
+        Ok(hit)
+    }
+
     /// Resolve a ticker to the engine's internal company id.
     ///
     /// Needed because the two tick inputs key differently: order volumes match
@@ -666,7 +721,12 @@ impl DayBuffer {
 }
 
 /// A whole market, stepped through time.
+///
+/// `Clone` is what [`PyEngine::fork`] is made of, and it is derived rather
+/// than written so that a field added here is carried into a fork without
+/// anyone remembering to carry it. See the note on [`Engine`].
 #[pyclass(name = "Engine", module = "tradefloor._core")]
+#[derive(Clone)]
 pub struct PyEngine {
     inner: Engine,
     buffer: SessionBuffer,
@@ -1449,10 +1509,32 @@ impl PyEngine {
     ///
     /// Rates are FRACTIONAL, as everywhere else, and validated before being
     /// converted.
+    ///
+    /// # Four fields the market cannot see directly
+    ///
+    /// `gdp_growth`, `unemployment_rate`, `tariff_rate` and `oil_price` sit
+    /// in the same economy struct as the rest, but nothing in the market
+    /// reads them: the tick reads `federal_funds_rate`, `corporate_bond_yield`,
+    /// `qe_pe_boost`, `vix` and the cycle phase, and NOTHING else. These four
+    /// reach a price only through the macro chain -- the monthly inflation
+    /// update, then the central bank's next MEETING, then the curve. That is
+    /// slower than a short study, and it is the same horizon trap the
+    /// `tradefloor.scenario` module documents for the policy rate.
+    ///
+    /// They are here because they are what a supply shock or a tariff
+    /// actually IS in this model, and because the alternative -- moving
+    /// inflation by hand and calling it an oil shock -- states the
+    /// transmission as a fact rather than as an assumption.
+    ///
+    /// `gdp_growth`, `unemployment_rate` and `tariff_rate` are FRACTIONAL
+    /// like every other rate here (0.025 is 2.5%). `oil_price` is a price in
+    /// dollars, and the daily chain clamps it into [35, 150] on its next
+    /// step, so a pin outside that band survives only the day it is written.
     #[pyo3(signature = (
         *, vix = None, federal_funds_rate = None, corporate_bond_yield = None,
         inflation_rate = None, qe_pe_boost = None, qe_assets_ratio = None, fear_greed_index = None,
-        cycle = None
+        gdp_growth = None, unemployment_rate = None, tariff_rate = None,
+        oil_price = None, cycle = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn pin_macro(
@@ -1464,6 +1546,10 @@ impl PyEngine {
         qe_pe_boost: Option<f64>,
         qe_assets_ratio: Option<f64>,
         fear_greed_index: Option<f64>,
+        gdp_growth: Option<f64>,
+        unemployment_rate: Option<f64>,
+        tariff_rate: Option<f64>,
+        oil_price: Option<f64>,
         cycle: Option<String>,
     ) -> PyResult<()> {
         // Validate EVERYTHING before writing ANYTHING. A pin that applied the
@@ -1474,6 +1560,9 @@ impl PyEngine {
             ("federal_funds_rate", federal_funds_rate),
             ("corporate_bond_yield", corporate_bond_yield),
             ("inflation_rate", inflation_rate),
+            ("gdp_growth", gdp_growth),
+            ("unemployment_rate", unemployment_rate),
+            ("tariff_rate", tariff_rate),
         ] {
             if let Some(v) = v {
                 crate::units::check_rate(name, v).map_err(ValidationError::new_err)?;
@@ -1491,6 +1580,19 @@ impl PyEngine {
                         "{name} must be finite, got {v}"
                     )));
                 }
+            }
+        }
+        // A price, not a rate, so the fractional band does not apply -- but a
+        // non-positive one is not a cheaper barrel, it is a barrel the
+        // seasonality multiply and the inventory ratio both divide by, and
+        // the chain carries the result forward for the rest of the run.
+        if let Some(v) = oil_price {
+            if !v.is_finite() || v <= 0.0 {
+                return Err(ValidationError::new_err(format!(
+                    "oil_price must be finite and positive, got {v}. It is a price \
+                     in dollars (the engine opens at 75.0), not a fraction or a \
+                     multiplier."
+                )));
             }
         }
         let phase = match cycle.as_deref() {
@@ -1511,6 +1613,10 @@ impl PyEngine {
             ("qe_pe_boost", qe_pe_boost),
             ("qe_assets_ratio", qe_assets_ratio),
             ("fear_greed_index", fear_greed_index),
+            ("gdp_growth", gdp_growth),
+            ("unemployment_rate", unemployment_rate),
+            ("tariff_rate", tariff_rate),
+            ("oil_price", oil_price),
         ] {
             if let Some(v) = value {
                 logged.push((name.to_string(), v));
@@ -1543,10 +1649,127 @@ impl PyEngine {
         if let Some(v) = fear_greed_index {
             e.fear_greed_index = v;
         }
+        if let Some(v) = gdp_growth {
+            e.gdp_growth = crate::units::fraction_to_percent(v);
+        }
+        if let Some(v) = unemployment_rate {
+            e.unemployment_rate = crate::units::fraction_to_percent(v);
+        }
+        if let Some(v) = tariff_rate {
+            e.tariff_rate = crate::units::fraction_to_percent(v);
+        }
+        if let Some(v) = oil_price {
+            e.oil_price = v;
+        }
         if let Some(p) = phase {
             e.cycle_phase = p;
         }
         Ok(())
+    }
+
+    /// Every field [`PyEngine::pin_macro`] can write, as it can write it.
+    ///
+    /// The read side of the narrow write surface, and the reason it exists
+    /// separately from [`PyEngine::macro_state`] is UNITS. `macro_state`
+    /// returns the seven fields the `Macro` constructor takes;
+    /// `state_snapshot()["economy"]` returns the whole economy in the CORE'S
+    /// percent denomination. Neither is the set `pin_macro` accepts, and an
+    /// intervention that multiplies a value it read by 1.4 and writes it back
+    /// has to read and write in the same units or it is a factor of a hundred
+    /// out, silently, on a plausible-looking trajectory. See `units.rs`.
+    ///
+    /// So this returns exactly the pinnable fields, in exactly the
+    /// denomination `pin_macro` takes: fractional rates, VIX in points,
+    /// `oil_price` in dollars, `cycle` as its name. Read one, change it,
+    /// write it back.
+    #[getter]
+    fn macro_fields(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let e = self.inner.economy();
+        let out = PyDict::new_bound(py);
+        out.set_item("vix", e.vix)?;
+        out.set_item(
+            "federal_funds_rate",
+            crate::units::percent_to_fraction(e.federal_funds_rate),
+        )?;
+        out.set_item(
+            "corporate_bond_yield",
+            crate::units::percent_to_fraction(e.corporate_bond_yield),
+        )?;
+        out.set_item(
+            "inflation_rate",
+            crate::units::percent_to_fraction(e.inflation_rate),
+        )?;
+        out.set_item("qe_pe_boost", e.qe_pe_boost)?;
+        out.set_item("fear_greed_index", e.fear_greed_index)?;
+        out.set_item(
+            "gdp_growth",
+            crate::units::percent_to_fraction(e.gdp_growth),
+        )?;
+        out.set_item(
+            "unemployment_rate",
+            crate::units::percent_to_fraction(e.unemployment_rate),
+        )?;
+        out.set_item(
+            "tariff_rate",
+            crate::units::percent_to_fraction(e.tariff_rate),
+        )?;
+        out.set_item("oil_price", e.oil_price)?;
+        out.set_item("cycle", cycle_name(e.cycle_phase))?;
+        Ok(out.into())
+    }
+
+    /// Write the `avg_volume` column: one value per instrument, in shares.
+    ///
+    /// # Why this is the liquidity lever
+    ///
+    /// `avg_volume` is what the market maker quotes off. `base_quote_size`
+    /// reads it, every ladder level is a fraction of that size, and the
+    /// printed volume of a tick is bounded by `avg_volume / 390`. Halve it
+    /// and the book is half as deep at every level, a marketable order walks
+    /// further up it, and the impact an agent pays for the same trade rises.
+    /// That is a liquidity shock as this simulator can actually express one:
+    /// not a number called "liquidity" multiplied by 0.4, but less depth to
+    /// trade against.
+    ///
+    /// # Why the engine never writes it itself
+    ///
+    /// The shipped close policy is [`AvgVolumePolicy::Hold`], so `avg_volume`
+    /// stays whatever the universe calibrated it to be for the whole run --
+    /// see `market::daily`, which names writing `PriceField::AvgVolume` as
+    /// the embedder's route. This is that route, and it is recorded in the
+    /// order log like any other input, so a replay, a checkpoint and a fork
+    /// all carry it.
+    ///
+    /// Values must be finite and strictly positive. Zero is not "no
+    /// liquidity": `base_quote_size` treats a zero as ABSENT and falls
+    /// through to realised volume, then to half a percent of shares
+    /// outstanding, so a zeroed column quietly quotes a book off a different
+    /// input rather than a thin one.
+    fn set_avg_volume(&mut self, values: Vec<f64>) -> PyResult<()> {
+        let n = self.inner.len();
+        if values.len() != n {
+            return Err(ValidationError::new_err(format!(
+                "set_avg_volume needs one value per instrument: this engine \
+                 holds {n}, got {}. The column is positional, so a short or long \
+                 list would attach volumes to the wrong names.",
+                values.len()
+            )));
+        }
+        for (i, v) in values.iter().enumerate() {
+            if !v.is_finite() || *v <= 0.0 {
+                return Err(ValidationError::new_err(format!(
+                    "avg_volume[{i}] = {v} is not a positive, finite share count. \
+                     Zero is not an empty book here -- the maker reads a zero as \
+                     ABSENT and quotes off realised volume instead, so it thins \
+                     nothing. Scale the column down to thin it."
+                )));
+            }
+        }
+        self.log
+            .push(crate::python_log::LogEntry::SetAvgVolume { values: values.clone() });
+        self.inner
+            .set_column(PriceField::AvgVolume, &values)
+            .map_err(ValidationError::new_err)
     }
 
     /// The live factor names, in the order `attribution` reports them.
@@ -1600,6 +1823,44 @@ impl PyEngine {
         Ok(f64_bytes(py, &self.inner.attribution_column(index)))
     }
 
+    /// `count` independent engines at exactly this state.
+    ///
+    /// A deep copy of the whole engine, so the branches share no memory and
+    /// driving one cannot perturb another. That is what makes a fork a
+    /// controlled experiment rather than two runs that started similarly.
+    ///
+    /// # Why a copy and not a rebuilt snapshot
+    ///
+    /// Forking used to mean building a fresh engine and writing a
+    /// hand-maintained list of fields into it. The list was incomplete every
+    /// time the engine grew: the per-day attribution accumulators and the
+    /// market-open flag went missing first, then the market factor's variance
+    /// state, then the common log-volume state, then the day counter, then the
+    /// day's endogenous news -- and that last one made a mid-day fork price
+    /// DIFFERENTLY from the parent it was supposed to be a copy of, on the
+    /// shipped default preset, with nothing to indicate it.
+    ///
+    /// Each of those was a real divergence found after the fact. The list
+    /// cannot be trusted, so this does not keep one: `#[derive(Clone)]` copies
+    /// whatever the struct holds, and a field added tomorrow is carried
+    /// without anyone remembering to carry it.
+    ///
+    /// Unlike [`PyEngine::state_snapshot`] this also carries the run's ORDER
+    /// LOG, so a fork can itself be checkpointed, forked again, or written to
+    /// a `RunManifest`. Reconstructing a fork from a snapshot left its log
+    /// empty, and a `Checkpoint` taken on one then replayed a market that
+    /// began at day zero -- silently, because a checkpoint has no way to know
+    /// the history it was handed is short.
+    #[pyo3(signature = (count = 2))]
+    fn fork(&self, count: i64) -> PyResult<Vec<PyEngine>> {
+        if count < 1 {
+            return Err(ValidationError::new_err(format!(
+                "count must be at least 1, got {count}"
+            )));
+        }
+        Ok((0..count).map(|_| self.clone()).collect())
+    }
+
     /// Every column plus the generator position, as one dict.
     ///
     /// A market's complete state, in constant time. The alternative already
@@ -1612,8 +1873,26 @@ impl PyEngine {
     /// exhaustively on `PriceField`, so a new variant fails to compile until
     /// it is handled, and a snapshot cannot silently omit it.
     ///
-    /// NOT a substitute for the order log. A snapshot reproduces a STATE; the
-    /// log reproduces a HISTORY, and a published result cites the second.
+    /// # What it does NOT carry
+    ///
+    /// Everything here drives the market. Three things that do not are left
+    /// out deliberately, and each of them makes a restored engine differ from
+    /// the one it copied in a way no price will show:
+    ///
+    /// - **The order log.** A snapshot reproduces a STATE; the log reproduces
+    ///   a HISTORY, and a published result cites the second. An engine
+    ///   restored from a snapshot has an EMPTY log, so a `Checkpoint` or
+    ///   `RunManifest` taken on it describes a run that began at day zero.
+    /// - **The day's recorded tape.** `record` accumulates the day's ticks;
+    ///   a restore starts that accumulation empty, so a day half-recorded
+    ///   before the snapshot comes back half as long.
+    /// - **The pending daily jump**, which is the previous close's jump
+    ///   waiting for the first row of the next day's tape (§74).
+    ///
+    /// All three are recording and history rather than market state, which is
+    /// the line this method draws. [`PyEngine::fork`] carries them, because it
+    /// copies the engine rather than rebuilding one, and it is what
+    /// `tradefloor.branch` uses.
     fn state_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let out = PyDict::new_bound(py);
         let columns = PyDict::new_bound(py);
@@ -1685,6 +1964,28 @@ impl PyEngine {
         // the same failure: omitted, a fork re-opens at volume 1.0 mid-regime
         // and diverges through the book (§74).
         out.set_item("volume_state", self.inner.volume_state())?;
+        // The universe's remembered stress and the per-name volume states.
+        // Both are engine-level dials that are INERT under every preset
+        // through pt-v15, which is exactly the position `volume_state` above
+        // was in before pt-v10 turned it on and a restored engine started
+        // trading different volume. `set_universe_stress` was written for
+        // this and nothing called it. Carried now, while it is free.
+        out.set_item("universe_stress", self.inner.universe_stress())?;
+        out.set_item("volume_idio", f64_bytes(py, self.inner.volume_idio()))?;
+        // The day's endogenous news, generated once in `open_market` and read
+        // by every tick of that day. Per-DAY state, not a per-tick input, and
+        // omitting it made a mid-day restore run the rest of the day with the
+        // news missing -- a divergence in PRICE, on the shipped default
+        // preset, with nothing to indicate it.
+        let news = pyo3::types::PyList::empty_bound(py);
+        for event in self.inner.session_news() {
+            let item = PyDict::new_bound(py);
+            item.set_item("ticker", event.company_id.clone())?;
+            item.set_item("sector", event.sector.clone())?;
+            item.set_item("price_impact", event.price_impact)?;
+            news.append(item)?;
+        }
+        out.set_item("session_news", news)?;
 
         // The macro chain's state. The chain advances at every close now, so
         // a fork that did not carry these would snap back to the initial
@@ -1908,6 +2209,48 @@ impl PyEngine {
         if let Some(raw) = snapshot.get_item("volume_state")? {
             self.inner.set_volume_state(raw.extract::<f64>()?);
         }
+        if let Some(raw) = snapshot.get_item("universe_stress")? {
+            self.inner.set_universe_stress(raw.extract::<f64>()?);
+        }
+        if let Some(raw) = snapshot.get_item("volume_idio")? {
+            let bytes: &[u8] = raw.extract()?;
+            let values: Vec<f64> = bytes
+                .chunks_exact(8)
+                .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            self.inner
+                .set_volume_idio(&values)
+                .map_err(ValidationError::new_err)?;
+        }
+        // Absent in a snapshot written before this was carried. Such a
+        // snapshot described a day whose news this engine cannot know, so the
+        // honest restore is the empty day it recorded -- which is what those
+        // archives already replay to.
+        if let Some(raw) = snapshot.get_item("session_news")? {
+            let items = raw.downcast::<pyo3::types::PyList>()?;
+            let mut events = Vec::with_capacity(items.len());
+            for item in items.iter() {
+                let d = item.downcast::<PyDict>()?;
+                let get = |key: &str| -> PyResult<Option<Bound<'_, PyAny>>> {
+                    Ok(d.get_item(key)?)
+                };
+                events.push(NewsEvent {
+                    company_id: match get("ticker")? {
+                        Some(v) => v.extract()?,
+                        None => None,
+                    },
+                    sector: match get("sector")? {
+                        Some(v) => v.extract()?,
+                        None => None,
+                    },
+                    price_impact: match get("price_impact")? {
+                        Some(v) => v.extract()?,
+                        None => None,
+                    },
+                });
+            }
+            self.inner.set_session_news(events);
+        }
         if let Some(raw) = snapshot.get_item("market_variance")? {
             let vals: Vec<f64> = raw.extract()?;
             // Two values is a checkpoint written before the slow component
@@ -2101,16 +2444,21 @@ impl PyEngine {
     ///
     /// Every recorded day is a separate batch, so a year streams rather than
     /// materialising. With nothing recorded it falls back to the last session.
-    #[pyo3(signature = (*, day = 0, minutes = None, grain = None))]
+    ///
+    /// `day = None`, the default, is every recorded day; `day = N` is that day
+    /// alone. Like `truth`, it used to be discarded once anything had been
+    /// recorded and only labelled the un-recorded fallback.
+    #[pyo3(signature = (*, day = None, minutes = None, grain = None))]
     fn bars(
         &self,
-        day: u32,
+        day: Option<u32>,
         minutes: Option<usize>,
         grain: Option<&str>,
     ) -> PyResult<crate::python_arrow::PyArrowStream> {
         let days: Vec<crate::python_arrow::RecordedDay> = if self.recorded.is_empty() {
             vec![crate::python_arrow::RecordedDay {
-                day,
+                // The label, as it has always been on this path.
+                day: day.unwrap_or(0),
                 ticks: self.buffer.ticks_written,
                 instruments: self.buffer.companies,
                 prices: self.written(&self.buffer.prices).to_vec(),
@@ -2124,7 +2472,7 @@ impl PyEngine {
                 components: std::array::from_fn(|_| Vec::new()),
             }]
         } else {
-            self.recorded.clone()
+            self.select_recorded(day)?
         };
 
         // `None` means tick grain, which uses the narrow schema.
@@ -2191,11 +2539,24 @@ impl PyEngine {
     /// The log deviation from fair value that produced each print. No
     /// historical dataset carries this column, because no historical dataset
     /// knows what fair value was.
-    #[pyo3(signature = (*, day = 0))]
-    fn truth(&self, day: u32) -> PyResult<crate::python_arrow::PyArrowStream> {
+    ///
+    /// # `day` selects, and used not to
+    ///
+    /// `day = None`, the default, is every recorded day: one batch each, so a
+    /// year streams. `day = N` is that day alone.
+    ///
+    /// It was ignored entirely once anything had been recorded -- the argument
+    /// only ever labelled the un-recorded fallback -- so `truth(day=4)` on a
+    /// hundred-day run returned all hundred days and looked like it had
+    /// answered. The table had the right schema and plausible values, which is
+    /// why nothing noticed for as long as it did.
+    #[pyo3(signature = (*, day = None))]
+    fn truth(&self, day: Option<u32>) -> PyResult<crate::python_arrow::PyArrowStream> {
         let batches = if self.recorded.is_empty() {
             vec![crate::python_arrow::truth_batch(
-                day,
+                // Nothing is recorded, so there is no day to select and the
+                // argument is what it always was here: the label on the rows.
+                day.unwrap_or(0),
                 self.buffer.ticks_written,
                 self.buffer.companies,
                 self.written(&self.buffer.mispricing_s),
@@ -2215,8 +2576,9 @@ impl PyEngine {
             )
             .map_err(crate::python_arrow::arrow_err)?]
         } else {
-            let mut out = Vec::with_capacity(self.recorded.len());
-            for d in &self.recorded {
+            let selected = self.select_recorded(day)?;
+            let mut out = Vec::with_capacity(selected.len());
+            for d in &selected {
                 out.push(
                     crate::python_arrow::truth_batch(
                         d.day,

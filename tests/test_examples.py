@@ -23,15 +23,25 @@ import pytest
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 NOTEBOOKS = sorted(EXAMPLES.glob("0*.ipynb"))
-SCRIPTS = sorted(EXAMPLES.glob("0*.py"))
+# `[0-9]*` and not `0*`: the examples are numbered, and the tenth one is not
+# `0`-prefixed. Under the old glob example 10 onward was silently unchecked,
+# which is the failure mode this file exists to prevent, applied to itself.
+SCRIPTS = sorted(EXAMPLES.glob("[0-9]*.py"))
 
 #: Executing notebooks is slow and needs jupyter, so those tests are opt-in.
 #: The syntax check on the scripts is not -- a rename that missed a
 #: reference should fail on every run, not only when someone remembers the
 #: flag.
+#: Both spellings. The flag was named before the library was, and someone
+#: typing the current name at the current project should not silently get the
+#: skip -- which is the same "a guard that quietly stops guarding" shape the
+#: rename left in four other places. The old name keeps working because it is
+#: in CONTRIBUTING.md, in RELEASING.md, and in people's shell history.
 SLOW = pytest.mark.skipif(
-    not os.environ.get("PRETIUM_SLOW_TESTS"),
-    reason="executing the examples is slow; set PRETIUM_SLOW_TESTS=1 to run",
+    not (os.environ.get("TRADEFLOOR_SLOW_TESTS")
+         or os.environ.get("PRETIUM_SLOW_TESTS")),
+    reason=("executing the examples is slow; set TRADEFLOOR_SLOW_TESTS=1 "
+            "to run (PRETIUM_SLOW_TESTS is still honoured)"),
 )
 
 
@@ -121,6 +131,31 @@ def test_the_research_workflow_runs_end_to_end():
     assert "total" in done.stdout.lower()
 
 
+def test_the_forking_demo_runs_end_to_end():
+    """The forking demo, run whole, and NOT behind the slow flag.
+
+    It takes about two seconds, and what it checks -- that a fork starts where
+    its source stood, carries its source's history, does not reach its source
+    or its siblings, and replays from the checkpoint -- is the guarantee the
+    library makes about experiments. Something that central should be checked
+    on every run rather than when someone remembers a flag.
+
+    It asserts its own gates and exits non-zero if any fails, so this reads
+    the return code and then confirms the summary line, because a script that
+    printed FAIL and exited zero would be the more dangerous failure.
+    """
+    import subprocess
+    script = EXAMPLES / "10-forking-a-market.py"
+    if not script.exists():
+        pytest.fail(f"{script.name} is missing; examples/ has "
+                    f"{[p.name for p in SCRIPTS]}")
+    done = subprocess.run([sys.executable, str(script)],
+                          capture_output=True, text=True, timeout=600)
+    assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-3000:]
+    assert "fork test          PASS" in done.stdout, done.stdout[-2000:]
+    assert "FAIL" not in done.stdout
+
+
 @SLOW
 def test_the_claude_example_refuses_without_its_extra():
     """It cannot be run here -- it needs an API key and spends money per
@@ -135,7 +170,7 @@ def test_the_claude_example_refuses_without_its_extra():
     done = subprocess.run([sys.executable, str(script)],
                           capture_output=True, text=True, timeout=120, env=env)
     combined = done.stdout + done.stderr
-    assert "pretium[claude]" in combined or "ANTHROPIC_API_KEY" in combined, (
+    assert "tradefloor[claude]" in combined or "ANTHROPIC_API_KEY" in combined, (
         f"expected a readable refusal, got:\n{combined[-1500:]}"
     )
     assert "Traceback" not in done.stdout

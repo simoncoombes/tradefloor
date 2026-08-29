@@ -303,7 +303,8 @@ class RunManifest:
            universe: Sequence[Instrument], macro: Macro | None = None,
            scenario: Scenario | None = None,
            strategy: StrategySpec | str | None = None,
-           universe_source: Any = None, label: str = "") -> "RunManifest":
+           universe_source: Any = None, label: str = "",
+           derived_from: Any = None) -> "RunManifest":
         """Capture a finished run.
 
         ``universe`` and ``seed`` are passed rather than read off the engine
@@ -322,6 +323,17 @@ class RunManifest:
         methods section. The roster itself is always embedded regardless,
         because a recipe reproduces only while the generator behaves the same
         and a query is not the data it returned.
+
+        ``derived_from`` is the :class:`tradefloor.Checkpoint` this run
+        branched from, for the arm of an experiment rather than a run that
+        started at day zero. It records the checkpoint's fingerprint, its
+        label and how many log entries it held, which is the fork point.
+
+        Without it, lineage is only DERIVABLE: two branches of one experiment
+        share a log prefix and its length is where they parted, so a reader
+        holding both manifests can recover the structure by comparing them.
+        A reader holding one cannot, and nothing says a run is a branch of
+        anything. This is that sentence, written down.
         """
         from . import Universe
 
@@ -428,6 +440,49 @@ class RunManifest:
                 "draws_consumed": engine.draws_consumed,
             },
         }
+        if derived_from is not None:
+            # Identity before history. The log is a sequence of INPUTS, so two
+            # runs that opened and ran the same sessions carry the same log
+            # whatever seed drew their market: comparing prefixes alone would
+            # accept a checkpoint of an entirely different world. The seed and
+            # the roster are what separate them.
+            if int(derived_from.seed) != int(seed):
+                raise ValidationError(
+                    f"this checkpoint was taken on seed {derived_from.seed} "
+                    f"and this run is seed {seed}, so the run did not branch "
+                    "from it. Their order logs can still match: a log records "
+                    "inputs, and the same sessions on two seeds are the same "
+                    "inputs on two different markets."
+                )
+            if derived_from.universe_fingerprint != fingerprints["universe"]:
+                raise ValidationError(
+                    "this checkpoint was taken on a different roster "
+                    f"({derived_from.universe_fingerprint[:12]}... against "
+                    f"{fingerprints['universe'][:12]}...), so the run did not "
+                    "branch from it. Tickers are generated positionally, so "
+                    "two rosters can share every name and no fundamentals."
+                )
+            entries = len(derived_from.log)
+            if entries > len(log):
+                raise ValidationError(
+                    f"this checkpoint holds {entries} log entries and the run "
+                    f"holds {len(log)}, so the run cannot have started from "
+                    "it. A branch continues its parent's history, so its log "
+                    "is at least as long."
+                )
+            if list(log[:entries]) != list(derived_from.log):
+                raise ValidationError(
+                    "this run's first "
+                    f"{entries} log entries are not the checkpoint's, so it "
+                    "did not start there. Passing derived_from is a claim "
+                    "about history, and it is checked when it is made rather "
+                    "than believed."
+                )
+            doc["derived_from"] = {
+                "checkpoint": derived_from.fingerprint,
+                "label": derived_from.label,
+                "entries": entries,
+            }
         return cls(doc)
 
     def to_json(self) -> str:
@@ -560,6 +615,7 @@ class RunManifest:
         starts.
         """
         self._check_era()
+        self._check_lineage()
 
         engine = replay(self.order_log, seed=self.seed,
                         universe=self.universe, macro=self.macro,
@@ -568,21 +624,93 @@ class RunManifest:
         recorded = self._doc["result"]
         digest = market_digest(engine)
         if digest != recorded["digest"]:
-            wrote = self._doc["written_by"]["platform"]
-            raise ValidationError(
-                "the replay ran but did not rebuild the recorded market: "
-                f"digest {digest[:12]}... against the manifest's "
-                f"{recorded['digest'][:12]}... (draws consumed "
-                f"{engine.draws_consumed} against {recorded['draws_consumed']}"
-                "). Every carried input matched its fingerprint and the era "
-                "probe agreed, so the divergence is in arithmetic the probe "
-                "does not exercise, on an unmeasured platform pair (written "
-                f"on {wrote['os']}-{wrote['machine']}, replayed on "
-                f"{_platform.system()}-{_platform.machine()}) that is the "
-                "leading suspect. Bisect with tradefloor.replay(log, ..., "
-                "until=n)."
-            )
+            raise ValidationError(self._divergence(engine, digest, recorded))
         return engine
+
+    def _divergence(self, engine: Engine, digest: str,
+                    recorded: dict[str, Any]) -> str:
+        """Why the replay did not rebuild the market, ranked by the evidence
+        already in hand.
+
+        This used to lead with "an unmeasured platform pair" in every case,
+        and print the pair -- which was often the SAME platform twice, so the
+        sentence disproved itself while sending the reader to the Rust core.
+        It happened for real: a manifest taken on a fork whose order log was
+        empty reported a suspected Windows-versus-Windows arithmetic
+        difference, and the cause was a truncated history.
+
+        Two facts are free here and neither was used. The draw counts say
+        whether the two runs executed the same sequence of operations at all,
+        which separates an input problem from an arithmetic one; and the two
+        platform strings say whether a platform difference is even available
+        as an explanation.
+        """
+        wrote = self._doc["written_by"]["platform"]
+        there = f"{wrote['os']}-{wrote['machine']}"
+        here = f"{_platform.system()}-{_platform.machine()}"
+        head = (
+            "the replay ran but did not rebuild the recorded market: "
+            f"digest {digest[:12]}... against the manifest's "
+            f"{recorded['digest'][:12]}... (draws consumed "
+            f"{engine.draws_consumed} against {recorded['draws_consumed']}). "
+        )
+        bisect = (" Bisect with tradefloor.replay(log, ..., until=n): replay "
+                  "both to step n and compare, and the first n that differs "
+                  "is the operation to look at.")
+
+        if engine.draws_consumed != recorded["draws_consumed"]:
+            return head + (
+                "The DRAW COUNTS DIFFER, so the two runs did not execute the "
+                "same sequence of operations. That is an input difference, "
+                "not an arithmetic one, and no platform explains it: this log "
+                "is not the log that produced the recorded result. It is "
+                "shorter or longer than the history it claims. The usual "
+                "cause is a manifest written on an engine whose order log "
+                "did not cover how it reached its state."
+            ) + bisect
+
+        if there != here:
+            return head + (
+                "Every carried input matched its fingerprint, the era probe "
+                "agreed, and the draw counts match, so the two runs executed "
+                "the same operations and disagreed about the arithmetic. "
+                f"They ran on different platforms ({there} wrote it, {here} "
+                "replayed it), which is the leading suspect: this is the "
+                "cross-platform bit-identity the release gate exists to "
+                "measure, and a pair it has not measured can differ."
+            ) + bisect
+
+        return head + (
+            "Every carried input matched its fingerprint, the era probe "
+            "agreed, and the draw counts match. Both runs are on "
+            f"{here}, so a platform difference is NOT the explanation. What "
+            "is left, in order: a build with different flags (float "
+            "reassociation, FMA contraction or target-cpu=native would each "
+            "do this, which is why the release profile forbids them); a "
+            "wheel that is not the one whose digest was recorded, despite "
+            "reporting the same version; or arithmetic the era probe does "
+            "not exercise."
+        ) + bisect
+
+    def _check_lineage(self) -> None:
+        """The half of the lineage claim a manifest can check alone.
+
+        Without the checkpoint there is no way to confirm the first entries
+        ARE its log -- :meth:`verify_lineage` is for a reader who holds it.
+        What is checkable here is that the claim is not self-contradictory: a
+        run cannot have branched from a point later than its own history.
+        """
+        recorded = self.derived_from
+        if recorded is None:
+            return
+        entries = int(recorded["entries"])
+        if entries > len(self.order_log):
+            raise ValidationError(
+                f"this manifest says it branched from a checkpoint holding "
+                f"{entries} log entries and carries {len(self.order_log)}. A "
+                "branch continues its parent's history, so it cannot be "
+                "shorter than the point it started from."
+            )
 
     def _model_for_replay(self) -> ModelParams | None:
         """The model the run was recorded under, rebuilt for the replay.
@@ -716,6 +844,55 @@ class RunManifest:
         return self._doc.get("label", "")
 
     @property
+    def derived_from(self) -> dict[str, Any] | None:
+        """The checkpoint this run branched from, or ``None`` for a run that
+        started at day zero.
+
+        ``{"checkpoint": <fingerprint>, "label": ..., "entries": <fork point>}``.
+        The entry count is where this run's history stops being its parent's,
+        so two manifests naming the same checkpoint describe two arms of one
+        experiment and the number says where they parted.
+        """
+        recorded = self._doc.get("derived_from")
+        return dict(recorded) if recorded else None
+
+    def verify_lineage(self, checkpoint: Any) -> None:
+        """Check this manifest's declared parent IS the given checkpoint.
+
+        The declaration alone is a claim: it names a digest, and a reader
+        holding only the manifest cannot test it. A reader holding the
+        checkpoint can, and this is that test -- the fingerprint must match,
+        and the run's first entries must be the checkpoint's log.
+
+        Raises rather than returning a bool, for the same reason
+        :meth:`reproduce` does: a lineage check whose result can be ignored
+        by writing ``manifest.verify_lineage(cp)`` and reading nothing is a
+        check that will be.
+        """
+        recorded = self.derived_from
+        if recorded is None:
+            raise ValidationError(
+                "this manifest declares no parent, so there is no lineage to "
+                "verify. A run recorded with derived_from names the "
+                "checkpoint it branched from; this one was not."
+            )
+        if checkpoint.fingerprint != recorded["checkpoint"]:
+            raise ValidationError(
+                f"this manifest branched from checkpoint "
+                f"{recorded['checkpoint'][:12]}... and the one supplied is "
+                f"{checkpoint.fingerprint[:12]}.... Two checkpoints of the "
+                "same market taken at different points, or under different "
+                "labels, are different starting states and the digests say so."
+            )
+        entries = int(recorded["entries"])
+        if list(self.order_log[:entries]) != list(checkpoint.log):
+            raise ValidationError(
+                "this manifest's fingerprint matches the checkpoint but its "
+                f"first {entries} log entries do not, so one of the two was "
+                "edited after it was written."
+            )
+
+    @property
     def universe(self):
         """The embedded roster, as a :class:`tradefloor.Universe`."""
         from . import Universe
@@ -844,6 +1021,13 @@ class RunManifest:
                 "carried, realised path"
                 if doc.get("scenario") is not None else "none"),
         ]
+        parent = self.derived_from
+        if parent is not None:
+            named = f" {parent['label']!r}" if parent["label"] else ""
+            lines.append(
+                f"  branched from checkpoint{named} "
+                f"({parent['checkpoint'][:12]}...) at entry "
+                f"{parent['entries']}")
         if self.strategy is not None:
             lines.append(
                 f"  strategy: carried spec "

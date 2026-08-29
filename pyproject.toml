@@ -56,6 +56,11 @@ claude = ["anthropic>=0.40", "pydantic>=2"]
 mcp = ["mcp>=2.0"]
 
 [project.scripts]
+# Reads scenario files: `tradefloor scenario validate scenarios/*.yml`. It
+# does not run a market, which is the point -- configuration that can only be
+# checked by running a hundred-day simulation is configuration nobody checks.
+# `python -m tradefloor ...` is the same command tree without the script.
+tradefloor = "tradefloor.__main__:main"
 # Speaks MCP over stdio. Point an MCP client at `tradefloor-mcp` with no
 # arguments; see docs/mcp.md for a client configuration block.
 tradefloor-mcp = "tradefloor.mcp:main"
@@ -72,3 +77,19 @@ features = ["python"]
 # in the source tree. A stub that does not ship types nothing, and the failure
 # is silent -- a type checker just falls back to Any.
 include = ["python/tradefloor/py.typed", "python/tradefloor/_core.pyi"]
+# `maturin develop` writes the compiled extension and its Windows debug
+# database into python/tradefloor/, and maturin then packages everything it
+# finds under python-source. So a wheel built on a machine that had ever run
+# `maturin develop` carried a second, STALE copy of the extension and a 1.0 MB
+# .pdb -- which is how tradefloor 0.5.0 shipped `pretium.pdb` inside every
+# wheel. The build artefacts are gitignored, but .gitignore does not reach a
+# working tree, and this does. The extension the wheel is supposed to contain
+# comes from the Rust build rather than from here, so excluding these patterns
+# removes the stowaway and not the payload; tests/test_packaging.py checks that
+# on the built artefact rather than trusting it.
+exclude = [
+  "python/tradefloor/*.pdb",
+  "python/tradefloor/*.pyd",
+  "python/tradefloor/*.so",
+  "python/tradefloor/*.dylib",
+]

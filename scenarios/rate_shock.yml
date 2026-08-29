@@ -1,0 +1,46 @@
+# Example experimental assumptions. This scenario is not a forecast, and not
+# a claim about how a real market would respond to a real rate rise.
+#
+# The canonical rate-shock experiment, written as interventions. The Python
+# constructor `Scenario.rate_shock()` is unchanged and still ships: it pins a
+# 30-day RAMP across the whole curve for the entire run. This states the same
+# experiment in the intervention idiom -- a step, relative to whatever the
+# endogenous chain has reached by day 50, held from there.
+#
+# Both rates move, and that is the whole point. Equities are discounted off
+# the corporate bond yield; the policy rate is a fallback fair value reaches
+# only when no corporate yield is present, and inside the engine there always
+# is one. Moving the policy rate alone still transmits, but through the
+# curve at the central bank's next MEETING rather than on the day.
+#
+# `permanent` rather than a bare step, and that is not decoration. Measured on
+# `Universe.random(20, seed=101)` over 120 days, seeds 3/11/29, shock at day
+# 20: a one-shot +200bp write to macro.corporate_yield moved the median
+# instrument -0.23%, because the chain recomputes the corporate yield from the
+# 10-year at the next central-bank meeting and the write is gone. The same
+# shock re-asserted daily moved it -3.50%. A rate shock that is not sustained
+# is not a rate shock.
+
+version: 1
+
+scenario:
+  name: rate_shock
+
+  description: >
+    A sustained 200 basis point tightening across the curve, arriving on day
+    50 and held for the rest of the run. Example experimental assumptions,
+    not a forecast.
+
+  shocks:
+
+    - target: macro.corporate_yield
+      operation: add
+      value: 0.02
+      at: 50
+      shape: permanent
+
+    - target: macro.policy_rate
+      operation: add
+      value: 0.02
+      at: 50
+      shape: permanent

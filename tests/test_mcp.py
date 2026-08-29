@@ -384,10 +384,16 @@ def test_an_unknown_macro_field_is_refused_with_the_valid_list():
 def test_the_macro_field_list_is_read_from_the_engine():
     # Typed here, it would drift from what `Scenario` accepts -- which is
     # exactly how this module came to claim the surface was "40-odd fields"
-    # when it is seven.
+    # when it was seven. Asserted against `FIELDS` rather than against a
+    # count, because a count is a second place to remember: the list grew to
+    # eleven when the intervention framework exposed four macro fields the
+    # economy already carried, and a number here would have been a test
+    # failure standing in for a documentation update.
+    from tradefloor.scenario import FIELDS
+
     fields = mcp._macro_fields()
     assert "vix" in fields and "cycle" in fields
-    assert len(fields) == 7, fields
+    assert tuple(fields) == FIELDS, fields
 
 
 def test_an_unknown_step_kind_names_the_three_that_exist():
@@ -442,9 +448,10 @@ def test_the_day_cap_is_lifted_only_on_a_job_worker_thread():
     )
 
 
-@pytest.mark.skipif(not os.environ.get("PRETIUM_SLOW_TESTS"),
+@pytest.mark.skipif(not (os.environ.get("TRADEFLOOR_SLOW_TESTS")
+                         or os.environ.get("PRETIUM_SLOW_TESTS")),
                     reason="a 252-day evaluation is ~95s; "
-                           "set PRETIUM_SLOW_TESTS=1 to run it")
+                           "set TRADEFLOOR_SLOW_TESTS=1 to run it")
 def test_a_job_really_does_reach_the_certified_horizon():
     """The claim, measured rather than asserted.
 

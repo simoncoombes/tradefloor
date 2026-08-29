@@ -616,3 +616,97 @@ def test_prices_still_means_the_last_session():
     engine.run_session(10, 0, 3, 45)
     assert engine.session_ticks_written == 45
     assert len(engine.session_prices()) == 45 * len(universe) * 8
+
+
+# --------------------------------------------------------------------------
+# `day=` selects a day, and used not to
+# --------------------------------------------------------------------------
+
+
+def taped(days=5, n=4, ticks=10, seed=7, labels=None):
+    """A run with several days on the tape, labelled as given."""
+    u = tradefloor.Universe.random(n, seed=3)
+    e = tradefloor.Engine(seed=seed, universe=u)
+    for i in range(days):
+        label = i if labels is None else labels[i]
+        e.open_market()
+        e.run_session(9, 30, 3, ticks)
+        e.record(label)
+        e.close_market()
+    return e, n, ticks
+
+
+def days_in(stream):
+    return sorted(set(pa.table(stream).column("day").to_pylist()))
+
+
+@pytest.mark.parametrize("table", ["truth", "bars"])
+def test_a_day_argument_selects_that_day(table):
+    """The behaviour the argument's name has always implied.
+
+    It was discarded once anything had been recorded: `truth(day=4)` on a
+    five-day run returned all five days, with the right schema and plausible
+    values, and looked like it had answered. The argument only ever labelled
+    the un-recorded fallback.
+    """
+    e, n, ticks = taped()
+    one = getattr(e, table)(day=3)
+    assert days_in(one) == [3]
+    assert pa.table(one).num_rows == n * ticks
+
+
+@pytest.mark.parametrize("table", ["truth", "bars"])
+def test_no_day_argument_is_every_recorded_day(table):
+    """The default has to stay what it was, or every streaming consumer
+    quietly starts reading one day of a year."""
+    e, n, ticks = taped()
+    every = getattr(e, table)()
+    assert days_in(every) == [0, 1, 2, 3, 4]
+    assert pa.table(every).num_rows == 5 * n * ticks
+
+
+@pytest.mark.parametrize("table", ["truth", "bars"])
+def test_selecting_at_source_matches_filtering_afterwards(table):
+    """Two routes to one answer. If they disagreed, `day=` would be a
+    different question from the one a reader thinks they are asking."""
+    e, _, _ = taped()
+    at_source = pa.table(getattr(e, table)(day=2))
+    everything = pa.table(getattr(e, table)())
+    filtered = everything.filter(pc.equal(everything.column("day"), 2))
+    assert at_source.to_pydict() == filtered.to_pydict()
+
+
+@pytest.mark.parametrize("table", ["truth", "bars"])
+def test_a_day_that_was_never_recorded_says_which_ones_were(table):
+    """An empty table would be the same failure in a different shape: a
+    well-formed answer to a question nobody could have meant."""
+    e, _, _ = taped()
+    with pytest.raises(tradefloor.ValidationError) as raised:
+        getattr(e, table)(day=9)
+    assert "0 to 4" in str(raised.value)
+    assert "record(day)" in str(raised.value)
+
+
+@pytest.mark.parametrize("table", ["truth", "bars"])
+def test_the_recorded_days_are_listed_when_they_are_not_contiguous(table):
+    """A run that recorded every tenth day should not be described as a
+    range it does not cover."""
+    e, _, _ = taped(days=3, labels=[0, 2, 7])
+    with pytest.raises(tradefloor.ValidationError, match=r"0, 2, 7"):
+        getattr(e, table)(day=3)
+
+
+@pytest.mark.parametrize("table", ["truth", "bars"])
+def test_with_nothing_recorded_the_day_is_still_a_label(table):
+    """The one place the argument always meant something, unchanged.
+
+    Nothing is recorded, so there is no day to select; the session buffer is
+    returned and `day` names it. A caller who was relying on that has not
+    been broken by teaching the recorded path to select.
+    """
+    u = tradefloor.Universe.random(4, seed=3)
+    e = tradefloor.Engine(seed=7, universe=u)
+    e.open_market()
+    e.run_session(9, 30, 3, 10)
+    assert days_in(getattr(e, table)()) == [0]
+    assert days_in(getattr(e, table)(day=7)) == [7]

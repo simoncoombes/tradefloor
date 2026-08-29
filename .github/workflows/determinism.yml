@@ -146,7 +146,12 @@ jobs:
       - name: Build and install the wheel
         shell: bash
         run: |
-          python -m pip install --upgrade pip maturin pytest
+          # pyarrow is here for a reason, not for convenience. Two of the
+          # reproducibility tests read the recorded `truth` tape, and without
+          # it they `importorskip` and pass by not running -- which is how a
+          # fork that silently recorded a day HALF AS LONG as its parent's
+          # survived. A gate that skips its own hardest case is not a gate.
+          python -m pip install --upgrade pip maturin pytest pyarrow
           # Release profile is contractual: lto, codegen-units=1, and NO
           # target-cpu=native. A build that let LLVM fuse a multiply-add on
           # one CPU family would be a different market on that CPU family,
@@ -179,6 +184,60 @@ jobs:
           # test_known_answer.py deliberately does not depend on the golden
           # corpus, so it runs here where that corpus does not exist.
           python -m pytest tests/test_known_answer.py -v
+
+      - name: The reproducibility guarantees
+        shell: bash
+        run: |
+          cd "${{ github.workspace }}"
+          # Against the INSTALLED wheel, on every target, because a fork is a
+          # floating-point continuation of a market and there is no reason to
+          # assume it holds identically on a platform where nothing has run it.
+          #
+          # These four files are the chain a user relies on -- deterministic
+          # rerun, checkpoint restore, fork, fork independence, one controlled
+          # intervention -- plus what a wheel is allowed to contain. They take
+          # about fifteen seconds together, which is why they run here rather
+          # than in a nightly job: the whole point is that a pull request
+          # cannot merge having broken them.
+          #
+          # The rest of the suite (about 1,350 tests, and minutes of atlas and
+          # calibration work) is deliberately NOT here. Adding it would turn a
+          # three-minute gate into a long one and most of it cannot move a
+          # fork.
+          python -m pytest -q \
+            tests/test_forking.py \
+            tests/test_checkpoint.py \
+            tests/test_replay.py \
+            tests/test_packaging.py
+
+      - name: The optional surfaces
+        # One target, not five. What these cover is protocol plumbing and
+        # array marshalling over an engine whose determinism the other four
+        # targets have already checked; running them everywhere would buy a
+        # second copy of the same answer for the cost of a dependency stack.
+        #
+        # They exist because `importorskip` is a lane that reports green by
+        # not running. The MCP file asserted the server was named `pretium`
+        # for as long as the rename had existed: ninety-two tests, silent,
+        # because `mcp` is installed nowhere. The gym file is the same shape
+        # waiting to happen.
+        if: matrix.target == 'linux-x86_64'
+        shell: bash
+        run: |
+          cd "${{ github.workspace }}"
+          # By name rather than as extras of the local wheel: `--no-index`
+          # would block the extras' own dependencies, and dropping it would
+          # let pip resolve `tradefloor` from PyPI and test a package that is
+          # not the one just built.
+          python -m pip install mcp numpy gymnasium
+          # Loudly, before pytest gets the chance to skip quietly. A failed
+          # install would otherwise leave the tests reporting green by
+          # absence, which is the exact failure this job exists to close.
+          python -c "import mcp, numpy, gymnasium; print('optional surfaces present')"
+          python -m pytest -q \
+            tests/test_mcp.py \
+            tests/test_mcp_integration.py \
+            tests/test_gym.py
 
       - uses: actions/upload-artifact@v4
         with:

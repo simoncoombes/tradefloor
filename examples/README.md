@@ -1,6 +1,6 @@
 # Examples
 
-Eight notebooks and two scripts, numbered in reading order. The committed
+Eight notebooks and four scripts, numbered in reading order. The committed
 notebooks carry their output, so you can read them without running anything.
 Start at 00 if you have not used tradefloor before.
 
@@ -16,6 +16,8 @@ Start at 00 if you have not used tradefloor before.
 | [`09-a-pandemic-shaped-market.ipynb`](09-a-pandemic-shaped-market.ipynb) | Driving a real 2020-21 macro path, and diagnosing why the first attempt missed |
 | [`07-research-workflow.py`](07-research-workflow.py) | A whole study in one file: sweep, evaluation, TCA, replay |
 | [`08-claude-agent.py`](08-claude-agent.py) | An LLM agent scored against the baselines |
+| [`10-forking-a-market.py`](10-forking-a-market.py) | Fork a market mid-flight, change the policy rate in one branch, compare |
+| [`11-scenario-fork.py`](11-scenario-fork.py) | Read a scenario from YAML, apply it to one branch of a fork, and price what it cost |
 
 Notebooks 05 and 06 cover the two audiences the project is built for, RL
 researchers and execution developers.
@@ -31,8 +33,8 @@ Notebooks 00, 03 and 09 also need `matplotlib` for their charts, and 05 needs
 `tradefloor[rl]` for the Gymnasium environment. The core library has no
 dependencies.
 
-`07-research-workflow.py` runs in about five seconds and needs nothing
-extra. `08-claude-agent.py` needs `tradefloor[claude]` and an API key, and
+`07-research-workflow.py` runs in about five seconds and
+`10-forking-a-market.py` in about two, and neither needs anything extra. `08-claude-agent.py` needs `tradefloor[claude]` and an API key, and
 spends money per decision, so it's the one file here that isn't run
 automatically.
 
@@ -43,7 +45,7 @@ test run, which catches a rename that missed a reference. The rest is opt-in,
 because executing eight notebooks takes about a minute:
 
 ```
-PRETIUM_SLOW_TESTS=1 pytest tests/test_examples.py
+TRADEFLOOR_SLOW_TESTS=1 pytest tests/test_examples.py
 ```
 
 That executes every notebook, confirms the committed copies carry output,

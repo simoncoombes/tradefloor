@@ -115,7 +115,7 @@ Two rules this script enforces, both learned the hard way:
 
 Usage:
     python sync-goldens.py --verify   # the live use: verify what is here
-    PRETIUM_GOLDENS_SRC=/path/to/reference/goldens python sync-goldens.py
+    TRADEFLOOR_GOLDENS_SRC=/path/to/reference/goldens python sync-goldens.py
     python sync-goldens.py --from /path/to/goldens
 """
 
@@ -139,7 +139,10 @@ def _source() -> Path | None:
     """
     if "--from" in sys.argv:
         return Path(sys.argv[sys.argv.index("--from") + 1]).expanduser().resolve()
-    env = os.environ.get("PRETIUM_GOLDENS_SRC")
+    # Both prefixes, newest first: the variable was named before the
+    # library was.
+    env = (os.environ.get("TRADEFLOOR_GOLDENS_SRC")
+           or os.environ.get("PRETIUM_GOLDENS_SRC"))
     return Path(env).expanduser().resolve() if env else None
 
 
@@ -193,7 +196,8 @@ def main() -> int:
     source = _source()
     if source is None:
         print("  no source given.", file=sys.stderr)
-        print("  Set PRETIUM_GOLDENS_SRC, or pass --from <path>.", file=sys.stderr)
+        print("  Set TRADEFLOOR_GOLDENS_SRC, or pass --from <path>.",
+              file=sys.stderr)
         return 1
     if not source.exists():
         print(f"  source not found: {source}", file=sys.stderr)

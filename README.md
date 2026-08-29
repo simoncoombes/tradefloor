@@ -80,6 +80,40 @@ Strategies, universes and scenarios are data, so a tool argument cannot reach
 code. Each result carries its own caveats. See
 [the MCP page](https://simoncoombes.github.io/tradefloor/mcp.html).
 
+## Controlled scenarios
+
+```python
+scenario = tf.Scenario.from_yaml("scenarios/liquidity_crisis.yml")
+
+control, stress = tf.branch(engine, 2)
+for day in range(80):
+    scenario.apply(stress, day)
+    ...                                  # run both branches
+```
+
+A scenario is an explicit collection of market interventions and assumptions,
+for controlled experiments rather than for forecasting. It names targets from
+a registry of fields the engine actually reads, and it keeps what it asserts
+happened apart from what it assumes happened next:
+
+```
+tradefloor scenario show scenarios/oil_price_spike.yml
+
+Exogenous shocks
+  day 50+            commodity.oil            x1.4
+
+Assumed transmission
+  day 55..74 ramp    macro.inflation          +1.50pp
+  day 55+            macro.corporate_yield    +0.50pp
+```
+
+tradefloor does not claim what a war, an election, an oil shock or a
+recession will do to markets. It lets you state those assumptions and measure
+how an agent behaves under them. Six examples ship in
+[`scenarios/`](https://github.com/simoncoombes/tradefloor/tree/main/scenarios),
+each recording what it was measured to be worth. `tradefloor scenario
+targets` lists every target and what it actually reaches.
+
 ## How real it is
 
 `tf.facts.measure()` scores fourteen statistics against real-market bands. The
@@ -124,7 +158,7 @@ eng = tf.Engine(seed=42, universe=u, model="pt-v10")
 
 ## Examples
 
-Ten [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples) in reading order, run by the test suite:
+Eleven [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples) in reading order, run by the test suite:
 
 | | |
 |---|---|
@@ -138,6 +172,8 @@ Ten [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples)
 | [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It runs in about five seconds |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
 | [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit |
+| [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
+| [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
 
 ## More
 

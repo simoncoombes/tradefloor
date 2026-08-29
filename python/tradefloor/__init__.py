@@ -37,6 +37,12 @@ from .manifest import RunManifest
 from . import spec
 from .spec import SPEC_VERSION, StrategySpec
 from .scenario import Scenario, run_scenario
+from . import interventions
+from .interventions import (
+    Firing, Intervention, ScenarioValidationError, TARGETS,
+    UNSUPPORTED as UNSUPPORTED_TARGETS,
+)
+from . import yaml_subset
 from .tca import Execution
 from .baselines import capture_ratio, reference_agents
 from .ranking import AgentRecord, Ranking, rank
@@ -89,6 +95,8 @@ __all__ = [
     "rank", "Ranking", "AgentRecord",
     "spec", "StrategySpec", "SPEC_VERSION",
     "Scenario", "run_scenario", "facts", "loss", "Checkpoint", "branch", "sweep",
+    "Intervention", "Firing", "ScenarioValidationError", "interventions",
+    "TARGETS", "UNSUPPORTED_TARGETS", "yaml_subset",
     "manifest", "RunManifest",
     "apply_mispricing", "characteristic_root_moduli", "check_rate",
     "crowd_adjusted_root_moduli", "fair_value", "impulse_response",

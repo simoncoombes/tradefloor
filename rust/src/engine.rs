@@ -196,6 +196,17 @@ pub struct DayAdvanceOutcome {
     pub draws_consumed: usize,
 }
 
+/// Cloneable, and that is a correctness property rather than a convenience.
+///
+/// An in-memory fork is `self.clone()`. The alternative -- rebuilding a fresh
+/// engine from a hand-written list of fields to copy -- was the mechanism, and
+/// the list was incomplete five separate times: the per-day attribution
+/// accumulators, the market-open flag, the market factor's variance, the
+/// common log-volume state and the day counter were each added after a fork
+/// diverged from the parent it was supposed to be a copy of. A derived clone
+/// cannot omit a field, because a field added to this struct is copied
+/// without anyone remembering to.
+#[derive(Clone)]
 pub struct Engine {
     market_rng: GameRng,
     economy_rng: GameRng,
@@ -359,6 +370,47 @@ impl Engine {
     /// Put the remembered stress back. See [`Engine::universe_stress`].
     pub fn set_universe_stress(&mut self, stress: f64) {
         self.universe_stress = stress;
+    }
+
+    /// The per-name volume states, for checkpoints and forks.
+    ///
+    /// One AR(1) per company, walked at every tick. Inert under every preset
+    /// through pt-v15 (`volume_idio_sigma` is 0.0), which is exactly the
+    /// position [`Engine::volume_state`] was in before pt-v10 turned it on
+    /// and a restored engine started trading different volume. Carried now,
+    /// while carrying it is free.
+    pub fn volume_idio(&self) -> &[f64] {
+        &self.volume_idio
+    }
+
+    /// Put the per-name volume states back. See [`Engine::volume_idio`].
+    pub fn set_volume_idio(&mut self, values: &[f64]) -> Result<(), String> {
+        if values.len() != self.volume_idio.len() {
+            return Err(format!(
+                "expected {} per-name volume states for {} companies, got {}",
+                self.volume_idio.len(),
+                self.companies.len(),
+                values.len()
+            ));
+        }
+        self.volume_idio.copy_from_slice(values);
+        Ok(())
+    }
+
+    /// The day's endogenous news, for checkpoints and forks.
+    ///
+    /// Generated once in `open_market` and read by every tick of that day, so
+    /// it is per-DAY state and not a per-tick input. A fork taken mid-day
+    /// without it runs the rest of the day with the news missing and prices
+    /// differently from the engine it forked from -- which is what happened,
+    /// on the shipped default preset, until this was carried.
+    pub fn session_news(&self) -> &[NewsEvent] {
+        &self.session_news
+    }
+
+    /// Put the day's endogenous news back. See [`Engine::session_news`].
+    pub fn set_session_news(&mut self, news: Vec<NewsEvent>) {
+        self.session_news = news;
     }
 
     /// The preset an engine gets when the caller names none.

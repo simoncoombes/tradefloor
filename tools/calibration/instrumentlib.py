@@ -257,6 +257,24 @@ PARAM_SPECS: dict[str, dict] = {
     "momentum_theta":           {"kind": "abs", "step_unit": 0.1},
     "market_vol_alpha":         {"kind": "abs", "step_unit": 0.1},
     "market_vol_beta":          {"kind": "abs", "step_unit": 0.1},
+    # The market factor's GJR leverage. The same quantity as
+    # `garch_gamma` one level up, so the same spec: a bounded share
+    # measured in absolute deviation. It shipped without one, which
+    # made every guard that walks the settable surface fail and put
+    # the parameter out of reach of any search.
+    # `hard_range` as well as a step, which `garch_gamma` does not need
+    # because it ships non-zero: a parameter shipped at 0.0 has no
+    # multiplicative box, so the range has to be stated.
+    #
+    # 2.0 is the parameter's own domain boundary, not a taste: at
+    # gamma = 2 the leverage term alone consumes the whole persistence
+    # budget and alpha + beta + gamma/2 reaches 1 with both other terms
+    # at zero. What actually binds is the stationarity check below, and
+    # the transformed box tops out at 1.896 -- so a ceiling of 1.0,
+    # which is what this said first, would have rejected planned vectors
+    # for leaving a range narrower than the sampler.
+    "market_vol_gamma":         {"kind": "abs", "step_unit": 0.1,
+                                 "hard_range": (0.0, 2.0)},
     "market_vol_vix_coupling":  {"kind": "abs", "step_unit": 0.1,
                                  "hard_range": (0.0, 1.0)},
     # The slow variance component (pt-v4). All three ship at 0.0, so the
@@ -550,11 +568,20 @@ def feasibility_violation(vector: dict[str, float],
         return "garch alpha/beta/gamma must be non-negative"
     if a + b + g / 2.0 >= 1.0:
         return f"GJR stationarity: alpha+beta+gamma/2 = {a + b + g / 2.0:.4f} >= 1"
+    # The market factor carries the same GJR asymmetry the per-name
+    # process does, so it carries the same stationarity condition:
+    # alpha + beta + gamma/2 < 1, not alpha + beta < 1. The gamma term
+    # was missing here, and at the shipped market-vol persistence of
+    # 0.989 there is under 0.011 of headroom, so a survey that set the
+    # dial would have planned a non-stationary factor variance and this
+    # gate would have passed it.
     ma, mb = val("market_vol_alpha"), val("market_vol_beta")
-    if min(ma, mb) < 0:
-        return "market_vol alpha/beta must be non-negative"
-    if ma + mb >= 1.0:
-        return f"factor-variance stationarity: alpha+beta = {ma + mb:.4f} >= 1"
+    mg = val("market_vol_gamma")
+    if min(ma, mb, mg) < 0:
+        return "market_vol alpha/beta/gamma must be non-negative"
+    if ma + mb + mg / 2.0 >= 1.0:
+        return ("factor-variance GJR stationarity: alpha+beta+gamma/2 = "
+                f"{ma + mb + mg / 2.0:.4f} >= 1")
     if not 0.0 <= val("momentum_theta") < 1.0:
         return "momentum_theta must lie in [0, 1)"
     for name in ("market_factor_sigma", "sector_factor_sigma",
