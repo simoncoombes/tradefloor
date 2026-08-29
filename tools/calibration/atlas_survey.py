@@ -390,9 +390,19 @@ def decay_slope(panel_medians: dict[str, float], days: int) -> float | None:
     return sum((x - mx) * (y - my) for x, y in pts) / den
 
 
-#: The five raw parameters replaced by (persistence, share) axes.
+#: The six raw parameters replaced by (persistence, share) axes.
+#:
+#: `market_vol_gamma` joined them because a raw box around it cannot be
+#: sampled. Its stationarity condition is alpha + beta + gamma/2 < 1 and
+#: the shipped market-vol persistence is 0.98906, so at the ship point
+#: the whole feasible range of gamma is under 0.022 -- any honest raw
+#: range would be rejected by the stationarity gate almost everywhere.
+#: Under the reparameterisation the dial trades against persistence
+#: instead, which is both samplable and the form the R&D actually ran
+#: it in (the "swap": alpha down, alpha + gamma/2 preserved).
 REPARAMETERISED = ("garch_alpha", "garch_beta", "garch_gamma",
-                   "market_vol_alpha", "market_vol_beta")
+                   "market_vol_alpha", "market_vol_beta",
+                   "market_vol_gamma")
 
 #: The replacement axes. Ships (pt-v3): garch persistence 0.8364 with
 #: alpha fraction 0.0711 and gamma/2 fraction 0.1095; market-vol
@@ -407,6 +417,19 @@ TRANSFORMED_AXES = (
     atlas.Axis("garch_gamma_frac", 0.0, 0.45),
     atlas.Axis("market_vol_persistence", 0.25, 0.998),
     atlas.Axis("market_vol_alpha_frac", 0.05, 0.95),
+    # gamma/2 as a share of what alpha LEAVES, not of persistence -- the
+    # one difference from `garch_gamma_frac`, and it is forced. The garch
+    # alpha share stops at 0.50 so alpha + gamma there can never exceed
+    # 0.95 of persistence; this one runs to 0.95 on its own, so a share
+    # of persistence would put beta = p(1 - ms - mg) below zero across a
+    # fifth of the box. Nesting the share keeps every point non-negative
+    # and summing to p exactly without narrowing an axis that was fine.
+    #
+    # Whole domain, because both ends mean something: 0.0 is the
+    # symmetric factor every preset ships, and 1.0 puts the entire
+    # non-alpha budget in the leverage term (beta exactly zero), which is
+    # a boundary worth sampling rather than an arbitrary cap.
+    atlas.Axis("market_vol_gamma_frac", 0.0, 1.0),
 )
 
 
@@ -415,8 +438,17 @@ def vector_to_params(vector: dict[str, float]) -> dict[str, float]:
 
     garch_alpha = frac_a * p; garch_gamma = 2 * frac_g * p;
     garch_beta = p * (1 - frac_a - frac_g), so alpha + beta + gamma/2 = p
-    exactly. Same shape for the market-vol pair. Pure, so a survey row is
-    reconstructible from its parameters without this process's state.
+    exactly.
+
+    The market-vol triple splits the same budget in two steps rather than
+    three shares of one: alpha takes `market_vol_alpha_frac` of
+    persistence, and gamma/2 takes `market_vol_gamma_frac` of what is
+    left. It sums to p exactly the same way, and it stays non-negative
+    over the whole box where three shares of one budget would not, because
+    this alpha share runs to 0.95 rather than garch's 0.50.
+
+    Pure, so a survey row is reconstructible from its parameters without
+    this process's state.
     """
     p = dict(vector)
     pg = p.pop("garch_persistence")
@@ -427,8 +459,11 @@ def vector_to_params(vector: dict[str, float]) -> dict[str, float]:
     p["garch_beta"] = pg * (1.0 - af - gf)
     mp = p.pop("market_vol_persistence")
     ms = p.pop("market_vol_alpha_frac")
+    mg = p.pop("market_vol_gamma_frac")
+    rest = mp * (1.0 - ms)
     p["market_vol_alpha"] = ms * mp
-    p["market_vol_beta"] = (1.0 - ms) * mp
+    p["market_vol_gamma"] = 2.0 * mg * rest
+    p["market_vol_beta"] = (1.0 - mg) * rest
     return p
 
 
@@ -442,17 +477,34 @@ def params_to_vector(params: dict[str, float]) -> dict[str, float]:
     v["garch_persistence"] = pg
     v["garch_alpha_frac"] = a / pg
     v["garch_gamma_frac"] = (g / 2.0) / pg
-    ma, mb = float(params["market_vol_alpha"]), float(params["market_vol_beta"])
-    v["market_vol_persistence"] = ma + mb
-    v["market_vol_alpha_frac"] = ma / (ma + mb)
+    ma, mb, mg = (float(params[k]) for k in
+                  ("market_vol_alpha", "market_vol_beta", "market_vol_gamma"))
+    mpers = ma + mb + mg / 2.0
+    v["market_vol_persistence"] = mpers
+    v["market_vol_alpha_frac"] = ma / mpers
+    # The nested share: what gamma took out of what alpha left. `rest` is
+    # zero only if alpha took the entire persistence, in which case beta
+    # and gamma are both zero and the share is undefined rather than
+    # wrong -- 0.0 is the reading that round-trips.
+    rest = mpers - ma
+    v["market_vol_gamma_frac"] = (mg / 2.0) / rest if rest > 0.0 else 0.0
     return v
 
 
 def survey_axes() -> list[atlas.Axis]:
-    """The 54 survey axes, deterministic order, every range accounted for."""
+    """One axis per settable parameter, deterministic order, every range
+    accounted for. The count is not written down here because it moved
+    every time the model grew and the number in this line did not."""
     settable = tradefloor.ModelParams.settable()
     ship = tradefloor.ModelParams.from_preset(BASE_PRESET).to_dict()
-    zeros = {n for n in settable if float(ship[n]) == 0.0}
+    # A reparameterised parameter never gets a raw box -- it is replaced
+    # by transformed axes below -- so demanding a range for one is asking
+    # for a number that would be discarded. This mattered the moment a
+    # zero-shipped parameter joined REPARAMETERISED: `market_vol_gamma`
+    # ships at 0.0 and is reparameterised, and the guard refused every
+    # survey until it was given a range it could not have used.
+    zeros = {n for n in settable
+             if float(ship[n]) == 0.0 and n not in REPARAMETERISED}
     # These guards are raises, not asserts, on purpose: they are the same
     # registry-drift class this project added tests for AFTER a missing
     # PARAM_SPECS entry killed a 96-core search, and an assert vanishes
@@ -484,6 +536,20 @@ def survey_axes() -> list[atlas.Axis]:
         raise RuntimeError(
             "stale ZERO_SHIPPED_RANGES entries, zero on neither pt-v3 nor "
             f"the shipped default: {sorted(stale)}")
+    # The other side of the exemption just granted. A reparameterised
+    # parameter is excused a raw range because transformed axes cover it;
+    # if those axes stop covering it, the exemption becomes a hole and the
+    # parameter leaves the survey with nothing said. `vector_to_params` is
+    # the authority, since it is what actually turns axes into parameters.
+    probe = {axis.name: axis.low for axis in TRANSFORMED_AXES}
+    covered = set(vector_to_params(probe))
+    orphaned = set(REPARAMETERISED) - covered
+    if orphaned:
+        raise RuntimeError(
+            "these parameters are reparameterised, so they have no raw "
+            f"range, and no transformed axis produces them: {sorted(orphaned)}. "
+            "They would be surveyed at neither the base value nor anything "
+            "else.")
 
     raw = sorted(n for n in settable if n not in REPARAMETERISED)
     ranges: dict[str, tuple[float, float]] = {}
