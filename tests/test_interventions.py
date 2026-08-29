@@ -27,6 +27,7 @@ guarantees, then the CLI.
 """
 
 import json
+import pathlib
 import struct
 import subprocess
 import sys
@@ -39,7 +40,7 @@ from tradefloor.interventions import (
 )
 from tradefloor.scenario import Scenario
 
-REPO = __import__("pathlib").Path(__file__).resolve().parent.parent
+REPO = pathlib.Path(__file__).resolve().parent.parent
 SCENARIOS = REPO / "scenarios"
 
 UNIVERSE = tf.Universe.random(10, seed=20260829)
@@ -118,6 +119,8 @@ def test_a_one_day_ramp_is_an_impulse_by_construction():
     (dict(target="macro.policy_rate", operation="add", value=2.0), "FRACTIONS"),
     (dict(target="macro.cycle", operation="add", value=1.0), "NAME"),
     (dict(target="macro.cycle", operation="set", value="slump"), "cycle phase"),
+    (dict(target="macro.cycle", operation="set", value="contraction",
+          duration=3, shape="ramp"), "cannot ramp"),
     (dict(target="macro.vix"), "needs a value"),
 ])
 def test_a_bad_intervention_is_refused_by_name(kwargs, fragment):
@@ -140,6 +143,42 @@ def test_every_unsupported_name_explains_itself_and_is_not_registered():
         with pytest.raises(ScenarioValidationError) as exc:
             Intervention(name, value=1.0)
         assert reason.split(".")[0][:24] in str(exc.value)
+
+
+def test_the_registry_docstring_counts_the_registry():
+    """A count in prose is a second place to remember.
+
+    This exact defect was already live one module away: `test_mcp.py`
+    asserted the pinnable macro field list was seven, and the assertion
+    outlived the fact. A number written in a docstring cannot be asserted
+    against itself, so it is asserted against the thing it describes.
+    """
+    import re
+
+    from tradefloor import interventions
+
+    words = {"ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
+             "fourteen": 14, "fifteen": 15}
+    source = pathlib.Path(interventions.__file__).read_text(encoding="utf-8")
+    claims = re.findall(r"of the (\w+) targets|list of (\w+) names", source)
+    found = [w for pair in claims for w in pair if w]
+    assert found, "the registry docstring no longer states a count"
+    for word in found:
+        assert words.get(word) == len(TARGETS), (word, len(TARGETS))
+
+
+def test_only_a_numeric_target_can_ramp():
+    """A ramp interpolates, and one target's value is a NAME.
+
+    `macro.cycle` set to "contraction" with shape="ramp" used to raise a bare
+    TypeError from inside the run -- `unsupported operand type(s) for -:
+    'str' and 'str'` -- on whichever day the ramp reached its second step.
+    """
+    numeric = [name for name, t in TARGETS.items() if t.numeric]
+    assert len(numeric) == len(TARGETS) - 1
+    for name in numeric:
+        Intervention(name, operation="multiply", value=1.5, at=1, duration=3,
+                     shape="ramp")
 
 
 def test_every_registered_target_reads_and_writes_the_engine():
@@ -412,6 +451,43 @@ def test_compare_differences_the_scenario_against_itself_without_it():
     assert result["scenario_fingerprint"] == scenario.fingerprint
     assert result["interventions"], "the firing trail should reach the result"
     assert result["median_pct"] < 0
+
+
+def test_the_divergence_trace_lands_on_the_day_the_shock_fires():
+    """The check that a scenario did not leak before it said it did.
+
+    The baseline is the same world without the interventions, so the two
+    markets are bit-identical until the first one fires. `first_divergence`
+    earlier than `at` would mean the scenario reached the market early;
+    later would mean it fired into a market that did not notice.
+    """
+    for at in (2, 7, 13):
+        scenario = Scenario(name="rates").shock(
+            "macro.corporate_yield", operation="add", value=0.02, at=at,
+            shape="permanent")
+        result = tf.scenario.compare(scenario, seed=SEED,
+                                     universe=list(UNIVERSE), days=20,
+                                     ticks_per_day=TICKS, trace=True)
+        assert result["first_divergence"] == at
+
+
+def test_tracing_does_not_change_the_comparison():
+    """Two day loops, and the trace is only worth having if they are one.
+
+    `_run_in_lockstep` is a second copy of `run_scenario`'s loop, which is
+    exactly the kind of duplication that drifts. If it ever applies the
+    scenario at a different point, or records on a different day, this fails.
+    """
+    scenario = Scenario.from_yaml(YAML)
+    args = dict(seed=SEED, universe=list(UNIVERSE), days=25,
+                ticks_per_day=TICKS)
+    plain = tf.scenario.compare(scenario, **args)
+    traced = tf.scenario.compare(scenario, trace=True, **args)
+    assert plain["first_divergence"] is None
+    assert traced["first_divergence"] is not None
+    for key in plain:
+        if key != "first_divergence":
+            assert plain[key] == traced[key], key
 
 
 # ---------------------------------------------------------------------------

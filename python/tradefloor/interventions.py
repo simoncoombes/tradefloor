@@ -135,16 +135,24 @@ class Target:
     be read without the reader having to know the engine.
     """
 
-    __slots__ = ("name", "units", "note", "_read", "_write", "_check", "_format")
+    __slots__ = ("name", "units", "note", "numeric", "_read", "_write",
+                 "_check", "_format")
 
     def __init__(self, name: str, *, units: str, note: str,
                  read: Callable[[Engine], Any],
                  write: Callable[[Engine, Any], None],
                  check: Callable[[str, Any], None],
-                 format: Callable[[float], str]) -> None:
+                 format: Callable[[float], str],
+                 numeric: bool = True) -> None:
         self.name = name
         self.units = units
         self.note = note
+        # False for a target whose value is a NAME. There is one, and it is
+        # what makes this flag worth carrying: a `ramp` interpolates between
+        # two values, and interpolating between two cycle phases raised a
+        # bare TypeError from inside the run rather than being refused where
+        # it was written.
+        self.numeric = numeric
         self._read = read
         self._write = write
         self._check = check
@@ -303,10 +311,11 @@ def _liquidity_check(operation: str, value: Any) -> None:
 
 def _make_macro_target(name: str, field: str, *, units: str, note: str,
                        check: Callable[[str, Any], None],
-                       format: Callable[[float], str]) -> Target:
+                       format: Callable[[float], str],
+                       numeric: bool = True) -> Target:
     read, write = _macro(field)
     return Target(name, units=units, note=note, read=read, write=write,
-                  check=check, format=format)
+                  check=check, format=format, numeric=numeric)
 
 
 #: Every intervention target this build supports, and nothing else.
@@ -323,7 +332,7 @@ def _make_macro_target(name: str, field: str, *, units: str, note: str,
 #: 39 comparisons behind these numbers came back with a market draw delta of
 #: zero, so the difference is the intervention and nothing else.
 #:
-#: Read them before believing a scenario. Four of the eleven targets are
+#: Read them before believing a scenario. Four of the twelve targets are
 #: honest mechanisms with effects too small to see over a hundred days, and
 #: one of them is measurably worth exactly nothing. Knowing which is which is
 #: the difference between an experiment and a number.
@@ -402,7 +411,7 @@ _register(_make_macro_target(
         "recession probability at the next monthly step. `set` only: a "
         "phase is a name. Measured, set to contraction: -3.04%."
     ),
-    check=_cycle_check, format=str,
+    check=_cycle_check, format=str, numeric=False,
 ))
 
 _register(Target(
@@ -523,7 +532,7 @@ _register(_make_macro_target(
 #: get different answers.
 UNSUPPORTED: dict[str, str] = {
     "market.volatility": (
-        "there is no volatility level to set: this model's volatility is "
+        "there is no volatility level to set. This model's volatility is "
         "produced by a GARCH process whose reversion target is driven by "
         "VIX. Use macro.vix, which is the regime lever and moves realised "
         "volatility, the quoted spread and cross-sectional correlation "
@@ -549,7 +558,11 @@ UNSUPPORTED: dict[str, str] = {
         "did not trade. Thin the book with market.liquidity and impact rises "
         "because there is less to trade against"
     ),
-    "macro.interest": "did you mean macro.policy_rate or macro.corporate_yield",
+    "macro.interest": (
+        "there is no single interest rate here. There is the central bank's "
+        "macro.policy_rate, and there is the macro.corporate_yield equities "
+        "are actually discounted off, and moving one is not moving the other"
+    ),
     "sector.energy.demand": (
         "there is no per-sector economic state. Sectors carry a volatility "
         "multiplier and a correlation loading, not demand, earnings or input "
@@ -577,7 +590,7 @@ def suggest(name: str) -> str:
     target is a typo and gets the spelling. A name in :data:`UNSUPPORTED` is
     not a typo at all -- the reader has a mechanism in mind that this model
     does not have -- and gets the reason and the nearest real lever. Anything
-    else gets the whole registry, because a list of eleven names is shorter
+    else gets the whole registry, because a list of twelve names is shorter
     than a conversation.
     """
     if name in UNSUPPORTED:
@@ -663,6 +676,12 @@ class Intervention:
             )
 
         shape = _resolve_shape(shape, duration, self.target)
+        if shape == "ramp" and not self._target.numeric:
+            raise ScenarioValidationError(
+                f"{self.target} cannot ramp: its value is a "
+                f"{self._target.units}, and a ramp interpolates between two "
+                f"numbers. Use `impulse`, `hold` or `permanent`."
+            )
         if shape in _NEEDS_DURATION:
             duration = _whole("duration", duration)
             if duration < 1:

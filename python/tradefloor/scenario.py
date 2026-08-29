@@ -492,8 +492,7 @@ class Scenario:
     """
 
     __slots__ = ("_drivers", "_label", "_description", "_shocks",
-                 "_transmission", "_source", "_log", "_anchors", "_engine",
-                 "_day")
+                 "_transmission", "_source", "_log", "_anchors", "_day")
 
     def __init__(self, label: str = "", *, name: str | None = None,
                  description: str = "",
@@ -518,7 +517,6 @@ class Scenario:
         # sees a different engine or a restarted clock.
         self._log: list[Firing] = []
         self._anchors: dict[int, tuple[Any, Any]] = {}
-        self._engine: Engine | None = None
         self._day = -1
 
         for given, role in ((interventions, None), (shocks, "shock"),
@@ -980,8 +978,10 @@ class Scenario:
         checkpoint resume is a NEW engine continuing the SAME run. Days 0-59
         on the original and 60-119 on the engine `Checkpoint.resume()`
         returns is one experiment, and a hold that began on day 50 has to
-        survive the join. That is the §34 guarantee, and keying the anchor on
-        the engine would break it.
+        survive the join. Keying the anchor on the engine object would break
+        exactly that, and a checkpoint that could not carry a pending
+        intervention would make forking useless for the scenarios it is most
+        wanted for.
 
         The cost of that choice, stated plainly: one scenario object driving
         two runs AT ONCE shares one clock between them. Alternating
@@ -994,7 +994,6 @@ class Scenario:
         if day <= self._day:
             self._log = []
             self._anchors = {}
-        self._engine = engine
         self._day = day
 
         pins = self.at(day)
@@ -1576,6 +1575,47 @@ def run_scenario(
     return engine
 
 
+def _run_in_lockstep(
+    left: Scenario, right: Scenario, *, seed: int,
+    universe: Sequence[Instrument], days: int, macro: Macro | None = None,
+    ticks_per_day: int = 390, start: tuple[int, int, int] = (9, 30, 3),
+    record: bool = False, model: str | ModelParams | None = None,
+) -> tuple[Engine, Engine, int | None]:
+    """Two worlds, a day at a time, and the first day they part.
+
+    The same day loop as :func:`run_scenario`, run twice in step so the
+    digests can be compared as they go. Every worry a second loop would
+    raise -- that it might apply the scenario at a different point, or record
+    on a different day -- is why this is the only other place that loop is
+    written, and why the two are checked against each other in
+    ``tests/test_scenario.py``.
+
+    The day returned is the first on which the two markets differ at all,
+    which for an intervention scenario should be the day its first
+    intervention fires. Earlier would mean the scenario reached the market
+    before it said it did; later would mean it fired into a market that did
+    not notice.
+    """
+    hour, minute, day_of_week = start
+    engines = [Engine(seed=seed, universe=universe, macro_state=macro,
+                      model=model) for _ in range(2)]
+    from .manifest import market_digest
+
+    first_divergence: int | None = None
+    for day in range(days):
+        for scenario, engine in zip((left, right), engines):
+            scenario.apply(engine, day)
+            engine.open_market()
+            engine.run_session(hour, minute, day_of_week, ticks_per_day)
+            if record:
+                engine.record(day)
+            engine.close_market()
+        if first_divergence is None and \
+                market_digest(engines[0]) != market_digest(engines[1]):
+            first_divergence = day
+    return engines[0], engines[1], first_divergence
+
+
 def _path_summary(scenario: Scenario, days: int) -> str:
     """The day-zero pins, for an error message that names the actual values."""
     pins = scenario.at(0)
@@ -1666,6 +1706,7 @@ def compare(
     universe: Sequence[Instrument],
     days: int,
     baseline: Scenario | None = None,
+    trace: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Run the same seed under two macro paths and difference them.
@@ -1693,6 +1734,14 @@ def compare(
     differenced against a baseline under a different coefficient set would
     measure the model gap dressed up as the scenario's effect. The result
     records ``model_fingerprint``.
+
+    ``trace=True`` runs the two worlds a day at a time and reports
+    ``first_divergence``: the first day on which the two markets differ at
+    all. For an intervention scenario that is a CHECK and not a curiosity,
+    because it should equal the day the first intervention fires. Earlier
+    means the scenario reached the market before it said it did; later means
+    it fired into a market that did not notice. It costs a market digest per
+    day per world, which is why it is off by default rather than free.
     """
     import struct
 
@@ -1726,9 +1775,15 @@ def compare(
         return run_scenario(which, seed=seed, universe=universe, days=days,
                             **kwargs)
 
-    shocked = run(scenario)
+    if trace:
+        shocked, flat, first_divergence = _run_in_lockstep(
+            scenario, baseline, seed=seed, universe=universe, days=days,
+            **kwargs)
+    else:
+        first_divergence = None
+        shocked = run(scenario)
+        flat = run(baseline)
     firings = scenario.firing_table()
-    flat = run(baseline)
     # `run` on the baseline may reset the scenario's own trail if the two
     # objects are the same one, which an explicit baseline can make them.
     # Hold the shocked world's trail rather than reading it back afterwards.
@@ -1799,6 +1854,10 @@ def compare(
         "draws": shocked.draws_consumed,
         "draw_delta": delta,
         "exact": delta == 0,
+        # None unless `trace=True`. The first day the two markets differ at
+        # all, which for an intervention scenario is a check rather than a
+        # curiosity: it should equal the day the first intervention fires.
+        "first_divergence": first_divergence,
         "tickers": list(shocked.tickers),
         "move_pct": moves,
         "median_pct": median,
