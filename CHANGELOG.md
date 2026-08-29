@@ -28,7 +28,7 @@ for day in range(80):
 ```
 
 There is no `start_war()` and there will not be one. A scenario names
-targets from an explicit registry of eleven fields the engine actually
+targets from an explicit registry of twelve things the engine actually
 reads, applies one of three operations (`set`, `add`, `multiply`) on one of
 four shapes (`impulse`, `hold`, `ramp`, `permanent`), and keeps its
 EXOGENOUS SHOCKS apart from its ASSUMED TRANSMISSION -- because this library
@@ -36,7 +36,7 @@ cannot tell you that a 40% oil shock raises inflation 1.5 points, only run a
 market in which somebody assumed it did.
 
 Every registered target carries a MEASURED note saying what it is worth.
-Four of the eleven are honest mechanisms with effects too small to see over a
+Four of the twelve are honest mechanisms with effects too small to see over a
 hundred days, and `macro.fear_greed` measures at exactly 0.00% on every
 instrument: nothing in the market reads it. Knowing which is which is the
 difference between an experiment and a number.
