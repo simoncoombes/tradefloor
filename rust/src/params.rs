@@ -1205,6 +1205,9 @@ pub const PT_V14: ModelParams = ModelParams::pt_v14();
 /// pt-v14 with the slow variance component switched on and the credit
 /// floor enforced -- see [`ModelParams::pt_v15`].
 pub const PT_V15: ModelParams = ModelParams::pt_v15();
+/// pt-v15 with the QE valuation channel silenced -- see
+/// [`ModelParams::pt_v16`].
+pub const PT_V16: ModelParams = ModelParams::pt_v16();
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -2155,6 +2158,43 @@ impl ModelParams {
         p
     }
 
+    /// pt-v15 with one number: `qe_pe_gain` 0.0. The QE valuation channel
+    /// is silenced.
+    ///
+    /// The channel multiplies the target P/E by `1 + qe_pe_boost`, and its
+    /// input is not measured quantitative easing: the driven test derives
+    /// it from the S&P against its own 200-day EMA, a series that
+    /// correlates -0.485 with the Fed's actual securities purchases over
+    /// the same window -- procyclical where QE is countercyclical. Fed the
+    /// measured series instead, the linear formula overshoots (the 2020
+    /// peak reads 1.29 on a scale built for 0.10) and the driven window
+    /// gets WORSE. The channel subtracts realism whichever input it is
+    /// given, so this preset gives it none.
+    ///
+    /// Measured over thirteen thirty-seed blocks against pt-v15, paired
+    /// within one run: BIT-IDENTICAL on every certified panel and crisis
+    /// statistic -- the endogenous central-bank QE trigger (funds rate at
+    /// 0.25 inside a contraction) never fires at the panel's horizons --
+    /// and the driven noise ratio falls 1.4633 to 1.2384 against a real
+    /// 1.00, the largest driven improvement any measured change has
+    /// produced. A gain of 0.5 lands between, confirming the direction.
+    ///
+    /// What this deliberately changes: a scenario's `qe_pe_boost` input no
+    /// longer reaches fair values, so the driven gate now tests the
+    /// simulator without its QE channel. The honest end state remains a
+    /// reformulated channel -- concave, or reading the stock of holdings
+    /// rather than the flow -- calibrated against the measured series; this
+    /// preset removes a harmful approximation rather than modelling the
+    /// truth.
+    ///
+    /// NOT the default. pt-v14 holds that and the envelope certifies
+    /// pt-v14.
+    pub const fn pt_v16() -> ModelParams {
+        let mut p = ModelParams::pt_v15();
+        p.qe_pe_gain = 0.0;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22 (CALIBRATION-PTV2.md); `"pt-v3"` is
@@ -2184,6 +2224,7 @@ impl ModelParams {
             "pt-v13" => Some(PT_V13),
             "pt-v14" => Some(PT_V14),
             "pt-v15" => Some(PT_V15),
+            "pt-v16" => Some(PT_V16),
             _ => None,
         }
     }
@@ -2191,7 +2232,8 @@ impl ModelParams {
     /// Names of the shipped presets, for error messages.
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
-          "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15"]
+          "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
+          "pt-v16"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -2875,6 +2917,21 @@ mod tests {
         let err = PT_V1.with_override("mispricing_phi", 0.9).unwrap_err();
         assert!(err.contains("derived"), "{err}");
         assert!(PT_V1.with_override("garch_alpha", f64::NAN).is_err());
+    }
+
+    /// pt-v16's qualification is asym1's `qe0` cell: thirteen certified
+    /// blocks measured on `pt-v15 + {qe_pe_gain: 0.0}` as an override. The
+    /// frozen preset inherits those measurements only if it is that vector
+    /// to the bit, which this asserts. If it ever fails, the preset has
+    /// drifted from the evidence that qualified it.
+    #[test]
+    fn pt_v16_is_the_measured_qe0_cell_to_the_bit() {
+        let measured = ModelParams::preset("pt-v15")
+            .unwrap()
+            .with_override("qe_pe_gain", 0.0)
+            .expect("qe_pe_gain is settable");
+        assert_eq!(crate::params::PT_V16.digest(), measured.digest());
+        assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");
     }
 
     #[test]

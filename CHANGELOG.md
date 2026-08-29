@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+**pt-v16 registered: the QE valuation channel silenced.** pt-v15 plus one
+number, `qe_pe_gain` 0.0. The channel's driven-test input is a price-trend
+proxy that correlates -0.485 with measured Fed purchases, and the measured
+series overshoots the linear formula; the channel subtracts realism with
+either input, so pt-v16 gives it none. Qualification: over thirteen
+thirty-seed blocks against pt-v15 the preset is bit-identical on every
+certified panel and crisis statistic (the endogenous QE trigger never
+fires at panel horizons) and the driven noise ratio falls 1.4633 to
+1.2384 against a real 1.00, the largest driven improvement measured. A
+scenario's `qe_pe_boost` no longer reaches fair values under this preset.
+Selectable by name; not the default, which remains pt-v14.
+
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
 give each agent its own copy of the market, which is what makes the
 comparison clean. The next step is one book with several agents in it,
