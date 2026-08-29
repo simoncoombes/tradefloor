@@ -156,6 +156,10 @@ PERTURBATIONS = [
     ("garch_floor_multiple", 0.99, True),
     ("market_vol_alpha", 0.2, True),
     ("market_vol_beta", 0.7, True),
+    # The market factor's GJR leverage. Ships at 0.0 on every preset, so
+    # the perturbation has to be TO a non-zero value; measured to move the
+    # probe at 0.05 and at every larger value tried, and to move no draw.
+    ("market_vol_gamma", 0.3, True),
     ("market_vol_ceiling_multiple", 0.5, True),
     ("market_vol_floor_multiple", 2.0, True),
     ("market_vol_vix_coupling", 0.0, True),
@@ -298,8 +302,15 @@ PERTURBATIONS = [
 
 
 def test_the_perturbation_table_covers_the_whole_settable_surface():
+    # Both sides sorted. `settable()` returns the core's DECLARATION order,
+    # which was alphabetical by coincidence until `market_vol_gamma` was
+    # declared beside its siblings rather than at its letter. Comparing a
+    # sorted table against it then asked the table to match an order nothing
+    # maintains, and reported the mismatch as a MISSING PARAMETER -- a
+    # different and much more alarming fact than the one that was true.
+    # This test is about coverage, so it compares sets in a stable order.
     assert sorted(name for name, _, _ in PERTURBATIONS) == \
-        tradefloor.ModelParams.settable()
+        sorted(tradefloor.ModelParams.settable())
 
 
 @pytest.mark.parametrize("name,value,moves", PERTURBATIONS,

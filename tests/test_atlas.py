@@ -711,20 +711,103 @@ def _driver():
     return atlas_survey
 
 
-def test_the_reparameterisation_round_trips_the_preset_exactly():
+#: Every preset a survey can be based on. Named rather than discovered so a
+#: new one has to be added deliberately.
+ROUND_TRIP_PRESETS = ("pt-v1", "pt-v3", "pt-v4", "pt-v6", "pt-v8", "pt-v10",
+                      "pt-v12", "pt-v14", "pt-v15")
+
+
+@pytest.mark.parametrize("preset", ROUND_TRIP_PRESETS)
+def test_the_reparameterisation_round_trips_the_preset_exactly(preset):
     """The driver samples the two variance processes as (persistence,
     share) so every planned vector is stationary by construction. That is
-    only sound if the translation is exact: pt-v3 through the round trip
+    only sound if the translation is exact: a preset through the round trip
     must come back bit-comparable, or the map would be centred on a model
-    that is not the one shipping."""
+    that is not the one shipping.
+
+    Every shipped preset, not just the survey's default base. The market
+    factor's gamma share ships at 0.0 on all of them, which is the input its
+    inverse divides by, and one preset is a thin test of a branch that only
+    that value reaches."""
     drv = _driver()
     settable = tradefloor.ModelParams.settable()
-    ship = tradefloor.ModelParams.from_preset("pt-v3").to_dict()
+    ship = tradefloor.ModelParams.from_preset(preset).to_dict()
     params = {n: float(ship[n]) for n in settable}
     back = drv.vector_to_params(drv.params_to_vector(params))
     assert set(back) == set(params)
     for name in settable:
         assert back[name] == pytest.approx(params[name], rel=1e-12), name
+
+
+def test_every_point_in_the_transformed_box_is_a_valid_coefficient_set():
+    """The property the reparameterisation exists to buy, asserted over the
+    box rather than argued in a comment.
+
+    Sampling (persistence, share) instead of raw coefficients is worth its
+    complexity only if it means the stationarity gate never has to reject a
+    planned vector. That holds by construction, and "by construction" is a
+    claim about arithmetic that a comment cannot check.
+
+    It has already been false once. Adding the market factor's leverage share
+    as a third share of ONE budget looked symmetric with the garch triple and
+    was not: the garch alpha share stops at 0.50 where the market one runs to
+    0.95, so alpha + gamma could exceed persistence and beta went negative
+    across about a fifth of the box. Nothing failed -- the plan would have
+    carried negative coefficients into a survey.
+    """
+    import random
+
+    drv = _driver()
+    axes = {a.name: (a.low, a.high) for a in drv.TRANSFORMED_AXES}
+    rng = random.Random(20260829)
+
+    # The corners first: an interior sample can miss a face entirely, and
+    # every failure of this property so far has been at a corner.
+    import itertools
+    corners = [dict(zip(axes, combo)) for combo in
+               itertools.product(*([lo, hi] for lo, hi in axes.values()))]
+    interior = [{n: rng.uniform(lo, hi) for n, (lo, hi) in axes.items()}
+                for _ in range(2000)]
+
+    for vector in corners + interior:
+        params = drv.vector_to_params(dict(vector))
+        for prefix in ("garch", "market_vol"):
+            a = params[f"{prefix}_alpha"]
+            b = params[f"{prefix}_beta"]
+            g = params[f"{prefix}_gamma"]
+            assert min(a, b, g) >= 0.0, (
+                f"{prefix} coefficients went negative at {vector}: "
+                f"alpha={a}, beta={b}, gamma={g}")
+            assert a + b + g / 2.0 < 1.0, (
+                f"{prefix} is non-stationary at {vector}: "
+                f"alpha+beta+gamma/2 = {a + b + g / 2.0}")
+
+
+def test_the_stationarity_gate_would_pass_every_planned_vector():
+    """The same claim through the gate that actually judges a vector.
+
+    The property above is arithmetic; this is the instrument agreeing with
+    it. If they ever disagree, one of them is wrong about what the library
+    accepts, and a survey is either throwing away good points or planning
+    bad ones.
+    """
+    import random
+
+    drv = _driver()
+    lib = drv.lib
+    settable = tradefloor.ModelParams.settable()
+    ship = {n: float(tradefloor.ModelParams.from_preset(drv.BASE_PRESET)
+                     .to_dict()[n]) for n in settable}
+    axes = {a.name: (a.low, a.high) for a in drv.TRANSFORMED_AXES}
+    rng = random.Random(20260829)
+
+    for _ in range(500):
+        vector = {n: rng.uniform(lo, hi) for n, (lo, hi) in axes.items()}
+        params = drv.vector_to_params(dict(vector))
+        violation = lib.feasibility_violation(params, ship)
+        assert violation is None or "stationarity" not in violation, (
+            f"the gate rejected a planned vector as non-stationary: "
+            f"{violation} at {vector}")
 
 
 def test_the_survey_covers_every_settable_parameter():
