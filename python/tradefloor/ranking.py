@@ -426,7 +426,7 @@ def rank(
     ``model_fingerprint``, as does every scorecard under it.
 
     ```python
-    ranking = pt.rank(lambda: reference_agents(seed=3), seeds=range(12),
+    ranking = tf.rank(lambda: reference_agents(seed=3), seeds=range(12),
                       universe=u, days=10)
     print(ranking.report())
     ranking.separation("momentum", "mean_reversion")

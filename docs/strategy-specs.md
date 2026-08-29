@@ -16,8 +16,8 @@ market, then had no way to get your strategy.
 A `StrategySpec` is a strategy as data: declarative, versioned, hashable:
 
 ```python
-spec = pt.StrategySpec.momentum(lookback_days=1.0, top_k=5)
-scores = pt.evaluate({"momentum": spec}, seed=7, universe=universe, days=10)
+spec = tf.StrategySpec.momentum(lookback_days=1.0, top_k=5)
+scores = tf.evaluate({"momentum": spec}, seed=7, universe=universe, days=10)
 scores["momentum"].strategy_fingerprint    # sha256 -- cite this
 ```
 
@@ -55,15 +55,15 @@ spec is that grammar as JSON:
 `signal.kind` is one of `hold`, `random`, `momentum`, `mean_reversion`,
 `oracle`, or `blend`. Each carries only its own parameters, so a reader can
 see what the strategy knew. The named constructors default to exactly the
-shipped baselines. `pt.StrategySpec.momentum()` builds the class `Momentum()`
+shipped baselines. `tf.StrategySpec.momentum()` builds the class `Momentum()`
 is, and there is a test asserting the two score bit-identically:
 
 ```python
-pt.StrategySpec.hold()                 # BuyAndHold
-pt.StrategySpec.random(seed=0)         # RandomTrader; its seed is IN the spec
-pt.StrategySpec.momentum()             # Momentum
-pt.StrategySpec.mean_reversion()       # MeanReversion
-pt.StrategySpec.oracle()               # Oracle
+tf.StrategySpec.hold()                 # BuyAndHold
+tf.StrategySpec.random(seed=0)         # RandomTrader; its seed is IN the spec
+tf.StrategySpec.momentum()             # Momentum
+tf.StrategySpec.mean_reversion()       # MeanReversion
+tf.StrategySpec.oracle()               # Oracle
 ```
 
 `hold` and `random` take no `top_k`, because one owns the whole roster and the other
@@ -80,7 +80,7 @@ A single signal is a weak strategy, and the interesting comparisons are
 mixtures:
 
 ```python
-blend = pt.StrategySpec.blend([
+blend = tf.StrategySpec.blend([
     {"kind": "momentum",       "weight": 0.6, "lookback_days": 1.0},
     {"kind": "mean_reversion", "weight": 0.4, "lookback_days": 5.0},
 ], top_k=10)
@@ -188,8 +188,8 @@ it is the instruction for building one. `rank` takes a factory for exactly
 this reason, and a factory returning specs is the simplest correct one:
 
 ```python
-ranking = pt.rank(lambda: {"momentum": pt.StrategySpec.momentum(),
-                           "oracle": pt.StrategySpec.oracle()},
+ranking = tf.rank(lambda: {"momentum": tf.StrategySpec.momentum(),
+                           "oracle": tf.StrategySpec.oracle()},
                   seeds=range(12), universe=universe, days=10)
 ```
 

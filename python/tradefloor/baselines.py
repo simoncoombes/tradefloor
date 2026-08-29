@@ -111,7 +111,7 @@ exposure and a participation cap) and :class:`tradefloor.StrategySpec` writes it
 down as versioned, hashable JSON, so a result built on these agents can cite
 its strategy the way it already cites its seed and universe. Construct the
 spec instead of the class when the result is going anywhere other people
-will read: ``pt.StrategySpec.momentum()`` builds exactly ``Momentum()``.
+will read: ``tf.StrategySpec.momentum()`` builds exactly ``Momentum()``.
 """
 
 from __future__ import annotations

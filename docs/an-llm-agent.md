@@ -33,7 +33,7 @@ momentum                -2207       ...            -
 ```
 
 The oracle and momentum rows are measured, by the same call the example makes:
-the reference agents (`pt.reference_agents(seed=3)`) over
+the reference agents (`tf.reference_agents(seed=3)`) over
 `Universe.random(12, seed=7)`, seed 2026, 20 days, `max_leverage=2.0`. Adding
 the claude row does not move them, because `evaluate` runs each agent in its
 own copy of the market against one shared untraded baseline -- verified by
@@ -116,7 +116,7 @@ has to be all nine. The example's list held seven until 0.3.0, omitting
 `circuit_breaker` and `jump`, and a closed set narrower than the one the
 harness scores against is worse than an open one: on a day the engine
 attributes to a missing factor, the model is marked wrong for a choice it
-was never offered. `Factor` is now exactly `pt.Engine.FACTORS`, in order.
+was never offered. `Factor` is now exactly `tf.Engine.FACTORS`, in order.
 
 The call uses `messages.parse`, which validates the response against the
 schema:

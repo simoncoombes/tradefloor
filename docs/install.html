@@ -77,8 +77,8 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div class="pt-s28">
 <pre class="pt-s30">pip install tradefloor
 
-python -c "import tradefloor as pt; \
-  print(pt.__version__)"</pre>
+python -c "import tradefloor as tf; \
+  print(tf.__version__)"</pre>
 <div style="display:flex;flex-direction:column;gap:0.85rem;border:1px solid var(--line);border-radius:6px;background:var(--card);padding:1.1rem 1.2rem">
 <h3 class="pt-s4">From PyPI</h3>
 
@@ -448,7 +448,7 @@ class Component extends DCLogic {
     const t = this.state.target;
     const INSTALL = {
       py: {
-        code: 'pip install tradefloor\n\npython -c "import tradefloor as pt; \\\n  print(pt.__version__)"',
+        code: 'pip install tradefloor\n\npython -c "import tradefloor as tf; \\\n  print(tf.__version__)"',
         title: 'From PyPI',
         facts: [
           { k: 'No dependencies', v: 'The core package pulls nothing in. Read results into polars, pandas, pyarrow or duckdb if you want them.' },

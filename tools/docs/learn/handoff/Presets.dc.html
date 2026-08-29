@@ -180,11 +180,11 @@ input{font-family:inherit}
 <section style="padding:2.6rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <h2 style="font-size:1.5rem">Name it, or inherit a moving default</h2>
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">e = pt.Engine(seed=42, universe=u,
+<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">e = tf.Engine(seed=42, universe=u,
               model="pt-v14")
 
 e.model_fingerprint   # "pt-v14"
-pt.model_preset()     # the set in force
+tf.model_preset()     # the set in force
 
 # a settable change renames it
 # "custom-7f290e34"</pre>

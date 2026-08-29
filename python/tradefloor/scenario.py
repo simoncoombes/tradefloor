@@ -12,7 +12,7 @@ can be cited.
 
 ```python
 shock = Scenario.rate_shock(start=0.025, end=0.05, over=30)
-scores = pt.evaluate(agents, seed=7, universe=u, days=60, scenario=shock)
+scores = tf.evaluate(agents, seed=7, universe=u, days=60, scenario=shock)
 ```
 
 ## The trap this exists to close

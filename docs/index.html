@@ -61,11 +61,11 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,24rem) minmax(0,1fr);gap:1.6rem;align-items:stretch">
-<pre style="margin:0;height:100%;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as pt
+<pre style="margin:0;height:100%;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as tf
 
 # you name the companies yourself
-u = pt.Universe([
-    pt.Instrument("AMZN", "technology",
+u = tf.Universe([
+    tf.Instrument("AMZN", "technology",
         initial_price=397.17, eps=12.55,
         book_value_per_share=20.19,
         shares_outstanding=5.1e9),
@@ -74,7 +74,7 @@ u = pt.Universe([
 # or Universe.random(5, seed=7) to
 # generate one: AAA, AAB, AAC...
 
-e = pt.Engine(seed=776644, universe=u)
+e = tf.Engine(seed=776644, universe=u)
 <b style="color:var(--accent);font-weight:500">e.run_days(30)</b>
 
 bars = e.bars(grain="day")   # prices
@@ -456,19 +456,19 @@ print(u.fingerprint, e.model_fingerprint)</pre>
 </div>
 
 <div style="display:flex;flex-direction:column;gap:0.8rem">
-<pre style="margin:0;flex:1;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as pt
+<pre style="margin:0;flex:1;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as tf
 
-u = pt.Universe.random(40, seed=7)
+u = tf.Universe.random(40, seed=7)
 
 len(u)            # 40
 u.fingerprint     # sha256, order included
 u[0].ticker, u[0].sector
 # heaviest sectors: technology 4, financial_services 4
 
-macro = pt.Macro(federal_funds_rate=0.025,
+macro = tf.Macro(federal_funds_rate=0.025,
                  corporate_bond_yield=0.052, vix=16.0)
 
-e = pt.Engine(seed=42, universe=u, macro_state=macro)
+e = tf.Engine(seed=42, universe=u, macro_state=macro)
 e.run_days(252)   # one trading year</pre>
 <div style="border:1px solid var(--accent-line);background:var(--accent-soft);border-radius:6px;padding:0.75rem 0.9rem">
 <span style="font-family:'Source Serif 4',ui-serif,Georgia,serif;font-size:1.0625rem;font-weight:600;letter-spacing:-0.015em;color:var(--accent-deep)">Roster order is contractual</span>
@@ -541,11 +541,11 @@ e.run_days(252)   # one trading year</pre>
   },
   "seed": null
 }</pre>
-<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:0.9rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;line-height:1.6;color:var(--ink-2)">spec = pt.StrategySpec.momentum(
+<pre style="margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:0.9rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;line-height:1.6;color:var(--ink-2)">spec = tf.StrategySpec.momentum(
     lookback_days=1.0,
     top_k=5)
 
-scores = pt.evaluate(
+scores = tf.evaluate(
     {"mine": spec}, seed=7,
     universe=u, days=10)
 
@@ -748,7 +748,7 @@ obs, r, done, trunc, i = env.step(a)</pre>
     def act(self, obs):
         return {"AAA": 0.2}
 
-pt.tca.analyse(Mine(), seed=42,
+tf.tca.analyse(Mine(), seed=42,
     universe=u, days=5)</pre>
 </div>
 </div>
@@ -763,14 +763,14 @@ pt.tca.analyse(Mine(), seed=42,
 <p style="margin:0.3rem 0 0;font-size:0.8125rem;color:var(--ink-2)">Ten agents, ten identical markets. Each agent runs in its own copy of the same deterministic market, so nobody eats another agent's depth and the comparison stays clean and reproducible. A single shared market with many agents is the extension described below.</p>
 </div>
 </div>
-<pre class="pt-s30">agents = pt.reference_agents(seed=3)
+<pre class="pt-s30">agents = tf.reference_agents(seed=3)
 agents["mine"] = Mine()
 agents["policy"] = TrainedPolicy(net)
 
-scores = pt.evaluate(
+scores = tf.evaluate(
     agents, seed=7, universe=u, days=10)
 
-ranking = pt.rank(
+ranking = tf.rank(
     lambda: dict(agents), seeds=range(12),
     universe=u, days=10, workers=4)</pre>
 </div>
@@ -828,7 +828,7 @@ ranking = pt.rank(
 
 <tr>
 <td class="pt-s166">scoreboard</td>
-<td class="pt-s165">pt.rank compares agents across seeds, not against each other in one book.</td>
+<td class="pt-s165">tf.rank compares agents across seeds, not against each other in one book.</td>
 <td class="pt-s164">Ranking the cohort within the shared book.</td>
 </tr>
 
@@ -860,8 +860,8 @@ agents = {
 }
 
 # 2. one engine, one book, all of them
-engine = pt.Engine(seed=7, universe=u)
-books = {n: pt.Portfolio(cash=1e6) for n in agents}
+engine = tf.Engine(seed=7, universe=u)
+books = {n: tf.Portfolio(cash=1e6) for n in agents}
 
 for day in range(days):
     engine.open_market()
@@ -869,7 +869,7 @@ for day in range(days):
         flow = {}
         for name, agent in agents.items():
             obs = observe(engine, books[name])
-            orders = pt.baselines.rebalance(
+            orders = tf.baselines.rebalance(
                 obs, agent.act(obs),
                 max_participation=0.02)
             books[name].execute(orders)
@@ -1055,11 +1055,11 @@ for day in range(days):
 <p style="font-size:0.875rem;color:var(--ink-2);margin:0">A scenario drives the macro path. Without one, the economy finds its own path. Pick a scenario and see what the market did.</p>
 </div>
 <div style="display:grid;grid-template-columns:minmax(0,20rem) minmax(0,1fr);gap:1.3rem;align-items:stretch">
-<pre class="pt-s30">import tradefloor as pt
+<pre class="pt-s30">import tradefloor as tf
 
-u = pt.Universe.random(40, seed=7)
+u = tf.Universe.random(40, seed=7)
 
-shock = pt.Scenario.rate_shock(
+shock = tf.Scenario.rate_shock(
     start=0.045, end=0.016, over=13)
 
 pt.evaluate(agents, seed=7,
@@ -1253,11 +1253,11 @@ pt.evaluate(agents, seed=7,
 </div>
 
 <div style="display:grid;grid-template-columns:minmax(0,24rem) minmax(0,1fr);gap:1.6rem;align-items:stretch">
-<pre style="margin:0;height:100%;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as pt
+<pre style="margin:0;height:100%;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as tf
 
 # you name the companies yourself
-u = pt.Universe([
-    pt.Instrument("AMZN", "technology",
+u = tf.Universe([
+    tf.Instrument("AMZN", "technology",
         initial_price=397.17, eps=12.55,
         book_value_per_share=20.19,
         shares_outstanding=5.1e9),
@@ -1266,7 +1266,7 @@ u = pt.Universe([
 # or Universe.random(5, seed=7) to
 # generate one: AAA, AAB, AAC...
 
-e = pt.Engine(seed=776644, universe=u)
+e = tf.Engine(seed=776644, universe=u)
 <b style="color:var(--accent);font-weight:500">e.run_days(30)</b>
 
 bars = e.bars(grain="day")   # prices
@@ -1647,7 +1647,7 @@ obs, r, done, trunc, i = env.step(a)</pre>
     def act(self, obs):
         return {"AAA": 0.2}
 
-pt.tca.analyse(Mine(), seed=42,
+tf.tca.analyse(Mine(), seed=42,
     universe=u, days=5)</pre>
 </div>
 </div>
@@ -1662,14 +1662,14 @@ pt.tca.analyse(Mine(), seed=42,
 <p style="margin:0.3rem 0 0;font-size:0.8125rem;color:var(--ink-2)">Ten agents, ten identical markets. Each agent runs in its own copy of the same deterministic market, so nobody eats another agent's depth and the comparison stays clean and reproducible. A single shared market with many agents is the extension described below.</p>
 </div>
 </div>
-<pre class="pt-s30">agents = pt.reference_agents(seed=3)
+<pre class="pt-s30">agents = tf.reference_agents(seed=3)
 agents["mine"] = Mine()
 agents["policy"] = TrainedPolicy(net)
 
-scores = pt.evaluate(
+scores = tf.evaluate(
     agents, seed=7, universe=u, days=10)
 
-ranking = pt.rank(
+ranking = tf.rank(
     lambda: dict(agents), seeds=range(12),
     universe=u, days=10, workers=4)</pre>
 </div>
@@ -1723,8 +1723,8 @@ agents = {
 }
 
 # 2. one engine, one book, all of them
-engine = pt.Engine(seed=7, universe=u)
-books = {n: pt.Portfolio(cash=1e6) for n in agents}
+engine = tf.Engine(seed=7, universe=u)
+books = {n: tf.Portfolio(cash=1e6) for n in agents}
 
 for day in range(days):
     engine.open_market()
@@ -1732,7 +1732,7 @@ for day in range(days):
         flow = {}
         for name, agent in agents.items():
             obs = observe(engine, books[name])
-            orders = pt.baselines.rebalance(
+            orders = tf.baselines.rebalance(
                 obs, agent.act(obs),
                 max_participation=0.02)
             books[name].execute(orders)
@@ -2210,7 +2210,7 @@ class Component extends DCLogic {
           build: 'One call per agent per decision. Ten agents over 20 days at three decisions a day is 600 calls.' },
         { k: 'execution', have: 'Portfolio turns target weights into orders and reports pending_flow(). One book per name, price-time priority, so the agent that arrives first fills first.',
           build: 'The participation cap and the order sizing.' },
-        { k: 'scoreboard', have: 'pt.rank compares agents across seeds, not against each other in one book.',
+        { k: 'scoreboard', have: 'tf.rank compares agents across seeds, not against each other in one book.',
           build: 'Ranking the cohort within the shared book.' },
         { k: 'counterfactual', have: 'The same seed with no flow at all.',
           build: "The comparison that prices the whole cohort's footprint." }
@@ -2261,18 +2261,18 @@ class Component extends DCLogic {
     out.mix = mix.slice(0, 7).map(m => ({ name: m.name, n: m.n, w: (14 + 150 * m.n / maxN).toFixed(0) + 'px' }));
 
     const shapeCode = {
-      balanced: 'u = pt.Universe.random(' + s.uSize + ', seed=' + s.uSeed + ')',
-      'sp-like': 'u = pt.Universe.random(' + s.uSize + ', seed=' + s.uSeed + ')\n# then reweight sectors: see universe_util',
-      'tech-heavy': 'u = pt.Universe.random(' + s.uSize + ', seed=' + s.uSeed + ')\n# then concentrate: see universe_util',
-      defensive: 'u = pt.Universe.random(' + s.uSize + ', seed=' + s.uSeed + ')\n# then filter to defensive sectors'
+      balanced: 'u = tf.Universe.random(' + s.uSize + ', seed=' + s.uSeed + ')',
+      'sp-like': 'u = tf.Universe.random(' + s.uSize + ', seed=' + s.uSeed + ')\n# then reweight sectors: see universe_util',
+      'tech-heavy': 'u = tf.Universe.random(' + s.uSize + ', seed=' + s.uSeed + ')\n# then concentrate: see universe_util',
+      defensive: 'u = tf.Universe.random(' + s.uSize + ', seed=' + s.uSeed + ')\n# then filter to defensive sectors'
     }[s.uShape];
     const top = mix.slice(0, 2).map(m => m.raw + ' ' + m.n).join(', ');
-    out.uCode = 'import tradefloor as pt\n\n' + shapeCode +
+    out.uCode = 'import tradefloor as tf\n\n' + shapeCode +
       '\n\nlen(u)            # ' + s.uSize +
       '\nu.fingerprint     # sha256, order included' +
       '\nu[0].ticker, u[0].sector' +
       '\n# heaviest sectors: ' + top +
-      '\n\nmacro = pt.Macro(federal_funds_rate=0.025,\n                 corporate_bond_yield=0.052, vix=16.0)\n\ne = pt.Engine(seed=42, universe=u, macro_state=macro)\ne.run_days(252)   # one trading year';
+      '\n\nmacro = tf.Macro(federal_funds_rate=0.025,\n                 corporate_bond_yield=0.052, vix=16.0)\n\ne = tf.Engine(seed=42, universe=u, macro_state=macro)\ne.run_days(252)   # one trading year';
 
     const spec = { spec_version: 1, signal: { kind: s.sig }, portfolio: {}, execution: { cadence: s.cadence, max_participation: +(s.partRaw / 100).toFixed(2) }, seed: null };
     if (s.sig === 'momentum' || s.sig === 'mean_reversion') spec.signal.lookback_days = s.sig === 'momentum' ? 1.0 : 5.0;
@@ -2284,9 +2284,9 @@ class Component extends DCLogic {
     if (spec.signal.lookback_days) args.push('lookback_days=' + spec.signal.lookback_days.toFixed(1));
     if (spec.portfolio.top_k) args.push('top_k=' + spec.portfolio.top_k);
     if (s.sig === 'random') args.push('seed=0');
-    out.specPy = 'spec = pt.StrategySpec.' + s.sig + '(' +
+    out.specPy = 'spec = tf.StrategySpec.' + s.sig + '(' +
       (args.length ? '\n    ' + args.join(',\n    ') + ')' : ')') +
-      '\n\nscores = pt.evaluate(\n    {"mine": spec}, seed=7,\n    universe=u, days=10)\n\nscores["mine"].return_pct\nscores["mine"].impact_bps\nscores["mine"].strategy_fingerprint\n# sha256 -- cite this';
+      '\n\nscores = tf.evaluate(\n    {"mine": spec}, seed=7,\n    universe=u, days=10)\n\nscores["mine"].return_pct\nscores["mine"].impact_bps\nscores["mine"].strategy_fingerprint\n# sha256 -- cite this';
 
     out.cadence = [
       { label: '3 a day', v: '+37.55%', n: 37.55 },
@@ -2521,7 +2521,7 @@ const yrs = s.envDays / 252;
     out.setCVix = (e) => this.setState({ cVix: +e.target.value });
     out.setCYield = (e) => this.setState({ cYield: +e.target.value });
     out.setCOver = (e) => this.setState({ cOver: +e.target.value });
-    out.crisisCode = 'import tradefloor as pt\n\nu = pt.Universe.random(40, seed=7)\n\nshock = pt.Scenario.rate_shock(\n    start=0.045, end=' + cYield + ', over=' + cOver + ')\n\npt.evaluate(agents, seed=7,\n    universe=u, days=' + m + ',\n    scenario=shock)\n\n# leave corporate_bond_yield free:\n# pinning it severs the channel\n# the shock is travelling down.';
+    out.crisisCode = 'import tradefloor as tf\n\nu = tf.Universe.random(40, seed=7)\n\nshock = tf.Scenario.rate_shock(\n    start=0.045, end=' + cYield + ', over=' + cOver + ')\n\npt.evaluate(agents, seed=7,\n    universe=u, days=' + m + ',\n    scenario=shock)\n\n# leave corporate_bond_yield free:\n# pinning it severs the channel\n# the shock is travelling down.';
 
     return out;
   }

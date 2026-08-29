@@ -11,7 +11,7 @@ Run the same seed with and without your orders, and price every fill against
 what that instrument did in the world where you never traded.
 
 ```python
-ex = pt.tca.analyse(my_agent, seed=42, universe=universe, days=5)
+ex = tf.tca.analyse(my_agent, seed=42, universe=universe, days=5)
 
 ex.shortfall_bps()        # what your footprint cost
 ex.by_step()              # where it was paid
@@ -92,8 +92,8 @@ isolating one name's impact or auditing the subtraction, pin VIX in both
 worlds:
 
 ```python
-ex = pt.tca.analyse(my_agent, seed=42, universe=universe, days=5,
-                    scenario=pt.Scenario().hold(vix=15.0))
+ex = tf.tca.analyse(my_agent, seed=42, universe=universe, days=5,
+                    scenario=tf.Scenario().hold(vix=15.0))
 ex.untouched_moved()      # empty again, byte-exact
 ```
 

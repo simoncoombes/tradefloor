@@ -13,9 +13,9 @@ current default**; most users never touch it. Every earlier preset, `"pt-v1"`
 through `"pt-v11"`, remains selectable and bit-reproducing forever.
 
 ```python
-eng = pt.Engine(seed=42, universe=u, model="pt-v14")  # the default, spelled out
-eng = pt.Engine(seed=42, universe=u, model="pt-v10")  # the previous default, still exact
-eng = pt.Engine(seed=42, universe=u, model="pt-v1")   # an earlier era, still exact
+eng = tf.Engine(seed=42, universe=u, model="pt-v14")  # the default, spelled out
+eng = tf.Engine(seed=42, universe=u, model="pt-v10")  # the previous default, still exact
+eng = tf.Engine(seed=42, universe=u, model="pt-v1")   # an earlier era, still exact
 ```
 
 The reason is comparability. `(package version, model="pt-v12", universe
@@ -89,8 +89,8 @@ and the calibration record it cites.
 The escape hatch exists and is deliberately ceremonial:
 
 ```python
-custom = pt.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
-eng = pt.Engine(seed=42, universe=u, model=custom)
+custom = tf.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+eng = tf.Engine(seed=42, universe=u, model=custom)
 eng.model_fingerprint        # "custom-7f290e34", never "pt-v1"
 ```
 
@@ -106,16 +106,16 @@ model"; it is "a changed model has a different name."
 The fingerprint travels everywhere a result does:
 
 - `Scorecard.model_fingerprint`, beside the seed, the universe fingerprint
-  and the strategy fingerprint, via `pt.evaluate(..., model=custom)`.
+  and the strategy fingerprint, via `tf.evaluate(..., model=custom)`.
 - `RunManifest` embeds the **full coefficient dictionary** of the model the
   run actually ran, and `reproduce()` replays under it, so a custom-model
   manifest rebuilds the custom market bit for bit or refuses by name.
-- `Checkpoint` and `pt.branch` resume and fork under the parent's model.
-- `pt.replay(log, ..., model=custom)` for driving it by hand.
+- `Checkpoint` and `tf.branch` resume and fork under the parent's model.
+- `tf.replay(log, ..., model=custom)` for driving it by hand.
 
 ## What is settable, and what is not
 
-`pt.ModelParams.settable()` lists the runtime-settable surface, 87 names at
+`tf.ModelParams.settable()` lists the runtime-settable surface, 87 names at
 0.3.0. Read the list rather than a summary of it, but the shape is: the two
 variance processes (per-name GJR-GARCH and the market factor's, cascade
 components and slow term included), the factor sigmas, the sector loadings
@@ -176,8 +176,8 @@ default model is untouched:
 
 ```python
 for alpha in (0.02, 0.04, 0.08):
-    params = pt.ModelParams.from_preset("pt-v1", garch_alpha=alpha)
-    eng = pt.Engine(seed=1, universe=u, model=params)
+    params = tf.ModelParams.from_preset("pt-v1", garch_alpha=alpha)
+    eng = tf.Engine(seed=1, universe=u, model=params)
     eng.run_days(252)
     print(params.fingerprint, summarise(eng.bars(grain="day")))
 ```
@@ -200,7 +200,7 @@ What the shipped default is certified to reproduce, and where it is not, is
 [the realism envelope](realism-envelope.md).
 
 For the compact coefficient table the known-answer test hashes, see
-`pt.model_preset()`, which returns the nine-key mispricing and crowd
+`tf.model_preset()`, which returns the nine-key mispricing and crowd
 dictionary and keeps its exact historical shape. It has to:
 `metadata_buffer()` in `tests/known_answer.py` packs every value in it bar
 `name` as a canonical f64, sorted by key so the bytes cannot depend on dict

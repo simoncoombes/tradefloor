@@ -13,16 +13,16 @@ that procedure as one object: written by whoever ran the simulation, checked
 by whoever wants to.
 
 ```python
-manifest = pt.RunManifest.of(engine, seed=42, universe=universe,
+manifest = tf.RunManifest.of(engine, seed=42, universe=universe,
                              macro=macro, scenario=shock,
-                             strategy=pt.StrategySpec.momentum())
+                             strategy=tf.StrategySpec.momentum())
 open("run.json", "w").write(manifest.to_json())
 ```
 
 The reader needs the package and the file, nothing else:
 
 ```python
-same = pt.RunManifest.from_json(open("run.json").read()).reproduce()
+same = tf.RunManifest.from_json(open("run.json").read()).reproduce()
 ```
 
 `reproduce()` replays the run and checks the rebuilt market against the
@@ -50,7 +50,7 @@ The one thing that cannot be embedded is a hand-written Python agent, and
 the manifest says so rather than pretending. Pass a reference instead:
 
 ```python
-pt.RunManifest.of(engine, seed=42, universe=universe,
+tf.RunManifest.of(engine, seed=42, universe=universe,
                   strategy="github.com/you/strat at 58837b3")
 ```
 
@@ -67,12 +67,12 @@ A run is only reproducible on a build whose arithmetic matches the one that
 ran it, and [across versions, not at all](reproducing-a-run.md). The hazard
 is not hypothetical: one calendar day brought three trajectory-changing
 fixes (the macro-chain and volume fixes, then the market-factor-sigma
-recalibration) while `pt.version()` stayed `0.1.0` and the preset stayed
+recalibration) while `tf.version()` stayed `0.1.0` and the preset stayed
 `pt-v1`. The recalibrated constant is not even in the preset dictionary.
 Every name the library could quote held still while the numbers moved.
 
 So the manifest's era identity is behavioural, not nominal: it records the
-digest of a small fixed probe simulation (`pt.manifest.era_fingerprint()`),
+digest of a small fixed probe simulation (`tf.manifest.era_fingerprint()`),
 and `reproduce()` recomputes it **before replaying**. Two builds that agree
 on the probe agree on the arithmetic it exercises; two that disagree will
 not reproduce each other's runs, whatever their version strings say. The
@@ -101,7 +101,7 @@ a different machine **is** a cross-platform measurement for that run, made
 by the reader rather than promised by the library. A failure after every
 input and the era have verified is reported as exactly what it is, an
 arithmetic divergence, with both platforms named and the draw counts to
-start a bisection from (`pt.replay(log, ..., until=n)`).
+start a bisection from (`tf.replay(log, ..., until=n)`).
 
 ## Manifest or checkpoint?
 

@@ -75,7 +75,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal
 
-import tradefloor as pt
+import tradefloor as tf
 from tradefloor import baselines, envelope
 from tradefloor.facts import REAL_MARKETS, band_distance
 
@@ -148,8 +148,8 @@ SCENARIOS = ("rate_shock", "vix_shock", "vol_shock")
 #: typed, so this cannot drift from what `Scenario` actually accepts.
 def _macro_fields() -> list[str]:
     try:
-        pt.Scenario("probe").hold(__definitely_not_a_field__=0.0)
-    except pt.ValidationError as exc:
+        tf.Scenario("probe").hold(__definitely_not_a_field__=0.0)
+    except tf.ValidationError as exc:
         tail = str(exc).split("Valid:")[-1]
         return [f.strip() for f in tail.split(",") if f.strip()]
     return []
@@ -173,12 +173,12 @@ def _provenance(**extra: Any) -> dict[str, Any]:
     without its seed and fingerprints is not a measurement -- it is an
     anecdote, and a model summarising it cannot tell the difference.
     """
-    preset = pt.model_preset()
+    preset = tf.model_preset()
     return {
-        "pretium_version": pt.__version__,
+        "pretium_version": tf.__version__,
         "model_preset": preset["name"],
         "model_fingerprint": preset.get("fingerprint", ""),
-        "spec_version": pt.SPEC_VERSION,
+        "spec_version": tf.SPEC_VERSION,
         **extra,
     }
 
@@ -329,16 +329,16 @@ def _build_universe(size: int, seed: int,
     if not 2 <= size <= MAX_UNIVERSE:
         raise ValueError(f"universe_size must be 2..{MAX_UNIVERSE}, got {size}")
     if not sectors:
-        return pt.Universe.random(size, seed=seed), False
+        return tf.Universe.random(size, seed=seed), False
 
-    known = set(pt.sectors())
+    known = set(tf.sectors())
     unknown = sorted(set(sectors) - known)
     if unknown:
         raise ValueError(
             f"unknown sector(s) {unknown}; known sectors are "
             f"{sorted(known)}")
     want = set(sectors)
-    pool = pt.Universe.random(_POOL, seed=seed)
+    pool = tf.Universe.random(_POOL, seed=seed)
     chosen = [i for i in pool if i.sector in want][:size]
     if len(chosen) < size:
         raise ValueError(
@@ -346,7 +346,7 @@ def _build_universe(size: int, seed: int,
             f"{_POOL}; ask for fewer than {size} or add a sector")
     # Roster ORDER is contractual -- the engine draws in index order -- and
     # pool order is preserved here, so the same request is the same market.
-    return pt.Universe(chosen), True
+    return tf.Universe(chosen), True
 
 
 #: The Instrument fields a hand-authored roster may set. Anything else is
@@ -392,20 +392,20 @@ def _resolve_universe(doc: Any) -> tuple[Any, bool, dict[str, Any]]:
             kw = {k: v for k, v in row.items()
                   if k not in ("ticker", "sector")}
             try:
-                built.append(pt.Instrument(row["ticker"], row["sector"], **kw))
-            except pt.ValidationError as exc:
+                built.append(tf.Instrument(row["ticker"], row["sector"], **kw))
+            except tf.ValidationError as exc:
                 # The library's messages name the trap -- short_interest is a
                 # SHARE COUNT, not a fraction -- so pass them through whole.
                 raise ValueError(f"instrument {i} ({row['ticker']}): "
                                  f"{exc}") from exc
-        universe = pt.Universe(built)
+        universe = tf.Universe(built)
         counts = {}
         for inst in universe:
             counts[inst.sector] = counts.get(inst.sector, 0) + 1
         # A hand-authored roster counts as concentrated unless it spans most
         # of the sector space -- the gap is about the CROSS-SECTION, and a
         # caller who picked the names picked the cross-section.
-        concentrated = len(counts) < max(2, len(pt.sectors()) // 2)
+        concentrated = len(counts) < max(2, len(tf.sectors()) // 2)
         return universe, concentrated, {"instruments": rows}
 
     size = int(doc.get("size", 40))
@@ -446,7 +446,7 @@ def _normalise(doc: Any) -> tuple[str, bool]:
     if not isinstance(doc, dict):
         raise ValueError(f"a spec must be an object, got {type(doc).__name__}")
     if "spec_version" not in doc:
-        return json.dumps({"spec_version": pt.SPEC_VERSION, **doc}), True
+        return json.dumps({"spec_version": tf.SPEC_VERSION, **doc}), True
     return json.dumps(doc), False
 
 
@@ -470,7 +470,7 @@ def _specs_from(
     for name, doc in strategies.items():
         try:
             text, was_assumed = _normalise(doc)
-            built[name] = pt.StrategySpec.from_json(text)
+            built[name] = tf.StrategySpec.from_json(text)
         except Exception as exc:
             raise ValueError(f"strategy {name!r}: {exc}") from exc
         if was_assumed:
@@ -540,7 +540,7 @@ the honest version of `evaluate_strategies`.
 server = MCPServer(
     name="tradefloor",
     title="tradefloor market simulator",
-    version=pt.__version__,
+    version=tf.__version__,
     instructions=INSTRUCTIONS,
 )
 
@@ -587,8 +587,8 @@ def describe_simulator() -> dict[str, Any]:
             "comes from a known model.",
         ],
         "strategy_grammar": {
-            "signal_kinds": list(pt.spec.SIGNAL_KINDS),
-            "cadences": list(pt.spec.CADENCES),
+            "signal_kinds": list(tf.spec.SIGNAL_KINDS),
+            "cadences": list(tf.spec.CADENCES),
             "cannot_express": [
                 "path dependence (stop losses, drawdown limits, anything "
                 "reading its own P&L history)",
@@ -622,7 +622,7 @@ def describe_simulator() -> dict[str, Any]:
                    "the certified horizon, and a result there does not "
                    "carry the SHORT WINDOW caveat.",
         },
-        "factors": list(pt.Engine.FACTORS),
+        "factors": list(tf.Engine.FACTORS),
         "limits": {
             "max_days": MAX_DAYS, "max_universe": MAX_UNIVERSE,
             "max_strategies": MAX_STRATEGIES, "max_seeds": MAX_SEEDS,
@@ -666,7 +666,7 @@ def check_envelope(
             sector_concentrated=sector_concentrated,
             scenario_magnitude=scenario_magnitude,
         )
-    except pt.ValidationError as exc:
+    except tf.ValidationError as exc:
         return _fail(
             f"{exc}. Known statistics: {sorted(REAL_MARKETS)}. An unknown "
             f"name is refused rather than ignored, because silently dropping "
@@ -699,8 +699,8 @@ def validate_strategy(spec: dict[str, Any]) -> dict[str, Any]:
         built = specs["spec"]
     except ValueError as exc:
         return _fail(
-            f"{exc}\n\nSignal kinds: {list(pt.spec.SIGNAL_KINDS)}. "
-            f"Cadences: {list(pt.spec.CADENCES)}. "
+            f"{exc}\n\nSignal kinds: {list(tf.spec.SIGNAL_KINDS)}. "
+            f"Cadences: {list(tf.spec.CADENCES)}. "
             f"A minimal spec: "
             f'{{"signal": {{"kind": "momentum", "lookback_days": 1.0}}, '
             f'"portfolio": {{"top_k": 5, "gross": 1.0}}}}'
@@ -764,11 +764,11 @@ def evaluate_strategies(
             entrants.setdefault(name, agent)
 
     try:
-        scores = pt.evaluate(
+        scores = tf.evaluate(
             entrants, seed=seed, universe=roster, days=days,
             steps_per_day=steps_per_day, cash=cash, max_leverage=max_leverage,
         )
-    except pt.ValidationError as exc:
+    except tf.ValidationError as exc:
         return _fail(str(exc))
 
     rows = [_scorecard_row(s) for s in scores.values()]
@@ -781,7 +781,7 @@ def evaluate_strategies(
     }
     if include_baselines and "oracle" in scores:
         result["capture_ratio"] = {
-            k: round(v, 4) for k, v in pt.capture_ratio(scores).items()
+            k: round(v, 4) for k, v in tf.capture_ratio(scores).items()
         }
         result["capture_note"] = (
             "Fraction of the oracle's P&L captured. The oracle reads the "
@@ -852,11 +852,11 @@ def rank_strategies(
         return entrants
 
     try:
-        ranking = pt.rank(
+        ranking = tf.rank(
             make_agents, seeds=seeds, universe=roster, days=days,
             steps_per_day=steps_per_day, max_leverage=max_leverage,
         )
-    except pt.ValidationError as exc:
+    except tf.ValidationError as exc:
         return _fail(str(exc))
 
     # `table()` is the RANKED order; `records` is a dict, and iterating it
@@ -953,8 +953,8 @@ def _scenario_from(doc: Any, days: int) -> Any:
     # its own output back would fail, which is the first thing anyone tries.
     if "path" in doc and "steps" not in doc:
         try:
-            return pt.Scenario.from_json(json.dumps(doc))
-        except pt.ValidationError as exc:
+            return tf.Scenario.from_json(json.dumps(doc))
+        except tf.ValidationError as exc:
             raise ValueError(f"not a readable scenario document: {exc}") from exc
 
     steps = doc.get("steps")
@@ -965,7 +965,7 @@ def _scenario_from(doc: Any, days: int) -> Any:
             '{"kind":"ramp","field":F,"start":X,"end":Y,"over":N}, or '
             '{"kind":"step","field":F,"before":X,"after":Y,"at":N}. '
             f'Fields: {_macro_fields()}')
-    sc = pt.Scenario(str(doc.get("label", "")))
+    sc = tf.Scenario(str(doc.get("label", "")))
     for i, st in enumerate(steps):
         if not isinstance(st, dict) or "kind" not in st:
             raise ValueError(f"step {i}: needs a 'kind'")
@@ -984,7 +984,7 @@ def _scenario_from(doc: Any, days: int) -> Any:
                     f"unknown step kind {kind!r}; use hold, ramp or step")
         except KeyError as exc:
             raise ValueError(f"step {i} ({kind}): missing {exc}") from exc
-        except pt.ValidationError as exc:
+        except tf.ValidationError as exc:
             raise ValueError(f"step {i} ({kind}): {exc}") from exc
     return sc
 
@@ -1013,7 +1013,7 @@ def build_scenario(steps: list[dict[str, Any]], label: str = "",
     try:
         sc = _scenario_from({"label": label, "steps": steps}, days)
         table = sc.table(days)
-    except (ValueError, pt.ValidationError) as exc:
+    except (ValueError, tf.ValidationError) as exc:
         return _fail(str(exc))
     return {
         "ok": True,
@@ -1087,9 +1087,9 @@ def run_stress_scenario(
             if peak_day is not None:
                 kwargs["peak_day" if scenario != "rate_shock"
                        else "over"] = peak_day
-            built = getattr(pt.Scenario, scenario)(**kwargs)
+            built = getattr(tf.Scenario, scenario)(**kwargs)
             label = scenario
-    except (ValueError, pt.ValidationError) as exc:
+    except (ValueError, tf.ValidationError) as exc:
         return _fail(f"building scenario: {exc}")
     except Exception as exc:
         return _fail(f"building scenario: {exc}")
@@ -1106,11 +1106,11 @@ def run_stress_scenario(
         return out
 
     try:
-        shocked = pt.evaluate(entrants(), seed=seed, universe=roster,
+        shocked = tf.evaluate(entrants(), seed=seed, universe=roster,
                               days=days, scenario=built)
-        control = pt.evaluate(entrants(), seed=seed, universe=roster,
+        control = tf.evaluate(entrants(), seed=seed, universe=roster,
                               days=days)
-    except pt.ValidationError as exc:
+    except tf.ValidationError as exc:
         return _fail(str(exc))
 
     rows = []
@@ -1190,18 +1190,18 @@ def explain_price_move(
     except ValueError as exc:
         return _fail(str(exc))
 
-    engine = pt.Engine(universe=roster, seed=seed)
+    engine = tf.Engine(universe=roster, seed=seed)
     engine.run_days(day)
     tickers = list(engine.tickers)
 
     cols: dict[str, tuple[float, ...]] = {}
-    for factor in pt.Engine.FACTORS:
+    for factor in tf.Engine.FACTORS:
         raw = engine.attribution(factor)
         cols[factor] = struct.unpack(f"<{len(raw) // 8}d", raw)
 
     rows = []
     for i, tk in enumerate(tickers):
-        parts = {f: cols[f][i] for f in pt.Engine.FACTORS}
+        parts = {f: cols[f][i] for f in tf.Engine.FACTORS}
         total = sum(parts.values())
         # Rounded for readability, but the residual is measured on the
         # ROUNDED values that are actually returned. Reporting the model's
@@ -1231,7 +1231,7 @@ def explain_price_move(
         "ok": True,
         "day": day,
         "rows": rows,
-        "factors": list(pt.Engine.FACTORS),
+        "factors": list(tf.Engine.FACTORS),
         "reading_note": (
             "The nine factors SUM to `total_log_move`. Each row carries "
             "its own `residual` -- the measured disagreement in the figures "
@@ -1291,7 +1291,7 @@ def build_universe(size: int = 40, seed: int = 111,
         "ok": True,
         "universe": doc,
         "size": len(universe),
-        "fingerprint": pt.universe_util.fingerprint_of(universe),
+        "fingerprint": tf.universe_util.fingerprint_of(universe),
         "sector_counts": counts,
         "instruments": [
             {"ticker": i.ticker, "sector": i.sector,
@@ -1301,7 +1301,7 @@ def build_universe(size: int = 40, seed: int = 111,
             for i in shown
         ],
         "truncated": len(universe) - len(shown),
-        "known_sectors": list(pt.sectors()),
+        "known_sectors": list(tf.sectors()),
         "caveats": [
             "Roster ORDER is contractual: the engine draws in index order, "
             "so a reordered universe is a different market from the same "

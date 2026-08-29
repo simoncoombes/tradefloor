@@ -15,7 +15,7 @@ and the analysis is usually a reduction anyway (a mean, a regression, a count)
 that never needed the whole thing resident.
 
 ```python
-for seed, table in pt.sweep(range(100), universe=u, days=252, collect="truth"):
+for seed, table in tf.sweep(range(100), universe=u, days=252, collect="truth"):
     frame = pl.from_arrow(table)          # one seed's ground truth
     results.append(frame.select(...).mean())
 ```

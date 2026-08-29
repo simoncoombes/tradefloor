@@ -8,7 +8,7 @@ short: Sweeps and parallelism
 # Sweeps and parallelism
 
 ```python
-for seed, table in pt.sweep(range(100), universe=universe, days=252,
+for seed, table in tf.sweep(range(100), universe=universe, days=252,
                             collect="truth"):
     results.append(pl.from_arrow(table).select(...).mean())
 ```

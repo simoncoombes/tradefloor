@@ -51,9 +51,9 @@ had surveyed, in a direction someone had guessed.
 import statistics
 
 from tradefloor import atlas
-import tradefloor as pt
+import tradefloor as tf
 
-universe = pt.Universe.random(40, seed=111)
+universe = tf.Universe.random(40, seed=111)
 SURVEY_SEEDS = [11, 12, 13]     # the paths this screening pass runs on
 
 axes = atlas.axes_for(
@@ -63,8 +63,8 @@ axes = atlas.axes_for(
 )
 
 def measure(vector):
-    model = pt.ModelParams.from_preset("pt-v12", **vector)
-    runs = [pt.evaluate({"mine": pt.reference_agents(seed=3)["momentum"]},
+    model = tf.ModelParams.from_preset("pt-v12", **vector)
+    runs = [tf.evaluate({"mine": tf.reference_agents(seed=3)["momentum"]},
                         seed=s, universe=universe, days=3, model=model)["mine"]
             for s in SURVEY_SEEDS]     # your agent goes where momentum is
     return {"return_pct": statistics.median(r.return_pct for r in runs),
@@ -163,14 +163,14 @@ the map is affordable. That is enough to rank and describe. It is not enough
 to believe.
 
 ```python
-shipped = pt.ModelParams.from_preset("pt-v12").to_dict()
+shipped = tf.ModelParams.from_preset("pt-v12").to_dict()
 baseline = {a.name: shipped[a.name] for a in s.axes}
 candidate = s.pareto({"return_pct": "max",
                       "turnover": "min"})["front"][0]["parameters"]
 
 def measure_with_seed(vector, seed):        # one vector, one seed, full res
-    model = pt.ModelParams.from_preset("pt-v12", **vector)
-    r = pt.evaluate({"mine": pt.reference_agents(seed=3)["momentum"]},
+    model = tf.ModelParams.from_preset("pt-v12", **vector)
+    r = tf.evaluate({"mine": tf.reference_agents(seed=3)["momentum"]},
                     seed=seed, universe=universe, days=3, model=model)["mine"]
     return {"return_pct": r.return_pct, "turnover": r.turnover}
 

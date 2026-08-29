@@ -8,11 +8,11 @@ short: SEC EDGAR
 # Real fundamentals from SEC EDGAR
 
 ```python
-snap = pt.edgar.fetch(as_of="2024-06-30", limit=100,
+snap = tf.edgar.fetch(as_of="2024-06-30", limit=100,
                       user_agent="Jane Roe jane@example.org")
 snap.save("edgar-2024h1.json")            # the artifact, hashed and citable
 
-universe = pt.Universe.from_edgar(snap, federal_funds_rate=0.03)
+universe = tf.Universe.from_edgar(snap, federal_funds_rate=0.03)
 ```
 
 Seeding from filings gives you a cross-section that is real - true valuation
@@ -52,7 +52,7 @@ second fiscal quarter, so six to eighteen months old depending on the filer.
 And it is float, not capitalisation, so it understates founder-controlled
 companies specifically. Mis-tagged filings are rejected by implied price per
 share (`public_float / shares`) having to land inside
-`pt.edgar.PLAUSIBLE_IMPLIED_PRICE`, which is `(0.5, 10000.0)` -- a filing that
+`tf.edgar.PLAUSIBLE_IMPLIED_PRICE`, which is `(0.5, 10000.0)` -- a filing that
 implies a share price of eight million dollars has a units error, and saying
 that beats saying "too big".
 

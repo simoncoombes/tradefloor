@@ -34,12 +34,12 @@ month.
 ## First run
 
 ```python
-import tradefloor as pt
+import tradefloor as tf
 
-universe = pt.Universe.random(40, seed=111)
+universe = tf.Universe.random(40, seed=111)
 
-spec = pt.StrategySpec.momentum(lookback_days=1.0, top_k=5)
-scores = pt.evaluate({"mine": spec}, seed=7, universe=universe, days=10)
+spec = tf.StrategySpec.momentum(lookback_days=1.0, top_k=5)
+scores = tf.evaluate({"mine": spec}, seed=7, universe=universe, days=10)
 
 scores["mine"].return_pct            # what it made
 scores["mine"].impact_bps            # what its own footprint cost
@@ -47,7 +47,7 @@ scores["mine"].strategy_fingerprint  # sha256, cite this
 ```
 
 That is one market draw. It tells you as much about the seed as about the
-strategy. `pt.rank` runs many seeds and compares them with a paired sign test.
+strategy. `tf.rank` runs many seeds and compares them with a paired sign test.
 
 ## What you get
 
@@ -55,7 +55,7 @@ strategy. `pt.rank` runs many seeds and compares them with a paired sign test.
 |---|---|
 | `engine.truth()` | why each price moved: nine factors that sum to the move, to 1e-16 |
 | counterfactual TCA | the same seed with your orders and without them |
-| `pt.rank` | many seeds, paired sign tests |
+| `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
 | MCP server | eleven read-only tools for a coding agent |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, a browser build |
@@ -76,7 +76,7 @@ code. Each result carries its own caveats. See
 
 ## How real it is
 
-`pt.facts.measure()` scores fourteen statistics against real-market bands. The
+`tf.facts.measure()` scores fourteen statistics against real-market bands. The
 default preset, `pt-v14`, holds all fourteen at one year and at two years. It
 holds all fourteen on a roster it never saw, and thirteen on new seeds.
 
@@ -94,7 +94,7 @@ Five limits are measured and written down:
 | macro crises | an inflation crisis or a policy crisis needs a scenario to drive it |
 | roster | certification used a sector-balanced roster, which no real index is |
 
-`pt.envelope.check()` refuses a question that falls outside a limit, and
+`tf.envelope.check()` refuses a question that falls outside a limit, and
 [the realism envelope](https://simoncoombes.github.io/tradefloor/realism-envelope.html) says
 what each one forbids.
 
@@ -113,7 +113,7 @@ compares digests. A disagreement stops the release. The crate ships its own
 replays exactly. Every preset from `pt-v1` on is still selectable.
 
 ```python
-eng = pt.Engine(seed=42, universe=u, model="pt-v10")
+eng = tf.Engine(seed=42, universe=u, model="pt-v10")
 ```
 
 ## Examples

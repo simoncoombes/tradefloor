@@ -31,7 +31,7 @@ import os
 import sys
 from typing import Literal
 
-import tradefloor as pt
+import tradefloor as tf
 
 try:
     import anthropic
@@ -42,7 +42,7 @@ except ImportError:
 
 # The nine components the engine decomposes every price move into. Claude
 # picks from exactly this list so the answer is checkable rather than prose.
-# It has to be all nine: the harness scores against pt.Engine.FACTORS, so a
+# It has to be all nine: the harness scores against tf.Engine.FACTORS, so a
 # list missing `circuit_breaker` and `jump` -- as this one was until 0.3.0 --
 # marks the agent wrong on a day it was never offered the right answer to.
 Factor = Literal[
@@ -234,26 +234,26 @@ def main() -> None:
         print("No API key in the environment. `ant auth login` also works.\n"
               "Continuing anyway -- the SDK resolves a stored profile if there is one.\n")
 
-    universe = pt.Universe.random(12, seed=7)
+    universe = tf.Universe.random(12, seed=7)
     claude = ClaudeTrader()
 
     print("Running Claude against the reference agents. 20 API calls.\n")
 
-    agents = pt.reference_agents(seed=3)
+    agents = tf.reference_agents(seed=3)
     agents["claude"] = claude
 
-    scores = pt.evaluate(
+    scores = tf.evaluate(
         agents, seed=2026, universe=universe, days=20, max_leverage=2.0,
     )
 
     print("%-16s %12s %9s %12s" % ("agent", "pnl", "impact", "why-right"))
     print("-" * 54)
-    for s in pt.leaderboard(scores):
+    for s in tf.leaderboard(scores):
         acc = "     -" if s.explanation_accuracy is None else "%5.0f%%" % (s.explanation_accuracy * 100)
         print("%-16s %12.0f %9.1f %12s" % (s.name, s.pnl, s.impact_bps, acc))
 
     print("\nCapture against the Oracle:")
-    for name, ratio in pt.capture_ratio(scores).items():
+    for name, ratio in tf.capture_ratio(scores).items():
         print("  %-16s %+.3f" % (name, ratio))
 
     print("\nWhat Claude said, and whether the engine agreed:")
@@ -262,7 +262,7 @@ def main() -> None:
 
     print(
         "\nOne seed ranks the seed, not the agents. Before concluding anything,"
-        "\nrun pt.rank(...) across a dozen seeds -- a single market picks the"
+        "\nrun tf.rank(...) across a dozen seeds -- a single market picks the"
         "\ntop agent about half the time."
     )
 

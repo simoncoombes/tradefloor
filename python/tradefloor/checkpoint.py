@@ -6,7 +6,7 @@ identical, not statistically similar but identical, because both branches are
 the same seed replayed to the same point.
 
 ```python
-mark = pt.Checkpoint.of(engine)          # after sixty days
+mark = tf.Checkpoint.of(engine)          # after sixty days
 calm, hiked = mark.branch(2)
 run_scenario(shock, engine=hiked, ...)
 ```

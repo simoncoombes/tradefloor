@@ -63,10 +63,10 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s12">
 <div class="pt-s52">
-<h2 class="pt-s24"><span class="pt-s48">pt.evaluate</span></h2>
+<h2 class="pt-s24"><span class="pt-s48">tf.evaluate</span></h2>
 <span class="pt-s0">Score agents on one identical market.</span>
 </div>
-<pre class="pt-s50">scores = pt.evaluate(
+<pre class="pt-s50">scores = tf.evaluate(
     agents: dict[str, Agent | StrategySpec],
     *, seed: int, universe: Universe,
     days: int, scenario: Scenario | None = None,
@@ -89,12 +89,12 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 </div>
 
 <div class="pt-s43">
-<span class="pt-s6">pt.reference_agents(seed=3)</span>
+<span class="pt-s6">tf.reference_agents(seed=3)</span>
 <span class="pt-s3">The five shipped baselines as a ready dict: hold, random, momentum, mean_reversion and oracle.</span>
 </div>
 
 <div class="pt-s43">
-<span class="pt-s6">pt.capture_ratio(scores)</span>
+<span class="pt-s6">tf.capture_ratio(scores)</span>
 <span class="pt-s3">Each agent's P&amp;L as a fraction of the Oracle's.</span>
 </div>
 
@@ -104,10 +104,10 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 
 <div class="pt-s12">
 <div class="pt-s52">
-<h2 class="pt-s24"><span class="pt-s48">pt.rank</span></h2>
+<h2 class="pt-s24"><span class="pt-s48">tf.rank</span></h2>
 <span class="pt-s0">Repeat that across twelve seeds, and separate with a sign test.</span>
 </div>
-<pre class="pt-s50">ranking = pt.rank(
+<pre class="pt-s50">ranking = tf.rank(
     factory: Callable[[], dict],
     *, seeds: Iterable[int], universe: Universe,
     days: int, workers: int = 1)
@@ -142,10 +142,10 @@ ranking.separation("mean_reversion", "momentum")</pre>
 
 <div class="pt-s12">
 <div class="pt-s52">
-<h2 class="pt-s24"><span class="pt-s48">pt.tca.analyse</span></h2>
+<h2 class="pt-s24"><span class="pt-s48">tf.tca.analyse</span></h2>
 <span class="pt-s0">Price the execution against the world where you never traded.</span>
 </div>
-<pre class="pt-s50">ex = pt.tca.analyse(
+<pre class="pt-s50">ex = tf.tca.analyse(
     algo, *, seed: int,
     universe: Universe, days: int)
 
@@ -180,10 +180,10 @@ ex.partial_fills()</pre>
 
 <div class="pt-s12">
 <div class="pt-s52">
-<h2 class="pt-s24"><span class="pt-s48">pt.RunManifest</span></h2>
+<h2 class="pt-s24"><span class="pt-s48">tf.RunManifest</span></h2>
 <span class="pt-s0">Write the run down so someone else can replay it.</span>
 </div>
-<pre class="pt-s50">manifest = pt.RunManifest.of(
+<pre class="pt-s50">manifest = tf.RunManifest.of(
     engine, spec, seed=7)
 
 manifest.to_json(path)
@@ -474,20 +474,20 @@ class Component extends DCLogic {
         }))
       })),
       calls: [
-        { name: 'pt.evaluate',
+        { name: 'tf.evaluate',
           lede: 'Score agents on one identical market.',
-          sig: 'scores = pt.evaluate(\n    agents: dict[str, Agent | StrategySpec],\n    *, seed: int, universe: Universe,\n    days: int, scenario: Scenario | None = None,\n    model: str | None = None)',
+          sig: 'scores = tf.evaluate(\n    agents: dict[str, Agent | StrategySpec],\n    *, seed: int, universe: Universe,\n    days: int, scenario: Scenario | None = None,\n    model: str | None = None)',
           members: [
             { k: 'agents', v: 'A dict of name to agent, or name to StrategySpec. A spec carries its own fingerprint into the result.' },
             { k: 'one engine each', v: 'Every agent gets its own Engine built from the same seed and roster, so nobody eats another agent\u0027s depth.' },
             { k: 'returns', v: 'A dict of name to Scorecard.' },
-            { k: 'pt.reference_agents(seed=3)', v: 'The five shipped baselines as a ready dict: hold, random, momentum, mean_reversion and oracle.' },
-            { k: 'pt.capture_ratio(scores)', v: 'Each agent\u0027s P&L as a fraction of the Oracle\u0027s.' }
+            { k: 'tf.reference_agents(seed=3)', v: 'The five shipped baselines as a ready dict: hold, random, momentum, mean_reversion and oracle.' },
+            { k: 'tf.capture_ratio(scores)', v: 'Each agent\u0027s P&L as a fraction of the Oracle\u0027s.' }
           ],
           note: 'One market is one sample. Use rank before you call a winner.' },
-        { name: 'pt.rank',
+        { name: 'tf.rank',
           lede: 'Repeat that across twelve seeds, and separate with a sign test.',
-          sig: 'ranking = pt.rank(\n    factory: Callable[[], dict],\n    *, seeds: Iterable[int], universe: Universe,\n    days: int, workers: int = 1)\n\nranking.report()\nranking.separation("mean_reversion", "momentum")',
+          sig: 'ranking = tf.rank(\n    factory: Callable[[], dict],\n    *, seeds: Iterable[int], universe: Universe,\n    days: int, workers: int = 1)\n\nranking.report()\nranking.separation("mean_reversion", "momentum")',
           members: [
             { k: 'factory', v: 'A callable returning a fresh agent dict per seed, because an agent that carries state across markets is not being measured on either.' },
             { k: 'report()', v: 'Pooled captures, their per-seed ranges, and how many seeds each agent topped.' },
@@ -495,9 +495,9 @@ class Component extends DCLogic {
             { k: 'workers', v: 'Processes. Seeds are independent, so this scales linearly.' }
           ],
           note: 'On the published twelve-market grid, mean-reversion pools at +0.783 and momentum at +0.259, and mean-reversion wins 9 to 3 at p = 0.15. One seed picks the pooled leader eight times in twelve.' },
-        { name: 'pt.tca.analyse',
+        { name: 'tf.tca.analyse',
           lede: 'Price the execution against the world where you never traded.',
-          sig: 'ex = pt.tca.analyse(\n    algo, *, seed: int,\n    universe: Universe, days: int)\n\nex.shortfall_bps()\nex.by_step()\nex.partial_fills()',
+          sig: 'ex = tf.tca.analyse(\n    algo, *, seed: int,\n    universe: Universe, days: int)\n\nex.shortfall_bps()\nex.by_step()\nex.partial_fills()',
           members: [
             { k: 'algo', v: 'Any object with an act method.' },
             { k: 'shortfall_bps()', v: 'What the footprint cost, against the same seed run with no orders.' },
@@ -505,9 +505,9 @@ class Component extends DCLogic {
             { k: 'partial_fills()', v: 'What you asked for against what you got.' }
           ],
           note: 'Round-trip shortfall measured over eight simulation seeds runs -17.72 to +2.03 bps. The range crosses zero, so one run tells you nothing.' },
-        { name: 'pt.RunManifest',
+        { name: 'tf.RunManifest',
           lede: 'Write the run down so someone else can replay it.',
-          sig: 'manifest = pt.RunManifest.of(\n    engine, spec, seed=7)\n\nmanifest.to_json(path)\npt.RunManifest.from_json(text)\npt.reproduce(manifest)',
+          sig: 'manifest = tf.RunManifest.of(\n    engine, spec, seed=7)\n\nmanifest.to_json(path)\npt.RunManifest.from_json(text)\npt.reproduce(manifest)',
           members: [
             { k: 'carries', v: 'Package version, preset, seed, universe fingerprint, macro conditions, scenario and strategy fingerprint, with the expected digest.' },
             { k: 'reproduce()', v: 'Raises on a mismatch and names the component that disagreed.' },

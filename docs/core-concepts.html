@@ -57,11 +57,11 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <section class="pt-s33">
 <h1 class="pt-s29">Core concepts</h1>
 <p class="pt-s17">Three things define a run. Two of them do something you can not expect when the market starts to move.</p>
-<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as pt
+<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as tf
 
-universe = pt.Universe.random(108, seed=7)
-macro = pt.Macro(federal_funds_rate=0.025, corporate_bond_yield=0.052, vix=16.0)
-engine = pt.Engine(seed=42, universe=universe, macro_state=macro)</pre>
+universe = tf.Universe.random(108, seed=7)
+macro = tf.Macro(federal_funds_rate=0.025, corporate_bond_yield=0.052, vix=16.0)
+engine = tf.Engine(seed=42, universe=universe, macro_state=macro)</pre>
 </section>
 
 <section class="pt-s34">
@@ -185,10 +185,10 @@ engine = pt.Engine(seed=42, universe=universe, macro_state=macro)</pre>
 
 <section class="pt-s19">
 <h2 class="pt-s7">Four ways to build a universe</h2>
-<pre class="pt-s30">pt.Universe.random(108, seed=7)          # generated, plausible per sector
-pt.Universe([pt.Instrument(...), ...])   # your own roster
-pt.Universe.from_edgar(snapshot)         # real SEC fundamentals
-pt.Universe.from_json(saved)             # one you saved with to_json
+<pre class="pt-s30">tf.Universe.random(108, seed=7)          # generated, plausible per sector
+tf.Universe([tf.Instrument(...), ...])   # your own roster
+tf.Universe.from_edgar(snapshot)         # real SEC fundamentals
+tf.Universe.from_json(saved)             # one you saved with to_json
 
 universe.fingerprint                     # sha256 over the roster, order included</pre>
 <p style="color:var(--ink-2);margin:0.3rem 0 0">The generator fills twelve sectors round-robin, so a generated roster is more balanced than any real index. That costs nothing over one year. It shows in the second year, as the <a href="index.html#trust">envelope</a> states.</p>
@@ -220,11 +220,11 @@ universe.fingerprint                     # sha256 over the roster, order include
 <section class="pt-s33">
 <h1 class="pt-s29">Core concepts</h1>
 <p class="pt-s17">Three things define a run. Two of them do something you can not expect when the market starts to move.</p>
-<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as pt
+<pre style="margin:0.2rem 0 0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem;overflow-x:auto;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.8125rem;line-height:1.7;color:var(--ink-2)">import tradefloor as tf
 
-universe = pt.Universe.random(108, seed=7)
-macro = pt.Macro(federal_funds_rate=0.025, corporate_bond_yield=0.052, vix=16.0)
-engine = pt.Engine(seed=42, universe=universe, macro_state=macro)</pre>
+universe = tf.Universe.random(108, seed=7)
+macro = tf.Macro(federal_funds_rate=0.025, corporate_bond_yield=0.052, vix=16.0)
+engine = tf.Engine(seed=42, universe=universe, macro_state=macro)</pre>
 </section>
 
 <section class="pt-s34">
@@ -300,10 +300,10 @@ engine = pt.Engine(seed=42, universe=universe, macro_state=macro)</pre>
 
 <section class="pt-s19">
 <h2 class="pt-s7">Four ways to build a universe</h2>
-<pre class="pt-s30">pt.Universe.random(108, seed=7)          # generated, plausible per sector
-pt.Universe([pt.Instrument(...), ...])   # your own roster
-pt.Universe.from_edgar(snapshot)         # real SEC fundamentals
-pt.Universe.from_json(saved)             # one you saved with to_json
+<pre class="pt-s30">tf.Universe.random(108, seed=7)          # generated, plausible per sector
+tf.Universe([tf.Instrument(...), ...])   # your own roster
+tf.Universe.from_edgar(snapshot)         # real SEC fundamentals
+tf.Universe.from_json(saved)             # one you saved with to_json
 
 universe.fingerprint                     # sha256 over the roster, order included</pre>
 <p style="color:var(--ink-2);margin:0.3rem 0 0">The generator fills twelve sectors round-robin, so a generated roster is more balanced than any real index. That costs nothing over one year. It shows in the second year, as the <a href="index.html#trust">envelope</a> states.</p>

@@ -5,11 +5,11 @@ shows a careful reader how to archive and check each one by hand. This module
 is that page as a single artifact:
 
 ```python
-manifest = pt.RunManifest.of(engine, seed=42, universe=u, macro=m)
+manifest = tf.RunManifest.of(engine, seed=42, universe=u, macro=m)
 open("run.json", "w").write(manifest.to_json())
 
 # ...anywhere else, with nothing but the package and the file...
-same = pt.RunManifest.from_json(open("run.json").read()).reproduce()
+same = tf.RunManifest.from_json(open("run.json").read()).reproduce()
 ```
 
 `reproduce()` replays the run and checks the result against the digest the
@@ -46,7 +46,7 @@ A run is only reproducible on a build whose arithmetic matches the build that
 ran it. "Across versions, not at all" is the documented guarantee, and the
 hazard is live: one calendar day brought three trajectory-changing fixes
 (the macro-chain and volume fixes, then the market-factor-sigma
-recalibration) while ``pt.version()`` stayed 0.1.0 and the preset stayed
+recalibration) while ``tf.version()`` stayed 0.1.0 and the preset stayed
 "pt-v1", and the recalibrated constant is not even in the preset dictionary,
 so a preset-value comparison holds still with them. Every NAME the
 library could quote held still while the numbers moved. A manifest that

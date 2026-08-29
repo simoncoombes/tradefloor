@@ -19,9 +19,9 @@ decision.
 
 ```python
 import numpy as np
-import tradefloor as pt
+import tradefloor as tf
 
-engine = pt.Engine(seed=42, universe=pt.Universe.random(20, seed=11))
+engine = tf.Engine(seed=42, universe=tf.Universe.random(20, seed=11))
 
 # whole span, one call
 engine.run_days(252)

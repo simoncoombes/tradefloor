@@ -86,7 +86,7 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
         # target weights, one per name
         return {"AAA": 0.2, "AAB": -0.1}
 
-scores = pt.evaluate(
+scores = tf.evaluate(
     {"mine": Mine()}, seed=7,
     universe=u, days=10)
 
@@ -163,8 +163,8 @@ scores["mine"].impact_bps</pre>
 
 <div class="pt-s28">
 <div style="display:flex;flex-direction:column;gap:0.8rem">
-<pre class="pt-s30">ranking = pt.rank(
-    lambda: pt.reference_agents(seed=3),
+<pre class="pt-s30">ranking = tf.rank(
+    lambda: tf.reference_agents(seed=3),
     seeds=range(12), universe=u,
     days=10, workers=4)
 
@@ -331,7 +331,7 @@ ranking.separation("mean_reversion",
         # target weights, one per name
         return {"AAA": 0.2, "AAB": -0.1}
 
-scores = pt.evaluate(
+scores = tf.evaluate(
     {"mine": Mine()}, seed=7,
     universe=u, days=10)
 
@@ -384,8 +384,8 @@ scores["mine"].impact_bps</pre>
 
 <div class="pt-s28">
 <div style="display:flex;flex-direction:column;gap:0.8rem">
-<pre class="pt-s30">ranking = pt.rank(
-    lambda: pt.reference_agents(seed=3),
+<pre class="pt-s30">ranking = tf.rank(
+    lambda: tf.reference_agents(seed=3),
     seeds=range(12), universe=u,
     days=10, workers=4)
 

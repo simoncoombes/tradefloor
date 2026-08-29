@@ -64,6 +64,6 @@ Raising it to 12.0 is the whole of `pt-v12`, and every earlier preset still
 runs the 4.0, which is why they replay unchanged. It is a real parameter now,
 one of the 87 `ModelParams.settable()` lists, and readable as
 `ModelParams.from_preset("pt-v12").volume_move_cap`. `model_preset()` still
-shows neither number. So quote the preset name AND `pt.version()` when you
+shows neither number. So quote the preset name AND `tf.version()` when you
 publish -- the version is what actually pins the build. See
 [Reproducing a run](reproducing-a-run.md).
