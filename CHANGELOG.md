@@ -62,7 +62,22 @@ difference between an experiment and a number.
 - YAML is read by `tradefloor.yaml_subset`, which implements the block-style
   subset the schema uses and refuses everything else by name. No dependency,
   no tags, no anchors, no flow style, and nothing a scenario file could use
-  to construct a Python object.
+  to construct a Python object. It agrees with `yaml.safe_load` on every
+  document it accepts, checked by a differential fuzz over sixteen thousand
+  generated documents; the classes that fuzz found -- `0x1f` is thirty-one,
+  `1_000` is a thousand, and `operation: -` is a syntax error rather than the
+  string `-` -- are all refused now.
+- A `hold` ends when it says it does, on every target. For a macro field
+  that needs no help -- the chain recomputes it. Nothing in the engine writes
+  `avg_volume` or `tariff_rate`, so on those the scenario puts the level back
+  itself, once, when the LAST window on that target closes; the restore is in
+  the audit trail as a `release`. Until it was, a twenty-five day liquidity
+  crisis quietly lasted for the rest of the run.
+- A relative operation cannot write a value its target cannot mean. `check`
+  sees the multiplier and only the run sees the result, so the result is
+  checked on the day it is written: `add -500` on `macro.vix` wrote a VIX of
+  -485 and the market traded a session against it, because `(vix/15)^2`
+  squares the sign away and nothing else looked.
 - Six scenarios ship in `scenarios/`, each carrying its measured effect and
   the statement that it is not a forecast. None names a political actor.
 - `examples/11-scenario-fork.py` is the whole workflow in one file.

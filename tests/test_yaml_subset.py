@@ -122,6 +122,13 @@ REFUSED = [
     ("a: 2026-08-29", "datetime"),
     ("a: .inf", "infinity"),
     ("a: .nan", "not-a-number"),
+    # Found by the differential fuzz below, not by reading the spec.
+    ("a: 0x1f", "hexadecimal"),
+    ("a: 1_000", "digit separator"),
+    ("a: -", "opens a block sequence"),
+    ("a: - x", "opens a block sequence"),
+    ("a: %v", "reserved indicator"),
+    ("a: `x", "reserved indicator"),
 ]
 
 
@@ -178,6 +185,110 @@ def test_the_ambiguous_number_refusals_are_the_ones_pyyaml_disagrees_on():
                       __import__("datetime").date)
     with pytest.raises(YamlSubsetError):
         read("a: 2026-08-29")
+
+
+def _fuzz_document(rng):
+    """One generated block-YAML document, from the grammar the schema uses."""
+    keys = ["a", "b", "name", "target", "value", "at", "duration", "shape"]
+    scalars = ["1", "0", "-2", "+3", "1.5", "-0.05", "0.40", "1500.0",
+               "2.0e+3", "true", "false", "null", "~", "", "hello",
+               "hello world", "macro.policy_rate", "a-b_c", "x:y", "a#b",
+               "'quoted'", "'with: colon'", "'it''s'", '"dq"', "multiply",
+               "  spaced  ", "a,b", "3 # trailing", "yes", "no", "on", "off",
+               ".5", "5.", "e5", "inf", "0x1f", "1_000", "-", "007", "1:30"]
+
+    def mapping(indent, depth, budget):
+        lines, used = [], set()
+        for _ in range(rng.randint(1, 3)):
+            if budget[0] <= 0:
+                break
+            budget[0] -= 1
+            key = rng.choice(keys)
+            if key in used:
+                continue
+            used.add(key)
+            pad = " " * indent
+            roll = rng.random()
+            if depth > 0 and roll < 0.18:
+                lines.append(f"{pad}{key}:")
+                lines.extend(mapping(indent + rng.choice([1, 2, 4]),
+                                     depth - 1, budget))
+            elif depth > 0 and roll < 0.40:
+                lines.append(f"{pad}{key}:")
+                lines.extend(sequence(indent + rng.choice([0, 2, 4]),
+                                      depth - 1, budget))
+            elif roll < 0.48:
+                style = rng.choice([">", "|", ">-", "|-"])
+                lines.append(f"{pad}{key}: {style}")
+                for _ in range(rng.randint(1, 3)):
+                    lines.append(f"{' ' * (indent + 2)}"
+                                 f"{rng.choice(['some text', 'a b c'])}")
+            else:
+                lines.append(f"{pad}{key}: {rng.choice(scalars)}")
+            if rng.random() < 0.12:
+                lines.append(f"{' ' * indent}# a comment")
+            if rng.random() < 0.10:
+                lines.append("")
+        return lines
+
+    def sequence(indent, depth, budget):
+        lines, pad = [], " " * indent
+        for _ in range(rng.randint(1, 3)):
+            if budget[0] <= 0:
+                break
+            budget[0] -= 1
+            if rng.random() < 0.3:
+                lines.append(f"{pad}- {rng.choice(scalars)}")
+                continue
+            inner = [ln for ln in mapping(0, depth - 1, budget) if ln.strip()]
+            if not inner:
+                lines.append(f"{pad}- {rng.choice(scalars)}")
+                continue
+            first, *rest = inner
+            lines.append(f"{pad}- {first.lstrip()}")
+            lines.extend(f"{pad}  {ln.lstrip()}" for ln in rest)
+        return lines
+
+    return "\n".join(mapping(0, 3, [12])) + "\n"
+
+
+def test_the_reader_never_disagrees_with_a_real_parser():
+    """The property the whole module rests on, fuzzed rather than argued.
+
+    A document this reader ACCEPTS must be read the way `yaml.safe_load`
+    reads it. Refusing something pyyaml accepts is the safe direction and is
+    fine; reading it differently is not, because then a scenario file means
+    one thing to its author and another to the simulator.
+
+    Seeded, so a failure is reproducible, and small enough to be an ordinary
+    test. The version of this that ran during development, over sixteen
+    thousand documents on four seeds, is what found `0x1f`, `1_000` and the
+    bare `-` in the refusal list above -- none of which came from reading the
+    YAML spec.
+    """
+    import random
+
+    rng = random.Random(20260829)
+    accepted = disagreements = 0
+    for _ in range(1500):
+        text = _fuzz_document(rng)
+        try:
+            mine = read(text)
+        except YamlSubsetError:
+            continue
+        try:
+            theirs = yaml.safe_load(text)
+        except Exception:
+            # We accepted a document pyyaml calls malformed. That is a
+            # disagreement too: it means a file that works here works
+            # nowhere else.
+            disagreements += 1
+            raise AssertionError(
+                f"pyyaml rejects a document we accept:\n{text}") from None
+        accepted += 1
+        assert mine == theirs, f"read differently:\n{text}\n{mine!r}\n{theirs!r}"
+    assert accepted > 300, f"the fuzz accepted only {accepted} documents"
+    assert disagreements == 0
 
 
 def test_the_reader_builds_only_plain_data():

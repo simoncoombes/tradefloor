@@ -22,10 +22,10 @@ import argparse
 import sys
 from typing import Sequence
 
-from . import __version__
+from . import __version__, yaml_subset
 from ._core import ValidationError
-from .interventions import TARGETS, UNSUPPORTED
-from .scenario import Scenario
+from .interventions import SCENARIO_SCHEMA, TARGETS, UNSUPPORTED
+from .scenario import Scenario, _wrap
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -68,11 +68,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _load(path: str) -> Scenario:
+    """Read one file, and let a missing one say so.
+
+    `Scenario.from_yaml` takes a path OR a document, which is right for a
+    notebook and wrong here: a typo in a filename would be parsed as YAML and
+    reported as a schema error. Reading the file first means "no such file"
+    stays "no such file".
+    """
     with open(path, "r", encoding="utf-8") as handle:
         text = handle.read()
-    scenario = Scenario.from_yaml(text)
-    scenario._source = path
-    return scenario
+    return Scenario.from_document(yaml_subset.read(text), source=path)
 
 
 def _validate(paths: Sequence[str]) -> int:
@@ -90,7 +95,7 @@ def _validate(paths: Sequence[str]) -> int:
             f"{path}\n"
             f"Scenario valid.\n\n"
             f"Name:          {scenario.name}\n"
-            f"Schema:        v1\n"
+            f"Schema:        v{SCENARIO_SCHEMA}\n"
             f"Shocks:        {len(scenario.shocks)}\n"
             f"Transmission:  {len(scenario.transmission)}\n"
             f"Fingerprint:   {scenario.fingerprint}"
@@ -119,6 +124,11 @@ def _diff(left_path: str, right_path: str) -> int:
     print(f"  B  {right.name}   {right.fingerprint}")
     if left.fingerprint == right.fingerprint:
         print("\nThe two resolve to the same scenario.")
+        return 0
+    if not (left.interventions or right.interventions):
+        print("\nNeither declares any interventions, so there is nothing to "
+              "line up target by target. They differ in name, description or "
+              "macro path; `show` prints both in full.")
         return 0
 
     def by_target(scenario: Scenario) -> dict[str, list[str]]:
@@ -157,19 +167,6 @@ def _targets() -> int:
             print(f"    {line}")
         print()
     return 0
-
-
-def _wrap(text: str, width: int = 72) -> list[str]:
-    words, lines, current = text.split(), [], ""
-    for word in words:
-        if current and len(current) + 1 + len(word) > width:
-            lines.append(current)
-            current = word
-        else:
-            current = f"{current} {word}".strip()
-    if current:
-        lines.append(current)
-    return lines
 
 
 if __name__ == "__main__":

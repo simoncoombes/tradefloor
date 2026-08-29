@@ -257,20 +257,35 @@ def test_the_fingerprint_is_stable_across_formatting():
 
 
 def test_the_fingerprint_moves_when_the_experiment_does():
-    base = Scenario.from_yaml(YAML).fingerprint
-    for changed in (
-        YAML.replace("value: 2.0", "value: 2.5"),
-        YAML.replace("at: 5", "at: 6"),
-        YAML.replace("duration: 10", "duration: 11"),
-        YAML.replace("name: probe", "name: probe2"),
-        YAML.replace("  transmission:", "  shocks:").replace(
-            "  shocks:\n    - target: macro.vix", "  x:\n    - target: macro.vix", 1),
-    ):
-        try:
-            other = Scenario.from_yaml(changed).fingerprint
-        except ScenarioValidationError:
-            continue
-        assert other != base
+    """Every edit below MUST move the hash, and every one must be reached.
+
+    An earlier version of this caught a `ScenarioValidationError` and
+    `continue`d, so a case that stopped parsing stopped being checked and the
+    test still passed. A skip and a pass are the same colour.
+    """
+    base = Scenario.from_yaml(YAML)
+    edits = {
+        "value": YAML.replace("value: 2.0", "value: 2.5"),
+        "at": YAML.replace("at: 5", "at: 6"),
+        "duration": YAML.replace("duration: 10", "duration: 11"),
+        "name": YAML.replace("name: probe", "name: probe2"),
+        "operation": YAML.replace("operation: multiply", "operation: set"),
+        "description": YAML.replace("Example experimental assumptions.",
+                                    "Different assumptions."),
+    }
+    for label, text in edits.items():
+        changed = Scenario.from_yaml(text)
+        assert changed.fingerprint != base.fingerprint, label
+
+    # And the role an intervention is filed under is part of the experiment,
+    # which YAML cannot express as an edit to one line.
+    same_values = Scenario(name=base.name, description=base.description)
+    for item in base.interventions:
+        same_values.intervene(Intervention(
+            item.target, operation=item.operation, value=item.value,
+            at=item.at, duration=item.duration, shape=item.shape,
+            role="shock"))
+    assert same_values.fingerprint != base.fingerprint
 
 
 def test_declared_order_is_part_of_the_experiment():
@@ -360,6 +375,133 @@ def test_a_hold_does_not_compound():
     assert len(written) == 6
     assert written == [pytest.approx(written[0])] * 6
     assert written[0] == pytest.approx(scenario.log[0].previous * 2.0)
+
+
+def test_a_hold_on_liquidity_puts_the_depth_back():
+    """The defect this restore exists to close.
+
+    Nothing in the engine writes `avg_volume` -- the shipped close policy is
+    Hold -- so "release" could not mean "stop writing". A five-day hold
+    thinned the book on day 2 and the book was still thin on day 14, under a
+    scenario whose own description said the window ended on day 7.
+    """
+    engine = tf.Engine(seed=SEED, universe=list(UNIVERSE))
+    before = engine.column("avg_volume")
+
+    scenario = liquidity_scenario(at=2, duration=5, factor=0.25)
+    inside = None
+    for day in range(14):
+        scenario.apply(engine, day)
+        engine.open_market()
+        engine.run_session(9, 30, 3, TICKS)
+        engine.close_market()
+        if day == 4:
+            inside = engine.column("avg_volume")
+
+    assert inside is not None and inside != before
+    assert engine.column("avg_volume") == before
+    releases = [f for f in scenario.log if f.operation == "release"]
+    assert [f.day for f in releases] == [7]
+    assert releases[0].new == pytest.approx(sum(
+        struct.unpack("<%dd" % len(UNIVERSE), before)))
+
+
+def test_overlapping_holds_restore_the_level_from_before_either_began():
+    """The release is per TARGET, and this is why.
+
+    Holds on days 1-4 and 3-6. Restoring what each one personally found puts
+    back full depth on day 5 and then HALF depth on day 7 -- because half is
+    what the second found while the first was running. The run ends thinned,
+    with nothing raised.
+    """
+    scenario = (Scenario(name="two")
+                .shock("market.liquidity", operation="multiply", value=0.5,
+                       at=1, duration=4)
+                .shock("market.liquidity", operation="multiply", value=0.5,
+                       at=3, duration=4))
+    engine = tf.Engine(seed=SEED, universe=list(UNIVERSE))
+    before = engine.column("avg_volume")
+    for day in range(12):
+        scenario.apply(engine, day)
+        engine.open_market()
+        engine.run_session(9, 30, 3, TICKS)
+        engine.close_market()
+
+    releases = [f for f in scenario.log if f.operation == "release"]
+    assert [f.day for f in releases] == [7], "one release, when the LAST ends"
+    assert engine.column("avg_volume") == before
+
+
+def test_a_release_is_a_logged_input_so_a_replay_reproduces_it():
+    """A restore that a replay did not carry would be a fork of the market."""
+    scenario = liquidity_scenario(at=2, duration=4, factor=0.3)
+    engine = tf.Engine(seed=SEED, universe=list(UNIVERSE))
+    for day in range(12):
+        scenario.apply(engine, day)
+        engine.open_market()
+        engine.run_session(9, 30, 3, TICKS)
+        engine.record(day)
+        engine.close_market()
+
+    writes = [e for e in engine.order_log if e["op"] == "set_avg_volume"]
+    assert len(writes) == 5, "four inside the window and one release"
+    resumed = tf.Checkpoint.of(engine, universe=list(UNIVERSE),
+                               seed=SEED).resume()
+    assert prices(resumed) == prices(engine)
+    assert resumed.column("avg_volume") == engine.column("avg_volume")
+
+
+def test_a_hold_on_a_self_restoring_target_writes_no_release():
+    """A macro field needs no help: the chain moves it back on its own.
+
+    Writing a restore there would be the library overriding the endogenous
+    dynamics it exists to run.
+    """
+    scenario = Scenario(name="v").shock(
+        "macro.vix", operation="multiply", value=2.0, at=2, duration=4)
+    run(scenario, days=12)
+    assert not [f for f in scenario.log if f.operation == "release"]
+
+
+def test_a_relative_operation_cannot_write_a_value_the_target_cannot_mean():
+    """`check` sees the multiplier; only the run sees the result.
+
+    `add -500` on macro.vix wrote a VIX of -485 and the market traded a
+    session against it, because (vix/15)^2 squares the sign away and nothing
+    else looked. The result is now checked on the day it is written.
+    """
+    cases = [
+        (dict(target="macro.vix", operation="add", value=-500.0),
+         "positive VIX level"),
+        (dict(target="macro.fear_greed", operation="multiply", value=1000.0),
+         "sentiment range"),
+        (dict(target="macro.policy_rate", operation="multiply", value=100.0),
+         "plausible rate band"),
+        (dict(target="market.liquidity", operation="add", value=-1e12),
+         "positive share count"),
+    ]
+    for kwargs, fragment in cases:
+        scenario = Scenario(name="bad").shock(at=1, **kwargs)
+        with pytest.raises(ScenarioValidationError) as exc:
+            run(scenario, days=4)
+        message = str(exc.value)
+        assert fragment in message, (kwargs, message)
+        # The message has to name the live value it started from, or the
+        # reader cannot tell a bad multiplier from a market that moved.
+        assert "applied to" in message and "day 1" in message
+
+
+def test_a_neutral_value_is_settable():
+    """Both of these were refused, and both are the field's own default.
+
+    `qe_pe_boost` opens at 0.0 and `fear_greed` runs from 0, so a check that
+    demanded a positive `set` refused turning the boost off and refused the
+    most extreme fear the index can express.
+    """
+    Intervention("macro.qe_pe_boost", operation="set", value=0.0, at=1)
+    Intervention("macro.fear_greed", operation="set", value=0.0, at=1)
+    with pytest.raises(ScenarioValidationError):
+        Intervention("macro.fear_greed", operation="set", value=140.0, at=1)
 
 
 def test_a_hold_releases_the_field_when_it_ends():
@@ -520,7 +662,7 @@ def test_applying_a_scenario_to_one_fork_does_not_touch_another():
     must not have written a single value into it.
     """
     engine = tf.Engine(seed=SEED, universe=list(UNIVERSE))
-    for day in range(10):
+    for _ in range(10):
         engine.open_market()
         engine.run_session(9, 30, 3, TICKS)
         engine.close_market()
@@ -529,17 +671,27 @@ def test_applying_a_scenario_to_one_fork_does_not_touch_another():
     lonely, = tf.branch(engine, 1)
 
     scenario = liquidity_scenario(at=0, duration=5)
+    inside_window = None
     for day in range(10):
         scenario.apply(stress, day)
         for branch in (control, stress, lonely):
             branch.open_market()
             branch.run_session(9, 30, 3, TICKS)
             branch.close_market()
+        if day == 3:
+            inside_window = (stress.column("avg_volume"),
+                             control.column("avg_volume"))
 
     assert prices(control) == prices(lonely)
     assert prices(stress) != prices(control)
     assert control.column("avg_volume") == lonely.column("avg_volume")
-    assert stress.column("avg_volume") != control.column("avg_volume")
+    # Thin INSIDE the window. Asserting this at the end of the run instead is
+    # what an earlier version of this test did, and it passed for the wrong
+    # reason: the column was never restored, so it read as different because
+    # of a defect rather than because of the shock.
+    assert inside_window is not None and inside_window[0] != inside_window[1]
+    # And back afterwards -- the window was days 0-4, and this is day 9.
+    assert stress.column("avg_volume") == control.column("avg_volume")
     # And the scenario's own trail belongs to the branch it was applied to.
     assert {f.target for f in scenario.log} == {"market.liquidity"}
 

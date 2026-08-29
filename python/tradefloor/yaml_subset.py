@@ -58,10 +58,20 @@ Numbers are narrower than YAML 1.1 on purpose, and the narrowing is a
 REFUSAL rather than a different answer. `1:30` is ninety to a YAML parser and
 one-thirty to a reader; `007` is seven; `2026-08-29` is a datetime object;
 `1e3` and `1.0e3` are TEXT, because YAML 1.1 wants a decimal point and a
-signed exponent. Each of those is a value that would mean something other
-than it looks like, so each raises and says what to write instead. Silently
-picking either answer is the quietest defect a configuration reader can
-have.
+signed exponent; `0x1f` is thirty-one; `1_000` is a thousand. Each of those
+is a value that would mean something other than it looks like, so each raises
+and says what to write instead. Silently picking either answer is the
+quietest defect a configuration reader can have.
+
+The same rule covers the other direction. `operation: -` is a syntax error to
+a real parser, because a dash opens a block sequence rather than a value, and
+reading it as the string "-" would accept a file nothing else will. Leading
+indicator characters are refused for that reason.
+
+All three classes came out of a differential fuzz against `yaml.safe_load`
+over four thousand generated block documents. That fuzz is the reason this
+reader can be trusted at all, and `tests/test_yaml_subset.py` keeps a
+regression corpus from it.
 
 ## What it does not claim
 
@@ -525,6 +535,7 @@ def _scalar(text: str, line: _Line) -> Any:
             )
         return _unquote(text[: end + 1], text[0], line)
     _refuse_unread(text, line)
+    _refuse_indicator(text, line)
 
     lowered = text.lower()
     if lowered in _TRUE:
@@ -564,7 +575,22 @@ _AMBIGUOUS = (
      "number to a reader. Write 1500.0, or 1.5e+3"),
     (re.compile(r"^[-+]?\.(?:inf|nan)$", re.I),
      "infinity and not-a-number are not values a scenario can mean"),
+    (re.compile(r"^[-+]?0[xXoObB][0-9a-fA-F_]+$"),
+     "YAML 1.1 reads this as hexadecimal, octal or binary, so 0x1f is "
+     "thirty-one. Write it in decimal, or quote it"),
+    (re.compile(r"^[-+]?[0-9][0-9_]*_[0-9_.eE+-]*$"),
+     "YAML 1.1 reads an underscore in a number as a digit separator, so "
+     "1_000 is a thousand. Write it without the underscores"),
 )
+
+#: Characters a plain scalar cannot begin with.
+#:
+#: `operation: -` is not the string "-": the dash opens a block sequence,
+#: and a real parser calls the document malformed. Reading it as text is
+#: the wrong kind of permissive -- it accepts a file nothing else will.
+#: `-2` is fine, because the indicator only applies when a space follows.
+_INDICATOR_ALONE = frozenset("-?:")
+_INDICATOR_RESERVED = frozenset("%@`,")
 
 
 def _refuse_ambiguous_number(text: str, line: _Line) -> None:
@@ -574,6 +600,23 @@ def _refuse_ambiguous_number(text: str, line: _Line) -> None:
                 f"{text!r} is ambiguous: {why}",
                 line=line.number, text=line.raw,
             )
+
+
+def _refuse_indicator(text: str, line: _Line) -> None:
+    """A plain scalar that a real parser would not read as a scalar at all."""
+    if text in _INDICATOR_ALONE or text[:2] in ("- ", "? ", ": "):
+        raise YamlSubsetError(
+            f"{text!r} begins with {text[0]!r}, which opens a block sequence "
+            f"or a complex key rather than a value. A YAML parser calls this "
+            f"document malformed; quote it if you meant the text",
+            line=line.number, text=line.raw,
+        )
+    if text[:1] in _INDICATOR_RESERVED:
+        raise YamlSubsetError(
+            f"{text!r} begins with the reserved indicator {text[0]!r}, which "
+            f"a plain scalar cannot. Quote it if you meant the text",
+            line=line.number, text=line.raw,
+        )
 
 
 def _number(text: str) -> int | float | None:
