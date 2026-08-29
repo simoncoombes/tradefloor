@@ -26,7 +26,8 @@ from ._core import Engine, Instrument, Macro, ModelParams, News, ValidationError
 # by name rather than by falling through a chain of ifs into silence.
 _OPS = frozenset({
     "open_market", "close_market", "tick", "run_session", "pin_macro",
-    "list_instrument", "delist", "draw_uniform", "draw_normal", "record",
+    "set_avg_volume", "list_instrument", "delist", "draw_uniform",
+    "draw_normal", "record",
 })
 
 
@@ -100,6 +101,8 @@ def replay(
             ))
         elif op == "pin_macro":
             engine.pin_macro(**entry["fields"])
+        elif op == "set_avg_volume":
+            engine.set_avg_volume(entry["values"])
         elif op == "tick":
             engine.tick(
                 entry["hour"], entry["minute"], entry["day_of_week"],

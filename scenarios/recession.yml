@@ -1,0 +1,60 @@
+# Example experimental assumptions. This scenario is not a forecast, and not
+# a claim about how a real market behaves in a real recession.
+#
+# The strongest lever here is the CYCLE PHASE, not the growth rate. Setting
+# the phase to `contraction` retargets GDP growth, unemployment and the
+# recession probability at the next monthly step, and it also raises the
+# universe's own stress intensity immediately. Measured on
+# `Universe.random(20, seed=101)` over 120 days, seeds 3/11/29: the phase
+# change alone moved the median instrument -3.04%.
+#
+# `macro.growth` is the intuitive lever and it is nearly inert: growth pinned
+# three percentage points lower for a hundred days moved the median
+# instrument +0.36%. Growth reaches equities only through the central bank,
+# and the bank's response to weaker growth is to cut, which supports prices.
+# That sign is not a defect, and this file states the growth assumption
+# anyway -- an experiment that only used the lever that "works" would be
+# choosing its answer.
+
+version: 1
+
+scenario:
+  name: recession
+
+  description: >
+    A downturn: the cycle turns to contraction on day 50 and growth is held
+    three percentage points lower, with an assumed volatility and credit
+    response. Example experimental assumptions, not a forecast.
+
+  shocks:
+
+    - target: macro.cycle
+      operation: set
+      value: contraction
+      at: 50
+      shape: permanent
+
+    - target: macro.growth
+      operation: add
+      value: -0.03
+      at: 50
+      shape: permanent
+
+  transmission:
+
+    # Assumed risk response: half again the volatility, for two months.
+    - target: macro.vix
+      operation: multiply
+      value: 1.50
+      at: 50
+      duration: 60
+
+    # Assumed credit response: 150 basis points wider, held. This is the
+    # channel that carries a recession into equity prices in this model,
+    # and it is an assumption rather than something the engine derives from
+    # the growth path.
+    - target: macro.corporate_yield
+      operation: add
+      value: 0.015
+      at: 50
+      shape: permanent

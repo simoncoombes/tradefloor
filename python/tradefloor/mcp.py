@@ -129,7 +129,9 @@ MAX_SEEDS = 12
 #: An earlier draft of this module exposed ONLY these, on the stated grounds
 #: that free-form building was "a fluent API over 40-odd engine fields" and
 #: would let a model pin macro state nobody calibrated. Both halves were
-#: wrong. A scenario pins SEVEN validated macro fields, not forty; unknown
+#: wrong. A scenario pins a SHORT, VALIDATED list of macro fields -- eleven
+#: since the intervention framework exposed four the economy already
+#: carried -- not forty; unknown
 #: names are refused with the valid list; and `Scenario` already round-trips
 #: through `to_json`/`from_json`, so it is data in exactly the way a
 #: `StrategySpec` is data.
@@ -991,7 +993,7 @@ def _scenario_from(doc: Any, days: int) -> Any:
 
 @server.tool(
     description="Author a custom macro scenario from hold/ramp/step "
-                "instructions over the seven macro fields, and see its "
+                "instructions over the pinnable macro fields, and see its "
                 "day-by-day table before running it."
 )
 def build_scenario(steps: list[dict[str, Any]], label: str = "",

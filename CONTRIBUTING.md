@@ -28,13 +28,21 @@ In practice:
 git clone https://github.com/simoncoombes/tradefloor
 cd tradefloor
 uv venv && source .venv/bin/activate
-uv pip install maturin pytest pyarrow numpy
+uv pip install maturin pytest pyarrow numpy pyyaml
 maturin develop --release
 ```
 
 `--release` is not optional for anything you intend to measure: a debug
 build is roughly thirty times slower and you will conclude the simulator is
 unusable.
+
+`pyyaml` is a DEVELOPMENT dependency only, and the library never imports it.
+Scenario files are read by `tradefloor.yaml_subset`, a strict reader for the
+block-style subset the schema uses, because the package depends on nothing
+and a configuration file should not change that. pyyaml is here so
+`tests/test_yaml_subset.py` can check that reader against a real parser on
+every fragment it accepts and every scenario the repository ships. Without
+it those tests skip, and a skip and a pass are the same colour.
 
 ## Tests
 

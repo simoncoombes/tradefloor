@@ -1,0 +1,60 @@
+# Example experimental assumptions. This scenario is not a forecast, and not
+# a claim about how a real market responds to a real change of government.
+#
+# There is no candidate here, no party and no election, and there will not
+# be. A scenario named after a person is a political forecast wearing a
+# simulator's clothes, and this library has nothing to say about who wins an
+# election. What it can do is run a market under an explicitly stated policy
+# assumption, so that the assumption is the thing being argued about.
+#
+# So the political event is abstracted into the economics: a tariff rate that
+# moves, and an assumed response in prices and credit. Anyone who wants to
+# map a narrative onto this file can, and the mapping stays theirs.
+#
+# The tariff channel is real and small. `policy.tariff_rate` is the one
+# target here nothing moves endogenously, so a change to it is permanent by
+# construction, and it adds (rate - 5pp) * 0.01 to the monthly inflation
+# step. Measured on `Universe.random(20, seed=101)` over 120 days, seeds
+# 3/11/29: +8 percentage points of tariff moved the median instrument 0.00%
+# (worst -0.25%, best +0.37%) -- indistinguishable from noise at three seeds.
+# The transmission block below is therefore where this scenario's content
+# actually lives, which is exactly why it is written down separately.
+
+version: 1
+
+scenario:
+  name: policy_regime_shift
+
+  description: >
+    A change in trade and monetary policy: tariffs eight percentage points
+    higher from day 40, with an assumed inflation and credit response.
+    Example experimental assumptions about policy, not about any election,
+    party or person.
+
+  shocks:
+
+    - target: policy.tariff_rate
+      operation: add
+      value: 0.08
+      at: 40
+      shape: permanent
+
+  transmission:
+
+    # Assumed pass-through of tariffs into consumer prices: 40 basis points,
+    # held. The engine's own tariff-to-inflation channel is roughly a third
+    # of this and arrives monthly; the difference is the assumption.
+    - target: macro.inflation
+      operation: add
+      value: 0.004
+      at: 50
+      shape: permanent
+
+    # Assumed policy-uncertainty repricing, arriving before the tariff does
+    # because markets price a regime change when it becomes likely rather
+    # than when it takes effect.
+    - target: macro.corporate_yield
+      operation: add
+      value: 0.005
+      at: 30
+      shape: permanent

@@ -56,6 +56,11 @@ claude = ["anthropic>=0.40", "pydantic>=2"]
 mcp = ["mcp>=2.0"]
 
 [project.scripts]
+# Reads scenario files: `tradefloor scenario validate scenarios/*.yml`. It
+# does not run a market, which is the point -- configuration that can only be
+# checked by running a hundred-day simulation is configuration nobody checks.
+# `python -m tradefloor ...` is the same command tree without the script.
+tradefloor = "tradefloor.__main__:main"
 # Speaks MCP over stdio. Point an MCP client at `tradefloor-mcp` with no
 # arguments; see docs/mcp.md for a client configuration block.
 tradefloor-mcp = "tradefloor.mcp:main"

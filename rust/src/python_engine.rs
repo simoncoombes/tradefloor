@@ -1447,10 +1447,32 @@ impl PyEngine {
     ///
     /// Rates are FRACTIONAL, as everywhere else, and validated before being
     /// converted.
+    ///
+    /// # Four fields the market cannot see directly
+    ///
+    /// `gdp_growth`, `unemployment_rate`, `tariff_rate` and `oil_price` sit
+    /// in the same economy struct as the rest, but nothing in the market
+    /// reads them: the tick reads `federal_funds_rate`, `corporate_bond_yield`,
+    /// `qe_pe_boost`, `vix` and the cycle phase, and NOTHING else. These four
+    /// reach a price only through the macro chain -- the monthly inflation
+    /// update, then the central bank's next MEETING, then the curve. That is
+    /// slower than a short study, and it is the same horizon trap the
+    /// `tradefloor.scenario` module documents for the policy rate.
+    ///
+    /// They are here because they are what a supply shock or a tariff
+    /// actually IS in this model, and because the alternative -- moving
+    /// inflation by hand and calling it an oil shock -- states the
+    /// transmission as a fact rather than as an assumption.
+    ///
+    /// `gdp_growth`, `unemployment_rate` and `tariff_rate` are FRACTIONAL
+    /// like every other rate here (0.025 is 2.5%). `oil_price` is a price in
+    /// dollars, and the daily chain clamps it into [35, 150] on its next
+    /// step, so a pin outside that band survives only the day it is written.
     #[pyo3(signature = (
         *, vix = None, federal_funds_rate = None, corporate_bond_yield = None,
         inflation_rate = None, qe_pe_boost = None, fear_greed_index = None,
-        cycle = None
+        gdp_growth = None, unemployment_rate = None, tariff_rate = None,
+        oil_price = None, cycle = None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn pin_macro(
@@ -1461,6 +1483,10 @@ impl PyEngine {
         inflation_rate: Option<f64>,
         qe_pe_boost: Option<f64>,
         fear_greed_index: Option<f64>,
+        gdp_growth: Option<f64>,
+        unemployment_rate: Option<f64>,
+        tariff_rate: Option<f64>,
+        oil_price: Option<f64>,
         cycle: Option<String>,
     ) -> PyResult<()> {
         // Validate EVERYTHING before writing ANYTHING. A pin that applied the
@@ -1471,6 +1497,9 @@ impl PyEngine {
             ("federal_funds_rate", federal_funds_rate),
             ("corporate_bond_yield", corporate_bond_yield),
             ("inflation_rate", inflation_rate),
+            ("gdp_growth", gdp_growth),
+            ("unemployment_rate", unemployment_rate),
+            ("tariff_rate", tariff_rate),
         ] {
             if let Some(v) = v {
                 crate::units::check_rate(name, v).map_err(ValidationError::new_err)?;
@@ -1487,6 +1516,19 @@ impl PyEngine {
                         "{name} must be finite, got {v}"
                     )));
                 }
+            }
+        }
+        // A price, not a rate, so the fractional band does not apply -- but a
+        // non-positive one is not a cheaper barrel, it is a barrel the
+        // seasonality multiply and the inventory ratio both divide by, and
+        // the chain carries the result forward for the rest of the run.
+        if let Some(v) = oil_price {
+            if !v.is_finite() || v <= 0.0 {
+                return Err(ValidationError::new_err(format!(
+                    "oil_price must be finite and positive, got {v}. It is a price \
+                     in dollars (the engine opens at 75.0), not a fraction or a \
+                     multiplier."
+                )));
             }
         }
         let phase = match cycle.as_deref() {
@@ -1506,6 +1548,10 @@ impl PyEngine {
             ("inflation_rate", inflation_rate),
             ("qe_pe_boost", qe_pe_boost),
             ("fear_greed_index", fear_greed_index),
+            ("gdp_growth", gdp_growth),
+            ("unemployment_rate", unemployment_rate),
+            ("tariff_rate", tariff_rate),
+            ("oil_price", oil_price),
         ] {
             if let Some(v) = value {
                 logged.push((name.to_string(), v));
@@ -1535,10 +1581,127 @@ impl PyEngine {
         if let Some(v) = fear_greed_index {
             e.fear_greed_index = v;
         }
+        if let Some(v) = gdp_growth {
+            e.gdp_growth = crate::units::fraction_to_percent(v);
+        }
+        if let Some(v) = unemployment_rate {
+            e.unemployment_rate = crate::units::fraction_to_percent(v);
+        }
+        if let Some(v) = tariff_rate {
+            e.tariff_rate = crate::units::fraction_to_percent(v);
+        }
+        if let Some(v) = oil_price {
+            e.oil_price = v;
+        }
         if let Some(p) = phase {
             e.cycle_phase = p;
         }
         Ok(())
+    }
+
+    /// Every field [`PyEngine::pin_macro`] can write, as it can write it.
+    ///
+    /// The read side of the narrow write surface, and the reason it exists
+    /// separately from [`PyEngine::macro_state`] is UNITS. `macro_state`
+    /// returns the seven fields the `Macro` constructor takes;
+    /// `state_snapshot()["economy"]` returns the whole economy in the CORE'S
+    /// percent denomination. Neither is the set `pin_macro` accepts, and an
+    /// intervention that multiplies a value it read by 1.4 and writes it back
+    /// has to read and write in the same units or it is a factor of a hundred
+    /// out, silently, on a plausible-looking trajectory. See `units.rs`.
+    ///
+    /// So this returns exactly the pinnable fields, in exactly the
+    /// denomination `pin_macro` takes: fractional rates, VIX in points,
+    /// `oil_price` in dollars, `cycle` as its name. Read one, change it,
+    /// write it back.
+    #[getter]
+    fn macro_fields(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let e = self.inner.economy();
+        let out = PyDict::new_bound(py);
+        out.set_item("vix", e.vix)?;
+        out.set_item(
+            "federal_funds_rate",
+            crate::units::percent_to_fraction(e.federal_funds_rate),
+        )?;
+        out.set_item(
+            "corporate_bond_yield",
+            crate::units::percent_to_fraction(e.corporate_bond_yield),
+        )?;
+        out.set_item(
+            "inflation_rate",
+            crate::units::percent_to_fraction(e.inflation_rate),
+        )?;
+        out.set_item("qe_pe_boost", e.qe_pe_boost)?;
+        out.set_item("fear_greed_index", e.fear_greed_index)?;
+        out.set_item(
+            "gdp_growth",
+            crate::units::percent_to_fraction(e.gdp_growth),
+        )?;
+        out.set_item(
+            "unemployment_rate",
+            crate::units::percent_to_fraction(e.unemployment_rate),
+        )?;
+        out.set_item(
+            "tariff_rate",
+            crate::units::percent_to_fraction(e.tariff_rate),
+        )?;
+        out.set_item("oil_price", e.oil_price)?;
+        out.set_item("cycle", cycle_name(e.cycle_phase))?;
+        Ok(out.into())
+    }
+
+    /// Write the `avg_volume` column: one value per instrument, in shares.
+    ///
+    /// # Why this is the liquidity lever
+    ///
+    /// `avg_volume` is what the market maker quotes off. `base_quote_size`
+    /// reads it, every ladder level is a fraction of that size, and the
+    /// printed volume of a tick is bounded by `avg_volume / 390`. Halve it
+    /// and the book is half as deep at every level, a marketable order walks
+    /// further up it, and the impact an agent pays for the same trade rises.
+    /// That is a liquidity shock as this simulator can actually express one:
+    /// not a number called "liquidity" multiplied by 0.4, but less depth to
+    /// trade against.
+    ///
+    /// # Why the engine never writes it itself
+    ///
+    /// The shipped close policy is [`AvgVolumePolicy::Hold`], so `avg_volume`
+    /// stays whatever the universe calibrated it to be for the whole run --
+    /// see `market::daily`, which names writing `PriceField::AvgVolume` as
+    /// the embedder's route. This is that route, and it is recorded in the
+    /// order log like any other input, so a replay, a checkpoint and a fork
+    /// all carry it.
+    ///
+    /// Values must be finite and strictly positive. Zero is not "no
+    /// liquidity": `base_quote_size` treats a zero as ABSENT and falls
+    /// through to realised volume, then to half a percent of shares
+    /// outstanding, so a zeroed column quietly quotes a book off a different
+    /// input rather than a thin one.
+    fn set_avg_volume(&mut self, values: Vec<f64>) -> PyResult<()> {
+        let n = self.inner.len();
+        if values.len() != n {
+            return Err(ValidationError::new_err(format!(
+                "set_avg_volume needs one value per instrument: this engine \
+                 holds {n}, got {}. The column is positional, so a short or long \
+                 list would attach volumes to the wrong names.",
+                values.len()
+            )));
+        }
+        for (i, v) in values.iter().enumerate() {
+            if !v.is_finite() || *v <= 0.0 {
+                return Err(ValidationError::new_err(format!(
+                    "avg_volume[{i}] = {v} is not a positive, finite share count. \
+                     Zero is not an empty book here -- the maker reads a zero as \
+                     ABSENT and quotes off realised volume instead, so it thins \
+                     nothing. Scale the column down to thin it."
+                )));
+            }
+        }
+        self.log
+            .push(crate::python_log::LogEntry::SetAvgVolume { values: values.clone() });
+        self.inner
+            .set_column(PriceField::AvgVolume, &values)
+            .map_err(ValidationError::new_err)
     }
 
     /// The live factor names, in the order `attribution` reports them.

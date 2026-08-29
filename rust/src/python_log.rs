@@ -58,6 +58,14 @@ pub enum LogEntry {
         fields: Vec<(String, f64)>,
         cycle: Option<String>,
     },
+    /// The whole `avg_volume` column, one value per instrument.
+    ///
+    /// A liquidity intervention is an INPUT, not a consequence: nothing in
+    /// the engine writes this column, so a replay that did not carry it would
+    /// rebuild a market with its original depth and call it the same run.
+    SetAvgVolume {
+        values: Vec<f64>,
+    },
     ListInstrument {
         ticker: String,
         sector: String,
@@ -197,6 +205,10 @@ impl LogEntry {
                 d.set_item("avg_volume", avg_volume)?;
                 d.set_item("beta", beta)?;
                 d.set_item("short_interest", short_interest)?;
+            }
+            LogEntry::SetAvgVolume { values } => {
+                d.set_item("op", "set_avg_volume")?;
+                d.set_item("values", values.to_vec())?;
             }
             LogEntry::Delist { index } => {
                 d.set_item("op", "delist")?;

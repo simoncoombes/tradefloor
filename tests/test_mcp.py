@@ -384,10 +384,16 @@ def test_an_unknown_macro_field_is_refused_with_the_valid_list():
 def test_the_macro_field_list_is_read_from_the_engine():
     # Typed here, it would drift from what `Scenario` accepts -- which is
     # exactly how this module came to claim the surface was "40-odd fields"
-    # when it is seven.
+    # when it was seven. Asserted against `FIELDS` rather than against a
+    # count, because a count is a second place to remember: the list grew to
+    # eleven when the intervention framework exposed four macro fields the
+    # economy already carried, and a number here would have been a test
+    # failure standing in for a documentation update.
+    from tradefloor.scenario import FIELDS
+
     fields = mcp._macro_fields()
     assert "vix" in fields and "cycle" in fields
-    assert len(fields) == 7, fields
+    assert tuple(fields) == FIELDS, fields
 
 
 def test_an_unknown_step_kind_names_the_three_that_exist():
