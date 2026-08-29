@@ -1,0 +1,15 @@
+[package]
+name = "pretium"
+version = "0.5.0"
+edition = "2021"
+description = "pretium is now tradefloor. This crate re-exports it."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/simoncoombes/tradefloor"
+homepage = "https://tradefloor.dev"
+documentation = "https://docs.rs/tradefloor"
+
+[badges]
+maintenance = { status = "deprecated" }
+
+[dependencies]
+tradefloor = "0.5.0"
