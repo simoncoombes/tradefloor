@@ -139,6 +139,26 @@ class Checkpoint:
         self.era = era
 
     @property
+    def fingerprint(self) -> str:
+        """This checkpoint's identity, as a digest of what it carries.
+
+        Two people holding the same seed, roster, macro, model and log
+        compute the same value, and anything else computes a different one.
+        That is what lets a fork's manifest NAME the point it began at
+        instead of describing it: `derived_from` on a
+        :class:`tradefloor.RunManifest` records this string.
+
+        Over `to_json`, which is canonical -- sorted keys, fixed separators
+        -- so the digest is a fact about the checkpoint rather than about how
+        it happened to be serialised. It therefore covers the label and the
+        version that wrote it, both of which are part of what a citation
+        means.
+        """
+        import hashlib
+
+        return hashlib.sha256(self.to_json().encode("utf-8")).hexdigest()
+
+    @property
     def universe_fingerprint(self) -> str:
         """Identity of the roster this checkpoint belongs to."""
         from . import Universe

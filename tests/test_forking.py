@@ -696,20 +696,20 @@ def test_a_manifest_of_a_fork_reproduces_the_fork():
 
 
 def test_manifest_records_fork_lineage():
-    """Lineage is DERIVABLE from a fork's manifest, and not declared by it.
+    """Lineage is both derivable and, now, declared.
 
     A fork carries its parent's order log, so the manifests of two branches of
-    one experiment share a prefix, and the length of that prefix is the point
-    they were forked at. That is enough to reconstruct
+    one experiment share a prefix and the length of that prefix is where they
+    parted. That reconstructs
 
         run -> checkpoint -> {control, treated}
 
-    from the artefacts alone, and it is asserted here so it stays true.
+    from the artefacts alone, by comparison, and it is asserted here so it
+    stays true.
 
-    What is NOT here is a declared parent: no field says "this run began at
-    checkpoint X", so the shared prefix has to be discovered by comparison
-    rather than read. That is a real gap and it is recorded as one rather than
-    papered over with a test that asserts less.
+    What used to be missing was a manifest saying so on its own: a reader
+    holding ONE of the two could not tell it was a branch of anything.
+    `derived_from` is that sentence, and the second half of this test is it.
     """
     engine, _ = checkpoint_at(20)
     control, treated = tf.branch(engine, 2)
@@ -743,12 +743,103 @@ def test_manifest_records_fork_lineage():
     assert market_digest(left.reproduce()) == market_digest(control)
     assert market_digest(right.reproduce()) == market_digest(treated)
 
-    # The gap, pinned: nothing in the document names the checkpoint.
-    document = json.loads(left.to_json())
-    assert not any("lineage" in key or "parent" in key for key in document), (
-        "fork lineage is now declared; update this test and the report that "
-        "recorded its absence"
-    )
+    # And declared, when the branch was recorded with the checkpoint it came
+    # from. Both arms name the same parent, at the same entry.
+    point = tf.Checkpoint.of(engine, universe=UNIVERSE, seed=SEED,
+                             label=f"day {20}")
+    declared_left = tf.RunManifest.of(control, seed=SEED, universe=UNIVERSE,
+                                      scenario=CONTROL, label="control",
+                                      derived_from=point)
+    declared_right = tf.RunManifest.of(treated, seed=SEED, universe=UNIVERSE,
+                                       scenario=INTERVENTION, label="treated",
+                                       derived_from=point)
+
+    for manifest in (declared_left, declared_right):
+        recorded = manifest.derived_from
+        assert recorded is not None
+        assert recorded["checkpoint"] == point.fingerprint
+        assert recorded["entries"] == len(parent_log)
+        assert recorded["label"] == "day 20"
+        # The claim survives the journey and can be checked by whoever
+        # receives it, given the checkpoint.
+        tf.RunManifest.from_json(manifest.to_json()).verify_lineage(point)
+
+    assert declared_left.derived_from["checkpoint"] == \
+        declared_right.derived_from["checkpoint"]
+
+
+def test_a_declared_parent_is_checked_when_it_is_claimed():
+    """`derived_from` is a claim about history, so it is tested at the point
+    it is made rather than believed and carried."""
+    engine, _ = checkpoint_at(20)
+    fork, = tf.branch(engine, 1)
+    run(fork, 5, first=20)
+    later = tf.Checkpoint.of(fork, universe=UNIVERSE, seed=SEED)
+
+    # A checkpoint taken AFTER the run cannot be where it started.
+    with pytest.raises(tf.ValidationError, match="cannot have started"):
+        tf.RunManifest.of(engine, seed=SEED, universe=UNIVERSE,
+                          derived_from=later)
+
+    # A checkpoint of a DIFFERENT MARKET is refused on identity, and it has
+    # to be: the log records inputs, so a run of the same sessions on another
+    # seed carries a log that compares equal entry for entry. Nothing about
+    # the history distinguishes them.
+    other = tf.Engine(seed=SEED + 1, universe=UNIVERSE)
+    run(other, 20)
+    elsewhere = tf.Checkpoint.of(other, universe=UNIVERSE, seed=SEED + 1)
+    assert elsewhere.log == tf.Checkpoint.of(engine, universe=UNIVERSE,
+                                             seed=SEED).log
+    with pytest.raises(tf.ValidationError, match="did not branch from it"):
+        tf.RunManifest.of(fork, seed=SEED, universe=UNIVERSE,
+                          derived_from=elsewhere)
+
+    # And a checkpoint of the same seed on another roster, which shares every
+    # ticker with this one and no fundamentals.
+    swapped = tf.Universe.random(len(UNIVERSE), seed=99)
+    assert [i.ticker for i in swapped] == [i.ticker for i in UNIVERSE]
+    stranger = tf.Engine(seed=SEED, universe=swapped)
+    run(stranger, 20)
+    with pytest.raises(tf.ValidationError, match="different roster"):
+        tf.RunManifest.of(fork, seed=SEED, universe=UNIVERSE,
+                          derived_from=tf.Checkpoint.of(
+                              stranger, universe=swapped, seed=SEED))
+
+
+def test_verifying_lineage_needs_the_checkpoint_it_names():
+    """The declaration names a digest; testing it needs the artefact."""
+    engine, point = checkpoint_at(20)
+    fork, = tf.branch(engine, 1)
+    run(fork, 5, first=20)
+    manifest = tf.RunManifest.of(fork, seed=SEED, universe=UNIVERSE,
+                                 derived_from=point)
+
+    manifest.verify_lineage(point)
+
+    # The same market frozen under a different label is a different starting
+    # state to cite, and the digest says so.
+    relabelled = tf.Checkpoint.of(engine, universe=UNIVERSE, seed=SEED,
+                                  label="something else")
+    with pytest.raises(tf.ValidationError, match="branched from checkpoint"):
+        manifest.verify_lineage(relabelled)
+
+    # A manifest that never claimed a parent says that, rather than passing.
+    plain = tf.RunManifest.of(fork, seed=SEED, universe=UNIVERSE)
+    assert plain.derived_from is None
+    with pytest.raises(tf.ValidationError, match="declares no parent"):
+        plain.verify_lineage(point)
+
+
+def test_a_checkpoint_fingerprint_is_content_not_formatting():
+    """Two people holding the same checkpoint compute the same identity, and
+    a checkpoint that travelled and arrived changed computes a different one."""
+    _, point = checkpoint_at(10)
+    assert point.fingerprint == point.fingerprint
+    assert tf.Checkpoint.from_json(point.to_json()).fingerprint == \
+        point.fingerprint
+
+    _, longer = checkpoint_at(11)
+    assert longer.fingerprint != point.fingerprint
 
 
 # --------------------------------------------------------------------------
