@@ -349,8 +349,21 @@ pub fn calculate_live_factors(
     // it (0.5 times the spike times the factor) is added here instead, and
     // the sector draw arrives intact. A branch, not arithmetic, so 0.0 is
     // bit-identical.
-    let market_component = if params.crisis_blend_source == 0.0 {
+    // Downside transmission asymmetry (§round 102). Real correlation rises
+    // in falling markets because names co-move harder on the way down --
+    // exceedance correlation, the direct mechanism corr_asymmetry measures.
+    // On a down tick of the factor the transmission is scaled by
+    // (1 + market_beta_down_asym); up ticks are untouched. At 0.0 neither
+    // branch below multiplies, so every shipped preset is bit-identical.
+    let factor_through = if params.market_beta_down_asym == 0.0
+        || shared.market_factor >= 0.0
+    {
         beta * shared.market_factor
+    } else {
+        beta * shared.market_factor * (1.0 + params.market_beta_down_asym)
+    };
+    let market_component = if params.crisis_blend_source == 0.0 {
+        factor_through
     } else {
         // At a held VIX the crisis spike is pinned at `crisis_blend_cap`, so
         // the only thing varying block to block in this injection is
@@ -378,7 +391,7 @@ pub fn calculate_live_factors(
             injection * mathx::clamp(
                 mathx::pow(rel, -params.crisis_blend_variance_damp), 0.1, 10.0)
         };
-        beta * shared.market_factor + injection
+        factor_through + injection
     };
     // The sector loading (§108). It was the literal 0.5 for every member of
     // every sector: a name's exposure to its own industry was the one
