@@ -72,11 +72,11 @@ results), or `TRADEFLOOR_SLOW_TESTS` being unset. Only the last is a choice you
 made.
 
 `TRADEFLOOR_SLOW_TESTS=1` adds two things: the example notebooks, which are
-executed rather than read (`tests/test_examples.py` holds 21 tests over eight
-notebooks and two scripts, 19 of them behind the flag -- the two script
-syntax checks run on every pass, because a rename that missed a reference
-should fail whether or not you remembered the flag), and the one MCP test
-that runs a full 252-day evaluation. That test costs what it costs because
+executed rather than read (`tests/test_examples.py` walks `examples/` and
+parametrises over what it finds, so its count moves when an example is added
+-- the script syntax checks run on every pass, because a rename that missed a
+reference should fail whether or not you remembered the flag), and the one
+MCP test that runs a full 252-day evaluation. That test costs what it costs because
 the only way to show a result AT the certified horizon is not a slice of a
 shorter one is to reach the horizon.
 
@@ -134,6 +134,68 @@ until the browser build needed it too; moving it was a day's work that
 should not have to happen twice.
 
 Bindings own conversion, error translation and bookkeeping. Nothing else.
+
+## Where examples, integrations and fixtures go
+
+`examples/` used to mean one thing: a numbered series read in order. It now
+means two, and keeping them in one flat directory cost something real. The
+example test globbed `0*`, so the first unnumbered example added to
+`examples/` was invisible to CI on the day it landed -- it compiled nowhere,
+executed nowhere, and nothing said so.
+
+Three tiers, and the rule for each is about who owns it.
+
+```
+examples/
+    00-...ipynb .. 09-...py     the curriculum. Reading order. Core library.
+    README.md
+    data/
+    <study>/                    one self-contained study per directory
+        <name>.py
+        <name>.ipynb
+        README.md
+        artifacts/              output, git-ignored, regenerable
+
+python/tradefloor/
+    integrations/
+        <framework>.py          one adapter per third-party framework
+
+tests/
+    test_<name>.py              flat, as everything else here is
+    fixtures/<name>/            recorded input, committed, one copy
+```
+
+**The numbers are a curriculum, not an index.** `00` to `09` are steps a
+reader takes in order, they use the core library and at most an extra the
+project itself ships, and adding to them is adding a lesson. A study is not
+a lesson. It has one question, it may need an optional extra, and there is no
+sense in which it comes after `09`, so it gets a name and a directory instead
+of the next number.
+
+**A study is one directory.** The script and the notebook for one experiment
+are the same experiment in two presentations; splitting them across
+`examples/` and a top-level `notebooks/` puts two halves of one thing in two
+places and makes `notebooks/` a second unordered pile on the day a second one
+arrives. The notebook imports the module; the module is the source of truth.
+
+**Artifacts are output, fixtures are input, and they do not live together.**
+An artifact is written by a run, describes that run, and is regenerable by
+running it again -- so it sits beside the run that wrote it, in
+`examples/<study>/artifacts/`, and is git-ignored. A fixture is recorded once
+and replayed forever; it is the thing under test, and the test suite and the
+example both read the SAME one, because two copies of a recording are two
+recordings that can drift. So fixtures are committed, under
+`tests/fixtures/<name>/`, whoever reads them.
+
+**An integration is a subpackage member, an optional extra, and a study.**
+See `python/tradefloor/integrations/__init__.py` for the rules the adapter
+itself follows -- lazy import, never reached by `import tradefloor`, one
+extra named after the framework. The runnable half is a study like any other.
+
+**Every example is checked.** `tests/test_examples.py` walks `examples/`
+rather than globbing `0*`, so a new example cannot be added invisible again.
+Scripts are syntax-checked on every run; notebooks are executed behind
+`TRADEFLOOR_SLOW_TESTS=1`.
 
 ## Style
 

@@ -10,9 +10,14 @@ notebook read correctly, the output looked right, and the code raised
 `TypeError`. It was caught because the notebooks are executed rather than
 written and hoped over.
 
-Opt-in because executing eight notebooks takes about a minute and needs
-`jupyter`, which the library does not depend on. Set `PRETIUM_SLOW_TESTS=1`
+Opt-in because executing every notebook takes about a minute and needs
+`jupyter`, which the library does not depend on. Set `TRADEFLOOR_SLOW_TESTS=1`
 to run it; the release check does.
+
+What is checked is everything under `examples/`, both tiers of it: the
+numbered curriculum and the per-study directories `CONTRIBUTING.md`
+describes. It used to be `0*`, which is how the first unnumbered example
+landed with nothing checking it at all.
 """
 
 import os
@@ -22,11 +27,28 @@ from pathlib import Path
 import pytest
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
-NOTEBOOKS = sorted(EXAMPLES.glob("0*.ipynb"))
-# `[0-9]*` and not `0*`: the examples are numbered, and the tenth one is not
-# `0`-prefixed. Under the old glob example 10 onward was silently unchecked,
-# which is the failure mode this file exists to prevent, applied to itself.
-SCRIPTS = sorted(EXAMPLES.glob("[0-9]*.py"))
+
+#: Everything under `examples/`, rather than a glob. A glob has now missed
+#: two examples in two different ways: `0*` left `10-forking-a-market.py`
+#: unchecked because the tenth example is not `0`-prefixed, and widening it to
+#: `[0-9]*` still leaves out every example that is not numbered at all. Both
+#: are the same failure, which is that a glob matching nothing new fails
+#: silently by design. `CONTRIBUTING.md` sets out the two tiers -- the
+#: numbered curriculum and one directory per study -- and this walk covers
+#: both, so adding to either is enough to be checked.
+_IGNORED = ("__pycache__", ".ipynb_checkpoints", "artifacts", "data")
+
+
+def _examples(suffix: str) -> list[Path]:
+    return sorted(
+        path for path in EXAMPLES.rglob(f"*{suffix}")
+        if not any(part in _IGNORED for part in path.relative_to(
+            EXAMPLES).parts)
+    )
+
+
+NOTEBOOKS = _examples(".ipynb")
+SCRIPTS = _examples(".py")
 
 #: Executing notebooks is slow and needs jupyter, so those tests are opt-in.
 #: The syntax check on the scripts is not -- a rename that missed a
@@ -63,9 +85,11 @@ def test_the_notebook_executes_without_error(path):
     nb = nbformat.read(path, as_version=4)
     # Run in the notebook's own directory, as a reader would, and never write
     # back: a test that rewrote the committed output would hide the drift it
-    # exists to find.
+    # exists to find. `path.parent` rather than `EXAMPLES`, because a study
+    # notebook lives one level down and its relative paths are written from
+    # where it sits.
     client = NotebookClient(nb, timeout=900, kernel_name="python3",
-                            resources={"metadata": {"path": str(EXAMPLES)}})
+                            resources={"metadata": {"path": str(path.parent)}})
     client.execute()
 
 
@@ -86,7 +110,7 @@ def test_the_committed_notebook_carries_its_output(path):
     assert not empty, (
         f"{path.name}: code cells {empty} carry no output. Regenerate with "
         f"`jupyter nbconvert --to notebook --execute --inplace "
-        f"examples/0*.ipynb`"
+        f"{path.relative_to(EXAMPLES.parent).as_posix()}`"
     )
 
     errors = [o for c in code for o in c.get("outputs", [])

@@ -59,5 +59,8 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Experiment artifacts written by examples/rate_shock_counterfactual.py
-examples/artifacts/
+# Experiment artifacts written by a study under examples/. Output, not input:
+# regenerable by running the study again, and describing one run rather than
+# the repository. The recorded inputs a study REPLAYS are a different thing
+# and are committed, under tests/fixtures/. See CONTRIBUTING.md.
+examples/*/artifacts/

@@ -6,7 +6,7 @@ Five minutes, one command, no keys and no network.
 git clone https://github.com/simoncoombes/tradefloor
 cd tradefloor
 pip install tradefloor
-python examples/rate_shock_counterfactual.py
+python examples/rate-shock/counterfactual.py
 ```
 
 The wheel carries the library, not the examples, so the clone is what puts
@@ -224,7 +224,7 @@ and nothing else could have caused it because nothing else differed.
 ## What you get afterwards
 
 ```
-examples/artifacts/rate-shock-demo/
+examples/rate-shock/artifacts/
     manifest.json       the experiment: design, intervention, agreement, divergence
     checkpoint.json     the state both arms forked from
     control.json        a RunManifest; .reproduce() rebuilds the market

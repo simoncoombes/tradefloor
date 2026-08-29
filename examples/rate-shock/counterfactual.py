@@ -2,7 +2,7 @@
 
 Run it:
 
-    python examples/rate_shock_counterfactual.py
+    python examples/rate-shock/counterfactual.py
 
 One market. One agent. Twenty days of shared history. Then a checkpoint, a
 fork into two identical worlds, and one changed variable: interest rates rise
@@ -18,8 +18,9 @@ because history ran once.
 
 `main` below is the experiment and nothing else; every `_show` is narration,
 and deleting all of them would leave the design intact and readable. The agent
-is in `macro_aware_agent.py`, and it is a parameter -- replace that import and
-no other line here changes.
+is in `agent.py`, and it is a parameter -- replace that import and no other
+line here changes. `examples/finrobot/` is that swap, made: the same
+experiment with a real FinRobot agent in place of this one.
 
 Everything reported is ground truth about THIS market. It is a controlled
 synthetic experiment, not a prediction about how real securities would react
@@ -40,7 +41,7 @@ import tradefloor as tf
 from tradefloor.counterfactual import World, agree, compare
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from macro_aware_agent import MacroAwareAgent  # noqa: E402
+from agent import MacroAwareAgent  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # The experiment, as constants. Everything that decides what runs is here.
@@ -114,9 +115,9 @@ DURATION = {row[0]: row[7] for row in ROSTER}
 #: is that the response is monotone in it and an alphabetical table hides that.
 BY_DURATION = sorted(ROSTER, key=lambda row: row[7], reverse=True)
 
-DEFAULT_OUT = Path(__file__).resolve().parent / "artifacts" / "rate-shock-demo"
+DEFAULT_OUT = Path(__file__).resolve().parent / "artifacts"
 
-AGENT_REFERENCE = "examples/macro_aware_agent.py::MacroAwareAgent"
+AGENT_REFERENCE = "examples/rate-shock/agent.py::MacroAwareAgent"
 
 
 def universe() -> tf.Universe:

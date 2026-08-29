@@ -220,13 +220,52 @@ decision, its orders, the prices and the portfolios came apart. The agent
 is a parameter throughout, so swapping a deterministic policy for an LLM
 or a third-party framework changes no line of the experiment.
 
-**The canonical demo: `examples/rate_shock_counterfactual.py`.** Four
+**The canonical demo: `examples/rate-shock/counterfactual.py`.** Four
 companies of differing duration, a macro-aware deterministic agent, twenty
 days of shared history, a checkpoint, a fork, +200bps in one branch, and
 twenty more days in each. Runs in about two seconds with no keys, no
 network and no data files, writes a checkpoint, a `RunManifest` per arm, a
 comparison and a chart, and is covered by `tests/test_rate_shock_demo.py`.
-The tutorial is `examples/your-first-counterfactual-experiment.md`.
+The tutorial is `examples/rate-shock/README.md`.
+
+**Evaluate a real FinRobot agent: `tradefloor.integrations.finrobot`.** The
+canonical rate-shock experiment with the agent swapped and nothing else
+moved -- same seed, same roster, same pins, same twenty days of shared
+history, same checkpoint, same fork, same +200bps, same comparison -- but
+the agent is a real
+[FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
+`SingleAssistant` running over `autogen`. `FinRobotAdapter` implements the
+four methods `World` looks for and is deliberately thin: FinRobot owns
+interpretation, the portfolio decision and a rationale; Tradefloor owns the
+market, execution, accounting, the fork and the comparison. FinRobot never
+mutates engine state -- it returns JSON, which is parsed, validated against
+the listed universe and the supported sides, and refused if it cannot be
+executed. The observation is an allowlist written out field by field rather
+than a filter, so fair value, the factor attribution, the mispricing and the
+macro path ahead stay on the Tradefloor side of the line; two tests prove it,
+one against an engine that raises when the forbidden surface is touched and
+one that computes the hidden values and scans the agent's input for them.
+
+`examples/finrobot/` is the study, script and notebook together. Both default
+to replaying a genuine recorded run from `tests/fixtures/finrobot/`, keyed by
+the SHA-256 of the exact text FinRobot was sent, so they need no API key, no
+network and no FinRobot install -- and a changed observation mapping produces
+a missing key and a loud refusal rather than an answer recorded for a
+different question. `--live` calls the real thing behind
+`pip install "tradefloor[finrobot]"`, which needs Python 3.11 exactly:
+FinRobot declares `>=3.10, <3.12` and this project needs `>=3.11`.
+
+**`examples/` now has two tiers.** The numbered files are a curriculum with a
+reading order; a study is a directory. `examples/rate-shock/` and
+`examples/finrobot/` each hold their script, their notebook, their README and
+their own git-ignored `artifacts/`, because the script and the notebook for
+one experiment are the same experiment in two presentations. Artifacts are
+output and regenerable, so they sit beside the run that wrote them; recorded
+inputs a study replays are committed once under `tests/fixtures/`, because two
+copies of a recording are two recordings that can drift.
+`tests/test_examples.py` now walks `examples/` instead of globbing `0*`, which
+is how the first unnumbered example arrived with nothing checking it at all.
+`CONTRIBUTING.md` has the rule.
 
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
 give each agent its own copy of the market, which is what makes the

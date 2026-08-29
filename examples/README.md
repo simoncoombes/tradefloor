@@ -1,20 +1,23 @@
 # Examples
 
+Two tiers, and they are different things. `CONTRIBUTING.md` has the rule; the
+short version is that the numbers are a curriculum and a directory is a study.
+
 ## Start here
 
-**[`rate_shock_counterfactual.py`](rate_shock_counterfactual.py)** is the
+**[`rate-shock/counterfactual.py`](rate-shock/counterfactual.py)** is the
 canonical demo: one market, one agent, twenty days of shared history, a
 checkpoint, a fork into two identical worlds, +200bps in one of them, and a
 comparison of what the same agent did next. It runs in about two seconds and
 needs nothing installed beyond the library.
 
 ```
-python examples/rate_shock_counterfactual.py
+python examples/rate-shock/counterfactual.py
 ```
 
 The five-minute walkthrough is
-[**Your first counterfactual experiment**](your-first-counterfactual-experiment.md).
-The agent it runs is [`macro_aware_agent.py`](macro_aware_agent.py), which is
+[**Your first counterfactual experiment**](rate-shock/README.md).
+The agent it runs is [`rate-shock/agent.py`](rate-shock/agent.py), which is
 a parameter -- swap it for your own and nothing else in the experiment moves.
 
 ## The reading order
@@ -41,6 +44,18 @@ Start at 00 if you have not used tradefloor before.
 Notebooks 05 and 06 cover the two audiences the project is built for, RL
 researchers and execution developers.
 
+## The studies
+
+One directory each, self-contained, no reading order. A study asks one
+question, keeps its script and its notebook together because they are the same
+experiment in two presentations, and writes its output to its own git-ignored
+`artifacts/`.
+
+| | what it asks |
+|---|---|
+| [`rate-shock/`](rate-shock/) | Does the agent actually react to macro conditions? Checkpoint, fork, +200bps in one arm, compare. Two seconds, no keys |
+| [`finrobot/`](finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
+
 ## Running them
 
 ```
@@ -52,23 +67,29 @@ Notebooks 00, 03 and 09 also need `matplotlib` for their charts, and 05 needs
 `tradefloor[rl]` for the Gymnasium environment. The core library has no
 dependencies.
 
-`rate_shock_counterfactual.py` runs in about two seconds, `07-research-workflow.py` in about five and
-`10-forking-a-market.py` in about two, and none of them needs anything extra. The
-first writes a chart if `matplotlib` is installed and says so if it is not.
-`08-claude-agent.py` needs `tradefloor[claude]` and an API key, and
-spends money per decision, so it's the one file here that isn't run
-automatically.
+`rate-shock/counterfactual.py` runs in about two seconds,
+`07-research-workflow.py` in about five and `10-forking-a-market.py` in about
+two, and none of them needs anything extra. The first writes a chart if
+`matplotlib` is installed and says so if it is not. `finrobot/rate_shock.py`
+also runs on the core library alone in its default replay mode; `--live` is
+the one that needs `tradefloor[finrobot]`, Python 3.11 and an API key.
+`08-claude-agent.py` needs `tradefloor[claude]` and an API key, and spends
+money per decision, so it's the one file here that isn't run automatically.
 
 ## How they're kept working
 
-`tests/test_examples.py` checks them. The scripts are syntax-checked on every
-test run, which catches a rename that missed a reference.
-`rate_shock_counterfactual.py` gets more than that: `tests/test_rate_shock_demo.py`
+`tests/test_examples.py` checks them. It walks `examples/` rather than
+globbing `0*`, so both tiers are covered and a new example cannot arrive
+unchecked. The scripts are syntax-checked on every test run, which catches a
+rename that missed a reference. `rate-shock/counterfactual.py` gets more than
+that: `tests/test_rate_shock_demo.py`
 runs it end to end on every test run and checks its claims, not only its exit
 code -- that the arms started identical, that nothing diverged before the
 intervention, that the experiment reruns to the bit, and that both manifests
-reproduce. The rest is opt-in,
-because executing eight notebooks takes about a minute:
+reproduce. `finrobot/rate_shock.py` has the same in
+`tests/test_finrobot.py`, which replays its recorded FinRobot run end to end
+on every pass. The rest is opt-in, because executing every notebook takes
+about a minute:
 
 ```
 TRADEFLOOR_SLOW_TESTS=1 pytest tests/test_examples.py
@@ -82,4 +103,5 @@ Regenerate the committed output with:
 
 ```
 jupyter nbconvert --to notebook --execute --inplace examples/0*.ipynb
+jupyter nbconvert --to notebook --execute --inplace examples/*/*.ipynb
 ```
