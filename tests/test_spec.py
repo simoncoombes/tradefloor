@@ -349,7 +349,7 @@ def test_spec_built_baselines_score_identically_to_hand_built_ones():
     # The claim "this spec names that agent" is tested rather than asserted:
     # the same market, one evaluation from specs, one from the shipped
     # classes, and the scorecards must agree to the bit. If this fails, a
-    # baseline's meaning has moved out from under the spec, and that is a
+    # baseline's meaning has moved out from under the spec, a
     # SPEC_VERSION question before it is anything else.
     specs = {
         "hold": StrategySpec.hold(),

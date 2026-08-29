@@ -34,8 +34,8 @@ different numbers.
 
 So the *snapshot* is the artifact, not the query. ``fetch`` produces a frozen,
 hashable snapshot; ``Universe.from_edgar`` is pure and takes one. Re-running
-``fetch`` is expected to produce a different hash, and that is the design
-working, not failing.
+``fetch`` is expected to produce a different hash. The design is working
+there, not failing.
 
 This is the same discipline applied to the golden vectors: pin the artifact,
 because a rebuild would silently change the reference.
@@ -281,8 +281,8 @@ def filter_rows(rows: Sequence[dict], *, exclude_negative_equity: bool = True):
     Negative-equity loss-makers are excluded by default. A company with
     negative EPS takes the book-value valuation path, and negative book value
     there produces a negative fair value which the floor then clamps, so the
-    name would trade at the floor with no fundamental anchor at all. That is
-    not a stock, it is a constant.
+    name would trade at the floor with no fundamental anchor at all. What
+    trades then is a constant wearing a ticker.
 
     Excluded rows are RETURNED, not dropped. A loader that silently discarded
     a tenth of the market would produce a universe whose composition nobody
@@ -339,8 +339,8 @@ _SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 #:
 #: $10,000 is the working ceiling. It clears the genuinely high-priced US
 #: listings -- NVR near $7k, Booking near $5k -- and rejects every scale
-#: error seen. It also rejects Berkshire's A shares, and that is the
-#: deliberate trade: one real company excluded, against several hundred
+#: error seen. It also rejects Berkshire's A shares. That trade was made on
+#: purpose: one real company excluded, against several hundred
 #: mis-tagged filings admitted. B shares are unaffected.
 PLAUSIBLE_IMPLIED_PRICE = (0.5, 10_000.0)
 
@@ -537,8 +537,8 @@ def fetch(
     The result is a frozen artifact. Save it, hash it, cite it -- and do not
     expect a re-fetch to reproduce it. EDGAR is not append-only: companies
     amend and restate, so the same query returns different numbers next year.
-    That is exactly why the snapshot, not the query, is the input to
-    everything downstream.
+    So the snapshot, rather than the query, is the input to everything
+    downstream.
     """
     if not user_agent or "@" not in user_agent:
         raise ValidationError(

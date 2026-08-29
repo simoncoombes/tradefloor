@@ -54,7 +54,7 @@ def test_plan_writes_the_plan_it_forecast(tmp_path: pathlib.Path) -> None:
 def test_run_refuses_a_different_sample_count(tmp_path: pathlib.Path) -> None:
     """The refusal that the 2026-08-25 survey needed and did not get.
 
-    `run` here deliberately omits `--samples`, which is exactly what the AWS
+    `run` here deliberately omits `--samples`, as the AWS
     launcher did, so it falls back to the tool default and builds a different
     plan.
     """

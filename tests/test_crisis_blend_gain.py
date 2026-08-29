@@ -44,7 +44,7 @@ def test_setting_it_to_its_own_value_is_inert(preset: str) -> None:
     threshold, so a calm check would pass for the wrong reason.
 
     Written against each preset's OWN value rather than the literal 0.5,
-    which is what every preset carried until pt-v11 moved it to 0.8. A test
+    the value every preset carried until pt-v11 moved it to 0.8. A test
     that hardcodes the old default silently stops testing inertness the day
     a preset adopts the dial.
     """
@@ -73,7 +73,7 @@ def test_it_does_nothing_below_the_crisis_gate() -> None:
 
 
 def test_raising_the_gain_raises_crisis_co_movement() -> None:
-    """The direction, which is the whole point of the dial.
+    """The direction the dial exists to set.
 
     Cross-sectional correlation under a held VIX 45 is the market factor's
     share of variance. Loading names onto that factor harder must raise it.

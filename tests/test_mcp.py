@@ -210,7 +210,7 @@ def test_a_version_the_caller_gave_is_not_overwritten():
 
 
 def test_python_source_is_not_a_strategy():
-    """There is no code path from a tool argument to execution, and this is
+    """No code path runs from a tool argument to execution. This is
     the test that says so out loud."""
     for hostile in ("lambda obs: {}", "__import__('os').system('id')",
                     {"signal": {"kind": "eval", "code": "1+1"}}):

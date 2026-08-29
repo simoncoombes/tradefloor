@@ -98,7 +98,7 @@ ate the book, so size relative to average daily volume matters more than \
 notional size.
 - Returns carry only a small lag-one autocorrelation, +0.0239 on the shipped \
 model, which is inside the range real equities show. Momentum is not a free \
-edge here, and it was in earlier versions of this simulator.
+edge here, though it was in earlier versions of this simulator.
 
 Give a portfolio, not a trade list. Concentration is allowed and often \
 correct; equal-weighting everything is a way of declining to have a view.\
@@ -197,8 +197,8 @@ class ClaudeTrader:
         self._driver = decision.driver
         self._log.append((obs.day, decision.driver, decision.reasoning))
 
-        # Weights to share deltas. The harness wants quantities, and this is
-        # the arithmetic the model was deliberately not asked to do.
+        # Weights to share deltas. The harness wants quantities, and this
+        # arithmetic is what the model was deliberately not asked to do.
         gross = obs.portfolio.net_worth(obs.engine)
         orders: dict[str, float] = {}
         for ticker, weight in decision.weights.items():
@@ -223,8 +223,8 @@ class ClaudeTrader:
         """The factor the agent believes moved prices most.
 
         The harness passes the day and checks the answer against the engine's
-        own attribution, which is what turns a plausible-sounding rationale
-        into a score.
+        own attribution, which turns a plausible-sounding rationale into a
+        score.
         """
         return self._driver
 

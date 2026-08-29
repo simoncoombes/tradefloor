@@ -46,7 +46,7 @@ def test_passing_built_agents_is_refused():
 
     Momentum keeps a rolling window. Reusing it across seeds scores a
     momentum agent that has already seen a different market -- and the
-    numbers look completely normal, which is what makes refusing better than
+    numbers look completely normal, which makes refusing better than
     documenting.
     """
     with pytest.raises(tradefloor.ValidationError, match="factory"):
@@ -206,7 +206,7 @@ def test_a_real_difference_separates_and_a_median_gap_may_not(ranking):
         "confidence as momentum-vs-random; it is not discriminating"
     )
     # And the ordering the aggregate suggests is the one the sign test
-    # refuses to confirm -- which is the entire point of reporting both.
+    # refuses to confirm, and reporting both exists for that.
     table = {r.name: r.pooled_capture for r in ranking.table()}
     assert table["mean_reversion"] > table["random"]
 

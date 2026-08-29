@@ -1,6 +1,6 @@
 """The example notebooks must still run.
 
-A committed notebook carries its output, which is what makes it readable
+A committed notebook carries its output, which makes it readable
 without a kernel -- and also what lets it rot silently. The output says the
 code worked on the day it was written; nothing says it works now. A reader
 who trusts a stale notebook loses an afternoon to an API that moved.
@@ -16,7 +16,7 @@ to run it; the release check does.
 
 What is checked is everything under `examples/`, both tiers of it: the
 numbered curriculum and the per-study directories `CONTRIBUTING.md`
-describes. It used to be `0*`, which is how the first unnumbered example
+describes. It used to be `0*`, and the first unnumbered example
 landed with nothing checking it at all.
 """
 

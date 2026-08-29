@@ -70,7 +70,7 @@ def test_it_is_not_the_default() -> None:
     """Passing the controls is not certification.
 
     The envelope certifies pt-v3 at 252 days. pt-v6 clears §8 and scenario
-    response, and that is a different claim from being certified.
+    response, a different claim from being certified.
     """
     # The PROPERTY, not the literal. This read `== "pt-v10"` and had to be
     # edited at every era boundary; asserting what the test is named for

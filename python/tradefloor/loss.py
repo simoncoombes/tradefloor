@@ -155,8 +155,8 @@ def seed_sd_from_panels(
 
     This is the estimator behind the shipped `facts.SEED_SD` (there is a
     test re-deriving those constants from the committed thirty-seed panel
-    table, two seeds of which it re-measures live), and it is what the
-    calibration instrument runs on its own seed panels. Sample (n-1)
+    table, two seeds of which it re-measures live), and the calibration
+    instrument runs it on its own seed panels. Sample (n-1)
     standard deviation, matching the shipped values' convention.
 
     A statistic that came back None on any panel is refused rather than
@@ -192,7 +192,7 @@ def band_distance_loss(
 
     `panel` is either one statistics mapping -- a `facts.measure` result, or
     already-aggregated medians -- or a sequence of per-seed panels, in which
-    case each statistic's m_k is its MEDIAN across seeds, which is how the
+    case each statistic's m_k is its MEDIAN across seeds. That is how the
     calibration instrument evaluates a candidate on its fixed seed list.
 
     `seed_sd` is the noise scale s_k per statistic. The default is the
@@ -240,7 +240,7 @@ def band_distance_loss(
         provenance = "caller-supplied"
 
     # `bands` exists so a horizon can be scored against its OWN ruler. The
-    # default is the 252-day set, which is what every existing caller means.
+    # default is the 252-day set, the one every existing caller means.
     # Passing `facts.REAL_MARKETS_504` alongside `facts.SEED_SD_504` scores a
     # 504-day panel; passing one without the other is the mistake this
     # parameter was added to make avoidable, not to make easy.
@@ -342,10 +342,10 @@ def dual_horizon_loss(
     3.23, so reusing `SEED_SD` there would over-penalise excess kurtosis
     threefold while under-penalising volatility.
 
-    # The weighting is a choice, and it is stated rather than hidden
+    # The weighting is a choice, stated rather than hidden
 
-    `weight_504` defaults to 1.0 -- equal weight -- and that is a judgement,
-    not a derivation. There is no principled exchange rate between a
+    `weight_504` defaults to 1.0 -- equal weight -- and that is a judgement
+    rather than a derivation. There is no principled exchange rate between a
     252-day band exit and a 504-day one. Equal weighting says "a
     seed-sd of miss matters the same at either horizon", which is defensible
     and revisitable; what would not be defensible is an unstated weighting
@@ -364,8 +364,8 @@ def dual_horizon_loss(
         }
 
     Both breakdowns ride along in full, because a combined number that
-    cannot be decomposed is exactly the single realism score this module
-    refuses to publish.
+    cannot be decomposed is the single realism score this module refuses to
+    publish.
     """
     if not panels_252 or not panels_504:
         raise ValidationError(

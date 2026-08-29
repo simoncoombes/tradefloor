@@ -180,8 +180,8 @@ class Observation:
         with participation, not with notional: 13.7 million shares is 0.05x a
         day's volume in one name here and 407x in another, and the same order
         moves the first by nothing and the second by 47%. An agent sizing in
-        flat share counts is not choosing a position, it is choosing a
-        different experiment per instrument.
+        flat share counts is choosing a different experiment per instrument
+        rather than a position.
         """
         return self._adv[self.tickers.index(ticker)]
 
@@ -197,8 +197,8 @@ class Observation:
     def __repr__(self) -> str:
         # `step` is printed as "N of M" so that anyone who prints an
         # observation while debugging a per-day guard sees immediately that it
-        # counts the run rather than the day -- which is the point at which
-        # the trap is usually discovered, or missed.
+        # counts the run rather than the day. That is where the trap is
+        # usually discovered, or missed.
         return (f"Observation(day={self.day}, "
                 f"step_of_day={self.step_of_day}/{self.steps_per_day}, "
                 f"step={self.step} of run, n={len(self.tickers)})")
@@ -350,8 +350,8 @@ def evaluate(
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
-    One market. Every agent meets the same one, which is what makes the
-    comparison exact -- but a verdict from a single seed is a measurement of
+    One market. Every agent meets the same one, so the comparison is exact
+    -- but a verdict from a single seed is a measurement of
     that seed as much as of the agents. See :func:`tradefloor.rank` for the
     across-seed version, and :func:`leaderboard` for the measured size of the
     effect.

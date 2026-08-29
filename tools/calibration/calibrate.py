@@ -143,7 +143,7 @@ PENALTY_SCALE = 1e3
 #:
 #: Why a margin at all, and why it belongs in the search rather than in
 #: the loss. `tradefloor.loss.band_distance_loss` is a published surface
-#: whose meaning is "distance outside the band", and it is flat inside the
+#: whose meaning is "distance outside the band", flat inside the
 #: band on purpose — a statistic that is in band contributes nothing, and
 #: there is no gradient rewarding one that is comfortably in over one that
 #: is barely in. §6.3's regulariser then pulls every parameter back toward
@@ -231,7 +231,7 @@ def search_loss(panels: list[dict], margin: dict,
     ruler produced the number. This is the same formula — median across
     seeds, two-sided distance through the library's own `band_distance`,
     scaled by the same `SEED_SD`, squared and summed — evaluated against
-    the margined interval, and it is named for what it is.
+    the margined interval, and named for that.
 
     With `k = 0` it is `band_distance_loss(panels)["loss"]` to the bit,
     which the certificate asserts rather than assumes.
@@ -379,7 +379,7 @@ class DevSpace:
     needs, and re-pointing it at a different box to save thirty lines
     would silently re-scope certificates already in the record.
 
-    One change beyond the box, and it is not cosmetic. §6.3's deviation
+    One change beyond the box, and a substantive one. §6.3's deviation
     units are comparable *as a penalty* — that is what the log/raw split
     buys — but they are not comparable as a SEARCH geometry: at pt-v1 the
     box is ±0.06 deviation units wide for `garch_alpha` and ±1.4 for
@@ -530,7 +530,7 @@ class DevSpace:
 
         A missing key means "not overridden", which is deviation zero —
         and it is not a hypothetical: the baseline vector is the empty
-        dict, it sits in the same cache as every candidate, and it is
+        dict, it sits in the same cache as every candidate, and it forms
         the leftmost point of the frontier this function computes.
         """
         return sum(deviation(name, raw.get(name, self.ship[name]),
@@ -1202,7 +1202,7 @@ def main() -> None:
     # The frontier is §6.3's deliverable and its realism axis is the
     # PUBLISHED one: what a reader gets for a given deviation from the
     # shipped preset, priced against the true bands. The margined loss
-    # rides along on each point so the two can be compared, but it is not
+    # rides along on each point so the two can be compared, without being
     # what the picks are chosen on.
     lambda_picks = {}
     for lam_text in args.lambda_frontier.split(","):

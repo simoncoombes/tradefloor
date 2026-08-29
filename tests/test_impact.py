@@ -1,4 +1,4 @@
-"""Market impact is emergent, and this is the file that proves it.
+"""Market impact is emergent, and this file proves it.
 
 The claim is that a large order pays worse prices because it CONSUMED LEVELS,
 not because a slippage coefficient said large orders cost more. That is a
@@ -54,7 +54,7 @@ def test_the_average_price_rises_exactly_when_a_level_is_crossed():
 
 
 def test_an_order_cannot_fill_beyond_the_displayed_depth():
-    # Displayed depth is executable depth, and it is also the ceiling. An
+    # Displayed depth is executable depth, and also the ceiling. An
     # order for twice the book gets the book.
     _, book = book_after_a_session()
     depth = book.depth("sell")

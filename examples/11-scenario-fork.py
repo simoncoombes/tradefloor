@@ -147,7 +147,7 @@ def main() -> dict:
 
     # 5. What actually fired, with the values it saw. Not the recipe: the
     #    trail records that depth went from N shares to 0.4N on the day it
-    #    happened, which is what a reader needs afterwards.
+    #    happened, the thing a reader needs afterwards.
     print("\n  INTERVENTIONS APPLIED")
     for firing in scenario.log[:6]:
         print(f"    {firing}")

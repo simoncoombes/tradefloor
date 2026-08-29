@@ -18,13 +18,13 @@ the same forty-name roster, and `real-vix-lever.json` holds it. This
 measures the model at those buckets' midpoints on the same estimator, so
 the two curves can be laid side by side.
 
-The construction difference is stated rather than hidden, and it is the same
+The construction difference is stated rather than hidden, and stays the same
 one `real_vix_lever.py` records: a real bucket mixes days whose VIX arrived
 from different directions, while a held run is a steady state real markets
 never occupy. A gap that appears only in the middle of the curve is
 therefore evidence about the model's steady-state transfer function, and a
 gap that appears only in a DRIVEN window is evidence about its dynamics.
-Separating those two is the whole point of running this.
+Separating those two is what running this is for.
 
     python tools/calibration/vix_transfer.py --candidates c.json \\
         --seeds 30 --workers 190 --out transfer.json
@@ -50,7 +50,7 @@ import gate_pick  # noqa: E402
 #: by the bucket's midpoint. Quoted rather than re-fetched: that script is
 #: the measurement of record and a second copy would be a second thing to
 #: drift. The last bucket is open-ended at 45+ and its VIX mean over the
-#: sample is nearer 55 than its nominal midpoint, which is why it reads 55.
+#: sample is nearer 55 than its nominal midpoint, so it reads 55.
 REAL = {
     9.0: 17.21,
     14.0: 20.57,

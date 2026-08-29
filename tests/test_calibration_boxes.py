@@ -118,7 +118,7 @@ def test_every_hard_range_is_ordered_and_contains_the_shipped_value():
 ])
 def test_the_inert_mechanisms_are_reachable_by_a_search(name):
     """These ship at 0.0 *by design* — they are built mechanisms nobody has
-    turned on. That is exactly why they must be reachable: the whole point
+    turned on. That is why they must be reachable: the reason
     of measuring them is to find out whether they should be."""
     low, high = _box(name)
     assert low < high, f"{name} is frozen at a point"

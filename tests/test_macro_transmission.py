@@ -66,7 +66,7 @@ def _fundamental(days: int, drop: tuple[str, ...] = (), **over) -> float:
 
 
 def test_qe_pe_boost_is_a_direct_multiple() -> None:
-    """The one channel that bypasses the discount rate, and it is linear.
+    """The one channel that bypasses the discount rate, and a linear one.
 
     This is what makes it the only field able to express a re-rating: a 34%
     fall in a market is a multiple compressing, and nothing else in the macro
@@ -206,7 +206,7 @@ def test_endogenous_inflation_never_reaches_its_own_crisis_regime() -> None:
     process stalls well below the trigger. Measured over five seeds and five
     years, endogenous inflation peaks at 4.06% to 4.11% against a hard clamp
     of 6.0% and a real US CPI that reached 9.1% in June 2022. So the ceiling
-    is not the clamp, it is the dynamics.
+    is the dynamics, not the clamp.
 
     WHICH part of the dynamics is measured, not guessed, because the obvious
     guess is wrong. `inflation_mean_rev_coeff` is 0.55 per month, which looks

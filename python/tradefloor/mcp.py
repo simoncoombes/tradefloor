@@ -24,7 +24,7 @@ That limit is stated in `describe_simulator` rather than discovered.
 
 ## Every result carries its own caveats
 
-This is the part that is not ordinary MCP plumbing, and it is load-bearing.
+This part goes beyond ordinary MCP plumbing, and carries real weight.
 
 A person calling `evaluate` has the docstring, the README and the realism
 envelope page in reach. A model calling `evaluate_strategies` has the tool
@@ -210,8 +210,8 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
 
     Computed, not selected from a list of stock warnings. Each branch below
     fires on a property of the request, so a result never carries a caveat
-    that does not apply to it -- which is what keeps the ones it does carry
-    worth reading.
+    that does not apply to it, which keeps the ones it does carry worth
+    reading.
     """
     out: list[str] = [
         "The price process is a known model, not a forecast. A strategy that "
@@ -236,8 +236,8 @@ def _caveats(*, days: int, n_seeds: int, signals: set[str],
     # answer inside a conversation.
     #
     # So every result here is a slice of a market whose realism was measured
-    # over a year. That is not a violation, and it is not nothing either:
-    # the statistics that make this market credible are annual ones.
+    # over a year. No violation, and no free pass either: the statistics
+    # that make this market credible are annual ones.
     horizon = envelope.CERTIFIED_HORIZON_DAYS
     if days < horizon // 4:
         out.append(
@@ -426,8 +426,8 @@ _ASSUMED = "spec_version_assumed"
 def _normalise(doc: Any) -> tuple[str, bool]:
     """Wire form to spec JSON, defaulting a MISSING version but never a wrong one.
 
-    `StrategySpec.from_json` requires `spec_version`, and it is right to:
-    a spec document without one is unversioned, and reading a NEWER version
+    `StrategySpec.from_json` requires `spec_version`, correctly: a spec
+    document without one is unversioned, and reading a NEWER version
     on a best-effort basis would produce a strategy nobody specified while
     claiming, via its fingerprint, to be what was written.
 
@@ -1181,7 +1181,7 @@ def explain_price_move(
 
     You can observe that a stock fell. You cannot observe that 60% of the
     fall was order-flow pressure and the rest was noise -- unless something
-    computed it, which is exactly what happened here.
+    computed it, and something did.
     """
     if not 1 <= day <= MAX_DAYS:
         return _fail(f"day must be 1..{MAX_DAYS}, got {day}")

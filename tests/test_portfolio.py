@@ -162,7 +162,7 @@ def test_flow_fed_back_actually_moves_the_market():
     # saturates at 10x the average minute volume, and its saturated ceiling
     # works out to about one cent over this session -- which the cent grid
     # then hides or shows depending on where the seed's noise lands. It
-    # showed until the stream-split re-deal and hides after, but that is the
+    # showed until the stream-split re-deal and hides after, but the
     # coin flip, not the claim. AAB's 2M-share day clears the grid by an
     # order of magnitude, so THIS assertion measures the mechanism.
     #

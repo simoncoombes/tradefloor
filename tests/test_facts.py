@@ -128,7 +128,7 @@ def test_the_autocorrelation_is_the_mispricing_process_showing_through():
     That is positive serial correlation by construction, so the measured
     return autocorrelation above is the process showing through in prices
     rather than a coincidence of one seed. Two independent measurements of the
-    same mechanism, which is what makes it an explanation instead of an
+    same mechanism, which makes it an explanation instead of an
     observation.
     """
     response = tradefloor.impulse_response(12)
@@ -151,14 +151,14 @@ def test_volatility_clustering_is_in_band_at_short_lags_and_dies_too_fast():
     # reads 0.130 here against a 0.02-0.22 band, lag five 0.052 against
     # 0.02-0.09.
     #
-    # What did NOT get fixed is the SHAPE, and that is the finding worth
+    # What did NOT get fixed is the SHAPE, the finding worth
     # keeping. The model's clustering is gone by lag twenty -- it reads
     # negative here -- where real markets stay weakly positive out to lag
     # sixty (a 252-day real median of +0.020 at lag 20). Measured across the
     # whole curve the model is 2.6-3.2x real out to lag five and crosses to
     # nothing by twenty: a log-log decay slope of -1.33 against real markets'
     # -0.44. Exponential memory imitating hyperbolic memory. It is
-    # structural, no parameter setting fixes it, and it is the reason the
+    # structural, no parameter setting fixes it, and the reason the
     # 504-day horizon is the one axis still not perfectly in band.
     # Measured at the CERTIFIED horizon, not at 180 days as this used to be.
     # The bands come from 252-day windows of real data, and clustering is
@@ -484,7 +484,7 @@ def test_correlation_persistence_is_reported_and_judged_with_its_noise_stated():
     non-overlapping 21-day windows in a year is a noisy series and the real
     windows scatter from -0.05 to +0.40, so the 252-day band is wide enough
     to admit every preset; the 504-day band is the ruler. Its seed sd is the
-    largest in the table, which is why it sits outside the objective.
+    largest in the table, so it sits outside the objective.
     """
     short = measure(seed=2, universe=UNIVERSE, days=60)
     assert "corr_persistence_acf1" in short

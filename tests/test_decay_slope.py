@@ -44,7 +44,7 @@ def test_it_reproduces_the_shipped_preset_slope() -> None:
 
 
 def test_a_flatter_curve_reads_as_a_flatter_slope() -> None:
-    """Direction, which is the whole point of recording it.
+    """Direction, the reason for recording it.
 
     Real markets decay more slowly than the model, so their slope is closer
     to zero. A helper that got the sign or the ordering wrong would make the

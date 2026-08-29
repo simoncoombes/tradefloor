@@ -287,7 +287,7 @@ def test_a_panel_that_loses_a_statistic_is_named():
     the thin-tails gap, which was retired at 0.2.0 when the shipped preset
     closed it too -- and it surrenders `return_acf1` at the certified
     horizon. It was called a win twice before anyone counted the panel
-    (CALIBRATION-FOLLOWUPS §33), which is why this is a function now.
+    (CALIBRATION-FOLLOWUPS §33), so this is a function now.
     """
     panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
     low, high = REAL_MARKETS["return_acf1"]
@@ -313,7 +313,7 @@ def test_a_row_the_shipped_preset_does_not_hold_cannot_be_lost():
     """The condition that always did the work, asserted directly.
 
     Nothing can be blamed on a candidate for a row the baseline misses too,
-    which is what keeps this function from calling every candidate a
+    which keeps this function from calling every candidate a
     regression the moment a statistic leaves the shipped panel.
     """
     panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}

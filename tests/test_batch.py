@@ -49,7 +49,7 @@ def test_every_member_equals_that_seed_run_alone():
 
 def test_members_do_not_interact():
     # Each engine owns its own generator. There is no decomposition WITHIN a
-    # run that preserves the draw schedule, which is why per-seed is the only
+    # run that preserves the draw schedule, so per-seed is the only
     # safe boundary.
     small = batch([0, 1])
     large = batch([0, 1, 2, 3, 4, 5])

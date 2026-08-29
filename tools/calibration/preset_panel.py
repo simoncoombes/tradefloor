@@ -13,7 +13,7 @@ on the certified roster, at both horizons, on a universe none of them was
 tuned on, and under a held crisis. One method, one ruler, one run.
 
 Every number the ranking table publishes comes from here. Nothing is carried
-forward from a calibration record, because that is exactly how the current
+forward from a calibration record, because that is how the current
 table drifted.
 
 The method, spelled out because "check which one you are reading" is a
@@ -29,7 +29,7 @@ standing warning on the realism page:
                 Universe.random(60, seed=909), 252 days, seeds 101-130. A
                 roster no preset was calibrated on.
   heldout_seeds Universe.random(40, seed=111), 252 days, seeds 1-30. THIRTY,
-                not the six gate_pick screens on: trap 15, where a six-seed
+                against the six gate_pick screens on: trap 15, where a six-seed
                 read called pt-v10 13/14 and thirty called it 14/14 because
                 corr_persistence_acf1 has an across-seed sd of 0.28.
   crisis_lever  annualised volatility under a held VIX 65 divided by the same
