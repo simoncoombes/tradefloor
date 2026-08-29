@@ -32,6 +32,10 @@ on:
         description: "Build and verify one Linux target, publish nothing"
         type: boolean
         default: true
+      publish_pretium_shim:
+        description: "Publish the pretium 0.5.0 PyPI shim (shims/pypi-pretium)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -265,26 +269,12 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         # `--no-verify` because the package was already built and tested
         # above; re-verifying compiles the whole crate a second time for no
-        # additional signal.
-        #
-        # TRANSITION GUARD, remove after v0.5.0: the tradefloor crate's
-        # first publish had to be manual (crates.io cannot configure a
-        # Trusted Publisher for a crate that does not exist), so the
-        # rename tag finds its version already uploaded. That one refusal
-        # is expected and treated as published; any other failure still
-        # fails, and a re-run refusal on a NORMAL release still fails,
-        # which is the correct outcome this guard must give back after
-        # this tag.
-        run: |
-          set -o pipefail
-          if cargo publish --no-verify 2>&1 | tee publish.log; then
-            exit 0
-          fi
-          if grep -qi "already uploaded\|already exists" publish.log; then
-            echo "version already on crates.io -- the transition tag's expected state"
-            exit 0
-          fi
-          exit 1
+        # additional signal. Not idempotent the way PyPI's skip-existing is:
+        # crates.io refuses a version that already exists, and that refusal is
+        # the correct outcome for a re-run rather than something to swallow.
+        # (v0.5.0 briefly carried a guard here for the rename's manual first
+        # publish; it went with the transition.)
+        run: cargo publish --no-verify
 
   github_release:
     name: GitHub release
@@ -372,3 +362,24 @@ jobs:
             --notes-file NOTES.md \
             --verify-tag \
             dist/*
+
+  publish_shim:
+    name: publish the pretium shim to PyPI
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_pretium_shim
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write        # the pretium project's Trusted Publisher, repointed here
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Build the shim
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --sdist --wheel shims/pypi-pretium -o shim-dist
+          ls -la shim-dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: shim-dist
+          skip-existing: true
