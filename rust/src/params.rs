@@ -2197,64 +2197,42 @@ impl ModelParams {
         p
     }
 
-    /// pt-v15 with four numbers: the QE valuation channel silenced, and
-    /// the composition that closed the full house.
+    /// pt-v15 re-levelled: the QE channel silenced, the asymmetry
+    /// composition, and the 0.86x joint volatility trim.
     ///
-    /// **The first preset to hold the full card.** Over thirteen
-    /// thirty-seed qualification blocks: 504-day panel full-house 13/13
-    /// (pt-v15 holds 11), crisis co-movement in range 13/13 with the
-    /// across-block spread at 0.0444, crisis lever 13/13 at median 6.137
-    /// against the real 6.16, driven noise ratio 1.2511 against pt-v15's
-    /// ~1.46. Paired against the qe0-only base the panel is 2 wins, 11
-    /// ties, 0 losses; the driven cost of the composition is +0.0127 and
-    /// is the one trade this preset makes.
+    /// **The first preset to hold the complete card at the deepest
+    /// standard this programme runs** -- twenty-six blocks spanning both
+    /// the qualification corpus and thirteen blocks no search ever
+    /// touched, one hundred seeds per block:
     ///
-    /// The composition, and why each number: `vix_cycle_amplitude` 0.85
-    /// pulls the business-cycle share of the VIX in, a clean
-    /// corr-asymmetry gain with no measured cost; `market_beta_down_asym`
-    /// 0.01 is the exceedance-correlation wire (down ticks of the factor
-    /// transmit harder) at the lowest measured effective dose -- higher
-    /// doses tax crisis co-movement roughly one-for-one; and
-    /// `sector_loading_beta_slope` rises 0.5 to 0.7 to fund the
-    /// co-movement margin that dose spends. The two neighbouring
-    /// compositions measured (more wire with more funding; gentler cycle)
-    /// both fail block 601, so this is the measured optimum, not a point
-    /// on a plateau.
+    /// | | pt-v16 | the pre-trim candidate |
+    /// |---|---|---|
+    /// | 504 full-house | **26/26** | 24/26 |
+    /// | crisis co-movement in range | 26/26 (spread 0.0406) | 26/26 |
+    /// | crisis lever in tolerance | 26/26 (median 6.241) | 26/26 |
+    /// | driven noise ratio | **1.1246** | 1.2995 |
+    /// | out-of-band rows, anywhere | **none** | corr_asymmetry x2 |
     ///
-    /// Stated margins, because they are thin: corr_asymmetry clears its
-    /// -0.04 floor by 0.0009 at block 601 and 0.0022 at 1201; co-movement
-    /// clears its floor by 0.0012 at block 401. And stated scope: the
-    /// -0.04 floor is itself generous -- every one of the six real
-    /// reference windows measures corr_asymmetry at -0.0105 or above,
-    /// five of six positive -- so this preset is band-complete while
-    /// still below every real observation on that axis. The gap that
-    /// remains is real and smaller than it has ever been.
+    /// Three ideas compose. `qe_pe_gain` 0.0 silences a channel whose
+    /// driven input is a proxy anticorrelated with measured Fed purchases
+    /// (-0.485) and which subtracts realism with either input.
+    /// `vix_cycle_amplitude` 0.85, `sector_loading_beta_slope` 0.7 and
+    /// `market_beta_down_asym` 0.025 are the correlation-asymmetry
+    /// composition: down ticks of the factor transmit harder (exceedance
+    /// correlation, the mechanism the statistic is about), funded by
+    /// sector-loading dispersion, seasoned by pulling the business-cycle
+    /// share of the VIX in. And the six noise sources scale together by
+    /// 0.86, which round 101 measured as the model running 20-25% hot at
+    /// both held-VIX ends with the ratio immaculate, and round 107 proved
+    /// must be trimmed JOINTLY -- any single source alone re-balances the
+    /// market/idio split and collapses correlations instead of
+    /// re-levelling.
     ///
-    /// The channel multiplies the target P/E by `1 + qe_pe_boost`, and its
-    /// input is not measured quantitative easing: the driven test derives
-    /// it from the S&P against its own 200-day EMA, a series that
-    /// correlates -0.485 with the Fed's actual securities purchases over
-    /// the same window -- procyclical where QE is countercyclical. Fed the
-    /// measured series instead, the linear formula overshoots (the 2020
-    /// peak reads 1.29 on a scale built for 0.10) and the driven window
-    /// gets WORSE. The channel subtracts realism whichever input it is
-    /// given, so this preset gives it none.
-    ///
-    /// Measured over thirteen thirty-seed blocks against pt-v15, paired
-    /// within one run: BIT-IDENTICAL on every certified panel and crisis
-    /// statistic -- the endogenous central-bank QE trigger (funds rate at
-    /// 0.25 inside a contraction) never fires at the panel's horizons --
-    /// and the driven noise ratio falls 1.4633 to 1.2384 against a real
-    /// 1.00, the largest driven improvement any measured change has
-    /// produced. A gain of 0.5 lands between, confirming the direction.
-    ///
-    /// What this deliberately changes: a scenario's `qe_pe_boost` input no
-    /// longer reaches fair values, so the driven gate now tests the
-    /// simulator without its QE channel. The honest end state remains a
-    /// reformulated channel -- concave, or reading the stock of holdings
-    /// rather than the flow -- calibrated against the measured series; this
-    /// preset removes a harmful approximation rather than modelling the
-    /// truth.
+    /// Scope, stated: corr_asymmetry's median (-0.022) is band-complete
+    /// and still below every real reference window; the driven window at
+    /// 1.12 is the closest this model has been to real (1.00) and is not
+    /// there. The gaps that remain are real, smaller than they have ever
+    /// been, and named in the record.
     ///
     /// NOT the default. pt-v14 holds that and the envelope certifies
     /// pt-v14.
@@ -2262,8 +2240,18 @@ impl ModelParams {
         let mut p = ModelParams::pt_v15();
         p.qe_pe_gain = 0.0;
         p.vix_cycle_amplitude = 0.85;
-        p.market_beta_down_asym = 0.01;
         p.sector_loading_beta_slope = 0.7;
+        p.market_beta_down_asym = 0.025;
+        // The 0.86x joint level trim: every noise source scaled together,
+        // which preserves correlations and ratios while bringing the
+        // volatility LEVEL to real scale. Trimming any one source alone
+        // re-balances instead of re-levelling (round 107).
+        p.market_factor_sigma = 0.007593024924589399;
+        p.idio_sigma_scale = 0.5125981926;
+        p.jump_sigma_idio = 0.0752080062;
+        p.jump_sigma_market = 0.0024597567320385947;
+        p.endogenous_news_sigma = 0.01751004376;
+        p.sector_factor_sigma = 0.008583053614;
         p
     }
 
@@ -3014,8 +3002,14 @@ mod tests {
             .unwrap()
             .with_override("qe_pe_gain", 0.0)
             .and_then(|m| m.with_override("vix_cycle_amplitude", 0.85))
-            .and_then(|m| m.with_override("market_beta_down_asym", 0.01))
             .and_then(|m| m.with_override("sector_loading_beta_slope", 0.7))
+            .and_then(|m| m.with_override("market_beta_down_asym", 0.025))
+            .and_then(|m| m.with_override("market_factor_sigma", 0.007593024924589399))
+            .and_then(|m| m.with_override("idio_sigma_scale", 0.5125981926))
+            .and_then(|m| m.with_override("jump_sigma_idio", 0.0752080062))
+            .and_then(|m| m.with_override("jump_sigma_market", 0.0024597567320385947))
+            .and_then(|m| m.with_override("endogenous_news_sigma", 0.01751004376))
+            .and_then(|m| m.with_override("sector_factor_sigma", 0.008583053614))
             .expect("every folded dial is settable");
         assert_eq!(crate::params::PT_V16.digest(), measured.digest());
         assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");

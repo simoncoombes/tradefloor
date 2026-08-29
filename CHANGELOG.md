@@ -2,19 +2,18 @@
 
 ## Unreleased
 
-**pt-v16 registered: the first full-house preset.** pt-v15 plus four
-numbers: `qe_pe_gain` 0.0 (the QE channel's driven input is a proxy
-anticorrelated with measured Fed purchases, and the channel subtracts
-realism with either input, so it gets none), `vix_cycle_amplitude` 0.85,
-`market_beta_down_asym` 0.01 (down ticks of the market factor transmit
-harder -- the exceedance-correlation mechanism), and
-`sector_loading_beta_slope` 0.7. Over thirteen thirty-seed blocks:
-504-day panel full-house 13/13 -- the first preset to hold every
-statistic on every block -- crisis co-movement 13/13 with the spread at
-0.0444, crisis lever 13/13 at median 6.137, and the driven noise ratio
-at 1.2511 against pt-v15's ~1.46. Margins and scope stated in the
-preset's documentation. Selectable by name; not the default, which
-remains pt-v14.
+**pt-v16 registered: the complete card.** pt-v15 re-levelled: the QE
+valuation channel silenced (its driven input was a proxy anticorrelated
+with measured Fed purchases), the correlation-asymmetry composition
+(down ticks transmit harder, funded by sector-loading dispersion and a
+quieter VIX cycle), and a 0.86x joint trim of every noise source, which
+preserves correlations and ratios while bringing the volatility level
+to real scale. Judged on twenty-six blocks -- thirteen of them never
+touched by any search -- at one hundred seeds per block: 504-day
+full-house 26/26 with no out-of-band row anywhere, crisis co-movement
+and lever 26/26 each, and the driven noise ratio at 1.1246 against
+pt-v15's ~1.46. Selectable by name; not the default, which remains
+pt-v14.
 
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
 give each agent its own copy of the market, which is what makes the
