@@ -36,6 +36,19 @@ from tradefloor import Scenario, envelope, facts  # noqa: E402
 
 TRAIN = tuple(range(101, 131))
 HELDOUT = (1, 2, 3, 4, 5, 6)
+
+# The measurement universe. 111/40 is the search universe every recorded
+# figure used; PT_UNIVERSE_SEED/PT_UNIVERSE_N override it for held-out
+# universe cards (round 122). ho_universe stays pinned to 909/60 — it is
+# the card's own cross-check and must not move with the override.
+import os as _os
+_U_SEED = int(_os.environ.get("PT_UNIVERSE_SEED", "111"))
+_U_N = int(_os.environ.get("PT_UNIVERSE_N", "40"))
+
+
+def _universe():
+    return pt.Universe.random(_U_N, seed=_U_SEED)
+
 _MODEL: dict = {}
 
 
@@ -260,7 +273,7 @@ def _roster_inputs(roster_path):
     return dates, closes, vols, (crash[0], crash[-1])
 
 
-def driven_basket(m, seed: int, roster_path) -> dict:
+def driven_basket(m, seed: int, roster_path, freeze=()) -> dict:
     """Four cross-sectional statistics, sim vs real, along the real path.
 
     Basket noise ratio (the driven ratio, de-AAPLed), dispersion path
@@ -277,6 +290,16 @@ def driven_basket(m, seed: int, roster_path) -> dict:
     path = [{"day": i, "vix": raw["vix"][i], "federal_funds_rate": policy[i],
              "corporate_bond_yield": credit[i], "qe_pe_boost": qe[i]}
             for i in range(n)]
+    if freeze:
+        # Round 76's channel attribution, on the basket: a frozen channel
+        # holds its day-zero value for the whole window.
+        keys = {"vix": "vix", "policy": "federal_funds_rate",
+                "credit": "corporate_bond_yield"}
+        for ch in freeze:
+            k = keys[ch]
+            v0 = path[0][k]
+            for i in range(n):
+                path[i][k] = v0
     scen = pt.Scenario.from_json(json.dumps(
         {"schema": 1, "label": "covid-basket", "days": n, "path": path}))
     names = sorted(closes)
@@ -356,21 +379,21 @@ def one(job):
     base, overrides, kind, seed = job
     m = model(base, overrides)
     if kind == "p252":
-        f = facts.measure(seed=seed, universe=pt.Universe.random(40, seed=111), days=252, model=m)
+        f = facts.measure(seed=seed, universe=_universe(), days=252, model=m)
     elif kind == "p504":
-        f = facts.measure(seed=seed, universe=pt.Universe.random(40, seed=111), days=504, model=m)
+        f = facts.measure(seed=seed, universe=_universe(), days=504, model=m)
     elif kind in ("vix5", "vix45", "vix65"):
         # The two ENDS as well as the middle: the crisis volatility lever is
         # vol(VIX 65) / vol(VIX 5), and it is the headline number for any
         # crisis preset. A gate that reported only the middle sent every
         # candidate to a separate laptop run to find its lever (§93).
         held = {"vix5": 5.0, "vix45": 45.0, "vix65": 65.0}[kind]
-        f = facts.measure(seed=seed, universe=pt.Universe.random(40, seed=111), days=252,
+        f = facts.measure(seed=seed, universe=_universe(), days=252,
                           model=m, scenario=Scenario().hold(vix=held))
     elif kind == "driven":
         return kind, driven_window(m, seed)
     elif kind == "ho_seeds":
-        f = facts.measure(seed=seed, universe=pt.Universe.random(40, seed=111), days=252, model=m)
+        f = facts.measure(seed=seed, universe=_universe(), days=252, model=m)
     elif kind == "ho_universe":
         f = facts.measure(seed=seed, universe=pt.Universe.random(60, seed=909), days=252, model=m)
     else:
