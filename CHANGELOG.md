@@ -2,16 +2,22 @@
 
 ## Unreleased
 
-**pt-v15 registered: the slow-variance mixture and the credit floor.**
-pt-v14 plus five numbers: the two-timescale variance mixture the model has
+**pt-v15 registered: the slow-variance mixture, the credit floor, and
+sector dispersion.** pt-v14 plus six numbers: the two-timescale variance mixture the model has
 carried inert since the pt-v4 era (slow weight 0.35, persistence 0.98,
 gain 0.05, VIX damp 0.374) and `daily_credit_floor_gain` 1.0, which
 activates the #48 fix as a preset the way the version policy requires.
 Against pt-v14 over thirteen thirty-seed blocks the 504-day panel ties on
 every block, the crisis co-movement range across blocks falls 0.0774 to
 0.0502 -- inside the 0.0630 band width, past pt-v12's 0.0551 -- and the
-crisis lever median lands at 6.159 against the real 6.16 with 13/13 in
-tolerance. Selectable by name; not the default, which remains pt-v14.
+crisis lever median lands near the real 6.16 with 13/13 in tolerance.
+`sector_loading_beta_slope` 0.5 -- cross-sectional dispersion in sector
+exposure -- then takes back the one crisis co-movement block the mixture
+cannot reach: confirmed over thirteen blocks paired against the
+five-override base, co-movement goes 12/13 to 13/13 and the range falls
+0.0502 to 0.0464 with the panel a tie on every block, making pt-v15 the
+first preset measured to hold both crisis instruments on all thirteen.
+Selectable by name; not the default, which remains pt-v14.
 
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
 give each agent its own copy of the market, which is what makes the

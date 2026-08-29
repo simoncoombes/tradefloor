@@ -2062,14 +2062,18 @@ impl ModelParams {
     /// pt-v14 with the slow variance component switched on, its VIX
     /// coupling damped, and the daily credit floor enforced.
     ///
-    /// Five numbers. Four are the two-timescale mixture the model has
+    /// Six numbers. Four are the two-timescale mixture the model has
     /// carried inert since the pt-v4 era: the slow component takes weight
     /// 0.35 of the market variance target (persistence 0.98, gain 0.05)
     /// and its VIX coupling is damped to 0.374. The fifth,
     /// [`daily_credit_floor_gain`](#structfield.daily_credit_floor_gain)
     /// at 1.0, activates the #48 fix in full, arriving the way the
     /// version policy requires a trajectory change to arrive: as a new
-    /// preset.
+    /// preset. The sixth,
+    /// [`sector_loading_beta_slope`](#structfield.sector_loading_beta_slope)
+    /// at 0.5, gives sector exposure cross-sectional dispersion -- a
+    /// high-beta name loads harder on its industry -- and is what closes
+    /// the one crisis block the mixture alone cannot reach.
     ///
     /// The slow component carries part of the variance target at a
     /// persistence the fast component cannot, and its damped VIX coupling
@@ -2101,6 +2105,16 @@ impl ModelParams {
     /// that frontier that holds the lever everywhere and cedes a single
     /// co-movement block -- one pt-v14 also fails.
     ///
+    /// The sector dispersion takes that ceded block back, which no dial
+    /// inside the variance mixture can: it raises pairwise sector
+    /// co-movement without touching market variance. Confirmed over
+    /// thirteen thirty-seed blocks against the five-override base, paired
+    /// within one run: co-movement in range 13/13 (the base 12/13), the
+    /// range over blocks 0.0502 to 0.0464, the ceiling keeping 0.0148 of
+    /// headroom, the lever 13/13 at median 6.152, the panel a tie on
+    /// every block. **The first measured cell to hold both crisis
+    /// instruments on all thirteen blocks.**
+    ///
     /// The credit floor is measured free: against the same base with only
     /// this dial moved, the panel reads 1W 12T 0L and both crisis
     /// instruments are identical on every block. What it buys is an
@@ -2116,6 +2130,7 @@ impl ModelParams {
         p.market_vol_slow_gain = 0.05;
         p.market_vol_slow_vix_damp = 0.374;
         p.daily_credit_floor_gain = 1.0;
+        p.sector_loading_beta_slope = 0.5;
         p
     }
 
