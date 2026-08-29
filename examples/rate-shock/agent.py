@@ -1,6 +1,6 @@
 """A deterministic agent that trades the rate regime, not the price chart.
 
-Used by ``rate_shock_counterfactual.py``. It exists to make one experiment
+Used by ``counterfactual.py``. It exists to make one experiment
 answerable -- does the same agent behave differently when rates move? -- and it
 is written to be read, not to win. Every number in it is a declared constant,
 there is no fitting, no randomness and no lookup of anything the simulator

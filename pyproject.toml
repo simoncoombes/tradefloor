@@ -54,6 +54,57 @@ claude = ["anthropic>=0.40", "pydantic>=2"]
 # Optional for the same reason as the rest: nothing in the library imports it,
 # and a user who only wants the simulator should not install a server stack.
 mcp = ["mcp>=2.0"]
+# Runs a real FinRobot agent inside a market, for
+# examples/finrobot/rate_shock.py. Optional, and it has to be: this is the
+# largest extra by an order of magnitude, and only the LIVE half of the
+# integration needs it. Replaying the recorded run -- which is what the
+# example and the notebook do by default -- imports none of it.
+#
+# The pins are not preferences. FinRobot 0.1.5 ships an sdist whose
+# `setup.py` reads `requirements.txt` at build time and does not find it, so
+# the published wheel declares NO dependencies at all and `pip install
+# finrobot` installs a package that cannot import itself. Everything below
+# except `finrobot` is that missing list, narrowed to the closure of
+# `from finrobot.agents.workflow import SingleAssistant`.
+#
+# Three of them carry a reason worth knowing:
+#
+#   pyautogen<0.3   FinRobot's own floor is `pyautogen>=0.2.19`, which today
+#                   resolves to 0.10.0 -- the AutoGen 0.4+ rewrite, which does
+#                   not provide `import autogen` at all. FinRobot's workflow
+#                   module is written against the 0.2 API (ConversableAgent,
+#                   UserProxyAgent, autogen.cache.Cache), so the ceiling is
+#                   the working version and the floor is FinRobot's.
+#   retrievechat    `finrobot.functional.rag` imports
+#                   `RetrieveUserProxyAgent` at module scope and
+#                   `functional/__init__` imports rag, so the RAG stack is on
+#                   the path to `SingleAssistant` whether or not anything
+#                   uses it. That is where the size comes from.
+#   anthropic<1.0   only for `api_type: "anthropic"`. autogen 0.2.35's
+#                   Anthropic client imports `anthropic.types.Completion`,
+#                   removed in the 1.0 SDK. An OpenAI-configured run does not
+#                   need it; it is here because the shipped example's default
+#                   provider is Anthropic.
+#
+# Python 3.11 exactly: FinRobot declares `>=3.10, <3.12` and this project
+# needs >=3.11.
+finrobot = [
+  "finrobot>=0.1.5",
+  "pyautogen[retrievechat]>=0.2.19,<0.3",
+  "anthropic>=0.30,<1.0",
+  "finnhub-python",
+  "yfinance",
+  "sec-api",
+  "praw",
+  "mplfinance",
+  "matplotlib",
+  "backtrader",
+  "reportlab",
+  "ipython",
+  "pandas",
+  "numpy",
+  "requests",
+]
 
 [project.scripts]
 # Reads scenario files: `tradefloor scenario validate scenarios/*.yml`. It

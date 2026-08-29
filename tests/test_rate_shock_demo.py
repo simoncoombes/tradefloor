@@ -1,6 +1,6 @@
 """The canonical demo has to keep being true, not merely keep running.
 
-``examples/rate_shock_counterfactual.py`` is the project's headline claim in
+``examples/rate-shock/counterfactual.py`` is the project's headline claim in
 executable form: same world, same agent, one changed variable. A demo that
 still runs while quietly failing to demonstrate that is worse than one that
 crashes, because nobody looks.
@@ -24,11 +24,11 @@ import pytest
 import tradefloor as tf
 from tradefloor.counterfactual import World, agree, compare
 
-EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
-sys.path.insert(0, str(EXAMPLES))
+STUDY = Path(__file__).resolve().parent.parent / "examples" / "rate-shock"
+sys.path.insert(0, str(STUDY))
 
-demo = pytest.importorskip("rate_shock_counterfactual")
-from macro_aware_agent import MacroAwareAgent  # noqa: E402
+demo = pytest.importorskip("counterfactual")
+from agent import MacroAwareAgent  # noqa: E402
 
 
 def build() -> World:
