@@ -303,9 +303,17 @@ def test_the_intervention_is_recorded_in_the_engines_own_log():
                 for entry in world.engine.order_log
                 if entry["op"] == "pin_macro"]
 
+    # Both arms carry the whole history, because a fork is a copy of the
+    # engine: the shock arm's log holds the shared days at 0.04 AND its own
+    # at 0.06. That is the point -- an arm whose log began at the fork would
+    # replay into a market that never had a pre-shock history.
     assert set(rates(control)) == {0.04}
-    assert set(rates(shock)) == {0.06}
-    assert len(rates(shock)) == FORWARD
+    assert len(rates(control)) == WARMUP + FORWARD
+
+    assert set(rates(shock)) == {0.04, 0.06}
+    assert set(rates(shock)[:WARMUP]) == {0.04}
+    assert set(rates(shock)[WARMUP:]) == {0.06}
+    assert len(rates(shock)[WARMUP:]) == FORWARD
 
 
 def test_the_scenario_describes_the_intervention_as_data():
@@ -417,37 +425,59 @@ def test_a_state_snapshot_does_not_compare_equal_to_itself():
     assert any(value != value for value in snapshot["rng"])
 
 
-def test_a_branch_does_not_carry_the_draw_counter_or_the_log():
-    """Also pinned as current behaviour, and it reaches further than it looks.
+def test_a_branch_carries_the_draw_counter_and_the_log():
+    """The fork is a copy, so both come with it.
 
-    ``branch`` builds fresh engines and restores state into them. The draw
-    counter and the order log are not part of that state, so a branch starts
-    at zero on both. ``market_digest`` folds the draw counter in, so a
-    branched engine's digest differs from its parent's while every column is
-    identical -- and a RunManifest written from a branch therefore records a
-    different ``result.digest`` than one written from the checkpoint replay of
-    the same state.
-
-    Two engines on the same market, two digests. Fixing it means either
-    restoring the counter or taking it out of the digest, and the second
-    changes every published digest, so it is reported rather than patched
-    here.
+    This asserted the opposite until `Engine.fork` replaced the
+    rebuild-from-a-field-list branch. A fresh engine restored from a state
+    snapshot started at zero draws with an empty log; `market_digest` folds
+    the draw counter in, so a branched engine's digest differed from its
+    parent's while every column was identical, and a RunManifest written from
+    a branch recorded a different `result.digest` than one written from the
+    checkpoint replay of the same state. Two engines on one market, two
+    digests. A copy has none of that, and it closes the whole class rather
+    than the three cases that had been found.
     """
     world = build()
     world.run(days=2)
     (forked,) = world.fork("forked")
 
     assert world.engine.draws_consumed > 0
-    assert forked.engine.draws_consumed == 0
-    assert world.engine.order_log != []
-    assert forked.engine.order_log == []
+    assert forked.engine.draws_consumed == world.engine.draws_consumed
+    assert forked.engine.order_log == world.engine.order_log
 
     assert forked.engine.prices() == world.engine.prices()
     assert (forked.engine.state_snapshot()["columns"]
             == world.engine.state_snapshot()["columns"])
-    assert market_digest(forked.engine) != market_digest(world.engine)
+    assert market_digest(forked.engine) == market_digest(world.engine)
 
-    # The replay route does carry it, which is what makes the two disagree.
+    # And the replay route agrees with both, which it did not before.
     replayed = world.checkpoint().resume()
     assert replayed.draws_consumed == world.engine.draws_consumed
     assert market_digest(replayed) == market_digest(world.engine)
+
+
+def test_a_forked_arms_log_holds_the_shared_history_exactly_once():
+    """The regression the two fixes made possible between them.
+
+    `World` carried its parent's log across a fork because a branched engine's
+    began empty; `Engine.fork` then started copying it. Each was right alone,
+    and together the shared history was in the log twice -- so a manifest
+    built from a forked arm replayed the first days over again,
+    reproducibly, into a market nobody ran. Which is the defect the World-side
+    workaround was written to fix, arriving from the other direction.
+    """
+    world = build()
+    world.run(days=2)
+    before = len(world.order_log)
+    assert before > 0
+
+    control, shock = world.fork("control", "shock")
+    assert len(control.order_log) == before, (
+        f"the fork's log holds {len(control.order_log)} entries against the "
+        f"parent's {before}; the shared history is in it more than once")
+
+    control.run(days=1)
+    assert len(control.order_log) > before
+    assert control.order_log[:before] == world.order_log
+    assert len(shock.order_log) == before, "the arms are not independent"

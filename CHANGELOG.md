@@ -267,6 +267,14 @@ copies of a recording are two recordings that can drift.
 is how the first unnumbered example arrived with nothing checking it at all.
 `CONTRIBUTING.md` has the rule.
 
+**Fixed: a forked world's log held the shared history twice.** `World`
+carried its parent's order log across a fork because a branched engine's began
+empty; `Engine.fork` then started copying the engine, which carries it for the
+same reason. Two fixes for one defect, and together they made a manifest built
+from a forked arm replay the first days over again -- reproducibly, into a
+market nobody ran, which is what the first fix existed to prevent.
+`World.order_log` is the engine's own now, on a root and a fork alike.
+
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
 give each agent its own copy of the market, which is what makes the
 comparison clean. The next step is one book with several agents in it,

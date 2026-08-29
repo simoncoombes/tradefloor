@@ -134,7 +134,7 @@ class World:
                  "max_leverage", "steps_per_day", "ticks_per_step", "start",
                  "engine", "portfolio", "agent", "trace", "pins",
                  "interventions", "rejected", "fork_step",
-                 "inherited_log", "_day", "_step", "_adv")
+                 "_day", "_step", "_adv")
 
     def __init__(
         self,
@@ -179,13 +179,6 @@ class World:
         # history, so counting it into both inflates every level in both
         # columns and buries the difference between them.
         self.fork_step: int | None = None
-        # A branched engine's own log begins EMPTY: `branch` builds fresh
-        # engines and restores state into them, and the log is not part
-        # of that state. So a forked arm has to carry its parent's log
-        # itself, or its checkpoint and its manifest would describe a
-        # run that began at the fork -- replayable, reproducible, and
-        # not the run it claims to be.
-        self.inherited_log: list[dict[str, Any]] = []
         self._day = 0
         self._step = 0
         self._adv = [instrument.avg_volume for instrument in self.universe]
@@ -210,12 +203,17 @@ class World:
     def order_log(self) -> list[dict[str, Any]]:
         """Every input that reached this world's engine, from day zero.
 
-        The engine's own log for a root; the parent's log followed by this
-        arm's for a fork. Use this rather than ``world.engine.order_log``,
-        which on a forked arm holds only what happened after the fork.
+        The engine's own, on a root and on a fork alike. This carried a
+        separately inherited copy of the parent's log until `Engine.fork`
+        started copying the engine rather than restoring a list of fields into
+        a fresh one: a branched engine's log used to begin empty, so an arm
+        had to carry its parent's history itself or its checkpoint and its
+        manifest would describe a run that began at the fork. Both layers
+        fixing the same defect meant the shared history appeared twice, and a
+        manifest built from it replayed a market that ran the first twenty
+        days over again.
         """
-        return [dict(entry)
-                for entry in (*self.inherited_log, *self.engine.order_log)]
+        return [dict(entry) for entry in self.engine.order_log]
 
     def digest(self) -> str:
         """sha256 over the engine's market state.
@@ -418,8 +416,6 @@ class World:
         image of this interpreter.
         """
         self._refuse_open_market("checkpoint")
-        # Built from the FULL log rather than by `Checkpoint.of`, which reads
-        # the engine's own and would freeze a forked arm at the fork.
         default = ModelParams.from_preset().fingerprint
         return Checkpoint(
             seed=self.seed, universe=self.universe, log=self.order_log,
@@ -468,7 +464,6 @@ class World:
             child._day = self._day
             child._step = self._step
             child.fork_step = self._step
-            child.inherited_log = self.order_log
             out.append(child)
         return out
 
