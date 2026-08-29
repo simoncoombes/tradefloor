@@ -162,10 +162,24 @@ def test_the_published_artifact_matches_the_module():
     import json
     from pathlib import Path
 
-    doc = json.loads(
-        (Path(__file__).resolve().parent.parent / "docs" / "envelope.json")
-        .read_text(encoding="utf-8")
-    )
+    # The documentation site moved to its own repository and took
+    # `docs/envelope.json` with it, so this check has nowhere to run here
+    # and has failed on a missing file since the move.
+    #
+    # A skip and not a deletion, and the reason says exactly where the
+    # check belongs, because the drift it catches is real: the module
+    # gained a sixth gap and the published artifact kept quoting five.
+    # Someone has to run this against the docs checkout. A silent skip
+    # would let that be nobody.
+    artifact = Path(__file__).resolve().parent.parent / "docs" / "envelope.json"
+    if not artifact.exists():
+        pytest.skip(
+            "docs/envelope.json is not in this repository: the docs site "
+            "lives in simoncoombes/tradefloor-docs. This check belongs "
+            "there, against that checkout, and until it runs there the "
+            "published envelope artifact is unverified."
+        )
+    doc = json.loads(artifact.read_text(encoding="utf-8"))
     assert doc["preset"] == env.PRESET
     assert doc["certified_horizon_days"] == env.CERTIFIED_HORIZON_DAYS
     assert [g["id"] for g in doc["gaps"]] == [g.id for g in env.GAPS], (
@@ -189,8 +203,11 @@ def test_the_certified_comment_matches_the_certified_numbers():
     import re
     from pathlib import Path
 
-    src = (Path(__file__).resolve().parent.parent / "python" / "pretium"
-           / "envelope.py").read_text(encoding="utf-8")
+    # The package directory, read from the imported module rather than
+    # spelled out: this line said "pretium" for a week after the rename and
+    # the test failed on a missing file. Asking the module where it lives
+    # cannot go stale the next time the package moves.
+    src = Path(env.__file__).read_text(encoding="utf-8")
     note = src[:src.index("CERTIFIED: dict[str, float] = {")]
     note = note[note.rindex("#: Measured at the certified horizon"):]
 
