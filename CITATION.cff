@@ -19,7 +19,7 @@
 
 cff-version: 1.2.0
 message: "If you use this software, please cite it using these metadata."
-title: pretium
+title: tradefloor
 abstract: >-
   A deterministic market simulator with a real limit order book. A Rust core
   with a Python API. The same seed produces the same market on every platform,
@@ -30,13 +30,13 @@ authors:
   - family-names: Coombes
     given-names: Simon
     email: simon@coombes.io
-version: 0.4.3
-date-released: "2026-08-28"
+version: 0.5.0
+date-released: "2026-08-29"
 license:
   - MIT
   - Apache-2.0
-repository-code: "https://github.com/simoncoombes/pretium"
-url: "https://simoncoombes.github.io/pretium/"
+repository-code: "https://github.com/simoncoombes/tradefloor"
+url: "https://tradefloor.dev/"
 keywords:
   - market simulation
   - limit order book
