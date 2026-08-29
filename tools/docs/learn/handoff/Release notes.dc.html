@@ -8,7 +8,7 @@
 <body>
 <x-dc>
 <helmet>
-<title>Release notes · pretium</title>
+<title>Release notes · tradefloor</title>
 <meta name="description" content="What changed, what it means for a run you already have, and how to pin an old preset if you need the old behaviour.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
@@ -27,25 +27,29 @@ table{border-collapse:collapse;width:100%}
 <div data-screen-label="Release notes" style="min-height:100vh;padding:0 0 5rem">
 <header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)">
 <div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem">
-<a href="./Learn pretium.dc.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)">
-<img src="{{ markLogo }}" alt="pretium" width="15" height="22" style="display:block;flex:none"></img>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span>
+<a href="./Learn tradefloor.dc.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)">
+<img src="{{ markLogo }}" alt="tradefloor" width="15" height="22" style="display:block;flex:none"></img>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">tradefloor</span>
 </a>
-<a href="./Learn pretium.dc.html" style="font-size:0.875rem;color:var(--ink-2)">All pages</a>
+<a href="./Learn tradefloor.dc.html" style="font-size:0.875rem;color:var(--ink-2)">All pages</a>
 <span style="flex:1"></span>
 <button onClick="{{ toggleTheme }}" style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.75rem;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px 11px;cursor:pointer">{{ themeGlyph }}</button>
 </div>
 </header>
 <main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
 <div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="./Learn pretium.dc.html" style="color:var(--ink-3)">REFERENCE</a><span>/</span><span style="color:var(--accent)">RELEASE NOTES</span>
+<a href="./Learn tradefloor.dc.html" style="color:var(--ink-3)">REFERENCE</a><span>/</span><span style="color:var(--accent)">RELEASE NOTES</span>
 </div>
 <section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">Release notes</h1>
-<p style="font-size:1.125rem;color:var(--ink-2);margin:0">What changed, what it means for a run you already have, and how to pin the old behaviour if you need it. Full history in <a href="https://github.com/simoncoombes/pretium/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
+<p style="font-size:1.125rem;color:var(--ink-2);margin:0">What changed, what it means for a run you already have, and how to pin the old behaviour if you need it. Full history in <a href="https://github.com/simoncoombes/tradefloor/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</p>
 </section>
 <section style="padding:2.5rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <div style="display:flex;align-items:baseline;gap:0.7rem">
+<h2 style="font-size:1.5rem">0.5.0</h2>
+<p style="color:var(--ink-2);margin:0"><strong style="color:var(--ink)">The library is now tradefloor.</strong> Formerly pretium, which published through 0.4.3 and stays on PyPI and crates.io forever: published results cite those versions, and reproducibility is the point. Install <code>tradefloor</code>, <code>import tradefloor</code>, crate <code>tradefloor</code>, MCP server <code>tradefloor-mcp</code>. The rename changes no behaviour — this release reproduces 0.4.3's known-answer digest on every platform, and the release gate proves it before publishing. Preset names stay <code>pt-v1</code> through <code>pt-v15</code>: they are citation identifiers, frozen under the old prefix.</p>
+<p style="color:var(--ink-2);margin:0"><strong style="color:var(--ink)">pt-v15: the first preset to hold both crisis instruments everywhere.</strong> pt-v14 plus six numbers: the two-timescale variance mixture (slow weight 0.35, persistence 0.98, gain 0.05, VIX damp 0.374), the daily credit floor at 1.0, and sector-loading dispersion at 0.5. Over thirteen thirty-seed qualification blocks it ties pt-v14's panel on every block, compresses the crisis co-movement range from 0.0774 to 0.0464 — inside the 0.0630 band width — holds crisis co-movement in range on 13 of 13 blocks and the crisis lever on 13 of 13 at median 6.152 against the real 6.16. Selectable by name; not the default, which remains pt-v14.</p>
+
 <h2 style="font-size:1.5rem">0.4.3</h2>
 <span style="font-family:'Spline Sans Mono',monospace;font-size:0.75rem;color:var(--ink-3)">2026-08-28</span>
 </div>
@@ -134,7 +138,7 @@ table{border-collapse:collapse;width:100%}
 </section>
 <nav style="display:flex;justify-content:space-between;gap:1rem;padding:2.5rem 0 0;margin-top:2.5rem;border-top:1px solid var(--line);font-size:0.875rem">
 <a href="./The nine factors.dc.html" style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">BACK</span><span>The nine factors</span></a>
-<a href="./Learn pretium.dc.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>Back to the front door</span></a>
+<a href="./Learn tradefloor.dc.html" style="display:flex;flex-direction:column;gap:2px;text-align:right"><span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;color:var(--ink-3)">NEXT</span><span>Back to the front door</span></a>
 </nav>
 </main>
 </div>
@@ -160,7 +164,7 @@ class Component extends DCLogic {
   }
   renderVals() {
     return {
-      markLogo: this.state.dark ? './mark-pretium-dark.png' : './mark-pretium.png',
+      markLogo: this.state.dark ? './mark-tradefloor-dark.png' : './mark-tradefloor.png',
       themeGlyph: this.state.dark ? 'light' : 'dark',
       toggleTheme: () => { const n = !this.state.dark; this.setState({ dark: n }); this.applyTheme(n); }
     };

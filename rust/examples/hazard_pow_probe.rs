@@ -1,5 +1,5 @@
 // Quantify the weibullHazard divergence: how many, how large, and is it pow?
-use pretium::economy::*;
+use tradefloor::economy::*;
 use serde_json::Value;
 
 fn bits(h: &str) -> f64 {

@@ -420,7 +420,7 @@ def rank(
     across seeds, where it is a property of the agents rather than of one draw.
 
     ``model`` selects the coefficient set every evaluation runs, either a
-    preset name or a :class:`pretium.ModelParams`, one model for the whole
+    preset name or a :class:`tradefloor.ModelParams`, one model for the whole
     ranking, agents and seeds alike, because a verdict taken across models
     would rank markets rather than agents. The :class:`Ranking` records
     ``model_fingerprint``, as does every scorecard under it.

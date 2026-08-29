@@ -2793,7 +2793,7 @@
    },
    "source": "stated",
    "status_override": "covered_by_tests",
-   "note": "a network-shape claim; exercised by tests/test_edgar.py through the injectable transport, not re-measured here. Counted through that transport on the four-filer market: 10 frame calls plus 4 submissions calls by default, 11 frame calls under rank_by=\"public_float\". The ten are diluted EPS, stockholders' equity, two share-count tags (us-gaap and dei) and three revenue tags at two periods each (python/pretium/edgar.py, _REVENUE_TAGS)"
+   "note": "a network-shape claim; exercised by tests/test_edgar.py through the injectable transport, not re-measured here. Counted through that transport on the four-filer market: 10 frame calls plus 4 submissions calls by default, 11 frame calls under rank_by=\"public_float\". The ten are diluted EPS, stockholders' equity, two share-count tags (us-gaap and dei) and three revenue tags at two periods each (python/tradefloor/edgar.py, _REVENUE_TAGS)"
   },
   {
    "id": "rl.env_checker",
@@ -3482,7 +3482,7 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+   "method": "tradefloor.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
   },
   {
    "id": "rec.r3_vol",
@@ -3497,7 +3497,7 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+   "method": "tradefloor.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
   },
   {
    "id": "rec.r3_vol_uplift",
@@ -3512,7 +3512,7 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+   "method": "tradefloor.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
   },
   {
    "id": "rec.r3_calm_corr",
@@ -3527,7 +3527,7 @@
     "decimals": 3
    },
    "source": "stated",
-   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+   "method": "tradefloor.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
   },
   {
    "id": "rec.r3_corr",
@@ -3542,7 +3542,7 @@
     "decimals": 3
    },
    "source": "stated",
-   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+   "method": "tradefloor.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
   },
   {
    "id": "rec.r3_median",
@@ -3766,7 +3766,7 @@
     "decimals": 2
    },
    "source": "stated",
-   "method": "pretium.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
+   "method": "tradefloor.facts.measure(seed=3, universe=Universe.random(20, seed=11), days=120, scenario=...); the page states the convention"
   },
   {
    "id": "rec.r5_day17_vix",

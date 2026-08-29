@@ -107,7 +107,7 @@ in the first place.
 ## Every one of these is expressible as data
 
 The five classes here share one grammar (a signal, a concentration, an
-exposure and a participation cap) and :class:`pretium.StrategySpec` writes it
+exposure and a participation cap) and :class:`tradefloor.StrategySpec` writes it
 down as versioned, hashable JSON, so a result built on these agents can cite
 its strategy the way it already cites its seed and universe. Construct the
 spec instead of the class when the result is going anywhere other people
@@ -472,7 +472,7 @@ class Oracle:
 
 
 def reference_agents(*, seed: int = 0) -> dict[str, Any]:
-    """The standard set, ready to pass to :func:`pretium.evaluate`.
+    """The standard set, ready to pass to :func:`tradefloor.evaluate`.
 
     ``seed`` only seeds the random baseline. It is deliberately separate from
     the market seed: reusing one number for both would couple the noise floor

@@ -67,7 +67,7 @@ except ImportError:  # pragma: no cover
 def _require(module, name: str, extra: str):
     if module is None:
         raise ImportError(
-            f"{name} is required for pretium.gym but is not installed. "
+            f"{name} is required for tradefloor.gym but is not installed. "
             f"Install it with: pip install {extra}"
         )
     return module

@@ -1,4 +1,4 @@
-"""The realism envelope, as data: what pretium certifies, and what it does not.
+"""The realism envelope, as data: what tradefloor certifies, and what it does not.
 
 `docs/realism-envelope.md` states the envelope in prose. This module states
 it in a form a program can read, so a user does not have to remember a page
@@ -12,7 +12,7 @@ estimate from a stochastic simulator invites a precision it does not have:
 `abs_return_acf20` reads +0.0096 at the shipped preset, and the across-seed
 range is wide enough that a single seed can read either side of zero. The
 band distance is reported in units of that spread, which is the same
-weighting `pretium.loss` uses -- so "how far out" is denominated in the
+weighting `tradefloor.loss` uses -- so "how far out" is denominated in the
 model's own noise rather than in the statistic's arbitrary units.
 
 **A membership check** (`check`). Given a horizon, the statistics a strategy
@@ -21,7 +21,7 @@ inside the envelope, and when it does not, says which measurement says so.
 
 ## Why there is no single confidence number
 
-`pretium.loss.compare_to_real_markets` refuses to emit one realism score,
+`tradefloor.loss.compare_to_real_markets` refuses to emit one realism score,
 and this module does not reopen that. The reason is not modesty, it is
 that aggregation destroys the only information that matters here: a model
 is realistic in some respects, at some measurement scale, and not others.
@@ -42,13 +42,13 @@ shipped default preset, which `PRESET` names.
 
 Nothing here re-checks that at call time. `check` reads these constants and
 the question you asked; it never looks at the engine you are about to run.
-So if `pretium.model_preset()["name"]` is not `PRESET`, this module is
+So if `tradefloor.model_preset()["name"]` is not `PRESET`, this module is
 describing a different model than the one you are running and will NOT say
 so. This docstring claimed until 2026-08-27 that `check` said so, and it
 never did. The comparison is one line and belongs beside any citation of
 these numbers:
 
-    pretium.model_preset()["name"] == pretium.envelope.PRESET
+    tradefloor.model_preset()["name"] == tradefloor.envelope.PRESET
 """
 
 from __future__ import annotations

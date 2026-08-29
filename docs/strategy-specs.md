@@ -152,11 +152,11 @@ demands: a version bump, not a patch.
 ## Cadence is in the spec
 
 How often a strategy re-decides moves results more than any signal parameter:
-the rebalance measurement behind `pretium.baselines` swings the same one-day
+the rebalance measurement behind `tradefloor.baselines` swings the same one-day
 signal from +37.55% at three decisions a day, to +9.79% at six, to -27.46% at
 twelve, purely by trading it more often (seed 2026, `Universe.random(40,
 seed=7)`, 30 days, ticks per step set to keep the day at roughly 390 ticks;
-pretium 0.3.0 under `pt-v12`). A strategy whose identity excluded that would
+tradefloor 0.3.0 under `pt-v12`). A strategy whose identity excluded that would
 not be identified, because two runs of the same fingerprint could differ by the
 whole return -- here, by its sign.
 

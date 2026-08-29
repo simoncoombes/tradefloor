@@ -39,7 +39,7 @@ market that already exists.
 
 | | |
 |---|---|
-| what "training" means | training your policy against the Gymnasium environment, `pretium.gym.TradingEnv` |
+| what "training" means | training your policy against the Gymnasium environment, `tradefloor.gym.TradingEnv` |
 | what "validation" means | ranking across seeds with a paired sign test |
 | the preset | a fixed input you cite, never something you tune |
 

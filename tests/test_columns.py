@@ -10,7 +10,7 @@ import struct
 
 import pytest
 
-import pretium
+import tradefloor
 
 
 FIELDS = [
@@ -27,7 +27,7 @@ UNSET_BEFORE_FIRST_TICK = [
     "mispricing_momentum", "last_daily_return", "maker_inventory",
 ]
 
-UNIVERSE = pretium.Universe.random(5, seed=2)
+UNIVERSE = tradefloor.Universe.random(5, seed=2)
 
 
 def column(engine, field):
@@ -36,7 +36,7 @@ def column(engine, field):
 
 
 def test_every_declared_field_can_be_read():
-    engine = pretium.Engine(seed=3, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=3, universe=UNIVERSE)
     engine.run_days(2)
     for field in FIELDS:
         assert len(column(engine, field)) == len(UNIVERSE), field
@@ -51,7 +51,7 @@ def test_absence_is_nan_and_never_zero():
     invisible because after the first tick an inventory of exactly zero
     essentially never occurs.
     """
-    engine = pretium.Engine(seed=3, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=3, universe=UNIVERSE)
     for field in UNSET_BEFORE_FIRST_TICK:
         values = column(engine, field)
         assert all(math.isnan(v) for v in values), (field, values)
@@ -60,7 +60,7 @@ def test_absence_is_nan_and_never_zero():
 def test_the_unset_fields_become_real_numbers_once_they_exist():
     # The other half. A column that were NaN forever would satisfy the test
     # above and be useless.
-    engine = pretium.Engine(seed=3, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=3, universe=UNIVERSE)
     engine.run_days(2)
     for field in UNSET_BEFORE_FIRST_TICK:
         values = column(engine, field)
@@ -70,7 +70,7 @@ def test_the_unset_fields_become_real_numbers_once_they_exist():
 def test_fields_that_are_genuinely_zero_stay_zero():
     # volume before any trading is a real zero, not an absence, and must not
     # be turned into NaN by an over-eager application of the rule above.
-    engine = pretium.Engine(seed=3, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=3, universe=UNIVERSE)
     assert all(v == 0.0 for v in column(engine, "volume"))
     assert all(math.isfinite(v) for v in column(engine, "garch_variance"))
 
@@ -80,8 +80,8 @@ def test_an_unknown_field_lists_every_valid_one():
     # could omit a name the function accepted. A list of valid names that is
     # missing one is worse than no list: it sends the reader hunting for a
     # different mistake.
-    engine = pretium.Engine(seed=1, universe=UNIVERSE)
-    with pytest.raises(pretium.ValidationError) as caught:
+    engine = tradefloor.Engine(seed=1, universe=UNIVERSE)
+    with pytest.raises(tradefloor.ValidationError) as caught:
         engine.column("nonsense")
     message = str(caught.value)
     for field in FIELDS:
@@ -89,7 +89,7 @@ def test_an_unknown_field_lists_every_valid_one():
 
 
 def test_the_characteristics_are_constant_through_a_run():
-    engine = pretium.Engine(seed=3, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=3, universe=UNIVERSE)
     before = {f: column(engine, f) for f in ("beta", "short_interest", "float_shares")}
     engine.run_days(3)
     for field, values in before.items():
@@ -97,7 +97,7 @@ def test_the_characteristics_are_constant_through_a_run():
 
 
 def test_the_characteristics_match_the_universe_they_came_from():
-    engine = pretium.Engine(seed=3, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=3, universe=UNIVERSE)
     assert column(engine, "beta") == pytest.approx([i.beta for i in UNIVERSE])
     assert column(engine, "short_interest") == pytest.approx(
         [i.short_interest for i in UNIVERSE])
@@ -117,7 +117,7 @@ def test_float_equals_shares_outstanding_which_is_a_simplification():
     nominal short interest. Asserted rather than left to be discovered from a
     squeeze column that is mostly zero.
     """
-    engine = pretium.Engine(seed=3, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=3, universe=UNIVERSE)
     assert column(engine, "float_shares") == pytest.approx(
         [i.shares_outstanding for i in UNIVERSE])
 
@@ -125,9 +125,9 @@ def test_float_equals_shares_outstanding_which_is_a_simplification():
 def test_reading_a_column_does_not_disturb_the_market():
     # Columns are observations. Reading one must not consume a draw or change
     # a price, or every diagnostic would alter the thing it measured.
-    quiet = pretium.Engine(seed=9, universe=UNIVERSE)
+    quiet = tradefloor.Engine(seed=9, universe=UNIVERSE)
     quiet.run_days(2)
-    watched = pretium.Engine(seed=9, universe=UNIVERSE)
+    watched = tradefloor.Engine(seed=9, universe=UNIVERSE)
     watched.run_days(2)
     for field in FIELDS:
         watched.column(field)
@@ -153,8 +153,8 @@ def test_a_fraction_shaped_short_interest_is_refused():
     watched the output not move, and only then read the formula. Refusing the
     ambiguous range is the same treatment rates get.
     """
-    with pytest.raises(pretium.ValidationError) as caught:
-        pretium.Instrument("AAA", "technology", initial_price=50.0,
+    with pytest.raises(tradefloor.ValidationError) as caught:
+        tradefloor.Instrument("AAA", "technology", initial_price=50.0,
                            shares_outstanding=1e9, eps=3.0, short_interest=0.03)
     message = str(caught.value)
     assert "SHARE COUNT" in message
@@ -164,7 +164,7 @@ def test_a_fraction_shaped_short_interest_is_refused():
 
 
 def test_a_real_share_count_is_accepted():
-    instrument = pretium.Instrument(
+    instrument = tradefloor.Instrument(
         "AAA", "technology", initial_price=50.0, shares_outstanding=1e9,
         eps=3.0, short_interest=3e7)
     assert instrument.short_interest == 3e7
@@ -173,7 +173,7 @@ def test_a_real_share_count_is_accepted():
 def test_zero_short_interest_is_legal():
     # Zero is "nobody is short", which is a real and common state. Only the
     # ambiguous open interval is refused.
-    instrument = pretium.Instrument(
+    instrument = tradefloor.Instrument(
         "AAA", "technology", initial_price=50.0, shares_outstanding=1e9,
         eps=3.0, short_interest=0.0)
     assert instrument.short_interest == 0.0
@@ -183,7 +183,7 @@ def test_a_fractional_share_is_legal_in_a_tiny_company():
     # The guard keys on the share count, not on the value alone. Half a share
     # of a hundred-share company is a coherent position; half a share of a
     # billion-share company is a typo.
-    instrument = pretium.Instrument(
+    instrument = tradefloor.Instrument(
         "AAA", "technology", initial_price=50.0, shares_outstanding=100.0,
         eps=3.0, short_interest=0.5)
     assert instrument.short_interest == 0.5
@@ -192,7 +192,7 @@ def test_a_fractional_share_is_legal_in_a_tiny_company():
 def test_generated_universes_pass_their_own_guard():
     # The generator draws a fraction of shares outstanding, so it must never
     # produce a value the constructor would reject.
-    for instrument in pretium.Universe.random(60, seed=5):
+    for instrument in tradefloor.Universe.random(60, seed=5):
         assert instrument.short_interest == 0.0 or instrument.short_interest >= 1.0
 
 
@@ -215,14 +215,14 @@ def test_fills_join_to_the_tape_on_day_tick_instrument():
     """
     pa = pytest.importorskip("pyarrow")
 
-    universe = pretium.Universe.random(6, seed=1)
-    engine = pretium.Engine(seed=1, universe=universe)
+    universe = tradefloor.Universe.random(6, seed=1)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     engine.run_days(3, record=True, ticks_per_day=40)
     bars = pa.table(engine.bars())
 
-    portfolio = pretium.Portfolio(cash=1_000_000.0)
+    portfolio = tradefloor.Portfolio(cash=1_000_000.0)
     portfolio.stamp(1, 6, 20)
-    fills = pa.table(pretium._core.fills_stream(
+    fills = pa.table(tradefloor._core.fills_stream(
         [1], [6], [20], [0], [100.0], [10.0], [10.0], [1000.0]))
 
     joined = fills.join(bars, keys=["day", "tick", "instrument_id"])
@@ -240,9 +240,9 @@ def test_the_join_key_is_the_tick_the_fill_preceded():
     fill's tick must equal that, for the steps_per_day and ticks_per_step the
     run actually used.
     """
-    universe = pretium.Universe.random(6, seed=1)
+    universe = tradefloor.Universe.random(6, seed=1)
     steps_per_day, ticks_per_step = 4, 10
-    execution = pretium.tca.analyse(
+    execution = tradefloor.tca.analyse(
         _AlwaysBuys(), seed=1, universe=universe, days=3,
         steps_per_day=steps_per_day, ticks_per_step=ticks_per_step)
     assert execution.fills, "no fills, so this proves nothing"
@@ -256,7 +256,7 @@ def test_the_join_key_is_the_tick_the_fill_preceded():
 def test_stamping_without_a_tick_is_a_type_error():
     # Defaulting it would put every fill at tick zero: a table that joins
     # cleanly, to the wrong bar, with nothing to indicate it.
-    portfolio = pretium.Portfolio(cash=1_000.0)
+    portfolio = tradefloor.Portfolio(cash=1_000.0)
     with pytest.raises(TypeError):
         portfolio.stamp(1, 6)
 

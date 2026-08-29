@@ -242,7 +242,7 @@ impl RecordBatchReader for BatchReader {
 /// Exposes `__arrow_c_stream__`, so `polars.from_arrow`, `pyarrow.table`,
 /// `pandas` and duckdb all read it directly and zero-copy. The package depends
 /// on none of them.
-#[pyclass(name = "ArrowStream", module = "pretium._core")]
+#[pyclass(name = "ArrowStream", module = "tradefloor._core")]
 pub struct PyArrowStream {
     schema: SchemaRef,
     batches: Vec<RecordBatch>,

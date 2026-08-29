@@ -23,7 +23,7 @@ use crate::python::ValidationError;
 
 /// An immutable model coefficient set: a shipped preset, or a named
 /// deviation from one.
-#[pyclass(name = "ModelParams", module = "pretium._core", frozen)]
+#[pyclass(name = "ModelParams", module = "tradefloor._core", frozen)]
 #[derive(Debug, Clone)]
 pub struct PyModelParams {
     pub inner: ModelParams,
@@ -139,7 +139,7 @@ impl PyModelParams {
                 None => {
                     return Err(ValidationError::new_err(format!(
                         "unknown model parameter {key:?} in the dictionary. \
-                         A newer build may have written it; upgrade pretium \
+                         A newer build may have written it; upgrade tradefloor \
                          rather than dropping it silently."
                     )));
                 }

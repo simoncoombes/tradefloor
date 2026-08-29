@@ -18,13 +18,13 @@
 use std::fs;
 use std::path::PathBuf;
 
-use pretium::microstructure::{
+use tradefloor::microstructure::{
     base_quote_size, build_live_book, compute_spread_bps, settle_price_through_book,
     CompanyMicrostructure, LiveBookOptions, SettleOptions,
 };
 
-use pretium::rng::GameRng;
-use pretium::types::Difficulty;
+use tradefloor::rng::GameRng;
+use tradefloor::types::Difficulty;
 use serde::Deserialize;
 
 /// The main stream's sequence, from the reference implementation.

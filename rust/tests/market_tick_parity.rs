@@ -64,9 +64,9 @@
 use std::fs;
 use std::path::PathBuf;
 
-use pretium::economy::{create_initial_economy_state, InitialEconomyOptions};
-use pretium::market::*;
-use pretium::rng::Rng;
+use tradefloor::economy::{create_initial_economy_state, InitialEconomyOptions};
+use tradefloor::market::*;
+use tradefloor::rng::Rng;
 use serde::Deserialize;
 use serde_json::Value as Json;
 
@@ -205,7 +205,7 @@ fn build_company(c: &Json) -> TickCompany {
             mispricing_momentum: maybe(&s["mispricingMomentum"]),
             maker_inventory: maybe(&s["makerInventory"]),
             garch_variance: bits(s["garchVariance"].as_str().unwrap()),
-            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
+            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
             last_daily_return: maybe(&s["lastDailyReturn"]),
             beta: maybe(&s["beta"]),
             short_interest: bits(s["shortInterest"].as_str().unwrap()),
@@ -289,7 +289,7 @@ fn check_scenario(file: &str) {
                 settle_draws: SettleDrawPolicy::FourOrZero,
                 // The shipped preset: the parity contract is against the
                 // reference model, which is what PT_V1 carries.
-                params: &pretium::params::PT_V1,
+                params: &tradefloor::params::PT_V1,
             },
             &mut rng,
         );

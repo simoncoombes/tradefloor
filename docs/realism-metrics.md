@@ -11,7 +11,7 @@ What every number a preset is judged on actually measures, why it is in the
 panel, and what a failure on it means for your results.
 
 This is the reference for the vocabulary. [The realism envelope](realism-envelope.md)
-states which of these pretium currently passes and at what horizon; this
+states which of these tradefloor currently passes and at what horizon; this
 page explains what passing one *means*.
 
 Five families, and they answer different questions:
@@ -30,7 +30,7 @@ much as the one measurement that reads the panel's clustering lags as a
 
 ## The fourteen panel statistics
 
-`pretium.facts.measure()` returns these. Every band in
+`tradefloor.facts.measure()` returns these. Every band in
 `facts.REAL_MARKETS` was derived from **ten consecutive 252-day windows of
 40 US large caps, 2015-2025**, measured with this module's own estimators,
 with one of the ten held out: **nine** windows set the band, because the
@@ -203,7 +203,7 @@ that asymmetry, and `skew` is what would prove it.
 Five of the fourteen are measured, given a band and a verdict, and left out
 of the loss the search minimises: `volume_change_acf1`, `corr_asymmetry`,
 `corr_asymmetry_lagged`, `sector_excess_corr` and `corr_persistence_acf1`,
-which is exactly `pretium.loss.STRUCTURAL`. They appear in every `L_real`
+which is exactly `tradefloor.loss.STRUCTURAL`. They appear in every `L_real`
 breakdown with the role `structural` and contribute zero to its scalar,
 because no lever has been shown to move them cleanly and an optimiser
 pointed at one of them distorts everything else chasing it. Membership is a
@@ -241,7 +241,7 @@ instruments and one over 60 are not the same claim.
 ## Uncertainty: what a single run actually shows you
 
 Every banded number above is a **median across seeds**, and the spread
-around it is large enough to change the answer. `pretium.envelope.intervals()`
+around it is large enough to change the answer. `tradefloor.envelope.intervals()`
 reports it, per statistic:
 
 | field | what it is |
@@ -288,7 +288,7 @@ What replaces it is per-statistic uncertainty, above, and a membership
 check that returns a boolean with its reasons attached:
 
 ```python
-from pretium import envelope
+from tradefloor import envelope
 
 print(envelope.check(horizon_days=756, statistics=["abs_return_acf20"]))
 # OUTSIDE the envelope
@@ -361,7 +361,7 @@ panel: fine over one year, thinning as the window grows.
 
 ## The aggregate losses
 
-**`L_real`**: the band-distance loss, from `pretium.loss`:
+**`L_real`**: the band-distance loss, from `tradefloor.loss`:
 
 ```
 d_k    = max(0, lo_k - m_k, m_k - hi_k)     # zero INSIDE the band
@@ -485,5 +485,5 @@ effect in public: `corr_persistence_acf1` is in band at 0.1525 on the
 certification's seeds and out of it on thirty seeds the calibration never
 used.
 
-`pretium.envelope.intervals()` reports the actual spread beside each
+`tradefloor.envelope.intervals()` reports the actual spread beside each
 median, and it is the honest thing to read before relying on a single run.

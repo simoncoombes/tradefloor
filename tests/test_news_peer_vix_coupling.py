@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import pytest
 
-import pretium as pt
-from pretium import Scenario, facts
+import tradefloor as pt
+from tradefloor import Scenario, facts
 
 NEWS = dict(endogenous_news_intensity=0.10, endogenous_news_sigma=0.04,
             news_peer_weight=0.5, news_peer_weight_down=0.5)

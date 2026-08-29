@@ -29,8 +29,8 @@ from __future__ import annotations
 
 import pytest
 
-import pretium as pt
-from pretium import Scenario, facts
+import tradefloor as pt
+from tradefloor import Scenario, facts
 
 SEEDS = (101, 102, 103, 104, 105, 106)   # screening resolution, direction only
 

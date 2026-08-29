@@ -10,7 +10,7 @@ stale-wheel hazard class. Post-seam, a parameter vector is an argument:
     .venv/bin/python tools/calibration/eval_model_params.py \
         --seeds 1,2,3 --workers 8
 
-The panel is `pretium.facts.measure` — the library's own instrument, never
+The panel is `tradefloor.facts.measure` — the library's own instrument, never
 a reimplementation (the Appendix B rule) — at the published method:
 `Universe.random(40, seed=111)`, 252 days, per seed. The model reaches it
 through `Engine(model=...)`.
@@ -32,7 +32,7 @@ asserted on every run of this tool (Appendix B):
 
 `facts.measure` builds its engine internally and does not (yet) take
 `model=` — `facts.py` belongs to the phase-0 stream. Until it grows the
-argument, this tool substitutes the `Engine` symbol in `pretium.facts`
+argument, this tool substitutes the `Engine` symbol in `tradefloor.facts`
 with a partial application that adds `model=`, calls the UNMODIFIED
 `measure`, and restores the symbol in a `finally:`. Every statistic is
 computed by the library's own code; only the constructor call is
@@ -79,11 +79,11 @@ def _measure_with_model(overrides: dict[str, float], seed: int,
     spawn without payload. Returns the panel plus the identity that makes
     the two runtime assertions checkable in the parent.
     """
-    import pretium
-    import pretium.facts as facts
+    import tradefloor
+    import tradefloor.facts as facts
 
-    model = pretium.ModelParams.from_preset("pt-v1", **overrides)
-    universe = pretium.Universe.random(universe_n, seed=universe_seed)
+    model = tradefloor.ModelParams.from_preset("pt-v1", **overrides)
+    universe = tradefloor.Universe.random(universe_n, seed=universe_seed)
 
     engines: list = []
     original = facts.Engine

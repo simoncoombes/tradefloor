@@ -71,8 +71,8 @@
 use std::fs;
 use std::path::PathBuf;
 
-use pretium::economy::*;
-use pretium::rng::Rng;
+use tradefloor::economy::*;
+use tradefloor::rng::Rng;
 use serde::Deserialize;
 use serde_json::Value as Json;
 

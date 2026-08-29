@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-import pretium
+import tradefloor
 
 
 def _driver():
@@ -44,8 +44,8 @@ def restricted():
 def test_every_vector_sets_every_parameter(restricted):
     axes, vectors, feasibility = restricted.build_plan(8, restricted.DEFAULT_PLAN_SEED)
     assert [a.name for a in axes] == sorted(ONLY) or {a.name for a in axes} == set(ONLY)
-    settable = set(pretium.ModelParams.settable())
-    base = pretium.ModelParams.from_preset("pt-v6").to_dict()
+    settable = set(tradefloor.ModelParams.settable())
+    base = tradefloor.ModelParams.from_preset("pt-v6").to_dict()
     for vec in vectors:
         params = restricted.vector_to_params(vec)
         assert set(params) == settable, (

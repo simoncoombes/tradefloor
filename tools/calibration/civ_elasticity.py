@@ -27,7 +27,7 @@ sys.path.append(f"{SP}/rnd/tools/calibration")
 
 def stats_from_run(m, seed, vix=45.0):
     import pyarrow as pa, pyarrow.compute as pc
-    import pretium as pt
+    import tradefloor as pt
     u = pt.Universe.random(40, seed=111)
     e = pt.Engine(seed=seed, universe=u, model=m)
     scen = pt.Scenario().hold(vix=vix)

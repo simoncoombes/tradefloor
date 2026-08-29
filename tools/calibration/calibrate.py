@@ -13,7 +13,7 @@ Four things make it a different tool from `falsify.py` rather than a flag
 on it, and each is a decision the report has to defend:
 
 **The objective is the shipped one, regularised.** `L_real` comes from
-`pretium.loss.band_distance_loss` — the library's own function, with the
+`tradefloor.loss.band_distance_loss` — the library's own function, with the
 library's own `LIVE_TARGETS`/`CONSTRAINTS` membership and the library's
 own `SEED_SD` — so the number the search minimises is the number a reader
 can recompute from the wheel. On top of it sits §6.3's penalty,
@@ -142,7 +142,7 @@ PENALTY_SCALE = 1e3
 #: own seed sd. `0.0` reproduces phase 3 exactly.
 #:
 #: Why a margin at all, and why it belongs in the search rather than in
-#: the loss. `pretium.loss.band_distance_loss` is a published surface
+#: the loss. `tradefloor.loss.band_distance_loss` is a published surface
 #: whose meaning is "distance outside the band", and it is flat inside the
 #: band on purpose — a statistic that is in band contributes nothing, and
 #: there is no gradient rewarding one that is comfortably in over one that
@@ -224,7 +224,7 @@ def search_loss(panels: list[dict], margin: dict,
                 room_target: float = 0.0, room_weight: float = 0.0) -> float:
     """`L_real`'s arithmetic on the shrunk bands: the SEARCH objective.
 
-    Deliberately not a call into `pretium.loss.band_distance_loss` with
+    Deliberately not a call into `tradefloor.loss.band_distance_loss` with
     different bands, because that function does not take bands and must
     not learn to: its published meaning is distance outside the REAL
     band, and a reader who sees its name must never have to ask which
@@ -236,7 +236,7 @@ def search_loss(panels: list[dict], margin: dict,
     With `k = 0` it is `band_distance_loss(panels)["loss"]` to the bit,
     which the certificate asserts rather than assumes.
     """
-    from pretium.facts import band_distance
+    from tradefloor.facts import band_distance
 
     total = 0.0
     for key, spec in margin.items():
@@ -703,7 +703,7 @@ class Evaluator:
     def _score(self, panels: list[dict], overrides: dict[str, float],
                seeds: tuple[int, ...], stage: str,
                far_panels: list[dict] | None = None) -> dict:
-        from pretium.loss import band_distance_loss
+        from tradefloor.loss import band_distance_loss
 
         # Two numbers, two rulers, and the names say which is which.
         # `loss_real` is the shipped function against the TRUE bands: the
@@ -900,8 +900,8 @@ def main() -> None:
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
-    import pretium.facts as facts
-    import pretium.loss as loss_mod
+    import tradefloor.facts as facts
+    import tradefloor.loss as loss_mod
 
     ship = lib.shipped_values()
     if args.params == "spectrum8":
@@ -1449,7 +1449,7 @@ def main() -> None:
             },
         },
         "method": {
-            "loss": "pretium.loss.band_distance_loss (the shipped "
+            "loss": "tradefloor.loss.band_distance_loss (the shipped "
                     "objective) + lambda * sum_j dev_j^2 (§6.3)",
             "search_margin": {
                 "margin_sd": args.margin_sd,
@@ -1504,7 +1504,7 @@ def main() -> None:
                            "falsification certificates.",
                 }),
             "lambda": args.lam,
-            "seed_sd_source": "pretium.facts.SEED_SD",
+            "seed_sd_source": "tradefloor.facts.SEED_SD",
             "seed_sd": dict(facts.SEED_SD),
             "seed_sd_provenance": dict(facts.SEED_SD_PROVENANCE),
             "bands": {k: list(v) for k, v in facts.REAL_MARKETS.items()},

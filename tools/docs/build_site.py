@@ -44,7 +44,7 @@ OUT = ROOT / "docs"
 
 #: Absolute base for canonical links, Open Graph URLs and the sitemap. These
 #: three all need an absolute URL to work at all, so this cannot be relative.
-BASE_URL = "https://simoncoombes.github.io/pretium"
+BASE_URL = "https://tradefloor.dev"
 
 #: GA4 measurement ID, the "G-XXXXXXXXXX" from the property's web data
 #: stream. Empty means no analytics: the snippet is omitted entirely rather
@@ -68,7 +68,7 @@ VERSION = _project_version()
 
 SITE_NAME = "pretium docs"
 TAGLINE = "repeatable market simulation"
-REPO_URL = "https://github.com/simoncoombes/pretium"
+REPO_URL = "https://github.com/simoncoombes/tradefloor"
 
 #: Tab icon. The SVG is the real one; the .ico exists because browsers ask
 #: for /favicon.ico by default whether or not a page links to it, and that
@@ -283,7 +283,7 @@ ERA_FIXES = [
         'data-lang="sh" style="font:400 13px/1.7 var(--font-mono);'
         'color:var(--codefg)">cargo add pretium</code></pre>\n'
         '        <p style="color:var(--mut);font-size:14px">Docs at '
-        '<a href="https://docs.rs/pretium">docs.rs/pretium</a>. The crate '
+        '<a href="https://docs.rs/tradefloor">docs.rs/tradefloor</a>. The crate '
         'carries the engine, the presets and the determinism guarantees; the '
         'Python package adds the harness, the evaluation layer and the '
         'notebooks.</p>\n'
@@ -455,7 +455,7 @@ ERA_FIXES = [
         "every era boundary carries a different one, so a digest is an era "
         "marker rather than a version number. For the check that matters "
         "to a citation, compare "
-        '<code style="font-size:13px">pretium.model_preset()["name"]</code> '
+        '<code style="font-size:13px">tradefloor.model_preset()["name"]</code> '
         "against the preset named in envelope.json: if they differ, the "
         "published page describes a different model than the one you are "
         "running.",
@@ -1068,10 +1068,10 @@ def certified_rows() -> str:
     The bundle carries a pt-v3-era table: ten statistics, `volume_change_acf1`
     at -0.4598 and out by 13.7 sd. Every figure moved at the 2026-08-26 era
     boundary, and this is the page a reader consults to decide whether to
-    trust a result. Generating it from `pretium.envelope` means the published
+    trust a result. Generating it from `tradefloor.envelope` means the published
     table cannot drift from the module again.
     """
-    from pretium import envelope as env, facts
+    from tradefloor import envelope as env, facts
 
     rows = []
     for name, value in env.CERTIFIED.items():
@@ -1096,7 +1096,7 @@ def certified_rows() -> str:
 
 def horizon_rows() -> str:
     """The 504-day comparison table, likewise generated."""
-    from pretium import envelope as env, facts
+    from tradefloor import envelope as env, facts
 
     rows = []
     for name in facts.REAL_MARKETS:
@@ -1129,7 +1129,7 @@ def horizon_rows() -> str:
 #: axis cannot, and no run in the repository records its loss, so the cell
 #: says so rather than carrying a number nobody measured.
 #:
-#: Not generated from `pretium.envelope` like the two tables above it,
+#: Not generated from `tradefloor.envelope` like the two tables above it,
 #: because the module carries the certified panel and not the held-out runs.
 #: A generated table cannot drift; this one can, so it names its provenance.
 HELD_OUT_ROWS = (
@@ -1276,7 +1276,7 @@ def apply_trust_fixes(doc: str) -> str:
             "\u22120.20, and at two, \u22120.2572 against \u22120.29 to \u22120.21. A "
             "retired gap is recorded in the release notes rather than kept as "
             "a numbered slot, so the five below are numbered as "
-            "<code style=\"font-size:12.5px\">pretium.envelope.GAPS</code> "
+            "<code style=\"font-size:12.5px\">tradefloor.envelope.GAPS</code> "
             "lists them.</p>",
         ),
         (
@@ -1535,7 +1535,7 @@ def apply_trust_fixes(doc: str) -> str:
             "describe. The cross-platform determinism baseline for this era "
             "is known-answer v11, digest 60d47572…0de590, which the release "
             "workflow checks inside every wheel before it uploads. If "
-            "pretium.model_preset()[\"name\"] is not the preset named in "
+            "tradefloor.model_preset()[\"name\"] is not the preset named in "
             "envelope.json, this page describes a different model than the "
             "one you are running.",
         ),
@@ -1708,7 +1708,7 @@ def apply_trust_fixes(doc: str) -> str:
         # under a paragraph that now says they were superseded -- so the
         # header changes with the rows: the interesting axis is no longer a
         # single in-band count but the two horizons side by side. Figures
-        # from `pretium.envelope.GAPS["roster-concentration"]`, measured by
+        # from `tradefloor.envelope.GAPS["roster-concentration"]`, measured by
         # tools/calibration/roster_shapes.py.
         (
             '<sc-raw-thead><sc-raw-tr><sc-raw-th>Roster</sc-raw-th>'
@@ -1787,7 +1787,7 @@ def apply_trust_fixes(doc: str) -> str:
         ),
     ])
 
-    # The gap list is renumbered to match `pretium.envelope.GAPS`, which is
+    # The gap list is renumbered to match `tradefloor.envelope.GAPS`, which is
     # the only list of gaps this project actually maintains. The bundle
     # numbers six in a different order; these run last so that no earlier
     # swap has to know which number a gap currently carries.
@@ -2062,7 +2062,7 @@ def apply_scenarios_fixes(doc: str) -> str:
         # Two corrections, not one. The NUMBER: the steady-state crisis
         # lever reads 6.04x on pt-v12 against real markets' 6.16x
         # (docs/realism-envelope.md:245-251, and the same pair in
-        # `pretium.envelope.GAPS` under `scenario-magnitude`), so "four
+        # `tradefloor.envelope.GAPS` under `scenario-magnitude`), so "four
         # fifths" -- itself the pt-v10 5.05x -- understates the shipped
         # preset by a factor a reader would act on. The INDEX: there are
         # five gaps now, `[g.id for g in envelope.GAPS]` gives horizon,
@@ -2130,7 +2130,7 @@ def apply_internals_fixes(doc: str) -> str:
     pt-v11's crisis work quadrupled it (`rust/src/params.rs:1663`), and
     `ModelParams.from_preset("pt-v12").to_dict()["sector_vix_coupling"]` reads
     1.0. And the certified annualised volatility is 32.7604, not 31.5:
-    `pretium.envelope.CERTIFIED["annualised_vol_pct"]` gives 32.7604, which is
+    `tradefloor.envelope.CERTIFIED["annualised_vol_pct"]` gives 32.7604, which is
     what the trust page's certified table publishes as 32.76, so quoting 31.5
     here left two pages of one site disagreeing about one measurement.
 
@@ -2334,7 +2334,7 @@ def apply_factors_fixes(doc: str) -> str:
         # The last count of seven left on the page, in the Scope section, one
         # paragraph below a table this function has just made nine rows long
         # and under a heading ERA_FIXES retitles "The Nine Components".
-        # `len(pretium.Engine.FACTORS)` is 9 and `truth()` carries nine
+        # `len(tradefloor.Engine.FACTORS)` is 9 and `truth()` carries nine
         # component columns (`rust/src/python_arrow.rs`), so a name that did
         # not tick has nine zeros, not seven.
         (
@@ -2393,7 +2393,7 @@ def apply_guide_fixes(doc: str) -> str:
     therefore runs the default. On 0.3.0 that engine's `model_fingerprint`
     is `pt-v12`, `ModelParams.from_preset("pt-v12").to_dict()`
     ["momentum_theta"] is 0.0185515625 against pt-v3's 0.0742062, and
-    `pretium.envelope.CERTIFIED["return_acf1"]` is 0.0239. The OUTPUT block
+    `tradefloor.envelope.CERTIFIED["return_acf1"]` is 0.0239. The OUTPUT block
     keeps its ILLUSTRATIVE badge, which covers composed numbers; it does not
     cover a preset name, which is an identity and the one thing the
     fingerprint mechanism exists to make checkable.
@@ -2735,7 +2735,7 @@ def api_params_subtitle(doc: str) -> str:
     this counts what is actually there afterwards rather than asserting a
     number that drifts the next time the surface moves.
     """
-    from pretium import ModelParams
+    from tradefloor import ModelParams
 
     start = doc.index('data-page="api-params"')
     end = doc.index('data-page="', start + 1)
@@ -2778,7 +2778,7 @@ def apply_reference_fixes(doc: str) -> str:
     that "a hardcoded caveat is how a caveat becomes false" and the box
     making the argument carried a hardcoded pt-v3 figure two eras old. The
     server composes that sentence at call time from `envelope.CERTIFIED`
-    and `facts.REAL_MARKETS` (`_statistic_line` in `python/pretium/mcp.py`),
+    and `facts.REAL_MARKETS` (`_statistic_line` in `python/tradefloor/mcp.py`),
     so the sample output now carries what that expression yields on 0.3.0
     rather than a paraphrase naming a preset the tool never emits.
 
@@ -2840,7 +2840,7 @@ def apply_reference_fixes(doc: str) -> str:
             "<strong style=\"color:var(--fg)\">The 87 model coefficients."
             "</strong>",
         ),
-        # len(pretium.envelope.GAPS) -> 5. The volume-change gap retired at
+        # len(tradefloor.envelope.GAPS) -> 5. The volume-change gap retired at
         # 0.3.0 because pt-v12 holds that row at both horizons.
         (
             "A sector-concentrated roster is one of the six named envelope "
@@ -2920,7 +2920,7 @@ def apply_reference_fixes(doc: str) -> str:
         ),
         # -- wasm size ---------------------------------------------------
         # Measured on the committed 0.3.0 artefact,
-        # rust/target/wasm32-unknown-unknown/release/pretium.wasm, which
+        # rust/target/wasm32-unknown-unknown/release/tradefloor.wasm, which
         # `strings` confirms carries 0.3.0:
         #   wc -c              -> 204290
         #   gzip -9 -c | wc -c ->  72981

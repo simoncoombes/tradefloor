@@ -59,7 +59,7 @@ def replay(
     Like ``seed`` and ``universe`` it is identity, not history, so it is
     not in the log; replaying a custom-model run under the default would
     produce a plausible market that is not the recorded one, which is why
-    :class:`pretium.RunManifest` carries the full coefficient dictionary
+    :class:`tradefloor.RunManifest` carries the full coefficient dictionary
     and passes it back through here.
     """
     engine = Engine(seed=seed, universe=universe, macro_state=macro,

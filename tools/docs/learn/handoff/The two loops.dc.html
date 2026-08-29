@@ -8,7 +8,7 @@
 <body>
 <x-dc>
 <helmet>
-<title>The two loops · pretium</title>
+<title>The two loops · tradefloor</title>
 <meta name="description" content="Training means two different things here. One trains the market model, the other trains a strategy against a market that already exists.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
@@ -95,9 +95,9 @@ summary::marker{color:var(--accent-line)}
 </div>
 <header style="position:sticky;top:0;z-index:40;background:var(--header-bg);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)">
 <div style="max-width:1040px;margin:0 auto;padding:0.7rem 1.5rem;display:flex;align-items:center;gap:1.5rem">
-<a href="./Learn pretium.dc.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)">
-<img src="./mark-pretium.png" alt="pretium" width="15" height="22" style="display:{{ showLight }};flex:none"></img><img src="./mark-pretium-dark.png" alt="pretium" width="15" height="22" style="display:{{ showDark }};flex:none"></img>
-<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">pretium</span>
+<a href="./Learn tradefloor.dc.html" style="display:flex;align-items:center;gap:0.5rem;color:var(--ink)">
+<img src="./mark-tradefloor.png" alt="tradefloor" width="15" height="22" style="display:{{ showLight }};flex:none"></img><img src="./mark-tradefloor-dark.png" alt="tradefloor" width="15" height="22" style="display:{{ showDark }};flex:none"></img>
+<span style="font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:1.0625rem;font-weight:500;letter-spacing:-0.01em">tradefloor</span>
 </a>
 <nav style="display:flex;gap:1.3rem;align-items:center;flex-wrap:wrap">
 <details class="ptmenu" style="position:relative">
@@ -155,7 +155,7 @@ summary::marker{color:var(--accent-line)}
 <main style="max-width:1040px;margin:0 auto;padding:0 1.5rem">
 
 <div style="display:flex;align-items:center;gap:0.5rem;padding:2.5rem 0 0;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:0.6875rem;letter-spacing:0.1em;color:var(--ink-3)">
-<a href="./Learn pretium.dc.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">THE TWO LOOPS</span>
+<a href="./Learn tradefloor.dc.html" style="color:var(--ink-3)">LEARN</a><span>/</span><span style="color:var(--accent)">THE TWO LOOPS</span>
 </div>
 
 <section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1.2rem">
@@ -234,7 +234,7 @@ summary::marker{color:var(--accent-line)}
 <h2 style="font-size:1.5rem">What the envelope adds</h2>
 <p style="color:var(--ink-2);margin:0">The preset carries a measurement with it. pt-v14 holds all fourteen realism statistics inside their real-market bands at the certified horizon of 252 trading days. It also names five gaps where it does not hold. A Loop B result gets both. The certification lets you say the market reproduced those fourteen habits of real equities. The gaps stop you before you say more than that.</p>
 <div style="display:flex;gap:0.7rem;flex-wrap:wrap">
-<a href="./Learn pretium.dc.html#trust" style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep);border-radius:6px;padding:0.5rem 0.85rem">Check a question against the envelope</a>
+<a href="./Learn tradefloor.dc.html#trust" style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep);border-radius:6px;padding:0.5rem 0.85rem">Check a question against the envelope</a>
 <a href="./Running a market.dc.html" style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:6px;padding:0.5rem 0.85rem">Start Loop B</a>
 </div>
 </section>
@@ -431,7 +431,7 @@ class Component extends DCLogic {
     }));
     const S = this.searchVals();
     return Object.assign({}, S, {
-      markLogo: dark ? './mark-pretium-dark.png' : './mark-pretium.png',
+      markLogo: dark ? './mark-tradefloor-dark.png' : './mark-tradefloor.png',
       showLight: this.state.dark ? 'none' : 'block',
       showDark: this.state.dark ? 'block' : 'none',
       themeGlyph: dark ? 'light' : 'dark',
@@ -454,10 +454,10 @@ class Component extends DCLogic {
       ]),
       routes: [
         { want: 'Test a trading strategy', loop: 'B', start: 'Running a market', href: './Running a market.dc.html' },
-        { want: 'Train a reinforcement-learning policy', loop: 'B', start: 'The RL environment', href: 'https://github.com/simoncoombes/pretium/blob/main/docs/reinforcement-learning.md' },
-        { want: 'Know what your result depends on', loop: 'A', start: 'Atlas', href: 'https://simoncoombes.github.io/pretium/atlas.html' },
-        { want: 'Fit coefficients to your own data', loop: 'A', start: 'Atlas', href: 'https://simoncoombes.github.io/pretium/atlas.html' },
-        { want: 'Know what the market reproduces', loop: 'neither', start: 'The realism envelope', href: 'https://simoncoombes.github.io/pretium/trust.html' }
+        { want: 'Train a reinforcement-learning policy', loop: 'B', start: 'The RL environment', href: 'https://github.com/simoncoombes/tradefloor/blob/main/docs/reinforcement-learning.md' },
+        { want: 'Know what your result depends on', loop: 'A', start: 'Atlas', href: 'https://tradefloor.dev/atlas.html' },
+        { want: 'Fit coefficients to your own data', loop: 'A', start: 'Atlas', href: 'https://tradefloor.dev/atlas.html' },
+        { want: 'Know what the market reproduces', loop: 'neither', start: 'The realism envelope', href: 'https://tradefloor.dev/trust.html' }
       ].map(r => ({ want: r.want, loop: r.loop, start: r.start, href: r.href,
         col: r.loop === 'A' ? 'var(--amber)' : r.loop === 'B' ? 'var(--accent)' : 'var(--ink-3)' }))
     });

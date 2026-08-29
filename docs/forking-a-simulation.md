@@ -28,7 +28,7 @@ slower, and is what you want when the fork has to outlive the process. Cite the
 log in a published result, since that is what someone else can re-run.
 
 Both figures are for a sixty-day, forty-instrument run, which is the
-measurement `pretium.checkpoint`'s own module docstring records. Read the
+measurement `tradefloor.checkpoint`'s own module docstring records. Read the
 absolutes as an order of magnitude rather than as a spec: replay cost scales
 with the order log, so it moves with the run length as much as with the
 machine. `tools/remeasure` re-times the pair on a shorter thirty-day,

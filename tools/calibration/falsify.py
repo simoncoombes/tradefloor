@@ -160,7 +160,7 @@ class DevSpace:
 def scaled_band_loss(medians: dict[str, float], targets: list[str],
                      constraints: list[str], seed_sd: dict[str, float],
                      bands: dict[str, tuple[float, float]]) -> dict:
-    from pretium.facts import band_distance
+    from tradefloor.facts import band_distance
 
     rows = {}
     total = 0.0
@@ -374,7 +374,7 @@ def main() -> None:
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
-    import pretium.facts as facts
+    import tradefloor.facts as facts
 
     base = dict(lib.LEGACY_OVERRIDES) if args.base == "legacy" else {}
     ship = lib.shipped_values()
@@ -573,7 +573,7 @@ def main() -> None:
                         f"seed={lib.PANEL_UNIVERSE_SEED})",
             "loss": "sum over targets+constraints of (band_distance / "
                     "seed_sd)^2, medians over search seeds, lambda = 0",
-            "seed_sd_source": "pretium.facts.SEED_SD (shipped)",
+            "seed_sd_source": "tradefloor.facts.SEED_SD (shipped)",
             "search": search_spec,
             "workers": args.workers,
         },

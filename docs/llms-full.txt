@@ -1,14 +1,14 @@
-# pretium
+# tradefloor
 
 > A reproducible evaluation environment for financial AI agents: a
 > deterministic market simulator with order-book execution, macro dynamics
 > and causal ground truth.
-> Version 0.4.3. Every page of the learning path, in reading order.
+> Version 0.5.0. Every page of the learning path, in reading order.
 
 
 ======================================================================
-# Learn pretium
-https://simoncoombes.github.io/pretium/
+# Learn tradefloor
+https://tradefloor.dev/
 
 Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.
 ======================================================================
@@ -17,10 +17,10 @@ A reproducible evaluation environment for financial AI agents
 
 Run controlled, reproducible experiments on trading agents in a market with realistic execution - not a backtest over historical prices. A deterministic market simulator with order-book execution, macro dynamics, causal ground truth and agent-native interfaces.
 
-pip install pretium
-cargo add pretium
+pip install tradefloor
+cargo add tradefloor
 
-import pretium as pt
+import tradefloor as pt
 
 # you name the companies yourself
 u = pt.Universe([
@@ -100,7 +100,7 @@ What a RunManifest pins
 
 seed The integer the whole market unrolls from. universe Every instrument, in roster order. The order is contractual. macro Day-zero rates, inflation and the cycle. scenario The macro path driven through it, if there was one. strategy The StrategySpec, carried in full and cited by fingerprint. model The preset that priced it, by name, or custom-XXXXXXXX if modified. fingerprints.inputs One digest over the seed and all of the above. This is the experiment's identity. result.digest What the market did. Re-running the inputs has to reproduce it. 
 
-run → record → reproduce → compare → fork 
+run â†’ record â†’ reproduce â†’ compare â†’ fork 
 reproduce() refuses on a mismatch rather than returning a number that looks fine. A checkpoint branches a run at a decision point, so two hypotheses share one past instead of being statistically similar.
 
 Same world. Same conditions. Different agent. Two agents run against the identical market path, so a difference between them is the agent and not a different roll of the market.
@@ -109,7 +109,7 @@ Same experiment. Different hypothesis. Change one component, re-run, and attribu
 
 Fork an experiment without changing its past
 
-checkpoint · day 100 IDENTICAL MARKET HISTORY UP TO HERE CHANGE ONE INPUT, HERE fork A policy A future A fork B policy B future B compare 1 Run once, then mark the state A checkpoint captures the engine at a chosen day: every column, the order book, and the position of the generator that draws the next random number. 2 Branch it mark.branch(2) returns two engines identical to that state, in under a millisecond. Checkpoint.resume() is the slower form that replays the order log and outlives the process. 3 Change exactly one input The agent, the policy, an order size, a pinned macro field. Everything else on both branches is already identical, so there is nothing else it could be. 4 Let both run on Each branch carries its own copy of the generator, so the futures are independent from the fork onward and neither disturbs the other. 5 Compare The two runs shared one past exactly, not approximately. What differs between them is the input you changed. This is a fork of an experiment, not of a repository. Both branches carry the same past bit for bit, so they do not start from similar conditions - they start from the same one, and the difference between the futures is attributable to the input you changed rather than to a different roll of the market.
+checkpoint Â· day 100 IDENTICAL MARKET HISTORY UP TO HERE CHANGE ONE INPUT, HERE fork A policy A future A fork B policy B future B compare 1 Run once, then mark the state A checkpoint captures the engine at a chosen day: every column, the order book, and the position of the generator that draws the next random number. 2 Branch it mark.branch(2) returns two engines identical to that state, in under a millisecond. Checkpoint.resume() is the slower form that replays the order log and outlives the process. 3 Change exactly one input The agent, the policy, an order size, a pinned macro field. Everything else on both branches is already identical, so there is nothing else it could be. 4 Let both run on Each branch carries its own copy of the generator, so the futures are independent from the fork onward and neither disturbs the other. 5 Compare The two runs shared one past exactly, not approximately. What differs between them is the input you changed. This is a fork of an experiment, not of a repository. Both branches carry the same past bit for bit, so they do not start from similar conditions - they start from the same one, and the difference between the futures is attributable to the input you changed rather than to a different roll of the market.
 
 GROUND TRUTH 
 The simulator knows why the price moved
@@ -135,10 +135,10 @@ The seed fixes every random number
 
 The same universe, macro state and seed give the same market on Linux, macOS and Windows, digit for digit. Every release does a check of this. It builds five wheel targets, runs one fixed simulation in each, and compares the digests. A disagreement stops the release. Determinism also makes a fork possible: checkpoint at day 100, then branch, and the two branches share one past. The two runs below are the repository's reference runs, and they have a different seed and a different roster.
 
-seed 776644 · calm
-seed 20260821 · eventful
+seed 776644 Â· calm
+seed 20260821 Â· eventful
 
-GROUND TRUTH · DAY 1 
+GROUND TRUTH Â· DAY 1 
 expansion 
 
 The nine factors that sum to every move
@@ -214,7 +214,7 @@ industrials
 
 3 
 
-import pretium as pt
+import tradefloor as pt
 
 u = pt.Universe.random(40, seed=7)
 
@@ -313,7 +313,7 @@ mm
 
 105 
 
-spread 4.00 · mid 101.00 · last 103.00 
+spread 4.00 Â· mid 101.00 Â· last 103.00 
 
 mm 
 99.00 
@@ -382,12 +382,12 @@ Three modes of agent interaction: observe the market, trade inside it, or train 
 
 Agents over MCP
 
-No simulator integration code. Claude or another model calls pretium through MCP, observes the market and submits trades as tool calls. Eleven tools, everything composed as data.
+No simulator integration code. Claude or another model calls tradefloor through MCP, observes the market and submits trades as tool calls. Eleven tools, everything composed as data.
 
-pip install "pretium[mcp]"
+pip install "tradefloor[mcp]"
 
-claude mcp add pretium \
- -- pretium-mcp
+claude mcp add tradefloor \
+ -- tradefloor-mcp
 
 # then just ask it a question
 
@@ -395,7 +395,7 @@ Reinforcement learning
 
 Passes gymnasium's env_checker. Actions are target weights in [-1, 1]. Reward is measured after the market moves, so it already carries the cost of the agent's own footprint.
 
-import pretium.gym as ptg
+import tradefloor.gym as ptg
 
 env = ptg.TradingEnv(universe=u,
  seed=42, days=20)
@@ -419,7 +419,7 @@ Hand evaluate a dict of ten agents and each one runs in its own copy of an ident
 
 Then rank repeats that across seeds and separates them with a paired sign test. The Oracle reads the true mispricing and says so. Read it as a reference point, not a ceiling: it spends the same gross on a naive rule, and mean-reversion beats it on 5 of the 12 markets.
 
-SHIPPED · EACH IN ITS OWN COPY 
+SHIPPED Â· EACH IN ITS OWN COPY 
 Ten agents, ten identical markets. Each agent runs in its own copy of the same deterministic market, so nobody eats another agent's depth and the comparison stays clean and reproducible. A single shared market with many agents is the extension described below.
 
 agents = pt.reference_agents(seed=3)
@@ -436,7 +436,7 @@ ranking = pt.rank(
 COMING UP 
 Coming next: competitive multi-agent markets
 
-single-agent evaluation → competitive agents → emergent market behaviour 
+single-agent evaluation â†’ competitive agents â†’ emergent market behaviour 
 The next step is to move from evaluating agents independently to evaluating them together. A shared-book arena will let several agents interact in one market, compete for the same liquidity, respond to each other, and be scored under identical conditions - which turns a reproducible environment for single-agent evaluation into somewhere to study how a market of agents behaves. It is not shipped. The primitives are public and composable in the meantime, and this is what building one takes.
 
 What an arena takes
@@ -602,7 +602,7 @@ Run a crisis through it
 
 A scenario drives the macro path. Without one, the economy finds its own path. Pick a scenario and see what the market did.
 
-import pretium as pt
+import tradefloor as pt
 
 u = pt.Universe.random(40, seed=7)
 
@@ -728,9 +728,9 @@ element, and that is
 
 ======================================================================
 # Install
-https://simoncoombes.github.io/pretium/install.html
+https://tradefloor.dev/install.html
 
-Install pretium from PyPI or crates.io, and what a version number promises about a published result.
+Install tradefloor from PyPI or crates.io, and what a version number promises about a published result.
 ======================================================================
 
 LEARN/ INSTALL 
@@ -745,9 +745,9 @@ Rust
 
 MCP
 
-pip install pretium
+pip install tradefloor
 
-python -c "import pretium as pt; \
+python -c "import tradefloor as pt; \
  print(pt.__version__)"
 
 From PyPI
@@ -800,7 +800,7 @@ A person does a check of the WebAssembly build by hand, because it needs a toolc
 
 Presets and the era boundary
 
-Fourteen presets ship, pt-v1 through pt-v14 . You can select all of them, and all of them reproduce bit for bit.
+Fifteen presets ship, pt-v1 through pt-v14 . You can select all of them, and all of them reproduce bit for bit.
 
 7/14 
 
@@ -834,7 +834,7 @@ All pages
 
 Start > Install > Core concepts > The two loops > Running a market Use it > Agents > Scenarios > Execution cost > Checkpoints and forking > EDGAR companies > RL environment > The MCP server Trust it > Realism envelope > The metrics > Principles > Citing a run Reference > Glossary > The nine factors > Conventions > Schemas > Presets > Release notes API > Core types > Evaluate > Parameters 
 
-BACK Learn pretium NEXT Core concepts 
+BACK Learn tradefloor NEXT Core concepts 
 
 element, and that is
  not a style choice. An HTML parser applies the table content model to
@@ -845,7 +845,7 @@ element, and that is
 
 ======================================================================
 # Core concepts
-https://simoncoombes.github.io/pretium/core-concepts.html
+https://tradefloor.dev/core-concepts.html
 
 Universe, macro and seed: the three things that define a run, and what each one does once the market starts moving.
 ======================================================================
@@ -856,7 +856,7 @@ Core concepts
 
 Three things define a run. Two of them do something you can not expect when the market starts to move.
 
-import pretium as pt
+import tradefloor as pt
 
 universe = pt.Universe.random(108, seed=7)
 macro = pt.Macro(federal_funds_rate=0.025, corporate_bond_yield=0.052, vix=16.0)
@@ -962,7 +962,7 @@ element, and that is
 
 ======================================================================
 # The two loops
-https://simoncoombes.github.io/pretium/two-loops.html
+https://tradefloor.dev/two-loops.html
 
 Training means two different things here. One trains the market model, the other trains a strategy against a market that already exists.
 ======================================================================
@@ -1066,7 +1066,7 @@ element, and that is
 
 ======================================================================
 # Running a market
-https://simoncoombes.github.io/pretium/running-a-market.html
+https://tradefloor.dev/running-a-market.html
 
 Build a universe, run a market, test a strategy. For most users this page is the whole library.
 ======================================================================
@@ -1077,7 +1077,7 @@ Running a market
 
 Build a universe, run a market, and do a test of a strategy. For most people this page is the whole library.
 
-import pretium as pt
+import tradefloor as pt
 
 universe = pt.Universe.random(108, seed=7)
 macro = pt.Macro(federal_funds_rate=0.025,
@@ -1186,7 +1186,7 @@ A year from start to finish
 
 Build a universe, run a year, and read the results. Score a strategy, then run the same comparison across twelve markets. Each step prints something.
 
-import pretium as pt
+import tradefloor as pt
 
 # 1. a universe and a market
 universe = pt.Universe.random(30, seed=11)
@@ -1250,7 +1250,7 @@ element, and that is
 
 ======================================================================
 # Agents
-https://simoncoombes.github.io/pretium/agents.html
+https://tradefloor.dev/agents.html
 
 Any object with an act method can trade this market. What the agent sees, what the harness gives it, and how to compare two of them.
 ======================================================================
@@ -1410,7 +1410,7 @@ element, and that is
 
 ======================================================================
 # Scenarios
-https://simoncoombes.github.io/pretium/scenarios.html
+https://tradefloor.dev/scenarios.html
 
 Drive a macro path through the market instead of letting the economy find its own, and what a scenario result may claim.
 ======================================================================
@@ -1513,7 +1513,7 @@ element, and that is
 
 ======================================================================
 # Execution cost
-https://simoncoombes.github.io/pretium/execution-cost.html
+https://tradefloor.dev/execution-cost.html
 
 Run the same seed with and without your orders, so every fill is priced against the market where you never traded.
 ======================================================================
@@ -1619,7 +1619,7 @@ element, and that is
 
 ======================================================================
 # Checkpoints and forking
-https://simoncoombes.github.io/pretium/checkpoints.html
+https://tradefloor.dev/checkpoints.html
 
 Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.
 ======================================================================
@@ -1673,7 +1673,7 @@ element, and that is
 
 ======================================================================
 # Real companies from EDGAR
-https://simoncoombes.github.io/pretium/edgar.html
+https://tradefloor.dev/edgar.html
 
 Seed a universe from real SEC filings: real valuation dispersion, real sector weights, synthetic price paths.
 ======================================================================
@@ -1721,7 +1721,7 @@ element, and that is
 
 ======================================================================
 # RL environment
-https://simoncoombes.github.io/pretium/rl-environment.html
+https://tradefloor.dev/rl-environment.html
 
 A Gymnasium environment where the market answers back, so what a policy learns about size is not fiction.
 ======================================================================
@@ -1732,7 +1732,7 @@ RL environment
 
 A Gymnasium environment where the market answers back. Every seed is a fresh independent episode.
 
-from pretium.gym import TradingEnv
+from tradefloor.gym import TradingEnv
 
 env = TradingEnv(
  universe=u, seed=42, days=20)
@@ -1809,7 +1809,7 @@ element, and that is
 
 ======================================================================
 # The MCP server
-https://simoncoombes.github.io/pretium/mcp.html
+https://tradefloor.dev/mcp.html
 
 Eleven tools over the simulator, so a coding agent can ask whether a strategy beats buy-and-hold here, and whether the difference is real.
 ======================================================================
@@ -1820,9 +1820,9 @@ The MCP server
 
 Eleven tools over the simulator. A coding agent can ask whether momentum beats buy-and-hold here, and whether the difference is real.
 
-pip install "pretium[mcp]"
+pip install "tradefloor[mcp]"
 
-claude mcp add pretium -- pretium-mcp
+claude mcp add tradefloor -- tradefloor-mcp
 
 # then ask it a question in plain words
 
@@ -2022,7 +2022,7 @@ element, and that is
 
 ======================================================================
 # Realism envelope
-https://simoncoombes.github.io/pretium/realism-envelope.html
+https://tradefloor.dev/realism-envelope.html
 
 Fourteen statistics, a certified horizon of 252 days, and five named gaps. What this market reproduces, and what it forbids you to claim.
 ======================================================================
@@ -2252,7 +2252,7 @@ element, and that is
 
 ======================================================================
 # The metrics
-https://simoncoombes.github.io/pretium/metrics.html
+https://tradefloor.dev/metrics.html
 
 What each of the fourteen realism statistics measures, where its band came from, and how wide the spread around it is.
 ======================================================================
@@ -2449,7 +2449,7 @@ band -0.19 to 0.54
 
 What one run actually shows you
 
-Every banded number is a median across seeds. The spread around it is wide enough to change the answer, and pretium.envelope.intervals() reports it per statistic.
+Every banded number is a median across seeds. The spread around it is wide enough to change the answer, and tradefloor.envelope.intervals() reports it per statistic.
 
 median 
 The point estimate a single panel would report. 
@@ -2514,7 +2514,7 @@ element, and that is
 
 ======================================================================
 # Principles
-https://simoncoombes.github.io/pretium/principles.html
+https://tradefloor.dev/principles.html
 
 Twelve rules this project works under, six of them bought with a specific loss.
 ======================================================================
@@ -2693,7 +2693,7 @@ element, and that is
 
 ======================================================================
 # Citing a run
-https://simoncoombes.github.io/pretium/citing.html
+https://tradefloor.dev/citing.html
 
 A citation identifies software. A manifest identifies a run. What to record so someone else can reproduce your result.
 ======================================================================
@@ -2704,9 +2704,11 @@ Citing a run
 
 A citation identifies software. It does not identify a run. A manifest does.
 
+Formerly pretium. Versions through 0.4.3 were published under that name and remain installable forever; cite them as pretium at their exact version and they replay bit for bit. From 0.5.0 the library is tradefloor, with the same version line and the same known-answer digest.
+
 Not enough on its own
 
-"We used pretium." That names the software and says nothing of the market you ran. Two people can obey it, get different numbers, and both be correct.
+"We used tradefloor." That names the software and says nothing of the market you ran. Two people can obey it, get different numbers, and both be correct.
 
 CITATION.cff covers this half 
 
@@ -2762,7 +2764,7 @@ In most cases it is the preset. pt-v14 became the default on 2026-08-28, so a ma
 
 What to put in a paper
 
-Momentum, top_k 5, one-day lookback, scored on pretium 0.4.0 under preset pt-v14, universe fingerprint 4c1e9f77a3b8d502, seeds 0 to 11, 252 days. Strategy fingerprint 9f2c8d41e7b6a530. Manifest and order log attached.
+Momentum, top_k 5, one-day lookback, scored on tradefloor 0.4.0 under preset pt-v14, universe fingerprint 4c1e9f77a3b8d502, seeds 0 to 11, 252 days. Strategy fingerprint 9f2c8d41e7b6a530. Manifest and order log attached.
 
 Illustrative. The fingerprints in that sentence are placeholders, and yours will differ.
 
@@ -2789,7 +2791,7 @@ element, and that is
 
 ======================================================================
 # Glossary
-https://simoncoombes.github.io/pretium/glossary.html
+https://tradefloor.dev/glossary.html
 
 Every term this library uses in a specific way, with the measurement that makes it specific.
 ======================================================================
@@ -3040,7 +3042,7 @@ element, and that is
 
 ======================================================================
 # The nine factors
-https://simoncoombes.github.io/pretium/factors.html
+https://tradefloor.dev/factors.html
 
 Every tick's change in mispricing decomposes into nine named components that sum to the move.
 ======================================================================
@@ -3118,7 +3120,7 @@ element, and that is
 
 ======================================================================
 # Conventions
-https://simoncoombes.github.io/pretium/conventions.html
+https://tradefloor.dev/conventions.html
 
 Eight rules about units and inputs, worth reading before you hit them.
 ======================================================================
@@ -3241,7 +3243,7 @@ element, and that is
 
 ======================================================================
 # Schemas
-https://simoncoombes.github.io/pretium/schemas.html
+https://tradefloor.dev/schemas.html
 
 Every column of the five Arrow tables, the constructor fields, and where each call refuses rather than guesses.
 ======================================================================
@@ -3292,7 +3294,7 @@ instrument_id
 uint32 
 Roster index. 
 
-open · high · low 
+open Â· high Â· low 
 float64 
 Day grain only. 
 
@@ -3361,16 +3363,16 @@ element, and that is
 
 ======================================================================
 # Presets
-https://simoncoombes.github.io/pretium/presets.html
+https://tradefloor.dev/presets.html
 
-Fourteen named coefficient sets. Which one to use, what each one measured, and what a preset does not pin.
+Fifteen named coefficient sets. Which one to use, what each one measured, and what a preset does not pin.
 ======================================================================
 
 LEARN/ PRESETS 
 
 Presets
 
-Fourteen named coefficient sets. Use pt-v14 unless a published run names another one.
+Fifteen named coefficient sets. Use pt-v14 unless a published run names another one.
 
 pt-v14 
 The default since 2026-08-28. All fourteen statistics in band at 252 days and again at 504. 
@@ -3510,7 +3512,7 @@ element, and that is
 
 ======================================================================
 # Release notes
-https://simoncoombes.github.io/pretium/release-notes.html
+https://tradefloor.dev/release-notes.html
 
 What changed, what it means for a run you already have, and how to pin an old preset if you need the old behaviour.
 ======================================================================
@@ -3520,6 +3522,12 @@ REFERENCE/ RELEASE NOTES
 Release notes
 
 What changed, what it means for a run you already have, and how to pin the old behaviour if you need it. Full history in CHANGELOG.md.
+
+0.5.0
+
+The library is now tradefloor. Formerly pretium, which published through 0.4.3 and stays on PyPI and crates.io forever: published results cite those versions, and reproducibility is the point. Install tradefloor, import tradefloor, crate tradefloor, MCP server tradefloor-mcp. The rename changes no behaviour â€” this release reproduces 0.4.3's known-answer digest on every platform, and the release gate proves it before publishing. Preset names stay pt-v1 through pt-v15: they are citation identifiers, frozen under the old prefix.
+
+pt-v15: the first preset to hold both crisis instruments everywhere. pt-v14 plus six numbers: the two-timescale variance mixture (slow weight 0.35, persistence 0.98, gain 0.05, VIX damp 0.374), the daily credit floor at 1.0, and sector-loading dispersion at 0.5. Over thirteen thirty-seed qualification blocks it ties pt-v14's panel on every block, compresses the crisis co-movement range from 0.0774 to 0.0464 â€” inside the 0.0630 band width â€” holds crisis co-movement in range on 13 of 13 blocks and the crisis lever on 13 of 13 at median 6.152 against the real 6.16. Selectable by name; not the default, which remains pt-v14.
 
 0.4.3
 
@@ -3618,7 +3626,7 @@ element, and that is
 
 ======================================================================
 # Core types
-https://simoncoombes.github.io/pretium/core-types.html
+https://tradefloor.dev/core-types.html
 
 Engine, Universe, Instrument, Macro and OrderBook: the signatures you need to run a market.
 ======================================================================
@@ -3805,7 +3813,7 @@ element, and that is
 
 ======================================================================
 # Evaluate
-https://simoncoombes.github.io/pretium/evaluate.html
+https://tradefloor.dev/evaluate.html
 
 evaluate, rank, tca and reproduce: the calls that turn a market into a result someone else can check.
 ======================================================================
@@ -3957,7 +3965,7 @@ element, and that is
 
 ======================================================================
 # Parameters
-https://simoncoombes.github.io/pretium/parameters.html
+https://tradefloor.dev/parameters.html
 
 What ModelParams exposes: 87 settable names, 118 visible entries, and why the gap between them exists.
 ======================================================================

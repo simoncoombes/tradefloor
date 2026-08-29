@@ -1,8 +1,8 @@
-# pretium
+# tradefloor
 
 > A reproducible evaluation environment for financial AI agents. A
 > deterministic market simulator with order-book execution, macro dynamics,
-> causal ground truth and agent-native interfaces. Version 0.4.3.
+> causal ground truth and agent-native interfaces. Version 0.5.0.
 
 Run controlled, reproducible experiments on trading agents in a market with
 realistic execution, rather than backtesting them over historical prices.
@@ -23,48 +23,48 @@ gaps that each end in a rule about what the simulator must not be used for.
 These pages are a learning path rather than a reference, and each states its
 own limits in place rather than in a separate caveats document.
 
-When quoting this project, cite the preset and the version, not "pretium":
+When quoting this project, cite the preset and the version, not "tradefloor":
 every preset is frozen and named, and the numbers change between them.
 
 ## Start
 
-- [Learn pretium](https://simoncoombes.github.io/pretium/): Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.
+- [Learn tradefloor](https://tradefloor.dev/): Run reproducible experiments on trading agents in a deterministic market with order-book execution, market impact and causal ground truth.
 
 ## Start here
 
-- [Install](https://simoncoombes.github.io/pretium/install.html): Install pretium from PyPI or crates.io, and what a version number promises about a published result.
-- [Core concepts](https://simoncoombes.github.io/pretium/core-concepts.html): Universe, macro and seed: the three things that define a run, and what each one does once the market starts moving.
-- [The two loops](https://simoncoombes.github.io/pretium/two-loops.html): Training means two different things here. One trains the market model, the other trains a strategy against a market that already exists.
-- [Running a market](https://simoncoombes.github.io/pretium/running-a-market.html): Build a universe, run a market, test a strategy. For most users this page is the whole library.
+- [Install](https://tradefloor.dev/install.html): Install tradefloor from PyPI or crates.io, and what a version number promises about a published result.
+- [Core concepts](https://tradefloor.dev/core-concepts.html): Universe, macro and seed: the three things that define a run, and what each one does once the market starts moving.
+- [The two loops](https://tradefloor.dev/two-loops.html): Training means two different things here. One trains the market model, the other trains a strategy against a market that already exists.
+- [Running a market](https://tradefloor.dev/running-a-market.html): Build a universe, run a market, test a strategy. For most users this page is the whole library.
 
 ## Use it
 
-- [Agents](https://simoncoombes.github.io/pretium/agents.html): Any object with an act method can trade this market. What the agent sees, what the harness gives it, and how to compare two of them.
-- [Scenarios](https://simoncoombes.github.io/pretium/scenarios.html): Drive a macro path through the market instead of letting the economy find its own, and what a scenario result may claim.
-- [Execution cost](https://simoncoombes.github.io/pretium/execution-cost.html): Run the same seed with and without your orders, so every fill is priced against the market where you never traded.
-- [Checkpoints and forking](https://simoncoombes.github.io/pretium/checkpoints.html): Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.
-- [Real companies from EDGAR](https://simoncoombes.github.io/pretium/edgar.html): Seed a universe from real SEC filings: real valuation dispersion, real sector weights, synthetic price paths.
-- [RL environment](https://simoncoombes.github.io/pretium/rl-environment.html): A Gymnasium environment where the market answers back, so what a policy learns about size is not fiction.
-- [The MCP server](https://simoncoombes.github.io/pretium/mcp.html): Eleven tools over the simulator, so a coding agent can ask whether a strategy beats buy-and-hold here, and whether the difference is real.
+- [Agents](https://tradefloor.dev/agents.html): Any object with an act method can trade this market. What the agent sees, what the harness gives it, and how to compare two of them.
+- [Scenarios](https://tradefloor.dev/scenarios.html): Drive a macro path through the market instead of letting the economy find its own, and what a scenario result may claim.
+- [Execution cost](https://tradefloor.dev/execution-cost.html): Run the same seed with and without your orders, so every fill is priced against the market where you never traded.
+- [Checkpoints and forking](https://tradefloor.dev/checkpoints.html): Run to day sixty, then ask two questions of the same market, with everything before the fork identical rather than statistically similar.
+- [Real companies from EDGAR](https://tradefloor.dev/edgar.html): Seed a universe from real SEC filings: real valuation dispersion, real sector weights, synthetic price paths.
+- [RL environment](https://tradefloor.dev/rl-environment.html): A Gymnasium environment where the market answers back, so what a policy learns about size is not fiction.
+- [The MCP server](https://tradefloor.dev/mcp.html): Eleven tools over the simulator, so a coding agent can ask whether a strategy beats buy-and-hold here, and whether the difference is real.
 
 ## Trust it
 
-- [Realism envelope](https://simoncoombes.github.io/pretium/realism-envelope.html): Fourteen statistics, a certified horizon of 252 days, and five named gaps. What this market reproduces, and what it forbids you to claim.
-- [The metrics](https://simoncoombes.github.io/pretium/metrics.html): What each of the fourteen realism statistics measures, where its band came from, and how wide the spread around it is.
-- [Principles](https://simoncoombes.github.io/pretium/principles.html): Twelve rules this project works under, six of them bought with a specific loss.
-- [Citing a run](https://simoncoombes.github.io/pretium/citing.html): A citation identifies software. A manifest identifies a run. What to record so someone else can reproduce your result.
+- [Realism envelope](https://tradefloor.dev/realism-envelope.html): Fourteen statistics, a certified horizon of 252 days, and five named gaps. What this market reproduces, and what it forbids you to claim.
+- [The metrics](https://tradefloor.dev/metrics.html): What each of the fourteen realism statistics measures, where its band came from, and how wide the spread around it is.
+- [Principles](https://tradefloor.dev/principles.html): Twelve rules this project works under, six of them bought with a specific loss.
+- [Citing a run](https://tradefloor.dev/citing.html): A citation identifies software. A manifest identifies a run. What to record so someone else can reproduce your result.
 
 ## Reference
 
-- [Glossary](https://simoncoombes.github.io/pretium/glossary.html): Every term this library uses in a specific way, with the measurement that makes it specific.
-- [The nine factors](https://simoncoombes.github.io/pretium/factors.html): Every tick's change in mispricing decomposes into nine named components that sum to the move.
-- [Conventions](https://simoncoombes.github.io/pretium/conventions.html): Eight rules about units and inputs, worth reading before you hit them.
-- [Schemas](https://simoncoombes.github.io/pretium/schemas.html): Every column of the five Arrow tables, the constructor fields, and where each call refuses rather than guesses.
-- [Presets](https://simoncoombes.github.io/pretium/presets.html): Fourteen named coefficient sets. Which one to use, what each one measured, and what a preset does not pin.
-- [Release notes](https://simoncoombes.github.io/pretium/release-notes.html): What changed, what it means for a run you already have, and how to pin an old preset if you need the old behaviour.
+- [Glossary](https://tradefloor.dev/glossary.html): Every term this library uses in a specific way, with the measurement that makes it specific.
+- [The nine factors](https://tradefloor.dev/factors.html): Every tick's change in mispricing decomposes into nine named components that sum to the move.
+- [Conventions](https://tradefloor.dev/conventions.html): Eight rules about units and inputs, worth reading before you hit them.
+- [Schemas](https://tradefloor.dev/schemas.html): Every column of the five Arrow tables, the constructor fields, and where each call refuses rather than guesses.
+- [Presets](https://tradefloor.dev/presets.html): Fifteen named coefficient sets. Which one to use, what each one measured, and what a preset does not pin.
+- [Release notes](https://tradefloor.dev/release-notes.html): What changed, what it means for a run you already have, and how to pin an old preset if you need the old behaviour.
 
 ## API
 
-- [Core types](https://simoncoombes.github.io/pretium/core-types.html): Engine, Universe, Instrument, Macro and OrderBook: the signatures you need to run a market.
-- [Evaluate](https://simoncoombes.github.io/pretium/evaluate.html): evaluate, rank, tca and reproduce: the calls that turn a market into a result someone else can check.
-- [Parameters](https://simoncoombes.github.io/pretium/parameters.html): What ModelParams exposes: 87 settable names, 118 visible entries, and why the gap between them exists.
+- [Core types](https://tradefloor.dev/core-types.html): Engine, Universe, Instrument, Macro and OrderBook: the signatures you need to run a market.
+- [Evaluate](https://tradefloor.dev/evaluate.html): evaluate, rank, tca and reproduce: the calls that turn a market into a result someone else can check.
+- [Parameters](https://tradefloor.dev/parameters.html): What ModelParams exposes: 87 settable names, 118 visible entries, and why the gap between them exists.

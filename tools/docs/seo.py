@@ -11,7 +11,7 @@ here has to agree with every other one: the `<meta name=description>`, the
 summary in llms.txt are the same sentence, written once, here.
 
 Nothing in this module invents a claim. Descriptions are hand-written from
-what the page says; the realism dataset is generated from `pretium.envelope`,
+what the page says; the realism dataset is generated from `tradefloor.envelope`,
 which is the same module the certification tables come from, so the numbers a
 crawler reads cannot drift from the numbers a reader reads.
 """
@@ -41,7 +41,7 @@ DOCS = ROOT / "docs"
 #: sentence that stops mid-clause reads as a broken page.
 #:
 #: They are also written for the question someone would actually type. The
-#: word "pretium" is Latin for price and collides with a great deal else, so
+#: word "tradefloor" is Latin for price and collides with a great deal else, so
 #: the phrases that have to appear are the ones a person searches: market
 #: simulator, limit order book, backtest, trading strategy, deterministic.
 #:
@@ -74,7 +74,7 @@ DESCRIPTIONS = {
         "the market data its tools return."
     ),
     "wasm": (
-        "pretium compiles to WebAssembly and the browser build is bit "
+        "tradefloor compiles to WebAssembly and the browser build is bit "
         "identical to the native one, so a permalink carrying seed and roster "
         "reproduces a market exactly."
     ),
@@ -114,7 +114,7 @@ DESCRIPTIONS = {
         "determinism holds to the last bit."
     ),
     "releases": (
-        "Release notes for pretium on PyPI and crates.io: what changed in "
+        "Release notes for tradefloor on PyPI and crates.io: what changed in "
         "each version, and what an era boundary means for reproducing a "
         "result you recorded earlier."
     ),
@@ -135,11 +135,11 @@ DESCRIPTIONS = {
     ),
     "citing": (
         "A citation identifies the software; a methods section also has to "
-        "identify the run. How to cite pretium, one specific simulation, and "
+        "identify the run. How to cite tradefloor, one specific simulation, and "
         "a published realism claim."
     ),
     "install": (
-        "Install pretium from PyPI, choose an extra, and check bit identity "
+        "Install tradefloor from PyPI, choose an extra, and check bit identity "
         "on your own machine. What moves between versions and what is "
         "guaranteed to stay put."
     ),
@@ -154,7 +154,7 @@ DESCRIPTIONS = {
         "reinforcement learning environment."
     ),
     "api-realism": (
-        "API reference for pretium.facts, loss, envelope and atlas: measuring "
+        "API reference for tradefloor.facts, loss, envelope and atlas: measuring "
         "what the market reproduces, pricing what it does not, and mapping "
         "what it responds to."
     ),
@@ -192,7 +192,7 @@ DESCRIPTIONS = {
 TITLES = {
     "mcp": "MCP Server for Market Simulation",
     "trust": "Realism and Limits: What This Market Simulator Reproduces",
-    "home": "pretium: repeatable market simulation",
+    "home": "tradefloor: repeatable market simulation",
 }
 
 DESC_MIN, DESC_MAX = 120, 165
@@ -244,23 +244,23 @@ def title(slug: str, h1: str) -> str:
 
 #: Every other place this software is published. Without these a search engine
 #: has no way to know that the PyPI package, the crate, the docs and this site
-#: are one thing rather than four, and "pretium" is Latin for price, so the
+#: are one thing rather than four, and "tradefloor" is Latin for price, so the
 #: name alone disambiguates nothing at all.
 SAME_AS = [
-    "https://pypi.org/project/pretium/",
-    "https://crates.io/crates/pretium",
-    "https://docs.rs/pretium",
-    "https://github.com/simoncoombes/pretium",
+    "https://pypi.org/project/tradefloor/",
+    "https://crates.io/crates/tradefloor",
+    "https://docs.rs/tradefloor",
+    "https://github.com/simoncoombes/tradefloor",
 ]
 
-ALTERNATE_NAME = "pretium market simulator"
+ALTERNATE_NAME = "tradefloor market simulator"
 
 
 def software_node(base_url: str, repo_url: str, version: str) -> dict:
     """The SoftwareApplication node, one definition used by every page."""
     return {
         "@type": "SoftwareApplication",
-        "name": "pretium",
+        "name": "tradefloor",
         "alternateName": ALTERNATE_NAME,
         "applicationCategory": "DeveloperApplication",
         "applicationSubCategory": "Market simulation",
@@ -375,10 +375,10 @@ def dataset_node(base_url: str, repo_url: str) -> dict:
     return {
         "@context": "https://schema.org",
         "@type": "Dataset",
-        "name": "pretium realism envelope",
-        "alternateName": f"pretium {env['preset']} realism measurement",
+        "name": "tradefloor realism envelope",
+        "alternateName": f"tradefloor {env['preset']} realism measurement",
         "description": (
-            f"The {len(stats)} statistics pretium's default preset "
+            f"The {len(stats)} statistics tradefloor's default preset "
             f"{env['preset']} is measured on, each with the real-market band "
             f"it was scored against, the certified horizon of "
             f"{env['certified_horizon_days']} trading days, and the named "
@@ -566,7 +566,7 @@ def _llms_header(version: str, base_url: str) -> str:
         f"{base_url}/envelope.json and described at "
         f"{base_url}/envelope.html."
     )
-    return f"""# pretium
+    return f"""# tradefloor
 
 > A deterministic market simulator with a real limit order book. A Rust core
 > with a Python API: you give it a seed and a list of companies and it runs a
@@ -581,7 +581,7 @@ them, and fork one state into several futures.
 
 When quoting this project: the numbers change between versions and every
 preset is frozen and named, so cite the preset and the version, not
-"pretium".
+"tradefloor".
 """
 
 
@@ -759,8 +759,8 @@ def faq(slug: str) -> list[tuple[str, str]]:
     if slug == "install":
         return [
             (
-                "How do I install pretium?",
-                "pip install pretium. The core package has no dependencies at "
+                "How do I install tradefloor?",
+                "pip install tradefloor. The core package has no dependencies at "
                 "all. The extras are opt-in: [rl] adds numpy and gymnasium, "
                 "[arrow] adds pyarrow, [mcp] adds the MCP server, and "
                 "[claude] adds what the Claude agent example needs.",
@@ -858,7 +858,7 @@ def envelope_page(base_url: str, repo_url: str, version: str) -> str:
     )
     ld = json.dumps(dataset_node(base_url, repo_url), separators=(",", ":"))
     desc = (
-        f"The {len(env['statistics'])} statistics pretium {version} is "
+        f"The {len(env['statistics'])} statistics tradefloor {version} is "
         f"measured on, each with the real-market band it was scored against "
         f"and the certified horizon of {env['certified_horizon_days']} days."
     )
@@ -867,7 +867,7 @@ def envelope_page(base_url: str, repo_url: str, version: str) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Realism Envelope Dataset · pretium docs</title>
+<title>Realism Envelope Dataset · tradefloor docs</title>
 <meta name="description" content="{_html.escape(desc, quote=True)}">
 <link rel="canonical" href="{base_url}/envelope.html">
 <script type="application/ld+json">{ld}</script>
@@ -904,7 +904,7 @@ one carries a rule about what it forbids you to conclude.</p>
 <h2>Citing this</h2>
 <p>Cite the preset and the version, never the project alone: the numbers above
 are properties of <code>{_html.escape(env['preset'])}</code> as shipped in
-pretium {version}, and every preset is frozen under its own name. Source and
+tradefloor {version}, and every preset is frozen under its own name. Source and
 licence at <a href="{repo_url}">{repo_url}</a>.</p>
 </body>
 </html>

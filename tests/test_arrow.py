@@ -11,7 +11,7 @@ import struct
 
 import pytest
 
-import pretium
+import tradefloor
 
 pa = pytest.importorskip("pyarrow", reason="pyarrow is a test-only dependency")
 pc = pytest.importorskip("pyarrow.compute")
@@ -22,8 +22,8 @@ def arr(buf):
 
 
 def session(n=5, ticks=120, seed=42):
-    u = pretium.Universe.random(n, seed=3)
-    e = pretium.Engine(seed=seed, universe=u)
+    u = tradefloor.Universe.random(n, seed=3)
+    e = tradefloor.Engine(seed=seed, universe=u)
     e.open_market()
     e.run_session(9, 30, 3, ticks)
     return e, u, ticks
@@ -119,8 +119,8 @@ def test_an_empty_session_produces_an_empty_table_not_an_error():
     # A session that ran no ticks is a legitimate state -- a weekend, or a
     # stop condition firing immediately. It must produce zero rows rather
     # than raising.
-    u = pretium.Universe.random(3, seed=1)
-    e = pretium.Engine(seed=1, universe=u)
+    u = tradefloor.Universe.random(3, seed=1)
+    e = tradefloor.Engine(seed=1, universe=u)
     table = pa.table(e.bars(day=0))
     assert table.num_rows == 0
     assert table.column_names == ["day", "tick", "instrument_id", "close", "volume"]
@@ -139,8 +139,8 @@ def test_arrow_and_the_bytes_surface_never_disagree():
 # --------------------------------------------------------------------------
 
 def recorded(days=4, ticks=60, n=6):
-    u = pretium.Universe.random(n, seed=5)
-    e = pretium.Engine(seed=2026, universe=u, macro_state=pretium.Macro(federal_funds_rate=0.03))
+    u = tradefloor.Universe.random(n, seed=5)
+    e = tradefloor.Engine(seed=2026, universe=u, macro_state=tradefloor.Macro(federal_funds_rate=0.03))
     for day in range(days):
         e.open_market()
         e.run_session(9, 30, 3, ticks)
@@ -173,8 +173,8 @@ def test_recording_is_explicit_and_the_buffer_is_reused():
     # The session buffer is overwritten every session, so anything not
     # captured before the next run is gone. Recording is a choice a caller
     # makes, and a caller who does not want a table pays nothing.
-    u = pretium.Universe.random(3, seed=1)
-    e = pretium.Engine(seed=1, universe=u)
+    u = tradefloor.Universe.random(3, seed=1)
+    e = tradefloor.Engine(seed=1, universe=u)
     e.open_market()
     e.run_session(9, 30, 3, 50)
     assert e.recorded_days == 0
@@ -232,10 +232,10 @@ def test_macro_columns_are_all_f64():
 # --------------------------------------------------------------------------
 
 def traded(days=3, steps=4, ticks=60):
-    u = pretium.Universe(sorted(pretium.Universe.random(8, seed=5),
+    u = tradefloor.Universe(sorted(tradefloor.Universe.random(8, seed=5),
                                 key=lambda i: i.avg_volume))
-    e = pretium.Engine(seed=2026, universe=u)
-    p = pretium.Portfolio(cash=50_000_000)
+    e = tradefloor.Engine(seed=2026, universe=u)
+    p = tradefloor.Portfolio(cash=50_000_000)
     ticker = u[0].ticker
     for day in range(days):
         e.open_market()
@@ -309,7 +309,7 @@ def test_fills_carry_the_worst_price_not_only_the_average():
 
 def test_an_untraded_roster_yields_an_empty_fills_table():
     e, _, _, _, _ = recorded()
-    empty = pretium.Portfolio(cash=1e6)
+    empty = tradefloor.Portfolio(cash=1e6)
     assert pa.table(empty.fills_table(e.tickers)).num_rows == 0
 
 
@@ -318,8 +318,8 @@ def test_an_untraded_roster_yields_an_empty_fills_table():
 # --------------------------------------------------------------------------
 
 def multiday(days=3, ticks=390, n=4):
-    u = pretium.Universe.random(n, seed=5)
-    e = pretium.Engine(seed=2026, universe=u)
+    u = tradefloor.Universe.random(n, seed=5)
+    e = tradefloor.Engine(seed=2026, universe=u)
     for day in range(days):
         e.open_market()
         e.run_session(9, 30, 3, ticks)
@@ -380,8 +380,8 @@ def test_a_short_final_bucket_is_kept_not_dropped():
 
     Including the close, which is the single most-used price in the table.
     """
-    u = pretium.Universe.random(2, seed=1)
-    e = pretium.Engine(seed=1, universe=u)
+    u = tradefloor.Universe.random(2, seed=1)
+    e = tradefloor.Engine(seed=1, universe=u)
     e.open_market()
     e.run_session(9, 30, 3, 47)     # not a multiple of 10
     e.record(0)
@@ -410,11 +410,11 @@ def test_grain_still_streams_per_day():
 
 def test_conflicting_or_unknown_grain_is_refused():
     e, _, _, _ = multiday()
-    with pytest.raises(pretium.ValidationError, match="not both"):
+    with pytest.raises(tradefloor.ValidationError, match="not both"):
         e.bars(minutes=5, grain="day")
-    with pytest.raises(pretium.ValidationError, match="unknown grain"):
+    with pytest.raises(tradefloor.ValidationError, match="unknown grain"):
         e.bars(grain="hourly")
-    with pytest.raises(pretium.ValidationError, match="at least 1"):
+    with pytest.raises(tradefloor.ValidationError, match="at least 1"):
         e.bars(minutes=0)
 
 
@@ -423,8 +423,8 @@ def test_conflicting_or_unknown_grain_is_refused():
 # --------------------------------------------------------------------------
 
 def snapshotted(names=4, levels=5, shots=4):
-    u = pretium.Universe.random(names, seed=5)
-    e = pretium.Engine(seed=2026, universe=u)
+    u = tradefloor.Universe.random(names, seed=5)
+    e = tradefloor.Engine(seed=2026, universe=u)
     e.open_market()
     for i in range(shots):
         e.run_session(9, 30 + i * 30, 3, 30)
@@ -439,8 +439,8 @@ def test_depth_is_opt_in_and_records_nothing_by_default():
     a day against 39,000 for bars. Recording it by default would make every
     run forty times more expensive to answer a question most runs never ask.
     """
-    u = pretium.Universe.random(3, seed=1)
-    e = pretium.Engine(seed=1, universe=u)
+    u = tradefloor.Universe.random(3, seed=1)
+    e = tradefloor.Engine(seed=1, universe=u)
     e.open_market()
     e.run_session(9, 30, 3, 60)
     assert e.recorded_book_rows == 0
@@ -504,8 +504,8 @@ def test_snapshotting_does_not_disturb_the_market():
     produces the same depth whether or not anyone looked at it.
     """
     def run(observe):
-        u = pretium.Universe.random(4, seed=5)
-        e = pretium.Engine(seed=2026, universe=u)
+        u = tradefloor.Universe.random(4, seed=5)
+        e = tradefloor.Engine(seed=2026, universe=u)
         e.open_market()
         for i in range(4):
             e.run_session(9, 30 + i * 30, 3, 30)
@@ -521,7 +521,7 @@ def test_snapshotting_does_not_disturb_the_market():
 
 def test_zero_levels_is_refused():
     e, _, _, _ = snapshotted()
-    with pytest.raises(pretium.ValidationError, match="at least 1"):
+    with pytest.raises(tradefloor.ValidationError, match="at least 1"):
         e.snapshot_book(levels=0)
 
 
@@ -546,8 +546,8 @@ def test_a_day_of_many_sessions_records_every_tick():
     that was well-formed, self-consistent, and missing 75% of the market with
     nothing to indicate it.
     """
-    universe = pretium.Universe.random(4, seed=5)
-    engine = pretium.Engine(seed=1, universe=universe)
+    universe = tradefloor.Universe.random(4, seed=5)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     engine.open_market()
     for step in range(4):
         hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
@@ -568,9 +568,9 @@ def test_the_recorded_day_is_exactly_its_sessions_concatenated():
     above. This holds each session's own path as it is produced and asserts
     the day's tape is those, end to end, bit for bit.
     """
-    universe = pretium.Universe.random(4, seed=5)
+    universe = tradefloor.Universe.random(4, seed=5)
     count = len(universe)
-    engine = pretium.Engine(seed=1, universe=universe)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     engine.open_market()
     sessions = []
     for step in range(4):
@@ -588,8 +588,8 @@ def test_the_recorded_day_is_exactly_its_sessions_concatenated():
 def test_opening_a_new_day_starts_a_new_tape():
     # Without the clear, a run that opened twice would accumulate one
     # unbounded "day" and every per-day table would be wrong from day two.
-    universe = pretium.Universe.random(4, seed=5)
-    engine = pretium.Engine(seed=1, universe=universe)
+    universe = tradefloor.Universe.random(4, seed=5)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     for day in range(3):
         engine.open_market()
         engine.run_session(9, 30, 3, 30)
@@ -609,8 +609,8 @@ def test_prices_still_means_the_last_session():
     # The fix must not change what `session_prices` has always meant. It is
     # the session buffer, and a caller reading it between steps is reading the
     # step, not the day.
-    universe = pretium.Universe.random(4, seed=5)
-    engine = pretium.Engine(seed=1, universe=universe)
+    universe = tradefloor.Universe.random(4, seed=5)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     engine.open_market()
     engine.run_session(9, 30, 3, 30)
     engine.run_session(10, 0, 3, 45)

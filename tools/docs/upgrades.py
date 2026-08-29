@@ -8,7 +8,7 @@ Applied here rather than edited into `docs/*.html`, because the build
 overwrites every page it owns. Every insertion asserts on its anchor, so a
 reworded bundle fails the build rather than silently dropping the addition.
 
-The loss table takes its membership from `pretium.loss` at build time. The
+The loss table takes its membership from `tradefloor.loss` at build time. The
 three roles are one tuple each and the third is derived as the complement, so
 a statistic promoted between releases moves in this table without anyone
 editing it.
@@ -167,8 +167,8 @@ def atlas_pipeline() -> str:
 # ------------------------------------------------------------- loss role table
 
 def loss_table() -> str:
-    """The three roles in `pretium.loss`, with membership read from the module."""
-    from pretium import loss
+    """The three roles in `tradefloor.loss`, with membership read from the module."""
+    from tradefloor import loss
 
     rows = [
         ("live target", loss.LIVE_TARGETS,
@@ -195,7 +195,7 @@ def loss_table() -> str:
     return f"""
         <h3 style="font-size:16px;margin:26px 0 8px">What each of the fourteen does in the loss</h3>
         <p {_P}>Each statistic has one of three roles, and the roles are one tuple
-        each in <code style="font-size:12.5px">pretium.loss</code>. The third is
+        each in <code style="font-size:12.5px">tradefloor.loss</code>. The third is
         derived as the complement of the first two, so promoting a statistic is a
         one-tuple edit and a statistic added to
         <code style="font-size:12.5px">facts.REAL_MARKETS</code> is excluded and
@@ -285,7 +285,7 @@ def apply(doc: str) -> str:
                never_claim(), "the what-never-to-claim list")
     m = re.search(r'<h2[^>]*font-family:var\(--font-mono\)[^>]*>pretium\.loss</h2>', doc)
     if not m:
-        sys.exit("upgrades: the pretium.loss heading is not in the design bundle")
+        sys.exit("upgrades: the tradefloor.loss heading is not in the design bundle")
     doc = _sub(doc, m.group(0), loss_table(), "the loss role table")
     doc = loop_links(doc)
     return doc

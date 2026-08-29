@@ -12,7 +12,7 @@ What one run produces, in one JSON:
 
 - the base panel per seed — for the thirty-seed training list this IS
   phase 2's re-measured baseline panel, and the across-seed sd per
-  statistic is the s_k re-estimate `pretium.loss` §6.1 asks for;
+  statistic is the s_k re-estimate `tradefloor.loss` §6.1 asks for;
 - per parameter: the bracket actually evaluated (central, or one-sided
   where a hard range pins the base to a boundary — pt-v1 ships
   `market_vol_vix_coupling` at 1.0, the top of its range), the per-seed
@@ -153,7 +153,7 @@ def main() -> None:
 
     # s_k re-estimate from the base panels (the §6.1 discipline), via the
     # library's own estimator so the convention cannot drift.
-    from pretium.loss import seed_sd_from_panels
+    from tradefloor.loss import seed_sd_from_panels
     seed_sd = (seed_sd_from_panels(list(center_panels.values()))
                if len(seeds) >= 2 else None)
 

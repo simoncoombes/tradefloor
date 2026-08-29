@@ -100,7 +100,7 @@ jobs:
           # --no-index is load-bearing. Without it pip may resolve the name
           # from PyPI, and the digest would then describe a package that is
           # not the one just built -- a green run proving nothing.
-          python -m pip install --no-index --find-links dist --force-reinstall pretium
+          python -m pip install --no-index --find-links dist --force-reinstall tradefloor
           # Run from outside the checkout so the WHEEL is imported rather
           # than the source tree, which is importable and would say nothing
           # about the artefact being shipped.
@@ -114,8 +114,8 @@ jobs:
           set -euo pipefail
           cd "${{ runner.temp }}"
           python - <<'PY'
-          import pretium as pt
-          from pretium import envelope as env
+          import tradefloor as pt
+          from tradefloor import envelope as env
           u = pt.Universe.random(12, seed=7)
           e = pt.Engine(universe=u, seed=3)
           e.run_days(3)
@@ -248,7 +248,7 @@ jobs:
           set -euo pipefail
           cargo package
           V=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          cd "target/package/pretium-${V}"
+          cd "target/package/tradefloor-${V}"
           # `cargo package`'s verify build fetches the library's
           # dependencies and nothing else, so the dev-dependencies the test
           # suite needs are absent here -- the 0.4.3 release failed exactly

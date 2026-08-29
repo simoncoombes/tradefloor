@@ -210,7 +210,7 @@ def _level(x):
 def envelope() -> dict:
     """The fourteen statistics, their real bands, and the five named gaps.
 
-    One source, `docs/envelope.json`, which is what `pretium.envelope`
+    One source, `docs/envelope.json`, which is what `tradefloor.envelope`
     publishes: it already carries each statistic's measured value, the band
     it was graded against and the verdict, so reading the bands from
     `measurements/real-panel.json` separately - as the handoff's provenance

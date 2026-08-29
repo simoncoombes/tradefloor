@@ -28,8 +28,8 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "python"))
 
-import pretium as pt  # noqa: E402
-from pretium import envelope, facts  # noqa: E402
+import tradefloor as pt  # noqa: E402
+from tradefloor import envelope, facts  # noqa: E402
 
 N = 40
 

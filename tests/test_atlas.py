@@ -14,9 +14,9 @@ import math
 
 import pytest
 
-import pretium
-from pretium import atlas
-from pretium.atlas import Axis, Survey
+import tradefloor
+from tradefloor import atlas
+from tradefloor.atlas import Axis, Survey
 
 
 def unit_axes(*names):
@@ -100,14 +100,14 @@ def test_a_log_axis_spreads_points_across_decades_not_the_top_one():
 
 
 def test_a_tiny_survey_is_refused_not_averaged():
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         atlas.plan(unit_axes("x"), 4)
 
 
 def test_axis_validation_refuses_an_empty_or_impossible_range():
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         Axis("x", 1.0, 1.0)
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         Axis("x", 0.0, 1.0, log=True)  # zero is infinitely far in log space
 
 
@@ -115,7 +115,7 @@ def test_axis_validation_refuses_an_empty_or_impossible_range():
 
 def test_the_default_box_is_a_quarter_to_four_times_the_preset():
     (axis,) = atlas.axes_for(["market_factor_sigma"], preset="pt-v3")
-    ship = pretium.ModelParams.from_preset("pt-v3").market_factor_sigma
+    ship = tradefloor.ModelParams.from_preset("pt-v3").market_factor_sigma
     assert axis.low == pytest.approx(ship * 0.25)
     assert axis.high == pytest.approx(ship * 4.0)
 
@@ -124,7 +124,7 @@ def test_a_zero_shipped_parameter_is_refused_rather_than_guessed():
     """Nineteen parameters ship inert at 0.0. A multiplicative box around
     zero is the single point zero, and inventing a range instead would
     decide -- silently, in library code -- what the map can see."""
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         atlas.axes_for(["jump_intensity_market"], preset="pt-v3")
     # With an explicit range the same parameter is fine.
     (axis,) = atlas.axes_for(["jump_intensity_market"], preset="pt-v3",
@@ -136,18 +136,18 @@ def test_a_typoed_range_override_is_refused_not_silently_dropped():
     """The crisisearch4 shape of failure with worse ergonomics: a caller
     who widens a box under a misspelled name would otherwise get the
     default box, silently, and believe the optimum was searched."""
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         atlas.axes_for(["crisis_blend_ramp"], preset="pt-v3",
                        ranges={"crisis_blend_rampp": (0.35, 50.0)})
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         atlas.axes_for(["crisis_blend_ramp"], preset="pt-v3",
                        log=["crisis_blend_rampp"])
 
 
 def test_an_unknown_parameter_and_a_duplicate_are_refused():
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         atlas.axes_for(["sharpe_ratio"], preset="pt-v3")
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         atlas.axes_for(["garch_alpha", "garch_alpha"], preset="pt-v3")
 
 
@@ -166,7 +166,7 @@ def test_a_vector_that_breaks_the_model_is_recorded_not_fatal():
     raises is a fact about the model and must cost one row, not the run."""
     def measure(v):
         if v["x1"] > 0.8:
-            raise pretium.ValidationError("no instrument produced returns")
+            raise tradefloor.ValidationError("no instrument produced returns")
         return {"y": v["x1"]}
 
     result = synthetic(measure, samples=100, seed=3)
@@ -192,13 +192,13 @@ def test_the_survey_measures_exactly_the_vectors_it_planned():
 
 def test_record_refuses_ambiguous_and_malformed_rows():
     s = Survey(axes=unit_axes("x1"))
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         s.record(0, {"x1": 0.5})  # neither outputs nor error
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         s.record(0, {"x1": 0.5}, outputs={"y": 1.0}, error="also broken")
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         s.record(0, {"wrong": 0.5}, outputs={"y": 1.0})
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         s.record(0, {"x1": 0.5, "extra": 1.0}, outputs={"y": 1.0})
 
 
@@ -222,9 +222,9 @@ def test_a_curved_monotone_response_reads_at_full_strength():
 def test_an_unmeasured_output_name_is_refused_as_a_probable_typo():
     # An empty answer to a misspelled output would read as a finding.
     result = synthetic(lambda v: {"y": v["x1"]})
-    with pytest.raises(pretium.ValidationError, match="no row measures"):
+    with pytest.raises(tradefloor.ValidationError, match="no row measures"):
         result.sensitivity("yy")
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         result.pareto({"yy": "min"})
 
 
@@ -233,7 +233,7 @@ def test_too_few_usable_rows_are_refused_not_correlated():
     s = Survey(axes=axes)
     for i in range(6):
         s.record(i, {"x1": i / 6.0}, outputs={"y": float(i)})
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         s.sensitivity("y")
 
 
@@ -250,7 +250,7 @@ def test_where_asks_the_targeted_interaction_question():
     assert high["correlations"]["x1"] > 0.5
     assert low["correlations"]["x1"] < -0.5
     assert high["rows_used"] + low["rows_used"] == 400
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         result.sensitivity("y", where={"x9": (0.0, 0.5)})
 
 
@@ -288,7 +288,7 @@ def test_profile_bins_a_log_axis_in_its_own_geometry():
 
 def test_a_marginal_too_thin_for_its_bins_is_refused():
     result = synthetic(lambda v: {"y": v["x1"]}, samples=30)
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         result.profile("x1", "y", bins=12)
 
 
@@ -329,7 +329,7 @@ def test_the_front_respects_a_max_direction():
     result = s.pareto({"a": "min", "b": "max"})
     front = {(r["outputs"]["a"], r["outputs"]["b"]) for r in result["front"]}
     assert front == {(0.0, 2.0)}, "one point is best on both axes at once"
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         s.pareto({"a": "minimise"})
 
 
@@ -385,11 +385,11 @@ def test_attribution_reports_measured_delta_and_residual_when_given():
 
 def test_attribution_refuses_extrapolation_and_one_sided_vectors():
     result = synthetic(lambda v: {"y": v["x1"]}, samples=240)
-    with pytest.raises(pretium.ValidationError, match="outside the surveyed"):
+    with pytest.raises(tradefloor.ValidationError, match="outside the surveyed"):
         result.attribution({"x1": 0.5}, {"x1": 1.5}, "y")
-    with pytest.raises(pretium.ValidationError, match="one vector"):
+    with pytest.raises(tradefloor.ValidationError, match="one vector"):
         result.attribution({"x1": 0.5, "x2": 0.1}, {"x1": 0.6}, "y")
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         result.attribution({"x9": 0.5}, {"x9": 0.6}, "y")
 
 
@@ -508,7 +508,7 @@ def test_confirmation_on_the_surveys_own_seeds_is_refused_not_warned():
     -0.0315, +0.0209, +0.0233. A warning is a thing people read past, so
     overlap raises."""
     s = screened(seeds=range(101, 131))
-    with pytest.raises(pretium.ValidationError, match="confirm itself"):
+    with pytest.raises(tradefloor.ValidationError, match="confirm itself"):
         s.confirm({"x1": 0.8}, {"x1": 0.2},
                   lambda v, seed: {"y": v["x1"]},
                   seed_blocks=[range(101, 131)])
@@ -523,7 +523,7 @@ def test_a_survey_without_a_seed_record_cannot_confirm():
     # The overlap check runs on records, not on trust: a survey that does
     # not know its own seeds cannot prove disjointness, so it refuses.
     result = synthetic(lambda v: {"y": v["x1"]}, names=("x1",), samples=32)
-    with pytest.raises(pretium.ValidationError, match="meta\\['seeds'\\]"):
+    with pytest.raises(tradefloor.ValidationError, match="meta\\['seeds'\\]"):
         result.confirm({"x1": 0.8}, {"x1": 0.2},
                        lambda v, seed: {"y": v["x1"]},
                        seed_blocks=[[201, 202]])
@@ -531,11 +531,11 @@ def test_a_survey_without_a_seed_record_cannot_confirm():
 
 def test_blocks_sharing_a_seed_or_identical_vectors_are_refused():
     s = screened()
-    with pytest.raises(pretium.ValidationError, match="more than one"):
+    with pytest.raises(tradefloor.ValidationError, match="more than one"):
         s.confirm({"x1": 0.8}, {"x1": 0.2},
                   lambda v, seed: {"y": v["x1"]},
                   seed_blocks=[[201, 202], [202, 203]])
-    with pytest.raises(pretium.ValidationError, match="identical"):
+    with pytest.raises(tradefloor.ValidationError, match="identical"):
         s.confirm({"x1": 0.5}, {"x1": 0.5},
                   lambda v, seed: {"y": v["x1"]},
                   seed_blocks=[[201, 202]])
@@ -590,7 +590,7 @@ def test_a_measurement_hole_fails_the_confirmation_loudly():
     def measure(v, seed):
         return {"y": float("nan") if seed == 203 else v["x1"]}
 
-    with pytest.raises(pretium.ValidationError, match="seed 203"):
+    with pytest.raises(tradefloor.ValidationError, match="seed 203"):
         s.confirm({"x1": 0.8}, {"x1": 0.2}, measure,
                   seed_blocks=[range(201, 206)])
 
@@ -607,7 +607,7 @@ def test_a_hole_at_the_first_seed_is_a_refusal_not_a_smaller_answer():
         y = float("nan") if seed == 201 else v["x1"]
         return {"y": y, "z": v["x1"]}
 
-    with pytest.raises(pretium.ValidationError, match="seed 201") as err:
+    with pytest.raises(tradefloor.ValidationError, match="seed 201") as err:
         s.confirm({"x1": 0.8}, {"x1": 0.2}, measure,
                   seed_blocks=[range(201, 206)])
     assert "'y'" in str(err.value), "the refusal names the holed output"
@@ -620,7 +620,7 @@ def test_an_empty_seed_record_cannot_vouch_for_disjointness():
     record wearing the key."""
     result = synthetic(lambda v: {"y": v["x1"]}, names=("x1",), samples=32)
     result.meta["seeds"] = []
-    with pytest.raises(pretium.ValidationError, match="missing or empty"):
+    with pytest.raises(tradefloor.ValidationError, match="missing or empty"):
         result.confirm({"x1": 0.8}, {"x1": 0.2},
                        lambda v, seed: {"y": v["x1"]},
                        seed_blocks=[[201, 202]])
@@ -631,11 +631,11 @@ def test_seed_types_are_normalised_before_the_overlap_check():
     # both sides so a JSON round trip cannot re-open it. Anything that is
     # not a seed at all is refused.
     s = screened(seeds=(101, 102, 103))
-    with pytest.raises(pretium.ValidationError, match="confirm itself"):
+    with pytest.raises(tradefloor.ValidationError, match="confirm itself"):
         s.confirm({"x1": 0.8}, {"x1": 0.2},
                   lambda v, seed: {"y": v["x1"]},
                   seed_blocks=[["101", 202]])
-    with pytest.raises(pretium.ValidationError, match="not a\\s+seed"):
+    with pytest.raises(tradefloor.ValidationError, match="not a\\s+seed"):
         s.confirm({"x1": 0.8}, {"x1": 0.2},
                   lambda v, seed: {"y": v["x1"]},
                   seed_blocks=[["twelve"]])
@@ -718,8 +718,8 @@ def test_the_reparameterisation_round_trips_the_preset_exactly():
     must come back bit-comparable, or the map would be centred on a model
     that is not the one shipping."""
     drv = _driver()
-    settable = pretium.ModelParams.settable()
-    ship = pretium.ModelParams.from_preset("pt-v3").to_dict()
+    settable = tradefloor.ModelParams.settable()
+    ship = tradefloor.ModelParams.from_preset("pt-v3").to_dict()
     params = {n: float(ship[n]) for n in settable}
     back = drv.vector_to_params(drv.params_to_vector(params))
     assert set(back) == set(params)
@@ -732,7 +732,7 @@ def test_the_survey_covers_every_settable_parameter():
     # three: a parameter missing here would be silently unsurveyed.
     drv = _driver()
     axes = {a.name for a in drv.survey_axes()}
-    settable = set(pretium.ModelParams.settable())
+    settable = set(tradefloor.ModelParams.settable())
     covered = (axes - {a.name for a in drv.TRANSFORMED_AXES}) \
         | set(drv.REPARAMETERISED)
     assert covered == settable
@@ -803,7 +803,7 @@ def test_resume_skips_model_refusals_but_can_retry_infrastructure():
 
 def test_error_kinds_separate_the_model_from_the_machine():
     drv = _driver()
-    assert drv.error_kind(pretium.ValidationError("no returns")) == "model"
+    assert drv.error_kind(tradefloor.ValidationError("no returns")) == "model"
     assert drv.error_kind(MemoryError()) == "infrastructure"
     assert drv.error_kind(OSError(12, "cannot allocate")) == "infrastructure"
     assert drv.error_kind(RuntimeError("?")) == "unclassified"
@@ -831,7 +831,7 @@ def test_collect_builds_the_survey_from_streamed_rows_mid_flight(tmp_path):
     pending vectors counted rather than invented, and the artifacts being
     written mid-flight."""
     import argparse
-    from pretium.facts import REAL_MARKETS
+    from tradefloor.facts import REAL_MARKETS
 
     drv = _driver()
     axes = drv.survey_axes()

@@ -14,7 +14,7 @@ what the three consumers who asked for the split actually get:
   trading moves the same-day VIX, VIX sets the factor's variance target
   two closes later — so the byte-identical guarantee is qualified: small
   next to direct impact, and restored exactly under a pinned VIX. The
-  measurement lives in ``pretium.tca``'s ``moved()`` docstring,
+  measurement lives in ``tradefloor.tca``'s ``moved()`` docstring,
 - pinned-versus-baseline macro comparison: two macro paths, one market
   noise sequence,
 - cutover: an embedder's own draws never move the market.
@@ -24,11 +24,11 @@ import struct
 
 import pytest
 
-import pretium
-from pretium.scenario import Scenario, run_scenario
+import tradefloor
+from tradefloor.scenario import Scenario, run_scenario
 
 
-UNIVERSE = pretium.Universe.random(12, seed=7)
+UNIVERSE = tradefloor.Universe.random(12, seed=7)
 
 
 def prices(engine):
@@ -85,7 +85,7 @@ def test_a_pinned_run_matches_its_endogenous_twin_when_the_values_agree():
     difference is the macro values, never the plumbing.
     """
     days = 3
-    a = pretium.Engine(seed=99, universe=UNIVERSE)
+    a = tradefloor.Engine(seed=99, universe=UNIVERSE)
     pins = []
     for _ in range(days):
         a.open_market()
@@ -98,7 +98,7 @@ def test_a_pinned_run_matches_its_endogenous_twin_when_the_values_agree():
                          qe_pe_boost=m.qe_pe_boost,
                          fear_greed_index=m.fear_greed_index))
 
-    b = pretium.Engine(seed=99, universe=UNIVERSE)
+    b = tradefloor.Engine(seed=99, universe=UNIVERSE)
     for day in range(days):
         b.open_market()
         b.run_session(9, 30, 3, 60)
@@ -118,7 +118,7 @@ def test_a_pinned_run_matches_its_endogenous_twin_when_the_values_agree():
 
 def test_embedder_draws_leave_the_market_bit_identical():
     def run(extra_draws):
-        e = pretium.Engine(seed=42, universe=UNIVERSE)
+        e = tradefloor.Engine(seed=42, universe=UNIVERSE)
         e.open_market()
         for _ in range(extra_draws):
             e.draw_uniform()
@@ -135,8 +135,8 @@ def test_embedder_draws_leave_the_market_bit_identical():
 
 
 def test_embedder_draws_are_reproducible_from_the_seed():
-    a = pretium.Engine(seed=5, universe=UNIVERSE)
-    b = pretium.Engine(seed=5, universe=UNIVERSE)
+    a = tradefloor.Engine(seed=5, universe=UNIVERSE)
+    b = tradefloor.Engine(seed=5, universe=UNIVERSE)
     assert [a.draw_normal() for _ in range(8)] == [b.draw_normal() for _ in range(8)]
 
 
@@ -146,7 +146,7 @@ def test_embedder_draws_are_reproducible_from_the_seed():
 
 
 def test_the_per_stream_counts_sum_to_the_total():
-    e = pretium.Engine(seed=11, universe=UNIVERSE)
+    e = tradefloor.Engine(seed=11, universe=UNIVERSE)
     e.draw_uniform()
     e.open_market()
     e.run_session(9, 30, 3, 30)
@@ -163,7 +163,7 @@ def test_the_per_stream_counts_sum_to_the_total():
 def test_a_snapshot_carries_every_stream():
     # An odd number of normals per stream, so each has a Box-Muller spare in
     # flight -- the piece of position a lazy snapshot drops first.
-    e = pretium.Engine(seed=3, universe=UNIVERSE)
+    e = tradefloor.Engine(seed=3, universe=UNIVERSE)
     e.draw_normal()
     e.open_market()
     e.run_session(9, 30, 3, 17)
@@ -176,7 +176,7 @@ def test_a_snapshot_carries_every_stream():
     # silently wrong the day they are not.
     assert len(snapshot["rng"]) == 3 * 7
 
-    restored = pretium.Engine(seed=3, universe=UNIVERSE)
+    restored = tradefloor.Engine(seed=3, universe=UNIVERSE)
     restored.restore_state(snapshot)
     # Identical continuations on every stream: the market via prices, the
     # economy via the next day's chain, the external via the next draw.
@@ -192,9 +192,9 @@ def test_a_snapshot_carries_every_stream():
 
 
 def test_a_pre_split_snapshot_is_refused_with_its_era_named():
-    e = pretium.Engine(seed=1, universe=UNIVERSE)
+    e = tradefloor.Engine(seed=1, universe=UNIVERSE)
     snapshot = e.state_snapshot()
     snapshot["rng"] = snapshot["rng"][0:3]  # the old single-stream format
-    fresh = pretium.Engine(seed=1, universe=UNIVERSE)
-    with pytest.raises(pretium.ValidationError, match="stream split"):
+    fresh = tradefloor.Engine(seed=1, universe=UNIVERSE)
+    with pytest.raises(tradefloor.ValidationError, match="stream split"):
         fresh.restore_state(snapshot)

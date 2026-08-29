@@ -11,7 +11,7 @@ short: An LLM agent
 against the reference baselines.
 
 ```
-pip install "pretium[claude]"
+pip install "tradefloor[claude]"
 export ANTHROPIC_API_KEY=...        # or: ant auth login
 python examples/08-claude-agent.py
 ```

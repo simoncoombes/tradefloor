@@ -51,7 +51,7 @@ fn f64_bytes(py: Python<'_>, values: &[f64]) -> Py<PyBytes> {
 }
 
 /// N independent markets, advanced together.
-#[pyclass(name = "EngineBatch", module = "pretium._core")]
+#[pyclass(name = "EngineBatch", module = "tradefloor._core")]
 pub struct PyEngineBatch {
     engines: Vec<Engine>,
     buffers: Vec<SessionBuffer>,

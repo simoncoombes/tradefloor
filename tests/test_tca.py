@@ -9,10 +9,10 @@ wrong reason.
 
 import pytest
 
-import pretium
+import tradefloor
 
 
-UNIVERSE = pretium.Universe.random(20, seed=7)
+UNIVERSE = tradefloor.Universe.random(20, seed=7)
 
 
 class BuyOnce:
@@ -55,7 +55,7 @@ def analyse(agent, **kwargs):
     kwargs.setdefault("days", 1)
     kwargs.setdefault("steps_per_day", 6)
     kwargs.setdefault("seed", 2026)
-    return pretium.tca.analyse(agent, universe=UNIVERSE, **kwargs)
+    return tradefloor.tca.analyse(agent, universe=UNIVERSE, **kwargs)
 
 
 # --------------------------------------------------------------------------
@@ -280,7 +280,7 @@ def test_as_dict_is_json_shaped():
 
 def test_a_degenerate_session_is_refused():
     for kwargs in ({"days": 0}, {"steps_per_day": 0}, {"ticks_per_step": 0}):
-        with pytest.raises(pretium.ValidationError):
+        with pytest.raises(tradefloor.ValidationError):
             analyse(Idle(), **kwargs)
 
 

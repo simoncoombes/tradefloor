@@ -116,7 +116,7 @@ page: they are a list of things this documentation does not currently explain.
 
 | term | what it means here | owning page |
 |---|---|---|
-| the panel | The fourteen statistics `pretium.facts.measure()` returns, measured at a single flat VIX on one horizon, so a preset can be perfect on all fourteen while the market's response to a crisis changes underneath it. | [realism metrics](realism-metrics.md) |
+| the panel | The fourteen statistics `tradefloor.facts.measure()` returns, measured at a single flat VIX on one horizon, so a preset can be perfect on all fourteen while the market's response to a crisis changes underneath it. | [realism metrics](realism-metrics.md) |
 | band | The range a statistic must land in, measured with the panel's own estimators on real data: nine consecutive 252-day windows of 40 US large caps over 2015-2025 set each one, and the tenth is held out because it straddles the COVID crash. | [realism metrics](realism-metrics.md) |
 | crisis_window | The tenth of those ten windows, reported beside each band rather than setting it, because the panel is a claim about a typical year and crisis behaviour is measured under pinned scenarios. | [realism metrics](realism-metrics.md) |
 | SEED_SD | Each statistic's across-seed standard deviation at the shipped baseline, and the unit every band exit is priced in, so a miss on volatility measured in tens and a miss on an autocorrelation measured in hundredths are comparable. | [realism metrics](realism-metrics.md) |
@@ -130,7 +130,7 @@ page: they are a list of things this documentation does not currently explain.
 | decay curve | The model's absolute-return autocorrelation at ten lags out to 60, fitted as a log-log slope over lags 1 to 20 because no single lag reveals a shape: real markets fit -0.436 and the model -0.953, so its volatility memory fades about 2.2 times as fast. | [realism metrics](realism-metrics.md) |
 | VIX lever | The ratio of realised volatility at a high held VIX to a low one, so how much more violent a sustained crisis is than a calm market; real markets read x6.16, and it is a gate rather than a calibration target because the panel cannot see it. | [realism metrics](realism-metrics.md) |
 | VIX shock | The ratio of realised volatility during a 20-day VIX spike to a flat baseline, so how fast the market reacts as distinct from where it settles: a variance process with a long half-life reaches the right level for a sustained crisis and cannot track a short spike. | [realism metrics](realism-metrics.md) |
-| envelope | What pretium certifies and what it does not -- the statistics matched, the horizon, the axes the claim survives and the five measured gaps -- published instead of a single realism score, because one number hides the structure that decides whether a result means anything. | [realism envelope](realism-envelope.md) |
+| envelope | What tradefloor certifies and what it does not -- the statistics matched, the horizon, the axes the claim survives and the five measured gaps -- published instead of a single realism score, because one number hides the structure that decides whether a result means anything. | [realism envelope](realism-envelope.md) |
 | certified horizon | 252 trading days, the horizon the certification was measured at on thirty seeds, and `envelope.check` refuses to certify beyond it even though `pt-v12` holds all fourteen against bands re-derived at 504 days. | [realism envelope](realism-envelope.md) |
 | Gap | One measured way the model departs from real markets, each ending in a rule about what it forbids you to conclude: five ship with `pt-v12`, down from six at that boundary and eight at 0.1.4, and the three that closed are recorded rather than deleted. | [realism envelope](realism-envelope.md) |
 | check() | `envelope.check()` answers whether a question falls inside the envelope and returns a boolean with its reasons attached, and it raises on an unknown statistic name because a silently dropped name is a silently granted certification. | [realism metrics](realism-metrics.md) |
@@ -196,11 +196,11 @@ page: they are a list of things this documentation does not currently explain.
 | `known-answer test` | named in docs/model-presets.md:200 and docs/reading-results.md:35 but defined on neither. docs/reproducing-a-run.md describes the mechanism in full (f. |
 | `era boundary` | used on eight docs pages (conventions, model-presets, scenarios, realism-envelope, rng-streams, sharing-a-run, atlas) and defined on none of them. |
 | `promotion` | no docs/*.md page defines it. |
-| `Scorecard` | defined only in code, at python/pretium/harness.py:222, docstring "One agent's result", with the field list in `__slots__` at line 231 and the fingerp. |
-| `unmeasurable` | defined only in code, at python/pretium/ranking.py:227-231 ("Seeds where capture was not measurable because the reference did not make money") and enf. |
-| `live target` | defined only in python/pretium/loss.py: the module docstring at line 31 ("the five statistics the search is trying to move into band"), the LIVE_TARGE. |
-| `constraint` | defined only in python/pretium/loss.py: the module docstring at line 34 ("the four statistics in band at the baseline ... push back only when a candid. |
-| `Axis` | the type is defined only at python/pretium/atlas.py:142, `class Axis: "One parameter and the range the survey moves it over."`, with the log-axis refu. |
+| `Scorecard` | defined only in code, at python/tradefloor/harness.py:222, docstring "One agent's result", with the field list in `__slots__` at line 231 and the fingerp. |
+| `unmeasurable` | defined only in code, at python/tradefloor/ranking.py:227-231 ("Seeds where capture was not measurable because the reference did not make money") and enf. |
+| `live target` | defined only in python/tradefloor/loss.py: the module docstring at line 31 ("the five statistics the search is trying to move into band"), the LIVE_TARGE. |
+| `constraint` | defined only in python/tradefloor/loss.py: the module docstring at line 34 ("the four statistics in band at the baseline ... push back only when a candid. |
+| `Axis` | the type is defined only at python/tradefloor/atlas.py:142, `class Axis: "One parameter and the range the survey moves it over."`, with the log-axis refu. |
 | `emptiness certificate` | defined only at tools/calibration/falsify.py:1-40 (module docstring, CALIBRATION.md 4.4). |
 | `gate` | defined only at tools/calibration/gate_pick.py:1-13 (the thirty-seed battery for one candidate) and gate_batch.py:1-34 (the same axes for many candida. |
 | `emit_preset` | defined only at tools/calibration/emit_preset.py:1-20. |

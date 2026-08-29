@@ -3,8 +3,8 @@ requires = ["maturin>=1.5,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "pretium"
-version = "0.4.3"
+name = "tradefloor"
+version = "0.5.0"
 description = "A reproducible evaluation environment for financial AI agents."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,12 +33,12 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://simoncoombes.github.io/pretium"
-Repository = "https://github.com/simoncoombes/pretium"
-Documentation = "https://simoncoombes.github.io/pretium"
+Homepage = "https://tradefloor.dev"
+Repository = "https://github.com/simoncoombes/tradefloor"
+Documentation = "https://tradefloor.dev"
 # PyPI has no changelog field, so a project page can only point at one.
 # Without this a visitor has no route from the package to its release notes.
-Changelog = "https://github.com/simoncoombes/pretium/releases"
+Changelog = "https://github.com/simoncoombes/tradefloor/releases"
 
 [project.optional-dependencies]
 # The core package depends on NOTHING. These are for surfaces that genuinely
@@ -56,19 +56,19 @@ claude = ["anthropic>=0.40", "pydantic>=2"]
 mcp = ["mcp>=2.0"]
 
 [project.scripts]
-# Speaks MCP over stdio. Point an MCP client at `pretium-mcp` with no
+# Speaks MCP over stdio. Point an MCP client at `tradefloor-mcp` with no
 # arguments; see docs/mcp.md for a client configuration block.
-pretium-mcp = "pretium.mcp:main"
+tradefloor-mcp = "tradefloor.mcp:main"
 
 [tool.maturin]
 manifest-path = "rust/Cargo.toml"
-# Mixed layout: the compiled extension is pretium._core and the Python package
-# in python/ wraps it. Keeps the public name `pretium` while leaving room for
+# Mixed layout: the compiled extension is tradefloor._core and the Python package
+# in python/ wraps it. Keeps the public name `tradefloor` while leaving room for
 # pure-Python surface.
 python-source = "python"
-module-name = "pretium._core"
+module-name = "tradefloor._core"
 features = ["python"]
 # The stub file and the PEP 561 marker must be INSTALLED, not merely present
 # in the source tree. A stub that does not ship types nothing, and the failure
 # is silent -- a type checker just falls back to Any.
-include = ["python/pretium/py.typed", "python/pretium/_core.pyi"]
+include = ["python/tradefloor/py.typed", "python/tradefloor/_core.pyi"]

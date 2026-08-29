@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import pytest
 
-import pretium as pt
+import tradefloor as pt
 
 UNIVERSE_SEED = 7
 NAMES = 20
@@ -127,7 +127,7 @@ def test_lowering_it_reduces_return_autocorrelation() -> None:
     is the DIRECTION, so a later change that silently inverts the sign gets
     caught here rather than in a search that costs real money.
     """
-    from pretium import facts
+    from tradefloor import facts
 
     u = pt.Universe.random(40, seed=111)
     seeds = (101, 102, 103, 104, 105, 106)

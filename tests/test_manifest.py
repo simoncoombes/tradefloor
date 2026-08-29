@@ -11,20 +11,20 @@ import json
 
 import pytest
 
-import pretium
-from pretium.manifest import _canonical, _sha, era_fingerprint, market_digest
-from pretium.scenario import Scenario
+import tradefloor
+from tradefloor.manifest import _canonical, _sha, era_fingerprint, market_digest
+from tradefloor.scenario import Scenario
 
-UNIVERSE = pretium.Universe.random(10, seed=3)
+UNIVERSE = tradefloor.Universe.random(10, seed=3)
 MACRO_KWARGS = dict(vix=18.0, federal_funds_rate=0.03,
                     corporate_bond_yield=0.05)
 
 
 def full_run(seed=42, days=3):
     """A run using every kind of input: macro, scenario pins, order flow."""
-    macro = pretium.Macro(**MACRO_KWARGS)
+    macro = tradefloor.Macro(**MACRO_KWARGS)
     shock = Scenario.rate_shock(start=0.03, end=0.05, over=2)
-    engine = pretium.Engine(seed=seed, universe=UNIVERSE, macro_state=macro)
+    engine = tradefloor.Engine(seed=seed, universe=UNIVERSE, macro_state=macro)
     for day in range(days):
         shock.apply(engine, day)
         engine.open_market()
@@ -35,7 +35,7 @@ def full_run(seed=42, days=3):
 
 
 def manifest_of(engine, macro, shock, **kwargs):
-    return pretium.RunManifest.of(engine, seed=42, universe=UNIVERSE,
+    return tradefloor.RunManifest.of(engine, seed=42, universe=UNIVERSE,
                                   macro=macro, scenario=shock, **kwargs)
 
 
@@ -55,7 +55,7 @@ def test_a_manifest_reproduces_the_run_bit_for_bit():
     engine, macro, shock = full_run()
     text = manifest_of(engine, macro, shock).to_json()
 
-    rebuilt = pretium.RunManifest.from_json(text).reproduce()
+    rebuilt = tradefloor.RunManifest.from_json(text).reproduce()
 
     assert rebuilt.prices() == engine.prices()
     assert rebuilt.draws_consumed == engine.draws_consumed
@@ -64,11 +64,11 @@ def test_a_manifest_reproduces_the_run_bit_for_bit():
 
 
 def test_a_minimal_run_needs_only_seed_universe_and_log():
-    engine = pretium.Engine(seed=7, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=7, universe=UNIVERSE)
     engine.run_days(2, record=False)
-    manifest = pretium.RunManifest.of(engine, seed=7, universe=UNIVERSE)
+    manifest = tradefloor.RunManifest.of(engine, seed=7, universe=UNIVERSE)
 
-    rebuilt = pretium.RunManifest.from_json(manifest.to_json()).reproduce()
+    rebuilt = tradefloor.RunManifest.from_json(manifest.to_json()).reproduce()
     assert rebuilt.prices() == engine.prices()
     assert manifest.result["days"] == 2
     assert manifest.macro is None and manifest.scenario is None
@@ -76,16 +76,16 @@ def test_a_minimal_run_needs_only_seed_universe_and_log():
 
 def test_the_manifest_carries_every_component_as_data():
     engine, macro, shock = full_run()
-    loaded = pretium.RunManifest.from_json(
+    loaded = tradefloor.RunManifest.from_json(
         manifest_of(engine, macro, shock,
-                    strategy=pretium.StrategySpec.momentum(),
+                    strategy=tradefloor.StrategySpec.momentum(),
                     universe_source={"constructor": "random", "n": 10,
                                      "seed": 3}).to_json())
 
     assert loaded.universe.fingerprint == UNIVERSE.fingerprint
     assert loaded.macro.vix == MACRO_KWARGS["vix"]
     assert loaded.scenario.to_json(3) == shock.to_json(3)
-    assert loaded.strategy == pretium.StrategySpec.momentum()
+    assert loaded.strategy == tradefloor.StrategySpec.momentum()
     assert loaded.universe_source == {"constructor": "random", "n": 10,
                                       "seed": 3}
     assert loaded.result["days"] == 3
@@ -100,9 +100,9 @@ def test_the_reader_is_told_when_the_market_is_not_the_same():
     engine, macro, shock = full_run()
     text = tampered(manifest_of(engine, macro, shock), lambda p: p["result"].
                     __setitem__("digest", "0" * 64))
-    with pytest.raises(pretium.ValidationError,
+    with pytest.raises(tradefloor.ValidationError,
                        match="did not rebuild the recorded market"):
-        pretium.RunManifest.from_json(text).reproduce()
+        tradefloor.RunManifest.from_json(text).reproduce()
 
 
 def test_the_market_digest_covers_state_not_only_prints():
@@ -118,7 +118,7 @@ def test_the_market_digest_covers_state_not_only_prints():
 def test_each_component_mismatch_is_named_not_generic():
     engine, macro, shock = full_run()
     manifest = manifest_of(engine, macro, shock,
-                           strategy=pretium.StrategySpec.momentum())
+                           strategy=tradefloor.StrategySpec.momentum())
 
     cases = [
         (lambda p: p["universe"]["instruments"][0].__setitem__("eps", 99.0),
@@ -132,8 +132,8 @@ def test_each_component_mismatch_is_named_not_generic():
             "top_k", 4), "strategy spec"),
     ]
     for mutate, culprit in cases:
-        with pytest.raises(pretium.ValidationError, match=culprit):
-            pretium.RunManifest.from_json(tampered(manifest, mutate))
+        with pytest.raises(tradefloor.ValidationError, match=culprit):
+            tradefloor.RunManifest.from_json(tampered(manifest, mutate))
 
 
 def test_a_fingerprint_without_its_spec_is_refused():
@@ -141,11 +141,11 @@ def test_a_fingerprint_without_its_spec_is_refused():
     # carried spec went missing must say that, not verify the hole.
     engine, macro, shock = full_run()
     manifest = manifest_of(engine, macro, shock,
-                           strategy=pretium.StrategySpec.momentum())
+                           strategy=tradefloor.StrategySpec.momentum())
     text = tampered(manifest, lambda p: p.__setitem__(
         "strategy", {"reference": "lost"}))
-    with pytest.raises(pretium.ValidationError, match="cannot reconstruct"):
-        pretium.RunManifest.from_json(text)
+    with pytest.raises(tradefloor.ValidationError, match="cannot reconstruct"):
+        tradefloor.RunManifest.from_json(text)
 
 
 # -- property 3: it refuses rather than misleads ---------------------------
@@ -160,9 +160,9 @@ def test_a_different_era_is_refused_before_anything_replays():
     text = tampered(manifest_of(engine, macro, shock),
                     lambda p: p["written_by"]["era"].__setitem__(
                         "digest", "0" * 64))
-    with pytest.raises(pretium.ValidationError,
+    with pytest.raises(tradefloor.ValidationError,
                        match="does not reproduce the manifest's era"):
-        pretium.RunManifest.from_json(text).reproduce()
+        tradefloor.RunManifest.from_json(text).reproduce()
 
 
 def test_a_moved_coefficient_is_named_by_key():
@@ -170,8 +170,8 @@ def test_a_moved_coefficient_is_named_by_key():
     text = tampered(manifest_of(engine, macro, shock),
                     lambda p: p["written_by"]["model"].__setitem__(
                         "momentum_theta", 0.30))
-    with pytest.raises(pretium.ValidationError, match="momentum_theta"):
-        pretium.RunManifest.from_json(text).reproduce()
+    with pytest.raises(tradefloor.ValidationError, match="momentum_theta"):
+        tradefloor.RunManifest.from_json(text).reproduce()
 
 
 def test_a_different_preset_name_is_refused():
@@ -183,9 +183,9 @@ def test_a_different_preset_name_is_refused():
     text = tampered(manifest_of(engine, macro, shock),
                     lambda p: p["written_by"]["model"].__setitem__(
                         "name", "custom-a41f9c02"))
-    with pytest.raises(pretium.ValidationError,
+    with pytest.raises(tradefloor.ValidationError,
                        match="model dictionary|model preset"):
-        pretium.RunManifest.from_json(text).reproduce()
+        tradefloor.RunManifest.from_json(text).reproduce()
 
 
 def test_a_run_under_a_shipped_non_default_preset_reproduces_under_it():
@@ -201,9 +201,9 @@ def test_a_run_under_a_shipped_non_default_preset_reproduces_under_it():
     asserted, because either alone would pass under the bug: the era gate
     must not refuse the run, and the market must come back bit-identical.
     """
-    macro = pretium.Macro(**MACRO_KWARGS)
+    macro = tradefloor.Macro(**MACRO_KWARGS)
     shock = Scenario.rate_shock(start=0.03, end=0.05, over=2)
-    engine = pretium.Engine(seed=42, universe=UNIVERSE, macro_state=macro,
+    engine = tradefloor.Engine(seed=42, universe=UNIVERSE, macro_state=macro,
                             model="pt-v2")
     for day in range(3):
         shock.apply(engine, day)
@@ -215,7 +215,7 @@ def test_a_run_under_a_shipped_non_default_preset_reproduces_under_it():
     text = manifest_of(engine, macro, shock).to_json()
     assert json.loads(text)["written_by"]["model"]["name"] == "pt-v2"
 
-    rebuilt = pretium.RunManifest.from_json(text).reproduce()
+    rebuilt = tradefloor.RunManifest.from_json(text).reproduce()
     assert rebuilt.model_fingerprint == "pt-v2"
     assert rebuilt.prices() == engine.prices()
 
@@ -235,8 +235,8 @@ def test_a_legacy_manifest_naming_a_different_preset_is_refused():
         fps["inputs"] = _sha(_canonical({"seed": p["seed"], **check}))
 
     text = tampered(manifest_of(engine, macro, shock), rewrite)
-    with pytest.raises(pretium.ValidationError, match="model preset"):
-        pretium.RunManifest.from_json(text).reproduce()
+    with pytest.raises(tradefloor.ValidationError, match="model preset"):
+        tradefloor.RunManifest.from_json(text).reproduce()
 
 
 def test_an_unknown_probe_version_refuses_to_conclude():
@@ -245,16 +245,16 @@ def test_an_unknown_probe_version_refuses_to_conclude():
     engine, macro, shock = full_run()
     text = tampered(manifest_of(engine, macro, shock),
                     lambda p: p["written_by"]["era"].__setitem__("probe", 99))
-    with pytest.raises(pretium.ValidationError, match="cannot be compared"):
-        pretium.RunManifest.from_json(text).reproduce()
+    with pytest.raises(tradefloor.ValidationError, match="cannot be compared"):
+        tradefloor.RunManifest.from_json(text).reproduce()
 
 
 def test_a_newer_manifest_schema_is_refused():
     engine, macro, shock = full_run()
     text = tampered(manifest_of(engine, macro, shock),
                     lambda p: p.__setitem__("schema", 99))
-    with pytest.raises(pretium.ValidationError, match="newer"):
-        pretium.RunManifest.from_json(text)
+    with pytest.raises(tradefloor.ValidationError, match="newer"):
+        tradefloor.RunManifest.from_json(text)
 
 
 def test_the_era_fingerprint_is_stable_within_a_build():
@@ -272,7 +272,7 @@ def test_a_hand_written_agent_is_honestly_incomplete():
     engine, macro, shock = full_run()
     manifest = manifest_of(engine, macro, shock,
                            strategy="github.com/example/strat at 58837b3")
-    loaded = pretium.RunManifest.from_json(manifest.to_json())
+    loaded = tradefloor.RunManifest.from_json(manifest.to_json())
 
     assert not loaded.complete
     assert any("58837b3" in gap for gap in loaded.gaps)
@@ -285,8 +285,8 @@ def test_a_hand_written_agent_is_honestly_incomplete():
 
 def test_a_carried_spec_makes_the_manifest_complete():
     engine, macro, shock = full_run()
-    spec = pretium.StrategySpec.momentum(top_k=3)
-    loaded = pretium.RunManifest.from_json(
+    spec = tradefloor.StrategySpec.momentum(top_k=3)
+    loaded = tradefloor.RunManifest.from_json(
         manifest_of(engine, macro, shock, strategy=spec).to_json())
     assert loaded.complete and loaded.gaps == []
     assert loaded.fingerprints["strategy"] == spec.fingerprint
@@ -297,16 +297,16 @@ def test_an_agent_object_is_refused_with_directions():
     # Accepting an object would embed a repr while implying it embedded a
     # strategy. The refusal tells the author what to pass instead.
     engine, macro, shock = full_run()
-    with pytest.raises(pretium.ValidationError, match="repo and\\s+commit"):
+    with pytest.raises(tradefloor.ValidationError, match="repo and\\s+commit"):
         manifest_of(engine, macro, shock,
-                    strategy=pretium.baselines.Momentum())
-    with pytest.raises(pretium.ValidationError, match="nothing"):
+                    strategy=tradefloor.baselines.Momentum())
+    with pytest.raises(tradefloor.ValidationError, match="nothing"):
         manifest_of(engine, macro, shock, strategy="   ")
 
 
 def test_universe_source_must_travel_as_data():
     engine, macro, shock = full_run()
-    with pytest.raises(pretium.ValidationError, match="JSON-serialisable"):
+    with pytest.raises(tradefloor.ValidationError, match="JSON-serialisable"):
         manifest_of(engine, macro, shock, universe_source=object())
 
 
@@ -325,8 +325,8 @@ def test_a_restored_scenario_replays_the_same_market():
     shock = Scenario.vix_shock(calm=15.0, peak=45.0, at=1, over=1)
     restored = Scenario.from_json(shock.to_json(3))
     kwargs = dict(seed=11, universe=UNIVERSE, days=3, ticks_per_day=78)
-    assert (pretium.run_scenario(restored, **kwargs).prices()
-            == pretium.run_scenario(shock, **kwargs).prices())
+    assert (tradefloor.run_scenario(restored, **kwargs).prices()
+            == tradefloor.run_scenario(shock, **kwargs).prices())
 
 
 def test_a_restored_scenario_holds_its_final_values_beyond_the_horizon():
@@ -354,5 +354,5 @@ def test_an_inconsistent_scenario_document_is_refused():
     ]:
         broken = json.loads(json.dumps(payload))
         mutate(broken)
-        with pytest.raises(pretium.ValidationError, match=why):
+        with pytest.raises(tradefloor.ValidationError, match=why):
             Scenario.from_json(json.dumps(broken))

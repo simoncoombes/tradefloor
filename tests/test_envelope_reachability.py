@@ -1,6 +1,6 @@
 """Every gap must be reachable through `check`, not only through prose.
 
-`pretium.envelope` exists so that a user does not have to remember a
+`tradefloor.envelope` exists so that a user does not have to remember a
 documentation page to find out whether their question is one this simulator
 can answer. A gap that appears in `GAPS` and in `certified()` but that no
 argument to `check()` can ever surface defeats that: the programmatic
@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import pytest
 
-from pretium import envelope as env
+from tradefloor import envelope as env
 
 #: How a caller reaches each gap. Every entry is a kwargs dict for `check`
 #: that MUST surface that gap, so adding a gap means adding the route to it.

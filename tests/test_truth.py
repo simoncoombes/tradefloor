@@ -14,7 +14,7 @@ import pytest
 
 pa = pytest.importorskip("pyarrow")
 
-import pretium
+import tradefloor
 
 
 def _f64(buf):
@@ -41,8 +41,8 @@ LEVELS = ["mispricing_s", "fundamental_value", "anchor_price"]
 
 
 def run(n=6, seed=5, days=2, model=None):
-    universe = pretium.Universe.random(n, seed=2)
-    engine = pretium.Engine(seed=seed, universe=universe, model=model)
+    universe = tradefloor.Universe.random(n, seed=2)
+    engine = tradefloor.Engine(seed=seed, universe=universe, model=model)
     engine.run_days(days, record=True)
     return engine, pa.table(engine.truth()).to_pydict(), n
 
@@ -79,24 +79,24 @@ def test_the_components_sum_to_the_change_in_mispricing():
 def test_the_reconstruction_still_holds_with_news_and_order_flow():
     # The two columns a quiet run leaves at zero. A decomposition that only
     # balanced when nothing happened would be worthless.
-    universe = pretium.Universe.random(6, seed=2)
-    engine = pretium.Engine(seed=5, universe=universe)
+    universe = tradefloor.Universe.random(6, seed=2)
+    engine = tradefloor.Engine(seed=5, universe=universe)
     engine.open_market()
     ticker = engine.tickers[0]
     engine.run_session(9, 30, 3, 60,
-                       news=[pretium.News(ticker=ticker, price_impact=0.08)],
+                       news=[tradefloor.News(ticker=ticker, price_impact=0.08)],
                        order_flow={ticker: (900_000.0, 0.0)})
     table = pa.table(engine.truth()).to_pydict()
     assert max(residuals(table, 6)) < 1e-15
 
 
 def test_news_and_flow_land_on_the_traded_name_and_nowhere_else():
-    universe = pretium.Universe.random(6, seed=2)
-    engine = pretium.Engine(seed=5, universe=universe)
+    universe = tradefloor.Universe.random(6, seed=2)
+    engine = tradefloor.Engine(seed=5, universe=universe)
     engine.open_market()
     ticker = engine.tickers[0]
     engine.run_session(9, 30, 3, 60,
-                       news=[pretium.News(ticker=ticker, price_impact=0.08)],
+                       news=[tradefloor.News(ticker=ticker, price_impact=0.08)],
                        order_flow={ticker: (900_000.0, 0.0)})
     table = pa.table(engine.truth()).to_pydict()
     ids = table["instrument_id"]
@@ -116,7 +116,7 @@ def test_a_quiet_run_leaves_the_shock_columns_at_zero():
     # news argument WAS a quiet market; pt-v11 added endogenous news and
     # pt-v12 ships it on, so a default run now has company_news in it by
     # design. Turning the mechanism off is what this test means by quiet.
-    quiet_model = pretium.ModelParams.from_preset(
+    quiet_model = tradefloor.ModelParams.from_preset(
         endogenous_news_intensity=0.0, endogenous_news_sigma=0.0)
     _, table, _ = run(model=quiet_model)
     assert all(x == 0.0 for x in table["company_news"])
@@ -180,8 +180,8 @@ def test_every_numeric_column_is_f64():
 
 
 def test_truth_streams_one_batch_per_day():
-    universe = pretium.Universe.random(4, seed=2)
-    engine = pretium.Engine(seed=1, universe=universe)
+    universe = tradefloor.Universe.random(4, seed=2)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     engine.run_days(3, record=True)
     assert engine.truth().num_batches == 3
 
@@ -217,9 +217,9 @@ def test_recording_the_decomposition_does_not_change_the_market():
     sys.path.insert(0, str(here))
     import known_answer
 
-    quiet = pretium.Engine(seed=7, universe=pretium.Universe.random(5, seed=1))
+    quiet = tradefloor.Engine(seed=7, universe=tradefloor.Universe.random(5, seed=1))
     quiet.run_days(2)
-    watched = pretium.Engine(seed=7, universe=pretium.Universe.random(5, seed=1))
+    watched = tradefloor.Engine(seed=7, universe=tradefloor.Universe.random(5, seed=1))
     watched.run_days(2, record=True)
     watched.truth()
     assert quiet.prices() == watched.prices()
@@ -251,15 +251,15 @@ def test_the_day_attribution_is_the_truth_column_summed_over_the_day():
     """
     import struct
 
-    universe = pretium.Universe.random(6, seed=4)
-    engine = pretium.Engine(seed=11, universe=universe)
+    universe = tradefloor.Universe.random(6, seed=4)
+    engine = tradefloor.Engine(seed=11, universe=universe)
     engine.open_market()
     engine.run_session(9, 30, 3, 90)
     engine.record(0)
     table = pa.table(engine.truth()).to_pydict()
 
     ids = table["instrument_id"]
-    for factor in pretium.Engine.FACTORS:
+    for factor in tradefloor.Engine.FACTORS:
         day_total = struct.unpack(
             "<%dd" % len(universe), engine.attribution(factor)
         )
@@ -271,9 +271,9 @@ def test_the_day_attribution_is_the_truth_column_summed_over_the_day():
 def test_the_dominant_factor_is_the_one_that_actually_moved_the_price():
     # A quiet session with no news and no order flow IS noise, and the scorer
     # must say so. The old raw ranking named company_news here.
-    from pretium.harness import _dominant_factor
+    from tradefloor.harness import _dominant_factor
 
-    engine = pretium.Engine(seed=11, universe=pretium.Universe.random(6, seed=4))
+    engine = tradefloor.Engine(seed=11, universe=tradefloor.Universe.random(6, seed=4))
     engine.open_market()
     engine.run_session(9, 30, 3, 90)
     assert _dominant_factor(engine) == "random_noise"
@@ -298,8 +298,8 @@ def test_attribution_covers_the_whole_day_not_the_last_step():
     exactly zero at the close. The agent's own impact was erased from the
     ground truth that scores it.
     """
-    universe = pretium.Universe.random(6, seed=5)
-    engine = pretium.Engine(seed=3, universe=universe)
+    universe = tradefloor.Universe.random(6, seed=5)
+    engine = tradefloor.Engine(seed=3, universe=universe)
     ticker = universe[0].ticker
     engine.open_market()
     for step in range(6):
@@ -328,8 +328,8 @@ def test_attribution_equals_the_tape_for_every_factor():
     pa = pytest.importorskip("pyarrow")
     pc = pytest.importorskip("pyarrow.compute")
 
-    universe = pretium.Universe.random(4, seed=5)
-    engine = pretium.Engine(seed=1, universe=universe)
+    universe = tradefloor.Universe.random(4, seed=5)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     engine.open_market()
     for step in range(4):
         hour, minute = divmod(9 * 60 + 30 + step * 60, 60)
@@ -340,7 +340,7 @@ def test_attribution_equals_the_tape_for_every_factor():
     truth = pa.table(engine.truth())
     rows = truth.filter(pc.equal(truth.column("instrument_id"), 0))
     checked = 0
-    for factor in pretium.Engine.FACTORS:
+    for factor in tradefloor.Engine.FACTORS:
         if factor not in truth.column_names:
             continue
         recorded = _f64(engine.attribution(factor))[0]
@@ -353,21 +353,21 @@ def test_attribution_equals_the_tape_for_every_factor():
     assert checked == 9, f"only {checked} factors compared"
     # And at least one of them must be non-zero, or this compared zeros.
     assert any(_f64(engine.attribution(f))[0] != 0.0
-               for f in pretium.Engine.FACTORS if f in truth.column_names)
+               for f in tradefloor.Engine.FACTORS if f in truth.column_names)
 
 
 def test_a_single_session_day_is_unaffected():
     """The parity guarantee. One session per day is what the reference does,
     and opening once versus opening twice with no ticks between is the same
     state -- so no golden vector moves. Asserted rather than reasoned."""
-    universe = pretium.Universe.random(4, seed=5)
+    universe = tradefloor.Universe.random(4, seed=5)
 
-    explicit = pretium.Engine(seed=1, universe=universe)
+    explicit = tradefloor.Engine(seed=1, universe=universe)
     explicit.open_market()
     explicit.run_session(9, 30, 3, 120)
     explicit.close_market()
 
-    implicit = pretium.Engine(seed=1, universe=universe)
+    implicit = tradefloor.Engine(seed=1, universe=universe)
     implicit.run_session(9, 30, 3, 120)
     implicit.close_market()
 

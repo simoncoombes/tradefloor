@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+**Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
+give each agent its own copy of the market, which is what makes the
+comparison clean. The next step is one book with several agents in it,
+competing for the same liquidity and scored under identical conditions.
+Not shipped, and the realism envelope does not cover it: certification was
+measured on a single agent.
+
+## 0.5.0
+
+**The library is now `tradefloor`** — formerly `pretium`, which published
+through 0.4.3 and stays on PyPI and crates.io forever, because published
+results cite those versions and reproducibility is the point. Install
+`tradefloor`, `import tradefloor`, crate `tradefloor`, MCP server
+`tradefloor-mcp`. Docs move to https://tradefloor.dev. The rename changes
+no behaviour: this release reproduces the same known-answer digest as
+0.4.3 on every platform, which the release gate proves before publishing.
+Preset names (`pt-v1` … `pt-v15`) are citation identifiers and are frozen
+under the old prefix, as are the run-manifest `pretium_version` key and
+the known-answer `kind`, which describe documents written under them.
+
 **pt-v15 registered: the slow-variance mixture, the credit floor, and
 sector dispersion.** pt-v14 plus six numbers: the two-timescale variance mixture the model has
 carried inert since the pt-v4 era (slow weight 0.35, persistence 0.98,
@@ -19,12 +39,8 @@ five-override base, co-movement goes 12/13 to 13/13 and the range falls
 first preset measured to hold both crisis instruments on all thirteen.
 Selectable by name; not the default, which remains pt-v14.
 
-**Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
-give each agent its own copy of the market, which is what makes the
-comparison clean. The next step is one book with several agents in it,
-competing for the same liquidity and scored under identical conditions.
-Not shipped, and the realism envelope does not cover it: certification was
-measured on a single agent.
+<!-- release-note-ends -->
+
 
 ## 0.4.3
 

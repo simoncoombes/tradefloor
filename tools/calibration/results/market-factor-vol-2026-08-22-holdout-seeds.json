@@ -1,7 +1,7 @@
 {
  "method": {
   "days": 252,
-  "panel": "pretium.facts.measure, per seed",
+  "panel": "tradefloor.facts.measure, per seed",
   "pin_days": 60,
   "pin_vix": [
    15.0

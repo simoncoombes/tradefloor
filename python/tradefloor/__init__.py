@@ -1,6 +1,6 @@
-"""pretium: a deterministic market simulator with a real limit order book.
+"""tradefloor: a deterministic market simulator with a real limit order book.
 
-The compiled engine lives in ``pretium._core``. This package re-exports it and
+The compiled engine lives in ``tradefloor._core``. This package re-exports it and
 adds the parts that are better written in Python than in Rust: JSON
 round-trips, and process-level parallelism for seed sweeps. Forcing those into
 the extension would mean hand-rolling JSON escaping and reimplementing a
@@ -154,7 +154,7 @@ class Universe(list):
     def from_edgar(cls, snapshot, **kwargs: Any) -> "Universe":
         """Build a universe from an EDGAR snapshot. Pure and reproducible.
 
-        Takes a :class:`pretium.edgar.Snapshot` or a path to a saved one.
+        Takes a :class:`tradefloor.edgar.Snapshot` or a path to a saved one.
         Extra keyword arguments are the macro conditions the fair values are
         computed under, and they must match the macro the engine then runs --
         otherwise every company starts mispriced by the difference, which is a
@@ -221,13 +221,13 @@ class Universe(list):
         """
         payload = json.loads(text)
         if not isinstance(payload, dict) or "instruments" not in payload:
-            raise ValidationError("not a pretium universe document")
+            raise ValidationError("not a tradefloor universe document")
 
         schema = payload.get("schema", 0)
         if schema > _UNIVERSE_SCHEMA:
             raise ValidationError(
                 f"universe schema {schema} is newer than this version "
-                f"understands ({_UNIVERSE_SCHEMA}). Upgrade pretium rather "
+                f"understands ({_UNIVERSE_SCHEMA}). Upgrade tradefloor rather "
                 "than reading it partially."
             )
 
@@ -390,7 +390,7 @@ def run_many(
     draw count and tickers).
 
     ``model`` selects the coefficient set, either a preset name or a
-    :class:`pretium.ModelParams`, and every seed runs it, because a sweep
+    :class:`tradefloor.ModelParams`, and every seed runs it, because a sweep
     is many draws of ONE market and members under different models would be
     a model comparison presented as a seed distribution. The ``summary``
     and ``attribution`` rows record ``model_fingerprint``.
@@ -485,13 +485,13 @@ class FlowImpact:
     Named for what it measures rather than for the category it belongs to.
     It was called `Counterfactual`, which claimed the general concept while
     doing one narrow part of it -- and the library now has three
-    counterfactuals (this, :func:`pretium.tca.analyse`, and
-    :func:`pretium.scenario.compare`), so the general name pointed at the
+    counterfactuals (this, :func:`tradefloor.tca.analyse`, and
+    :func:`tradefloor.scenario.compare`), so the general name pointed at the
     least general tool.
 
     .. note::
 
-       For **what your trading cost you**, use :func:`pretium.tca.analyse`.
+       For **what your trading cost you**, use :func:`tradefloor.tca.analyse`.
        It runs an agent that actually executes against the book and prices
        every fill against the untraded world.
 
@@ -593,7 +593,7 @@ class FlowImpact:
         shares against the first name of ``Universe.random(20, seed=7)``
         run for ten days leaks nothing at sim seeds 2026 and 7 and moves
         one untouched name +22.8 bps at sim seed 11. Pin VIX in both
-        worlds to restore byte-exactness; ``pretium.tca``'s ``moved()``
+        worlds to restore byte-exactness; ``tradefloor.tca``'s ``moved()``
         docstring carries the full measurement of the channel.
 
         So on a one-day run impact is exactly attributable to the names
@@ -634,7 +634,7 @@ def flow_impact(
 
     The two runs are otherwise identical by construction: same seed, same
     universe, same macro, same session, and the same ``model``, either a preset
-    name or a :class:`pretium.ModelParams`, applied to BOTH worlds, since a
+    name or a :class:`tradefloor.ModelParams`, applied to BOTH worlds, since a
     difference against a baseline under other coefficients would measure
     the model rather than the flow. The ONLY difference is the flow, which
     is what makes the subtraction meaningful. Anything else that differed

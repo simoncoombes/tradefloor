@@ -190,7 +190,7 @@
    102,
    103
   ],
-  "seed_sd_source": "pretium.facts.SEED_SD (shipped)",
+  "seed_sd_source": "tradefloor.facts.SEED_SD (shipped)",
   "universe": "Universe.random(40, seed=111)",
   "workers": 8
  },

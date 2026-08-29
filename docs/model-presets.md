@@ -21,7 +21,7 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v1")   # an earlier era, still ex
 The reason is comparability. `(package version, model="pt-v12", universe
 fingerprint, seed)` is a complete, minimal, citable specification of a
 market. If every user ran a bespoke coefficient set, no two published
-results would be comparable, and "tested on the pretium simulator" would
+results would be comparable, and "tested on the tradefloor simulator" would
 mean nothing.
 
 ## Which preset to use
@@ -81,7 +81,7 @@ The default moved from `pt-v12` to `pt-v14` on 2026-08-28. Re-certifying
 moves every published number at once, which is why it happens rarely and
 why the old default stays selectable by name. The per-preset record of
 what moved and what it measured is in the
-[changelog](https://github.com/simoncoombes/pretium/blob/main/CHANGELOG.md)
+[changelog](https://github.com/simoncoombes/tradefloor/blob/main/CHANGELOG.md)
 and the calibration record it cites.
 
 ## Changing the model

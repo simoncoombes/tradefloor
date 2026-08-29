@@ -41,7 +41,7 @@ while another drifted:
 import hashlib
 import struct
 
-import pretium
+import tradefloor
 
 # Bumped only when the simulation itself changes. A digest change WITHOUT a
 # version bump means a platform disagreed, which is the thing this exists to
@@ -105,7 +105,7 @@ import pretium
 # era decision that closed design finding 6's open question -- the v7
 # process was built with the coupling measured and deliberately OFF,
 # because flipping it silently would have falsified the tested claims
-# in pretium.scenario and docs/scenarios.md that VIX does not drive
+# in tradefloor.scenario and docs/scenarios.md that VIX does not drive
 # volatility; those claims were rewritten in the change that flipped
 # it. Endogenously the coupled panel is statistically indistinguishable
 # from v7's (correlation 0.257 vs 0.260, kurtosis 3.11 vs 3.14); under
@@ -180,7 +180,7 @@ def simulation_buffer() -> bytes:
     # Interleaved on purpose: the Box-Muller spare means the parity of normal
     # draws is generator state, so an implementation that produced correct
     # normals but accounted for them differently would still diverge here.
-    rng = pretium.GameRng(SEED, 99)
+    rng = tradefloor.GameRng(SEED, 99)
     for i in range(64):
         _f64(buf, rng.next_float())
         _f64(buf, rng.next_normal())
@@ -189,7 +189,7 @@ def simulation_buffer() -> bytes:
             _f64(buf, 1.0 if rng.next_bool(0.5) else 0.0)
 
     # --- 2. Fair value across every sector, both valuation paths ---------
-    sectors = pretium.sectors()
+    sectors = tradefloor.sectors()
     assert len(sectors) == 12, "sector table changed; KAT_VERSION must bump"
 
     instruments = []
@@ -206,7 +206,7 @@ def simulation_buffer() -> bytes:
         }
         instruments.append(instrument)
 
-        value = pretium.fair_value(
+        value = tradefloor.fair_value(
             eps=instrument["eps"],
             sector=sector,
             revenue_growth=instrument["revenue_growth"],
@@ -228,20 +228,20 @@ def simulation_buffer() -> bytes:
     # 250 days x 12 instruments. Long enough that a single-ULP disagreement
     # compounds into something visible rather than being lost in rounding.
     for instrument in instruments:
-        state = pretium.MispricingState(0.0)
+        state = tradefloor.MispricingState(0.0)
         for day in range(DAYS):
             innovation = rng.next_normal() * 0.012
             shock = 0.02 if day % 61 == 60 else 0.0
-            state = pretium.step_mispricing_daily(
+            state = tradefloor.step_mispricing_daily(
                 state, innovation=innovation, shock=shock
             )
             if day % 25 == 0:
                 _f64(buf, state.s)
                 _f64(buf, state.s_prev)
-                _f64(buf, pretium.apply_mispricing(instrument["fair_value"], state.s))
+                _f64(buf, tradefloor.apply_mispricing(instrument["fair_value"], state.s))
 
     # --- 4. The order book ------------------------------------------------
-    book = pretium.OrderBook("KAT", 100.0)
+    book = tradefloor.OrderBook("KAT", 100.0)
     for level in range(16):
         book.post_limit("sell", 100.0 + level * 0.25, 500 + level * 10, owner="mm")
         book.post_limit("buy", 99.75 - level * 0.25, 500 + level * 10, owner="mm")
@@ -285,9 +285,9 @@ def simulation_buffer() -> bytes:
     # exercises one module at a time; this runs the coupled system, where the
     # shared factor structure, the order book and the macro state all feed each
     # other. A disagreement that cancelled out in isolation shows up here.
-    sector_names = pretium.sectors()
+    sector_names = tradefloor.sectors()
     instruments = [
-        pretium.Instrument(
+        tradefloor.Instrument(
             f"KAT{i}",
             sector_names[i % 12],
             initial_price=20.0 + i * 7.5,
@@ -301,10 +301,10 @@ def simulation_buffer() -> bytes:
         for i in range(12)
     ]
 
-    engine = pretium.Engine(
+    engine = tradefloor.Engine(
         seed=SEED,
         universe=instruments,
-        macro_state=pretium.Macro(
+        macro_state=tradefloor.Macro(
             vix=19.5, federal_funds_rate=0.0425, corporate_bond_yield=0.0610,
             inflation_rate=0.031, qe_pe_boost=0.0, fear_greed_index=38.0,
             cycle="contraction",
@@ -368,7 +368,7 @@ def metadata_buffer() -> bytes:
     Sorted by key so the digest cannot depend on dict ordering.
     """
     buf = bytearray()
-    preset = pretium.model_preset()
+    preset = tradefloor.model_preset()
     for key in sorted(k for k in preset if k != "name"):
         _f64(buf, float(preset[key]))
     return bytes(buf)
@@ -396,7 +396,7 @@ def known_answer_digest() -> str:
 if __name__ == "__main__":
     data = known_answer_buffer()
     print(f"pretium known-answer test v{KAT_VERSION}")
-    print(f"  package  {pretium.version()}")
+    print(f"  package  {tradefloor.version()}")
     print(f"  bytes    {len(data)}")
     print(f"  sha256   {known_answer_digest()}")
     print(f"  sim      {simulation_digest()}")

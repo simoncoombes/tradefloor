@@ -24,10 +24,10 @@ import struct
 
 import pytest
 
-import pretium
-from pretium.baselines import BuyAndHold, reference_agents
+import tradefloor
+from tradefloor.baselines import BuyAndHold, reference_agents
 
-UNIVERSE = pretium.Universe.random(20, seed=7)
+UNIVERSE = tradefloor.Universe.random(20, seed=7)
 
 
 def column(engine, field):
@@ -48,7 +48,7 @@ def test_untouched_moved_can_be_non_empty():
     but a method returning an unconditional empty list would satisfy every
     test that uses it. Constructed here from two worlds that genuinely differ.
     """
-    from pretium.tca import Execution
+    from tradefloor.tca import Execution
 
     execution = Execution(
         tickers=["AAA", "BBB"], fills=[],
@@ -63,7 +63,7 @@ def test_a_real_counterfactual_moves_the_traded_name():
     # The positive counterpart to "nothing else moved". If the flow were
     # silently dropped, nothing at all would move, and the no-leak assertion
     # would pass while comparing two identical worlds.
-    cf = pretium.flow_impact(
+    cf = tradefloor.flow_impact(
         seed=42, universe=UNIVERSE,
         order_flow={UNIVERSE[0].ticker: (6e6, 0.0)}, ticks=390,
     )
@@ -78,7 +78,7 @@ def test_a_real_counterfactual_moves_the_traded_name():
 
 def test_every_reference_agent_actually_trades():
     # `errors == []` is satisfied by an agent that never acted.
-    scores = pretium.evaluate(reference_agents(seed=3), seed=2026,
+    scores = tradefloor.evaluate(reference_agents(seed=3), seed=2026,
                               universe=UNIVERSE, days=5)
     for name, card in scores.items():
         assert card.errors == [], (name, card.errors)
@@ -93,7 +93,7 @@ def test_an_agent_that_does_nothing_is_visibly_different():
         def act(self, obs):
             return {}
 
-    scores = pretium.evaluate({"idle": Idle(), "active": BuyAndHold()},
+    scores = tradefloor.evaluate({"idle": Idle(), "active": BuyAndHold()},
                               seed=2026, universe=UNIVERSE, days=5)
     assert scores["idle"].trades == 0
     assert scores["active"].trades > 0
@@ -130,21 +130,21 @@ def test_every_truth_component_can_be_non_zero():
     # Neither was a dead column; the test was too short. Worth the comment
     # because "this component is always zero" and "you did not run long enough
     # to see it" look identical from one day of data.
-    universe = pretium.Universe.random(40, seed=5)
-    engine = pretium.Engine(seed=3, universe=universe)
+    universe = tradefloor.Universe.random(40, seed=5)
+    engine = tradefloor.Engine(seed=3, universe=universe)
     ticker = engine.tickers[0]
     for day in range(2):
         engine.open_market()
         engine.run_session(
             9, 30, 3, 390,
-            news=[pretium.News(ticker=ticker, price_impact=0.06)] if day == 0 else None,
+            news=[tradefloor.News(ticker=ticker, price_impact=0.06)] if day == 0 else None,
             order_flow={ticker: (800_000.0, 0.0)},
         )
         engine.close_market()
         engine.record(day)
 
     table = pa.table(engine.truth()).to_pydict()
-    dead = [name for name in pretium.Engine.FACTORS
+    dead = [name for name in tradefloor.Engine.FACTORS
             if name != "circuit_breaker" and all(v == 0.0 for v in table[name])]
     assert dead == [], dead
     # And momentum specifically is zero on day one and non-zero on day two,
@@ -170,12 +170,12 @@ def test_the_circuit_breaker_component_fires_when_the_breaker_binds():
     """
     pa = pytest.importorskip("pyarrow")
 
-    universe = pretium.Universe.random(20, seed=5)
-    scenario = (pretium.Scenario()
+    universe = tradefloor.Universe.random(20, seed=5)
+    scenario = (tradefloor.Scenario()
                 .hold(vix=15.0, corporate_bond_yield=0.055)
                 .ramp("vix", start=65.0, end=15.0, over=20, begin=5)
                 .step("qe_pe_boost", before=0.0, after=-0.30, at=5))
-    engine = pretium.Engine(seed=2024, universe=universe)
+    engine = tradefloor.Engine(seed=2024, universe=universe)
     for day in range(25):
         scenario.apply(engine, day)
         engine.run_days(1, first_day=day, record=True)
@@ -186,7 +186,7 @@ def test_the_circuit_breaker_component_fires_when_the_breaker_binds():
 
     # And with it recorded, the columns reconstruct the move exactly.
     rows = list(zip(table["instrument_id"], table["mispricing_s"],
-                    *(table[c] for c in pretium.Engine.FACTORS)))
+                    *(table[c] for c in tradefloor.Engine.FACTORS)))
     first = [r for r in rows if r[0] == 0]
     delta = first[-1][1] - first[0][1]
     total = sum(sum(r[2:]) for r in first[1:])
@@ -198,8 +198,8 @@ def test_the_circuit_breaker_component_fires_when_the_breaker_binds():
 def test_every_column_can_differ_between_two_markets():
     # A column returning a constant would satisfy any equality test comparing
     # two runs of the same seed. Two different seeds must differ.
-    a = pretium.Engine(seed=5, universe=UNIVERSE)
-    b = pretium.Engine(seed=6, universe=UNIVERSE)
+    a = tradefloor.Engine(seed=5, universe=UNIVERSE)
+    b = tradefloor.Engine(seed=6, universe=UNIVERSE)
     a.run_days(2, record=False)
     b.run_days(2, record=False)
 
@@ -229,8 +229,8 @@ def test_the_known_answer_digest_responds_to_the_market():
     assert len(known_answer.known_answer_digest()) == 64
     assert len(known_answer.known_answer_buffer()) > 1000
 
-    one = pretium.Engine(seed=1, universe=UNIVERSE)
-    two = pretium.Engine(seed=2, universe=UNIVERSE)
+    one = tradefloor.Engine(seed=1, universe=UNIVERSE)
+    two = tradefloor.Engine(seed=2, universe=UNIVERSE)
     one.run_days(1, record=False)
     two.run_days(1, record=False)
     assert one.prices() != two.prices()
@@ -241,15 +241,15 @@ def test_replay_can_fail():
     # it was handed, or if both were empty. A different seed must not match.
     import json
 
-    engine = pretium.Engine(seed=42, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=42, universe=UNIVERSE)
     engine.open_market()
     engine.run_session(9, 30, 3, 60)
     engine.close_market()
 
     log = json.loads(json.dumps(engine.order_log))
     assert log, "an empty log would replay anything"
-    assert pretium.replay(log, seed=42, universe=UNIVERSE).prices() == engine.prices()
-    assert pretium.replay(log, seed=43, universe=UNIVERSE).prices() != engine.prices()
+    assert tradefloor.replay(log, seed=42, universe=UNIVERSE).prices() == engine.prices()
+    assert tradefloor.replay(log, seed=43, universe=UNIVERSE).prices() != engine.prices()
 
 
 # --------------------------------------------------------------------------
@@ -286,9 +286,9 @@ def test_shortfall_can_be_both_signs():
 
     positive = negative = 0
     for seed in (2026, 1, 2, 3, 4, 5, 7, 11):
-        held = pretium.tca.analyse(Buyer(), seed=seed, universe=UNIVERSE,
+        held = tradefloor.tca.analyse(Buyer(), seed=seed, universe=UNIVERSE,
                                    days=1, steps_per_day=6)
-        traded = pretium.tca.analyse(RoundTrip(), seed=seed, universe=UNIVERSE,
+        traded = tradefloor.tca.analyse(RoundTrip(), seed=seed, universe=UNIVERSE,
                                      days=1, steps_per_day=6)
         # A one-way buyer always pays: they moved the price and never sold
         # into it. That direction is structural, so it is asserted per seed.
@@ -309,8 +309,8 @@ def test_the_stylised_facts_are_not_all_within_range():
     # If every statistic matched, `compare_to_real_markets` would be doing no
     # work and the module's honesty would be untested. Two are known
     # mismatches; that must stay visible.
-    facts = pretium.facts.measure(
-        seed=3, universe=pretium.Universe.random(40, seed=111), days=120)
-    verdicts = pretium.facts.compare_to_real_markets(facts)
+    facts = tradefloor.facts.measure(
+        seed=3, universe=tradefloor.Universe.random(40, seed=111), days=120)
+    verdicts = tradefloor.facts.compare_to_real_markets(facts)
     assert any(not v["matches"] for v in verdicts.values())
     assert any(v["matches"] for v in verdicts.values())

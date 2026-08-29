@@ -186,7 +186,7 @@ pub const MARKET_VOL_FLOOR_MULTIPLE: f64 = 0.05;
 /// saturation arithmetic so a recalibration that moves the anchor or the
 /// ceiling revisits this argument deliberately.
 ///
-/// The flip landed together with what it falsified: `pretium.scenario`'s
+/// The flip landed together with what it falsified: `tradefloor.scenario`'s
 /// "What a VIX path actually moves" and `docs/scenarios.md`'s "VIX does
 /// not drive volatility" were rewritten in the same change, their tests
 /// re-grounded, and the KAT bumped — a constant that silently inverted

@@ -30,23 +30,23 @@ import re
 import subprocess
 
 
-REPO_URL = "https://github.com/simoncoombes/pretium"
+REPO_URL = "https://github.com/simoncoombes/tradefloor"
 AUTHOR = {"@type": "Person", "name": "Simon Coombes",
           "url": "https://github.com/simoncoombes"}
-SAME_AS = [REPO_URL, "https://pypi.org/project/pretium/", "https://crates.io/crates/pretium"]
+SAME_AS = [REPO_URL, "https://pypi.org/project/tradefloor/", "https://crates.io/crates/tradefloor"]
 
 
 def software_node(version: str) -> dict:
     """The package itself, described once and referred to from every page.
 
     Without it the PyPI package, the crate, the repository and this site are
-    four unrelated things to a search engine rather than one - and "pretium"
+    four unrelated things to a search engine rather than one - and "tradefloor"
     is Latin for price, which is a crowded name to have no disambiguation.
     """
     return {
         "@type": "SoftwareApplication",
-        "name": "pretium",
-        "alternateName": "pretium market simulator",
+        "name": "tradefloor",
+        "alternateName": "tradefloor market simulator",
         "applicationCategory": "DeveloperApplication",
         "applicationSubCategory": "Market simulation",
         "operatingSystem": "Linux, macOS, Windows",
@@ -70,7 +70,7 @@ def article_node(page, base_url, version, description, published, modified) -> d
         "url": canonical(base_url, page['slug']),
         "inLanguage": "en",
         "author": AUTHOR,
-        "isPartOf": {"@type": "WebSite", "name": "pretium documentation",
+        "isPartOf": {"@type": "WebSite", "name": "tradefloor documentation",
                      "url": f"{base_url}/"},
         "about": software_node(version),
     }
@@ -93,7 +93,7 @@ def breadcrumb_node(page, base_url) -> dict | None:
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
         "itemListElement": [
-            {"@type": "ListItem", "position": 1, "name": "pretium",
+            {"@type": "ListItem", "position": 1, "name": "tradefloor",
              "item": f"{base_url}/index.html"},
             {"@type": "ListItem", "position": 2, "name": page["door"]},
             {"@type": "ListItem", "position": 3, "name": page["name"],
@@ -107,7 +107,7 @@ def website_node(base_url: str) -> dict:
     return {
         "@context": "https://schema.org",
         "@type": "WebSite",
-        "name": "pretium documentation",
+        "name": "tradefloor documentation",
         "url": f"{base_url}/",
         "inLanguage": "en",
         "publisher": AUTHOR,
@@ -143,10 +143,10 @@ def dataset_node(envelope: dict, base_url: str) -> dict:
     return {
         "@context": "https://schema.org",
         "@type": "Dataset",
-        "name": "pretium realism envelope",
-        "alternateName": f"pretium {envelope['preset']} realism measurement",
+        "name": "tradefloor realism envelope",
+        "alternateName": f"tradefloor {envelope['preset']} realism measurement",
         "description": (
-            f"The {len(measured)} statistics pretium's default preset "
+            f"The {len(measured)} statistics tradefloor's default preset "
             f"{envelope['preset']} is measured on, each with the real-market "
             f"band it was scored against, a certified horizon of "
             f"{envelope['certified_horizon_days']} trading days, and the named "
@@ -199,9 +199,9 @@ def glossary_node(terms, base_url: str) -> dict | None:
     return {
         "@context": "https://schema.org",
         "@type": "DefinedTermSet",
-        "name": "pretium glossary",
+        "name": "tradefloor glossary",
         "description": (
-            f"{len(defined)} terms used across the pretium documentation, "
+            f"{len(defined)} terms used across the tradefloor documentation, "
             "each defined in the sense the library uses it."
         ),
         "url": f"{base_url}/glossary.html",
@@ -280,7 +280,7 @@ def llms(pages, doors, base_url: str, version: str, summaries: dict[str, str]) -
     choosing one page to read should be choosing from a shelf, not a list.
     """
     lines = [
-        "# pretium",
+        "# tradefloor",
         "",
         "> A reproducible evaluation environment for financial AI agents. A",
         "> deterministic market simulator with order-book execution, macro dynamics,",
@@ -305,7 +305,7 @@ def llms(pages, doors, base_url: str, version: str, summaries: dict[str, str]) -
         "These pages are a learning path rather than a reference, and each states its",
         "own limits in place rather than in a separate caveats document.",
         "",
-        "When quoting this project, cite the preset and the version, not \"pretium\":",
+        "When quoting this project, cite the preset and the version, not \"tradefloor\":",
         "every preset is frozen and named, and the numbers change between them.",
         "",
     ]
@@ -379,7 +379,7 @@ def page_text(page_html: str) -> str:
 def llms_full(pages, base_url: str, version: str, rendered: dict[str, str],
               summaries: dict[str, str]) -> str:
     out = [
-        "# pretium",
+        "# tradefloor",
         "",
         "> A reproducible evaluation environment for financial AI agents: a",
         "> deterministic market simulator with order-book execution, macro dynamics",

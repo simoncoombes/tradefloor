@@ -10,12 +10,12 @@ demonstration pair was momentum against mean-reversion, +0.519 against
 
 import pytest
 
-import pretium
-from pretium.baselines import BuyAndHold, Momentum, reference_agents
-from pretium.ranking import AgentRecord, _sign_test
+import tradefloor
+from tradefloor.baselines import BuyAndHold, Momentum, reference_agents
+from tradefloor.ranking import AgentRecord, _sign_test
 
 
-UNIVERSE = pretium.Universe.random(20, seed=11)
+UNIVERSE = tradefloor.Universe.random(20, seed=11)
 
 #: The configuration the module's documented findings were measured on.
 #: Deliberately larger than a unit test wants -- about ten seconds, built once
@@ -23,7 +23,7 @@ UNIVERSE = pretium.Universe.random(20, seed=11)
 #: the reference set separates, and a test suite that only ever ran the cheap
 #: configuration could not tell a working sign test from one wired to return
 #: "no difference".
-HEADLINE = pretium.Universe.random(30, seed=11)
+HEADLINE = tradefloor.Universe.random(30, seed=11)
 
 
 def make():
@@ -32,7 +32,7 @@ def make():
 
 @pytest.fixture(scope="module")
 def ranking():
-    return pretium.rank(make, seeds=range(12), universe=HEADLINE, days=10,
+    return tradefloor.rank(make, seeds=range(12), universe=HEADLINE, days=10,
                         workers=4)
 
 
@@ -49,8 +49,8 @@ def test_passing_built_agents_is_refused():
     numbers look completely normal, which is what makes refusing better than
     documenting.
     """
-    with pytest.raises(pretium.ValidationError, match="factory"):
-        pretium.rank(reference_agents(seed=3), seeds=range(3),
+    with pytest.raises(tradefloor.ValidationError, match="factory"):
+        tradefloor.rank(reference_agents(seed=3), seeds=range(3),
                      universe=UNIVERSE, days=1)
 
 
@@ -61,7 +61,7 @@ def test_the_factory_is_called_once_per_seed():
         calls.append(1)
         return {"buy_and_hold": BuyAndHold(), "momentum": Momentum()}
 
-    pretium.rank(counting, seeds=range(4), universe=UNIVERSE, days=1)
+    tradefloor.rank(counting, seeds=range(4), universe=UNIVERSE, days=1)
     assert len(calls) == 4
 
 
@@ -83,7 +83,7 @@ def test_agents_really_are_fresh_each_seed():
                 seen.append(self)
             return super().act(obs)
 
-    pretium.rank(lambda: {"a": Recording()}, seeds=range(4),
+    tradefloor.rank(lambda: {"a": Recording()}, seeds=range(4),
                  universe=UNIVERSE, days=1)
     assert len(seen) == 4
 
@@ -100,32 +100,32 @@ def test_threading_does_not_change_the_answer():  # noqa: D401
     median over an even count picks the same element every run. Scheduling
     must not reach the numbers.
     """
-    serial = pretium.rank(make, seeds=range(6), universe=UNIVERSE, days=2)
-    threaded = pretium.rank(make, seeds=range(6), universe=UNIVERSE, days=2,
+    serial = tradefloor.rank(make, seeds=range(6), universe=UNIVERSE, days=2)
+    threaded = tradefloor.rank(make, seeds=range(6), universe=UNIVERSE, days=2,
                             workers=4)
     assert serial.as_dict() == threaded.as_dict()
 
 
 def test_a_ranking_is_reproducible():
-    first = pretium.rank(make, seeds=range(4), universe=UNIVERSE, days=2)
-    again = pretium.rank(make, seeds=range(4), universe=UNIVERSE, days=2)
+    first = tradefloor.rank(make, seeds=range(4), universe=UNIVERSE, days=2)
+    again = tradefloor.rank(make, seeds=range(4), universe=UNIVERSE, days=2)
     assert again.as_dict() == first.as_dict()
 
 
 def test_repeated_seeds_are_refused():
     # The same market twice would weight it double in every median, quietly.
-    with pytest.raises(pretium.ValidationError, match="distinct"):
-        pretium.rank(make, seeds=[1, 2, 1], universe=UNIVERSE, days=1)
+    with pytest.raises(tradefloor.ValidationError, match="distinct"):
+        tradefloor.rank(make, seeds=[1, 2, 1], universe=UNIVERSE, days=1)
 
 
 def test_no_seeds_is_refused():
-    with pytest.raises(pretium.ValidationError):
-        pretium.rank(make, seeds=[], universe=UNIVERSE, days=1)
+    with pytest.raises(tradefloor.ValidationError):
+        tradefloor.rank(make, seeds=[], universe=UNIVERSE, days=1)
 
 
 def test_workers_must_be_positive():
-    with pytest.raises(pretium.ValidationError):
-        pretium.rank(make, seeds=range(2), universe=UNIVERSE, days=1, workers=0)
+    with pytest.raises(tradefloor.ValidationError):
+        tradefloor.rank(make, seeds=range(2), universe=UNIVERSE, days=1, workers=0)
 
 
 # --------------------------------------------------------------------------
@@ -227,7 +227,7 @@ def test_every_pairing_accounts_for_every_seed(ranking):
 
 
 def test_separation_refuses_an_unknown_agent(ranking):
-    with pytest.raises(pretium.ValidationError, match="not in this ranking"):
+    with pytest.raises(tradefloor.ValidationError, match="not in this ranking"):
         ranking.separation("momentum", "nonesuch")
 
 
@@ -253,7 +253,7 @@ def test_the_oracle_is_not_a_contender(ranking):
 
 
 def test_ranking_by_an_unknown_key_is_refused(ranking):
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         ranking.table(by="sharpe")
 
 
@@ -264,7 +264,7 @@ def test_an_absent_reference_leaves_capture_unmeasurable_and_says_so():
     reads None rather than 0.0 -- which would have sorted a lossmaking agent
     above one that lost more.
     """
-    ranking = pretium.rank(make, seeds=range(4), universe=UNIVERSE, days=2,
+    ranking = tradefloor.rank(make, seeds=range(4), universe=UNIVERSE, days=2,
                            oracle="not_present")
     assert ranking.unmeasurable == [0, 1, 2, 3]
     assert all(r.median_capture is None for r in ranking.records.values())

@@ -2,14 +2,14 @@
 
 import pytest
 
-import pretium
+import tradefloor
 
-UNIVERSE = pretium.Universe.random(5, seed=3)
+UNIVERSE = tradefloor.Universe.random(5, seed=3)
 TICKER = UNIVERSE[0].ticker
 
 
 def market(seed=42, ticks=60):
-    e = pretium.Engine(seed=seed, universe=UNIVERSE)
+    e = tradefloor.Engine(seed=seed, universe=UNIVERSE)
     e.open_market()
     e.run_session(9, 30, 3, ticks)
     return e
@@ -27,15 +27,15 @@ def test_a_fill_is_priced_by_the_book_not_by_a_coefficient():
     book.
     """
     e = market()
-    small = pretium.Portfolio(cash=1e9).execute(e, TICKER, 1_000)
-    large = pretium.Portfolio(cash=1e9).execute(e, TICKER, 500_000)
+    small = tradefloor.Portfolio(cash=1e9).execute(e, TICKER, 1_000)
+    large = tradefloor.Portfolio(cash=1e9).execute(e, TICKER, 500_000)
     assert large["price"] > small["price"]
     assert large["worst_price"] > small["worst_price"]
 
 
 def test_cash_and_position_move_together():
     e = market()
-    p = pretium.Portfolio(cash=5e6)
+    p = tradefloor.Portfolio(cash=5e6)
     fill = p.execute(e, TICKER, 10_000)
     assert p.positions[TICKER].quantity == 10_000
     assert p.cash == pytest.approx(5e6 - fill["notional"])
@@ -45,7 +45,7 @@ def test_selling_short_is_allowed():
     # A harness that could not express a short would quietly narrow what an
     # agent can be evaluated on.
     e = market()
-    p = pretium.Portfolio(cash=5e6)
+    p = tradefloor.Portfolio(cash=5e6)
     p.execute(e, TICKER, -10_000)
     assert p.positions[TICKER].quantity == -10_000
     assert p.cash > 5e6, "a short sale brings cash in"
@@ -56,7 +56,7 @@ def test_a_partial_fill_is_reported_as_partial():
     # was not there -- the kind of convenience that makes a backtest
     # profitable and a live strategy not.
     e = market()
-    p = pretium.Portfolio(cash=1e12)
+    p = tradefloor.Portfolio(cash=1e12)
     depth = e.book(TICKER).depth("sell")
     fill = p.execute(e, TICKER, depth * 2)
     assert fill["partial"] is True
@@ -65,9 +65,9 @@ def test_a_partial_fill_is_reported_as_partial():
 
 def test_a_zero_or_nan_trade_is_refused():
     e = market()
-    p = pretium.Portfolio()
+    p = tradefloor.Portfolio()
     for bad in (0, float("nan")):
-        with pytest.raises(pretium.ValidationError):
+        with pytest.raises(tradefloor.ValidationError):
             p.execute(e, TICKER, bad)
 
 
@@ -77,7 +77,7 @@ def test_a_zero_or_nan_trade_is_refused():
 
 def test_a_round_trip_realises_the_spread_it_paid():
     e = market()
-    p = pretium.Portfolio(cash=1e9)
+    p = tradefloor.Portfolio(cash=1e9)
     p.execute(e, TICKER, 50_000)
     p.execute(e, TICKER, -50_000)
     assert p.positions[TICKER].quantity == 0
@@ -95,7 +95,7 @@ def test_crossing_through_zero_realises_only_the_part_that_closed():
     the direction still right, so nothing would look obviously broken.
     """
     e = market()
-    p = pretium.Portfolio(cash=1e9)
+    p = tradefloor.Portfolio(cash=1e9)
     p.execute(e, TICKER, 10_000)
     entry = p.positions[TICKER].avg_cost
 
@@ -113,7 +113,7 @@ def test_crossing_through_zero_realises_only_the_part_that_closed():
 
 def test_adding_to_a_position_averages_the_cost():
     e = market()
-    p = pretium.Portfolio(cash=1e9)
+    p = tradefloor.Portfolio(cash=1e9)
     first = p.execute(e, TICKER, 10_000)
     second = p.execute(e, TICKER, 30_000)
     expected = (first["price"] * 10_000 + second["price"] * 30_000) / 40_000
@@ -122,7 +122,7 @@ def test_adding_to_a_position_averages_the_cost():
 
 def test_net_worth_is_cash_plus_marks():
     e = market()
-    p = pretium.Portfolio(cash=5e6)
+    p = tradefloor.Portfolio(cash=5e6)
     p.execute(e, TICKER, 20_000)
     marks = p.marks(e)
     assert p.net_worth(e) == pytest.approx(p.cash + 20_000 * marks[TICKER])
@@ -131,7 +131,7 @@ def test_net_worth_is_cash_plus_marks():
 
 def test_unrealised_moves_with_the_market():
     e = market()
-    p = pretium.Portfolio(cash=1e9)
+    p = tradefloor.Portfolio(cash=1e9)
     p.execute(e, TICKER, 20_000)
     before = p.unrealised(e)
     e.run_session(10, 30, 3, 120)
@@ -147,7 +147,7 @@ def test_pending_flow_is_what_the_market_should_feel():
     # executed without feeding flow back would have a trader with realistic
     # fills and an invisible footprint.
     e = market()
-    p = pretium.Portfolio(cash=1e9)
+    p = tradefloor.Portfolio(cash=1e9)
     p.execute(e, TICKER, 30_000)
     p.execute(e, TICKER, -10_000)
     assert p.pending_flow() == {TICKER: (30_000.0, 10_000.0)}
@@ -174,7 +174,7 @@ def test_flow_fed_back_actually_moves_the_market():
     quiet.run_session(10, 30, 3, 200)
 
     traded = market()
-    p = pretium.Portfolio(cash=1e10)
+    p = tradefloor.Portfolio(cash=1e10)
     p.execute(traded, thin, 500_000)
     traded.run_session(10, 30, 3, 200, order_flow=p.pending_flow())
 
@@ -189,7 +189,7 @@ def test_unconstrained_by_default():
     # A bare simulator should not impose a broker's risk policy on a
     # researcher studying what an unconstrained strategy does.
     e = market()
-    p = pretium.Portfolio(cash=5e6)
+    p = tradefloor.Portfolio(cash=5e6)
     p.execute(e, TICKER, 200_000)
     assert p.cash < 0, "leverage is available when nothing caps it"
 
@@ -204,8 +204,8 @@ def test_a_leverage_cap_refuses_the_trade_before_taking_it():
     mechanically.
     """
     e = market()
-    p = pretium.Portfolio(cash=5e6, max_leverage=2.0)
-    with pytest.raises(pretium.OrderError, match="above the 2.00x limit"):
+    p = tradefloor.Portfolio(cash=5e6, max_leverage=2.0)
+    with pytest.raises(tradefloor.OrderError, match="above the 2.00x limit"):
         p.execute(e, TICKER, 200_000)
     # And nothing moved: the check runs before any mutation.
     assert p.positions == {}
@@ -214,7 +214,7 @@ def test_a_leverage_cap_refuses_the_trade_before_taking_it():
 
 def test_a_trade_within_the_cap_succeeds():
     e = market()
-    p = pretium.Portfolio(cash=5e6, max_leverage=2.0)
+    p = tradefloor.Portfolio(cash=5e6, max_leverage=2.0)
     p.execute(e, TICKER, 90_000)
     assert p.leverage(e) <= 2.0
 
@@ -224,7 +224,7 @@ def test_gross_exposure_does_not_net_longs_against_shorts():
     # flat book. Netting them would report a hedged trader and a reckless one
     # as identical.
     e = market()
-    p = pretium.Portfolio(cash=1e9)
+    p = tradefloor.Portfolio(cash=1e9)
     p.execute(e, UNIVERSE[0].ticker, 10_000)
     p.execute(e, UNIVERSE[1].ticker, -10_000)
     marks = p.marks(e)
@@ -233,8 +233,8 @@ def test_gross_exposure_does_not_net_longs_against_shorts():
 
 
 def test_an_invalid_cap_is_refused():
-    with pytest.raises(pretium.ValidationError, match="max_leverage"):
-        pretium.Portfolio(cash=1e6, max_leverage=0)
+    with pytest.raises(tradefloor.ValidationError, match="max_leverage"):
+        tradefloor.Portfolio(cash=1e6, max_leverage=0)
 
 
 # --------------------------------------------------------------------------
@@ -244,7 +244,7 @@ def test_an_invalid_cap_is_refused():
 def test_a_trading_session_is_reproducible():
     def run():
         e = market(seed=11)
-        p = pretium.Portfolio(cash=1e8)
+        p = tradefloor.Portfolio(cash=1e8)
         for _ in range(3):
             p.execute(e, TICKER, 20_000)
             e.run_session(10, 0, 3, 60, order_flow=p.pending_flow())
@@ -269,7 +269,7 @@ def test_a_short_gains_when_the_price_falls():
     """
     engine = market()
     ticker = engine.tickers[0]
-    portfolio = pretium.Portfolio(cash=1_000_000.0)
+    portfolio = tradefloor.Portfolio(cash=1_000_000.0)
     portfolio.execute(engine, ticker, -500)
 
     import struct
@@ -293,13 +293,13 @@ def test_the_leverage_cap_counts_shorts():
     # account short without limit while reporting itself constrained.
     engine = market()
     ticker = engine.tickers[0]
-    portfolio = pretium.Portfolio(cash=100_000.0, max_leverage=2.0)
+    portfolio = tradefloor.Portfolio(cash=100_000.0, max_leverage=2.0)
 
     refused = False
     for _ in range(60):
         try:
             portfolio.execute(engine, ticker, -2000)
-        except (pretium.OrderError, pretium.ValidationError):
+        except (tradefloor.OrderError, tradefloor.ValidationError):
             refused = True
             break
     assert refused, "shorting was never refused; the cap does not see it"
@@ -312,7 +312,7 @@ def test_pnl_decomposes_into_realised_and_unrealised():
     # ever disagree, one of the three is computed from a different basis.
     engine = market()
     ticker = engine.tickers[0]
-    portfolio = pretium.Portfolio(cash=1_000_000.0)
+    portfolio = tradefloor.Portfolio(cash=1_000_000.0)
     portfolio.execute(engine, ticker, 150)
     engine.run_session(9, 30, 3, 60)
     portfolio.execute(engine, ticker, -50)

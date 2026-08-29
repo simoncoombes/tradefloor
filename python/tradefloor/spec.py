@@ -99,7 +99,7 @@ SPEC_VERSION = 1
 
 #: Every signal kind the grammar knows. ``blend`` combines the ranked kinds;
 #: ``oracle`` is privileged and declares itself as such. See this module's
-#: docstring and :class:`pretium.baselines.Oracle`.
+#: docstring and :class:`tradefloor.baselines.Oracle`.
 SIGNAL_KINDS = ("hold", "random", "momentum", "mean_reversion", "oracle",
                 "blend")
 
@@ -398,7 +398,7 @@ class StrategySpec:
              max_participation: float = 0.05) -> "StrategySpec":
         """Equal weight across the roster, bought once and left alone.
 
-        ``gross`` is what :class:`pretium.baselines.BuyAndHold` calls
+        ``gross`` is what :class:`tradefloor.baselines.BuyAndHold` calls
         ``leverage``: an equal-weight long-only book at weight ``gross/n`` IS
         a gross exposure of ``gross``, and the spec uses one word for one
         dimension across every kind.
@@ -413,7 +413,7 @@ class StrategySpec:
         """Uniformly random target weights: the noise floor.
 
         ``seed`` seeds the strategy's own draws, on its own stream, exactly
-        as :class:`pretium.baselines.RandomTrader` does. It is deliberately
+        as :class:`tradefloor.baselines.RandomTrader` does. It is deliberately
         separate from the market seed and it is recorded in the spec, because
         a noise floor that cannot be reproduced is not a floor.
         """
@@ -462,7 +462,7 @@ class StrategySpec:
         disclosure into the uncitable escape hatch. Its ``top_k`` moves the
         denominator of every capture ratio the library quotes, so a ratio
         published without the oracle's spec fingerprint beside it is not a
-        number anyone can compare. See :class:`pretium.baselines.Oracle` for
+        number anyone can compare. See :class:`tradefloor.baselines.Oracle` for
         the measurements.
         """
         return cls({"kind": "oracle"},
@@ -532,7 +532,7 @@ class StrategySpec:
         """
         payload = json.loads(text)
         if not isinstance(payload, dict) or "signal" not in payload:
-            raise ValidationError("not a pretium strategy spec document")
+            raise ValidationError("not a tradefloor strategy spec document")
         _refuse_unknown("strategy spec", payload,
                         ("spec_version", "signal", "portfolio", "execution",
                          "seed"))
@@ -545,7 +545,7 @@ class StrategySpec:
         if version > SPEC_VERSION:
             raise ValidationError(
                 f"spec_version {version} is newer than this version "
-                f"understands ({SPEC_VERSION}). Upgrade pretium rather than "
+                f"understands ({SPEC_VERSION}). Upgrade tradefloor rather than "
                 "reading it partially: the version pins what the words mean."
             )
         return cls(payload["signal"],

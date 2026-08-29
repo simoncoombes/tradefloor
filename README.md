@@ -1,6 +1,11 @@
-# pretium
+# tradefloor
 
-[![determinism](https://github.com/simoncoombes/pretium/actions/workflows/determinism.yml/badge.svg)](https://github.com/simoncoombes/pretium/actions/workflows/determinism.yml)
+> Formerly **pretium**. Versions through 0.4.3 were published under that
+> name and remain installable forever; results recorded against them replay
+> under those exact versions. The rename changed no behaviour: 0.5.0
+> reproduces the same known-answer digest on every platform.
+
+[![determinism](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml/badge.svg)](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml)
 [![licence: MIT OR Apache-2.0](https://img.shields.io/badge/licence-MIT%20OR%20Apache--2.0-blue.svg)](#licence)
 [![python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
@@ -16,11 +21,11 @@ caused a move. This can, because it computed every price.
 ## Install
 
 ```
-pip install pretium
+pip install tradefloor
 ```
 
 Wheels for Linux, macOS and Windows on CPython 3.11+. No dependencies. The same
-engine is a Rust crate: `cargo add pretium`.
+engine is a Rust crate: `cargo add tradefloor`.
 
 The API can still change before 1.0. A published result cannot: new
 coefficients ship as a new preset, so a run you cited last month replays this
@@ -29,7 +34,7 @@ month.
 ## First run
 
 ```python
-import pretium as pt
+import tradefloor as pt
 
 universe = pt.Universe.random(40, seed=111)
 
@@ -61,13 +66,13 @@ you that a stock fell. It never shows you that 60% of the fall was order flow.
 To drive it from an agent:
 
 ```
-pip install "pretium[mcp]"
-claude mcp add pretium -- pretium-mcp
+pip install "tradefloor[mcp]"
+claude mcp add tradefloor -- tradefloor-mcp
 ```
 
 Strategies, universes and scenarios are data, so a tool argument cannot reach
 code. Each result carries its own caveats. See
-[the MCP page](https://simoncoombes.github.io/pretium/mcp.html).
+[the MCP page](https://simoncoombes.github.io/tradefloor/mcp.html).
 
 ## How real it is
 
@@ -90,7 +95,7 @@ Five limits are measured and written down:
 | roster | certification used a sector-balanced roster, which no real index is |
 
 `pt.envelope.check()` refuses a question that falls outside a limit, and
-[the realism envelope](https://simoncoombes.github.io/pretium/realism-envelope.html) says
+[the realism envelope](https://simoncoombes.github.io/tradefloor/realism-envelope.html) says
 what each one forbids.
 
 Good results here do not predict real returns. The prices come from a known
@@ -113,30 +118,30 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v10")
 
 ## Examples
 
-Ten [`examples/`](https://github.com/simoncoombes/pretium/tree/main/examples) in reading order, run by the test suite:
+Ten [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples) in reading order, run by the test suite:
 
 | | |
 |---|---|
-| [`00-a-year-in-one-market`](https://github.com/simoncoombes/pretium/blob/main/examples/00-a-year-in-one-market.ipynb) | Start here: one company, one year, two crises, one chart |
-| [`01-first-simulation`](https://github.com/simoncoombes/pretium/blob/main/examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
-| [`02-evaluating-a-strategy`](https://github.com/simoncoombes/pretium/blob/main/examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
-| [`03-why-did-the-price-move`](https://github.com/simoncoombes/pretium/blob/main/examples/03-why-did-the-price-move.ipynb) | The nine factors that sum to every move |
-| [`04-how-realistic-is-this`](https://github.com/simoncoombes/pretium/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the limits |
-| [`05-training-an-agent`](https://github.com/simoncoombes/pretium/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
-| [`06-execution-and-impact`](https://github.com/simoncoombes/pretium/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
-| [`07-research-workflow.py`](https://github.com/simoncoombes/pretium/blob/main/examples/07-research-workflow.py) | A whole study in one file. It runs in about five seconds |
-| [`08-claude-agent.py`](https://github.com/simoncoombes/pretium/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
-| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/pretium/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit |
+| [`00-a-year-in-one-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/00-a-year-in-one-market.ipynb) | Start here: one company, one year, two crises, one chart |
+| [`01-first-simulation`](https://github.com/simoncoombes/tradefloor/blob/main/examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
+| [`02-evaluating-a-strategy`](https://github.com/simoncoombes/tradefloor/blob/main/examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
+| [`03-why-did-the-price-move`](https://github.com/simoncoombes/tradefloor/blob/main/examples/03-why-did-the-price-move.ipynb) | The nine factors that sum to every move |
+| [`04-how-realistic-is-this`](https://github.com/simoncoombes/tradefloor/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the limits |
+| [`05-training-an-agent`](https://github.com/simoncoombes/tradefloor/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
+| [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
+| [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It runs in about five seconds |
+| [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
+| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit |
 
 ## More
 
-Full docs: [**simoncoombes.github.io/pretium**](https://simoncoombes.github.io/pretium/).
+Full docs: [**simoncoombes.github.io/tradefloor**](https://simoncoombes.github.io/tradefloor/).
 
-To contribute, see [CONTRIBUTING.md](https://github.com/simoncoombes/pretium/blob/main/CONTRIBUTING.md) and [RELEASING.md](https://github.com/simoncoombes/pretium/blob/main/RELEASING.md). One rule shapes the
+To contribute, see [CONTRIBUTING.md](https://github.com/simoncoombes/tradefloor/blob/main/CONTRIBUTING.md) and [RELEASING.md](https://github.com/simoncoombes/tradefloor/blob/main/RELEASING.md). One rule shapes the
 rest: a change to the simulated trajectory is a breaking change, whatever its
 size.
 
-To cite the software, see [CITATION.cff](https://github.com/simoncoombes/pretium/blob/main/CITATION.cff). To cite a result, use its
+To cite the software, see [CITATION.cff](https://github.com/simoncoombes/tradefloor/blob/main/CITATION.cff). To cite a result, use its
 `RunManifest`.
 
-Licence: MIT OR Apache-2.0, at your option. See [LICENSE-MIT](https://github.com/simoncoombes/pretium/blob/main/LICENSE-MIT) and [LICENSE-APACHE](https://github.com/simoncoombes/pretium/blob/main/LICENSE-APACHE).
+Licence: MIT OR Apache-2.0, at your option. See [LICENSE-MIT](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-MIT) and [LICENSE-APACHE](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-APACHE).

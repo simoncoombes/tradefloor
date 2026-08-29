@@ -74,10 +74,10 @@ import math
 import statistics
 import time
 
-import pretium
-import pretium.facts as facts
-from pretium import Scenario
-from pretium.scenario import run_scenario
+import tradefloor
+import tradefloor.facts as facts
+from tradefloor import Scenario
+from tradefloor.scenario import run_scenario
 
 HELD_VIX = (5.0, 15.0, 25.0, 45.0, 65.0)
 
@@ -107,19 +107,19 @@ SHOCK_DAYS, SHOCK_TICKS = 40, 80
 def load_vector(spec: str):
     """`pt-v1`/`pt-v2`/`pt-v3`, or a certificate path (optionally `#name`)."""
     if "/" not in spec and not spec.endswith(".json"):
-        pretium.ModelParams.from_preset(spec)   # refuses an unknown name
+        tradefloor.ModelParams.from_preset(spec)   # refuses an unknown name
         return spec, spec
     path, _, name = spec.partition("#")
     with open(path, encoding="utf-8") as handle:
         doc = json.load(handle)
     vector = doc["vectors"][name]["vector"] if name else doc["best_vector"]
-    return spec, pretium.ModelParams.from_preset("pt-v1", **vector)
+    return spec, tradefloor.ModelParams.from_preset("pt-v1", **vector)
 
 
 def pooled_vol(scenario, seed, model) -> float:
     import pyarrow as pa
     engine = run_scenario(scenario, seed=seed,
-                          universe=pretium.Universe.random(UNIVERSE_N,
+                          universe=tradefloor.Universe.random(UNIVERSE_N,
                                                            seed=UNIVERSE_SEED),
                           days=SHOCK_DAYS, ticks_per_day=SHOCK_TICKS,
                           record=True, model=model)
@@ -145,7 +145,7 @@ def _held_panel(job):
     overrides, vix, seed = job
     model = _rebuild(overrides)
     panel = facts.measure(
-        seed=seed, universe=pretium.Universe.random(UNIVERSE_N,
+        seed=seed, universe=tradefloor.Universe.random(UNIVERSE_N,
                                                     seed=UNIVERSE_SEED),
         days=HELD_DAYS, scenario=Scenario().hold(vix=vix), model=model)
     return vix, seed, {k: panel[k] for k in HELD_KEYS}
@@ -172,16 +172,16 @@ def _rebuild(overrides):
     pickle."""
     if isinstance(overrides, str):
         return overrides
-    return pretium.ModelParams.from_preset("pt-v1", **overrides)
+    return tradefloor.ModelParams.from_preset("pt-v1", **overrides)
 
 
 def _as_overrides(model):
     if isinstance(model, str):
         return model
-    ship = pretium.ModelParams.from_preset("pt-v1").to_dict()
+    ship = tradefloor.ModelParams.from_preset("pt-v1").to_dict()
     live = model.to_dict()
     return {k: v for k, v in live.items()
-            if k in pretium.ModelParams.settable() and v != ship[k]}
+            if k in tradefloor.ModelParams.settable() and v != ship[k]}
 
 
 def aggregate(held_rows, shock_rows, seeds) -> dict:
@@ -245,7 +245,7 @@ def measure_vector(model, seeds=DEFAULT_SEEDS, workers: int = 8) -> dict:
 def persistence(model) -> dict:
     """The quantity that sets all of it, reported so the cause is on the page."""
     if isinstance(model, str):
-        model = pretium.ModelParams.from_preset(model)
+        model = tradefloor.ModelParams.from_preset(model)
     total = model.market_vol_alpha + model.market_vol_beta
     return {
         "market_vol_alpha": model.market_vol_alpha,

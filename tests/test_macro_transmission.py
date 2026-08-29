@@ -25,7 +25,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pytest
 
-import pretium as pt
+import tradefloor as pt
 
 #: The first scheduled central-bank meeting. Nothing rate-borne transmits
 #: before it, and the boundary is sharp rather than gradual.

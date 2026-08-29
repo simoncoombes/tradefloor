@@ -69,12 +69,12 @@ VECTORS: dict[str, dict[str, float]] = {
 
 def run_vix(job: tuple) -> dict:
     label, overrides, seed, days = job
-    import pretium
+    import tradefloor
 
-    model = pretium.ModelParams.from_preset("pt-v1", **overrides)
-    universe = pretium.Universe.random(lib.PANEL_UNIVERSE_N,
+    model = tradefloor.ModelParams.from_preset("pt-v1", **overrides)
+    universe = tradefloor.Universe.random(lib.PANEL_UNIVERSE_N,
                                        seed=lib.PANEL_UNIVERSE_SEED)
-    engine = pretium.Engine(seed=seed, universe=universe, model=model)
+    engine = tradefloor.Engine(seed=seed, universe=universe, model=model)
     vix_path = []
     for _ in range(days):
         engine.open_market()

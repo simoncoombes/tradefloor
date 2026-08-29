@@ -46,8 +46,8 @@ run it by hand when the work warrants it.
 tools/docs/learn/publish-dev.sh
 ```
 
-builds with `--target dev` and pushes to `simoncoombes/pretium-dev`, served
-at <https://simoncoombes.github.io/pretium-dev/>. Use it to look at a change
+builds with `--target dev` and pushes to `simoncoombes/tradefloor-dev`, served
+at <https://tradefloor.dev-dev/>. Use it to look at a change
 at a real URL - on a phone, through a link unfurl, against a structured-data
 validator - before it is the documentation.
 
@@ -57,7 +57,7 @@ production:
 
 | | live | dev |
 |---|---|---|
-| address | `/pretium` | `/pretium-dev` |
+| address | `/tradefloor` | `/tradefloor-dev` |
 | `robots` meta | absent | `noindex, nofollow` |
 | `robots.txt` | allows everything | `Disallow: /` |
 | sitemap | written | not written |

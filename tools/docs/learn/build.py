@@ -1,4 +1,4 @@
-"""Build the pretium learning-path documentation site.
+"""Build the tradefloor learning-path documentation site.
 
 The design handoff ships twenty-five pages in a prototyping dialect. This
 script turns them into a static site: one HTML file per page that reads
@@ -48,7 +48,7 @@ SITE = HERE / "site"
 #: Where a build is going, and what that implies.
 #:
 #: There are two: the published site, and a staging copy at
-#: `simoncoombes.github.io/pretium-dev` for looking at a change before it is
+#: `tradefloor.dev-dev` for looking at a change before it is
 #: the documentation. Everything that differs between them is here, so
 #: nothing about the staging site is a hand edit that could be forgotten on
 #: the way to production.
@@ -67,10 +67,10 @@ class Target:
 
 TARGETS = {
     "live": Target(
-        base_url="https://simoncoombes.github.io/pretium",
+        base_url="https://tradefloor.dev",
         indexable=True, analytics=True, sitemap=True),
     "dev": Target(
-        base_url="https://simoncoombes.github.io/pretium-dev",
+        base_url="https://tradefloor.dev-dev",
         indexable=False, analytics=False, sitemap=False),
 }
 
@@ -103,7 +103,7 @@ NOINDEX = ('\n<meta name="robots" content="noindex, nofollow">'
 STAGING_ROBOTS = """User-agent: *
 Disallow: /
 
-# This is a staging copy of https://simoncoombes.github.io/pretium.
+# This is a staging copy of https://tradefloor.dev.
 # Every page also carries <meta name="robots" content="noindex, nofollow">,
 # which is the part that keeps it out of an index; this file is here to
 # keep a crawler from spending anything on it in the first place.
@@ -188,7 +188,7 @@ DOORS: list[tuple[str, str, str, list[tuple[str, str]]]] = [
     ]),
 ]
 
-FRONT = ("Learn pretium", "index")
+FRONT = ("Learn tradefloor", "index")
 
 #: Where each page of the previous site goes.
 #:
@@ -235,7 +235,7 @@ ICONS = ["favicon.svg", "favicon.ico", "apple-touch-icon.png",
          "icon-512.png", "og-card.png", "site.webmanifest"]
 
 ASSETS = [
-    "mark-pretium.png", "mark-pretium-dark.png",
+    "mark-tradefloor.png", "mark-tradefloor-dark.png",
     "logo-python.png", "logo-python-dark.png",
     "logo-rust.png", "logo-rust-dark.png",
 ]
@@ -256,7 +256,7 @@ REDIRECT_PAGE = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Moved - pretium</title>
+<title>Moved - tradefloor</title>
 <link rel="canonical" href="{base}/{target}.html">
 <meta http-equiv="refresh" content="0; url={target}.html">
 <meta name="robots" content="noindex, follow">
@@ -614,14 +614,14 @@ PAGE = """<!doctype html>
 <meta name="description" content="{description}">
 <link rel="canonical" href="{canonical}">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium">
+<meta property="og:site_name" content="tradefloor">
 <meta property="og:title" content="{title}">
 <meta property="og:description" content="{description}">
 <meta property="og:url" content="{canonical}">
 <meta property="og:image" content="{base}/og-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="pretium - a market you can run a strategy against">
+<meta property="og:image:alt" content="tradefloor - a market you can run a strategy against">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="{base}/og-card.png">
 <meta name="author" content="Simon Coombes">{robots_meta}
@@ -938,8 +938,8 @@ def build(out_dir: pathlib.Path) -> set[str]:
 def canonical_url(slug: str) -> str:
     """One address per page.
 
-    GitHub Pages serves the front door at both `/pretium/` and
-    `/pretium/index.html`. Naming the directory form as canonical is what
+    GitHub Pages serves the front door at both `/tradefloor/` and
+    `/tradefloor/index.html`. Naming the directory form as canonical is what
     stops the two being indexed as separate pages, and it is the one people
     actually link to.
     """
@@ -952,7 +952,7 @@ def structured_data(page, rendered_page, version, envelope, emitted) -> str:
     The site it replaces carried this and it would be a plain regression to
     drop it: without a SoftwareApplication node the PyPI package, the crate,
     the repository and these pages are four unrelated things rather than one
-    product, and "pretium" is Latin for price, which is a crowded name to
+    product, and "tradefloor" is Latin for price, which is a crowded name to
     have no disambiguation at all.
 
     Two pages carry more. The realism envelope is the project's central

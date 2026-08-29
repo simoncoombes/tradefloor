@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use pretium::fair_value::{
+use tradefloor::fair_value::{
     compute_fair_value, compute_target_pe, CompanyValuationInputs, EconomyValuationInputs,
 };
 use serde::Deserialize;

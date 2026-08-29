@@ -3,20 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The nine factors · pretium</title>
+<title>The nine factors Â· tradefloor</title>
 <meta name="description" content="Every tick's change in mispricing decomposes into nine named components that sum to the move.">
-<link rel="canonical" href="https://simoncoombes.github.io/pretium/factors.html">
+<link rel="canonical" href="https://tradefloor.dev/factors.html">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="pretium">
-<meta property="og:title" content="The nine factors · pretium">
+<meta property="og:site_name" content="tradefloor">
+<meta property="og:title" content="The nine factors Â· tradefloor">
 <meta property="og:description" content="Every tick's change in mispricing decomposes into nine named components that sum to the move.">
-<meta property="og:url" content="https://simoncoombes.github.io/pretium/factors.html">
-<meta property="og:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta property="og:url" content="https://tradefloor.dev/factors.html">
+<meta property="og:image" content="https://tradefloor.dev/og-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="pretium - a market you can run a strategy against">
+<meta property="og:image:alt" content="tradefloor - a market you can run a strategy against">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://simoncoombes.github.io/pretium/og-card.png">
+<meta name="twitter:image" content="https://tradefloor.dev/og-card.png">
 <meta name="author" content="Simon Coombes">
 <meta name="theme-color" content="#FAFBFA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0D1312" media="(prefers-color-scheme: dark)">
@@ -34,8 +34,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Public+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="learn.css">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The nine factors","description":"Every tick's change in mispricing decomposes into nine named components that sum to the move.","url":"https://simoncoombes.github.io/pretium/factors.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"pretium documentation","url":"https://simoncoombes.github.io/pretium/"},"about":{"@type":"SoftwareApplication","name":"pretium","alternateName":"pretium market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.4.3","codeRepository":"https://github.com/simoncoombes/pretium","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/pretium","https://pypi.org/project/pretium/","https://crates.io/crates/pretium"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"pretium","item":"https://simoncoombes.github.io/pretium/index.html"},{"@type":"ListItem","position":2,"name":"Reference"},{"@type":"ListItem","position":3,"name":"The nine factors","item":"https://simoncoombes.github.io/pretium/factors.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The nine factors","description":"Every tick's change in mispricing decomposes into nine named components that sum to the move.","url":"https://tradefloor.dev/factors.html","inLanguage":"en","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"isPartOf":{"@type":"WebSite","name":"tradefloor documentation","url":"https://tradefloor.dev/"},"about":{"@type":"SoftwareApplication","name":"tradefloor","alternateName":"tradefloor market simulator","applicationCategory":"DeveloperApplication","applicationSubCategory":"Market simulation","operatingSystem":"Linux, macOS, Windows","programmingLanguage":["Rust","Python"],"softwareVersion":"0.5.0","codeRepository":"https://github.com/simoncoombes/tradefloor","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Simon Coombes","url":"https://github.com/simoncoombes"},"sameAs":["https://github.com/simoncoombes/tradefloor","https://pypi.org/project/tradefloor/","https://crates.io/crates/tradefloor"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}},"datePublished":"2026-08-27","dateModified":"2026-08-28"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"tradefloor","item":"https://tradefloor.dev/index.html"},{"@type":"ListItem","position":2,"name":"Reference"},{"@type":"ListItem","position":3,"name":"The nine factors","item":"https://tradefloor.dev/factors.html"}]}</script>
 <script>
 (function(){try{var s=localStorage.getItem('pt-learn-theme');
 if(s)document.documentElement.setAttribute('data-theme',s==='dark'?'dark':'light');}catch(e){}})();
@@ -47,14 +47,14 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <body class="pt-page">
 <div style="min-height:100vh;padding:0 0 5rem">
 <div id="pt-search" class="pt-overlay" hidden><div class="pt-overlay-box"><input id="pt-search-input" type="text" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><div id="pt-search-results" class="pt-results" role="listbox"></div><div class="pt-overlay-foot"><span id="pt-search-count"></span><span>ENTER OPENS, ESC CLOSES</span></div></div></div>
-<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-pretium.png" alt="pretium" width="15" height="22"><img class="pt-dark" src="mark-pretium-dark.png" alt="pretium" width="15" height="22"><span class="pt-wordmark">pretium</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">EDGAR companies</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu pt-here"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><span class="pt-current">The nine factors</span><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
-<div id="pt-root"><main class="pt-s17">
-<div class="pt-s20">
+<header class="pt-head"><div class="pt-head-row"><a class="pt-brand" href="index.html"><img class="pt-light" src="mark-tradefloor.png" alt="tradefloor" width="15" height="22"><img class="pt-dark" src="mark-tradefloor-dark.png" alt="tradefloor" width="15" height="22"><span class="pt-wordmark">tradefloor</span></a><nav class="pt-nav"><details class="ptmenu"><summary>Start<span class="pt-caret">▼</span></summary><div><a href="install.html">Install</a><a href="core-concepts.html">Core concepts</a><a href="two-loops.html">The two loops</a><a href="running-a-market.html">Running a market</a></div></details><details class="ptmenu"><summary>Use it<span class="pt-caret">▼</span></summary><div><a href="agents.html">Agents</a><a href="scenarios.html">Scenarios</a><a href="execution-cost.html">Execution cost</a><a href="checkpoints.html">Checkpoints and forking</a><a href="edgar.html">EDGAR companies</a><a href="rl-environment.html">RL environment</a><a href="mcp.html">The MCP server</a></div></details><details class="ptmenu"><summary>Trust it<span class="pt-caret">▼</span></summary><div><a href="realism-envelope.html">Realism envelope</a><a href="metrics.html">The metrics</a><a href="principles.html">Principles</a><a href="citing.html">Citing a run</a></div></details><details class="ptmenu pt-here"><summary>Reference<span class="pt-caret">▼</span></summary><div><a href="glossary.html">Glossary</a><span class="pt-current">The nine factors</span><a href="conventions.html">Conventions</a><a href="schemas.html">Schemas</a><a href="presets.html">Presets</a><a href="release-notes.html">Release notes</a></div></details><details class="ptmenu"><summary>API<span class="pt-caret">▼</span></summary><div><a href="core-types.html">Core types</a><a href="evaluate.html">Evaluate</a><a href="parameters.html">Parameters</a></div></details></nav><span class="pt-spacer"></span><button id="pt-search-open" class="pt-searchbtn" type="button" hidden aria-label="Search the docs">Search<span id="pt-search-hint" class="pt-key">CTRL K</span></button><button id="pt-theme" class="pt-pill" type="button" aria-label="Switch theme"><span class="pt-light">dark</span><span class="pt-dark">light</span></button></div></header>
+<div id="pt-root"><main class="pt-s18">
+<div class="pt-s21">
 <a href="index.html" class="pt-s10">REFERENCE</a><span>/</span><span class="pt-s11">THE NINE FACTORS</span>
 </div>
 <section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">The nine factors</h1>
-<p class="pt-s23">Every tick's change in mispricing breaks into nine components that sum to it. These are the names the <code>truth</code> table uses, and the closed set an agent's <code>explain</code> must answer from.</p>
+<p class="pt-s17">Every tick's change in mispricing breaks into nine components that sum to it. These are the names the <code>truth</code> table uses, and the closed set an agent's <code>explain</code> must answer from.</p>
 </section>
 <section class="pt-s182">
 <h2 class="pt-s7">The set, in order</h2>
@@ -63,47 +63,47 @@ gtag('js',new Date());gtag('config','G-1LBM3239ZF');</script>
 <div class="pt-scroll"><table style="font-size:0.8125rem"><tbody>
 
 <tr>
-<td class="pt-s166">reversion</td>
+<td class="pt-s167">reversion</td>
 <td class="pt-s62">The pull back toward fair value. Negative above fair value, positive below, decaying at a rate set by its half-life.</td>
 </tr>
 
 <tr>
-<td class="pt-s166">momentum</td>
+<td class="pt-s167">momentum</td>
 <td class="pt-s62">Herding: the fraction of yesterday's re-rating that continues today. Controlled by momentum_theta, and the reason returns trend here.</td>
 </tr>
 
 <tr>
-<td class="pt-s166">crowd_lean</td>
+<td class="pt-s167">crowd_lean</td>
 <td class="pt-s62">The crowd's net flow: net-buys what trades below fair value, net-sells what trades above, and chases yesterday's move. Bounded.</td>
 </tr>
 
 <tr>
-<td class="pt-s166">company_news</td>
+<td class="pt-s167">company_news</td>
 <td class="pt-s62">News priced in: a name's own events at full weight, its sector's at a fraction, market-wide at a smaller fraction.</td>
 </tr>
 
 <tr>
-<td class="pt-s166">order_flow_impact</td>
+<td class="pt-s167">order_flow_impact</td>
 <td class="pt-s62">The permanent, information-bearing part of order imbalance. Your own orders land here.</td>
 </tr>
 
 <tr>
-<td class="pt-s166">short_squeeze_effect</td>
+<td class="pt-s167">short_squeeze_effect</td>
 <td class="pt-s62">Forced flow: squeezes on high short interest into a rising price, and stop cascades in either direction.</td>
 </tr>
 
 <tr>
-<td class="pt-s166">random_noise</td>
+<td class="pt-s167">random_noise</td>
 <td class="pt-s62">The idiosyncratic draw, scaled by the name's beta, its sector's volatility, its size, and the GARCH variance state.</td>
 </tr>
 
 <tr>
-<td class="pt-s166">circuit_breaker</td>
+<td class="pt-s167">circuit_breaker</td>
 <td class="pt-s62">The session breaker's own correction, when the model price leaves the allowed band.</td>
 </tr>
 
 <tr>
-<td class="pt-s166">jump</td>
+<td class="pt-s167">jump</td>
 <td class="pt-s62">The daily jump, applied after the tick loop, recorded on the tick where it is first observed.</td>
 </tr>
 
@@ -147,13 +147,13 @@ print((delta[1:] - summed[1:]).abs().max())      # ~1e-16</pre>
      inside a table is foster-parented out of the table and its rows are
      left behind ungrouped. The template survives a <script> intact because
      a script's contents are never parsed as markup. -->
-<script id="pt-template" type="text/x-pt-template"><main class="pt-s17">
-<div class="pt-s20">
+<script id="pt-template" type="text/x-pt-template"><main class="pt-s18">
+<div class="pt-s21">
 <a href="index.html" class="pt-s10">REFERENCE</a><span>/</span><span class="pt-s11">THE NINE FACTORS</span>
 </div>
 <section style="padding:1.2rem 0 0;display:flex;flex-direction:column;gap:1rem">
 <h1 style="font-size:clamp(1.9rem,4vw,2.6rem);max-width:26ch;text-wrap:balance">The nine factors</h1>
-<p class="pt-s23">Every tick's change in mispricing breaks into nine components that sum to it. These are the names the <code>truth</code> table uses, and the closed set an agent's <code>explain</code> must answer from.</p>
+<p class="pt-s17">Every tick's change in mispricing breaks into nine components that sum to it. These are the names the <code>truth</code> table uses, and the closed set an agent's <code>explain</code> must answer from.</p>
 </section>
 <section class="pt-s182">
 <h2 class="pt-s7">The set, in order</h2>
@@ -162,7 +162,7 @@ print((delta[1:] - summed[1:]).abs().max())      # ~1e-16</pre>
 <div class="pt-scroll"><table style="font-size:0.8125rem"><tbody>
 <sc-for list="{{ factors }}" as="f">
 <tr>
-<td class="pt-s166">{{ f.n }}</td>
+<td class="pt-s167">{{ f.n }}</td>
 <td class="pt-s62">{{ f.d }}</td>
 </tr>
 </sc-for>
@@ -221,7 +221,7 @@ class Component extends DCLogic {
   }
   renderVals() {
     return {
-      markLogo: this.state.dark ? './mark-pretium-dark.png' : './mark-pretium.png',
+      markLogo: this.state.dark ? './mark-tradefloor-dark.png' : './mark-tradefloor.png',
       themeGlyph: this.state.dark ? 'light' : 'dark',
       toggleTheme: () => { const n = !this.state.dark; this.setState({ dark: n }); this.applyTheme(n); },
       factors: [

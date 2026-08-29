@@ -10,9 +10,9 @@ import pytest
 
 pa = pytest.importorskip("pyarrow")
 
-import pretium
+import tradefloor
 
-UNIVERSE = pretium.Universe.random(12, seed=7)
+UNIVERSE = tradefloor.Universe.random(12, seed=7)
 
 
 class CountingScenario:
@@ -33,7 +33,7 @@ class CountingScenario:
 
 def test_nothing_runs_until_the_first_seed_is_asked_for():
     watcher = CountingScenario()
-    stream = pretium.sweep(range(5), universe=UNIVERSE, days=2,
+    stream = tradefloor.sweep(range(5), universe=UNIVERSE, days=2,
                            ticks_per_day=40, scenario=watcher)
     # Constructing the generator ran nothing at all.
     assert watcher.applied == 0
@@ -53,7 +53,7 @@ def test_a_bounded_window_runs_ahead_but_not_to_the_end():
     # than len(seeds). Checked by counting: after taking one result, at most
     # `workers` seeds have been started, not all twenty.
     watcher = CountingScenario()
-    iterator = iter(pretium.sweep(range(20), universe=UNIVERSE, days=1,
+    iterator = iter(tradefloor.sweep(range(20), universe=UNIVERSE, days=1,
                                   ticks_per_day=40, workers=3,
                                   scenario=watcher))
     next(iterator)
@@ -62,7 +62,7 @@ def test_a_bounded_window_runs_ahead_but_not_to_the_end():
 
 
 def test_seeds_arrive_in_order_serially():
-    seeds = [s for s, _ in pretium.sweep(range(6), universe=UNIVERSE, days=1,
+    seeds = [s for s, _ in tradefloor.sweep(range(6), universe=UNIVERSE, days=1,
                                          ticks_per_day=40)]
     assert seeds == list(range(6))
 
@@ -71,16 +71,16 @@ def test_seeds_arrive_in_order_with_workers():
     # Yielded in SEED order, never completion order. A sweep whose row order
     # depended on scheduling would be non-deterministic in the one way this
     # library exists to avoid.
-    seeds = [s for s, _ in pretium.sweep(range(9), universe=UNIVERSE, days=1,
+    seeds = [s for s, _ in tradefloor.sweep(range(9), universe=UNIVERSE, days=1,
                                          ticks_per_day=40, workers=4)]
     assert seeds == list(range(9))
 
 
 def test_a_swept_table_matches_a_hand_run_engine():
-    swept = dict(pretium.sweep([5], universe=UNIVERSE, days=2,
+    swept = dict(tradefloor.sweep([5], universe=UNIVERSE, days=2,
                                ticks_per_day=100, collect="bars"))[5]
 
-    engine = pretium.Engine(seed=5, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE)
     for day in range(2):
         engine.open_market()
         engine.run_session(9, 30, 3, 100)
@@ -95,11 +95,11 @@ def test_workers_do_not_change_the_answer():
     # seed builds its own engine and they share nothing -- asserted, not
     # assumed.
     serial = {s: pa.table(t).to_pydict()["close"]
-              for s, t in pretium.sweep(range(4), universe=UNIVERSE, days=1,
+              for s, t in tradefloor.sweep(range(4), universe=UNIVERSE, days=1,
                                         ticks_per_day=60)}
     for workers in (2, 4):
         threaded = {s: pa.table(t).to_pydict()["close"]
-                    for s, t in pretium.sweep(range(4), universe=UNIVERSE,
+                    for s, t in tradefloor.sweep(range(4), universe=UNIVERSE,
                                               days=1, ticks_per_day=60,
                                               workers=workers)}
         assert threaded == serial, workers
@@ -107,7 +107,7 @@ def test_workers_do_not_change_the_answer():
 
 def test_every_collect_mode_streams_per_day():
     for collect, expected in (("bars", 3), ("truth", 3), ("macro", 1)):
-        _, table = next(iter(pretium.sweep([1], universe=UNIVERSE, days=3,
+        _, table = next(iter(tradefloor.sweep([1], universe=UNIVERSE, days=3,
                                            ticks_per_day=40, collect=collect)))
         assert table.num_rows > 0, collect
         # bars and truth batch per day; macro is one row per day in one batch.
@@ -115,23 +115,23 @@ def test_every_collect_mode_streams_per_day():
 
 
 def test_a_scenario_reaches_the_sweep():
-    from pretium.scenario import Scenario
+    from tradefloor.scenario import Scenario
 
-    calm = dict(pretium.sweep([3], universe=UNIVERSE, days=4, ticks_per_day=60,
+    calm = dict(tradefloor.sweep([3], universe=UNIVERSE, days=4, ticks_per_day=60,
                               collect="macro",
                               scenario=Scenario().hold(vix=15.0)))[3]
-    spiked = dict(pretium.sweep([3], universe=UNIVERSE, days=4,
+    spiked = dict(tradefloor.sweep([3], universe=UNIVERSE, days=4,
                                 ticks_per_day=60, collect="macro",
                                 scenario=Scenario().hold(vix=45.0)))[3]
     assert pa.table(calm).to_pydict()["vix"] != pa.table(spiked).to_pydict()["vix"]
 
 
 def test_degenerate_inputs_are_refused():
-    with pytest.raises(pretium.ValidationError, match="no seeds"):
-        next(iter(pretium.sweep([], universe=UNIVERSE)))
-    with pytest.raises(pretium.ValidationError, match="unknown collect"):
-        next(iter(pretium.sweep([1], universe=UNIVERSE, collect="prices")))
-    with pytest.raises(pretium.ValidationError, match="workers"):
-        next(iter(pretium.sweep([1], universe=UNIVERSE, workers=0)))
-    with pytest.raises(pretium.ValidationError):
-        next(iter(pretium.sweep([1], universe=UNIVERSE, days=0)))
+    with pytest.raises(tradefloor.ValidationError, match="no seeds"):
+        next(iter(tradefloor.sweep([], universe=UNIVERSE)))
+    with pytest.raises(tradefloor.ValidationError, match="unknown collect"):
+        next(iter(tradefloor.sweep([1], universe=UNIVERSE, collect="prices")))
+    with pytest.raises(tradefloor.ValidationError, match="workers"):
+        next(iter(tradefloor.sweep([1], universe=UNIVERSE, workers=0)))
+    with pytest.raises(tradefloor.ValidationError):
+        next(iter(tradefloor.sweep([1], universe=UNIVERSE, days=0)))

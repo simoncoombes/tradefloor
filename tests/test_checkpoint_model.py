@@ -13,8 +13,8 @@ survive a round trip, and the two defaults must agree.
 
 from __future__ import annotations
 
-import pretium as pt
-from pretium.checkpoint import Checkpoint
+import tradefloor as pt
+from tradefloor.checkpoint import Checkpoint
 
 PRESETS = ("pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8")
 

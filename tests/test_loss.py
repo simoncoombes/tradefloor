@@ -23,15 +23,15 @@ import pytest
 
 pytest.importorskip("pyarrow")
 
-import pretium
-from pretium.facts import (
+import tradefloor
+from tradefloor.facts import (
     REAL_MARKETS,
     SEED_SD,
     band_distance,
     compare_to_real_markets,
     measure,
 )
-from pretium.loss import (
+from tradefloor.loss import (
     CONSTRAINTS,
     LIVE_TARGETS,
     STRUCTURAL,
@@ -59,7 +59,7 @@ def baseline_panels():
 
 
 # Same roster and length as test_facts, for the same estimator reasons.
-UNIVERSE = pretium.Universe.random(40, seed=111)
+UNIVERSE = tradefloor.Universe.random(40, seed=111)
 
 
 @pytest.fixture(scope="module")
@@ -94,7 +94,7 @@ def test_an_overshot_leverage_effect_is_not_scored_as_satisfying_the_band():
     high scores zero -- so -0.5 would read as inside a band whose strong
     edge is -0.16, and the search direction for this statistic would invert
     while every other statistic's tests still passed. If this test fails,
-    check `pretium.facts.band_distance` for exactly that form.
+    check `tradefloor.facts.band_distance` for exactly that form.
     """
     low, high = LEVERAGE_BAND
     assert band_distance(-0.5, low, high) > 0.0
@@ -124,7 +124,7 @@ def test_band_distance_agrees_with_the_verdict_wording_on_every_band():
     each other, on a grid that straddles every band's edges, so they cannot
     drift apart under separate refactors.
     """
-    from pretium.facts import _verdict
+    from tradefloor.facts import _verdict
 
     for key, (low, high) in REAL_MARKETS.items():
         width = high - low
@@ -228,8 +228,8 @@ def test_promoting_a_structural_statistic_is_one_tuple(monkeypatch):
     exercises the real path rather than a copy of it.
     """
     monkeypatch.setattr(
-        pretium.loss, "LIVE_TARGETS",
-        pretium.loss.LIVE_TARGETS + ("volume_change_acf1",),
+        tradefloor.loss, "LIVE_TARGETS",
+        tradefloor.loss.LIVE_TARGETS + ("volume_change_acf1",),
     )
     panels = baseline_panels()
     result = band_distance_loss(panels)
@@ -313,10 +313,10 @@ def test_there_is_no_unweighted_fallback():
     # rather than quietly entering the sum with weight one.
     panel = {key: (low + high) / 2 for key, (low, high) in REAL_MARKETS.items()}
     missing = {k: v for k, v in SEED_SD.items() if k != "return_acf1"}
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         band_distance_loss(panel, seed_sd=missing)
     degenerate = dict(SEED_SD, return_acf1=0.0)
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         band_distance_loss(panel, seed_sd=degenerate)
 
 
@@ -325,7 +325,7 @@ def test_a_live_statistic_that_could_not_be_measured_refuses():
     # would make unmeasurable an attractive direction for the search.
     panel = {key: (low + high) / 2 for key, (low, high) in REAL_MARKETS.items()}
     panel["cross_sectional_corr"] = None
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         band_distance_loss(panel)
     # A structural statistic degrades instead: it was never in the sum, and
     # a reporting gap must not block the evaluation.
@@ -485,7 +485,7 @@ def test_the_shipped_seed_sds_are_reproducible_by_re_measurement():
     """
     import statistics as st
 
-    universe = pretium.Universe.random(40, seed=111)
+    universe = tradefloor.Universe.random(40, seed=111)
     for seed in (101, 130):
         position = THIRTY_SEED_PANELS["seeds"].index(seed)
         # pt-v1 NAMED, not the default. SEED_SD is a noise scale measured
@@ -520,10 +520,10 @@ def test_substituting_the_seed_sds_is_a_parameter_not_an_edit():
 
 def test_seed_sd_estimation_refuses_thin_or_gappy_panels():
     panel = {key: (low + high) / 2 for key, (low, high) in REAL_MARKETS.items()}
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         seed_sd_from_panels([panel])
     gappy = [dict(panel), dict(panel, leverage_effect=None)]
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         seed_sd_from_panels(gappy)
 
 
@@ -586,6 +586,6 @@ def test_the_loss_is_a_breakdown_with_the_scalar_inside_it(facts):
     assert isinstance(result, dict)
     assert set(result["statistics"]) == set(REAL_MARKETS)
     assert result["loss"] >= 0.0
-    text = pretium.facts.report(facts)
+    text = tradefloor.facts.report(facts)
     assert "loss" not in text.lower()
     assert "score" not in text.lower()

@@ -12,7 +12,7 @@ import struct
 
 import pytest
 
-import pretium
+import tradefloor
 
 
 def arr(buf):
@@ -21,9 +21,9 @@ def arr(buf):
 
 
 def universe(n=6):
-    sectors = pretium.sectors()
+    sectors = tradefloor.sectors()
     return [
-        pretium.Instrument(
+        tradefloor.Instrument(
             f"C{i}", sectors[i % 12],
             initial_price=50.0 + i * 3,
             shares_outstanding=1e8,
@@ -36,8 +36,8 @@ def universe(n=6):
 
 
 def engine(seed=42, n=6, **macro):
-    return pretium.Engine(
-        seed=seed, universe=universe(n), macro_state=pretium.Macro(**macro)
+    return tradefloor.Engine(
+        seed=seed, universe=universe(n), macro_state=tradefloor.Macro(**macro)
     )
 
 
@@ -110,11 +110,11 @@ def test_a_closed_market_costs_nothing():
 
 def test_session_boundaries_are_half_open():
     # 16:00 exactly is after-hours, not the last minute of the session.
-    assert pretium.market_status(9, 30, 3) == "open"
-    assert pretium.market_status(15, 59, 3) == "open"
-    assert pretium.market_status(16, 0, 3) == "after_hours"
-    assert pretium.market_status(9, 29, 3) == "pre_market"
-    assert pretium.market_status(11, 0, 0) == "closed"  # Sunday
+    assert tradefloor.market_status(9, 30, 3) == "open"
+    assert tradefloor.market_status(15, 59, 3) == "open"
+    assert tradefloor.market_status(16, 0, 3) == "after_hours"
+    assert tradefloor.market_status(9, 29, 3) == "pre_market"
+    assert tradefloor.market_status(11, 0, 0) == "closed"  # Sunday
 
 
 def test_extended_hours_still_trade():
@@ -148,7 +148,7 @@ def test_market_cap_is_derived_from_price_and_shares():
 
 
 def test_instrument_market_cap_tracks_its_inputs():
-    inst = pretium.Instrument("X", "technology", initial_price=25.0,
+    inst = tradefloor.Instrument("X", "technology", initial_price=25.0,
                               shares_outstanding=4e8)
     assert inst.market_cap == 25.0 * 4e8
 
@@ -189,7 +189,7 @@ def test_ground_truth_columns_are_available():
 
 def test_unknown_column_names_the_valid_ones():
     e = engine()
-    with pytest.raises(pretium.ValidationError, match="mispricing_s"):
+    with pytest.raises(tradefloor.ValidationError, match="mispricing_s"):
         e.column("close")
 
 
@@ -201,41 +201,41 @@ def test_seed_is_required():
     # No clock fallback. A simulator that seeds itself when you forget
     # produces a run nobody can reproduce, and nothing reports it.
     with pytest.raises(TypeError):
-        pretium.Engine(universe=universe())
+        tradefloor.Engine(universe=universe())
 
 
 def test_an_empty_universe_is_refused():
-    with pytest.raises(pretium.ValidationError, match="empty"):
-        pretium.Engine(seed=1, universe=[])
+    with pytest.raises(tradefloor.ValidationError, match="empty"):
+        tradefloor.Engine(seed=1, universe=[])
 
 
 def test_instrument_rejects_bad_input():
-    with pytest.raises(pretium.ValidationError, match="sector"):
-        pretium.Instrument("X", "tecnology", initial_price=10.0, shares_outstanding=1e6)
-    with pytest.raises(pretium.ValidationError, match="initial_price"):
-        pretium.Instrument("X", "technology", initial_price=0.0, shares_outstanding=1e6)
-    with pytest.raises(pretium.ValidationError, match="finite"):
-        pretium.Instrument("X", "technology", initial_price=float("nan"),
+    with pytest.raises(tradefloor.ValidationError, match="sector"):
+        tradefloor.Instrument("X", "tecnology", initial_price=10.0, shares_outstanding=1e6)
+    with pytest.raises(tradefloor.ValidationError, match="initial_price"):
+        tradefloor.Instrument("X", "technology", initial_price=0.0, shares_outstanding=1e6)
+    with pytest.raises(tradefloor.ValidationError, match="finite"):
+        tradefloor.Instrument("X", "technology", initial_price=float("nan"),
                            shares_outstanding=1e6)
 
 
 def test_macro_rates_are_fractional():
-    with pytest.raises(pretium.ValidationError, match="percent"):
-        pretium.Macro(federal_funds_rate=4.5)
+    with pytest.raises(tradefloor.ValidationError, match="percent"):
+        tradefloor.Macro(federal_funds_rate=4.5)
     # And the real range is admitted.
-    assert pretium.Macro(federal_funds_rate=-0.005) is not None
-    assert pretium.Macro(federal_funds_rate=0.20) is not None
+    assert tradefloor.Macro(federal_funds_rate=-0.005) is not None
+    assert tradefloor.Macro(federal_funds_rate=0.20) is not None
 
 
 def test_macro_rejects_an_unknown_cycle():
-    with pytest.raises(pretium.ValidationError, match="expansion"):
-        pretium.Macro(cycle="boom")
+    with pytest.raises(tradefloor.ValidationError, match="expansion"):
+        tradefloor.Macro(cycle="boom")
 
 
 def test_invalid_clock_values_are_refused():
     e = engine()
     for bad in ((24, 0, 3), (9, 60, 3), (9, 30, 7)):
-        with pytest.raises(pretium.ValidationError):
+        with pytest.raises(tradefloor.ValidationError):
             e.tick(*bad)
 
 
@@ -279,7 +279,7 @@ def test_listing_and_delisting_reproduce_on_replay():
         e = engine(seed=7, n=4)
         e.open_market()
         e.run_session(9, 30, 3, 20)
-        e.list_instrument(pretium.Instrument(
+        e.list_instrument(tradefloor.Instrument(
             "IPO", "energy", initial_price=33.0, shares_outstanding=5e7, eps=1.5))
         e.run_session(9, 50, 3, 20)
         e.delist(1)
@@ -304,7 +304,7 @@ def test_an_edit_moves_the_rest_of_the_market():
     edited = engine(seed=11, n=4)
     edited.open_market()
     edited.run_session(9, 30, 3, 20)
-    edited.list_instrument(pretium.Instrument(
+    edited.list_instrument(tradefloor.Instrument(
         "IPO", "energy", initial_price=33.0, shares_outstanding=5e7, eps=1.5))
     edited.run_session(9, 50, 3, 20)
 
@@ -327,7 +327,7 @@ def test_roster_edits_draw_nothing():
     e.open_market()
     e.run_session(9, 30, 3, 10)
     before = e.draws_consumed
-    e.list_instrument(pretium.Instrument("X", "utilities", initial_price=10.0,
+    e.list_instrument(tradefloor.Instrument("X", "utilities", initial_price=10.0,
                                          shares_outstanding=1e7))
     e.delist(0)
     assert e.draws_consumed == before
@@ -335,14 +335,14 @@ def test_roster_edits_draw_nothing():
 
 def test_delisting_out_of_range_reports_the_roster_size():
     e = engine(n=2)
-    with pytest.raises(pretium.ValidationError, match="roster holds 2"):
+    with pytest.raises(tradefloor.ValidationError, match="roster holds 2"):
         e.delist(5)
     assert len(e) == 2, "a failed delisting must not disturb the roster"
 
 
 def test_columns_follow_the_edited_roster():
     e = engine(n=3)
-    e.list_instrument(pretium.Instrument("NEW", "materials", initial_price=77.0,
+    e.list_instrument(tradefloor.Instrument("NEW", "materials", initial_price=77.0,
                                          shares_outstanding=1e8))
     assert len(arr(e.prices())) == 4
     assert e.tickers[3] == "NEW"
@@ -361,7 +361,7 @@ def test_news_reaches_the_price():
     e_news = engine(n=4)
     e_news.open_market()
     e_news.run_session(9, 30, 3, 60,
-                       news=[pretium.News(ticker="C0", price_impact=0.05)])
+                       news=[tradefloor.News(ticker="C0", price_impact=0.05)])
 
     assert arr(e_none.prices()) != arr(e_news.prices())
 
@@ -409,10 +409,10 @@ def test_an_unknown_ticker_is_refused_not_ignored():
     # Silently dropping flow would mean a study believing it applied pressure
     # that never reached the book, with nothing to say otherwise.
     e = engine(n=3)
-    with pytest.raises(pretium.ValidationError, match="NOPE"):
+    with pytest.raises(tradefloor.ValidationError, match="NOPE"):
         e.tick(9, 30, 3, order_flow={"NOPE": (1.0, 1.0)})
-    with pytest.raises(pretium.ValidationError, match="NOPE"):
-        e.tick(9, 30, 3, news=[pretium.News(ticker="NOPE", price_impact=0.1)])
+    with pytest.raises(tradefloor.ValidationError, match="NOPE"):
+        e.tick(9, 30, 3, news=[tradefloor.News(ticker="NOPE", price_impact=0.1)])
 
 
 def test_news_scope_is_decided_by_which_fields_are_set():
@@ -420,7 +420,7 @@ def test_news_scope_is_decided_by_which_fields_are_set():
     # asymmetry surprises people, so it is pinned.
     market_wide = engine(n=4)
     market_wide.open_market()
-    market_wide.run_session(9, 30, 3, 60, news=[pretium.News(price_impact=0.04)])
+    market_wide.run_session(9, 30, 3, 60, news=[tradefloor.News(price_impact=0.04)])
 
     quiet = engine(n=4)
     quiet.open_market()
@@ -432,15 +432,15 @@ def test_news_scope_is_decided_by_which_fields_are_set():
 
 
 def test_news_validates_its_sector():
-    with pytest.raises(pretium.ValidationError, match="sector"):
-        pretium.News(sector="tecnology", price_impact=0.1)
-    with pytest.raises(pretium.ValidationError, match="finite"):
-        pretium.News(ticker="C0", price_impact=float("nan"))
+    with pytest.raises(tradefloor.ValidationError, match="sector"):
+        tradefloor.News(sector="tecnology", price_impact=0.1)
+    with pytest.raises(tradefloor.ValidationError, match="finite"):
+        tradefloor.News(ticker="C0", price_impact=float("nan"))
 
 
 def test_negative_order_flow_is_refused():
     e = engine(n=3)
-    with pytest.raises(pretium.ValidationError, match="negative"):
+    with pytest.raises(tradefloor.ValidationError, match="negative"):
         e.tick(9, 30, 3, order_flow={"C0": (-1.0, 0.0)})
 
 
@@ -449,8 +449,8 @@ def test_news_driven_runs_are_reproducible():
         e = engine(seed=5, n=4)
         e.open_market()
         e.run_session(9, 30, 3, 80,
-                      news=[pretium.News(ticker="C1", price_impact=0.03)],
-                      news_impacts=[pretium.NewsImpact(ticker="C1",
+                      news=[tradefloor.News(ticker="C1", price_impact=0.03)],
+                      news_impacts=[tradefloor.NewsImpact(ticker="C1",
                                                        remaining_impact=0.02)],
                       order_flow={"C0": (2e6, 1e5)})
         return arr(e.prices()), e.draws_consumed
@@ -469,12 +469,12 @@ def test_attribution_names_the_cause_of_each_move():
     sixty per cent of the fall was order-flow pressure and the rest was noise.
     The simulator knows, because it computed the reasons.
     """
-    u = pretium.Universe.random(4, seed=1)
-    e = pretium.Engine(seed=42, universe=u)
+    u = tradefloor.Universe.random(4, seed=1)
+    e = tradefloor.Engine(seed=42, universe=u)
     e.open_market()
     e.run_session(9, 30, 3, 200,
                   order_flow={u[0].ticker: (4e6, 0.0)},
-                  news=[pretium.News(ticker=u[1].ticker, price_impact=0.04)])
+                  news=[tradefloor.News(ticker=u[1].ticker, price_impact=0.04)])
 
     news = arr(e.attribution("company_news"))
     flow = arr(e.attribution("order_flow_impact"))
@@ -492,7 +492,7 @@ def test_attribution_reports_every_component_that_moves_a_price():
     # is structurally zero -- the "knobs wired to nothing" lie this model has
     # already had to correct once -- and none that moves a price is missing,
     # which is the failure that made the old four-column version misrank.
-    assert pretium.Engine.FACTORS == [
+    assert tradefloor.Engine.FACTORS == [
         "reversion", "momentum", "crowd_lean",
         "company_news", "order_flow_impact", "short_squeeze_effect",
         "random_noise",
@@ -507,8 +507,8 @@ def test_attribution_reports_every_component_that_moves_a_price():
 
 
 def test_an_unknown_factor_names_the_valid_ones():
-    e = pretium.Engine(seed=1, universe=pretium.Universe.random(3, seed=1))
-    with pytest.raises(pretium.ValidationError, match="reversion"):
+    e = tradefloor.Engine(seed=1, universe=tradefloor.Universe.random(3, seed=1))
+    with pytest.raises(tradefloor.ValidationError, match="reversion"):
         e.attribution("sentiment")
 
 
@@ -535,7 +535,7 @@ def test_attribution_tracks_roster_edits():
     e.run_session(9, 30, 3, 50)
     assert len(arr(e.attribution("random_noise"))) == 3
 
-    e.list_instrument(pretium.Instrument("NEW", "utilities", initial_price=10.0,
+    e.list_instrument(tradefloor.Instrument("NEW", "utilities", initial_price=10.0,
                                          shares_outstanding=1e7))
     assert len(arr(e.attribution("random_noise"))) == 4
     assert arr(e.attribution("random_noise"))[3] == 0, "a new listing starts at zero"
@@ -546,7 +546,7 @@ def test_attribution_tracks_roster_edits():
 
 def test_an_unknown_factor_names_the_valid_ones():
     e = engine(n=2)
-    with pytest.raises(pretium.ValidationError, match="order_flow_impact"):
+    with pytest.raises(tradefloor.ValidationError, match="order_flow_impact"):
         e.attribution("sentiment")
 
 
@@ -555,7 +555,7 @@ def test_attribution_is_reproducible():
         e = engine(seed=9, n=3)
         e.open_market()
         e.run_session(9, 30, 3, 60, order_flow={"C0": (1e6, 5e5)})
-        return [arr(e.attribution(f)) for f in pretium.Engine.FACTORS]
+        return [arr(e.attribution(f)) for f in tradefloor.Engine.FACTORS]
 
     assert run() == run()
 
@@ -578,13 +578,13 @@ def test_close_at_end_is_the_same_close_as_calling_it_yourself():
     garch_variance specifically because that is the field the innovation
     drives -- prices alone would have matched either way and hidden it.
     """
-    universe = pretium.Universe.random(6, seed=2)
+    universe = tradefloor.Universe.random(6, seed=2)
 
-    inline = pretium.Engine(seed=5, universe=universe)
+    inline = tradefloor.Engine(seed=5, universe=universe)
     inline.open_market()
     inline.run_session(9, 30, 3, 390, close_at_end=True)
 
-    explicit = pretium.Engine(seed=5, universe=universe)
+    explicit = tradefloor.Engine(seed=5, universe=universe)
     explicit.open_market()
     explicit.run_session(9, 30, 3, 390)
     explicit.close_market()
@@ -612,19 +612,19 @@ def test_run_until_does_not_close_the_day():
     exactly and differs from a closed one on precisely the fields a close
     rolls.
     """
-    universe = pretium.Universe.random(6, seed=2)
+    universe = tradefloor.Universe.random(6, seed=2)
 
-    halted = pretium.Engine(seed=5, universe=universe)
+    halted = tradefloor.Engine(seed=5, universe=universe)
     halted.open_market()
     # A band nothing crosses, so it runs the full budget and stops on ticks.
     assert halted.run_until(ticker=halted.tickers[0], above=1e12,
                             max_ticks=100) is None
 
-    unclosed = pretium.Engine(seed=5, universe=universe)
+    unclosed = tradefloor.Engine(seed=5, universe=universe)
     unclosed.open_market()
     unclosed.run_session(9, 30, 3, 100)
 
-    closed = pretium.Engine(seed=5, universe=universe)
+    closed = tradefloor.Engine(seed=5, universe=universe)
     closed.open_market()
     closed.run_session(9, 30, 3, 100, close_at_end=True)
 

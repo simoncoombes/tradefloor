@@ -30,8 +30,8 @@ from pathlib import Path
 # bug because it only ever added its own directory.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "python"))
-import pretium as pt  # noqa: E402
-from pretium import Scenario, envelope, facts  # noqa: E402
+import tradefloor as pt  # noqa: E402
+from tradefloor import Scenario, envelope, facts  # noqa: E402
 
 TRAIN = tuple(range(101, 131))
 HELDOUT = (1, 2, 3, 4, 5, 6)

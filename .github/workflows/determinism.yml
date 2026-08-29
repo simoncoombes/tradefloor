@@ -159,7 +159,7 @@ jobs:
           # resolve the name from PyPI, and the gate would then compare
           # digests from a package that is not the one just built -- a green
           # run proving nothing at all.
-          python -m pip install --no-index --find-links dist --force-reinstall pretium
+          python -m pip install --no-index --find-links dist --force-reinstall tradefloor
 
       - name: Run the known-answer simulation
         shell: bash

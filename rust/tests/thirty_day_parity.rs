@@ -66,13 +66,13 @@
 use std::fs;
 use std::path::PathBuf;
 
-use pretium::economy::{
+use tradefloor::economy::{
     create_initial_central_bank_state, create_initial_economy_state, CyclePhase,
     InitialEconomyOptions,
 };
-use pretium::engine::{DayAdvanceRequest, DayCloseRequest, Engine, PriceField, TickRequest};
-use pretium::market::{AvgVolumePolicy, GameTime, TickCompany, TickStock};
-use pretium::rng::Rng;
+use tradefloor::engine::{DayAdvanceRequest, DayCloseRequest, Engine, PriceField, TickRequest};
+use tradefloor::market::{AvgVolumePolicy, GameTime, TickCompany, TickStock};
+use tradefloor::rng::Rng;
 use serde_json::Value as Json;
 
 // ── Replay ────────────────────────────────────────────────────────────────
@@ -211,7 +211,7 @@ fn build_company(c: &Json) -> TickCompany {
             mispricing_momentum: maybe(&s["mispricingMomentum"]),
             maker_inventory: maybe(&s["makerInventory"]),
             garch_variance: bits(s["garchVariance"].as_str().unwrap()),
-            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
+            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
             last_daily_return: maybe(&s["lastDailyReturn"]),
             beta: maybe(&s["beta"]),
             short_interest: bits(s["shortInterest"].as_str().unwrap()),

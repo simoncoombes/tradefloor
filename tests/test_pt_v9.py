@@ -7,7 +7,7 @@ the preset exists for: the VIX reads the day rather than the closing minute.
 
 from __future__ import annotations
 
-import pretium as pt
+import tradefloor as pt
 
 MOVED = {
     "momentum_theta": 0.018551562499999993,
@@ -67,7 +67,7 @@ def test_the_earlier_presets_are_untouched() -> None:
 
 
 def test_it_is_not_the_default() -> None:
-    from pretium import envelope
+    from tradefloor import envelope
     # The PROPERTY, not the literal: what this test is named for is that
     # pt-v9 is not the certified preset, and that survives an era boundary
     # where a hard-coded successor's name does not.

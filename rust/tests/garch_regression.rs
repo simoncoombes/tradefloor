@@ -46,10 +46,10 @@
 //! is where the model lives, so the chains that gate it here exercise the
 //! path the reference vectors never reached.
 
-use pretium::market::garch::{
+use tradefloor::market::garch::{
     ALPHA, BETA, CEILING_MULTIPLE, FLOOR_MULTIPLE, GAMMA, OMEGA,
 };
-use pretium::market::update_garch_variance;
+use tradefloor::market::update_garch_variance;
 
 /// The representative sector daily variance the pins are stated at: a 1.5%
 /// daily sigma, `sectorBaseDailyVariance`'s default and the same anchor

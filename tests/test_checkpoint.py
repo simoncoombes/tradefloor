@@ -11,16 +11,16 @@ import struct
 
 import pytest
 
-import pretium
-from pretium.scenario import Scenario
+import tradefloor
+from tradefloor.scenario import Scenario
 
-UNIVERSE = pretium.Universe.random(8, seed=2)
+UNIVERSE = tradefloor.Universe.random(8, seed=2)
 
 
 def mark(days=3, seed=5, macro=None):
-    engine = pretium.Engine(seed=seed, universe=UNIVERSE, macro_state=macro)
+    engine = tradefloor.Engine(seed=seed, universe=UNIVERSE, macro_state=macro)
     engine.run_days(days, record=False)
-    return engine, pretium.Checkpoint.of(engine, universe=UNIVERSE, seed=seed,
+    return engine, tradefloor.Checkpoint.of(engine, universe=UNIVERSE, seed=seed,
                                          macro=macro)
 
 
@@ -62,7 +62,7 @@ def test_branches_do_not_share_memory():
 def test_a_macro_fork_isolates_the_path():
     # Sixty days of shared history, then two futures that differ only in the
     # macro path. This is the shape the module exists for.
-    _, point = mark(days=3, macro=pretium.Macro(federal_funds_rate=0.025,
+    _, point = mark(days=3, macro=tradefloor.Macro(federal_funds_rate=0.025,
                                                 corporate_bond_yield=0.045))
     calm, hiked = point.branch(2)
     shock = Scenario.rate_shock(start=0.025, end=0.06, over=3)
@@ -85,16 +85,16 @@ def test_a_macro_fork_isolates_the_path():
 
 def test_a_checkpoint_round_trips_through_json():
     engine, point = mark()
-    restored = pretium.Checkpoint.from_json(point.to_json())
+    restored = tradefloor.Checkpoint.from_json(point.to_json())
     assert restored.seed == point.seed
     assert len(restored.universe) == len(point.universe)
     assert restored.resume().prices() == engine.prices()
 
 
 def test_a_checkpoint_carries_its_macro():
-    macro = pretium.Macro(vix=28.0, federal_funds_rate=0.05, cycle="contraction")
+    macro = tradefloor.Macro(vix=28.0, federal_funds_rate=0.05, cycle="contraction")
     engine, point = mark(macro=macro)
-    restored = pretium.Checkpoint.from_json(point.to_json())
+    restored = tradefloor.Checkpoint.from_json(point.to_json())
     assert restored.macro is not None
     assert restored.macro.vix == 28.0
     assert restored.macro.cycle == "contraction"
@@ -107,13 +107,13 @@ def test_a_newer_schema_is_refused():
     engine, point = mark()
     payload = json.loads(point.to_json())
     payload["schema"] = 99
-    with pytest.raises(pretium.ValidationError, match="newer"):
-        pretium.Checkpoint.from_json(json.dumps(payload))
+    with pytest.raises(tradefloor.ValidationError, match="newer"):
+        tradefloor.Checkpoint.from_json(json.dumps(payload))
 
 
 def test_a_degenerate_branch_count_is_refused():
     _, point = mark()
-    with pytest.raises(pretium.ValidationError, match="at least 1"):
+    with pytest.raises(tradefloor.ValidationError, match="at least 1"):
         point.branch(0)
 
 
@@ -144,7 +144,7 @@ def test_branch_reaches_the_same_state_as_a_replay():
     position is checked too.
     """
     engine, point = mark(days=4)
-    fast, = pretium.branch(engine, 1, universe=UNIVERSE, seed=5)
+    fast, = tradefloor.branch(engine, 1, universe=UNIVERSE, seed=5)
     slow = point.resume()
 
     assert fast.prices() == engine.prices()
@@ -159,7 +159,7 @@ def test_branch_reaches_the_same_state_as_a_replay():
 
 def test_branches_from_a_snapshot_are_independent():
     engine, _ = mark(days=3)
-    a, b = pretium.branch(engine, 2, universe=UNIVERSE, seed=5)
+    a, b = tradefloor.branch(engine, 2, universe=UNIVERSE, seed=5)
     before = b.prices()
     a.run_days(2, record=False)
     assert b.prices() == before
@@ -170,9 +170,9 @@ def test_a_snapshot_will_not_restore_onto_a_resized_roster():
     # The columns are positional, so a roster of a different size or order
     # would attach every value to the wrong instrument.
     engine, _ = mark(days=2)
-    smaller = pretium.Universe.random(4, seed=2)
-    target = pretium.Engine(seed=5, universe=smaller)
-    with pytest.raises(pretium.ValidationError, match="roster"):
+    smaller = tradefloor.Universe.random(4, seed=2)
+    target = tradefloor.Engine(seed=5, universe=smaller)
+    with pytest.raises(tradefloor.ValidationError, match="roster"):
         target.restore_state(engine.state_snapshot())
 
 
@@ -189,12 +189,12 @@ def test_matching_tickers_do_not_mean_a_matching_universe():
     snapshot came from. Documented on `restore_state` and pinned here, because
     a guard people believe is stronger than it is is worse than no guard.
     """
-    other = pretium.Universe.random(8, seed=99)
+    other = tradefloor.Universe.random(8, seed=99)
     assert [i.ticker for i in other] == [i.ticker for i in UNIVERSE]
     assert [i.eps for i in other] != [i.eps for i in UNIVERSE]
 
     engine, _ = mark(days=2)
-    target = pretium.Engine(seed=5, universe=other)
+    target = tradefloor.Engine(seed=5, universe=other)
     target.restore_state(engine.state_snapshot())      # accepted
     assert target.prices() == engine.prices()
 
@@ -227,9 +227,9 @@ def test_absence_survives_a_snapshot_round_trip():
     # NaN means "unset" in both directions. A snapshot that stored NaN as a
     # number would turn "no mispricing yet" into "a mispricing of NaN", and a
     # snapshot that stored it as zero would turn it into a real value.
-    universe = pretium.Universe.random(4, seed=3)
-    fresh = pretium.Engine(seed=1, universe=universe)
-    restored, = pretium.branch(fresh, 1, universe=universe, seed=1)
+    universe = tradefloor.Universe.random(4, seed=3)
+    fresh = tradefloor.Engine(seed=1, universe=universe)
+    restored, = tradefloor.branch(fresh, 1, universe=universe, seed=1)
     import math
     import struct
     unset = struct.unpack("<%dd" % len(universe),
@@ -239,8 +239,8 @@ def test_absence_survives_a_snapshot_round_trip():
 
 def test_a_degenerate_branch_count_is_refused():
     engine, _ = mark(days=1)
-    with pytest.raises(pretium.ValidationError, match="at least 1"):
-        pretium.branch(engine, 0, universe=UNIVERSE, seed=5)
+    with pytest.raises(tradefloor.ValidationError, match="at least 1"):
+        tradefloor.branch(engine, 0, universe=UNIVERSE, seed=5)
 
 
 # --------------------------------------------------------------------------
@@ -256,18 +256,18 @@ def test_a_fingerprint_distinguishes_universes_that_tickers_cannot():
     is checking almost nothing -- which is exactly the hole found in
     `restore_state`, where a substituted roster was accepted.
     """
-    a = pretium.Universe.random(40, seed=1)
-    b = pretium.Universe.random(40, seed=99)
+    a = tradefloor.Universe.random(40, seed=1)
+    b = tradefloor.Universe.random(40, seed=99)
     assert [i.ticker for i in a] == [i.ticker for i in b]
     assert a.fingerprint != b.fingerprint
 
 
 def test_a_fingerprint_is_content_not_formatting():
-    universe = pretium.Universe.random(12, seed=4)
-    assert universe.fingerprint == pretium.Universe.random(12, seed=4).fingerprint
+    universe = tradefloor.Universe.random(12, seed=4)
+    assert universe.fingerprint == tradefloor.Universe.random(12, seed=4).fingerprint
     # Survives a JSON round trip, so a checkpoint written on one machine and
     # read on another compares equal.
-    assert pretium.Universe.from_json(universe.to_json()).fingerprint == \
+    assert tradefloor.Universe.from_json(universe.to_json()).fingerprint == \
         universe.fingerprint
 
 
@@ -276,10 +276,10 @@ def test_a_checkpoint_refuses_a_universe_that_arrived_changed():
     payload = json.loads(point.to_json())
     # Same names, different fundamentals -- the substitution the roster check
     # cannot see.
-    other = pretium.Universe.random(len(UNIVERSE), seed=99)
+    other = tradefloor.Universe.random(len(UNIVERSE), seed=99)
     payload["universe"] = json.loads(other.to_json())
-    with pytest.raises(pretium.ValidationError, match="fingerprint"):
-        pretium.Checkpoint.from_json(json.dumps(payload))
+    with pytest.raises(tradefloor.ValidationError, match="fingerprint"):
+        tradefloor.Checkpoint.from_json(json.dumps(payload))
 
 
 def test_resuming_onto_a_supplied_roster_is_checked():
@@ -287,8 +287,8 @@ def test_resuming_onto_a_supplied_roster_is_checked():
     # The right one works.
     assert point.resume(universe=UNIVERSE).prices() == engine.prices()
     # The same-named wrong one does not.
-    other = pretium.Universe.random(len(UNIVERSE), seed=99)
-    with pytest.raises(pretium.ValidationError, match="fingerprint"):
+    other = tradefloor.Universe.random(len(UNIVERSE), seed=99)
+    with pytest.raises(tradefloor.ValidationError, match="fingerprint"):
         point.resume(universe=other)
 
 
@@ -299,7 +299,7 @@ def test_an_older_checkpoint_without_a_fingerprint_still_loads():
     engine, point = mark(days=2)
     payload = json.loads(point.to_json())
     del payload["universe_fingerprint"]
-    restored = pretium.Checkpoint.from_json(json.dumps(payload))
+    restored = tradefloor.Checkpoint.from_json(json.dumps(payload))
     assert restored.resume().prices() == engine.prices()
 
 
@@ -325,13 +325,13 @@ def test_a_mid_day_fork_continues_the_parent_exactly():
     Every existing test forked on a day boundary, where there is no per-day
     state to lose.
     """
-    universe = pretium.Universe.random(6, seed=5)
+    universe = tradefloor.Universe.random(6, seed=5)
     count = len(universe)
-    parent = pretium.Engine(seed=1, universe=universe)
+    parent = tradefloor.Engine(seed=1, universe=universe)
     parent.open_market()
     parent.run_session(9, 30, 3, 60)
 
-    forks = pretium.branch(parent, 2, universe=universe, seed=1)
+    forks = tradefloor.branch(parent, 2, universe=universe, seed=1)
     assert _first(forks[0], "random_noise", count) == _first(
         parent, "random_noise", count), "the fork lost the day's attribution"
 
@@ -353,12 +353,12 @@ def test_a_mid_day_fork_closes_the_day_the_same_way():
     variance -- which does not show up in today's prices at all, only in
     tomorrow's.
     """
-    universe = pretium.Universe.random(6, seed=5)
+    universe = tradefloor.Universe.random(6, seed=5)
     count = len(universe)
-    parent = pretium.Engine(seed=1, universe=universe)
+    parent = tradefloor.Engine(seed=1, universe=universe)
     parent.open_market()
     parent.run_session(9, 30, 3, 60)
-    fork = pretium.branch(parent, 1, universe=universe, seed=1)[0]
+    fork = tradefloor.branch(parent, 1, universe=universe, seed=1)[0]
 
     parent.run_session(10, 30, 3, 60)
     fork.run_session(10, 30, 3, 60)
@@ -367,7 +367,7 @@ def test_a_mid_day_fork_closes_the_day_the_same_way():
 
     assert fork.column("garch_variance") == parent.column("garch_variance")
     # And the variance actually moved, or this compared two untouched arrays.
-    fresh = pretium.Engine(seed=1, universe=universe)
+    fresh = tradefloor.Engine(seed=1, universe=universe)
     assert fork.column("garch_variance") != fresh.column("garch_variance")
 
 
@@ -375,8 +375,8 @@ def test_a_snapshot_without_the_day_state_still_restores():
     # Written before the per-day accumulators were carried. Such a snapshot
     # described a day that had not started, so that is what it restores to --
     # refusing it would break every archived state for no gain.
-    universe = pretium.Universe.random(6, seed=5)
-    engine = pretium.Engine(seed=1, universe=universe)
+    universe = tradefloor.Universe.random(6, seed=5)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     engine.open_market()
     engine.run_session(9, 30, 3, 60)
     snapshot = engine.state_snapshot()
@@ -384,14 +384,14 @@ def test_a_snapshot_without_the_day_state_still_restores():
                 "tick_anchor", "market_open"):
         snapshot.pop(key)
 
-    restored = pretium.Engine(seed=1, universe=universe)
+    restored = tradefloor.Engine(seed=1, universe=universe)
     restored.restore_state(snapshot)
     assert restored.prices() == engine.prices()
 
 
 def test_the_snapshot_carries_the_open_flag():
-    universe = pretium.Universe.random(6, seed=5)
-    engine = pretium.Engine(seed=1, universe=universe)
+    universe = tradefloor.Universe.random(6, seed=5)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     assert engine.state_snapshot()["market_open"] is False
     engine.open_market()
     assert engine.state_snapshot()["market_open"] is True
@@ -409,13 +409,13 @@ def test_a_mid_day_checkpoint_is_exact_because_it_replays():
     That is the reason the serialisable form is the log rather than the
     snapshot, and it is asserted here rather than argued.
     """
-    universe = pretium.Universe.random(6, seed=5)
+    universe = tradefloor.Universe.random(6, seed=5)
     count = len(universe)
-    engine = pretium.Engine(seed=1, universe=universe)
+    engine = tradefloor.Engine(seed=1, universe=universe)
     engine.open_market()
     engine.run_session(9, 30, 3, 60)
 
-    resumed = pretium.Checkpoint.of(engine, universe=universe,
+    resumed = tradefloor.Checkpoint.of(engine, universe=universe,
                                     seed=1).resume()
     assert resumed.prices() == engine.prices()
     assert _first(resumed, "random_noise", count) == _first(

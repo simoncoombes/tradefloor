@@ -4,14 +4,14 @@ from unittest import mock
 
 import pytest
 
-import pretium
-from pretium import envelope as env
-from pretium.facts import REAL_MARKETS, band_distance
+import tradefloor
+from tradefloor import envelope as env
+from tradefloor.facts import REAL_MARKETS, band_distance
 
 
 def test_the_envelope_describes_the_preset_that_actually_ships():
     """If this fails, every constant in the module describes another model."""
-    assert pretium.model_preset()["name"] == env.PRESET
+    assert tradefloor.model_preset()["name"] == env.PRESET
 
 
 def test_the_certified_panel_covers_every_measured_statistic():
@@ -113,19 +113,19 @@ def test_the_volume_change_row_is_now_inside_at_both_horizons():
 def test_an_unknown_statistic_is_refused_not_ignored():
     # Silently dropping an unrecognised name would grant a certification
     # nobody measured.
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         env.check(horizon_days=252, statistics=["sharpe_ratio"])
 
 
 def test_a_nonsense_horizon_is_refused():
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         env.check(horizon_days=0)
 
 
 def test_intervals_refuse_a_single_panel():
     # A spread over one observation is not a spread.
     panel = {k: 0.0 for k in REAL_MARKETS}
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         env.intervals([panel])
 
 
@@ -169,7 +169,7 @@ def test_the_published_artifact_matches_the_module():
     assert doc["preset"] == env.PRESET
     assert doc["certified_horizon_days"] == env.CERTIFIED_HORIZON_DAYS
     assert [g["id"] for g in doc["gaps"]] == [g.id for g in env.GAPS], (
-        "docs/envelope.json's gap list has drifted from pretium.envelope.GAPS; "
+        "docs/envelope.json's gap list has drifted from tradefloor.envelope.GAPS; "
         "regenerate it from envelope.certified()"
     )
 
@@ -311,10 +311,10 @@ def test_regressions_refuses_a_horizon_it_has_no_baseline_for():
     # CERTIFIED is measured at 252. Comparing a 504-day panel against it
     # would be the wrong-ruler error wearing a different hat.
     panel = {k: env.CERTIFIED[k] for k in REAL_MARKETS}
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         env.regressions(panel, horizon_days=504)
 
 
 def test_an_unknown_statistic_is_refused_by_score():
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         env.score({"sharpe_ratio": 1.0})

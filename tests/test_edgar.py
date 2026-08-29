@@ -10,8 +10,8 @@ import struct
 
 import pytest
 
-import pretium
-from pretium.edgar import LOADER_VERSION, Snapshot, filter_rows, to_instruments
+import tradefloor
+from tradefloor.edgar import LOADER_VERSION, Snapshot, filter_rows, to_instruments
 
 ROWS = [
     dict(ticker="ALPHA", sector="technology", eps=6.10,
@@ -81,7 +81,7 @@ def test_a_reloaded_snapshot_keeps_the_loader_version_that_built_it():
 def test_a_newer_schema_is_refused():
     payload = snapshot().to_dict()
     payload["schema"] = 99
-    with pytest.raises(pretium.ValidationError, match="newer"):
+    with pytest.raises(tradefloor.ValidationError, match="newer"):
         Snapshot.from_dict(payload)
 
 
@@ -136,7 +136,7 @@ def test_prices_start_at_fair_value():
     """
     instruments = to_instruments(snapshot(), **MACRO)
     for inst, row in zip(instruments, ROWS):
-        expected = pretium.fair_value(
+        expected = tradefloor.fair_value(
             eps=row["eps"], sector=row["sector"],
             revenue_growth=row["revenue_growth"],
             book_value_per_share=row["book_value_per_share"], **MACRO)
@@ -175,7 +175,7 @@ def test_an_explicit_field_overrides_the_derivation():
 
 def test_a_missing_required_field_is_named():
     rows = [dict(ticker="X", sector="technology")]
-    with pytest.raises(pretium.ValidationError, match="shares_outstanding"):
+    with pytest.raises(tradefloor.ValidationError, match="shares_outstanding"):
         to_instruments(Snapshot(as_of="x", rows=rows), **MACRO)
 
 
@@ -184,8 +184,8 @@ def test_a_missing_required_field_is_named():
 # --------------------------------------------------------------------------
 
 def test_a_loaded_universe_drives_the_engine():
-    u = pretium.Universe.from_edgar(snapshot(), **MACRO)
-    engine = pretium.Engine(seed=1, universe=u, macro_state=pretium.Macro(**MACRO))
+    u = tradefloor.Universe.from_edgar(snapshot(), **MACRO)
+    engine = tradefloor.Engine(seed=1, universe=u, macro_state=tradefloor.Macro(**MACRO))
     engine.open_market()
     engine.run_session(9, 30, 3, 60)
     assert all(p > 0 for p in arr(engine.prices()))
@@ -200,13 +200,13 @@ def test_matching_the_macro_matters():
     the tick's own noise. A mismatched rate regime leaves it around 1e-1, two
     orders of magnitude larger.
     """
-    u = pretium.Universe.from_edgar(snapshot(), **MACRO)
+    u = tradefloor.Universe.from_edgar(snapshot(), **MACRO)
 
-    matched = pretium.Engine(seed=1, universe=u, macro_state=pretium.Macro(**MACRO))
+    matched = tradefloor.Engine(seed=1, universe=u, macro_state=tradefloor.Macro(**MACRO))
     matched.open_market()
     matched.tick(9, 30, 3)
 
-    mismatched = pretium.Engine(seed=1, universe=u, macro_state=pretium.Macro(
+    mismatched = tradefloor.Engine(seed=1, universe=u, macro_state=tradefloor.Macro(
         federal_funds_rate=0.08, corporate_bond_yield=0.10))
     mismatched.open_market()
     mismatched.tick(9, 30, 3)
@@ -218,8 +218,8 @@ def test_matching_the_macro_matters():
 
 
 def test_loading_is_reproducible():
-    a = pretium.Universe.from_edgar(snapshot(), **MACRO)
-    b = pretium.Universe.from_edgar(snapshot(), **MACRO)
+    a = tradefloor.Universe.from_edgar(snapshot(), **MACRO)
+    b = tradefloor.Universe.from_edgar(snapshot(), **MACRO)
     assert [i.initial_price for i in a] == [i.initial_price for i in b]
     assert [i.beta for i in a] == [i.beta for i in b]
 
@@ -227,7 +227,7 @@ def test_loading_is_reproducible():
 def test_from_edgar_accepts_a_path(tmp_path):
     path = tmp_path / "snap.json"
     snapshot().save(str(path))
-    u = pretium.Universe.from_edgar(str(path), **MACRO)
+    u = tradefloor.Universe.from_edgar(str(path), **MACRO)
     assert u.tickers() == [r["ticker"] for r in ROWS]
 
 
@@ -246,8 +246,8 @@ def test_from_edgar_accepts_a_path(tmp_path):
 
 import json as _json
 
-from pretium import ValidationError
-from pretium.edgar import FetchError, fetch, sector_for_sic
+from tradefloor import ValidationError
+from tradefloor.edgar import FetchError, fetch, sector_for_sic
 
 UA = "Test Runner test@example.org"
 
@@ -499,9 +499,9 @@ def test_progress_reports_something_per_company():
 
 def test_a_fetched_snapshot_drives_an_engine():
     snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market())
-    universe = pretium.Universe.from_edgar(snap, federal_funds_rate=0.03)
-    engine = pretium.Engine(seed=1, universe=universe,
-                            macro_state=pretium.Macro(federal_funds_rate=0.03))
+    universe = tradefloor.Universe.from_edgar(snap, federal_funds_rate=0.03)
+    engine = tradefloor.Engine(seed=1, universe=universe,
+                            macro_state=tradefloor.Macro(federal_funds_rate=0.03))
     engine.run_days(3)
     import struct
     prices = struct.unpack("<%dd" % len(universe), engine.prices())
@@ -512,14 +512,14 @@ def test_a_fetched_snapshot_round_trips_and_keeps_its_hash(tmp_path):
     snap = fetch(as_of="2024-06-30", user_agent=UA, transport=small_market())
     path = str(tmp_path / "snap.json")
     snap.save(path)
-    assert pretium.edgar.Snapshot.load(path).hash == snap.hash
+    assert tradefloor.edgar.Snapshot.load(path).hash == snap.hash
 
 
 def test_the_rate_limiter_actually_waits():
     # Eight a second, under the SEC's ten. Verified by measurement, with an
     # injected clock -- a sleep the test cannot see is a sleep that could be
     # removed by accident.
-    from pretium.edgar import default_transport
+    from tradefloor.edgar import default_transport
 
     slept = []
     ticks = [0.0]
@@ -579,7 +579,7 @@ def test_every_sic_mapping_names_a_real_sector():
     # A typo in the table would put a company in a sector the engine does not
     # know, and the failure would surface as a construction error on some
     # unlucky user's universe rather than here.
-    valid = set(pretium.sectors())
+    valid = set(tradefloor.sectors())
     for code in range(0, 10000):
         sector = sector_for_sic(code)
         assert sector is None or sector in valid, (code, sector)
@@ -601,7 +601,7 @@ import statistics
 
 
 def wide_snapshot(n=120):
-    secs = pretium.sectors()
+    secs = tradefloor.sectors()
     return Snapshot(as_of="2024-06-30", rows=[
         dict(ticker="T%03d" % i, sector=secs[i % 12], eps=2.0 + i * 0.05,
              book_value_per_share=15.0 + i * 0.2, revenue_growth=0.05,
@@ -617,9 +617,9 @@ def test_the_stationary_width_is_the_model_s_own_not_a_chosen_number():
     simulation. That check matters because a derived formula is exactly the
     kind of thing that looks right and is off by a factor.
     """
-    for sector in pretium.sectors():
-        daily = pretium.sector_daily_sigma(sector)
-        width = pretium.stationary_sigma(daily)
+    for sector in tradefloor.sectors():
+        daily = tradefloor.sector_daily_sigma(sector)
+        width = tradefloor.stationary_sigma(daily)
         assert width is not None
         # The process amplifies its innovations about 7.6x at rest.
         assert width / daily == pytest.approx(7.636, rel=1e-3)
@@ -647,8 +647,8 @@ def test_zero_start_takes_about_a_half_life_to_catch_up():
     snap = wide_snapshot(40)
 
     def dispersion_after(mode, days):
-        u = pretium.Universe(to_instruments(snap, initial_s=mode, s_seed=11, **MACRO))
-        e = pretium.Engine(seed=5, universe=u, macro_state=pretium.Macro(**MACRO))
+        u = tradefloor.Universe(to_instruments(snap, initial_s=mode, s_seed=11, **MACRO))
+        e = tradefloor.Engine(seed=5, universe=u, macro_state=tradefloor.Macro(**MACRO))
         e.run_days(days, ticks_per_day=390, record=False)
         return statistics.pstdev(arr(e.column("mispricing_s")))
 
@@ -658,7 +658,7 @@ def test_zero_start_takes_about_a_half_life_to_catch_up():
 def test_a_tail_draw_cannot_start_outside_the_model_s_cap():
     # A company beginning outside the range the process can reach would be a
     # state the model cannot produce.
-    cap = pretium.model_preset()["mispricing_cap"]
+    cap = tradefloor.model_preset()["mispricing_cap"]
     spread = to_instruments(wide_snapshot(300), initial_s="stationary",
                             s_seed=3, **MACRO)
     zero = to_instruments(wide_snapshot(300), initial_s="zero", **MACRO)
@@ -682,10 +682,10 @@ def test_the_dispersion_seed_does_not_perturb_the_market():
     different market, and "same universe, different draws" would be a lie.
     """
     snap = wide_snapshot(20)
-    zero = pretium.Universe(to_instruments(snap, initial_s="zero", **MACRO))
+    zero = tradefloor.Universe(to_instruments(snap, initial_s="zero", **MACRO))
 
     def prices(seed):
-        e = pretium.Engine(seed=99, universe=zero, macro_state=pretium.Macro(**MACRO))
+        e = tradefloor.Engine(seed=99, universe=zero, macro_state=tradefloor.Macro(**MACRO))
         e.run_days(2, ticks_per_day=100, record=False)
         return arr(e.prices())
 
@@ -694,16 +694,16 @@ def test_the_dispersion_seed_does_not_perturb_the_market():
 
 
 def test_an_unknown_mode_is_refused():
-    with pytest.raises(pretium.ValidationError, match='"zero" or "stationary"'):
+    with pytest.raises(tradefloor.ValidationError, match='"zero" or "stationary"'):
         to_instruments(wide_snapshot(3), initial_s="wishful", **MACRO)
 
 
 def test_stationary_sigma_refuses_nonsense_and_reports_non_stationarity():
-    with pytest.raises(pretium.ValidationError, match="finite"):
-        pretium.stationary_sigma(float("nan"))
+    with pytest.raises(tradefloor.ValidationError, match="finite"):
+        tradefloor.stationary_sigma(float("nan"))
     # A unit root has infinite variance. None rather than a large finite
     # number, which would be worse: it would get used.
-    assert pretium.stationary_sigma(0.01, phi=1.0, theta=0.0) is None
+    assert tradefloor.stationary_sigma(0.01, phi=1.0, theta=0.0) is None
 
 
 # --------------------------------------------------------------------------
@@ -733,7 +733,7 @@ network = pytest.mark.skipif(
 
 @network
 def test_the_frames_api_returns_the_shape_this_was_written_against():
-    from pretium.edgar import _frame, default_transport
+    from tradefloor.edgar import _frame, default_transport
 
     get = default_transport(SEC_UA)
     eps = _frame(get, "us-gaap", "EarningsPerShareDiluted", "USD-per-shares",
@@ -751,7 +751,7 @@ def test_a_missing_frame_really_does_404():
     # The fallback chain depends on it. Verified live: SalesRevenueNet has no
     # CY2023 frame and returns 404, which `_frame` turns into an empty dict
     # rather than an exception -- so the chain moves on instead of dying.
-    from pretium.edgar import _frame, default_transport
+    from tradefloor.edgar import _frame, default_transport
 
     get = default_transport(SEC_UA)
     assert _frame(get, "us-gaap", "SalesRevenueNet", "USD", "CY2023") == {}
@@ -766,7 +766,7 @@ def test_merging_both_share_tags_reaches_far_more_filers():
     4,733 -- so taking dei and falling back only when it came back EMPTY
     dropped more than half the usable universe, invisibly.
     """
-    from pretium.edgar import _frame, default_transport
+    from tradefloor.edgar import _frame, default_transport
 
     get = default_transport(SEC_UA)
     dei = _frame(get, "dei", "EntityCommonStockSharesOutstanding", "shares",
@@ -779,19 +779,19 @@ def test_merging_both_share_tags_reaches_far_more_filers():
 
 @network
 def test_a_real_fetch_builds_a_universe_that_drives_an_engine():
-    snapshot = pretium.edgar.fetch(as_of="2024-06-30", user_agent=SEC_UA,
+    snapshot = tradefloor.edgar.fetch(as_of="2024-06-30", user_agent=SEC_UA,
                                    limit=20)
     assert len(snapshot.rows) == 20
     assert snapshot.notes["candidates"] > 3_000
     for row in snapshot.rows:
-        assert row["sector"] in pretium.sectors()
+        assert row["sector"] in tradefloor.sectors()
         assert row["shares_outstanding"] > 0
 
-    universe = pretium.Universe.from_edgar(snapshot, federal_funds_rate=0.05,
+    universe = tradefloor.Universe.from_edgar(snapshot, federal_funds_rate=0.05,
                                            corporate_bond_yield=0.055)
-    engine = pretium.Engine(
+    engine = tradefloor.Engine(
         seed=1, universe=universe,
-        macro_state=pretium.Macro(federal_funds_rate=0.05,
+        macro_state=tradefloor.Macro(federal_funds_rate=0.05,
                                   corporate_bond_yield=0.055))
     engine.run_days(3)
     assert all(p > 0 for p in arr(engine.prices()))

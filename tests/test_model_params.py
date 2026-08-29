@@ -26,16 +26,16 @@ import struct
 
 import pytest
 
-import pretium
+import tradefloor
 
-DEFAULT = pretium.ModelParams.from_preset().fingerprint
+DEFAULT = tradefloor.ModelParams.from_preset().fingerprint
 
-UNIVERSE = pretium.Universe.random(10, seed=3)
+UNIVERSE = tradefloor.Universe.random(10, seed=3)
 
 
 def run_market(model=None, *, seed=42, days=3, universe=UNIVERSE):
     kwargs = {} if model is None else {"model": model}
-    engine = pretium.Engine(seed=seed, universe=universe, **kwargs)
+    engine = tradefloor.Engine(seed=seed, universe=universe, **kwargs)
     for _ in range(days):
         engine.open_market()
         engine.run_session(9, 30, 3, 78)
@@ -62,8 +62,8 @@ def test_the_preset_constructed_engine_is_the_const_build_bit_for_bit():
     committed known-answer digest guards the first; this makes the other
     two the same engine."""
     default = market_state(run_market())
-    named = market_state(run_market(pretium.ModelParams.from_preset().fingerprint))
-    built = market_state(run_market(pretium.ModelParams.from_preset()))
+    named = market_state(run_market(tradefloor.ModelParams.from_preset().fingerprint))
+    built = market_state(run_market(tradefloor.ModelParams.from_preset()))
     assert default == named
     assert default == built
 
@@ -71,16 +71,16 @@ def test_the_preset_constructed_engine_is_the_const_build_bit_for_bit():
 def test_an_override_equal_to_the_preset_is_the_preset():
     # Bit-identity is the membership rule, not construction history: the
     # same value must produce the same model, fingerprint and trajectory.
-    same = pretium.ModelParams.from_preset(
-        **{k: v for k, v in pretium.ModelParams.from_preset().to_dict().items()
-           if k in pretium.ModelParams.settable()})
-    assert same.fingerprint == pretium.ModelParams.from_preset().fingerprint
+    same = tradefloor.ModelParams.from_preset(
+        **{k: v for k, v in tradefloor.ModelParams.from_preset().to_dict().items()
+           if k in tradefloor.ModelParams.settable()})
+    assert same.fingerprint == tradefloor.ModelParams.from_preset().fingerprint
     assert market_state(run_market(same)) == market_state(run_market())
 
 
 def test_the_shipped_half_life_keeps_the_recorded_bits():
     # The derived-bits policy: sameness of value means sameness of bits.
-    same = pretium.ModelParams.from_preset("pt-v1",
+    same = tradefloor.ModelParams.from_preset("pt-v1",
                                            mispricing_half_life_days=60.0)
     assert struct.pack(">d", same.mispricing_phi).hex() == "3fefa1e827a1b38c"
     assert struct.pack(">d", same.s_phi_tick).hex() == "3fefffc1e1385e9e"
@@ -299,7 +299,7 @@ PERTURBATIONS = [
 
 def test_the_perturbation_table_covers_the_whole_settable_surface():
     assert sorted(name for name, _, _ in PERTURBATIONS) == \
-        pretium.ModelParams.settable()
+        tradefloor.ModelParams.settable()
 
 
 @pytest.mark.parametrize("name,value,moves", PERTURBATIONS,
@@ -317,7 +317,7 @@ def test_each_settable_parameter_moves_the_market_or_names_why_not(
     # parameter effect. That is what happened at the pt-v3 era boundary --
     # six parameters documented as inert "failed" because the baseline had
     # moved underneath them.
-    custom = pretium.ModelParams.from_preset(**{name: value})
+    custom = tradefloor.ModelParams.from_preset(**{name: value})
     assert custom.fingerprint.startswith("custom-")
     perturbed = market_state(run_market(custom))
 
@@ -344,7 +344,7 @@ def test_the_slow_variance_component_acts_when_its_three_parts_agree():
     optimiser could walk through.
     """
     base = market_state(run_market())
-    both = pretium.ModelParams.from_preset(
+    both = tradefloor.ModelParams.from_preset(
         "pt-v3", market_vol_slow_gain=0.1, market_vol_slow_weight=0.5)
     assert both.fingerprint.startswith("custom-")
     moved = market_state(run_market(both))
@@ -365,7 +365,7 @@ def test_universe_memory_acts_above_the_crisis_threshold():
     because that is the only shape in which the difference exists at all
     -- at a flat VIX there is nothing to remember.
     """
-    import pretium.scenario as sc
+    import tradefloor.scenario as sc
 
     def final_prices(model=None):
         kwargs = {} if model is None else {"model": model}
@@ -375,8 +375,8 @@ def test_universe_memory_acts_above_the_crisis_threshold():
         return struct.unpack("<%dd" % len(engine.tickers),
                              engine.column("price"))
 
-    forgetful = final_prices(pretium.ModelParams.from_preset("pt-v3"))
-    remembering = final_prices(pretium.ModelParams.from_preset(
+    forgetful = final_prices(tradefloor.ModelParams.from_preset("pt-v3"))
+    remembering = final_prices(tradefloor.ModelParams.from_preset(
         "pt-v3", universe_stress_decay=0.97, universe_stress_weight=1.0))
     assert forgetful != remembering, (
         "universe memory changed nothing across a VIX spike and decay; "
@@ -486,7 +486,7 @@ def test_the_calibration_instrument_knows_every_settable_parameter():
                            / "tools" / "calibration"))
     from instrumentlib import PARAM_SPECS
 
-    settable = set(pretium.ModelParams.settable())
+    settable = set(tradefloor.ModelParams.settable())
     missing = sorted(settable - set(PARAM_SPECS))
     assert not missing, (
         f"settable but with no calibration spec, so no search can reach "
@@ -510,7 +510,7 @@ def test_the_crisis_threshold_acts_above_itself():
     lowered one, because a probe below the gate cannot tell them apart:
     that is the whole reason this parameter reads inert in the table above.
     """
-    import pretium.scenario as sc
+    import tradefloor.scenario as sc
 
     def prices(model):
         shock = sc.Scenario.vix_shock(calm=15.0, peak=40.0, at=3, over=6)
@@ -519,8 +519,8 @@ def test_the_crisis_threshold_acts_above_itself():
         return struct.unpack("<%dd" % len(engine.tickers),
                              engine.column("price"))
 
-    shipped = prices(pretium.ModelParams.from_preset("pt-v3"))
-    earlier = prices(pretium.ModelParams.from_preset(
+    shipped = prices(tradefloor.ModelParams.from_preset("pt-v3"))
+    earlier = prices(tradefloor.ModelParams.from_preset(
         "pt-v3", crisis_vix_threshold=18.0))
     assert shipped != earlier, (
         "lowering the crisis threshold changed nothing across a VIX spike "
@@ -543,15 +543,15 @@ def test_jumps_move_prices_when_intensity_is_on():
     """
     def run(model=None, days=6):
         kwargs = {} if model is None else {"model": model}
-        engine = pretium.Engine(seed=42, universe=UNIVERSE, **kwargs)
+        engine = tradefloor.Engine(seed=42, universe=UNIVERSE, **kwargs)
         for _ in range(days):
             engine.open_market()
             engine.run_session(9, 30, 3, 40)
             engine.close_market()
         return struct.unpack("<%dd" % len(engine.tickers), engine.column("price"))
 
-    quiet = run(pretium.ModelParams.from_preset("pt-v3"))
-    crashing = run(pretium.ModelParams.from_preset(
+    quiet = run(tradefloor.ModelParams.from_preset("pt-v3"))
+    crashing = run(tradefloor.ModelParams.from_preset(
         "pt-v3", jump_intensity_market=1.0, jump_mean_market=-0.06,
         jump_sigma_market=0.01))
 
@@ -579,14 +579,14 @@ def test_jumps_are_inert_at_the_shipped_intensity():
     exactly. This is the assertion that guards that claim.
     """
     def prices(model):
-        engine = pretium.Engine(seed=7, universe=UNIVERSE, model=model)
+        engine = tradefloor.Engine(seed=7, universe=UNIVERSE, model=model)
         engine.open_market()
         engine.run_session(9, 30, 3, 40)
         engine.close_market()
         return struct.unpack("<%dd" % len(engine.tickers), engine.column("price"))
 
-    shipped = prices(pretium.ModelParams.from_preset("pt-v3"))
-    explicit_zero = prices(pretium.ModelParams.from_preset(
+    shipped = prices(tradefloor.ModelParams.from_preset("pt-v3"))
+    explicit_zero = prices(tradefloor.ModelParams.from_preset(
         "pt-v3", jump_intensity_market=0.0, jump_intensity_idio=0.0,
         jump_sigma_market=0.0, jump_sigma_idio=0.0, jump_mean_market=0.0))
     assert shipped == explicit_zero
@@ -604,23 +604,23 @@ def test_peer_transfer_moves_a_name_the_news_never_named():
     Asserted on a name OTHER than the announcer, because the announcer moves
     identically either way: it is matched by id, before sector is consulted.
     """
-    universe = pretium.Universe.random(40, seed=3)
+    universe = tradefloor.Universe.random(40, seed=3)
     announcer = universe.tickers()[0]
 
     def prices(model=None):
         kwargs = {} if model is None else {"model": model}
-        engine = pretium.Engine(seed=42, universe=universe, **kwargs)
+        engine = tradefloor.Engine(seed=42, universe=universe, **kwargs)
         engine.open_market()
         engine.run_session(
             9, 30, 3, 39,
-            news=[pretium.News(ticker=announcer, price_impact=0.05)],
+            news=[tradefloor.News(ticker=announcer, price_impact=0.05)],
         )
         engine.close_market()
         return struct.unpack("<%dd" % len(engine.tickers),
                              engine.column("price"))
 
-    isolated = prices(pretium.ModelParams.from_preset("pt-v3"))
-    transferring = prices(pretium.ModelParams.from_preset(
+    isolated = prices(tradefloor.ModelParams.from_preset("pt-v3"))
+    transferring = prices(tradefloor.ModelParams.from_preset(
         "pt-v3", news_peer_weight=0.2, news_peer_weight_down=0.5))
 
     moved = [i for i in range(1, len(isolated))
@@ -641,9 +641,9 @@ def test_the_conditionally_inert_parameters_act_under_their_conditions():
     assumed."""
     def run_with_inputs(model=None):
         kwargs = {} if model is None else {"model": model}
-        engine = pretium.Engine(seed=42, universe=UNIVERSE, **kwargs)
-        news = [pretium.News(sector="technology", price_impact=0.04),
-                pretium.News(price_impact=0.02)]
+        engine = tradefloor.Engine(seed=42, universe=UNIVERSE, **kwargs)
+        news = [tradefloor.News(sector="technology", price_impact=0.04),
+                tradefloor.News(price_impact=0.02)]
         engine.open_market()
         engine.run_session(9, 30, 3, 39, news=news,
                            order_flow={UNIVERSE.tickers()[0]: (200_000.0, 0.0)})
@@ -655,14 +655,14 @@ def test_the_conditionally_inert_parameters_act_under_their_conditions():
                         ("informed_flow_fraction", 0.5),
                         ("news_sector_weight", 0.6),
                         ("news_market_weight", 0.4)]:
-        custom = pretium.ModelParams.from_preset("pt-v1", **{name: value})
+        custom = tradefloor.ModelParams.from_preset("pt-v1", **{name: value})
         moved = run_with_inputs(custom)
         assert moved["draws"] == base["draws"], name
         assert moved != base, f"{name} did not act even under its inputs"
 
 
 def test_a_recomputed_half_life_still_halves_in_its_stated_days():
-    fast = pretium.ModelParams.from_preset("pt-v1",
+    fast = tradefloor.ModelParams.from_preset("pt-v1",
                                            mispricing_half_life_days=30.0)
     decayed = 1.0
     for _ in range(30):
@@ -677,9 +677,9 @@ def test_a_recomputed_half_life_still_halves_in_its_stated_days():
 # -- property 3: the fingerprint cannot lie ---------------------------------
 
 def test_the_fingerprint_is_stable_distinct_and_honestly_shaped():
-    a = pretium.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
-    b = pretium.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
-    c = pretium.ModelParams.from_preset("pt-v1", garch_alpha=0.13)
+    a = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+    b = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+    c = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.13)
     assert a.fingerprint == b.fingerprint
     assert a.fingerprint != c.fingerprint
     assert a.fingerprint.startswith("custom-")
@@ -688,44 +688,44 @@ def test_the_fingerprint_is_stable_distinct_and_honestly_shaped():
 
 
 def test_a_built_params_cannot_be_mutated():
-    params = pretium.ModelParams.from_preset("pt-v1")
+    params = tradefloor.ModelParams.from_preset("pt-v1")
     with pytest.raises(AttributeError):
         params.garch_alpha = 0.5
 
 
 def test_unknown_read_only_and_derived_names_are_refused():
-    with pytest.raises(pretium.ValidationError, match="unknown model parameter"):
-        pretium.ModelParams.from_preset("pt-v1", garch_alfa=0.1)
-    with pytest.raises(pretium.ValidationError, match="not yet runtime-settable"):
-        pretium.ModelParams.from_preset("pt-v1", oil_baseline=80.0)
-    with pytest.raises(pretium.ValidationError, match="derived"):
-        pretium.ModelParams.from_preset("pt-v1", mispricing_phi=0.9)
-    with pytest.raises(pretium.ValidationError, match="finite"):
-        pretium.ModelParams.from_preset("pt-v1", garch_alpha=float("nan"))
-    with pytest.raises(pretium.ValidationError, match="unknown model preset"):
-        pretium.ModelParams.from_preset("pt-v999")
-    with pytest.raises(pretium.ValidationError, match="model must be"):
-        pretium.Engine(seed=1, universe=UNIVERSE, model=0.12)
+    with pytest.raises(tradefloor.ValidationError, match="unknown model parameter"):
+        tradefloor.ModelParams.from_preset("pt-v1", garch_alfa=0.1)
+    with pytest.raises(tradefloor.ValidationError, match="not yet runtime-settable"):
+        tradefloor.ModelParams.from_preset("pt-v1", oil_baseline=80.0)
+    with pytest.raises(tradefloor.ValidationError, match="derived"):
+        tradefloor.ModelParams.from_preset("pt-v1", mispricing_phi=0.9)
+    with pytest.raises(tradefloor.ValidationError, match="finite"):
+        tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=float("nan"))
+    with pytest.raises(tradefloor.ValidationError, match="unknown model preset"):
+        tradefloor.ModelParams.from_preset("pt-v999")
+    with pytest.raises(tradefloor.ValidationError, match="model must be"):
+        tradefloor.Engine(seed=1, universe=UNIVERSE, model=0.12)
 
 
 def test_the_dict_round_trips_and_a_foreign_constant_is_refused():
-    custom = pretium.ModelParams.from_preset("pt-v1", momentum_theta=0.4)
+    custom = tradefloor.ModelParams.from_preset("pt-v1", momentum_theta=0.4)
     d = custom.to_dict()
     assert d["name"] == custom.fingerprint
-    rebuilt = pretium.ModelParams.from_dict(d)
+    rebuilt = tradefloor.ModelParams.from_dict(d)
     assert rebuilt == custom and rebuilt.fingerprint == custom.fingerprint
 
     # A dict claiming a different value for a coefficient this build cannot
     # set describes a model this build cannot run.
     foreign = dict(d)
     foreign["oil_baseline"] = 80.0
-    with pytest.raises(pretium.ValidationError, match="oil_baseline"):
-        pretium.ModelParams.from_dict(foreign)
+    with pytest.raises(tradefloor.ValidationError, match="oil_baseline"):
+        tradefloor.ModelParams.from_dict(foreign)
 
 
 def test_the_engine_reports_the_model_it_runs():
-    custom = pretium.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
-    engine = pretium.Engine(seed=1, universe=UNIVERSE, model=custom)
+    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+    engine = tradefloor.Engine(seed=1, universe=UNIVERSE, model=custom)
     assert engine.model_fingerprint == custom.fingerprint
     assert engine.model == custom
     assert engine.model_params["name"] == custom.fingerprint
@@ -733,8 +733,8 @@ def test_the_engine_reports_the_model_it_runs():
 
 
 def test_model_preset_keeps_its_kat_frozen_shape_and_gains_name():
-    legacy = pretium.model_preset()
-    assert sorted(legacy) == sorted(pretium.model_preset("pt-v1"))
+    legacy = tradefloor.model_preset()
+    assert sorted(legacy) == sorted(tradefloor.model_preset("pt-v1"))
     # The KAT hashes every value in this dict; its shape is load-bearing
     # until the next deliberate KAT bump. See the function's docstring.
     assert sorted(legacy) == [
@@ -742,8 +742,8 @@ def test_model_preset_keeps_its_kat_frozen_shape_and_gains_name():
         "daily_shock_cap", "mispricing_cap", "mispricing_half_life_days",
         "mispricing_phi", "momentum_theta", "name",
     ]
-    with pytest.raises(pretium.ValidationError, match="unknown model preset"):
-        pretium.model_preset("pt-v999")
+    with pytest.raises(tradefloor.ValidationError, match="unknown model preset"):
+        tradefloor.model_preset("pt-v999")
 
 
 # -- property 4: the fingerprint travels ------------------------------------
@@ -752,14 +752,14 @@ def test_a_custom_preset_round_trips_through_a_manifest():
     """The §9 composition: a run under a custom model is captured, travels
     as JSON, and reproduces on the other side — under the recorded
     coefficients, to the recorded digest."""
-    custom = pretium.ModelParams.from_preset("pt-v1", garch_alpha=0.12,
+    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12,
                                              market_factor_sigma=0.018)
     engine = run_market(custom)
-    manifest = pretium.RunManifest.of(engine, seed=42, universe=UNIVERSE)
+    manifest = tradefloor.RunManifest.of(engine, seed=42, universe=UNIVERSE)
     assert manifest.fingerprints["model"] == custom.fingerprint
     assert manifest.model["name"] == custom.fingerprint
 
-    loaded = pretium.RunManifest.from_json(manifest.to_json())
+    loaded = tradefloor.RunManifest.from_json(manifest.to_json())
     rebuilt = loaded.reproduce()
     assert rebuilt.model_fingerprint == custom.fingerprint
     assert market_state(rebuilt) == market_state(engine)
@@ -767,36 +767,36 @@ def test_a_custom_preset_round_trips_through_a_manifest():
 
 def test_a_default_manifest_still_reproduces_and_names_its_preset():
     engine = run_market()
-    manifest = pretium.RunManifest.of(engine, seed=42, universe=UNIVERSE)
+    manifest = tradefloor.RunManifest.of(engine, seed=42, universe=UNIVERSE)
     assert manifest.fingerprints["model"] == DEFAULT
-    rebuilt = pretium.RunManifest.from_json(manifest.to_json()).reproduce()
+    rebuilt = tradefloor.RunManifest.from_json(manifest.to_json()).reproduce()
     assert rebuilt.model_fingerprint == DEFAULT
     assert market_state(rebuilt) == market_state(engine)
 
 
 def test_a_tampered_custom_model_dict_is_refused_before_replay():
-    custom = pretium.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
-    manifest = pretium.RunManifest.of(run_market(custom), seed=42,
+    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+    manifest = tradefloor.RunManifest.of(run_market(custom), seed=42,
                                       universe=UNIVERSE)
     payload = json.loads(manifest.to_json())
     payload["written_by"]["model"]["garch_alpha"] = 0.19
-    with pytest.raises(pretium.ValidationError, match="no longer"):
-        pretium.RunManifest.from_json(json.dumps(payload)).reproduce()
+    with pytest.raises(tradefloor.ValidationError, match="no longer"):
+        tradefloor.RunManifest.from_json(json.dumps(payload)).reproduce()
 
 
 def test_a_checkpoint_of_a_custom_run_resumes_under_that_model():
-    custom = pretium.ModelParams.from_preset("pt-v1", momentum_theta=0.4)
+    custom = tradefloor.ModelParams.from_preset("pt-v1", momentum_theta=0.4)
     engine = run_market(custom)
-    mark = pretium.Checkpoint.of(engine, universe=UNIVERSE, seed=42)
-    resumed = pretium.Checkpoint.from_json(mark.to_json()).resume()
+    mark = tradefloor.Checkpoint.of(engine, universe=UNIVERSE, seed=42)
+    resumed = tradefloor.Checkpoint.from_json(mark.to_json()).resume()
     assert resumed.model_fingerprint == custom.fingerprint
     assert market_state(resumed) == market_state(engine)
 
 
 def test_a_fork_of_a_custom_run_prices_under_the_parents_model():
-    custom = pretium.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
     parent = run_market(custom, days=2)
-    child = pretium.branch(parent, 1, universe=UNIVERSE, seed=42)[0]
+    child = tradefloor.branch(parent, 1, universe=UNIVERSE, seed=42)[0]
     assert child.model_fingerprint == custom.fingerprint
     # One more day each: identical futures, which only holds if the child
     # runs the parent's coefficients. Columns only — `draws_consumed` is a
@@ -817,12 +817,12 @@ def test_the_scorecard_carries_the_model_fingerprint():
         def act(self, obs):
             return {}
 
-    custom = pretium.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
-    small = pretium.Universe.random(4, seed=5)
-    default = pretium.evaluate({"idle": Idle()}, seed=9, universe=small,
+    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_alpha=0.12)
+    small = tradefloor.Universe.random(4, seed=5)
+    default = tradefloor.evaluate({"idle": Idle()}, seed=9, universe=small,
                                days=1, steps_per_day=2, ticks_per_step=10)
     assert default["idle"].model_fingerprint == DEFAULT
-    scored = pretium.evaluate({"idle": Idle()}, seed=9, universe=small,
+    scored = tradefloor.evaluate({"idle": Idle()}, seed=9, universe=small,
                               days=1, steps_per_day=2, ticks_per_step=10,
                               model=custom)
     assert scored["idle"].model_fingerprint == custom.fingerprint
@@ -830,14 +830,14 @@ def test_the_scorecard_carries_the_model_fingerprint():
 
 
 def test_replay_accepts_the_model_and_reproduces_the_custom_run():
-    custom = pretium.ModelParams.from_preset("pt-v1", garch_beta=0.7)
+    custom = tradefloor.ModelParams.from_preset("pt-v1", garch_beta=0.7)
     engine = run_market(custom)
-    replayed = pretium.replay(engine.order_log, seed=42, universe=UNIVERSE,
+    replayed = tradefloor.replay(engine.order_log, seed=42, universe=UNIVERSE,
                               model=custom)
     assert market_state(replayed) == market_state(engine)
     # And WITHOUT the model it replays the default market instead — the
     # reason the manifest must carry the coefficients.
-    wrong = pretium.replay(engine.order_log, seed=42, universe=UNIVERSE)
+    wrong = tradefloor.replay(engine.order_log, seed=42, universe=UNIVERSE)
     assert market_state(wrong) != market_state(engine)
 
 
@@ -855,9 +855,9 @@ def test_replay_accepts_the_model_and_reproduces_the_custom_run():
 #: One perturbation, shared by the whole section. market_factor_sigma is
 #: the loudest single lever (it scales the shared component of every
 #: return), so any runner that quietly dropped the model fails fast.
-CUSTOM = pretium.ModelParams.from_preset("pt-v1", market_factor_sigma=0.03)
+CUSTOM = tradefloor.ModelParams.from_preset("pt-v1", market_factor_sigma=0.03)
 
-SMALL = pretium.Universe.random(6, seed=2)
+SMALL = tradefloor.Universe.random(6, seed=2)
 
 
 class _Idle:
@@ -882,22 +882,22 @@ def test_facts_measure_runs_the_model_and_names_it():
     candidate vector is measure(model=candidate), and the row it returns
     names the vector it measured."""
     kwargs = dict(seed=1, universe=SMALL, days=35)
-    default = pretium.facts.measure(**kwargs)
-    custom = pretium.facts.measure(**kwargs, model=CUSTOM)
+    default = tradefloor.facts.measure(**kwargs)
+    custom = tradefloor.facts.measure(**kwargs, model=CUSTOM)
     assert default["model_fingerprint"] == DEFAULT
     assert custom["model_fingerprint"] == CUSTOM.fingerprint
     # The statistics were measured on the custom market, not merely
     # relabelled: tripling the factor sigma moves pooled volatility.
     assert custom["annualised_vol_pct"] != default["annualised_vol_pct"]
     # And the shipped default is untouched by the parameter existing.
-    assert pretium.facts.measure(**kwargs, model=DEFAULT) == default
+    assert tradefloor.facts.measure(**kwargs, model=DEFAULT) == default
 
 
 def test_tca_analyse_runs_the_model_in_both_worlds():
     kwargs = dict(seed=5, universe=SMALL, days=1, steps_per_day=2,
                   ticks_per_step=10)
-    default = pretium.tca.analyse(_BuyFirst(), **kwargs)
-    custom = pretium.tca.analyse(_BuyFirst(), **kwargs, model=CUSTOM)
+    default = tradefloor.tca.analyse(_BuyFirst(), **kwargs)
+    custom = tradefloor.tca.analyse(_BuyFirst(), **kwargs, model=CUSTOM)
     assert default.model_fingerprint == DEFAULT
     assert custom.model_fingerprint == CUSTOM.fingerprint
     assert custom.as_dict()["model_fingerprint"] == CUSTOM.fingerprint
@@ -909,18 +909,18 @@ def test_tca_analyse_runs_the_model_in_both_worlds():
 
 
 def test_run_scenario_and_compare_run_the_model():
-    scenario = pretium.Scenario(label="flat").hold(vix=15.0)
+    scenario = tradefloor.Scenario(label="flat").hold(vix=15.0)
     kwargs = dict(seed=3, universe=SMALL, days=1, ticks_per_day=30)
-    default = pretium.run_scenario(scenario, **kwargs)
-    custom = pretium.run_scenario(scenario, **kwargs, model=CUSTOM)
+    default = tradefloor.run_scenario(scenario, **kwargs)
+    custom = tradefloor.run_scenario(scenario, **kwargs, model=CUSTOM)
     assert default.model_fingerprint == DEFAULT
     assert custom.model_fingerprint == CUSTOM.fingerprint
     assert custom.prices() != default.prices()
 
-    from pretium.scenario import compare
+    from tradefloor.scenario import compare
 
     result = compare(
-        pretium.Scenario.vix_shock(calm=15.0, peak=45.0, at=0, over=2),
+        tradefloor.Scenario.vix_shock(calm=15.0, peak=45.0, at=0, over=2),
         seed=3, universe=SMALL, days=3, model=CUSTOM)
     assert result["model_fingerprint"] == CUSTOM.fingerprint
     # The membership rule holds through the runner: a model changes what
@@ -931,8 +931,8 @@ def test_run_scenario_and_compare_run_the_model():
 
 def test_run_many_runs_the_model_and_stamps_every_row():
     kwargs = dict(universe=SMALL, days=1, ticks=30, collect="summary")
-    default = pretium.run_many([1, 2], **kwargs)
-    custom = pretium.run_many([1, 2], **kwargs, model=CUSTOM)
+    default = tradefloor.run_many([1, 2], **kwargs)
+    custom = tradefloor.run_many([1, 2], **kwargs, model=CUSTOM)
     for row in default:
         assert row["model_fingerprint"] == DEFAULT
     for before, after in zip(default, custom):
@@ -941,7 +941,7 @@ def test_run_many_runs_the_model_and_stamps_every_row():
         # The CRN guard, through the runner: same seed, same schedule.
         assert after["draws_consumed"] == before["draws_consumed"]
     # The model survives the crossing into worker threads.
-    threaded = pretium.run_many([1, 2], **kwargs, model=CUSTOM, workers=2)
+    threaded = tradefloor.run_many([1, 2], **kwargs, model=CUSTOM, workers=2)
     assert [r["prices"] for r in threaded] == [r["prices"] for r in custom]
 
 
@@ -949,7 +949,7 @@ def test_sweep_runs_the_model():
     import pyarrow as pa
 
     def closes(model=None):
-        ((_, table),) = pretium.sweep([9], universe=SMALL, days=1,
+        ((_, table),) = tradefloor.sweep([9], universe=SMALL, days=1,
                                       ticks_per_day=30, model=model)
         return pa.table(table).to_pydict()["close"]
 
@@ -959,8 +959,8 @@ def test_sweep_runs_the_model():
 def test_flow_impact_runs_the_model_in_both_worlds():
     flow = {SMALL[0].ticker: (50_000.0, 0.0)}
     kwargs = dict(seed=4, universe=SMALL, order_flow=flow, ticks=30)
-    default = pretium.flow_impact(**kwargs)
-    custom = pretium.flow_impact(**kwargs, model=CUSTOM)
+    default = tradefloor.flow_impact(**kwargs)
+    custom = tradefloor.flow_impact(**kwargs, model=CUSTOM)
     assert custom.baseline != default.baseline
     # One day, both worlds under the one model: nothing untraded moves.
     assert custom.untouched_moved() == []
@@ -968,7 +968,7 @@ def test_flow_impact_runs_the_model_in_both_worlds():
 
 def test_the_gym_env_runs_the_model_and_reports_it_at_reset():
     numpy = pytest.importorskip("numpy")
-    from pretium.gym import TradingEnv
+    from tradefloor.gym import TradingEnv
 
     kwargs = dict(universe=SMALL, seed=6, days=1, steps_per_day=1,
                   ticks_per_step=10)
@@ -989,9 +989,9 @@ def test_the_gym_env_runs_the_model_and_reports_it_at_reset():
 def test_rank_runs_the_model_and_the_ranking_records_it():
     kwargs = dict(seeds=[1], universe=SMALL, days=1, steps_per_day=1,
                   ticks_per_step=10)
-    default = pretium.rank(lambda: {"idle": _Idle()}, **kwargs)
+    default = tradefloor.rank(lambda: {"idle": _Idle()}, **kwargs)
     assert default.model_fingerprint == DEFAULT
-    ranking = pretium.rank(lambda: {"idle": _Idle()}, **kwargs, model=CUSTOM)
+    ranking = tradefloor.rank(lambda: {"idle": _Idle()}, **kwargs, model=CUSTOM)
     assert ranking.model_fingerprint == CUSTOM.fingerprint
     assert ranking.as_dict()["model_fingerprint"] == CUSTOM.fingerprint
     assert CUSTOM.fingerprint in ranking.report()
@@ -1002,41 +1002,41 @@ def test_a_state_snapshot_refuses_to_restore_across_models():
     builds its engines from the parent's own model, but state_snapshot /
     restore_state are public, and a custom run's state restored onto a
     default-built engine would continue under pt-v1 with no symptom."""
-    parent = pretium.Engine(seed=11, universe=SMALL, model=CUSTOM)
+    parent = tradefloor.Engine(seed=11, universe=SMALL, model=CUSTOM)
     parent.open_market()
     parent.run_session(9, 30, 3, 20)
     snapshot = parent.state_snapshot()
     assert snapshot["model_fingerprint"] == CUSTOM.fingerprint
 
-    imposter = pretium.Engine(seed=11, universe=SMALL)
-    with pytest.raises(pretium.ValidationError, match="across models"):
+    imposter = tradefloor.Engine(seed=11, universe=SMALL)
+    with pytest.raises(tradefloor.ValidationError, match="across models"):
         imposter.restore_state(snapshot)
 
     # A snapshot from before the fingerprint was recorded has no key and
     # restores as it always did -- the caller vouches for the context,
     # exactly as they do for the universe.
     del snapshot["model_fingerprint"]
-    twin = pretium.Engine(seed=11, universe=SMALL, model=CUSTOM)
+    twin = tradefloor.Engine(seed=11, universe=SMALL, model=CUSTOM)
     twin.restore_state(snapshot)
     assert twin.prices() == parent.prices()
 
 
 def test_an_engine_batch_member_is_the_standalone_custom_engine():
     seeds = [7, 8]
-    b = pretium.EngineBatch(seeds=seeds, universe=SMALL, model=CUSTOM)
+    b = tradefloor.EngineBatch(seeds=seeds, universe=SMALL, model=CUSTOM)
     assert b.model_fingerprint == CUSTOM.fingerprint
     assert b.model == CUSTOM
     b.open_market()
     b.run_session(9, 30, 3, 30)
     rows = struct.unpack("<%dd" % (len(seeds) * len(SMALL)), b.prices())
     for i, seed in enumerate(seeds):
-        alone = pretium.Engine(seed=seed, universe=SMALL, model=CUSTOM)
+        alone = tradefloor.Engine(seed=seed, universe=SMALL, model=CUSTOM)
         alone.open_market()
         alone.run_session(9, 30, 3, 30)
         expected = struct.unpack("<%dd" % len(SMALL), alone.prices())
         assert rows[i * len(SMALL):(i + 1) * len(SMALL)] == expected, seed
 
-    assert pretium.EngineBatch(seeds=seeds,
+    assert tradefloor.EngineBatch(seeds=seeds,
                                universe=SMALL).model_fingerprint == DEFAULT
-    with pytest.raises(pretium.ValidationError, match="model must be"):
-        pretium.EngineBatch(seeds=seeds, universe=SMALL, model=0.12)
+    with pytest.raises(tradefloor.ValidationError, match="model must be"):
+        tradefloor.EngineBatch(seeds=seeds, universe=SMALL, model=0.12)

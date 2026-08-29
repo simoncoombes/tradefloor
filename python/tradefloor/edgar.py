@@ -151,7 +151,7 @@ class Snapshot:
         if payload.get("schema", 0) > 1:
             raise ValidationError(
                 f"snapshot schema {payload['schema']} is newer than this "
-                "version understands. Upgrade pretium rather than reading it "
+                "version understands. Upgrade tradefloor rather than reading it "
                 "partially."
             )
         snap = cls(
@@ -544,7 +544,7 @@ def fetch(
         raise ValidationError(
             'user_agent must identify you with a contact address, e.g. '
             '"Jane Roe jane@example.org". The SEC requires it and refuses '
-            'requests without one. pretium will not send a fabricated '
+            'requests without one. tradefloor will not send a fabricated '
             'User-Agent on your behalf.'
         )
     if limit < 1:

@@ -17,7 +17,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use pretium::order_book::{OrderBook, Side, SubmitOptions};
+use tradefloor::order_book::{OrderBook, Side, SubmitOptions};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -134,7 +134,7 @@ fn side_of(s: &str) -> Side {
 fn check_side(
     label: &str,
     step: &Step,
-    actual: &[pretium::order_book::BookOrder],
+    actual: &[tradefloor::order_book::BookOrder],
     expected: &[RestingOrder],
     problems: &mut Vec<String>,
 ) {

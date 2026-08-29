@@ -11,7 +11,7 @@ fundamentals are), a **macro** state (rates, inflation, the cycle), and a
 **seed**.
 
 ```python
-import pretium as pt
+import tradefloor as pt
 
 universe = pt.Universe.random(108, seed=7)
 macro = pt.Macro(federal_funds_rate=0.025, corporate_bond_yield=0.052, vix=16.0)

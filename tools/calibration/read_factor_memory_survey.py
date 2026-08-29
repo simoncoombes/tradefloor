@@ -24,7 +24,7 @@ from pathlib import Path
 # installed wheel, and the source has no compiled `_core`, so --help
 # died on a circular import. gate_pick.py has always appended.
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "python"))
-from pretium import envelope, facts  # noqa: E402
+from tradefloor import envelope, facts  # noqa: E402
 
 STRUCTURAL_MISS = {"volume_change_acf1"}
 PERSIST = "corr_persistence_acf1"

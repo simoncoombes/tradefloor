@@ -1,6 +1,6 @@
-# pretium
+# tradefloor
 
-The Rust core of [pretium](https://github.com/simoncoombes/pretium): a
+The Rust core of [tradefloor](https://github.com/simoncoombes/tradefloor): a
 deterministic market simulator with a real limit order book.
 
 A seed and a starting state run forward into prices, an order book with
@@ -26,13 +26,13 @@ libm.
   fingerprints as `custom-XXXXXXXX` and can never present as a shipped one.
 - **A published realism envelope.** Fourteen statistics measured against
   real-market bands, with the misses named as gaps rather than omitted.
-  See <https://simoncoombes.github.io/pretium/realism-envelope.html>.
+  See <https://tradefloor.dev/realism-envelope.html>.
 
 ## Using it
 
 ```rust
-use pretium::engine::Engine;
-use pretium::universe::random_universe;
+use tradefloor::engine::Engine;
+use tradefloor::universe::random_universe;
 
 let companies = random_universe(20, 7)
     .iter()
@@ -43,9 +43,9 @@ let companies = random_universe(20, 7)
 let mut engine = Engine::new(
     42,
     companies,
-    pretium::economy::create_initial_economy_state(&Default::default()),
-    pretium::economy::create_initial_central_bank_state(0),
-    pretium::sectors::keys().iter().map(|s| s.to_string()).collect(),
+    tradefloor::economy::create_initial_economy_state(&Default::default()),
+    tradefloor::economy::create_initial_central_bank_state(0),
+    tradefloor::sectors::keys().iter().map(|s| s.to_string()).collect(),
 );
 engine.close_day(0);
 let prices = engine.prices();
@@ -57,11 +57,11 @@ which wraps this crate and adds universes, scenarios, checkpoints, an
 Arrow bar reader, strategy evaluation and the realism panel:
 
 ```
-pip install pretium
+pip install tradefloor
 ```
 
 Documentation, including the realism envelope and what the simulator is not
-suitable for, is at <https://simoncoombes.github.io/pretium/>.
+suitable for, is at <https://tradefloor.dev/>.
 
 ## Scope of this crate
 

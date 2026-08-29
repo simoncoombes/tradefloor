@@ -30,7 +30,7 @@ a citation.
 Nothing tests it, so it reaches a citation field pointing at the previous
 release. Set it to the day you intend to tag, and check it again at the tag.
 
-Then `cargo update -p pretium` so `Cargo.lock` follows, and rebuild
+Then `cargo update -p tradefloor` so `Cargo.lock` follows, and rebuild
 (`maturin develop --release`) so the installed package reports the new
 number rather than the old one.
 
@@ -220,7 +220,7 @@ python -m pytest tests/test_readme_links.py -q
 
 `readme = "README.md"` means this file becomes the PyPI project page, which
 lives at pypi.org, so a relative link like `examples/01-first-simulation.ipynb`
-resolves to `pypi.org/project/pretium/examples/...` and 404s. It renders
+resolves to `pypi.org/project/tradefloor/examples/...` and 404s. It renders
 correctly on GitHub, which is why it survived two releases. The test fails on
 any relative link and on any absolute link naming a file that is not there.
 
@@ -385,8 +385,8 @@ one still 404s after ten minutes, the build failed and the crate page says why.
 
 - **Verify from the outside**, not from your working tree:
   ```
-  pip install pretium                     # the wheel
-  pip install --no-binary :all: pretium   # the sdist, compiled from source
+  pip install tradefloor                     # the wheel
+  pip install --no-binary :all: tradefloor   # the sdist, compiled from source
   ```
   The second is the path that was broken in 0.1.0 and nobody noticed until
   the release had gone out.
@@ -396,7 +396,7 @@ one still 404s after ten minutes, the build failed and the crate page says why.
   current as the last hand-run of `build_site.py` in step 5, and it changes
   only when that rebuild is committed and pushed. Nothing fails if you skip
   it; the site just goes on describing the previous release. Check it serves:
-  `curl -sI https://simoncoombes.github.io/pretium/`.
+  `curl -sI https://tradefloor.dev/`.
 - Submit the sitemap in Search Console if the page set changed. Google
   removed the ping endpoint in 2024, so it is a manual step.
 

@@ -9,11 +9,11 @@ import json
 
 import pytest
 
-import pretium
-from pretium.baselines import BuyAndHold
-from pretium.scenario import Scenario, compare, run_scenario
+import tradefloor
+from tradefloor.baselines import BuyAndHold
+from tradefloor.scenario import Scenario, compare, run_scenario
 
-UNIVERSE = pretium.Universe.random(20, seed=4)
+UNIVERSE = tradefloor.Universe.random(20, seed=4)
 
 
 def run(scenario, **kwargs):
@@ -193,7 +193,7 @@ def test_a_flat_scenario_against_its_default_baseline_is_refused():
     was reaching for is asserted below on a comparison that actually differs.
     """
     flat = Scenario().hold(federal_funds_rate=0.03, corporate_bond_yield=0.05)
-    with pytest.raises(pretium.ValidationError) as excinfo:
+    with pytest.raises(tradefloor.ValidationError) as excinfo:
         run(flat)
     message = str(excinfo.value)
     # Every refusal names the fields, the conflict and the fix.
@@ -223,7 +223,7 @@ def test_a_shock_that_starts_after_the_run_ends_is_refused_by_name():
     again -- but the caller's mistake is a horizon, not a missing baseline,
     and the message has to say which.
     """
-    with pytest.raises(pretium.ValidationError) as excinfo:
+    with pytest.raises(tradefloor.ValidationError) as excinfo:
         run(Scenario().ramp("vix", start=15.0, end=45.0, over=10, begin=60))
     message = str(excinfo.value)
     assert "'vix'" in message
@@ -238,7 +238,7 @@ def test_an_explicit_baseline_identical_to_the_scenario_is_refused():
     realises the SAME path is the original mistake with more typing, and it
     reports the same clean zero.
     """
-    with pytest.raises(pretium.ValidationError, match="identical worlds"):
+    with pytest.raises(tradefloor.ValidationError, match="identical worlds"):
         run(Scenario().hold(vix=45.0), baseline=Scenario().hold(vix=45.0))
 
 
@@ -326,7 +326,7 @@ def test_one_pin_on_a_field_behaves_exactly_as_it_did_before_layering():
 
 def test_pins_declared_out_of_order_are_refused_and_name_both():
     """The reverse ordering, which used to leave a crisis that never subsided."""
-    with pytest.raises(pretium.ValidationError) as excinfo:
+    with pytest.raises(tradefloor.ValidationError) as excinfo:
         (Scenario()
          .ramp("vix", start=48.0, end=22.0, over=45, begin=75)
          .step("vix", before=15.0, after=48.0, at=60))
@@ -339,7 +339,7 @@ def test_pins_declared_out_of_order_are_refused_and_name_both():
 
 def test_two_pins_claiming_the_same_day_are_refused():
     """One of the two would be dead code the caller believes is running."""
-    with pytest.raises(pretium.ValidationError) as excinfo:
+    with pytest.raises(tradefloor.ValidationError) as excinfo:
         (Scenario()
          .step("vix", before=15.0, after=48.0, at=60)
          .ramp("vix", start=48.0, end=18.0, over=40, begin=60))
@@ -350,14 +350,14 @@ def test_two_pins_claiming_the_same_day_are_refused():
 
     # Two whole-run paths on one field is the same conflict at day zero, and
     # the fix there is to keep one rather than to split them.
-    with pytest.raises(pretium.ValidationError, match="Keep one of them"):
+    with pytest.raises(tradefloor.ValidationError, match="Keep one of them"):
         Scenario().hold(vix=15.0).hold(vix=20.0)
 
 
 def test_a_refused_hold_leaves_the_scenario_untouched():
     """A half-applied hold would be the same quiet wrongness one level down."""
     scenario = Scenario().hold(vix=15.0)
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         scenario.hold(inflation_rate=0.06, vix=20.0)
     assert scenario.fields == ("vix",)
     assert scenario.at(0) == {"vix": 15.0}
@@ -390,7 +390,7 @@ def test_a_constructor_called_on_an_instance_is_refused(name):
     descriptor, which can.
     """
     base = Scenario().ramp("federal_funds_rate", start=0.02, end=0.05, over=30)
-    with pytest.raises(pretium.ValidationError) as excinfo:
+    with pytest.raises(tradefloor.ValidationError) as excinfo:
         getattr(base, name)()
     message = str(excinfo.value)
     assert f"Scenario.{name}" in message
@@ -413,25 +413,25 @@ def test_the_constructors_still_build_from_the_class():
 
 def test_a_percent_where_a_fraction_belongs_is_refused_at_construction():
     # Caught where the mistake is visible, not sixty days into a run.
-    with pytest.raises(pretium.ValidationError, match="FRACTIONS"):
+    with pytest.raises(tradefloor.ValidationError, match="FRACTIONS"):
         Scenario().ramp("federal_funds_rate", start=2.5, end=5.0, over=30)
-    with pytest.raises(pretium.ValidationError, match="FRACTIONS"):
+    with pytest.raises(tradefloor.ValidationError, match="FRACTIONS"):
         Scenario().hold(corporate_bond_yield=5.0)
 
 
 def test_an_unknown_field_is_refused_and_names_the_valid_ones():
     # A typo that silently did nothing would be the same class of failure this
     # whole module exists to close.
-    with pytest.raises(pretium.ValidationError, match="interest_rate"):
+    with pytest.raises(tradefloor.ValidationError, match="interest_rate"):
         Scenario().hold(interest_rate=0.05)
-    with pytest.raises(pretium.ValidationError, match="federal_funds_rate"):
+    with pytest.raises(tradefloor.ValidationError, match="federal_funds_rate"):
         Scenario().hold(interest_rate=0.05)
 
 
 def test_a_degenerate_ramp_is_refused():
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         Scenario().ramp("vix", start=15.0, end=45.0, over=0)
-    with pytest.raises(pretium.ValidationError):
+    with pytest.raises(tradefloor.ValidationError):
         Scenario().ramp("vix", start=15.0, end=45.0, over=10, begin=-1)
 
 
@@ -463,9 +463,9 @@ def test_a_scenario_reaches_the_evaluation_harness():
     shock = Scenario.rate_shock(start=0.025, end=0.05, over=15)
     agents = {"hold": BuyAndHold()}
 
-    quiet = pretium.evaluate(agents, seed=7, universe=UNIVERSE, days=20,
+    quiet = tradefloor.evaluate(agents, seed=7, universe=UNIVERSE, days=20,
                              scenario=calm)
-    hiked = pretium.evaluate({"hold": BuyAndHold()}, seed=7,
+    hiked = tradefloor.evaluate({"hold": BuyAndHold()}, seed=7,
                              universe=UNIVERSE, days=20, scenario=shock)
     assert hiked["hold"].return_pct < quiet["hold"].return_pct - 2.0
 
@@ -504,7 +504,7 @@ def test_a_sweep_runs_under_a_scenario():
     n = len(UNIVERSE)
 
     def medians(scenario):
-        results = pretium.run_many(seeds=list(range(8)), universe=UNIVERSE,
+        results = tradefloor.run_many(seeds=list(range(8)), universe=UNIVERSE,
                                    days=20, ticks=80, workers=4,
                                    scenario=scenario, collect="prices")
         return statistics.median(
@@ -521,7 +521,7 @@ def test_a_scenario_crosses_to_workers_as_a_path_not_an_object():
     import struct
 
     scenario = Scenario.rate_shock(start=0.02, end=0.04, over=5)
-    swept = pretium.run_many(seeds=[3], universe=UNIVERSE, days=6, ticks=40,
+    swept = tradefloor.run_many(seeds=[3], universe=UNIVERSE, days=6, ticks=40,
                              scenario=scenario, collect="prices")[0]
     engine = run_scenario(scenario, seed=3, universe=UNIVERSE, days=6,
                           ticks_per_day=40)
@@ -561,9 +561,9 @@ def test_execution_costs_more_in_a_volatile_regime():
     deltas = []
     wins = 0
     for seed in range(16):
-        calm = pretium.tca.analyse(Rotating(), seed=seed, universe=UNIVERSE,
+        calm = tradefloor.tca.analyse(Rotating(), seed=seed, universe=UNIVERSE,
                                    days=10, scenario=Scenario().hold(vix=15.0))
-        spike = pretium.tca.analyse(Rotating(), seed=seed, universe=UNIVERSE,
+        spike = tradefloor.tca.analyse(Rotating(), seed=seed, universe=UNIVERSE,
                                     days=10, scenario=Scenario().hold(vix=45.0))
         deltas.append(spike.shortfall_bps() - calm.shortfall_bps())
         wins += spike.shortfall_bps() > calm.shortfall_bps()
@@ -584,7 +584,7 @@ def test_the_tca_counterfactual_stays_clean_under_a_scenario():
         def act(self, obs):
             return {obs.tickers[0]: 0.002 * obs.avg_volume(obs.tickers[0])}
 
-    execution = pretium.tca.analyse(
+    execution = tradefloor.tca.analyse(
         Buyer(), seed=11, universe=UNIVERSE, days=5,
         scenario=Scenario.rate_shock(start=0.025, end=0.05, over=3))
     assert execution.untouched_moved() == []
@@ -598,7 +598,7 @@ def test_a_scenario_run_replays_from_its_own_log():
                           ticks_per_day=60)
     archived = json.loads(json.dumps(engine.order_log))
     assert sum(1 for e in archived if e["op"] == "pin_macro") == 8
-    replayed = pretium.replay(archived, seed=7, universe=UNIVERSE)
+    replayed = tradefloor.replay(archived, seed=7, universe=UNIVERSE)
     assert replayed.prices() == engine.prices()
     assert replayed.draws_consumed == engine.draws_consumed
 
@@ -606,8 +606,8 @@ def test_a_scenario_run_replays_from_its_own_log():
 def test_a_pin_holds_for_the_whole_day_it_was_applied_to():
     import pyarrow as pa
 
-    engine = pretium.Engine(seed=5, universe=UNIVERSE,
-                            macro_state=pretium.Macro(federal_funds_rate=0.02,
+    engine = tradefloor.Engine(seed=5, universe=UNIVERSE,
+                            macro_state=tradefloor.Macro(federal_funds_rate=0.02,
                                                       corporate_bond_yield=0.04))
     wanted = [0.04 + 0.005 * day for day in range(5)]
     for day in range(5):
@@ -698,7 +698,7 @@ def test_a_misspelt_cycle_phase_is_refused_where_it_is_written():
     the run rather than at the typo, and a phase name is exactly the kind of
     string nobody re-reads.
     """
-    with pytest.raises(pretium.ValidationError) as excinfo:
+    with pytest.raises(tradefloor.ValidationError) as excinfo:
         Scenario().hold(cycle="contration")
     assert "contration" in str(excinfo.value)
     assert "contraction" in str(excinfo.value)     # names the valid ones
@@ -716,9 +716,9 @@ def test_a_zero_day_serialisation_round_trip_is_refused_at_both_ends():
     read, because a document can arrive from anywhere.
     """
     scenario = Scenario.rate_shock(start=0.03, end=0.05, over=5)
-    with pytest.raises(pretium.ValidationError, match="at least 1"):
+    with pytest.raises(tradefloor.ValidationError, match="at least 1"):
         scenario.to_json(0)
-    with pytest.raises(pretium.ValidationError, match="empty path"):
+    with pytest.raises(tradefloor.ValidationError, match="empty path"):
         Scenario.from_json(json.dumps({"schema": 1, "label": "", "days": 0,
                                        "path": []}))
     # One day is a real, if short, path and still round-trips.

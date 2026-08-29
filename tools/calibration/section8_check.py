@@ -17,8 +17,8 @@ import sys, statistics, multiprocessing as mp
 import numpy as np
 sys.path.insert(0, "tools/calibration")
 import calibrate, instrumentlib as lib
-import pretium as pt
-from pretium import facts, loss
+import tradefloor as pt
+from tradefloor import facts, loss
 
 TRAIN = tuple(range(101, 131))
 HOLD_SEEDS = (1, 2, 3, 4, 5, 6)

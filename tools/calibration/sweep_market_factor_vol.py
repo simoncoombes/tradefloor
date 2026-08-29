@@ -159,7 +159,7 @@ def wheel_core_hash(wheel: Path) -> str:
 
     with zipfile.ZipFile(wheel) as archive:
         cores = [n for n in archive.namelist()
-                 if re.search(r"pretium/_core.*\.(so|pyd)$", n)]
+                 if re.search(r"tradefloor/_core.*\.(so|pyd)$", n)]
         if len(cores) != 1:
             raise SystemExit(f"expected one compiled core in {wheel}, found {cores}")
         import hashlib
@@ -171,11 +171,11 @@ def installed_core_hash(venv: Path) -> str:
     """SHA-256 of the compiled core actually importable from the venv."""
     import hashlib
 
-    cores = sorted(venv.glob("lib/python*/site-packages/pretium/_core*.so")) + sorted(
-        venv.glob("lib/python*/site-packages/pretium/_core*.pyd")
+    cores = sorted(venv.glob("lib/python*/site-packages/tradefloor/_core*.so")) + sorted(
+        venv.glob("lib/python*/site-packages/tradefloor/_core*.pyd")
     )
     if len(cores) != 1:
-        raise SystemExit(f"expected one installed pretium core in {venv}, found {cores}")
+        raise SystemExit(f"expected one installed tradefloor core in {venv}, found {cores}")
     return hashlib.sha256(cores[0].read_bytes()).hexdigest()[:16]
 
 

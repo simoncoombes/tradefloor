@@ -58,7 +58,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use pretium::market::*;
+use tradefloor::market::*;
 use serde_json::Value as Json;
 
 fn bits(hex: &str) -> f64 {
@@ -121,7 +121,7 @@ fn company(price: f64, previous_close: f64) -> TickCompany {
             mispricing_momentum: None,
             maker_inventory: None,
             garch_variance: 0.0,
-            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
+            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
             last_daily_return: None,
             beta: Some(1.0),
             short_interest: 0.0,

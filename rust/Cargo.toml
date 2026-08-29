@@ -1,6 +1,6 @@
 [package]
-name = "pretium"
-version = "0.4.3"
+name = "tradefloor"
+version = "0.5.0"
 edition = "2021"
 description = "A reproducible evaluation environment for financial AI agents."
 # Dual-licensed, the Rust-ecosystem norm (serde, tokio, rand): a downstream
@@ -9,8 +9,8 @@ description = "A reproducible evaluation environment for financial AI agents."
 # reasoning. LICENSE-APACHE and LICENSE-MIT carry the full texts; there is no
 # longer a generic LICENSE file, matching the same crates' convention.
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/simoncoombes/pretium"
-homepage = "https://simoncoombes.github.io/pretium"
+repository = "https://github.com/simoncoombes/tradefloor"
+homepage = "https://tradefloor.dev"
 keywords = ["simulation", "finance", "market", "orderbook", "deterministic"]
 categories = ["simulation", "science"]
 readme = "README.md"
@@ -57,7 +57,7 @@ exclude = [
 ]
 
 [lib]
-name = "pretium"
+name = "tradefloor"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]

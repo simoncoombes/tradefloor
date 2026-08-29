@@ -50,8 +50,8 @@ had surveyed, in a direction someone had guessed.
 ```python
 import statistics
 
-from pretium import atlas
-import pretium as pt
+from tradefloor import atlas
+import tradefloor as pt
 
 universe = pt.Universe.random(40, seed=111)
 SURVEY_SEEDS = [11, 12, 13]     # the paths this screening pass runs on

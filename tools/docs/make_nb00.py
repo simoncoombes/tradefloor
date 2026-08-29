@@ -8,14 +8,14 @@ def code(*lines): return {"cell_type": "code", "metadata": {}, "execution_count"
 cells = [
 md("# A year in one market\n",
    "\n",
-   "This is the shortest useful thing pretium does: run a market for a\n",
+   "This is the shortest useful thing tradefloor does: run a market for a\n",
    "trading year, watch one company, and see what happened to it and why.\n",
    "\n",
    "Everything here is deterministic. The same seed gives the same year,\n",
    "on any machine, forever. Nothing is downloaded and nothing is random\n",
    "in the sense of being unrepeatable.\n",
    "\n",
-   "You need `pip install pretium matplotlib`. It takes about twenty\n",
+   "You need `pip install tradefloor matplotlib`. It takes about twenty\n",
    "seconds to run."),
 
 md("## The market\n",
@@ -26,7 +26,7 @@ md("## The market\n",
    "co-move with. The numbers are a starting state, not a forecast: this\n",
    "is a company like Apple in a market like the US one, not Apple."),
 
-code("import pretium as pt\n",
+code("import tradefloor as pt\n",
      "\n",
      "aapl = pt.Instrument(\n",
      "    \"AAPL\", \"technology\",\n",
@@ -218,6 +218,6 @@ nb = {"cells": cells, "metadata": {"kernelspec": {"display_name": "Python 3",
       "language": "python", "name": "python3"},
       "language_info": {"name": "python", "version": "3.11"}},
       "nbformat": 4, "nbformat_minor": 5}
-out = pathlib.Path("/Users/simoncoombes-nw/Dev/pretium/examples/00-a-year-in-one-market.ipynb")
+out = pathlib.Path("/Users/simoncoombes-nw/Dev/tradefloor/examples/00-a-year-in-one-market.ipynb")
 out.write_text(json.dumps(nb, indent=1) + "\n")
 print(f"wrote {out.name}: {len(cells)} cells ({sum(1 for c in cells if c['cell_type']=='code')} code)")

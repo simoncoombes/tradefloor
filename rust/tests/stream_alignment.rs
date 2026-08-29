@@ -22,14 +22,14 @@
 //! Under [`SettleDrawPolicy::FourAlways`] the four draws are taken whether
 //! or not the settle uses them, so the schedule cannot depend on the
 //! trajectory and the counterfactual is exact BY CONSTRUCTION — which is
-//! what `pretium.tca`'s subtraction rests on.
+//! what `tradefloor.tca`'s subtraction rests on.
 
-use pretium::economy::{create_initial_economy_state, InitialEconomyOptions};
-use pretium::market::{
+use tradefloor::economy::{create_initial_economy_state, InitialEconomyOptions};
+use tradefloor::market::{
     reset_daily_prices, simulate_market_tick, MarketStatus, OrderVolume, SettleDrawPolicy,
     TickCompany, TickInputs, TickStock, MARKET_FACTOR_SIGMA,
 };
-use pretium::rng::{GameRng, Rng};
+use tradefloor::rng::{GameRng, Rng};
 
 /// Counts draws so a schedule shift is observable directly, not only through
 /// its downstream price damage.
@@ -77,7 +77,7 @@ fn company(id: &str, price: f64, avg_volume: f64, shares: f64) -> TickCompany {
             mispricing_momentum: None,
             maker_inventory: None,
             garch_variance: 0.015 * 0.015,
-            garch_cascade: [0.015 * 0.015; pretium::market::garch::CASCADE_MAX],
+            garch_cascade: [0.015 * 0.015; tradefloor::market::garch::CASCADE_MAX],
             last_daily_return: None,
             beta: Some(1.0),
             short_interest: 0.0,
@@ -140,7 +140,7 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
                 // variance process and pin behaviour at its baseline level.
                 market_sigma_daily: MARKET_FACTOR_SIGMA,
                 settle_draws: policy,
-                params: &pretium::params::PT_V1,
+                params: &tradefloor::params::PT_V1,
             },
             &mut rng,
         );

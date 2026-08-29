@@ -23,7 +23,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pytest
 
-import pretium as pt
+import tradefloor as pt
 
 BOOK = 20.0
 #: Book value times LOSS_MAKING_PRICE_TO_BOOK, the floor a loss-maker gets.

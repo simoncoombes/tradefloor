@@ -163,7 +163,7 @@ def main() -> None:
         indexed[(name, h, side, row["seed"])] = row
 
     stats = lib.PANEL_STATS
-    import pretium.facts as facts
+    import tradefloor.facts as facts
 
     report: dict[str, dict] = {}
     for name in params:

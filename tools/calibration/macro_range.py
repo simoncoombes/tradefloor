@@ -34,7 +34,7 @@ import pathlib
 import statistics
 import sys
 
-import pretium as pt
+import tradefloor as pt
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import gate_pick  # noqa: E402

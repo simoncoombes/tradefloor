@@ -4,17 +4,17 @@ import pytest
 
 import struct
 
-import pretium
-from pretium import harness
+import tradefloor
+from tradefloor import harness
 
 
 def _f64(buf):
     return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
 
-UNIVERSE = pretium.Universe.random(8, seed=5)
+UNIVERSE = tradefloor.Universe.random(8, seed=5)
 # The roster spans four orders of magnitude of liquidity by design, so the
 # first instrument is whichever one an ADV-sized order can actually move.
-UNIVERSE = pretium.Universe(
+UNIVERSE = tradefloor.Universe(
     sorted(UNIVERSE, key=lambda i: i.avg_volume)
 )
 
@@ -74,7 +74,7 @@ def run(agents, **kw):
     params = dict(seed=2026, universe=UNIVERSE, days=3, steps_per_day=4,
                   ticks_per_step=60, cash=200_000_000)
     params.update(kw)
-    return pretium.evaluate(agents, **params)
+    return tradefloor.evaluate(agents, **params)
 
 
 # --------------------------------------------------------------------------
@@ -235,7 +235,7 @@ def test_the_leaderboard_orders_best_first_and_breaks_ties_by_name():
     # A leaderboard whose order depended on dict insertion would rank
     # differently for reasons that have nothing to do with the agents.
     scores = run({"zeta": Idle(), "alpha": Idle()})
-    ranked = pretium.leaderboard(scores)
+    ranked = tradefloor.leaderboard(scores)
     assert [s.name for s in ranked] == ["alpha", "zeta"]
 
 
@@ -245,18 +245,18 @@ def test_impact_ranks_as_a_cost_so_lower_is_better():
     # move the market in its favour scores better than one that paid for it,
     # which is the correct reading of a cost.
     scores = run({"churner": Churner(), "idle": Idle()})
-    ranked = pretium.leaderboard(scores, by="impact_bps")
+    ranked = tradefloor.leaderboard(scores, by="impact_bps")
     assert ranked[0].impact_bps <= ranked[-1].impact_bps
 
 
 def test_an_unknown_ranking_key_is_refused():
-    with pytest.raises(pretium.ValidationError, match="cannot rank"):
-        pretium.leaderboard(run({"idle": Idle()}), by="vibes")
+    with pytest.raises(tradefloor.ValidationError, match="cannot rank"):
+        tradefloor.leaderboard(run({"idle": Idle()}), by="vibes")
 
 
 def test_no_agents_is_refused():
-    with pytest.raises(pretium.ValidationError, match="no agents"):
-        pretium.evaluate({}, seed=1, universe=UNIVERSE)
+    with pytest.raises(tradefloor.ValidationError, match="no agents"):
+        tradefloor.evaluate({}, seed=1, universe=UNIVERSE)
 
 
 # --------------------------------------------------------------------------
@@ -280,8 +280,8 @@ def test_a_stepped_day_is_the_same_market_as_one_session():
     With the clock advancing it is bit-identical, and that is asserted for
     several splits, because a single split could agree by coincidence.
     """
-    universe = pretium.Universe.random(20, seed=5)
-    reference = pretium.Engine(seed=1, universe=universe)
+    universe = tradefloor.Universe.random(20, seed=5)
+    reference = tradefloor.Engine(seed=1, universe=universe)
     reference.open_market()
     reference.run_session(9, 30, 3, 390)
     reference.close_market()
@@ -295,7 +295,7 @@ def test_a_stepped_day_is_the_same_market_as_one_session():
 
 
 def test_the_clock_advances_by_a_minute_a_tick():
-    from pretium.harness import session_clock
+    from tradefloor.harness import session_clock
 
     assert [session_clock((9, 30, 3), k, 65) for k in range(6)] == [
         (9, 30, 3), (10, 35, 3), (11, 40, 3),
@@ -304,7 +304,7 @@ def test_the_clock_advances_by_a_minute_a_tick():
 
 
 def test_the_clock_wraps_rather_than_running_past_midnight():
-    from pretium.harness import session_clock
+    from tradefloor.harness import session_clock
 
     # The engine refuses an hour outside 0..24, so a long configuration must
     # wrap. The day of week deliberately does not advance -- a "day" here is
@@ -356,7 +356,7 @@ def test_step_counts_the_whole_run_and_step_of_day_counts_the_day():
     why the within-day index has to be askable rather than derivable.
     """
     daily, once = OncePerDay(), OnceAndNeverAgain()
-    pretium.evaluate({"daily": daily, "once": once}, seed=3,
+    tradefloor.evaluate({"daily": daily, "once": once}, seed=3,
                      universe=UNIVERSE, days=4, steps_per_day=6)
 
     # The correct guard fires on every day, and its step numbers show why the
@@ -373,7 +373,7 @@ def test_the_within_day_helpers_agree_with_the_harness_own_arithmetic():
     `steps_per_day` -- and asserted against `session_clock`, which is the
     consumer that has always had to compute it.
     """
-    from pretium.harness import Observation, session_clock
+    from tradefloor.harness import Observation, session_clock
 
     steps_per_day = 6
     for step in range(steps_per_day * 3):
@@ -394,7 +394,7 @@ def test_the_within_day_helpers_agree_with_the_harness_own_arithmetic():
 
 def test_the_observation_repr_says_which_index_is_which():
     """Where the trap is usually discovered -- or missed."""
-    from pretium.harness import Observation
+    from tradefloor.harness import Observation
 
     text = repr(Observation(7, 1, ["A", "B"], [1.0, 2.0], None, None,
                             [1.0, 2.0], 6))

@@ -7,14 +7,14 @@ short: Envelope
 
 # The realism envelope
 
-What pretium certifies, at what horizon, and, just as precisely, what it
+What tradefloor certifies, at what horizon, and, just as precisely, what it
 does not.
 
 This page exists because "realistic" is not a property a simulator either
 has or lacks. A market model is realistic in some respects, at some
 measurement scale, and not others. A single realism score would hide
 exactly the structure that decides whether your result means anything, so
-pretium does not publish one. It publishes this envelope instead: the
+tradefloor does not publish one. It publishes this envelope instead: the
 statistics it matches, the horizon it matches them at, the axes the claim
 survives, and every gap that has been measured rather than assumed.
 
@@ -32,7 +32,7 @@ parameters move them, or which move YOUR result, see [Atlas](atlas.md).
 ## The claim, in one sentence
 
 **At a 252-day measurement horizon, the shipped `pt-v12` preset matches ALL
-FOURTEEN realism statistics pretium measures, on thirty calibration seeds
+FOURTEEN realism statistics tradefloor measures, on thirty calibration seeds
 and on a held-out 60-name universe measured at the same resolution.** At 504
 days, measured against bands re-derived at that length, it holds all
 fourteen as well. On a held-out set of seeds it holds thirteen, and the axes
@@ -42,7 +42,7 @@ because that is the horizon the certification was measured at.
 ## What is certified
 
 Shipped default `pt-v12`, 30 seeds, 40 instruments, 252 trading days.
-Bands are `pretium.facts.REAL_MARKETS`, derived from real-market windows
+Bands are `tradefloor.facts.REAL_MARKETS`, derived from real-market windows
 of the same length by the method in the calibration docs.
 
 | statistic | measured | band | verdict |
@@ -166,7 +166,7 @@ would be the wrong ruler, the shipped model holds **14 of 14**:
 | `sector_excess_corr` | 0.2079 | 0.1761 | 0.11 to 0.22 | in |
 | `corr_persistence_acf1` | 0.1525 | 0.2077 | 0.19 to 0.49 | in |
 
-**Consequence: pretium is still not certified for multi-year backtests, and
+**Consequence: tradefloor is still not certified for multi-year backtests, and
 the reason is now only the measurement.** The two-year panel is not bad, and
 since `pt-v12` no row of the fourteen misses it. Certification remains a
 252-day claim because that is where it was taken, on the axes above, and a
@@ -229,7 +229,7 @@ to lag 60.
 
 The model's volatility memory does not merely fade early. It changes
 sign. Where a real market still says "yesterday's turbulence makes today's
-more likely" a month later, pretium says the mild opposite.
+more likely" a month later, tradefloor says the mild opposite.
 
 This is a **mechanism** gap, not a calibration one. No parameter setting
 turns one slope into the other; it has been tried, and a two-component
@@ -238,7 +238,7 @@ in both directions at once.
 
 **Consequence: do not trust strategies whose edge depends on volatility
 memory beyond about lag 20**, a trading month, which is where
-`pretium.envelope.MEMORY_VALID_TO_LAG` draws the line in code.
+`tradefloor.envelope.MEMORY_VALID_TO_LAG` draws the line in code.
 Vol-targeting and risk-parity overlays that use a one-month or longer
 volatility estimate are outside the envelope.
 
@@ -449,7 +449,7 @@ record §65.
 ### Gap 5: certification was measured on a sector-balanced roster
 
 `Universe.random()` assigns sectors round-robin over the twelve that
-`pretium.sectors()` lists, so a roster is as close to balanced as its size
+`tradefloor.sectors()` lists, so a roster is as close to balanced as its size
 allows: the certified 40 names put four in each of four sectors and three in
 each of the other eight. No real index is balanced that way. The S&P is
 roughly a third technology and the Nasdaq more so. (This gap said "exactly
@@ -510,13 +510,13 @@ A statistic can be comfortably in band on the median and out of band on a
 large minority of individual seeds. The held-out-seed row above is that
 effect happening in public: `corr_persistence_acf1` is in band at 0.1525 on
 the certification's seeds and out of it on thirty seeds the calibration
-never used. `pretium.envelope.intervals()` reports the spread beside each
+never used. `tradefloor.envelope.intervals()` reports the spread beside each
 median, and reading it before relying on one run is the difference between a
 certified claim and a misread one.
 
 ## What this licenses
 
-**Use pretium for:**
+**Use tradefloor for:**
 
 - Strategy evaluation over horizons up to about one year, where the edge
   depends on volatility level, lag-1 to lag-5 volatility clustering,
@@ -531,7 +531,7 @@ certified claim and a misread one.
 - Agent and RL environments where a plausible, self-consistent market is
   needed and absolute realism of every moment is not the claim.
 
-**Do not use pretium for:**
+**Do not use tradefloor for:**
 
 - Multi-year backtests (Gap 1). The 504-day panel now holds all fourteen
   against matched bands, and runs out to 2520 days have been measured, but
@@ -611,6 +611,6 @@ version and the digest together or neither.
 The envelope is re-measured whenever the default preset changes.
 `envelope.json` carries the preset the figures describe rather than a
 digest, so the check to run is
-`pretium.model_preset()["name"] == json.load(open("envelope.json"))["preset"]`.
+`tradefloor.model_preset()["name"] == json.load(open("envelope.json"))["preset"]`.
 If those differ, this page describes a different model than the one you are
 running.

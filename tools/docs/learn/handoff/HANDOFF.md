@@ -1,8 +1,8 @@
-# Handoff: pretium documentation site
+# Handoff: tradefloor documentation site
 
 ## Overview
 
-A rebuild of the `pretium` documentation as a learning path rather than a defence
+A rebuild of the `tradefloor` documentation as a learning path rather than a defence
 of the project. Twenty-one pages, arranged in five doors, taking a reader from
 "what is a limit order book" to the API reference.
 
@@ -169,7 +169,7 @@ Body copy uses `text-wrap: pretty`; `h1` uses `text-wrap: balance`.
 
 ## Structure: five doors
 
-The front door (`Learn pretium`) carries a five-step spine and, at the bottom, an
+The front door (`Learn tradefloor`) carries a five-step spine and, at the bottom, an
 index of all five doors. Every other page carries the same door index above its
 prev/next pair, and a dropdown per door in the masthead.
 
@@ -204,8 +204,8 @@ blur(8px)`, `1px` bottom border in `--line`. Inner row is `max-width: 1040px`,
 `padding: 0.7rem 1.5rem`, `display: flex`, `align-items: center`, `gap: 1.5rem`.
 Contents, left to right:
 
-- The pretium mark (`mark-pretium.png`, 15×22, swapped for
-  `mark-pretium-dark.png` in dark mode) beside the wordmark in mono at
+- The tradefloor mark (`mark-tradefloor.png`, 15×22, swapped for
+  `mark-tradefloor-dark.png` in dark mode) beside the wordmark in mono at
   `1.0625rem`/500, tracking `-0.01em`. Links to the front door.
 - Five `<details class="ptmenu">` dropdowns, one per door, at `0.875rem`. Click
   to open. Opening one closes the others; a click outside or `Escape` closes all.
@@ -251,7 +251,7 @@ lose.
 
 | Page | Words | The picture, and its interaction |
 |---|---|---|
-| **Learn pretium** | 3,562 | (1) An order-book replay: 22 steps over a real golden ladder, driven by a range slider, with a play/pause. Each step names the operation and marks which of the four quote readouts moved and which held. (2) A 30-day market player: price line for five names, animated, looping, scrubable. (3) The realism envelope panel: fourteen statistics, each a band with the measured value plotted inside or outside it. (4) A sector-mix donut for a generated universe. |
+| **Learn tradefloor** | 3,562 | (1) An order-book replay: 22 steps over a real golden ladder, driven by a range slider, with a play/pause. Each step names the operation and marks which of the four quote readouts moved and which held. (2) A 30-day market player: price line for five names, animated, looping, scrubable. (3) The realism envelope panel: fourteen statistics, each a band with the measured value plotted inside or outside it. (4) A sector-mix donut for a generated universe. |
 | **Install** | 1,044 | Two install paths side by side (`pip` / `cargo`), each with the language logo. Five platform digest rows. |
 | **Core concepts** | 917 | The universe/macro/seed triad, with the roster-order warning as an inline callout — it is the one thing that silently changes results. |
 | **The two loops** | 791 | A two-column diagram: the research loop against the calibration loop, and where they touch. |
@@ -325,7 +325,7 @@ Until (1) lands, treat `pt-data.js` as a fixture snapshot, not a source.
 
 In `design/`:
 
-- `mark-pretium.png`, `mark-pretium-dark.png` — the pretium mark, 15×22 at 1×.
+- `mark-tradefloor.png`, `mark-tradefloor-dark.png` — the tradefloor mark, 15×22 at 1×.
 - `logo-python.png`, `logo-python-dark.png` — for the install page.
 - `logo-rust.png`, `logo-rust-dark.png` — for the install page.
 
@@ -336,7 +336,7 @@ chart drawn from data or a diagram built from divs and borders.
 
 ```
 design/
-  Learn pretium.dc.html          the front door, five-step spine
+  Learn tradefloor.dc.html          the front door, five-step spine
   Install.dc.html                Start here
   Core concepts.dc.html
   The two loops.dc.html
@@ -362,7 +362,7 @@ design/
   support.js                     prototyping runtime, do not port
   *.png                          logos and mark
 
-Learn pretium (standalone, offline).html   the front door, fully inlined,
+Learn tradefloor (standalone, offline).html   the front door, fully inlined,
                                            994 KB, opens with no network
 ```
 
