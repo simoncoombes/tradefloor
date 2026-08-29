@@ -293,8 +293,17 @@ fn component_step(
     target: f64,
     alpha: f64,
     beta: f64,
+    gamma: f64,
 ) -> f64 {
-    (1.0 - alpha - beta) * target + alpha * day_factor * day_factor + beta * current
+    // The GJR term, spelled exactly as `update_toward_with` spells it: a
+    // down day loads `alpha + gamma`, omega gives back `gamma/2`. The slow
+    // component always passes 0.0 -- the leverage effect is a same-week
+    // phenomenon and the slow timescale carries clustering, not asymmetry
+    // -- and 0.0 makes every term bit-identical to the symmetric step.
+    let leverage = if day_factor < 0.0 { gamma } else { 0.0 };
+    (1.0 - alpha - beta - 0.5 * gamma) * target
+        + (alpha + leverage) * day_factor * day_factor
+        + beta * current
 }
 
 /// The slow component's `(alpha, beta)`, from its persistence and the
@@ -327,9 +336,18 @@ fn update_toward_with(
     target_variance: f64,
 ) -> f64 {
     let base = params.market_factor_sigma * params.market_factor_sigma;
-    let omega = (1.0 - params.market_vol_alpha - params.market_vol_beta) * target_variance;
+    // GJR leverage on the common factor: a down day loads `alpha + gamma`
+    // on the squared shock, an up day `alpha` alone, and omega gives back
+    // `gamma/2` so the unconditional level stays on target -- the dial
+    // redistributes variance between down and up states rather than adding
+    // any. At gamma 0.0 every term below is bit-identical to the
+    // symmetric update, which is what every preset before the dial ships.
+    let gamma = params.market_vol_gamma;
+    let leverage = if day_factor < 0.0 { gamma } else { 0.0 };
+    let omega = (1.0 - params.market_vol_alpha - params.market_vol_beta - 0.5 * gamma)
+        * target_variance;
     let new_var = omega
-        + params.market_vol_alpha * day_factor * day_factor
+        + (params.market_vol_alpha + leverage) * day_factor * day_factor
         + params.market_vol_beta * current_variance;
     // `max(min(x, ceiling), floor)` — the same bound order as
     // `garch.rs`, which is contractual there because it is visible when
@@ -441,7 +459,8 @@ impl MarketVarianceState {
         let fast = clamp_variance(
             params,
             component_step(self.fast_variance, self.day_factor, target,
-                           params.market_vol_alpha, params.market_vol_beta),
+                           params.market_vol_alpha, params.market_vol_beta,
+                           params.market_vol_gamma),
         );
         // The slow component may revert to a LESS VIX-coupled target than
         // the fast one, which is the whole point of having two.
@@ -468,7 +487,7 @@ impl MarketVarianceState {
         let (sa, sb) = slow_alpha_beta(params);
         let slow = clamp_variance(
             params,
-            component_step(self.slow_variance, self.day_factor, slow_target, sa, sb),
+            component_step(self.slow_variance, self.day_factor, slow_target, sa, sb, 0.0),
         );
 
         self.fast_variance = fast;
@@ -813,5 +832,56 @@ mod tests {
             variance = update_market_variance_with(params, variance, innovation, vix);
             assert_eq!(composed.sigma_daily(), mathx::sqrt(variance), "day {day}");
         }
+    }
+}
+
+#[cfg(test)]
+mod gjr_tests {
+    use super::*;
+
+    /// The dial off is the symmetric step to the bit, whatever the sign
+    /// of the day.
+    #[test]
+    fn gamma_zero_is_the_symmetric_step_bit_for_bit() {
+        for d in [-0.02, -0.001, 0.0, 0.001, 0.02] {
+            let sym = (1.0 - 0.28 - 0.69) * 4e-4 + 0.28 * d * d + 0.69 * 3e-4;
+            let gjr = component_step(3e-4, d, 4e-4, 0.28, 0.69, 0.0);
+            assert_eq!(sym.to_bits(), gjr.to_bits(), "day_factor {d}");
+        }
+    }
+
+    /// A down day loads more variance than an up day of the same size,
+    /// and omega's gamma/2 rebate keeps the two-sided average on the
+    /// symmetric step: the dial redistributes, it does not add.
+    #[test]
+    /// A down day loads more variance than an up day of the same size.
+    /// The gamma/2 rebate in omega makes the two-sided average equal the
+    /// symmetric step exactly at the stationary point, and differ by
+    /// (gamma/2)(d^2 - t) elsewhere -- both pinned below.
+    fn gamma_redistributes_between_down_and_up_without_adding() {
+        let (a, b, g, v, t) = (0.28, 0.69, 0.10, 3e-4, 4e-4);
+        // At the stationary point (shock at target) the gamma/2 rebate is
+        // exact: the two-sided average equals the symmetric step, so in
+        // equilibrium the dial redistributes variance between down and up
+        // states rather than adding any.
+        let at_target = crate::mathx::sqrt(t);
+        let down = component_step(v, -at_target, t, a, b, g);
+        let up = component_step(v, at_target, t, a, b, g);
+        let sym = component_step(v, at_target, t, a, b, 0.0);
+        assert!(down > up, "leverage must load the down side");
+        let two_sided = 0.5 * (down + up);
+        assert!(
+            (two_sided - sym).abs() < 1e-18,
+            "at the stationary point the rebate is exact: {two_sided} vs {sym}"
+        );
+        // Off target the gap is (gamma/2)(d^2 - t) by construction.
+        let d = 0.015;
+        let gap = 0.5
+            * (component_step(v, -d, t, a, b, g) + component_step(v, d, t, a, b, g))
+            - component_step(v, d, t, a, b, 0.0);
+        assert!(
+            (gap - 0.5 * g * (d * d - t)).abs() < 1e-18,
+            "gap {gap} must be (gamma/2)(d^2 - t)"
+        );
     }
 }
