@@ -208,6 +208,15 @@ pub struct ModelParams {
     /// channel has one — but any value fitted to the current driven test
     /// carries that qualification with it.
     pub qe_pe_gain: f64,
+    /// Gain on the QE STOCK channel: the target P/E takes
+    /// `+ qe_pe_stock_gain * ln(qe_assets_ratio)`, concave in the level of
+    /// holdings, zero at the neutral baseline. 0.0 -- every preset when the
+    /// dial shipped -- is bit-inert. The flow channel above it is linear in
+    /// monthly purchases and overshoots when fed the measured series; this
+    /// is the formulation that can take real data. See `corpus/qe` in the
+    /// design record for the measured Fed series and the -0.485 proxy
+    /// anticorrelation that motivated it.
+    pub qe_pe_stock_gain: f64,
     /// Scale on the per-name idiosyncratic GARCH sigma — the funding side
     /// of the factor-variance reallocation. Bit-inert at 1.0.
     pub idio_sigma_scale: f64,
@@ -1261,6 +1270,7 @@ impl ModelParams {
             sector_loading_beta_slope: 0.0,
             crisis_blend_variance_damp: 0.0,
             qe_pe_gain: 1.0,
+            qe_pe_stock_gain: 0.0,
             idio_sigma_scale: factor_vol::IDIO_SIGMA_SCALE,
             idio_sigma_beta_exponent: 0.0,
             order_flow_coefficient: factors::ORDER_FLOW_COEFFICIENT,
@@ -2251,6 +2261,7 @@ impl ModelParams {
             "sector_loading_beta_slope" => self.sector_loading_beta_slope,
             "crisis_blend_variance_damp" => self.crisis_blend_variance_damp,
             "qe_pe_gain" => self.qe_pe_gain,
+            "qe_pe_stock_gain" => self.qe_pe_stock_gain,
             "idio_sigma_scale" => self.idio_sigma_scale,
             "idio_sigma_beta_exponent" => self.idio_sigma_beta_exponent,
             "order_flow_coefficient" => self.order_flow_coefficient,
@@ -2381,6 +2392,7 @@ impl ModelParams {
             "sector_loading_beta_slope" => out.sector_loading_beta_slope = value,
             "crisis_blend_variance_damp" => out.crisis_blend_variance_damp = value,
             "qe_pe_gain" => out.qe_pe_gain = value,
+            "qe_pe_stock_gain" => out.qe_pe_stock_gain = value,
             "idio_sigma_scale" => out.idio_sigma_scale = value,
             "idio_sigma_beta_exponent" => out.idio_sigma_beta_exponent = value,
             "order_flow_coefficient" => out.order_flow_coefficient = value,
@@ -2627,6 +2639,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "price_breaker_fraction",
         "price_hard_cap",
         "qe_pe_gain",
+        "qe_pe_stock_gain",
         "regime_stress_points",
         "sector_factor_sigma",
         "sector_loading",
@@ -2934,7 +2947,6 @@ mod tests {
         assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");
     }
 
-    #[test]
     #[test]
     fn every_preset_runs_the_half_life_it_reports() {
         // The gap this closes. `with_override` recomputes `mispricing_phi`

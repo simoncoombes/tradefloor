@@ -220,6 +220,7 @@ pub struct PyMacro {
     pub corporate_bond_yield: Option<f64>,
     pub inflation_rate: f64,
     pub qe_pe_boost: f64,
+    pub qe_assets_ratio: f64,
     pub fear_greed_index: f64,
     pub cycle: String,
 }
@@ -229,7 +230,7 @@ impl PyMacro {
     #[new]
     #[pyo3(signature = (
         *, vix = 15.0, federal_funds_rate = 0.025, corporate_bond_yield = None,
-        inflation_rate = 0.02, qe_pe_boost = 0.0, fear_greed_index = 50.0,
+        inflation_rate = 0.02, qe_pe_boost = 0.0, qe_assets_ratio = 1.0, fear_greed_index = 50.0,
         cycle = "expansion"
     ))]
     fn new(
@@ -238,6 +239,7 @@ impl PyMacro {
         corporate_bond_yield: Option<f64>,
         inflation_rate: f64,
         qe_pe_boost: f64,
+        qe_assets_ratio: f64,
         fear_greed_index: f64,
         cycle: &str,
     ) -> PyResult<Self> {
@@ -256,6 +258,8 @@ impl PyMacro {
         for (name, v) in [
             ("vix", vix),
             ("qe_pe_boost", qe_pe_boost),
+            ("qe_assets_ratio", qe_assets_ratio),
+            ("qe_assets_ratio", qe_assets_ratio),
             ("fear_greed_index", fear_greed_index),
         ] {
             if !v.is_finite() {
@@ -270,6 +274,7 @@ impl PyMacro {
             corporate_bond_yield,
             inflation_rate,
             qe_pe_boost,
+            qe_assets_ratio,
             fear_greed_index,
             cycle: cycle.to_string(),
         })
@@ -534,7 +539,7 @@ pub fn economy_from(
 ) -> PyResult<crate::economy::EconomyState> {
     Ok(match macro_state {
         Some(m) => m.to_core(),
-        None => PyMacro::new(15.0, 0.025, None, 0.02, 0.0, 50.0, "expansion")?.to_core(),
+        None => PyMacro::new(15.0, 0.025, None, 0.02, 0.0, 1.0, 50.0, "expansion")?.to_core(),
     })
 }
 
@@ -557,6 +562,7 @@ impl PyMacro {
             .unwrap_or(e.corporate_bond_yield);
         // NOT converted: a multiplier delta, fractional in both.
         e.qe_pe_boost = self.qe_pe_boost;
+        e.qe_assets_ratio = self.qe_assets_ratio;
         e.fear_greed_index = self.fear_greed_index;
         e.cycle_phase = CyclePhase::from_name(&self.cycle).expect("validated at construction");
         e
@@ -1419,6 +1425,7 @@ impl PyEngine {
             corporate_bond_yield: Some(crate::units::percent_to_fraction(e.corporate_bond_yield)),
             inflation_rate: crate::units::percent_to_fraction(e.inflation_rate),
             qe_pe_boost: e.qe_pe_boost,
+            qe_assets_ratio: e.qe_assets_ratio,
             fear_greed_index: e.fear_greed_index,
             cycle: cycle_name(e.cycle_phase).to_string(),
         }
@@ -1444,7 +1451,7 @@ impl PyEngine {
     /// converted.
     #[pyo3(signature = (
         *, vix = None, federal_funds_rate = None, corporate_bond_yield = None,
-        inflation_rate = None, qe_pe_boost = None, fear_greed_index = None,
+        inflation_rate = None, qe_pe_boost = None, qe_assets_ratio = None, fear_greed_index = None,
         cycle = None
     ))]
     #[allow(clippy::too_many_arguments)]
@@ -1455,6 +1462,7 @@ impl PyEngine {
         corporate_bond_yield: Option<f64>,
         inflation_rate: Option<f64>,
         qe_pe_boost: Option<f64>,
+        qe_assets_ratio: Option<f64>,
         fear_greed_index: Option<f64>,
         cycle: Option<String>,
     ) -> PyResult<()> {
@@ -1474,6 +1482,7 @@ impl PyEngine {
         for (name, v) in [
             ("vix", vix),
             ("qe_pe_boost", qe_pe_boost),
+            ("qe_assets_ratio", qe_assets_ratio),
             ("fear_greed_index", fear_greed_index),
         ] {
             if let Some(v) = v {
@@ -1500,6 +1509,7 @@ impl PyEngine {
             ("corporate_bond_yield", corporate_bond_yield),
             ("inflation_rate", inflation_rate),
             ("qe_pe_boost", qe_pe_boost),
+            ("qe_assets_ratio", qe_assets_ratio),
             ("fear_greed_index", fear_greed_index),
         ] {
             if let Some(v) = value {
@@ -1526,6 +1536,9 @@ impl PyEngine {
         }
         if let Some(v) = qe_pe_boost {
             e.qe_pe_boost = v;
+        }
+        if let Some(v) = qe_assets_ratio {
+            e.qe_assets_ratio = v;
         }
         if let Some(v) = fear_greed_index {
             e.fear_greed_index = v;

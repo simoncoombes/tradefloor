@@ -628,6 +628,7 @@ pub fn simulate_market_tick(
         corporate_bond_yield: Some(economy.corporate_bond_yield),
         federal_funds_rate: economy.federal_funds_rate,
         qe_pe_boost: Some(economy.qe_pe_boost),
+        qe_assets_ratio: Some(economy.qe_assets_ratio),
     };
 
     let mut new_prices = vec![0.0; active_count];
@@ -639,7 +640,7 @@ pub fn simulate_market_tick(
         let idx = active_indices[i];
         let breakdown = compute_fair_value_with(
             &companies[idx].valuation(), &econ_view, p.fair_value_book_floor,
-            p.qe_pe_gain);
+            p.qe_pe_gain, p.qe_pe_stock_gain);
         let fv = breakdown.fair_value;
 
         // Lazy init: adopt the current premium/discount as the starting `s`,

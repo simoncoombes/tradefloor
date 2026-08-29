@@ -317,6 +317,9 @@ fn fair_value(
         federal_funds_rate: crate::units::fraction_to_percent(federal_funds_rate),
         // NOT converted: a multiplier delta, fractional in both denominations.
         qe_pe_boost,
+        // The standalone helper mirrors the reference implementation, which has no
+        // stock channel; the engine paths carry it.
+        qe_assets_ratio: None,
     };
     let company = crate::fair_value::CompanyValuationInputs {
         sector_avg_pe: Some(s.avg_pe),

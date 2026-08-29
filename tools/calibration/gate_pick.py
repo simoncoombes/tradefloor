@@ -105,11 +105,31 @@ def qe_measured():
     return meas["qe_pe_boost"]
 
 
-def driven_window(m, seed: int, qe_series=None) -> dict:
+_QE_ASSETS = Path(__file__).resolve().parent / "data" / "qe-assets-2020-2021.json"
+
+
+def qe_assets_measured():
+    """The measured holdings RATIO, daily, aligned to the covid window.
+
+    FRED securities held outright over the window's first day, for the
+    stock channel (`qe_pe_stock_gain`). This is the input the redesigned
+    channel is calibrated against; the flow proxy stays what the certified
+    gate runs.
+    """
+    raw = json.loads(_COVID.read_text(encoding="utf-8"))
+    meas = json.loads(_QE_ASSETS.read_text(encoding="utf-8"))
+    assert meas["dates"] == raw["dates"], "the assets series must align by date"
+    return meas["qe_assets_ratio"]
+
+
+def driven_window(m, seed: int, qe_series=None, qe_assets=None) -> dict:
     """Daily return sd and the VIX-channel gain, against real AAPL's own.
 
     `qe_series` replaces the proxy `qe_pe_boost` input day for day when
     given (see `qe_measured`); None runs the shipped proxy, bit for bit.
+    `qe_assets` pins the holdings ratio day for day (see
+    `qe_assets_measured`) for models whose stock channel is on; None
+    leaves the ratio neutral.
     """
     import pyarrow as pa
     import pyarrow.compute as pc
@@ -121,6 +141,10 @@ def driven_window(m, seed: int, qe_series=None) -> dict:
     path = [{"day": i, "vix": raw["vix"][i], "federal_funds_rate": policy[i],
              "corporate_bond_yield": credit[i], "qe_pe_boost": qe[i]}
             for i in range(n)]
+    if qe_assets is not None:
+        assert len(qe_assets) == n, "qe_assets must cover the window"
+        for i in range(n):
+            path[i]["qe_assets_ratio"] = qe_assets[i]
     scen = pt.Scenario.from_json(json.dumps(
         {"schema": 1, "label": "covid", "days": n, "path": path}))
     aapl = pt.Instrument("AAPL", "technology", initial_price=raw["aapl"][0],

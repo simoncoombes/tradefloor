@@ -209,6 +209,7 @@ class Checkpoint:
                 "corporate_bond_yield": self.macro.corporate_bond_yield,
                 "inflation_rate": self.macro.inflation_rate,
                 "qe_pe_boost": self.macro.qe_pe_boost,
+                "qe_assets_ratio": getattr(self.macro, "qe_assets_ratio", 1.0),
                 "fear_greed_index": self.macro.fear_greed_index,
                 "cycle": self.macro.cycle,
             }
@@ -241,7 +242,11 @@ class Checkpoint:
             )
         macro = None
         if "macro" in payload:
-            macro = Macro(**payload["macro"])
+            m = dict(payload["macro"])
+            # Absent in checkpoints written before the QE stock channel;
+            # 1.0 is the neutral value those runs were computed under.
+            m.setdefault("qe_assets_ratio", 1.0)
+            macro = Macro(**m)
         return cls(
             seed=payload["seed"],
             universe=universe,

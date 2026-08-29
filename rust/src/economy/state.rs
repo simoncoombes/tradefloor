@@ -291,6 +291,12 @@ pub struct EconomyState {
 
     // QE pass-through
     pub qe_pe_boost: f64,
+    /// Fed securities held outright over a neutral baseline. 1.0 is
+    /// neutral. The central bank integrates its purchases into it; a
+    /// scenario may pin it to a measured series. Consumed only by the
+    /// stock channel (`qe_pe_stock_gain`), inert on every preset that
+    /// ships that dial at 0.0.
+    pub qe_assets_ratio: f64,
 
     // Fiscal policy
     pub fiscal_stimulus: f64,
@@ -419,6 +425,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         market_pe: Some(18.0),
 
         qe_pe_boost: 0.0,
+        qe_assets_ratio: 1.0,
 
         fiscal_stimulus: 0.0,
         government_debt_to_gdp: 100.0,

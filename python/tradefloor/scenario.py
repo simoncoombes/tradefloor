@@ -217,6 +217,7 @@ FIELDS = (
     "corporate_bond_yield",
     "inflation_rate",
     "qe_pe_boost",
+    "qe_assets_ratio",
     "fear_greed_index",
     "cycle",
 )
