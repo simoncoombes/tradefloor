@@ -2260,6 +2260,14 @@ impl ModelParams {
         p.jump_sigma_market = 0.0024597567320385947;
         p.endogenous_news_sigma = 0.01751004376;
         p.sector_factor_sigma = 0.008583053614;
+        // The same-day volume coupling, raised off the 252-day floor. The
+        // response term is the only one tying a name's volume to the size
+        // of TODAY'S move (see the field's docstring); at the shipped 0.6
+        // the 252-day volume-|return| correlation sat below the weakest
+        // real reference window on every block measured. At 1.0 all 26
+        // qualification blocks clear the floor and the union card is
+        // clean on both panels (volqual, 100 seeds).
+        p.volume_move_response = 1.0;
         p
     }
 
@@ -3021,6 +3029,7 @@ mod tests {
             .and_then(|m| m.with_override("jump_sigma_market", 0.0024597567320385947))
             .and_then(|m| m.with_override("endogenous_news_sigma", 0.01751004376))
             .and_then(|m| m.with_override("sector_factor_sigma", 0.008583053614))
+            .and_then(|m| m.with_override("volume_move_response", 1.0))
             .expect("every folded dial is settable");
         assert_eq!(crate::params::PT_V16.digest(), measured.digest());
         assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");
