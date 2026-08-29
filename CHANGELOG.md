@@ -2,17 +2,19 @@
 
 ## Unreleased
 
-**pt-v16 registered: the QE valuation channel silenced.** pt-v15 plus one
-number, `qe_pe_gain` 0.0. The channel's driven-test input is a price-trend
-proxy that correlates -0.485 with measured Fed purchases, and the measured
-series overshoots the linear formula; the channel subtracts realism with
-either input, so pt-v16 gives it none. Qualification: over thirteen
-thirty-seed blocks against pt-v15 the preset is bit-identical on every
-certified panel and crisis statistic (the endogenous QE trigger never
-fires at panel horizons) and the driven noise ratio falls 1.4633 to
-1.2384 against a real 1.00, the largest driven improvement measured. A
-scenario's `qe_pe_boost` no longer reaches fair values under this preset.
-Selectable by name; not the default, which remains pt-v14.
+**pt-v16 registered: the first full-house preset.** pt-v15 plus four
+numbers: `qe_pe_gain` 0.0 (the QE channel's driven input is a proxy
+anticorrelated with measured Fed purchases, and the channel subtracts
+realism with either input, so it gets none), `vix_cycle_amplitude` 0.85,
+`market_beta_down_asym` 0.01 (down ticks of the market factor transmit
+harder -- the exceedance-correlation mechanism), and
+`sector_loading_beta_slope` 0.7. Over thirteen thirty-seed blocks:
+504-day panel full-house 13/13 -- the first preset to hold every
+statistic on every block -- crisis co-movement 13/13 with the spread at
+0.0444, crisis lever 13/13 at median 6.137, and the driven noise ratio
+at 1.2511 against pt-v15's ~1.46. Margins and scope stated in the
+preset's documentation. Selectable by name; not the default, which
+remains pt-v14.
 
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
 give each agent its own copy of the market, which is what makes the

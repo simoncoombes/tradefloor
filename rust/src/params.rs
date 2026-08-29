@@ -2197,8 +2197,38 @@ impl ModelParams {
         p
     }
 
-    /// pt-v15 with one number: `qe_pe_gain` 0.0. The QE valuation channel
-    /// is silenced.
+    /// pt-v15 with four numbers: the QE valuation channel silenced, and
+    /// the composition that closed the full house.
+    ///
+    /// **The first preset to hold the full card.** Over thirteen
+    /// thirty-seed qualification blocks: 504-day panel full-house 13/13
+    /// (pt-v15 holds 11), crisis co-movement in range 13/13 with the
+    /// across-block spread at 0.0444, crisis lever 13/13 at median 6.137
+    /// against the real 6.16, driven noise ratio 1.2511 against pt-v15's
+    /// ~1.46. Paired against the qe0-only base the panel is 2 wins, 11
+    /// ties, 0 losses; the driven cost of the composition is +0.0127 and
+    /// is the one trade this preset makes.
+    ///
+    /// The composition, and why each number: `vix_cycle_amplitude` 0.85
+    /// pulls the business-cycle share of the VIX in, a clean
+    /// corr-asymmetry gain with no measured cost; `market_beta_down_asym`
+    /// 0.01 is the exceedance-correlation wire (down ticks of the factor
+    /// transmit harder) at the lowest measured effective dose -- higher
+    /// doses tax crisis co-movement roughly one-for-one; and
+    /// `sector_loading_beta_slope` rises 0.5 to 0.7 to fund the
+    /// co-movement margin that dose spends. The two neighbouring
+    /// compositions measured (more wire with more funding; gentler cycle)
+    /// both fail block 601, so this is the measured optimum, not a point
+    /// on a plateau.
+    ///
+    /// Stated margins, because they are thin: corr_asymmetry clears its
+    /// -0.04 floor by 0.0009 at block 601 and 0.0022 at 1201; co-movement
+    /// clears its floor by 0.0012 at block 401. And stated scope: the
+    /// -0.04 floor is itself generous -- every one of the six real
+    /// reference windows measures corr_asymmetry at -0.0105 or above,
+    /// five of six positive -- so this preset is band-complete while
+    /// still below every real observation on that axis. The gap that
+    /// remains is real and smaller than it has ever been.
     ///
     /// The channel multiplies the target P/E by `1 + qe_pe_boost`, and its
     /// input is not measured quantitative easing: the driven test derives
@@ -2231,6 +2261,9 @@ impl ModelParams {
     pub const fn pt_v16() -> ModelParams {
         let mut p = ModelParams::pt_v15();
         p.qe_pe_gain = 0.0;
+        p.vix_cycle_amplitude = 0.85;
+        p.market_beta_down_asym = 0.01;
+        p.sector_loading_beta_slope = 0.7;
         p
     }
 
@@ -2970,17 +3003,20 @@ mod tests {
         assert!(PT_V1.with_override("garch_alpha", f64::NAN).is_err());
     }
 
-    /// pt-v16's qualification is asym1's `qe0` cell: thirteen certified
-    /// blocks measured on `pt-v15 + {qe_pe_gain: 0.0}` as an override. The
+    /// pt-v16's qualification is asymqual's `cand` cell: thirteen
+    /// certified blocks measured on pt-v15 plus these four overrides. The
     /// frozen preset inherits those measurements only if it is that vector
     /// to the bit, which this asserts. If it ever fails, the preset has
     /// drifted from the evidence that qualified it.
     #[test]
-    fn pt_v16_is_the_measured_qe0_cell_to_the_bit() {
+    fn pt_v16_is_the_measured_cand_cell_to_the_bit() {
         let measured = ModelParams::preset("pt-v15")
             .unwrap()
             .with_override("qe_pe_gain", 0.0)
-            .expect("qe_pe_gain is settable");
+            .and_then(|m| m.with_override("vix_cycle_amplitude", 0.85))
+            .and_then(|m| m.with_override("market_beta_down_asym", 0.01))
+            .and_then(|m| m.with_override("sector_loading_beta_slope", 0.7))
+            .expect("every folded dial is settable");
         assert_eq!(crate::params::PT_V16.digest(), measured.digest());
         assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");
     }
