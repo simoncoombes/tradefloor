@@ -25,6 +25,16 @@ dist-spike/
 # and its debug symbols straight into the source tree. They are 2 MB, they
 # change on every rebuild, and a wheel is the only thing anyone should be
 # installing.
+# The path is `python/tradefloor/` and was `python/pretium/` until the rename.
+# These three lines kept the old path, so `maturin develop` began writing an
+# UNIGNORED 1.1 MB extension and a 1.0 MB debug database into the tree; both
+# were committed, the stale extension then shadowed the real one for anyone
+# importing from the source directory, and `pretium.pdb` shipped inside every
+# published wheel. Match the directory that exists, and both, so a rename
+# cannot quietly re-open this.
+python/tradefloor/*.pyd
+python/tradefloor/*.so
+python/tradefloor/*.pdb
 python/pretium/*.pyd
 python/pretium/*.so
 python/pretium/*.pdb

@@ -2,6 +2,69 @@
 
 ## Unreleased
 
+**Forking is now a copy of the engine, and four ways it was not exact are
+fixed.** `tf.branch` rebuilt a fork by writing a hand-maintained list of
+fields into a fresh engine, and the list was incomplete. Most seriously, it
+did not carry the day's endogenous news, which is generated once at
+`open_market` and read by every tick of that day: a fork taken MID-DAY ran
+the rest of the day with the news missing and priced differently from the
+parent it was supposed to be a copy of. That was live on the shipped default
+preset, `pt-v14`, and on every preset from `pt-v11`.
+
+The other three were silent in a different way. A fork's order log was empty,
+so a `Checkpoint` taken on a fork recorded a history that began at the fork
+and resumed to a market that began at day zero, with nothing raised; a
+`RunManifest` taken on one failed its own digest check and blamed a suspected
+platform arithmetic difference between Windows and Windows. A mid-day fork
+lost the day's already-recorded ticks, so `record` wrote a day half as long as
+its parent's, well-formed and short. And a fork lost the previous close's
+pending jump, so the first row of its next recorded day attributed nothing to
+a move that happened.
+
+All four had one cause and one fix: `Engine.fork` copies the engine, so there
+is no list of fields to be incomplete and a field added later is carried
+without anyone remembering to carry it. `tf.branch` calls it. Forks can now be
+checkpointed, forked again, and written to a manifest, which they could not be
+before. `universe` and `seed` become optional on `tf.branch` -- a copy cannot
+land on the wrong roster, which is what they were there to prevent -- and a
+`universe` that is passed is checked against the engine's own tickers.
+
+No trajectory moves: the known-answer digest is unchanged on every target.
+
+**`state_snapshot` carries three more pieces of engine state**: the day's
+endogenous news, the universe's remembered stress and the per-name volume
+states. The last two are inert under every shipped preset, which is exactly
+the position the common log-volume state was in before `pt-v10` turned it on
+and a restored engine started trading different volume. `set_universe_stress`
+existed for this and nothing called it. What a snapshot does NOT carry -- the
+order log, the recorded tape, the pending jump -- is now written on the method
+rather than left to be discovered.
+
+**A corrupted checkpoint says it is corrupted.** `Checkpoint.from_json` on a
+truncated or non-checkpoint payload raised `KeyError: 'seed'` or a `TypeError`
+about string indices. It now names what is missing.
+
+**`pretium.pdb` no longer ships inside the wheel.** `.gitignore` still named
+`python/pretium/` after the rename, so `maturin develop` wrote an unignored
+1.1 MB extension and a 1.0 MB Windows debug database into the source tree,
+both were committed, and maturin packaged the debug database into every wheel
+built from such a tree -- including the published 0.5.0. The stale committed
+extension also shadowed the real one for anyone importing from `python/`.
+The ignore rules name the directory that exists, the artefacts are untracked,
+`[tool.maturin] exclude` stops a developer's build sweeping them up, and
+`tests/test_packaging.py` checks all three.
+
+**`tests/test_stub_parity.py` runs again.** Its `STUB` path still pointed at
+`python/pretium/_core.pyi`, so its `skipif` skipped all ninety-nine of its
+tests and reported green while the type stub went unread. A missing stub is
+now an error rather than a skip.
+
+**New:** `tests/test_forking.py` (38 invariant tests over the whole
+run/checkpoint/fork/intervene/compare chain, including a cross-process
+checkpoint resume), `tests/test_packaging.py`, and
+`examples/10-forking-a-market.py`, a two-second runnable fork demonstration.
+The reproducibility tests now run in CI on all five wheel targets.
+
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
 give each agent its own copy of the market, which is what makes the
 comparison clean. The next step is one book with several agents in it,

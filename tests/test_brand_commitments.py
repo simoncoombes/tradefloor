@@ -91,13 +91,14 @@ ASCII_PROSE = (
     "RELEASING.md",
     "rust/README.md",
     "rust/goldens/README.md",
-    # The three pages added for 0.3.0. `docs/` as a whole is not on this list
-    # -- the older markdown carries em dashes that predate the commitment --
-    # but a page written after it should hold to it, and widening the list is
-    # how the commitment widens.
-    "docs/glossary.md",
-    "docs/two-loops.md",
-    "docs/principles.md",
+    # `docs/` is not on this list because there is no `docs/` here any more:
+    # the documentation site moved to its own repository, and the three pages
+    # that used to be checked here (glossary, two-loops, principles) went with
+    # it. They were left named, so this test failed on three missing files
+    # from the day of the move -- which is the same shape as the ignore rule
+    # and the stub path that also kept pointing at where things used to be.
+    # The commitment for those pages belongs in the repository that now holds
+    # them; widening this list is still how it widens for anything here.
 )
 
 NON_ASCII_PUNCTUATION = {

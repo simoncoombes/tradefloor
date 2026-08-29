@@ -24,9 +24,23 @@ import pytest
 
 import tradefloor._core as core
 
-STUB = Path(__file__).resolve().parent.parent / "python" / "pretium" / "_core.pyi"
+STUB = Path(__file__).resolve().parent.parent / "python" / "tradefloor" / "_core.pyi"
 
-pytestmark = pytest.mark.skipif(not STUB.exists(), reason="stub not present")
+# NOT a skipif. The path said "pretium" for a week after the package became
+# `tradefloor`, so `STUB.exists()` was False, and all ninety-nine tests in
+# this file skipped and reported green while the stub they exist to check
+# went unread. A guard that disables itself when its subject moves is worse
+# than no guard, because the suite keeps saying the thing is checked.
+#
+# A missing stub is also not a reason to pass: it means the package ships no
+# types, which is the failure this file is about.
+if not STUB.exists():  # pragma: no cover
+    raise AssertionError(
+        f"the type stub is not at {STUB}. Either it is missing, in which "
+        "case the package ships no types and a checker silently falls back "
+        "to Any, or the package directory moved and this path did not "
+        "follow it."
+    )
 
 
 def parsed():

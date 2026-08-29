@@ -23,7 +23,10 @@ import pytest
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 NOTEBOOKS = sorted(EXAMPLES.glob("0*.ipynb"))
-SCRIPTS = sorted(EXAMPLES.glob("0*.py"))
+# `[0-9]*` and not `0*`: the examples are numbered, and the tenth one is not
+# `0`-prefixed. Under the old glob example 10 onward was silently unchecked,
+# which is the failure mode this file exists to prevent, applied to itself.
+SCRIPTS = sorted(EXAMPLES.glob("[0-9]*.py"))
 
 #: Executing notebooks is slow and needs jupyter, so those tests are opt-in.
 #: The syntax check on the scripts is not -- a rename that missed a
@@ -119,6 +122,31 @@ def test_the_research_workflow_runs_end_to_end():
                           capture_output=True, text=True, timeout=600)
     assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-3000:]
     assert "total" in done.stdout.lower()
+
+
+def test_the_forking_demo_runs_end_to_end():
+    """The forking demo, run whole, and NOT behind the slow flag.
+
+    It takes about two seconds, and what it checks -- that a fork starts where
+    its source stood, carries its source's history, does not reach its source
+    or its siblings, and replays from the checkpoint -- is the guarantee the
+    library makes about experiments. Something that central should be checked
+    on every run rather than when someone remembers a flag.
+
+    It asserts its own gates and exits non-zero if any fails, so this reads
+    the return code and then confirms the summary line, because a script that
+    printed FAIL and exited zero would be the more dangerous failure.
+    """
+    import subprocess
+    script = EXAMPLES / "10-forking-a-market.py"
+    if not script.exists():
+        pytest.fail(f"{script.name} is missing; examples/ has "
+                    f"{[p.name for p in SCRIPTS]}")
+    done = subprocess.run([sys.executable, str(script)],
+                          capture_output=True, text=True, timeout=600)
+    assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-3000:]
+    assert "fork test          PASS" in done.stdout, done.stdout[-2000:]
+    assert "FAIL" not in done.stdout
 
 
 @SLOW
