@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pretium"
-version = "0.5.1"
+version = "0.5.2"
 description = "pretium is now tradefloor. This package re-exports it and warns."
 readme = "README.md"
 requires-python = ">=3.11"

@@ -20,7 +20,7 @@ caused a move. This can, because it computed every price.
 
 ## Documentation
 
-The full documentation lives at **https://tradefloor.dev** — install,
+The full documentation lives at **https://tradefloor.dev**: install,
 core concepts, the realism envelope, presets, the API surface, and the
 notebooks. (Its source is maintained separately.)
 
