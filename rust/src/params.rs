@@ -517,6 +517,14 @@ pub struct ModelParams {
     pub market_vol_vix_coupling: f64,
     /// VIX level at which a coupled target equals the baseline variance.
     pub market_vol_vix_anchor: f64,
+    /// Days of EMA smoothing on the VIX the MARKET variance target reads.
+    /// 0 -- every shipped preset -- reads each day's print raw, bit for
+    /// bit. Round 99: with QE silenced, the entire remaining driven-window
+    /// excess is the fear response transmitting print-to-print VIX churn
+    /// into the variance target; real volatility follows sustained fear.
+    /// Affects the market factor only; the per-name GARCH VIX coupling
+    /// still reads the print.
+    pub market_vol_vix_smooth: f64,
     /// Persistence of the SLOW variance component (Engle-Lee style). The
     /// market factor's variance carries two timescales from the pt-v4 era:
     /// the fast one above tracks the VIX-scaled target, this one carries
@@ -1303,6 +1311,7 @@ impl ModelParams {
             market_vol_floor_multiple: factor_vol::MARKET_VOL_FLOOR_MULTIPLE,
             market_vol_vix_coupling: factor_vol::MARKET_VOL_VIX_COUPLING,
             market_vol_vix_anchor: factor_vol::MARKET_VOL_VIX_ANCHOR,
+            market_vol_vix_smooth: 0.0,
             // Legacy values: the slow component is OFF, and the update
             // reduces to the single-component form bit for bit.
             market_vol_slow_persistence: 0.0,
@@ -2294,6 +2303,7 @@ impl ModelParams {
             "market_vol_floor_multiple" => self.market_vol_floor_multiple,
             "market_vol_vix_coupling" => self.market_vol_vix_coupling,
             "market_vol_vix_anchor" => self.market_vol_vix_anchor,
+            "market_vol_vix_smooth" => self.market_vol_vix_smooth,
             "market_vol_slow_persistence" => self.market_vol_slow_persistence,
             "market_vol_slow_gain" => self.market_vol_slow_gain,
             "fair_value_book_floor" => self.fair_value_book_floor,
@@ -2425,6 +2435,7 @@ impl ModelParams {
             "market_vol_floor_multiple" => out.market_vol_floor_multiple = value,
             "market_vol_vix_coupling" => out.market_vol_vix_coupling = value,
             "market_vol_vix_anchor" => out.market_vol_vix_anchor = value,
+            "market_vol_vix_smooth" => out.market_vol_vix_smooth = value,
             "market_vol_slow_persistence" => out.market_vol_slow_persistence = value,
             "market_vol_slow_gain" => out.market_vol_slow_gain = value,
             "fair_value_book_floor" => out.fair_value_book_floor = value,
@@ -2626,6 +2637,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_slow_vix_damp",
         "market_vol_slow_weight",
         "market_vol_vix_anchor",
+        "market_vol_vix_smooth",
         "market_vol_vix_coupling",
         "mispricing_cap",
         "mispricing_half_life_days",

@@ -122,7 +122,7 @@ def qe_assets_measured():
     return meas["qe_assets_ratio"]
 
 
-def driven_window(m, seed: int, qe_series=None, qe_assets=None) -> dict:
+def driven_window(m, seed: int, qe_series=None, qe_assets=None, freeze=()) -> dict:
     """Daily return sd and the VIX-channel gain, against real AAPL's own.
 
     `qe_series` replaces the proxy `qe_pe_boost` input day for day when
@@ -145,6 +145,18 @@ def driven_window(m, seed: int, qe_series=None, qe_assets=None) -> dict:
         assert len(qe_assets) == n, "qe_assets must cover the window"
         for i in range(n):
             path[i]["qe_assets_ratio"] = qe_assets[i]
+    if freeze:
+        # Channel attribution, round 76's method: a frozen channel holds its
+        # day-zero value for the whole window, so the difference against the
+        # full run is that channel's contribution. "vix" freezes the fear
+        # path; "policy" the funds rate; "credit" the bond yield.
+        keys = {"vix": "vix", "policy": "federal_funds_rate",
+                "credit": "corporate_bond_yield"}
+        for ch in freeze:
+            k = keys[ch]
+            v0 = path[0][k]
+            for i in range(n):
+                path[i][k] = v0
     scen = pt.Scenario.from_json(json.dumps(
         {"schema": 1, "label": "covid", "days": n, "path": path}))
     aapl = pt.Instrument("AAPL", "technology", initial_price=raw["aapl"][0],

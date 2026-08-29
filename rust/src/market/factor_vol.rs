@@ -376,6 +376,10 @@ pub struct MarketVarianceState {
     fast_variance: f64,
     /// The slow component's own level.
     slow_variance: f64,
+    /// EMA of the VIX the variance target reads, when
+    /// `market_vol_vix_smooth` is on. `None` until the first smoothed
+    /// close, and never touched while the dial is 0.0.
+    smoothed_vix: Option<f64>,
 }
 
 impl Default for MarketVarianceState {
@@ -404,6 +408,7 @@ impl MarketVarianceState {
             day_factor: 0.0,
             fast_variance: base,
             slow_variance: base,
+            smoothed_vix: None,
         }
     }
 
@@ -436,6 +441,22 @@ impl MarketVarianceState {
     /// calls; at [`crate::params::PT_V1`] it is the shipped update bit for
     /// bit.
     pub fn close_day_with(&mut self, params: &crate::params::ModelParams, vix: f64) {
+        // The fear the target reads, not necessarily today's print. Real
+        // volatility follows sustained fear with inertia; a model that
+        // transmits every VIX print one-for-one into the variance target
+        // injects the print-to-print churn straight into daily returns,
+        // which round 99 measured as the whole of the driven excess. At
+        // `market_vol_vix_smooth` = 0 -- every shipped preset -- the print
+        // is read raw and this state never updates, bit for bit.
+        let vix = if params.market_vol_vix_smooth == 0.0 {
+            vix
+        } else {
+            let alpha = 2.0 / (params.market_vol_vix_smooth + 1.0);
+            let prev = self.smoothed_vix.unwrap_or(vix);
+            let sm = prev + alpha * (vix - prev);
+            self.smoothed_vix = Some(sm);
+            sm
+        };
         let base = params.market_factor_sigma * params.market_factor_sigma;
         let vix_ratio = vix / params.market_vol_vix_anchor;
         let target = base
@@ -519,6 +540,9 @@ impl MarketVarianceState {
             day_factor,
             fast_variance: variance,
             slow_variance: variance,
+            // Pre-dial checkpoints carry no smoothed fear; the EMA
+            // re-seeds from the first smoothed close after restore.
+            smoothed_vix: None,
         }
     }
 
@@ -529,7 +553,7 @@ impl MarketVarianceState {
         fast_variance: f64,
         slow_variance: f64,
     ) -> Self {
-        Self { variance, day_factor, fast_variance, slow_variance }
+        Self { variance, day_factor, fast_variance, slow_variance, smoothed_vix: None }
     }
 }
 
