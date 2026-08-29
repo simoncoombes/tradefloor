@@ -380,11 +380,18 @@ def branch(
     engine's log was empty, so a checkpoint taken on it replayed a market
     beginning at day zero, silently.
 
-    ``universe`` and ``seed`` are accepted for compatibility and are no longer
-    needed -- a copy cannot land on the wrong roster, which is what they were
-    there to prevent. A ``universe`` that IS passed is checked against the
-    engine's own tickers, so a caller who believes they are forking a
-    different market is told rather than humoured.
+    ``universe``, ``seed`` and ``macro`` are accepted for compatibility and are
+    no longer needed. A copy cannot land on the wrong roster, which is what
+    ``universe`` and ``seed`` were there to prevent; a ``universe`` that IS
+    passed is checked against the engine's own tickers, so a caller who
+    believes they are forking a different market is told rather than humoured.
+
+    ``macro`` has never done anything here and does not now: it used to be
+    handed to the fresh engine's constructor and then immediately overwritten
+    by the snapshot's own economy. A fork inherits its parent's macro state,
+    which is the only reading that makes it a fork. To give a branch a
+    different economy, drive it with a :class:`tradefloor.Scenario` after
+    forking, which is what the intervention half of an experiment is.
 
     For a fork that must survive the process, use :class:`Checkpoint`.
     """
