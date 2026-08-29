@@ -902,6 +902,61 @@ def test_a_snapshot_does_not_carry_history_and_says_so():
 
 
 # --------------------------------------------------------------------------
+# 9b. Every shipped preset, not just the default
+# --------------------------------------------------------------------------
+
+#: Every preset a user can still select. Named rather than discovered, so a new
+#: one has to be added here on purpose -- and a preset that changes what a fork
+#: has to carry is exactly the thing that would otherwise ship unchecked.
+SHIPPED_PRESETS = ("pt-v1", "pt-v4", "pt-v6", "pt-v8", "pt-v10", "pt-v12",
+                   "pt-v14", "pt-v15")
+
+
+@pytest.mark.parametrize("preset", SHIPPED_PRESETS)
+def test_the_fork_guarantees_hold_on_every_shipped_preset(preset):
+    """A preset is a different market, and can be a different set of live state.
+
+    The news defect was inert before `pt-v11` and live after it; the common
+    log-volume state was inert before `pt-v10` and live after it. So "the fork
+    is exact" is a claim about a preset, not about the library, and testing it
+    only on the default would keep missing the same class of defect one preset
+    at a time.
+
+    Deliberately small -- eight steps, a mid-day fork, a restore and a
+    checkpoint of a fork -- because it runs eight times.
+    """
+    parent = fresh(model=preset)
+    run(parent, 4)
+
+    # A mid-day fork continues the parent exactly.
+    parent.open_market()
+    parent.run_session(9, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    fork, = tf.branch(parent, 1)
+    parent.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    fork.run_session(10, 30, 3, TICKS_PER_DAY, order_flow=FLOW)
+    assert differences(state(fork), state(parent)) == [], preset
+    for engine in (parent, fork):
+        engine.record(4)
+        engine.close_market()
+
+    # A checkpoint restores and then continues exactly.
+    point = tf.Checkpoint.of(parent, universe=UNIVERSE, seed=SEED)
+    restored = point.resume()
+    assert market_digest(restored) == market_digest(parent), preset
+    for i in range(5, 9):
+        day(parent, i)
+        day(restored, i)
+    assert differences(state(restored), state(parent)) == [], preset
+
+    # And a fork can be checkpointed on its own terms.
+    child, = tf.branch(parent, 1)
+    run(child, 3, first=9)
+    assert market_digest(
+        tf.Checkpoint.of(child, universe=UNIVERSE, seed=SEED).resume()
+    ) == market_digest(child), preset
+
+
+# --------------------------------------------------------------------------
 # 10. What the errors say
 # --------------------------------------------------------------------------
 
