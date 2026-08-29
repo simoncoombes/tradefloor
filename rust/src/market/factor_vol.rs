@@ -548,11 +548,14 @@ impl MarketVarianceState {
         self.day_factor = 0.0;
     }
 
-    /// The four state numbers, for checkpoints:
-    /// `(variance, day_factor, fast_variance, slow_variance)`.
-    pub fn snapshot(&self) -> (f64, f64, f64, f64, f64) {
+    /// The state numbers, for checkpoints: `(variance, day_factor,
+    /// fast_variance, slow_variance, prev_day_factor, smoothed_vix)`.
+    /// `smoothed_vix` is a VIX-scale positive number while primed;
+    /// a negative value is the None sentinel (JSON carries no NaN).
+    pub fn snapshot(&self) -> (f64, f64, f64, f64, f64, f64) {
         (self.variance, self.day_factor, self.fast_variance,
-         self.slow_variance, self.prev_day_factor)
+         self.slow_variance, self.prev_day_factor,
+         self.smoothed_vix.unwrap_or(-1.0))
     }
 
     /// Restore from a checkpoint. Values are adopted verbatim, like every
@@ -582,12 +585,20 @@ impl MarketVarianceState {
         fast_variance: f64,
         slow_variance: f64,
         prev_day_factor: f64,
+        smoothed_vix: f64,
     ) -> Self {
         // A checkpoint from before the lagged wire carries no
         // prev_day_factor; the caller passes 0.0 and the wire simply does
         // not fire on the first restored session, which is what those
-        // checkpoints' era did anyway.
-        Self { variance, day_factor, fast_variance, slow_variance, smoothed_vix: None, prev_day_factor }
+        // checkpoints' era did anyway. Same for the smoothed fear: a
+        // negative sentinel means unprimed, and the EMA re-seeds from the
+        // first smoothed close -- bit-identical for every checkpoint
+        // written while the dial was inert.
+        Self {
+            variance, day_factor, fast_variance, slow_variance,
+            smoothed_vix: if smoothed_vix < 0.0 { None } else { Some(smoothed_vix) },
+            prev_day_factor,
+        }
     }
 }
 
@@ -836,8 +847,8 @@ mod tests {
         state.accumulate(0.007);
         state.close_day(22.0);
         state.accumulate(-0.003);
-        let (v, df, fast, slow, pdf) = state.snapshot();
-        let restored = MarketVarianceState::restore_with_components(v, df, fast, slow, pdf);
+        let (v, df, fast, slow, pdf, sv) = state.snapshot();
+        let restored = MarketVarianceState::restore_with_components(v, df, fast, slow, pdf, sv);
         assert_eq!(state, restored);
     }
 
@@ -858,7 +869,7 @@ mod tests {
         original.close_day_with(params, 31.0);
         original.accumulate(-0.004);
 
-        let (v, df, _fast, _slow, _pdf) = original.snapshot();
+        let (v, df, _fast, _slow, _pdf, _sv) = original.snapshot();
         let mut restored = MarketVarianceState::restore(v, df);
 
         for day in 0..12 {

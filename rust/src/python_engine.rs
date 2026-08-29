@@ -1953,12 +1953,13 @@ impl PyEngine {
         // fork that lost it would re-open at the baseline factor sigma
         // mid-regime and diverge from its parent at the next close.
         let (market_variance, market_day_factor, market_fast_variance,
-             market_slow_variance, market_prev_day_factor) =
+             market_slow_variance, market_prev_day_factor, market_smoothed_vix) =
             self.inner.market_variance_state();
         out.set_item(
             "market_variance",
             vec![market_variance, market_day_factor, market_fast_variance,
-                 market_slow_variance, market_prev_day_factor],
+                 market_slow_variance, market_prev_day_factor,
+                 market_smoothed_vix],
         )?;
         // The common log-volume state. Same reason as the variance above, and
         // the same failure: omitted, a fork re-opens at volume 1.0 mid-regime
@@ -2256,7 +2257,7 @@ impl PyEngine {
             // Two values is a checkpoint written before the slow component
             // existed; three is one written after; four adds the mixture
             // components; five carries the lagged-wire memory. All replay.
-            if vals.len() < 2 || vals.len() > 5 {
+            if vals.len() < 2 || vals.len() > 6 {
                 return Err(ValidationError::new_err(format!(
                     "market_variance must be [variance, day_factor], optionally \
                      plus the component levels and the lagged-wire memory, \
@@ -2272,12 +2273,14 @@ impl PyEngine {
                 // as both components is the only reading that leaves a
                 // legacy preset replaying identically, where neither is
                 // read.
+                6 => self.inner.set_market_variance_state_with_components(
+                    vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]),
                 5 => self.inner.set_market_variance_state_with_components(
-                    vals[0], vals[1], vals[2], vals[3], vals[4]),
+                    vals[0], vals[1], vals[2], vals[3], vals[4], -1.0),
                 4 => self.inner.set_market_variance_state_with_components(
-                    vals[0], vals[1], vals[2], vals[3], 0.0),
+                    vals[0], vals[1], vals[2], vals[3], 0.0, -1.0),
                 3 => self.inner.set_market_variance_state_with_components(
-                    vals[0], vals[1], vals[0], vals[2], 0.0),
+                    vals[0], vals[1], vals[0], vals[2], 0.0, -1.0),
                 _ => self.inner.set_market_variance_state(vals[0], vals[1]),
             }
         }
