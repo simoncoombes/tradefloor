@@ -32,9 +32,16 @@ SCRIPTS = sorted(EXAMPLES.glob("[0-9]*.py"))
 #: The syntax check on the scripts is not -- a rename that missed a
 #: reference should fail on every run, not only when someone remembers the
 #: flag.
+#: Both spellings. The flag was named before the library was, and someone
+#: typing the current name at the current project should not silently get the
+#: skip -- which is the same "a guard that quietly stops guarding" shape the
+#: rename left in four other places. The old name keeps working because it is
+#: in CONTRIBUTING.md, in RELEASING.md, and in people's shell history.
 SLOW = pytest.mark.skipif(
-    not os.environ.get("PRETIUM_SLOW_TESTS"),
-    reason="executing the examples is slow; set PRETIUM_SLOW_TESTS=1 to run",
+    not (os.environ.get("TRADEFLOOR_SLOW_TESTS")
+         or os.environ.get("PRETIUM_SLOW_TESTS")),
+    reason=("executing the examples is slow; set TRADEFLOOR_SLOW_TESTS=1 "
+            "to run (PRETIUM_SLOW_TESTS is still honoured)"),
 )
 
 

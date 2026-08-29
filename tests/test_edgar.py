@@ -722,12 +722,17 @@ def test_stationary_sigma_refuses_nonsense_and_reports_non_stationarity():
 
 import os
 
-NETWORK = os.environ.get("PRETIUM_NETWORK_TESTS") == "1"
-SEC_UA = os.environ.get("PRETIUM_SEC_USER_AGENT", "")
+# Both prefixes. These were named before the library was, and someone
+# typing the current project's name should not silently get the skip.
+NETWORK = (os.environ.get("TRADEFLOOR_NETWORK_TESTS")
+           or os.environ.get("PRETIUM_NETWORK_TESTS")) == "1"
+SEC_UA = (os.environ.get("TRADEFLOOR_SEC_USER_AGENT")
+          or os.environ.get("PRETIUM_SEC_USER_AGENT", ""))
 
 network = pytest.mark.skipif(
     not NETWORK or "@" not in SEC_UA,
-    reason="set PRETIUM_NETWORK_TESTS=1 and PRETIUM_SEC_USER_AGENT='Name you@example.org'",
+    reason=("set TRADEFLOOR_NETWORK_TESTS=1 and "
+           "TRADEFLOOR_SEC_USER_AGENT='Name you@example.org'"),
 )
 
 

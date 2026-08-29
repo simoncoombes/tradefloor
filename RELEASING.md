@@ -72,7 +72,7 @@ publishes whole, which is what every version before 0.3.0 does.
 
 ```
 python -m pytest tests/ -q
-PRETIUM_SLOW_TESTS=1 python -m pytest tests/test_examples.py -q
+TRADEFLOOR_SLOW_TESTS=1 python -m pytest tests/test_examples.py -q
 cd rust && cargo test --offline
 ```
 

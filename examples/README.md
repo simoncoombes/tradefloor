@@ -45,7 +45,7 @@ test run, which catches a rename that missed a reference. The rest is opt-in,
 because executing eight notebooks takes about a minute:
 
 ```
-PRETIUM_SLOW_TESTS=1 pytest tests/test_examples.py
+TRADEFLOOR_SLOW_TESTS=1 pytest tests/test_examples.py
 ```
 
 That executes every notebook, confirms the committed copies carry output,
