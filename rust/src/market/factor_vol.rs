@@ -252,7 +252,7 @@ pub fn update_market_variance_with(
     let vix_ratio = vix / params.market_vol_vix_anchor;
     let target = base
         * (1.0 - params.market_vol_vix_coupling
-            + params.market_vol_vix_coupling * (vix_ratio * vix_ratio));
+            + params.market_vol_vix_coupling * vix_response(params, vix_ratio));
     update_toward_with(params, current_variance, day_factor, target)
 }
 
@@ -327,6 +327,21 @@ fn clamp_variance(params: &crate::params::ModelParams, v: f64) -> f64 {
         mathx::min(v, base * params.market_vol_ceiling_multiple),
         base * params.market_vol_floor_multiple,
     )
+}
+
+
+/// The VIX ratio raised to the response exponent. At exactly 2.0 -- every
+/// preset before the dial -- this is the literal `r * r` the shipped
+/// update has always computed, bit for bit; `powf` never runs there.
+/// Round 100: along the real covid path the square is too convex through
+/// mid-VIX, and the exponent (with the coupling re-fit to preserve the
+/// held-VIX ratio) is the shape the driven window asks for.
+fn vix_response(params: &crate::params::ModelParams, vix_ratio: f64) -> f64 {
+    if params.market_vol_vix_exponent == 2.0 {
+        vix_ratio * vix_ratio
+    } else {
+        mathx::pow(vix_ratio, params.market_vol_vix_exponent)
+    }
 }
 
 fn update_toward_with(
@@ -461,7 +476,7 @@ impl MarketVarianceState {
         let vix_ratio = vix / params.market_vol_vix_anchor;
         let target = base
             * (1.0 - params.market_vol_vix_coupling
-                + params.market_vol_vix_coupling * (vix_ratio * vix_ratio));
+                + params.market_vol_vix_coupling * vix_response(params, vix_ratio));
 
         let w = params.market_vol_slow_weight;
 
@@ -503,7 +518,7 @@ impl MarketVarianceState {
         } else {
             let c = params.market_vol_vix_coupling
                 * (1.0 - params.market_vol_slow_vix_damp);
-            base * (1.0 - c + c * (vix_ratio * vix_ratio))
+            base * (1.0 - c + c * vix_response(params, vix_ratio))
         };
         let (sa, sb) = slow_alpha_beta(params);
         let slow = clamp_variance(
