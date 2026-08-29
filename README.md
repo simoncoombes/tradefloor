@@ -37,6 +37,21 @@ The API can still change before 1.0. A published result cannot: new
 coefficients ship as a new preset, so a run you cited last month replays this
 month.
 
+## The demo
+
+```
+python examples/rate_shock_counterfactual.py
+```
+
+Run an agent in a controlled market. Checkpoint the world. Fork it. Raise
+rates by 200bps in one branch. Compare what the exact same agent does next.
+
+**Same world. Same agent. One changed variable.** Two seconds, no keys, no
+network. It prints the nine checks that prove the two branches started
+identical, the step at which the agent's behaviour changed, and the
+side-by-side. The walkthrough is
+[Your first counterfactual experiment](https://github.com/simoncoombes/tradefloor/blob/main/examples/your-first-counterfactual-experiment.md).
+
 ## First run
 
 ```python
@@ -63,6 +78,7 @@ strategy. `tf.rank` runs many seeds and compares them with a paired sign test.
 | counterfactual TCA | the same seed with your orders and without them |
 | `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
+| `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
 | MCP server | eleven read-only tools for a coding agent |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, a browser build |
 
@@ -169,6 +185,7 @@ Eleven [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/exampl
 | [`04-how-realistic-is-this`](https://github.com/simoncoombes/tradefloor/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the limits |
 | [`05-training-an-agent`](https://github.com/simoncoombes/tradefloor/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
 | [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
+| [`rate_shock_counterfactual.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/rate_shock_counterfactual.py) | The demo: checkpoint, fork, +200bps in one branch, compare |
 | [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It runs in about five seconds |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
 | [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit |

@@ -207,6 +207,27 @@ checkpoint resume), `tests/test_packaging.py`, and
 `examples/10-forking-a-market.py`, a two-second runnable fork demonstration.
 The reproducibility tests now run in CI on all five wheel targets.
 
+**`tradefloor.counterfactual`: run one agent in two worlds that differ by
+one variable.** The library had both halves of a controlled experiment and
+no way to join them -- `branch` forks a running engine, `evaluate` runs an
+agent, and `evaluate` runs start to finish with no moment inside it to
+stop, fork, change one thing and continue. A `World` is that run loop:
+market, agent, portfolio and macro path advancing a day at a time, with
+`checkpoint()`, `fork()` and `intervene()` between days. `agree()` verifies
+that two arms started identical across nine checks rather than asserting
+it, and `compare()` finds the first step at which the macro, the agent's
+decision, its orders, the prices and the portfolios came apart. The agent
+is a parameter throughout, so swapping a deterministic policy for an LLM
+or a third-party framework changes no line of the experiment.
+
+**The canonical demo: `examples/rate_shock_counterfactual.py`.** Four
+companies of differing duration, a macro-aware deterministic agent, twenty
+days of shared history, a checkpoint, a fork, +200bps in one branch, and
+twenty more days in each. Runs in about two seconds with no keys, no
+network and no data files, writes a checkpoint, a `RunManifest` per arm, a
+comparison and a chart, and is covered by `tests/test_rate_shock_demo.py`.
+The tutorial is `examples/your-first-counterfactual-experiment.md`.
+
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
 give each agent its own copy of the market, which is what makes the
 comparison clean. The next step is one book with several agents in it,
