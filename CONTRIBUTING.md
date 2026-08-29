@@ -68,10 +68,10 @@ reasons put a test in the skip column and it is worth knowing which you are
 looking at: an optional import the default install does not have (`pyarrow`,
 `gymnasium`, `numpy`, `nbformat` and `nbclient`, the `mcp` extra), an
 artifact that is not in your tree (the Rust golden corpus, stored sweep
-results), or `PRETIUM_SLOW_TESTS` being unset. Only the last is a choice you
+results), or `TRADEFLOOR_SLOW_TESTS` being unset. Only the last is a choice you
 made.
 
-`PRETIUM_SLOW_TESTS=1` adds two things: the example notebooks, which are
+`TRADEFLOOR_SLOW_TESTS=1` adds two things: the example notebooks, which are
 executed rather than read (`tests/test_examples.py` holds 21 tests over eight
 notebooks and two scripts, 19 of them behind the flag -- the two script
 syntax checks run on every pass, because a rename that missed a reference

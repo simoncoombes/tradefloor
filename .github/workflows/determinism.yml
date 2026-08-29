@@ -210,6 +210,35 @@ jobs:
             tests/test_replay.py \
             tests/test_packaging.py
 
+      - name: The optional surfaces
+        # One target, not five. What these cover is protocol plumbing and
+        # array marshalling over an engine whose determinism the other four
+        # targets have already checked; running them everywhere would buy a
+        # second copy of the same answer for the cost of a dependency stack.
+        #
+        # They exist because `importorskip` is a lane that reports green by
+        # not running. The MCP file asserted the server was named `pretium`
+        # for as long as the rename had existed: ninety-two tests, silent,
+        # because `mcp` is installed nowhere. The gym file is the same shape
+        # waiting to happen.
+        if: matrix.target == 'linux-x86_64'
+        shell: bash
+        run: |
+          cd "${{ github.workspace }}"
+          # By name rather than as extras of the local wheel: `--no-index`
+          # would block the extras' own dependencies, and dropping it would
+          # let pip resolve `tradefloor` from PyPI and test a package that is
+          # not the one just built.
+          python -m pip install mcp numpy gymnasium
+          # Loudly, before pytest gets the chance to skip quietly. A failed
+          # install would otherwise leave the tests reporting green by
+          # absence, which is the exact failure this job exists to close.
+          python -c "import mcp, numpy, gymnasium; print('optional surfaces present')"
+          python -m pytest -q \
+            tests/test_mcp.py \
+            tests/test_mcp_integration.py \
+            tests/test_gym.py
+
       - uses: actions/upload-artifact@v4
         with:
           name: digest-${{ matrix.target }}

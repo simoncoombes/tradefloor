@@ -448,9 +448,10 @@ def test_the_day_cap_is_lifted_only_on_a_job_worker_thread():
     )
 
 
-@pytest.mark.skipif(not os.environ.get("PRETIUM_SLOW_TESTS"),
+@pytest.mark.skipif(not (os.environ.get("TRADEFLOOR_SLOW_TESTS")
+                         or os.environ.get("PRETIUM_SLOW_TESTS")),
                     reason="a 252-day evaluation is ~95s; "
-                           "set PRETIUM_SLOW_TESTS=1 to run it")
+                           "set TRADEFLOOR_SLOW_TESTS=1 to run it")
 def test_a_job_really_does_reach_the_certified_horizon():
     """The claim, measured rather than asserted.
 
