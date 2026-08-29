@@ -1,5 +1,5 @@
 {
- "about": "Daily closes for the 2020-2021 period, used by notebook 09 to drive a pretium simulation with a real macro path and then score the result against what actually happened. Frozen here so the notebook runs offline and reproducibly.",
+ "about": "Daily closes for the 2020-2021 period, used by notebook 09 to drive a tradefloor simulation with a real macro path and then score the result against what actually happened. Frozen here so the notebook runs offline and reproducibly.",
  "retrieved": "2026-08-25",
  "source": "Yahoo Finance daily chart API (query1.finance.yahoo.com/v8/finance/chart)",
  "columns": {

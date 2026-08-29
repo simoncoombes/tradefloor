@@ -1,5 +1,7 @@
-# Golden vectors are a byte-exact parity contract, verified against the
-# SHA-256 manifest in index.json. Git's autocrlf would rewrite line endings on
-# checkout and every one of those hashes would fail on a fresh clone -- a
-# silent, confusing failure on Windows only. Never transform them.
-rust/goldens/** -text
+# The learn prerender reads these byte-for-byte and CRLF doubles its
+# extracted newlines, which broke every SCRIPT_FIXES anchor on a Windows
+# checkout after a rebase. LF in the working tree everywhere, always.
+* text=auto eol=lf
+*.png -text
+*.ico -text
+*.whl -text
