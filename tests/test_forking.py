@@ -262,6 +262,40 @@ def test_a_checkpoint_carries_everything_a_continuation_needs():
         assert gap == [], f"step {i} diverged in {gap}"
 
 
+def test_there_are_no_outstanding_orders_for_a_checkpoint_to_lose():
+    """Why a checkpoint carries no order book, asked rather than assumed.
+
+    "What about resting orders?" is the obvious question about a checkpoint,
+    and the answer here is that there are none: `engine.book()` is rebuilt per
+    call from current state and is detached, so an order posted to it prices a
+    fill and never joins the market. Pressure reaches the market only through
+    `order_flow`, which IS in the log.
+
+    Pinned because the day that stops being true, a checkpoint starts omitting
+    state it has never had to carry, and the failure would be a market that
+    restores with an empty book and looks entirely plausible.
+    """
+    engine = fresh()
+    run(engine, 2)
+    ticker = UNIVERSE[0].ticker
+    before = engine.book(ticker).depth("buy")
+
+    detached = engine.book(ticker)
+    order = detached.post_limit("buy", (detached.best_bid or 1.0) * 0.5,
+                                5_000.0, owner="me")
+    assert engine.book(ticker).depth("buy") == before, (
+        "posting to the book moved the engine's own depth; the book is no "
+        "longer detached and a checkpoint now has resting orders to carry"
+    )
+    assert engine.book(ticker).cancel_order(order) is False
+
+    # And the engine's state is untouched by any of it, so the checkpoint
+    # taken after is the same one that would have been taken before.
+    assert differences(
+        state(tf.Checkpoint.of(engine, universe=UNIVERSE, seed=SEED).resume()),
+        state(engine)) == []
+
+
 def test_a_checkpoint_of_a_custom_model_resumes_under_that_model():
     """A run under non-default coefficients must not resume under the default.
 
