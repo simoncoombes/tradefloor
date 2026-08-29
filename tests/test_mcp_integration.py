@@ -94,7 +94,7 @@ def live():
 def test_the_server_completes_an_mcp_handshake(live):
     init, _tools, _results = live
     info = getattr(init, "serverInfo", None) or getattr(init, "server_info")
-    assert info.name == "pretium"
+    assert info.name == "tradefloor"
 
 
 def test_the_server_advertises_its_instructions(live):

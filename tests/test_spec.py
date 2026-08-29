@@ -198,7 +198,7 @@ def test_the_reference_fingerprints_are_pinned():
     # with it the meaning of every published fingerprint -- has changed, and
     # that is a spec_version bump, not a patch: bump SPEC_VERSION, record why
     # in the docs page, and re-pin. See the module docstring of
-    # pretium/spec.py for what counts as a semantic change.
+    # tradefloor/spec.py for what counts as a semantic change.
     assert StrategySpec.momentum().fingerprint == (
         "e6bbc35c6f0968b1f178e1f7ee926d449a8d3fa72440e476dd8b25c7a6a50895")
     assert StrategySpec.oracle().fingerprint == (
@@ -231,7 +231,7 @@ def test_fingerprint_covers_spec_version():
 def test_a_newer_spec_version_is_refused_not_partially_read():
     doc = json.loads(StrategySpec.momentum().to_json())
     doc["spec_version"] = SPEC_VERSION + 1
-    with pytest.raises(ValidationError, match="Upgrade pretium"):
+    with pytest.raises(ValidationError, match="Upgrade tradefloor"):
         StrategySpec.from_json(json.dumps(doc))
 
 
