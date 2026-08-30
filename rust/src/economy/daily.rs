@@ -770,7 +770,7 @@ pub fn update_economy_daily(
         let p_daily = inputs.vix_jump_intensity / 252.0;
         if rng.next_f64() < p_daily {
             // Exponential magnitude: mean `vix_jump_scale` points.
-            inputs.vix_jump_scale * -(rng.next_f64().max(1e-12)).ln()
+            inputs.vix_jump_scale * -mathx::log(mathx::max(rng.next_f64(), 1e-12))
         } else {
             0.0
         }
