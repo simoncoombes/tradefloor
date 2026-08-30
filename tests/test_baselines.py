@@ -190,7 +190,7 @@ def test_a_capture_ratio_is_meaningless_without_its_horizon():
     and it is stronger than before: the same agent in the same market
     against the same Oracle moves its headline number by at least 0.11, and
     by as much as 0.28, on horizon alone. A capture ratio quoted without its
-    horizon is meaningless in either direction, which is what this test is
+    horizon is meaningless in either direction, and this test is
     named for.
     """
     gaps = []
@@ -475,12 +475,12 @@ def test_trading_more_often_loses_money_on_the_same_signal():
        12 steps/day    +0.18%
 
     Re-measured after a stepped day stopped re-opening the market at every
-    step. The numbers moved and the shape did not, which is the point: this
+    step. The numbers moved and the shape did not: this
     asserts the ORDERING, and the ordering is the mechanism.
 
     Nothing charges a fee. The orders simply cross a real spread and consume
     real depth four times as often. This is the same mechanism that makes
-    "trade bigger" unprofitable, and it is why an agent cannot win here by
+    "trade bigger" unprofitable, and an agent cannot win here by
     turning the dial up.
     """
     returns = []

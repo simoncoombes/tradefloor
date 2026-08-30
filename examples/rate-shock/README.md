@@ -158,7 +158,7 @@ agent watches and the corporate bond yield equities are discounted off.
 
 Both, and not the policy rate alone, because of how this model transmits:
 `federal_funds_rate` reaches a valuation *only* by steering the corporate bond
-yield, and that is recomputed at central-bank meetings, the first scheduled 45
+yield, recomputed at central-bank meetings, the first scheduled 45
 days out. A policy-rate hike by itself would move the agent and not the
 market. `tests/test_macro_transmission.py` pins that map.
 
@@ -168,7 +168,7 @@ controlled variable.
 
 It is recorded three times over: on the world, in the `Scenario` the world
 derives, and -- once the next day opens and `pin_macro` runs -- in the engine's
-own order log, which is what travels inside the checkpoint and the manifest.
+own order log, which travels inside the checkpoint and the manifest.
 
 ---
 

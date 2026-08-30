@@ -71,7 +71,7 @@ def test_the_untraded_world_is_unmoved_where_the_trader_did_not_go():
     it would have seen. If that were not true, impact would be a signal
     buried in a shifted market and the subtraction would be meaningless.
 
-    This is a ONE-DAY analysis, which is what makes emptiness assertable
+    This is a ONE-DAY analysis, which makes emptiness assertable
     exactly: the final prices predate the first close-repriced variance
     target, so the 2026-08 fear-gauge channel — trading moves the same-day
     VIX, VIX reaches other names' volatility two closes later — cannot
@@ -157,7 +157,7 @@ SEEDS = (2026, 1, 2, 3, 4, 5, 7, 11)
 
 
 def test_a_round_trip_recoups_its_own_impact():
-    """Buying then selling shows a NEGATIVE shortfall, and that is correct.
+    """Buying then selling shows a NEGATIVE shortfall, correctly.
 
     The entry pushes the price up, part of that impact persists, and the exit
     sells into it. The agent really did transact at prices better than the

@@ -97,8 +97,8 @@ vector, so 4,000 vectors is ~280 core-hours -- roughly 3 hours on the
 
 Seeds are the first six TRAINING seeds (101-106). The published seeds
 (1-6) stay out: they are held out of every search, and although Atlas is
-not a search, its map will steer searches -- reading the held-out seeds
-into it would quietly spend their independence.
+not a search, its map will steer searches. Reading the held-out seeds into
+it would quietly spend their independence.
 """
 
 from __future__ import annotations
@@ -194,8 +194,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # natural box. Measured across it on four blocks: crisis co-movement's
     # level falls monotonically from +0.002 off centre to -0.139 and the
     # lever goes from 0.020 to 0.208, so the whole box is surveyed with the
-    # far end known to be broken -- which is what makes an interior optimum,
-    # if there is one, worth finding.
+    # far end known to be broken, so an interior optimum, if there is one,
+    # is worth finding.
     "crisis_blend_variance_damp": (0.0, 1.0),
     # The daily credit spread floor (#48), shipped off. A gain on a floor, so
     # the unit interval is the domain: 0 is today's behaviour and 1 enforces
@@ -345,8 +345,8 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     # Ships at 1.0, so it has a multiplicative box in principle, and that box
     # is wrong: it is a share on the unit interval and doubling it is not a
     # defined thing to ask for. The whole interval IS the mechanism. At 1.0 a
-    # jump is a re-rating that momentum_theta continues, which is what
-    # couples 504-day kurtosis to 252-day return autocorrelation. At 0.0 the
+    # jump is a re-rating that momentum_theta continues, coupling 504-day
+    # kurtosis to 252-day return autocorrelation. At 0.0 the
     # jump moves the momentum reference with it, so herding never sees it.
     "jump_momentum_share": (0.0, 1.0),
     # The volume-move expression (§113). These ship NON-zero, at the four
@@ -426,8 +426,8 @@ REPARAMETERISED = ("garch_alpha", "garch_beta", "garch_gamma",
 #: persistence 0.98906 (the identifiability cap exactly) with alpha share
 #: 0.4731. Every range contains its ship; every point in the box maps to a
 #: stationary, non-negative coefficient set by construction (fractions sum
-#: below one), which is what buys back the ~half of the raw-coordinate box
-#: the stationarity gate would have rejected.
+#: below one), buying back the ~half of the raw-coordinate box the
+#: stationarity gate would have rejected.
 TRANSFORMED_AXES = (
     atlas.Axis("garch_persistence", 0.21, 0.99),
     atlas.Axis("garch_alpha_frac", 0.01, 0.50),
@@ -435,7 +435,7 @@ TRANSFORMED_AXES = (
     atlas.Axis("market_vol_persistence", 0.25, 0.998),
     atlas.Axis("market_vol_alpha_frac", 0.05, 0.95),
     # gamma/2 as a share of what alpha LEAVES, not of persistence -- the
-    # one difference from `garch_gamma_frac`, and it is forced. The garch
+    # one difference from `garch_gamma_frac`, and a forced one. The garch
     # alpha share stops at 0.50 so alpha + gamma there can never exceed
     # 0.95 of persistence; this one runs to 0.95 on its own, so a share
     # of persistence would put beta = p(1 - ms - mg) below zero across a
@@ -525,8 +525,8 @@ def survey_axes() -> list[atlas.Axis]:
     # These guards are raises, not asserts, on purpose: they are the same
     # registry-drift class this project added tests for AFTER a missing
     # PARAM_SPECS entry killed a 96-core search, and an assert vanishes
-    # under `python -O` -- which is exactly the kind of flag a "fast"
-    # production launch might add.
+    # under `python -O`, the kind of flag a "fast" production launch might
+    # add.
     #
     # Only the UNRANGED direction is an error. A base other than pt-v3 ships
     # some of these nonzero (pt-v6 carries jumps), and for those the explicit
@@ -667,7 +667,7 @@ def error_kind(exc: BaseException) -> str:
 
     "model" -- the library refused the vector's region (its ValidationError
     / OrderError). Deterministic: re-running reproduces it, so resume may
-    treat it as final, and it is a finding about the model.
+    treat it as final. It is a finding about the model.
 
     "infrastructure" -- the MACHINE failed (out of memory, a dead worker,
     an interrupted syscall). Not a property of the vector, except that it
@@ -946,7 +946,7 @@ def cmd_run(args) -> int:
         for index, vector in enumerate(vectors[:limit]):
             # Shard on the GLOBAL index so every shard agrees about which
             # vector is which, and a concatenation of their tasks.jsonl
-            # files is exactly the whole run.
+            # files reconstitutes the whole run.
             if index % args.shard_n != args.shard_i:
                 continue
             if feasibility[index]:
@@ -1099,8 +1099,8 @@ def cmd_collect(args) -> int:
         # cross-sectional correlation at VIX 45 was measured on every row
         # and never surfaced. `corr_blend` is a RATIO of crisis correlation
         # to calm, so a vector that raises calm correlation reads LOW on it
-        # while having the higher crisis LEVEL, which is what a preset is
-        # judged on. The level is what belongs here. Rows streamed by an
+        # while having the higher crisis LEVEL, the thing a preset is judged
+        # on. The level is what belongs here. Rows streamed by an
         # older driver lack these, so a resume without them is tolerated.
         for key, name in (("sector_ex", "sector_ex_45"), ("kurt", "kurt_45"),
                           ("corr", "xs_45")):
@@ -1226,8 +1226,8 @@ def main() -> int:
                         help="run only vectors where index %% N == I, so one "
                              "plan can span N boxes. The plan, its "
                              "fingerprint and the global vector indices are "
-                             "identical on every shard, which is what lets "
-                             "the tasks.jsonl files be concatenated and "
+                             "identical on every shard, so the tasks.jsonl "
+                             "files can be concatenated and "
                              "collected as one run. Spot quota, not money, "
                              "is what caps N.")
     parser.add_argument("--retry-errors", action="store_true",

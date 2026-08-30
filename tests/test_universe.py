@@ -171,7 +171,7 @@ def test_a_scenario_is_a_path_not_a_flag():
 
 def test_macro_reads_back_in_the_units_it_was_written_in():
     # Fractional in, fractional out. A value read here can be written straight
-    # back without a conversion, which is the entire point of one denomination
+    # back without a conversion, the reason for one denomination
     # at the boundary.
     e = tradefloor.Engine(seed=1, universe=tradefloor.Universe.random(3, seed=1),
                        macro_state=tradefloor.Macro(federal_funds_rate=0.0425,

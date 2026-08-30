@@ -22,9 +22,9 @@ inside the envelope, and when it does not, says which measurement says so.
 ## Why there is no single confidence number
 
 `tradefloor.loss.compare_to_real_markets` refuses to emit one realism score,
-and this module does not reopen that. The reason is not modesty, it is
-that aggregation destroys the only information that matters here: a model
-is realistic in some respects, at some measurement scale, and not others.
+and this module does not reopen that. Aggregation destroys the only
+information that matters here: a model is realistic in some respects, at some
+measurement scale, and not others. Modesty has nothing to do with it.
 
 There is also a practical failure mode. A scalar travels and a caveat does
 not. "87% realistic" is quotable in a way that "volatility memory turns
@@ -153,8 +153,8 @@ BANDS_504: dict[str, tuple[float, float]] = {
 #: row was `annualised_vol_pct` at 33.89 against a ceiling of 34.0 -- 0.11 of
 #: room on a statistic whose seed spread is far wider, so the count was
 #: genuine but would have flipped on a change that barely moved the model.
-#: pt-v14 reads 30.24 there, which is 3.76 of room, and that is the single
-#: largest robustness gain of the 2026-08-28 boundary.
+#: pt-v14 reads 30.24 there, 3.76 of room, and the single largest robustness
+#: gain of the 2026-08-28 boundary.
 #:
 #: The count is still MEASURED rather than certified: the certified horizon
 #: is 252 because that is where `CERTIFIED` was measured.
@@ -279,9 +279,8 @@ GAPS: tuple[Gap, ...] = (
             "gives 31.5, 35.6, 30.2, 33.5, 33.0, 33.1, 31.3, 32.4, 32.4 and "
             "31.6 percent, which is flat. So a five-year study is "
             "reading numbers that exist and are published. What it does not "
-            "have is a band derived at its own horizon, and there is no "
-            "committed tool to derive one -- which is what keeps the "
-            "certification at 252 days."
+            "have is a band derived at its own horizon, and no committed "
+            "tool derives one. That keeps the certification at 252 days."
         ),
         forbids="multi-year backtests, and anything keyed on volatility dynamics beyond one year",
         statistics=("abs_return_acf1", "abs_return_acf5", "return_acf1", "excess_kurtosis"),
@@ -353,8 +352,7 @@ GAPS: tuple[Gap, ...] = (
         summary="a scenario's size is right on average and unreliable in one run",
         detail=(
             "The expected size of a scenario\'s response is calibrated; "
-            "the dispersion around it is not, and that is the whole gap "
-            "now.\n\n"
+            "the dispersion around it is not. That is the gap now.\n\n"
             "The steady-state lever -- how much more violent a sustained "
             "crisis is than a calm market -- reads 6.12x on pt-v14 against "
             "real markets\' 6.16x, measured from a held VIX 5 to a held VIX "
@@ -386,8 +384,8 @@ GAPS: tuple[Gap, ...] = (
             "yield, and +1.226 against +1.272 for valuation, all within ten "
             "percent, with real AAPL inside the model\'s six-seed range on "
             "every channel.\n\n"
-            "The denominator is the defect, and it is what keeps this a "
-            "gap now that the lever has arrived. Over the driven window the "
+            "The denominator is the defect, and it keeps this a gap now "
+            "that the lever has arrived. Over the driven window the "
             "model\'s residual sd is 1.565x real on pt-v12, down from 1.76x "
             "at pt-v10 and barely moved from 1.555x at pt-v11. That is the "
             "worst axis in the model. So the expected response to a scenario "
@@ -409,10 +407,10 @@ GAPS: tuple[Gap, ...] = (
             "macro path carries. See "
             "examples/09-a-pandemic-shaped-market.ipynb.\n\n"
             "Sector structure was the same shortfall measured a second "
-            "way, and it is now CLOSED. In calm markets it is in band on "
+            "way, and is now CLOSED. In calm markets it is in band on "
             "the shipped preset, 0.2081 at 252 days "
             "and 0.1817 at 504 "
-            "against bands starting at 0.11, which is why the separate "
+            "against bands starting at 0.11, so the separate "
             "sector-structure gap was retired at 0.2.0. Under a held VIX "
             "45 pt-v12 reads +0.109 against a real +0.103, and crisis "
             "co-movement reads 0.696 against a real 0.664 to 0.727.\n\n"
@@ -533,8 +531,8 @@ GAPS: tuple[Gap, ...] = (
 class Verdict:
     """The answer `check` returns. Falsy when the question is outside.
 
-    `requested` is the statistics the caller named, and it is what makes the
-    printed verdict honest. A `check` is conditional on the question asked:
+    `requested` is the statistics the caller named, and it keeps the printed
+    verdict honest. A `check` is conditional on the question asked:
     it consults the horizon, the flags, and the statistics you passed, and it
     says nothing about the eleven you did not. Printing a bare "inside the
     envelope" read as a global all-clear, which it never was, so the head
@@ -588,7 +586,7 @@ def intervals(
     sits inside its band while its p10-p90 range crosses an edge is not
     comfortably in band -- it is in band on AVERAGE and out of band on a
     large minority of seeds. That distinction is invisible in a point
-    estimate and is exactly what a user running one seed will meet.
+    estimate, and a user running one seed meets it.
     `extremes_straddle` uses min and max instead, where a crossing is close
     to expected over thirty draws and is information rather than a finding.
 
@@ -718,8 +716,8 @@ def check(
 
     The answer is CONDITIONAL on the question. A verdict consults the
     horizon, the flags, and the statistics named in `statistics`; it says
-    nothing about the rest of the panel, which is why the printed head line
-    names its own scope rather than reading as a global all-clear. If your
+    nothing about the rest of the panel, so the printed head line names its
+    own scope rather than reading as a global all-clear. If your
     conclusion leans on a statistic you did not pass, this function has not
     been asked about it.
     """
@@ -769,7 +767,7 @@ def check(
             f"(tools/calibration/long_horizon.py), and annualised volatility "
             f"is flat year by year across those ten years "
             f"(tools/calibration/memory_vs_drift.py). No bands have been "
-            f"derived at a five-year window, which is why the certification "
+            f"derived at a five-year window, so the certification "
             f"stops here"
         ))
         if "excess_kurtosis" in wanted:
@@ -892,15 +890,15 @@ def score(panel: Mapping[str, float], *,
     `panel` maps statistic names to measured values -- what
     `facts.measure()` returns, or a median across seeds.
 
-    The horizon chooses the ruler, and that is the whole reason this exists
-    as a function rather than a comparison anyone can write inline: a
+    The horizon chooses the ruler. That is why this exists as a function
+    rather than a comparison anyone can write inline: a
     504-day panel scored against the 252-day bands is the wrong-ruler
     error, and it has been made repeatedly in this project. It flatters the
     model on kurtosis -- the 5.2 that pt-v3 read at 504 days sits
     comfortably inside the 252-day band of 1.6 to 41 and is OUT of the
     horizon-matched 7.1 to 22 -- while being harsher elsewhere. The shipped
-    preset reads 7.75 there, inside, which is the point of grading a
-    504-day panel with `BANDS_504`.
+    preset reads 7.75 there, inside. That is what grading a 504-day panel
+    with `BANDS_504` buys.
 
     `room_sd` is how far inside its band a statistic sits, in that
     horizon's own seed noise, signed so negative means out. A statistic

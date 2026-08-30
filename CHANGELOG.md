@@ -19,6 +19,41 @@ co-movement and lever 26/26 each, and the driven noise ratio at 1.13
 against pt-v15's ~1.46. Selectable by name; not the default, which remains
 pt-v14.
 
+**Scenarios reach the surfaces that were still behind them.** The framework
+landed in the library; the agent-facing server, the execution example and the
+counterfactual harness each had their own way of saying "change the market"
+and none of them could say it in the scenario grammar.
+
+- **The pack ships inside the wheel.** `scenarios/*.yml` moves to
+  `python/tradefloor/scenarios/`, so `tf.Scenario.load("liquidity_crisis")`
+  works on a plain `pip install` rather than only in a clone. That was the
+  blocker for offering them over MCP, where there is no clone at all.
+  `Scenario.available()` lists them, `tradefloor scenario list` prints them
+  with their fingerprints, and `validate`/`show`/`diff` take a name as
+  readily as a path.
+- **MCP learns the grammar.** A new `list_scenarios` tool returns the shipped
+  documents, the constructors, and every intervention target carrying what it
+  was MEASURED to be worth -- along with the refusals, because "there is no
+  volatility level to set in this model, use macro.vix" is a more useful
+  answer to a client than a schema error. `build_scenario` takes `shocks` and
+  `transmission` as well as `steps`; `run_stress_scenario` takes a shipped
+  name, and its control arm is now the same world WITHOUT the interventions
+  rather than no scenario at all.
+- **`World.apply(scenario)`** drives a counterfactual arm from a document,
+  beside the existing `World.intervene(**fields)`. It rebases the scenario
+  onto the world's own day numbering, so one file means one experiment on an
+  arm forked at day 20 and on one forked at day 60. `market.liquidity` --
+  the only lever that touches execution -- is reachable from the FinRobot
+  study for the first time, and `Divergence` can now say when the
+  intervention landed for an arm driven that way.
+- **Example 06 answers its own question.** It said the edge of the book
+  "exists and is measurable" and then never reached it, because at that size
+  the book absorbed every order. It now takes the depth away instead of
+  raising the size: same seed, same agent, same decisions, shortfall 6.04bp
+  to 10.81bp and partial fills 0 to 2. The prices barely move, which is the
+  point -- an evaluation reading only the price series scores the two runs
+  the same.
+
 **Scenarios are now a file you can hand to somebody else.** `tf.Scenario`
 gains a second half: a named, inspectable collection of explicit
 interventions, written in YAML or in Python, with a fingerprint over the
@@ -65,7 +100,7 @@ difference between an experiment and a number.
   unit for unit, so a relative intervention cannot be a factor of a hundred
   out.
 - `Engine.set_avg_volume` writes the column the market maker quotes off,
-  which is what a liquidity shock is here: measured, quoted depth scales
+  the shape a liquidity shock takes here: measured, quoted depth scales
   exactly with the multiplier and sweeping 50,000 shares costs 6.08bp at
   full depth and 14.59bp at a tenth of it. It is recorded in the order log
   like any other input, so a replay, a checkpoint and a fork all carry it.
@@ -107,7 +142,7 @@ still means what it meant.
 argument once anything had been recorded, returning every recorded day with
 the right schema and plausible values -- so `truth(day=4)` on a hundred-day
 run answered with all hundred and looked like it had answered the question.
-`day` is now optional: omitted is every recorded day, which is what these
+`day` is now optional: omitted is every recorded day, as these
 tables have always returned and what a streaming consumer wants, so no
 existing call changes. A day that was never recorded raises and names the
 days that were, as a range when they are contiguous and a list when they are
@@ -185,7 +220,7 @@ is no list of fields to be incomplete and a field added later is carried
 without anyone remembering to carry it. `tf.branch` calls it. Forks can now be
 checkpointed, forked again, and written to a manifest, which they could not be
 before. `universe` and `seed` become optional on `tf.branch` -- a copy cannot
-land on the wrong roster, which is what they were there to prevent -- and a
+land on the wrong roster, the hazard they were there to prevent -- and a
 `universe` that is passed is checked against the engine's own tickers.
 
 No trajectory moves: the known-answer digest is unchanged on every target.
@@ -223,7 +258,6 @@ run/checkpoint/fork/intervene/compare chain, including a cross-process
 checkpoint resume), `tests/test_packaging.py`, and
 `examples/10-forking-a-market.py`, a two-second runnable fork demonstration.
 The reproducibility tests now run in CI on all five wheel targets.
->>>>>>> origin/main
 
 **`tradefloor.counterfactual`: run one agent in two worlds that differ by
 one variable.** The library had both halves of a controlled experiment and
@@ -280,7 +314,7 @@ one experiment present the same experiment two ways. A run regenerates its
 artifacts, so they sit beside the run that wrote them. Recorded inputs a study
 replays are committed once under `tests/fixtures/`, because two copies of a
 recording can drift apart. `tests/test_examples.py` now walks `examples/`
-instead of globbing `0*`, which is how the first unnumbered example arrived
+instead of globbing `0*`, after the first unnumbered example arrived
 with nothing checking it at all. `CONTRIBUTING.md` has the rule.
 
 **Fixed: a forked world's log held the shared history twice.** `World`
@@ -292,8 +326,8 @@ a market nobody ran -- the outcome the first fix existed to prevent.
 `World.order_log` is the engine's own now, on a root and a fork alike.
 
 **Planned: a shared-book multi-agent arena.** Today `evaluate` and `rank`
-give each agent its own copy of the market, which is what makes the
-comparison clean. The next step is one book with several agents in it,
+give each agent its own copy of the market, which keeps the comparison
+clean. The next step is one book with several agents in it,
 competing for the same liquidity and scored under identical conditions.
 Not shipped, and the realism envelope does not cover it: certification was
 measured on a single agent.
@@ -449,8 +483,8 @@ What was wrong is a published fact. `pt.model_preset()` reported the 68.26,
 a manifest records it, and anyone who set a half-life from that number got a
 different market than the preset runs.
 
-Both presets now report 60, which is what they do. If you pinned either one
-in 0.4.0, your results are unaffected and need no rerun.
+Both presets now report 60, the rate they run. If you pinned either one in
+0.4.0, your results are unaffected and need no rerun.
 
 <!-- release-note-ends -->
 
@@ -469,8 +503,8 @@ and compares the reported half-life against the decay its `mispricing_phi`
 implies. It was checked against the defect before being committed: it fails
 naming the preset and the rate it actually runs.
 
-The 68.26 came from the calibration search that produced `pt-v14`, and it is
-kept in this record rather than in a field the engine contradicts. Shipping
+The 68.26 came from the calibration search that produced `pt-v14`, and this
+record keeps it rather than a field the engine contradicts. Shipping
 it for real means writing the recomputed bits literally, under a new preset
 name, because changing them under an existing one would move a published
 model.
@@ -503,8 +537,8 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v12")
 **What changed in the model.** Industry-level volatility now carries more of
 the market's shared movement, and the market's own volatility memory was
 retuned to pay for it. The effect is that stocks in different industries stop
-moving together quite so uniformly in a crisis, which is what real markets do
-and what the old default got wrong at exactly the wrong moment.
+moving together quite so uniformly in a crisis, as real markets do and as the
+old default got wrong at exactly the wrong moment.
 
 **One thing got slightly worse.** Volume and volatility still arrive
 together, but less tightly: the measure falls from 0.56 to 0.52 in a band

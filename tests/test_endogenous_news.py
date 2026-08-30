@@ -12,7 +12,7 @@ That left the jump process as the only idiosyncratic shock, and a jump lands
 on one name and reaches no other. Real earnings surprises transfer. What is
 pinned here is that the mechanism ships inert, that switching it on makes
 `company_news` non-zero, and that it reaches PEERS when peer transfer is on,
-which is the point of routing it through the news pipeline rather than
+and routing it through the news pipeline buys that, rather than
 inventing a second jump.
 """
 
@@ -34,7 +34,7 @@ def _news_column(model, days: int = 20, n: int = 25) -> list[float]:
 def test_restating_a_presets_own_news_is_inert(preset: str) -> None:
     """Re-stating a preset's own news settings changes nothing, bit for bit.
 
-    Written against each preset's OWN values rather than zero, which is what
+    Written against each preset's OWN values rather than zero, as
     every preset carried until pt-v11 switched news on. A test that
     hardcodes the old default stops testing inertness the day a preset
     adopts the dial.
@@ -69,7 +69,7 @@ def test_company_news_fires_on_pt_v11_and_on_nothing_before_it() -> None:
     note that a preset switching news on must update it deliberately rather
     than discover it failing. pt-v11 switched it on, so this is that
     deliberate update: the channel is live there and silent everywhere
-    earlier, which is what keeps the older presets reproducing.
+    earlier, which keeps the older presets reproducing.
     """
     for preset in ("pt-v3", "pt-v10"):
         assert all(v == 0.0 for v in _news_column(preset)), preset

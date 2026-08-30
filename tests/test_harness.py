@@ -140,7 +140,7 @@ def test_the_observation_exposes_a_tradable_book():
 
     run({"l": Looker()})
     assert depth["ask"] > 0
-    # The ask sits above the last print, which is why buying costs the spread.
+    # The ask sits above the last print, so buying costs the spread.
     assert depth["ask"] >= depth["price"]
 
 
@@ -277,7 +277,7 @@ def test_a_stepped_day_is_the_same_market_as_one_session():
     1,181,790,628 for the same day as one 390-tick session -- 56% too much,
     because the busiest hour was counted six times.
 
-    With the clock advancing it is bit-identical, and that is asserted for
+    With the clock advancing it is bit-identical, asserted for
     several splits, because a single split could agree by coincidence.
     """
     universe = tradefloor.Universe.random(20, seed=5)

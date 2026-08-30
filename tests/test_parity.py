@@ -22,7 +22,7 @@ import tradefloor
 
 GOLDENS = Path(__file__).resolve().parent.parent / "rust" / "goldens"
 
-# The goldens are NOT in this repository, and that is a decision rather than an
+# The goldens are NOT in this repository, a decision rather than an
 # oversight. They are 135 MB, and they are produced by a reference
 # implementation that is not public -- so committing them would bloat the repo
 # permanently with fixtures nobody outside can regenerate or check.
@@ -199,7 +199,7 @@ def test_fair_value_matches_the_reference_bit_for_bit():
 # --------------------------------------------------------------------------
 
 def test_rates_are_fractional_not_percent():
-    # The whole point of the convention. 4.5 means 450%, not 4.5%, and must
+    # The convention itself. 4.5 means 450%, not 4.5%, and must
     # be refused with a message that says so.
     with pytest.raises(ValueError, match="percent"):
         tradefloor.fair_value(eps=4.0, sector="technology", federal_funds_rate=4.5)
@@ -279,7 +279,7 @@ def _series(field, n):
 def test_daily_step_matches_the_reference_bit_for_bit():
     """All 58,080 recorded step cases, including out-of-cap states.
 
-    These use independent `s` and `s_prev`, which is why the constructor
+    These use independent `s` and `s_prev`, so the constructor
     accepts both: mid-trajectory they genuinely differ, and that difference IS
     the momentum term. Building them through the clamping constructor would
     zero the momentum and quietly test a different process.
@@ -591,7 +591,7 @@ def test_append_and_post_diverge_at_the_depth_cap():
     # ...but they kept DIFFERENT levels. Append refused everything past the
     # cap, so it holds the first 32. Post truncated the far end, so it holds
     # the best 32 -- identical here because price order matches insert order,
-    # which is exactly why this is easy to miss.
+    # and that is why this is easy to miss.
     assert appended.best_ask == 100.0
     assert posted.best_ask == 100.0
 

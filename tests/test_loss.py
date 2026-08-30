@@ -298,7 +298,7 @@ def test_noise_scaling_keeps_the_autocorrelations_in_the_objective():
     assert vol > 0.0
     assert others > 0.25 * result["loss"]
     # The unweighted counterfactual, computed from the same rows: not a
-    # form the API offers, which is the point.
+    # form the API offers, deliberately.
     unweighted_vol = rows["annualised_vol_pct"]["distance"] ** 2
     unweighted_rest = sum(
         rows[key]["distance"] ** 2

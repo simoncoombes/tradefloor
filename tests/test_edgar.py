@@ -94,7 +94,7 @@ def test_negative_equity_loss_makers_are_excluded_with_a_reason():
 
     Negative EPS takes the book-value path, and negative book value there
     produces a negative fair value the floor then clamps -- so it would trade
-    at the floor forever. That is not a stock, it is a constant.
+    at the floor forever. What trades then is a constant wearing a ticker.
     """
     keep, dropped = filter_rows(ROWS + [ZOMBIE])
     assert [r["ticker"] for r in keep] == [r["ticker"] for r in ROWS]
@@ -239,7 +239,7 @@ def test_from_edgar_accepts_a_path(tmp_path):
 # The network half, exercised without a network
 # --------------------------------------------------------------------------
 #
-# fetch() is pure given a transport, and that is the point of taking one. The
+# fetch() is pure given a transport, and takes one for that reason. The
 # fetch itself can never be deterministic -- EDGAR restates -- so the boundary
 # is drawn tightly around the socket and everything on this side of it is
 # tested exactly like the rest of the library.
@@ -745,7 +745,7 @@ def test_the_frames_api_returns_the_shape_this_was_written_against():
                  "CY2023")
     # Verified live: 5,716 filers reported diluted EPS for CY2023. The exact
     # count moves as companies amend, so this asserts the ORDER of magnitude,
-    # which is what would change if the endpoint or the tag did.
+    # which would change if the endpoint or the tag did.
     assert len(eps) > 3_000
     assert all(isinstance(k, int) and isinstance(v, float) for k, v in
                list(eps.items())[:20])

@@ -152,7 +152,7 @@ class MacroAwareAgent:
         # Learned on the first observation, not passed in: the agent's
         # reference point is the world it woke up in. Passing it would let a
         # caller put the two arms of an experiment on different baselines
-        # without noticing, which is exactly the confound a fork removes.
+        # without noticing, which is the confound a fork removes.
         self.baseline_rate: float | None = None
         self.history: list[list[float]] = []
         self._decision: dict[str, Any] | None = None
@@ -247,7 +247,7 @@ class MacroAwareAgent:
     def decision(self) -> dict[str, Any] | None:
         """What the last :meth:`act` concluded, before it became orders.
 
-        Recorded by ``World`` on every step, which is what lets the
+        Recorded by ``World`` on every step, which lets the
         comparison say when the agent's TARGET changed as distinct from when
         its orders did. They are not the same step: a target can move inside
         the rebalance band and produce no trade at all.

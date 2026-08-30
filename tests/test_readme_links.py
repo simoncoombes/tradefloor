@@ -4,7 +4,7 @@
 body on PyPI. That page lives at pypi.org, so a relative target like
 `examples/01-first-simulation.ipynb` resolves to
 pypi.org/project/tradefloor/examples/01-first-simulation.ipynb and 404s. On
-GitHub the identical markup works, which is exactly why the defect survived
+GitHub the identical markup works, so the defect survived
 a release: the file renders correctly everywhere the author looks at it.
 
 So the rule is checked rather than remembered. Every link in the README must

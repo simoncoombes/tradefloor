@@ -16,8 +16,8 @@ same = tf.RunManifest.from_json(open("run.json").read()).reproduce()
 manifest carries, so the reader is TOLD whether they rebuilt the same market
 rather than eyeballing numbers off a page. On success the returned engine is
 the published market, bit for bit. On any mismatch it raises, and the error
-names the component that disagreed, which is why every component carries its
-own fingerprint rather than one hash over the whole file.
+names the component that disagreed, so every component carries its own
+fingerprint rather than one hash over the whole file.
 
 ## The completeness rule
 
@@ -475,7 +475,7 @@ class RunManifest:
                     "this run's first "
                     f"{entries} log entries are not the checkpoint's, so it "
                     "did not start there. Passing derived_from is a claim "
-                    "about history, and it is checked when it is made rather "
+                    "about history, checked when it is made rather "
                     "than believed."
                 )
             doc["derived_from"] = {
@@ -686,7 +686,7 @@ class RunManifest:
             f"{here}, so a platform difference is NOT the explanation. What "
             "is left, in order: a build with different flags (float "
             "reassociation, FMA contraction or target-cpu=native would each "
-            "do this, which is why the release profile forbids them); a "
+            "do this, so the release profile forbids them); a "
             "wheel that is not the one whose digest was recorded, despite "
             "reporting the same version; or arithmetic the era probe does "
             "not exercise."
@@ -861,7 +861,7 @@ class RunManifest:
 
         The declaration alone is a claim: it names a digest, and a reader
         holding only the manifest cannot test it. A reader holding the
-        checkpoint can, and this is that test -- the fingerprint must match,
+        checkpoint can, and this test covers it -- the fingerprint must match,
         and the run's first entries must be the checkpoint's log.
 
         Raises rather than returning a bool, for the same reason
@@ -975,10 +975,10 @@ class RunManifest:
     def gaps(self) -> list[str]:
         """What a reader needs from OUTSIDE this manifest, spelled out.
 
-        Empty for a complete manifest. A gap is not a defect, since a
-        hand-written agent is the escape hatch working as designed, but it is a fact the
-        reader needs, so the manifest states it rather than leaving it to be
-        discovered.
+        Empty for a complete manifest. A gap is no defect, since a
+        hand-written agent is the escape hatch working as designed, but the
+        reader needs the fact, so the manifest states it rather than leaving
+        it to be discovered.
         """
         out = []
         reference = self.strategy_reference

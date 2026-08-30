@@ -4,8 +4,8 @@ Deliberately Python rather than engine state. Position accounting is
 arithmetic over IEEE-754 doubles, identical in both languages, and keeping it
 out of the engine means the engine stays a *market* rather than becoming a
 broker. It also lets a harness hold several portfolios against one market
-without the engine knowing about any of them, which is what running N agents
-on one seed requires.
+without the engine knowing about any of them, which running N agents on one
+seed requires.
 
 ## Execution and impact are separate channels, on purpose
 
@@ -14,7 +14,7 @@ the same book the tick settles through, so slippage is real levels consumed.
 That tells you what *you* paid. It tells the market nothing.
 
 The market learns about your trading through ``order_flow`` on the next tick,
-which is what :meth:`Portfolio.pending_flow` accumulates. A harness that
+and :meth:`Portfolio.pending_flow` accumulates it. A harness that
 executes without feeding the flow back has a trader whose fills are realistic
 and whose footprint is invisible, profitable in a way no real trader could be.
 """
@@ -72,8 +72,8 @@ class Portfolio:
         an unconstrained strategy does.
 
         For an EVALUATION harness it should almost always be set. An agent that
-        can trade unlimited size is not being tested against the market, it is
-        being tested against nothing: the order book makes large trades cost
+        can trade unlimited size is being tested against nothing: the order
+        book makes large trades cost
         more, but if there is no funding limit then arbitrarily large is always
         available and "trade everything" becomes a strategy. A leverage cap is
         what makes the impact constraint bite economically rather than only
@@ -106,8 +106,8 @@ class Portfolio:
 
         A partial fill is reported as partial rather than being completed at a
         made-up price. Filling the remainder at the last level would be
-        inventing liquidity that was not there, which is exactly the kind of
-        convenience that makes a backtest profitable and a live strategy not.
+        inventing liquidity that was not there, the kind of convenience that
+        makes a backtest profitable and a live strategy not.
         """
         if quantity != quantity or quantity == 0:
             raise ValidationError(
@@ -211,7 +211,7 @@ class Portfolio:
         )
         if ticker not in self.positions:
             equity += filled * price
-        # Non-positive equity is not "infinitely levered", it is insolvent.
+        # Non-positive equity means insolvent, not "infinitely levered".
         # Reporting infinity makes the comparison behave and the message read
         # correctly rather than dividing by zero.
         return float("inf") if equity <= 0 else gross / equity

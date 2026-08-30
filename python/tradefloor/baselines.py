@@ -70,8 +70,7 @@ everything else.
 So read a capture ratio as **P&L relative to a perfectly-informed reference
 portfolio under the same constraints**, not as a fraction of available alpha.
 A ratio above 1.0 is a real result meaning the agent built a better portfolio
-than top-k-by-mispricing, and it is worth looking at rather than explaining
-away.
+than top-k-by-mispricing. Look at it rather than explain it away.
 
 ## The Oracle cheats on purpose
 
@@ -388,8 +387,8 @@ class Oracle:
         random(20, seed=11)   196k   213k   180k   181k   164k   150k
         random(20, seed=7)    209k   176k   193k   269k   204k   170k
 
-    The curve is not monotonic and its shape is a property of the roster,
-    which is the point. On the first roster the best configuration measured
+    The curve is not monotonic, and its shape is a property of the roster.
+    That is the finding. On the first roster the best configuration measured
     is ``top_k=2`` at 1.18x the default and the worst is ``top_k=12`` at
     0.83x; on the second the default ``top_k=5`` is the best measured and
     every other setting lands between 0.63x and 0.78x of it. Nothing here

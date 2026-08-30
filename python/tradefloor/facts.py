@@ -95,8 +95,8 @@ work -- a symmetric variance process produces no asymmetry at any
 coefficients -- but the "too weak" verdict this row carried was a
 verdict against the wrong band. Mind the sign when reading this row: a
 value ABOVE a band whose top is zero is an effect too WEAK, not too
-strong, which is why `_verdict` and `band_distance` below carry their
-own sign handling.
+strong, so `_verdict` and `band_distance` below carry their own sign
+handling.
 
 ## What still fails, and what it costs you
 
@@ -147,8 +147,8 @@ shortfall in basis points -- over raw percentages.
 **Volume shocks do not persist, by construction.** Volume CHANGES
 autocorrelate at **-0.446** (-0.454 to -0.425) against a re-derived
 band of -0.32 to -0.20. The superseded band (-0.05 to +0.15) said real
-markets sit near zero here, and that was simply wrong at this
-estimator: every real window of a decade reads -0.22 to -0.30, because
+markets sit near zero here, and at this estimator that was simply wrong:
+every real window of a decade reads -0.22 to -0.30, because
 real daily volume is a persistent level plus large day-to-day noise,
 and differencing such a series is negatively autocorrelated. The band
 was relocated, not widened -- and the model is still outside it,
@@ -175,7 +175,7 @@ is evidence about the tuning, not the model -- and the band
 re-derivation sharpened that reading in both directions. Clustering at
 lag one, a calibrated statistic, is now OUT of band: the calibration
 drove it toward the long-sample textbook value at a within-year method,
-which is what tuning toward an unprovenanced target looks like from the
+the shape tuning toward an unprovenanced target takes when seen from the
 other side. And the held-out fragility this section used to report --
 correlation slipping under the floor on fresh seeds, leverage halving
 on fresh universes -- largely dissolves under honest bands: on thirty
@@ -236,7 +236,7 @@ and the record of which gap needed which KIND of change is worth keeping:
 - **Clustering** resisted every calibration lever -- persistence already
   at the reference's 0.99, and raising the variance ceiling bought +0.016
   of clustering for twenty points of volatility -- and was closed by the
-  same factor process, which is what market-wide clustering needed.
+  same factor process, the one market-wide clustering needed.
 - **Volume against volatility** was closed by removing the average-volume
   feedback that compounded the level and buried the covariation.
 - **The leverage effect** was absent at any coefficients of a symmetric
@@ -273,12 +273,12 @@ shock the model says it should. It did the opposite: clustering fell from +0.12
 to +0.10.
 
 The fix stayed anyway. It is what the model specifies, and the alternative is
-keeping a bug because it happened to score better on a statistic, which is how
+keeping a bug because it happened to score better on a statistic. That is how
 a model gets tuned toward its own report card instead of toward being right.
 When this was recorded these numbers were measurements rather than targets;
 four of them have since BECOME targets -- the calibration the era boundary
-performed, disclosed above -- which is why the held-out checks exist: they
-are where the report card stops being the thing that was tuned.
+performed, disclosed above. The held-out checks exist for that: they are
+where the report card stops being the thing that was tuned.
 
 ## Re-measure after any change
 
@@ -674,8 +674,8 @@ SEED_SD = {
     # Added 2026-08-25 on the SAME protocol as the rest of this table: pt-v1,
     # Universe.random(40, seed=111), 252 days, seeds 101-130, sample sd. Not
     # pt-v3, deliberately: this table is the frozen denominator of every
-    # "seed-sd out" figure the project has published, and it is re-derived
-    # from the committed per-seed table in tests/test_loss.py. A first draft
+    # "seed-sd out" figure the project has published, re-derived from the
+    # committed per-seed table in tests/test_loss.py. A first draft
     # measured these three on pt-v3 with the population estimator and was
     # caught by that test; the pt-v3 values (0.1435, 0.1451, 0.0071) are
     # recorded in the calibration record beside the certification medians.
@@ -1198,8 +1198,8 @@ def measure(
         "universe_fingerprint": fingerprint_of(universe),
         # And which MODEL produced them. The panel is the calibration
         # search's objective, so a panel row that does not name its
-        # coefficient set is exactly the ambiguity the fingerprint exists
-        # to remove.
+        # coefficient set carries the ambiguity the fingerprint exists to
+        # remove.
         "model_fingerprint": engine.model_fingerprint,
         "days": days,
         "instruments": count,
