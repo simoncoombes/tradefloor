@@ -252,5 +252,5 @@ and
 
 GitHub's sidebar reads Apache-2.0 because its detection picks one file and
 stops. So does the sidebar of `rust-lang/rust`, `serde` and `pyo3`, which
-carry the same two files. The dual grant is what `pyproject.toml`,
-`rust/Cargo.toml` and this section state, and it is what applies.
+carry the same two files. The grant that applies is the dual one, stated in
+`pyproject.toml`, `rust/Cargo.toml` and this section.
