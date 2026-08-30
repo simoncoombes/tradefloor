@@ -1,10 +1,12 @@
 # Content guidelines
 
 What every written surface in this repository and in `tradefloor-docs` has to
-meet. `PRODUCT.md` holds the register and the banned constructions;
-`RELEASING.md` holds the order things happen in at a release. This holds the
-budgets and the per-surface rules, and it is the document to work from while
-writing.
+meet: the register, the banned constructions, the budgets and the per-surface
+rules. `RELEASING.md` holds the order things happen in at a release. This is
+the document to work from while writing.
+
+The register below moved here from the product brief when that document
+left the repository, because it is the half of it that still binds.
 
 Two tools check the mechanical half:
 
@@ -15,6 +17,66 @@ python tools/release/check.py   # every budget below, plus release state
 
 Neither can see register, so read a clean run as the mechanical half
 passing and nothing more.
+
+## Register
+
+Name: `tradefloor`, lowercase. The former name, `pretium`, was Latin for
+*price*; the current one carries no such derivation.
+
+<!-- prose: off -->
+Voice: reference documentation. Flat, declarative, unmemorable. The reader is
+scanning for a fact, not being persuaded. This binds all prose in this
+repository and in `tradefloor-docs`: documentation, code comments, commit
+messages, pull request titles and bodies, UI copy, labels and error text.
+
+Rules, set by the plan owner:
+
+- Headings and labels are noun phrases. No commas, no trailing clauses, no
+  verbs. "Excluded tables", not "What was left alone, and why".
+- Every sentence has a subject and a finite verb. No verbless fragments.
+- Never tell the reader that something is significant. Delete "and that is the
+  point", "which is why this matters", "that is the whole idea".
+- Do not define things by negation. No "X is not Y", "not X but Y", "never
+  wrong, only incomplete". Say what it is.
+- No three-sentence assert, negate, resolve sequences. If three consecutive
+  sentences are each under ten words, merge them.
+- No sentence under six words may end a paragraph or a section.
+- Abstract subjects take plain verbs. "The check failed on 3 of 120 seeds", not
+  "the identity held through a crisis".
+- No em-dash asides, no rhetorical questions, no single-sentence paragraphs for
+  emphasis.
+- Prefer the specific number, filename, or field name over a characterisation
+  of it.
+- ASCII punctuation only. No em dashes, en dashes, typographic minus signs or
+  arrows.
+
+When a sentence could open a blog post, rewrite it.
+
+`tools/prose/prose.py` checks the mechanical rules and reports file, line and
+text. It is canonical in this repository and `tradefloor-docs` vendors it, so
+one copy of the rules checks both trees. It cannot see register, so a clean
+run is not a passing grade.
+
+This section is the register: what the writing sounds like. `CONTENT.md` is
+the other half, and holds the budgets and the per-surface rules, including
+how long a release note may run and which surfaces name the default preset in
+prose.
+<!-- prose: on -->
+
+Dual-licensed MIT OR Apache-2.0, at the user's option, which is the
+Rust-ecosystem norm and what `pyproject.toml` and `rust/Cargo.toml` both
+declare. The repository must not reference the commercial product the engine
+was ported from.
+
+**The visual identity is deliberately decoupled from the subject matter.** A
+first attempt themed the documentation as trading-desk stationery, deriving
+its world from markets. The plan owner rejected it: theming the library to
+its domain reads as a game artifact and couples the library's identity to the
+product it was extracted from. The standing commitment is the contemporary
+enterprise documentation standard, executed straight, with the Anthropic and
+Mintlify class of developer documentation as the craft bar. Neutral ground,
+one accent, no costume, no subject-derived metaphor. Light and dark are both
+supported.
 
 ## Budgets
 
@@ -137,5 +199,4 @@ python tools/release/check.py               # budgets and release state
 `prose.py` reports file, line and the text it objected to, so a finding
 names the thing to change. A passage that has to quote a banned
 construction in order to ban it is wrapped in `<!-- prose: off -->` and
-`<!-- prose: on -->`, which is why the voice section of `PRODUCT.md` reads
-clean.
+`<!-- prose: on -->`, which is why the register section above reads clean.
