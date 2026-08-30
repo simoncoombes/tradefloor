@@ -9,11 +9,28 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import os
 CELLS = {"v16": {}}
-for g in (0.00025, 0.0005, 0.001):
-    for th in (35.0, 40.0, 45.0):
-        CELLS[f"g{int(g*100000)}t{int(th)}"] = {
-            "forced_flow_gain": g, "forced_flow_threshold": th}
+if os.environ.get("FLOW_GRID", "one") == "two":
+    # Screen two (round 139): beta-weighted forced flow. The uniform lean
+    # pinned cohesion at a dispersion cost; beta^k concentrates the same
+    # pressure on high-beta names.
+    def c(g, th, k):
+        o = {"forced_flow_gain": g, "forced_flow_threshold": th}
+        if k: o["forced_flow_beta_exponent"] = k
+        return o
+    CELLS.update({
+        "g100t35": c(0.001, 35.0, 0.0),
+        "g100t35k1": c(0.001, 35.0, 1.0),
+        "g100t35k2": c(0.001, 35.0, 2.0),
+        "g100t40k1": c(0.001, 40.0, 1.0),
+        "g150t40k1": c(0.0015, 40.0, 1.0),
+    })
+else:
+    for g in (0.00025, 0.0005, 0.001):
+        for th in (35.0, 40.0, 45.0):
+            CELLS[f"g{int(g*100000)}t{int(th)}"] = {
+                "forced_flow_gain": g, "forced_flow_threshold": th}
 SEEDS = list(range(1, 31))
 
 
