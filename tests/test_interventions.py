@@ -41,7 +41,7 @@ from tradefloor.interventions import (
 from tradefloor.scenario import Scenario
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
-SCENARIOS = REPO / "scenarios"
+SCENARIOS = REPO / "python" / "tradefloor" / "scenarios"
 
 UNIVERSE = tf.Universe.random(10, seed=20260829)
 SEED = 4242
@@ -795,7 +795,7 @@ def test_a_checkpoint_and_an_uninterrupted_run_agree_to_the_last_day():
 
 
 def test_the_manifest_records_the_resolved_scenario_not_the_filename():
-    scenario = Scenario.from_yaml(str(SCENARIOS / "liquidity_crisis.yml"))
+    scenario = Scenario.load("liquidity_crisis")
     engine = tf.Engine(seed=SEED, universe=list(UNIVERSE))
     for day in range(60):
         scenario.apply(engine, day)
@@ -924,16 +924,14 @@ def cli(*args):
 
 
 def test_validate_reports_the_fingerprint_and_exits_zero():
-    result = cli("scenario", "validate", "scenarios/liquidity_crisis.yml")
+    result = cli("scenario", "validate", "liquidity_crisis")
     assert result.returncode == 0, result.stderr
     assert "Scenario valid." in result.stdout
-    assert Scenario.from_yaml(
-        str(SCENARIOS / "liquidity_crisis.yml")).fingerprint in result.stdout
+    assert Scenario.load("liquidity_crisis").fingerprint in result.stdout
 
 
 def test_validate_accepts_the_whole_pack_at_once():
-    result = cli("scenario", "validate", *[f"scenarios/{p.name}"
-                                           for p in SHIPPED])
+    result = cli("scenario", "validate", *[p.stem for p in SHIPPED])
     assert result.returncode == 0, result.stdout + result.stderr
     assert result.stdout.count("Scenario valid.") == len(SHIPPED)
 
@@ -950,7 +948,7 @@ def test_validate_fails_loudly_on_a_bad_file(tmp_path):
 
 
 def test_show_separates_shocks_from_assumptions():
-    result = cli("scenario", "show", "scenarios/oil_price_spike.yml")
+    result = cli("scenario", "show", "oil_price_spike")
     assert result.returncode == 0, result.stderr
     assert "Exogenous shocks" in result.stdout
     assert "Assumed transmission" in result.stdout
@@ -960,8 +958,7 @@ def test_show_separates_shocks_from_assumptions():
 
 
 def test_diff_names_the_targets_that_differ():
-    result = cli("scenario", "diff", "scenarios/rate_shock.yml",
-                 "scenarios/recession.yml")
+    result = cli("scenario", "diff", "rate_shock", "recession")
     assert result.returncode == 0, result.stderr
     assert "SCENARIO DIFF" in result.stdout
     assert "macro.cycle" in result.stdout

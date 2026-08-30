@@ -244,6 +244,7 @@ and gives the composing form.
 
 from __future__ import annotations
 
+import difflib
 import json
 import warnings
 from typing import Any, Callable, Sequence
@@ -415,6 +416,18 @@ def _describe_call(name: str, *args: Any, **kwargs: Any) -> str:
     parts = [repr(a) for a in args]
     parts += [f"{k}={v!r}" for k, v in kwargs.items()]
     return f"{name}({', '.join(parts)})"
+
+
+def _pack():
+    """The directory the shipped scenarios live in, installed or in a clone.
+
+    `importlib.resources` rather than `__file__ / "scenarios"`, because the
+    two differ exactly where it matters: a wheel installed into a zip, or a
+    package imported from anywhere but its source tree.
+    """
+    from importlib import resources
+
+    return resources.files(__package__) / "scenarios"
 
 
 def _wrap(text: str, width: int = 72) -> list[str]:
@@ -1394,6 +1407,61 @@ class Scenario:
         "document. Load it on the class, or read the file and add its "
         "interventions to this one with .intervene(...)."
     ))
+
+    def load(cls, name: str) -> "Scenario":
+        """One of the scenarios that ship with the library, by name.
+
+        ```python
+        scenario = tf.Scenario.load("liquidity_crisis")
+        ```
+
+        The pack travels inside the wheel rather than only in the repository,
+        so this works on a pip install. That is the point: a scenario named
+        in the README that only resolves in a clone is a promise the package
+        does not keep, and an agent driving the library over MCP has no clone
+        at all.
+
+        :meth:`available` lists them. For a file of your own, use
+        :meth:`from_yaml` with its path.
+        """
+        if not isinstance(name, str):
+            raise ScenarioValidationError(
+                f"load() takes a scenario name, got {type(name).__name__}. "
+                f"Available: {', '.join(cls.available())}."
+            )
+        stem = name[:-4] if name.endswith(".yml") else name
+        if stem not in cls.available():
+            close = difflib.get_close_matches(stem, cls.available(), n=3,
+                                              cutoff=0.5)
+            hint = ("\n\nDid you mean:\n  " + "\n  ".join(close) if close
+                    else "\n\nAvailable:\n  "
+                         + "\n  ".join(cls.available()))
+            raise ScenarioValidationError(
+                f"no scenario named {name!r} ships with tradefloor.{hint}"
+                f"\n\nTo load a file of your own: "
+                f"Scenario.from_yaml('path/to/it.yml')."
+            )
+        text = (_pack() / f"{stem}.yml").read_text(encoding="utf-8")
+        return cls.from_document(yaml_subset.read(text), source=f"{stem}.yml")
+
+    load = _constructor(load, (
+        "there is nothing to add: load builds a whole scenario from the "
+        "shipped pack. Load it on the class, or add its interventions to "
+        "this one with .intervene(...)."
+    ))
+
+    @classmethod
+    def available(cls) -> tuple[str, ...]:
+        """The names :meth:`load` accepts, sorted.
+
+        Read from the installed package rather than from a list, so a
+        scenario added to the pack appears here without anyone remembering
+        to write it down twice.
+        """
+        return tuple(sorted(
+            path.name[:-4] for path in _pack().iterdir()
+            if path.name.endswith(".yml")
+        ))
 
     def from_document(cls, document: Any, *,
                       source: str | None = None) -> "Scenario":

@@ -127,7 +127,17 @@ features = ["python"]
 # The stub file and the PEP 561 marker must be INSTALLED, not merely present
 # in the source tree. A stub that does not ship types nothing, and the failure
 # is silent -- a type checker just falls back to Any.
-include = ["python/tradefloor/py.typed", "python/tradefloor/_core.pyi"]
+# The stub, the PEP 561 marker and the SCENARIO PACK must be INSTALLED, not
+# merely present in the source tree. A stub that does not ship types nothing,
+# and the failure is silent -- a type checker just falls back to Any. The
+# scenarios fail more loudly but no more usefully: `Scenario.load("recession")`
+# would raise on every pip install while working in a clone, which is the
+# worst place for a difference between the two.
+include = [
+    "python/tradefloor/py.typed",
+    "python/tradefloor/_core.pyi",
+    "python/tradefloor/scenarios/*.yml",
+]
 # `maturin develop` writes the compiled extension and its Windows debug
 # database into python/tradefloor/, and maturin then packages everything it
 # finds under python-source. So a wheel built on a machine that had ever run

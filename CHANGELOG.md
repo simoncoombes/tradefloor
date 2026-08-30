@@ -19,6 +19,41 @@ co-movement and lever 26/26 each, and the driven noise ratio at 1.13
 against pt-v15's ~1.46. Selectable by name; not the default, which remains
 pt-v14.
 
+**Scenarios reach the surfaces that were still behind them.** The framework
+landed in the library; the agent-facing server, the execution example and the
+counterfactual harness each had their own way of saying "change the market"
+and none of them could say it in the scenario grammar.
+
+- **The pack ships inside the wheel.** `scenarios/*.yml` moves to
+  `python/tradefloor/scenarios/`, so `tf.Scenario.load("liquidity_crisis")`
+  works on a plain `pip install` rather than only in a clone. That was the
+  blocker for offering them over MCP, where there is no clone at all.
+  `Scenario.available()` lists them, `tradefloor scenario list` prints them
+  with their fingerprints, and `validate`/`show`/`diff` take a name as
+  readily as a path.
+- **MCP learns the grammar.** A new `list_scenarios` tool returns the shipped
+  documents, the constructors, and every intervention target carrying what it
+  was MEASURED to be worth -- along with the refusals, because "there is no
+  volatility level to set in this model, use macro.vix" is a more useful
+  answer to a client than a schema error. `build_scenario` takes `shocks` and
+  `transmission` as well as `steps`; `run_stress_scenario` takes a shipped
+  name, and its control arm is now the same world WITHOUT the interventions
+  rather than no scenario at all.
+- **`World.apply(scenario)`** drives a counterfactual arm from a document,
+  beside the existing `World.intervene(**fields)`. It rebases the scenario
+  onto the world's own day numbering, so one file means one experiment on an
+  arm forked at day 20 and on one forked at day 60. `market.liquidity` --
+  the only lever that touches execution -- is reachable from the FinRobot
+  study for the first time, and `Divergence` can now say when the
+  intervention landed for an arm driven that way.
+- **Example 06 answers its own question.** It said the edge of the book
+  "exists and is measurable" and then never reached it, because at that size
+  the book absorbed every order. It now takes the depth away instead of
+  raising the size: same seed, same agent, same decisions, shortfall 6.04bp
+  to 10.81bp and partial fills 0 to 2. The prices barely move, which is the
+  point -- an evaluation reading only the price series scores the two runs
+  the same.
+
 **Scenarios are now a file you can hand to somebody else.** `tf.Scenario`
 gains a second half: a named, inspectable collection of explicit
 interventions, written in YAML or in Python, with a fingerprint over the
