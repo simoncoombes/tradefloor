@@ -1042,6 +1042,42 @@ pub struct ModelParams {
     pub vix_jump_intensity: f64,
     /// Mean size of a fear event, in VIX points (exponential draw).
     pub vix_jump_scale: f64,
+    /// Flow composition (the design record's FLOW-COMPOSITION campaign):
+    /// a stress-activated COMMON flow lean in the price path -- forced,
+    /// correlated selling above a fear threshold, which is the real-market
+    /// mechanism hypothesized to PIN a crash's cohesion (real 2020 crash
+    /// co-movement 0.781 tightly, this model 0.22-0.73 across seeds).
+    /// Log-shock per VIX point above the threshold, per day, applied
+    /// identically to every name alongside the crowd lean. The term varies
+    /// only as the VIX varies, so a REPLAYED crash (VIX moving 30->80)
+    /// receives strong common motion while the held-VIX crisis instrument
+    /// (constant 45) receives a constant drift and near-zero added
+    /// correlation. 0.0 -- a branch, not arithmetic -- is bit-inert.
+    pub forced_flow_gain: f64,
+    /// Where forced flow wakes, in VIX points. Below it the segment does
+    /// not exist, which is what makes composition invisible in calm
+    /// markets by construction.
+    pub forced_flow_threshold: f64,
+    /// How unevenly forced flow lands, as beta^k. Screen one measured the
+    /// UNIFORM lean pinning crash cohesion (0.52 -> 0.69, IQR halved) at
+    /// the cost of crash dispersion (0.48 -> 0.34 of real) -- identical
+    /// pressure crowds out cross-sectional spread. Real forced selling is
+    /// heterogeneous: leveraged and high-beta names get sold hardest. At
+    /// k the per-name lean is the common term times beta^k; 0.0 is the
+    /// uniform screen-one behaviour bit for bit (beta^0 multiplies by
+    /// 1.0 through a branch, not a pow call).
+    pub forced_flow_beta_exponent: f64,
+    /// Forced sellers are FINITE (round 143: sixty held days of constant
+    /// sell drift ground prices into their clamps and the crisis lever
+    /// broke DOWNWARD -- only a sustained-stress instrument could catch
+    /// infinite sellers). The reservoir is the segment's total budget in
+    /// VIX-point-days: each day above the threshold spends its excess,
+    /// and the effective lean scales by the fraction remaining. 0.0 is
+    /// the infinite-sellers screen behaviour bit for bit.
+    pub forced_flow_reservoir: f64,
+    /// Fraction of spent budget recovered per below-threshold day
+    /// (deleveraging capacity rebuilds in calm). 0.0: never.
+    pub forced_flow_replenish: f64,
     /// VIX points added to its target per unit of a DOWN day's index
     /// return, before the clamp and cap below.
     ///
@@ -1400,6 +1436,11 @@ impl ModelParams {
             vix_decay_ratio: 1.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
+            forced_flow_gain: 0.0,
+            forced_flow_threshold: 40.0,
+            forced_flow_beta_exponent: 0.0,
+            forced_flow_reservoir: 0.0,
+            forced_flow_replenish: 0.0,
             vix_realised_vol_weight: 0.0,
             vix_cycle_amplitude: 1.0,
             vix_return_source: 0.0,
@@ -2442,6 +2483,11 @@ impl ModelParams {
             "vix_decay_ratio" => self.vix_decay_ratio,
             "vix_jump_intensity" => self.vix_jump_intensity,
             "vix_jump_scale" => self.vix_jump_scale,
+            "forced_flow_gain" => self.forced_flow_gain,
+            "forced_flow_threshold" => self.forced_flow_threshold,
+            "forced_flow_beta_exponent" => self.forced_flow_beta_exponent,
+            "forced_flow_reservoir" => self.forced_flow_reservoir,
+            "forced_flow_replenish" => self.forced_flow_replenish,
             "vix_cycle_amplitude" => self.vix_cycle_amplitude,
             "vix_realised_vol_weight" => self.vix_realised_vol_weight,
             "vix_return_clamp" => self.vix_return_clamp,
@@ -2580,6 +2626,11 @@ impl ModelParams {
             "vix_decay_ratio" => out.vix_decay_ratio = value,
             "vix_jump_intensity" => out.vix_jump_intensity = value,
             "vix_jump_scale" => out.vix_jump_scale = value,
+            "forced_flow_gain" => out.forced_flow_gain = value,
+            "forced_flow_threshold" => out.forced_flow_threshold = value,
+            "forced_flow_beta_exponent" => out.forced_flow_beta_exponent = value,
+            "forced_flow_reservoir" => out.forced_flow_reservoir = value,
+            "forced_flow_replenish" => out.forced_flow_replenish = value,
             "vix_cycle_amplitude" => out.vix_cycle_amplitude = value,
             "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
@@ -2782,6 +2833,11 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_decay_ratio",
         "vix_jump_intensity",
         "vix_jump_scale",
+        "forced_flow_gain",
+        "forced_flow_threshold",
+        "forced_flow_beta_exponent",
+        "forced_flow_reservoir",
+        "forced_flow_replenish",
         "vix_realised_vol_weight",
         "vix_return_clamp",
         "vix_return_gain",

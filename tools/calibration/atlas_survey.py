@@ -181,6 +181,17 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # real P(VIX>30) tail; 12/yr at 30 points is far past plausible.
     "vix_jump_intensity": (0.0, 12.0),
     "vix_jump_scale": (0.0, 30.0),
+    # Flow composition: lean per VIX point above threshold. At 0.001 and
+    # the covid peak (40 points above), the daily common shock is 0.04 --
+    # twice the crowd cap; 0.005 is far past plausible and bounds the box.
+    "forced_flow_gain": (0.0, 0.005),
+    "forced_flow_beta_exponent": (0.0, 3.0),
+    # The reservoir (round 143): covid's above-50 excess integrates to
+    # ~400 VIX-point-days, so the box spans drains-mid-crash to
+    # never-drains.
+    "forced_flow_reservoir": (0.0, 2000.0),
+    "forced_flow_replenish": (0.0, 0.25),
+
     # The VIX's feedback weight (§68): a share, so its box is the unit
     # interval. At 1.0 the loop gain is exactly one by construction, since
     # the implied VIX is the forward coupling's own inverse, so the top of

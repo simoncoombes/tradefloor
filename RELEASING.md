@@ -268,6 +268,26 @@ write the preset beside it.
 `tools/remeasure/inventory.json`, which lives in this repository and was never
 vendored, so the prose-figure check does not run there at all.
 
+### 5b-ii. Write the preset record
+
+```
+python tools/presets/record.py --panel <the preset_panel artefact>
+python tools/presets/record.py --panel <the same artefact> --check
+```
+
+The panel from the step above is a scratch file; the record is the committed
+form of it. One JSON per preset under `python/tradefloor/presets/`, shipped in
+the wheel, read by `tradefloor.preset_record` and by the documentation site.
+
+`tests/test_preset_records.py` binds the record for `envelope.PRESET` to
+`CERTIFIED` and `MEASURED_504`, so the panel and the preset it describes can
+no longer disagree. That binding is what 0.6.0 lacked: the panel was re-typed
+by hand and `DECAY_252` beside it was not, and nothing failed.
+
+Records exist for the presets the project publishes figures about rather than
+for all of them, because each one costs a measurement.
+`tradefloor.preset_records()` is the honest list of which.
+
 ### 5c. Document the API this release makes public
 
 The site describes the published wheel, not `main`. So API that merges
