@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import statistics as st
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -83,6 +84,38 @@ CRISIS_LEVER_TOLERANCE = 0.05
 
 KINDS = ("p252", "p504", "vix5", "vix45", "vix65", "driven",
          "ho_seeds", "ho_universe")
+
+
+#: The two axes that do not vary with the block seed, and therefore do not
+#: need measuring again for every block of a campaign.
+HO_KINDS = ("ho_seeds", "ho_universe")
+
+
+def ho_cache_read(path: str | None) -> dict[str, dict]:
+    """What a previous block measured, keyed by model fingerprint.
+
+    A fingerprint rather than a label: two labels can name one set of
+    coefficients, a label can be reused for different ones, and reading
+    another model's held-out rows under a shared label is the failure this
+    key exists to prevent.
+    """
+    if not path or not pathlib.Path(path).exists():
+        return {}
+    return json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+
+
+def ho_cache_write(path: str, cached: dict[str, dict],
+                   measured: dict[str, dict]) -> dict[str, dict]:
+    """Fold this run's rows into the file and return what was written.
+
+    Additive: a campaign gating several candidates over several blocks
+    accumulates one entry per model rather than replacing the file with
+    whichever candidate ran last.
+    """
+    fresh = dict(cached)
+    fresh.update(measured)
+    pathlib.Path(path).write_text(json.dumps(fresh, indent=1), encoding="utf-8")
+    return fresh
 
 
 def one(job):
@@ -149,6 +182,13 @@ def main() -> int:
              "exactly. Principle 6.")
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--out", default=None, help="write the verdicts as JSON")
+    ap.add_argument(
+        "--ho-cache", default=None, metavar="FILE",
+        help="reuse the held-out rows across blocks. They do not depend on "
+             "--seed-start, so a 26-block campaign recomputes them 26 times "
+             "identically. Keyed by the model fingerprint, so a candidate "
+             "whose coefficients move gets measured again rather than "
+             "reading somebody else's rows.")
     args = ap.parse_args()
 
     cands = load(args.candidates)
@@ -163,6 +203,13 @@ def main() -> int:
                      "that shares seeds with discovery confirms nothing")
     print(f"seeds {train[0]}-{train[-1]} "
           f"({'calibration' if args.seed_start is None else 'DISJOINT'})", flush=True)
+
+    # Keyed by model fingerprint rather than by label: two labels can name
+    # the same coefficients, and a label can be reused for different ones.
+    cached = ho_cache_read(args.ho_cache)
+    if cached:
+        print(f"ho cache: {len(cached)} model(s) in {args.ho_cache}", flush=True)
+    hit: set[str] = set()
 
     jobs = []
     for c in cands:
@@ -179,8 +226,16 @@ def main() -> int:
         # so seeds vary only the noise around it, and each run is 505
         # sessions over forty names. Six is enough to median a ratio.
         jobs += [(label, base, ov, "driven", s) for s in train[:6]]
-        jobs += [(label, base, ov, "ho_seeds", s) for s in gate_pick.HELDOUT]
-        jobs += [(label, base, ov, "ho_universe", s) for s in gate_pick.HELDOUT]
+        # The held-out rows vary with the model and not with the block, so
+        # a campaign that runs twenty-six blocks measures them twenty-six
+        # times and gets the same answer. With a cache the first block pays
+        # and the rest read (issue #82).
+        if cached.get(m.fingerprint):
+            hit.add(label)
+        else:
+            for kind in HO_KINDS:
+                jobs += [(label, base, ov, kind, s)
+                         for s in gate_pick.HELDOUT]
 
     print(f"\n{len(cands)} candidates, {len(jobs)} tasks, {args.workers} workers",
           flush=True)
@@ -193,6 +248,22 @@ def main() -> int:
             done += 1
             if done % 250 == 0:
                 print(f"  ... {done}/{len(jobs)}", flush=True)
+
+    if args.ho_cache:
+        measured = {}
+        for c in cands:
+            label = c["label"]
+            fp = gate_pick.model(c["base"], c["overrides"]).fingerprint
+            if label in hit:
+                # Read: this candidate ran no ho jobs, so its rows come back
+                # from the file rather than from the pool.
+                acc[label].update(cached[fp])
+            else:
+                measured[fp] = {k: acc[label][k] for k in HO_KINDS
+                                if acc[label].get(k)}
+        fresh = ho_cache_write(args.ho_cache, cached, measured)
+        print(f"ho cache: {len(hit)} reused, {len(cands) - len(hit)} measured, "
+              f"{len(fresh)} model(s) written", flush=True)
 
     results = {}
     for c in cands:
