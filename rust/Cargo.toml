@@ -5,7 +5,7 @@ edition = "2021"
 description = "A reproducible evaluation environment for financial AI agents."
 # Dual-licensed, the Rust-ecosystem norm (serde, tokio, rand): a downstream
 # user picks whichever term suits their own policy. Supersedes an earlier
-# Apache-2.0-only decision -- see DECISIONS.md in pretium-design for the
+# Apache-2.0-only decision -- see DECISIONS.md in tradefloor-design for the
 # reasoning. LICENSE-APACHE and LICENSE-MIT carry the full texts; there is no
 # longer a generic LICENSE file, matching the same crates' convention.
 license = "MIT OR Apache-2.0"

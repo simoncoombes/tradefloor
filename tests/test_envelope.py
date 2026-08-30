@@ -335,3 +335,127 @@ def test_regressions_refuses_a_horizon_it_has_no_baseline_for():
 def test_an_unknown_statistic_is_refused_by_score():
     with pytest.raises(tradefloor.ValidationError):
         env.score({"sharpe_ratio": 1.0})
+
+
+#: The lags the log-log fit behind `REAL_DECAY_SLOPE` runs over. Two of them,
+#: 2 and 3, are absent from `REAL_DECAY`, so the fit cannot be reproduced from
+#: the module alone: it returns -0.4615 against the shipped -0.436. The
+#: committed curve is the only source for them.
+_SLOPE_LAGS = (1, 2, 3, 5, 8, 12, 20)
+
+
+def _committed_curve():
+    """`decay-curve-504.json`, which tradefloor.dev cites as the real side."""
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "decay-curve-504.json"
+    assert path.exists(), (
+        f"{path.name} is missing from the repository root. tradefloor.dev's "
+        "realism-metrics page cites it as the source of REAL_DECAY and "
+        "REAL_DECAY_SLOPE, and nothing else in the library carries lags 2 "
+        "and 3 of the real curve."
+    )
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _log_log_slope(curve, lags):
+    """Least-squares slope through (log lag, log autocorrelation)."""
+    import math
+
+    xs = [math.log(lag) for lag in lags]
+    ys = [math.log(curve[lag]) for lag in lags]
+    mx = sum(xs) / len(xs)
+    my = sum(ys) / len(ys)
+    return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum(
+        (x - mx) ** 2 for x in xs
+    )
+
+
+def test_the_committed_curve_reproduces_its_own_median():
+    """The median block is derived, so it is recomputed here rather than read.
+
+    The file ships six windows and describes the median as covering the five
+    that carry no crisis flag. It shipped no flags at all until now, which
+    made that sentence unverifiable: a reader could not tell which window was
+    excluded, and neither could a test.
+    """
+    import statistics
+
+    data = _committed_curve()
+    noncrisis = [w for w in data["real_windows"] if not w.get("crisis")]
+    assert len(noncrisis) == 5, (
+        f"the median is described as five non-crisis windows, and "
+        f"{len(noncrisis)} of {len(data['real_windows'])} carry no crisis flag"
+    )
+    for lag, published in data["real_median_noncrisis"].items():
+        recomputed = statistics.median(w["curve"][lag] for w in noncrisis)
+        assert recomputed == pytest.approx(published, abs=1e-12), (
+            f"lag {lag}: real_median_noncrisis says {published}, the "
+            f"non-crisis windows give {recomputed}"
+        )
+
+
+def test_real_decay_is_the_committed_curve_rounded():
+    """`REAL_DECAY` is the published artifact rounded to four places.
+
+    tradefloor.dev tells a reader that the real side of the decay comparison
+    is reproducible from the tree and names this file. Nothing executed that
+    claim until now, so an edit to either side could carry the other out of
+    agreement while the suite stayed green.
+    """
+    curve = _committed_curve()["real_median_noncrisis"]
+    for lag, value in env.REAL_DECAY.items():
+        assert round(curve[str(lag)], 4) == value, (
+            f"REAL_DECAY[{lag}] is {value}; decay-curve-504.json rounds to "
+            f"{round(curve[str(lag)], 4)}"
+        )
+
+
+def test_real_decay_slope_is_the_seven_lag_fit_on_that_curve():
+    """`REAL_DECAY_SLOPE` needs two lags the module does not carry.
+
+    `REAL_DECAY` holds five of the seven lags the fit runs over, skipping 2
+    and 3. Fitting the five returns -0.4615 against the shipped -0.436, so
+    the committed curve earns its place at the repository root. Both figures
+    reach a reader: the gap messages quote the slope as about 2.2x steeper
+    than real markets.
+    """
+    curve = {
+        int(lag): value
+        for lag, value in _committed_curve()["real_median_noncrisis"].items()
+    }
+    fitted = _log_log_slope(curve, _SLOPE_LAGS)
+    assert round(fitted, 3) == env.REAL_DECAY_SLOPE, (
+        f"REAL_DECAY_SLOPE is {env.REAL_DECAY_SLOPE}; the fit over lags "
+        f"{list(_SLOPE_LAGS)} of decay-curve-504.json gives {fitted:.4f}"
+    )
+
+    from_module_only = _log_log_slope(
+        env.REAL_DECAY, [l for l in _SLOPE_LAGS if l in env.REAL_DECAY]
+    )
+    assert round(from_module_only, 3) != env.REAL_DECAY_SLOPE, (
+        "REAL_DECAY now reproduces the slope on its own, so the committed "
+        "curve is no longer load-bearing for it. Say so in the file's note "
+        "before this assertion is deleted."
+    )
+
+
+def test_the_model_slope_needs_no_committed_file():
+    """`DECAY_SLOPE` is the same fit over `DECAY_252`, which carries all seven.
+
+    The asymmetry is the point. `DECAY_252` holds every lag the fit needs, so
+    the model side of the comparison stays checkable with no committed
+    artifact, while the real side needs one.
+
+    The agreement is approximate, and the tolerance says why. `DECAY_252` is
+    published rounded to four places and the full-precision panel it came
+    from is not in this repository, so the fit over the rounded values
+    returns -0.9522 where the constant reads -0.953. The real side rounds
+    exactly, because there the full-precision source IS committed.
+    """
+    fitted = _log_log_slope(env.DECAY_252, _SLOPE_LAGS)
+    assert fitted == pytest.approx(env.DECAY_SLOPE, abs=2e-3), (
+        f"DECAY_SLOPE is {env.DECAY_SLOPE}; the fit over the published "
+        f"DECAY_252 gives {fitted:.4f}"
+    )

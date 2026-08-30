@@ -1,8 +1,8 @@
 """One object a stranger can reproduce a run from, and know that they did.
 
-`docs/reproducing-a-run.md` lists the five things that identify a run and
-shows a careful reader how to archive and check each one by hand. This module
-is that page as a single artifact:
+`tradefloor-docs: docs/reproducing-a-run.md` lists the five things that
+identify a run and shows a careful reader how to archive and check each one
+by hand. This module is that page as a single artifact:
 
 ```python
 manifest = tf.RunManifest.of(engine, seed=42, universe=u, macro=m)
@@ -81,9 +81,10 @@ x86_64) produced the identical digest, ``76983e65...3180eeb``, each also
 passing against the committed baseline. It has not yet run against a
 tagged release, and the current digest, ``1ee64998...fe3581c`` at v8, was
 regenerated on macOS arm64 and has one platform's confirmation behind it
-until the gate runs again. ``docs/reproducing-a-run.md`` keeps the full
-record. The manifest records the writer's platform and claims nothing
-beyond that. What it offers instead is sharper: the manifest carries the
+until the gate runs again. ``tradefloor-docs: docs/reproducing-a-run.md``
+keeps the full record. The manifest records the writer's platform and claims
+nothing beyond that. What it offers instead is sharper: the manifest carries
+the
 expected output digest, so a successful ``reproduce()`` on a different
 machine IS a cross-platform measurement for that run, made by the reader,
 not promised by the library. A failure after every input verified is
