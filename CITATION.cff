@@ -15,7 +15,9 @@
 # published result needs four more things: the seed, the universe fingerprint
 # and how it was built, the macro initial conditions, and the order log. The
 # package version and preset name come from the citation itself. All five are
-# in docs/reproducing-a-run.md.
+# at https://tradefloor.dev/citing.html. That page is the reference now: the
+# `docs/` tree this comment used to name left the repository with the
+# documentation site at 0.5.0.
 
 cff-version: 1.2.0
 message: "If you use this software, please cite it using these metadata."

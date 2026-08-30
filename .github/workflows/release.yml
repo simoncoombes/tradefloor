@@ -33,7 +33,7 @@ on:
         type: boolean
         default: true
       publish_pretium_shim:
-        description: "Publish the pretium 0.5.0 PyPI shim (shims/pypi-pretium)"
+        description: "Publish the pretium PyPI shim (shims/pypi-pretium)"
         type: boolean
         default: false
 
