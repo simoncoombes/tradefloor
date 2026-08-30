@@ -1,11 +1,8 @@
 # tradefloor
 
-> Formerly **pretium**. Versions through 0.4.3 were published under that
-> name and remain installable forever; results recorded against them replay
-> under those exact versions. The rename changed no behaviour: 0.5.0
-> reproduces the same known-answer digest on every platform.
-
 [![determinism](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml/badge.svg)](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml)
+[![PyPI](https://img.shields.io/pypi/v/tradefloor.svg)](https://pypi.org/project/tradefloor/)
+[![crates.io](https://img.shields.io/crates/v/tradefloor.svg)](https://crates.io/crates/tradefloor)
 [![licence: MIT OR Apache-2.0](https://img.shields.io/badge/licence-MIT%20OR%20Apache--2.0-blue.svg)](#licence)
 [![python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
@@ -30,6 +27,11 @@ notebooks, whose source is maintained in a separate repository.
 ```
 pip install tradefloor
 ```
+
+> Formerly **pretium**. Versions through 0.4.3 were published under that
+> name and remain installable forever; results recorded against them replay
+> under those exact versions. The rename changed no behaviour: 0.5.0
+> reproduces the same known-answer digest on every platform.
 
 Wheels for Linux, macOS and Windows on CPython 3.11+. No dependencies. The same
 engine is a Rust crate: `cargo add tradefloor`.
