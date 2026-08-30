@@ -185,6 +185,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # the covid peak (40 points above), the daily common shock is 0.04 --
     # twice the crowd cap; 0.005 is far past plausible and bounds the box.
     "forced_flow_gain": (0.0, 0.005),
+    "forced_flow_beta_exponent": (0.0, 3.0),
 
     # The VIX's feedback weight (§68): a share, so its box is the unit
     # interval. At 1.0 the loop gain is exactly one by construction, since

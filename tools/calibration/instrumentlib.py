@@ -175,6 +175,7 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_jump_scale": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 30.0)},
     "forced_flow_gain": {"kind": "abs", "step_unit": 0.0001, "hard_range": (0.0, 0.01)},
     "forced_flow_threshold": {"kind": "abs", "step_unit": 1.0, "hard_range": (20.0, 60.0)},
+    "forced_flow_beta_exponent": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 3.0)},
     # The volatility feedback (§68). Real markets move the VIX 165 points
     # per unit return on a heavy down day against the shipped 25, so the
     # box reaches well past the shipped value rather than around it.

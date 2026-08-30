@@ -1058,6 +1058,15 @@ pub struct ModelParams {
     /// not exist, which is what makes composition invisible in calm
     /// markets by construction.
     pub forced_flow_threshold: f64,
+    /// How unevenly forced flow lands, as beta^k. Screen one measured the
+    /// UNIFORM lean pinning crash cohesion (0.52 -> 0.69, IQR halved) at
+    /// the cost of crash dispersion (0.48 -> 0.34 of real) -- identical
+    /// pressure crowds out cross-sectional spread. Real forced selling is
+    /// heterogeneous: leveraged and high-beta names get sold hardest. At
+    /// k the per-name lean is the common term times beta^k; 0.0 is the
+    /// uniform screen-one behaviour bit for bit (beta^0 multiplies by
+    /// 1.0 through a branch, not a pow call).
+    pub forced_flow_beta_exponent: f64,
     /// VIX points added to its target per unit of a DOWN day's index
     /// return, before the clamp and cap below.
     ///
@@ -1417,6 +1426,7 @@ impl ModelParams {
             vix_jump_scale: 0.0,
             forced_flow_gain: 0.0,
             forced_flow_threshold: 40.0,
+            forced_flow_beta_exponent: 0.0,
             vix_realised_vol_weight: 0.0,
             vix_cycle_amplitude: 1.0,
             vix_return_source: 0.0,
@@ -2459,6 +2469,7 @@ impl ModelParams {
             "vix_jump_scale" => self.vix_jump_scale,
             "forced_flow_gain" => self.forced_flow_gain,
             "forced_flow_threshold" => self.forced_flow_threshold,
+            "forced_flow_beta_exponent" => self.forced_flow_beta_exponent,
             "vix_cycle_amplitude" => self.vix_cycle_amplitude,
             "vix_realised_vol_weight" => self.vix_realised_vol_weight,
             "vix_return_clamp" => self.vix_return_clamp,
@@ -2599,6 +2610,7 @@ impl ModelParams {
             "vix_jump_scale" => out.vix_jump_scale = value,
             "forced_flow_gain" => out.forced_flow_gain = value,
             "forced_flow_threshold" => out.forced_flow_threshold = value,
+            "forced_flow_beta_exponent" => out.forced_flow_beta_exponent = value,
             "vix_cycle_amplitude" => out.vix_cycle_amplitude = value,
             "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
@@ -2803,6 +2815,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_jump_scale",
         "forced_flow_gain",
         "forced_flow_threshold",
+        "forced_flow_beta_exponent",
         "vix_realised_vol_weight",
         "vix_return_clamp",
         "vix_return_gain",

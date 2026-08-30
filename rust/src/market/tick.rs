@@ -669,8 +669,16 @@ pub fn simulate_market_tick(
         // attribution contract is "recorded as applied". A branch, not
         // arithmetic, so 0.0 is bit-identical.
         let forced = if p.forced_flow_gain != 0.0 {
-            -p.forced_flow_gain
-                * mathx::max(0.0, economy.vix - p.forced_flow_threshold)
+            let common = -p.forced_flow_gain
+                * mathx::max(0.0, economy.vix - p.forced_flow_threshold);
+            // beta^0 through a branch, so screen one's uniform lean and
+            // every recorded run reproduce bit for bit.
+            if p.forced_flow_beta_exponent != 0.0 {
+                let beta = companies[idx].stock.beta.unwrap_or(1.0);
+                common * mathx::pow(mathx::max(beta, 0.1), p.forced_flow_beta_exponent)
+            } else {
+                common
+            }
         } else {
             0.0
         };
