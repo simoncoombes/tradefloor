@@ -51,6 +51,19 @@ def _grid(name):
                     "vix_return_gain_up": gu, "vix_return_clamp": 3.0}
         return {"w30d6": dict(base), "w30wireH": wired(0.8, 0.55),
                 "w30wire1": wired(1.55, 1.10), "w30wire2": wired(2.0, 1.4)}
+    elif name == "jump":
+        # Round 134: exogenous fear events on the dose base. Jumps supply
+        # up-side asymmetry on their own, so decay 0.7 hedges the 1.28
+        # asymmetry ceiling the base already touches.
+        b6 = {"vix_realised_vol_weight": 0.3, "vix_decay_ratio": 0.6,
+              "vix_mean_reversion": 0.06}
+        b7 = {**b6, "vix_decay_ratio": 0.7}
+        def j(base, i, s):
+            return {**base, "vix_jump_intensity": i, "vix_jump_scale": s}
+        return {"w30d6": dict(b6),
+                "w30j158": j(b6, 1.5, 8.0), "w30j310": j(b6, 3.0, 10.0),
+                "w30j312": j(b6, 3.0, 12.0), "w30j610": j(b6, 6.0, 10.0),
+                "w30d7j310": j(b7, 3.0, 10.0), "w30d7j312": j(b7, 3.0, 12.0)}
     else:
         raise SystemExit(f"unknown grid {name}")
     if isinstance(combos, dict):
