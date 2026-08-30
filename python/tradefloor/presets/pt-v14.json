@@ -2,7 +2,7 @@
   "schema": 1,
   "preset": "pt-v14",
   "fingerprint": "pt-v14",
-  "coefficient_digest": "f6da5166dc62b136ec8d98037165a8b843e2ed476e4aae2baac2af6ccabd7087",
+  "coefficient_digest": "dcda925c635d5aad8a756f3a62014566922bd5603a0a482c77f532616554c993",
   "coefficients": {
     "book_levels": 10.0,
     "crash_amplifier_slope": 0.2,
@@ -24,6 +24,11 @@
     "fair_value_book_floor": 0.0,
     "fair_value_floor": 0.01,
     "fiscal_multiplier": 0.3,
+    "forced_flow_beta_exponent": 0.0,
+    "forced_flow_gain": 0.0,
+    "forced_flow_replenish": 0.0,
+    "forced_flow_reservoir": 0.0,
+    "forced_flow_threshold": 40.0,
     "garch_alpha": 0.059507211981547736,
     "garch_beta": 0.6853150814664563,
     "garch_beta_dispersion": 0.0,
@@ -140,7 +145,7 @@
   "default_since": "0.4.0",
   "measured": {
     "tradefloor_version": "0.6.0",
-    "commit": "0ff5656b1ebf2fade887b275b3a0021ff68a3650",
+    "commit": "e09a490cab557557db151794f060310f5679e9b6",
     "workers": 94,
     "wall_seconds": 33.8,
     "method": {

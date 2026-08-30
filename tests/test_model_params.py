@@ -328,6 +328,19 @@ PERTURBATIONS = [
     # The size of a jump once one arrives. The other half of the pair: with
     # the intensity at 0.0 there is no arrival to scale.
     ("vix_jump_scale", 1.0, False),
+    # -- forced flow ---------------------------------------------------------
+    # Gated twice, which is why all five read inert here. `forced_flow_gain`
+    # ships at 0.0, so the mechanism is off; and `forced_flow_threshold`
+    # ships at 40.0, which the probe's three sessions never reach even with
+    # the gain on. Measured: the gain alone moves nothing at 0.5, 5.0 or
+    # 50.0, and gain 5.0 with the threshold at 0.5 moves the market. So this
+    # is a PAIR that needs both halves, like the endogenous news dials above,
+    # and it is exercised where the threshold can bind rather than here.
+    ("forced_flow_gain", 0.5, False),
+    ("forced_flow_threshold", 15.0, False),
+    ("forced_flow_reservoir", 0.3, False),
+    ("forced_flow_replenish", 0.2, False),
+    ("forced_flow_beta_exponent", 1.5, False),
 ]
 
 
