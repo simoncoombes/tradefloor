@@ -24,6 +24,7 @@ from .harness import Agent, Observation, Scorecard, evaluate, leaderboard
 from .replay import replay
 from . import edgar
 from . import envelope
+from .records import preset_record, available as preset_records
 from . import atlas
 from . import baselines
 from . import tca
@@ -88,6 +89,8 @@ __version__ = _core.__version__
 __all__ = [
     "atlas",
     "envelope",
+    "preset_record",
+    "preset_records",
     "ArrowStream", "Engine", "EngineBatch", "FairValue", "Fill", "GameRng", "Instrument", "Macro",
     "MatchResult", "MispricingState", "ModelParams", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",

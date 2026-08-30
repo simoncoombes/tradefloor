@@ -137,6 +137,10 @@ include = [
     "python/tradefloor/py.typed",
     "python/tradefloor/_core.pyi",
     "python/tradefloor/scenarios/*.yml",
+    # The preset records, for the same reason as the scenarios: the
+    # documentation site and anyone citing a preset read the measured panel
+    # out of the installed package rather than out of a clone.
+    "python/tradefloor/presets/*.json",
 ]
 # `maturin develop` writes the compiled extension and its Windows debug
 # database into python/tradefloor/, and maturin then packages everything it
