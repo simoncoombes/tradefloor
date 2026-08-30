@@ -88,9 +88,8 @@ bit-identical, so if you change anything in `rust/src/market/` or
 ## Branches, and how work reaches `main`
 
 `main` is what ships. It is protected: nothing lands on it except through a
-pull request that has passed the determinism gate on all five targets and the
-documentation build, and only the owner merges. `dev` carries the same
-requirement.
+pull request that has passed the determinism gate on all five targets, and
+only the owner merges. `dev` carries the same requirement.
 
 **Every piece of work gets its own branch.** Not `dev` directly, not `main`.
 
