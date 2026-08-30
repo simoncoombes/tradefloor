@@ -57,12 +57,6 @@ def test_the_house_style_holds_across_the_published_prose():
     )
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "The 0.6.0 section is 1,257 words against the 250-word budget this test "
-    "sets. Trimming it is a writing job and is not done yet. STRICT on "
-    "purpose: the day the section fits, this test passes, the strict marker "
-    "turns that pass into a failure, and whoever sees it deletes the marker. "
-    "A budget nobody is forced to un-exempt is a budget that never applies."))
 def test_the_newest_changelog_section_fits_the_release_note_budget():
     """The newest section only.
 
