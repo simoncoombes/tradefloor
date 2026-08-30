@@ -234,7 +234,7 @@ FinRobot's own interface.
 
 ## More
 
-Full docs: [**simoncoombes.github.io/tradefloor**](https://simoncoombes.github.io/tradefloor/).
+Full docs: [**tradefloor.dev**](https://tradefloor.dev/).
 
 To contribute, see [CONTRIBUTING.md](https://github.com/simoncoombes/tradefloor/blob/main/CONTRIBUTING.md) and [RELEASING.md](https://github.com/simoncoombes/tradefloor/blob/main/RELEASING.md). One rule shapes the
 rest: a change to the simulated trajectory is a breaking change, whatever its
@@ -243,4 +243,14 @@ size.
 To cite the software, see [CITATION.cff](https://github.com/simoncoombes/tradefloor/blob/main/CITATION.cff). To cite a result, use its
 `RunManifest`.
 
-Licence: MIT OR Apache-2.0, at your option. See [LICENSE-MIT](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-MIT) and [LICENSE-APACHE](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-APACHE).
+## Licence
+
+MIT OR Apache-2.0, at your option, which is the Rust-ecosystem norm. See
+[LICENSE-MIT](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-MIT)
+and
+[LICENSE-APACHE](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-APACHE).
+
+GitHub's sidebar reads Apache-2.0 because its detection picks one file and
+stops. So does the sidebar of `rust-lang/rust`, `serde` and `pyo3`, which
+carry the same two files. The dual grant is what `pyproject.toml`,
+`rust/Cargo.toml` and this section state, and it is what applies.
