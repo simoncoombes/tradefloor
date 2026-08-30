@@ -17,6 +17,15 @@
 name: suite
 
 on:
+  # A pull request as well as the schedule, since 0.6.x. The header above
+  # reasoned that half an hour was too slow to gate a merge, and it was; split
+  # four ways it is about ten minutes, which is not. Nightly alone let two
+  # merges land broken and be found later: one carried four Rust test files
+  # that did not compile, and one a markdown change that failed a prose test
+  # nothing ran. Both were invisible to `determinism.yml`, which gates on what
+  # can move a market and correctly says nothing about either.
+  pull_request:
+    branches: [main, dev]
   schedule:
     # 04:17 UTC. Off the hour on purpose: GitHub's scheduler queues the top of
     # every hour heavily and a job asking for 04:00 can wait twenty minutes for
@@ -46,6 +55,29 @@ jobs:
         with:
           name: suite-wheel
           path: dist/*.whl
+
+  rust:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      # `cargo test`, and not only `cargo build`: the failure this exists for
+      # was integration tests that stopped COMPILING when a struct gained a
+      # field, which a library build never sees. Until 0.6.x this ran only in
+      # `release.yml`, in the job that publishes the crate, which runs beside
+      # the job that publishes the wheels. A Rust test failure could therefore
+      # arrive after the wheels were already on PyPI, which is the one step
+      # that cannot be undone.
+      #
+      # The goldens are committed, so the parity suites run here in full
+      # rather than skipping the way they do against the packaged crate.
+      - name: The crate passes its own tests
+        working-directory: rust
+        run: cargo test --release
 
   batch:
     name: tests ${{ matrix.batch }}
@@ -127,13 +159,15 @@ jobs:
 
   complete:
     name: the suite is green
-    needs: [batch, versions]
+    needs: [batch, versions, rust]
     runs-on: ubuntu-latest
     steps:
       - name: Report
         shell: bash
         run: |
           # `needs` already fails this job if any batch failed. The step exists
-          # so there is one name to look at, and one to require if this is ever
-          # promoted from a nightly to a gate.
-          echo "every batch and every python version passed"
+          # so there is one name to look at, and one name to require. It is a
+          # gate as of 0.6.x, so making `the suite is green` a required check
+          # on main and dev is what actually closes the hole; the trigger
+          # above only makes it run.
+          echo "every batch, every python version and the crate passed"

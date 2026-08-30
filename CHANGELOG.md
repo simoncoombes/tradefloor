@@ -3,6 +3,39 @@
 ## 0.6.0
 
 **`pt-v16` is the default.** The market itself is different, so a run that
+took the default under 0.5.0 does not replay here. A run that names its
+preset replays exactly, and every preset from `pt-v1` on stays selectable:
+
+```python
+eng = tf.Engine(seed=42, universe=u, model="pt-v14")
+```
+
+pt-v16 holds the complete card over twenty-six seed blocks at one hundred
+seeds each, thirteen of them never touched by any search: 25 of 26 on the
+union full house, 26 of 26 on both crisis instruments, and a driven noise
+ratio of 1.12 against the candidate's 1.30. One row sits out of band, a
+`corr_asymmetry` median at one block, 0.0025 past a floor whose own
+derivation noise is 0.038.
+
+**The VIX learns fear.** It tracked its own market's realized volatility at
+0.16 correlation against a real 0.87, and decayed as fast as it rose.
+Measured on ^VIX and ^GSPC over 2004-2025: tracking 0.16 to 0.57, spike
+asymmetry 0.95 to 1.28 against a real 1.20, day persistence 0.90 to 0.985.
+
+**A policy rate reaches equities before the first meeting.** The daily credit
+floor touches the spread every day, so a policy-only ramp transmits inside
+the window that used to hold it: 0.00% under pt-v14 against -3.34% on the
+shipped default at 40 days. Pin `pt-v14` to keep the sharp boundary.
+
+Below the marker: scenarios as a file you can hand to somebody else, forking
+as a true copy of the engine, a stress-activated forced-flow segment shipped
+inert, and manifest lineage.
+
+<!-- release-note-ends -->
+
+### Detail
+
+**`pt-v16` is the default.** The market itself is different, so a run that
 took the default under 0.5.0 does not replay under this release. A run that
 names its preset replays exactly, and every preset from `pt-v1` on stays
 selectable and bit-reproducing:
@@ -137,8 +170,6 @@ a development build wrote an extension and a Windows debug database into the
 source tree, both were committed, and maturin packaged the debug database into
 every wheel built from such a tree, including the published 0.5.0. The ignore
 rules now name the directory that exists.
-
-<!-- release-note-ends -->
 
 
 ## 0.5.0
