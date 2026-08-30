@@ -33,6 +33,12 @@ def _grid(name):
                      for dr in (0.3, 0.2) for mr in (0.12, 0.06)]
                   + [(w, dr, mr) for w in (0.4, 0.6)
                      for dr in (0.6, 0.4) for mr in (0.18, 0.09)])
+    elif name == "fine":
+        # The dose question (round 130): the full fear cell pushes 1201's
+        # 504-day corr_asymmetry 0.0043 past the floor. Does a milder dose
+        # keep the fear gates and stay in band?
+        combos = [(w, dr, 0.06) for w in (0.3, 0.35, 0.4)
+                  for dr in (0.6, 0.7)]
     else:
         raise SystemExit(f"unknown grid {name}")
     cells = {}
