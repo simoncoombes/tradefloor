@@ -105,7 +105,8 @@ Stated limitations, which the documentation must keep visible rather than bury:
 - Good results do not predict real returns. The price process comes from a
   known model.
 
-Rates are fractional. Roster order is contractual. Every numeric column is f64.
+Rates are fractional, roster order is contractual, and every numeric column
+is f64.
 
 Published on PyPI as `tradefloor` and on crates.io as the `tradefloor` crate. The
 API may still move before 1.0.
@@ -115,6 +116,7 @@ API may still move before 1.0.
 Name: `tradefloor`, lowercase. The former name, `pretium`, was Latin for
 *price*; the current one carries no such derivation.
 
+<!-- prose: off -->
 Voice: reference documentation. Flat, declarative, unmemorable. The reader is
 scanning for a fact, not being persuaded. This binds all prose in this
 repository and in `tradefloor-docs`: documentation, code comments, commit
@@ -146,6 +148,7 @@ When a sentence could open a blog post, rewrite it.
 `tools/docs/learn/prose.py` in `tradefloor-docs` checks the mechanical rules
 and reports file, line and text. It cannot see register, so a clean run is not
 a passing grade.
+<!-- prose: on -->
 
 Dual-licensed MIT OR Apache-2.0, at the user's option, which is the
 Rust-ecosystem norm and what `pyproject.toml` and `rust/Cargo.toml` both
@@ -183,7 +186,7 @@ machine-bound rather than reproducible, which is the status `tools/remeasure`
 gives every timing it carries rather than claiming to reproduce one.
 
 No testimonials, customers, benchmarks against competitors, pricing or
-adoption numbers exist. None may be invented.
+adoption numbers exist, and none may be invented.
 
 ## Product Principles
 
