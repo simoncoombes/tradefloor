@@ -113,15 +113,25 @@ def main():
     ap.add_argument("--grid", default="base")
     a = ap.parse_args()
     CELLS.update(_grid(a.grid))
-    jobs = ([("fear", l, s) for l in CELLS for s in FEAR_SEEDS]
-            + [("panel", l, s) for l in CELLS for s in PANEL_SEEDS])
     rows = []
-    with ProcessPoolExecutor(max_workers=a.workers) as ex:
-        futs = [ex.submit(fear_one if k == "fear" else panel_one, (l, s))
-                for k, l, s in jobs]
-        for i, f in enumerate(futs):
-            rows.append(f.result())
-            if (i + 1) % 50 == 0: print(f"{i+1}/{len(jobs)}", flush=True)
+    failed = 0
+    # Fear jobs hold a 1260-day engine each; at 94 workers on 192 GB the
+    # pool OOMs (BrokenProcessPool, first launch of this screen). The
+    # fear pool is capped; the light 252-day panel jobs keep full width.
+    for kind, fn, seeds, cap in (("fear", fear_one, FEAR_SEEDS, 24),
+                                 ("panel", panel_one, PANEL_SEEDS, a.workers)):
+        jobs = [(l, s) for l in CELLS for s in seeds]
+        with ProcessPoolExecutor(max_workers=min(cap, a.workers)) as ex:
+            futs = {ex.submit(fn, j): j for j in jobs}
+            for i, f in enumerate(futs):
+                try:
+                    rows.append(f.result())
+                except Exception as e:
+                    failed += 1
+                    print(f"FAILED {kind} {futs[f]}: {e}", flush=True)
+                if (i + 1) % 50 == 0:
+                    print(f"{kind} {i+1}/{len(jobs)}", flush=True)
+    print(f"failed jobs: {failed}", flush=True)
     summary = {}
     for l in CELLS:
         fr = [r for r in rows if r["kind"] == "fear" and r["label"] == l]
