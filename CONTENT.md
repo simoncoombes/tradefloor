@@ -69,6 +69,29 @@ It is the PyPI project page, so every link must be absolute;
 version location. `tools/release/check.py` checks both against the build.
 A release that moves the default has to move these.
 
+### Commit messages and pull requests
+
+The register applies here in full, and this is the surface it is broken on
+most. A title is a heading, so it is a noun phrase or a plain statement of
+what changed, never a clever one. "A ban nobody checked, enforced" was a real
+title and is the shape to avoid.
+
+- **Titles say what changed.** No oblique headlines, no wordplay, no
+  colon-and-flourish.
+- **Commit messages stay abstract**, because both repositories are public.
+  Say what changed and why at the level a reader outside the project needs.
+  Leave out finding counts, tool and check names, internal process narrative,
+  who asked for what, and the shape of the session that produced the work.
+  This is the one place the "prefer the specific number" rule is reversed.
+- **A pull request body takes the specifics** the commit message left out:
+  the counts, the measured values, the checks that ran and what they said.
+  It has a reviewer, and a reviewer needs the evidence.
+- No definition by negation in either. "Point the runner at the current
+  names", not "the runner was not using the right names".
+
+`prose.py` cannot read a commit message, so this surface rests on the
+author rather than on a check.
+
 ### Example notebooks and scripts
 
 - A notebook's committed output is part of the content. A reader on GitHub
