@@ -73,6 +73,9 @@ pub struct DailyInputs<'a> {
     /// and the other is a LONGER SPIKE, which touches variance persistence
     /// not at all.
     pub vix_mean_reversion: f64,
+    /// See [`crate::params::ModelParams::vix_decay_ratio`]. 1.0 is the
+    /// shipped symmetric reversion exactly.
+    pub vix_decay_ratio: f64,
     /// VIX points per unit of a down day's index return (shipped 25.0), of
     /// an up day's (10.0), the clamp on that return (0.03) and the ceiling
     /// on the whole target excursion (12.0). Threaded for the reason
@@ -137,6 +140,7 @@ impl<'a> Default for DailyInputs<'a> {
             market_return_pct: 0.0,
             game_day: 0,
             vix_mean_reversion: VIX_MEAN_REVERSION,
+            vix_decay_ratio: 1.0,
             vix_return_gain: VIX_RETURN_GAIN,
             vix_realised_vol_weight: 0.0,
             vix_return_source: 0.0,
@@ -745,9 +749,17 @@ pub fn update_economy_daily(
         target_vix = (1.0 - w) * target_vix + w * inputs.vix_implied_from_market;
     }
 
+    // Asymmetric reversion: fear arrives at the full rate and decays at
+    // `vix_decay_ratio` of it. At 1.0 the branch collapses to the shipped
+    // arithmetic exactly (same multiply, same operand order).
+    let vix_mr = if target_vix < economy.vix {
+        inputs.vix_mean_reversion * inputs.vix_decay_ratio
+    } else {
+        inputs.vix_mean_reversion
+    };
     new_state.vix = clamp(
         economy.vix
-            + (target_vix - economy.vix) * inputs.vix_mean_reversion
+            + (target_vix - economy.vix) * vix_mr
             + random_normal(rng, 0.0, 0.15 * volatility),
         10.0,
         80.0,

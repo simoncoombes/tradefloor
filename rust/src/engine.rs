@@ -1195,6 +1195,7 @@ impl Engine {
             &self.economy,
             &DailyInputs {
                 vix_mean_reversion: self.params.vix_mean_reversion,
+                vix_decay_ratio: self.params.vix_decay_ratio,
                 vix_return_gain: self.params.vix_return_gain,
                 vix_realised_vol_weight: self.params.vix_realised_vol_weight,
                 vix_return_source: self.params.vix_return_source,

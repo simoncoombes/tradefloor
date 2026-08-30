@@ -1022,6 +1022,13 @@ pub struct ModelParams {
     /// variance process was measured to cost long-horizon realism, a longer
     /// SPIKE touches variance persistence not at all.
     pub vix_mean_reversion: f64,
+    /// Fear decays slower than it arrives. Multiplies the mean reversion
+    /// on days the target sits BELOW the current VIX (fear decaying);
+    /// rising days keep the full rate. 1.0 -- every preset before the
+    /// fear-gap era -- is the symmetric shipped arithmetic, bit for bit.
+    /// Real markets: up-moves average 1.20x the size of down-moves
+    /// (fear-gap-targets.json, 2004-2025).
+    pub vix_decay_ratio: f64,
     /// VIX points added to its target per unit of a DOWN day's index
     /// return, before the clamp and cap below.
     ///
@@ -1376,6 +1383,7 @@ impl ModelParams {
             spread_size_smoothness: 0.0,
             spread_size_exponent: crate::microstructure::SPREAD_SIZE_EXPONENT,
             vix_mean_reversion: crate::economy::VIX_MEAN_REVERSION,
+            vix_decay_ratio: 1.0,
             vix_realised_vol_weight: 0.0,
             vix_cycle_amplitude: 1.0,
             vix_return_source: 0.0,
@@ -2398,6 +2406,7 @@ impl ModelParams {
             "spread_size_smoothness" => self.spread_size_smoothness,
             "spread_size_exponent" => self.spread_size_exponent,
             "vix_mean_reversion" => self.vix_mean_reversion,
+            "vix_decay_ratio" => self.vix_decay_ratio,
             "vix_cycle_amplitude" => self.vix_cycle_amplitude,
             "vix_realised_vol_weight" => self.vix_realised_vol_weight,
             "vix_return_clamp" => self.vix_return_clamp,
@@ -2533,6 +2542,7 @@ impl ModelParams {
             "spread_size_exponent" => out.spread_size_exponent = value,
             "spread_size_smoothness" => out.spread_size_smoothness = value,
             "vix_mean_reversion" => out.vix_mean_reversion = value,
+            "vix_decay_ratio" => out.vix_decay_ratio = value,
             "vix_cycle_amplitude" => out.vix_cycle_amplitude = value,
             "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
@@ -2732,6 +2742,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "usd_crisis_vix_threshold",
         "vix_cycle_amplitude",
         "vix_mean_reversion",
+        "vix_decay_ratio",
         "vix_realised_vol_weight",
         "vix_return_clamp",
         "vix_return_gain",
