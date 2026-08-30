@@ -50,9 +50,8 @@ and none of them could say it in the scenario grammar.
   "exists and is measurable" and then never reached it, because at that size
   the book absorbed every order. It now takes the depth away instead of
   raising the size: same seed, same agent, same decisions, shortfall 6.04bp
-  to 10.81bp and partial fills 0 to 2. The prices barely move, which is the
-  point -- an evaluation reading only the price series scores the two runs
-  the same.
+  to 10.81bp and partial fills 0 to 2. The prices barely move, so an evaluation
+  reading only the price series scores the two runs the same.
 
 **Scenarios are now a file you can hand to somebody else.** `tf.Scenario`
 gains a second half: a named, inspectable collection of explicit
@@ -117,7 +116,7 @@ difference between an experiment and a number.
   to construct a Python object. It agrees with `yaml.safe_load` on every
   document it accepts, checked by a differential fuzz over sixteen thousand
   generated documents; the classes that fuzz found -- `0x1f` is thirty-one,
-  `1_000` is a thousand, and `operation: -` is a syntax error rather than the
+  `1_000` is a thousand, and `operation: -` is a syntax error, not the
   string `-` -- are all refused now.
 - A `hold` ends when it says it does, on every target. For a macro field
   that needs no help -- the chain recomputes it. Nothing in the engine writes
@@ -131,7 +130,7 @@ difference between an experiment and a number.
   -485 and the market traded a session against it, because `(vix/15)^2`
   squares the sign away and nothing else looked.
 - Six scenarios ship in `scenarios/`, each carrying its measured effect and
-  the statement that it is not a forecast. None names a political actor.
+  a statement of its assumed transmission. None names a political actor.
 - `examples/11-scenario-fork.py` is the whole workflow in one file.
 
 A scenario built only from pins serialises exactly as it always has, schema
@@ -251,7 +250,7 @@ The ignore rules name the directory that exists, the artefacts are untracked,
 **`tests/test_stub_parity.py` runs again.** Its `STUB` path still pointed at
 `python/pretium/_core.pyi`, so its `skipif` skipped all ninety-nine of its
 tests and reported green while the type stub went unread. A missing stub is
-now an error rather than a skip.
+now an error.
 
 **New:** `tests/test_forking.py` (38 invariant tests over the whole
 run/checkpoint/fork/intervene/compare chain, including a cross-process
@@ -278,7 +277,7 @@ days of shared history, a checkpoint, a fork, +200bps in one branch, and
 twenty more days in each. Runs in about two seconds with no keys, no
 network and no data files, writes a checkpoint, a `RunManifest` per arm, a
 comparison and a chart, and is covered by `tests/test_rate_shock_demo.py`.
-The tutorial is `examples/rate-shock/README.md`.
+The tutorial for it is `examples/rate-shock/README.md`.
 
 **Evaluate a real FinRobot agent: `tradefloor.integrations.finrobot`.** The
 canonical rate-shock experiment, with the agent swapped and nothing else
@@ -315,7 +314,7 @@ artifacts, so they sit beside the run that wrote them. Recorded inputs a study
 replays are committed once under `tests/fixtures/`, because two copies of a
 recording can drift apart. `tests/test_examples.py` now walks `examples/`
 instead of globbing `0*`, after the first unnumbered example arrived
-with nothing checking it at all. `CONTRIBUTING.md` has the rule.
+with nothing checking it at all. The rule is recorded in `CONTRIBUTING.md`.
 
 **Fixed: a forked world's log held the shared history twice.** `World`
 carried its parent's order log across a fork because a branched engine's began
@@ -399,7 +398,7 @@ since the site was rebuilt.
 
 <!-- release-note-ends -->
 
-### the detail, and why nothing caught it
+### Detail
 
 The dollar index is not an output-only series. `economy/daily.rs` reads it for
 the inflation effect and for the dollar effect, so a change to the safe-haven
@@ -451,7 +450,7 @@ nothing changes until a preset sets it.
 
 <!-- release-note-ends -->
 
-### the detail, and why the third one ships switched off
+### Detail
 
 `update_economy_daily` is preset-independent, so flooring the spread
 unconditionally would move the economy trajectory of every preset, `pt-v1`
@@ -488,7 +487,7 @@ Both presets now report 60, the rate they run. If you pinned either one in
 
 <!-- release-note-ends -->
 
-### the detail, and how it happened
+### Detail
 
 The presets are built by `const fn`. The half-life is an INPUT: assigning it
 has to recompute `mispricing_phi` and `s_phi_tick` through `ln` and `exp`,
@@ -504,7 +503,7 @@ implies. It was checked against the defect before being committed: it fails
 naming the preset and the rate it actually runs.
 
 The 68.26 came from the calibration search that produced `pt-v14`, and this
-record keeps it rather than a field the engine contradicts. Shipping
+record keeps it. Shipping
 it for real means writing the recomputed bits literally, under a new preset
 name, because changing them under an existing one would move a published
 model.
@@ -559,20 +558,20 @@ that replaced them, and four pages were retired.
 
 <!-- release-note-ends -->
 
-### the detail, and how it was measured
+### Detail
 
 **A band was too narrow and is now correct.** `abs_return_acf5` ran 0.02 to
 0.09. Real markets leave that band on five of eight non-crisis reference
 windows, which means it was rejecting reality. Re-derived from eight windows
-instead of three, it is 0.01 to 0.12. No preset's score changes.
+instead of three, it is 0.01 to 0.12. No preset's score changes as a result.
 
 **The leverage effect sits nearer its edge.** Its median moves from -0.0377
 to -0.0222 in a band that runs -0.16 to 0.0, and the count of seeds landing
 at or above zero goes from 4 of 30 to 6 of 30. Both presets pass the
 statistic at the certified resolution. A sentence in the old documentation
-said the sign was negative in six seeds of six; that was a fragile n=6 rather
-than a property of the model, and the row asserting it has been retired from
-the re-measurement inventory with its history recorded there.
+said the sign was negative in six seeds of six; that was a property of the
+sample at n=6, and the row asserting it has been retired from the
+re-measurement inventory with its history recorded there.
 
 **How the table was measured.** Every row is 13 seed blocks of 30 seeds each,
 at block starts 101 through 1401. The panel row counts blocks whose whole
@@ -613,13 +612,13 @@ eng = pt.Engine(seed=42, universe=u, model="pt-v10")
 
 **The fix was one number.** Volume stopped responding to a move at 4 percent,
 so a stock down 12 traded like a stock down 4. That cap had been in the engine
-since the first version and nobody chose it. It is now 12 percent.
+since the first version and nobody chose it; the figure is now 12 percent.
 
 **One thing got worse.** Under a real macro path, daily swings run 1.57x as
-wide as the real stock they are compared against, against 1.555x before. It is
-the `scenario-magnitude` gap.
+wide as the real stock they are compared against, against 1.555x before, and the
+shortfall is recorded as the `scenario-magnitude` gap.
 
-**`pt-v11` also ships, and is not the default.** It is the base `pt-v12` is
+**`pt-v11` also ships and is not selected by default.** It is the base `pt-v12` is
 built on, and the first preset whose crises behave like real ones.
 
 | in a crisis | `pt-v10` | `pt-v11` | real |
@@ -636,7 +635,7 @@ Before this, one company's earnings surprise reached nobody.
 
 **Seventeen new settings**, each at the value the engine already used, so no
 preset from `pt-v1` to `pt-v10` moves. `ModelParams` goes from 70 coefficients
-to 87. `pt.ModelParams.settable()` lists them.
+to 87. The full set is listed by `tf.ModelParams.settable()`.
 
 **The envelope covers more than it did.** Six gaps become five. `pt-v12` holds
 volume change in band at both horizons, so that gap is gone. Two-year and
@@ -648,7 +647,7 @@ S&P-like, technology-heavy and defensive rosters all hold 14 of 14 at one year.
 
 **A bug fixed on the way.** Driven a minute at a time, the model's own company
 news never reached you. A batched tick loop also rolled that news every minute.
-Both paths now print the same prices. This only affected `pt-v11`.
+Both paths now print the same prices, and the defect affected `pt-v11` alone.
 
 **Documentation.** Every published figure was re-measured against the engine.
 Three new pages: a glossary, the two loops, and the principles. References to
@@ -707,8 +706,8 @@ none. Both hold 13 of 14 in band at 504 days.
 
 Four statistics join the panel: `corr_asymmetry`, `corr_asymmetry_lagged`,
 `sector_excess_corr` and `corr_persistence_acf1`. `pt-v3` now reads 12 of 14 at
-252 days and 7 of 14 at 504. The engine did not move. The misses were always
-there.
+252 days and 7 of 14 at 504. The engine itself is unchanged, and the misses
+were present in every earlier release.
 
 Five settings that were literals: `crisis_blend_source`, `sector_vix_coupling`,
 `fair_value_book_floor`, `inflation_reversion` and `inflation_ceiling`. Each
@@ -744,9 +743,10 @@ Three fields act the day you move them. Two wait for a central bank meeting,
 because both work through the corporate bond yield. `fear_greed_index` is
 settable, validated, and read by no pricing code.
 
-The real 2020-21 macro path now drives four scenario response channels rather
-than a claim. Every sign is right. Each channel runs at 70 to 85 percent of the
-size real AAPL shows, which is the scenario-magnitude gap from another angle.
+The real 2020-21 macro path now drives four measured scenario response
+channels. Every sign is right, and each channel runs at 70 to 85 percent of
+the size real AAPL shows, which is the scenario-magnitude gap from another
+angle.
 
 ## 0.1.3
 
@@ -760,11 +760,12 @@ room, from 0.80 to 7.20 seed standard deviations. Use it for multi-year work
 where the tail matters. `pt-v3` is still the preset the envelope certifies.
 
 **A trade-off that was a wiring accident.** `pt-v4` reached the two-year tail
-and lost `return_acf1` at one year. That looked like the price of the tail. It was
-one line. A jump moved the mispricing state after the momentum roll had read it.
+and lost `return_acf1` at one year. That looked like the price of the tail,
+and it came from one line: a jump moved the mispricing state after the
+momentum roll had read it.
 The next close then read the jump as a re-rating and continued it.
-`jump_momentum_share` separates the two. `pt-v5` is `pt-v4` with it at zero.
-`pt-v6` also halves the herding term.
+`jump_momentum_share` separates the two, so `pt-v5` is `pt-v4` with that dial
+at zero, and `pt-v6` also halves the herding term.
 
 `garch_beta_dispersion` ships at zero. It was built for the decay-shape gap and moves
 away from it. The log-log slope reads -0.944 with it and -0.933 without, against
@@ -780,7 +781,7 @@ hold outside the notebook: only `qe_pe_boost` moves a valuation, and
 
 ## 0.1.2
 
-Fixes the PyPI project page. The engine did not move.
+Fixes the PyPI project page, leaving the engine itself unchanged.
 
 The README linked to examples and licences by relative path. That works on
 GitHub and 404s on PyPI, which renders the same file. Eleven links were dead. It
@@ -838,7 +839,7 @@ on purpose: an optimiser pointed at a target it cannot reach distorts everything
 else. Six further gaps say what each one stops you concluding, and
 `envelope.check()` refuses a question that falls outside them.
 
-`pt-v4` also ships and is not the default. It is the first preset to bring
+`pt-v4` also ships and is not selected by default. It is the first preset to bring
 504-day kurtosis inside its band, and it pays at one year, holding eight of ten.
 
 **Versioning.** Anything that changes the simulated trajectory is a breaking

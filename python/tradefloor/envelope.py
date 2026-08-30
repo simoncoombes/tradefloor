@@ -1,8 +1,9 @@
 """The realism envelope, as data: what tradefloor certifies, and what it does not.
 
-`docs/realism-envelope.md` states the envelope in prose. This module states
-it in a form a program can read, so a user does not have to remember a page
-to find out whether their question is one this simulator can answer.
+`tradefloor-docs: docs/realism-envelope.md` states the envelope in prose.
+This module states it in a form a program can read, so a user does not have
+to remember a page to find out whether their question is one this simulator
+can answer.
 
 Two things live here, and neither is a score.
 

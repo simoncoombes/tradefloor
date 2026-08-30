@@ -105,20 +105,50 @@ Stated limitations, which the documentation must keep visible rather than bury:
 - Good results do not predict real returns. The price process comes from a
   known model.
 
-Rates are fractional. Roster order is contractual. Every numeric column is f64.
+Rates are fractional, roster order is contractual, and every numeric column
+is f64.
 
 Published on PyPI as `tradefloor` and on crates.io as the `tradefloor` crate. The
 API may still move before 1.0.
 
 ## Brand Commitments
 
-Name: `tradefloor`, lowercase. Latin for *price*.
+Name: `tradefloor`, lowercase. The former name, `pretium`, was Latin for
+*price*; the current one carries no such derivation.
 
-Voice, established and approved across the README: direct, concrete,
-measurement-led, and willing to state limitations in the same breath as
-capabilities. Specific bans, set by the plan owner: no "X is not the Y, it is
-the Z" constructions, no marketing abstraction, ASCII punctuation only (no em
-dashes, en dashes, typographic minus signs or arrows).
+<!-- prose: off -->
+Voice: reference documentation. Flat, declarative, unmemorable. The reader is
+scanning for a fact, not being persuaded. This binds all prose in this
+repository and in `tradefloor-docs`: documentation, code comments, commit
+messages, pull request titles and bodies, UI copy, labels and error text.
+
+Rules, set by the plan owner:
+
+- Headings and labels are noun phrases. No commas, no trailing clauses, no
+  verbs. "Excluded tables", not "What was left alone, and why".
+- Every sentence has a subject and a finite verb. No verbless fragments.
+- Never tell the reader that something is significant. Delete "and that is the
+  point", "which is why this matters", "that is the whole idea".
+- Do not define things by negation. No "X is not Y", "not X but Y", "never
+  wrong, only incomplete". Say what it is.
+- No three-sentence assert, negate, resolve sequences. If three consecutive
+  sentences are each under ten words, merge them.
+- No sentence under six words may end a paragraph or a section.
+- Abstract subjects take plain verbs. "The check failed on 3 of 120 seeds", not
+  "the identity held through a crisis".
+- No em-dash asides, no rhetorical questions, no single-sentence paragraphs for
+  emphasis.
+- Prefer the specific number, filename, or field name over a characterisation
+  of it.
+- ASCII punctuation only. No em dashes, en dashes, typographic minus signs or
+  arrows.
+
+When a sentence could open a blog post, rewrite it.
+
+`tools/docs/learn/prose.py` in `tradefloor-docs` checks the mechanical rules
+and reports file, line and text. It cannot see register, so a clean run is not
+a passing grade.
+<!-- prose: on -->
 
 Dual-licensed MIT OR Apache-2.0, at the user's option, which is the
 Rust-ecosystem norm and what `pyproject.toml` and `rust/Cargo.toml` both
@@ -156,7 +186,7 @@ machine-bound rather than reproducible, which is the status `tools/remeasure`
 gives every timing it carries rather than claiming to reproduce one.
 
 No testimonials, customers, benchmarks against competitors, pricing or
-adoption numbers exist. None may be invented.
+adoption numbers exist, and none may be invented.
 
 ## Product Principles
 

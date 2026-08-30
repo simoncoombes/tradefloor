@@ -1197,7 +1197,7 @@ pub const PT_V1: ModelParams = ModelParams::pt_v1();
 /// Produced by `tools/calibration/calibrate.py` against the re-derived
 /// realism bands of 2026-08-22; the certificate that produced it is
 /// `tools/calibration/results/calibrate-pt-v2-2026-08-22.json` and the
-/// report is `pretium-design/CALIBRATION-PTV2.md`. Built as `pt_v1()` with
+/// report is `tradefloor-design/CALIBRATION-PTV2.md`. Built as `pt_v1()` with
 /// the calibrated coefficients substituted, for the same reason `PT_V1` is
 /// built from the consts: every constant this calibration did not move
 /// still has exactly one definition, so a build whose literals drift moves

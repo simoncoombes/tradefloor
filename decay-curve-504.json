@@ -13,39 +13,6 @@
   90,
   120
  ],
- "days": 504,
- "seeds": [
-  101,
-  102,
-  103,
-  104,
-  105,
-  106,
-  107,
-  108,
-  109,
-  110,
-  111,
-  112,
-  113,
-  114,
-  115,
-  116,
-  117,
-  118,
-  119,
-  120,
-  121,
-  122,
-  123,
-  124,
-  125,
-  126,
-  127,
-  128,
-  129,
-  130
- ],
  "real_windows": [
   {
    "window": "2013-07-16..2015-07-16",
@@ -100,6 +67,7 @@
   },
   {
    "window": "2019-07-23..2021-07-22",
+   "crisis": true,
    "curve": {
     "1": 0.3656236666255141,
     "2": 0.3875384668896724,
@@ -164,35 +132,5 @@
   "90": -0.01738006434810238,
   "120": 0.003940318661712365
  },
- "model": {
-  "pt-v6": {
-   "1": 0.19933730679469464,
-   "2": 0.15914226868084733,
-   "3": 0.13635471909915298,
-   "5": 0.1024437572228186,
-   "8": 0.07555483578923003,
-   "12": 0.027271406617456483,
-   "20": 0.010814640822206092,
-   "30": 0.002570864727751349,
-   "45": -0.005921155493677308,
-   "60": -0.0038798848723106245,
-   "90": -0.0066979583323910795,
-   "120": -0.011071663270901625
-  },
-  "pt-v6+disp": {
-   "1": 0.19100039057691728,
-   "2": 0.1487932846584644,
-   "3": 0.12504038454518102,
-   "5": 0.09559818298573547,
-   "8": 0.07260065010319519,
-   "12": 0.021271392553728966,
-   "20": 0.010924512504657634,
-   "30": 0.00010371449532565682,
-   "45": -0.007967868156606852,
-   "60": -0.00287431125063463,
-   "90": -0.006484568013989301,
-   "120": -0.0068367359476002
-  }
- },
- "note": "|r| autocorrelation, median across 40 names. Real: 5 non-crisis 505-bar windows. Model: median across seeds [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130] at 504 days."
+ "note": "|r| autocorrelation, median across 40 names, over the five windows in real_windows that carry no crisis flag. tradefloor.envelope.REAL_DECAY carries seven of these lags rounded to four places. REAL_DECAY_SLOPE is the log-log least-squares fit over lags 1, 2, 3, 5, 8, 12 and 20; lags 2 and 3 appear here and nowhere else in the library, which is why this file is committed. tests/test_envelope.py checks every step of that chain. The 504 in the filename is the horizon of a companion model measurement this file carried until it described a retired preset."
 }

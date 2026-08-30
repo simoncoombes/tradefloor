@@ -10,7 +10,7 @@ hand, or manual and ordered so the irreversible steps come last.
 
 ## Before you tag
 
-### 1. Move the version in four places
+### 1. Version locations
 
 `pt.version()` is a published fact and these must agree:
 
@@ -37,9 +37,9 @@ release. Set it to the day you intend to tag, and check it again at the tag.
 
 Then `cargo update -p tradefloor` so `Cargo.lock` follows, and rebuild
 (`maturin develop --release`) so the installed package reports the new
-number rather than the old one.
+number.
 
-### 2. Write the changelog section
+### 2. Changelog section
 
 `CHANGELOG.md`, newest first, heading `## X.Y.Z`. The release workflow cuts
 the GitHub release notes from this section, matching `## X.Y.Z` or
@@ -50,7 +50,7 @@ calls `sys.exit("CHANGELOG.md has no section for ...")`, the step runs under
 the time you see the failure the wheels are already on PyPI, which is the one
 step that cannot be undone. Write the section before you tag, not after.
 
-Prose, not a bulleted catalogue. No em dashes or en dashes anywhere.
+Write prose, with no em dashes or en dashes anywhere;
 `tests/test_brand_commitments.py` enforces that on `CHANGELOG.md`.
 
 **Lead the section, then mark where the lead ends.** The whole section is what
@@ -67,13 +67,14 @@ and an unreadable release page.
 <!-- release-note-ends -->
 
 ### the detail, and how it was measured
+
 ```
 
 Everything above `<!-- release-note-ends -->` becomes the release note, and
 the page folds the rest behind a disclosure. A section without the marker
 publishes whole, as every version before 0.3.0 does.
 
-### 3. Run the suite, including the slow half AND the Rust one
+### 3. Full suite including the slow half and Rust
 
 ```
 python -m pytest tests/ -q
@@ -92,8 +93,9 @@ The second executes all eight notebooks and the research workflow end to end
 (`tests/test_examples.py` globs `0*.ipynb`, which matches 00 through 06 and
 09), 21 tests in all. It is skipped by default because it runs for a minute
 or more, and because it needs `nbformat` and `nbclient`, which the library
-does not depend on. Check the summary line rather than the exit code: the
-eight tests that actually EXECUTE a notebook are the ones that need
+does not depend on. Check the summary line. The exit code is green whether or
+not the eight tests that actually EXECUTE a notebook ran, and those are the
+ones that need
 `nbclient`, so with `nbformat` alone those eight skip, the other thirteen
 report, and the step is green having executed no notebook at all. Both are
 exactly why it goes stale.
@@ -101,10 +103,10 @@ exactly why it goes stale.
 The last timed run of the whole file was 96s (`--durations=15` on an idle
 machine), with `09-a-pandemic-shaped-market.ipynb` alone at 40s against 21s
 for the next slowest. That figure is machine-bound: the same file under load
-has measured more than twice that, so read it as an order of magnitude
-rather than a budget. Time it on a quiet machine or not at all.
+has measured more than twice that, so read it as an order of magnitude. Time
+it on a quiet machine or not at all.
 
-### 4. Re-measure the published figures
+### 4. Published figures
 
 ```
 python tools/remeasure/remeasure.py
@@ -115,7 +117,7 @@ This is the step the site's own status paragraph promises.
 re-measured by `tools/remeasure`, which reports every number the stated
 method no longer produces, and a figure it flags is a documentation defect
 until someone corrects it." Nothing in CI runs it, so if it is not run here
-the guarantee is a sentence rather than a process.
+the guarantee is only a sentence.
 
 **Check what it actually ran before reading it.** The report's header used to
 say "Full run" whatever `--only` was passed. The 0.3.0 report on disk covered
@@ -129,7 +131,7 @@ per worker, so eight workers is roughly 13 GB, and it has taken this machine
 out once mid-run. `tools/calibration/aws/user-data-remeasure.sh` runs it on a
 96-vCPU box: 285 figures in 301 seconds at 64 workers, about twenty cents.
 Sixty-four rather than ninety-six because `remeasure` uses a thread pool, so
-the ceiling is how much of the engine releases the GIL rather than the core
+the ceiling is how much of the engine releases the GIL, not the core
 count.
 
 **The `perf` group's figures are laptop-bound.** They are marked
@@ -183,7 +185,7 @@ either.
 The gate is worth reading only once it comes back clean. 0.3.0 finished at 285
 figures, 199 reproduced, zero MOVED.
 
-### 5. Update the documentation site
+### 5. Documentation site
 
 **The site is not in this repository.** It is `simoncoombes/tradefloor-docs`,
 private, and Vercel serves its `docs/` directory verbatim from `main` with no
@@ -211,7 +213,7 @@ python tools/docs/learn/params.py --python /tmp/rel/bin/python
 python tools/docs/learn/api.py
 ```
 
-`--python` is not a courtesy. A local development build reports the same
+`--python` is required. A local development build reports the same
 version string as the release and can expose parameters the release does not:
 on 2026-08-29 this machine's system interpreter carried a build calling itself
 0.5.0 with 98 settable parameters against the published wheel's 93,
@@ -279,7 +281,7 @@ wrong, and the pages carry no version of their own to warn them.
 
 Two things to check while doing it, because both have been wrong before:
 
-- **An argument that changed meaning is not a new feature.** Say so
+- **An argument that changed meaning needs its own note.** Say so
   plainly. Code that already passes it is now doing something different,
   and its author will not think to re-read a page about a call they
   already use.
@@ -291,7 +293,7 @@ If a release ships nothing public, say so in the docs PR rather than
 skipping the step, so the next person can tell the difference between
 "nothing to do" and "not done".
 
-### 6. Check the README survives PyPI
+### 6. README on PyPI
 
 ```
 python -m pytest tests/test_readme_links.py -q
@@ -303,7 +305,7 @@ resolves to `pypi.org/project/tradefloor/examples/...` and 404s. It renders
 correctly on GitHub, so it survived two releases. The test fails on
 any relative link and on any absolute link naming a file that is not there.
 
-### 7. Run the determinism gate on the branch
+### 7. Determinism gate
 
 ```
 gh workflow run determinism.yml --ref <branch> -f targets=all
@@ -322,7 +324,7 @@ default because nothing else in the project touches them: `macos-arm64` is
 the machine the work is done on, and every AWS calibration run builds the
 crate and executes `tests/known_answer.py` before its own work, which has
 covered `linux-aarch64` repeatedly and `linux-x86_64` once, on 2026-08-24.
-So the default is the narrow path to the gap rather than the cheap one.
+So the default is the narrow path to the gap.
 Money has nothing to do with it: the repository is public, so standard runners
 are free, and the workflow's own note records the five-target run of 2026-08-27
 (run 33028345268) at 3m35s of wall clock and about ten minutes of runner
@@ -341,7 +343,7 @@ be green before the merge, not against `main` afterwards. The two-target push
 gate does not satisfy it: the required context is the job named `all targets
 agree`, and a run started with the default `unverified` never produces it.
 
-## Shipping it, in order
+## Shipping order
 
 The seven steps above run on a release branch off `main`, not on `main` and
 not on `dev`. `main` is protected: a pull request is the only way in, it must
@@ -362,12 +364,14 @@ gate has to be green BEFORE the merge, because it is what admits the merge.
    explicitly against the BRANCH:
    `gh workflow run determinism.yml --ref release/X.Y.Z -f targets=all`.
 4. **Wait for both required checks**, `all targets agree` and `build`. Read
-   the run you started rather than the newest in the list; see step 7.
+   the run you started; the newest in the list is often a different one. See
+   step 7.
 5. **Merge the pull request.** Pages serves from `main/docs`, so this is the
    step that publishes the site. Nothing before it is visible to a reader.
 6. **Check the tag target is the merged commit.** `git rev-parse origin/main`
    against the merge commit, compared rather than assumed. A squash merge
-   makes a NEW commit, so the SHA that passed the gate is not the SHA you are
+   makes a NEW commit, so the SHA that passed the gate differs from the one
+   you are
    about to tag. The gate ran on the same tree, which covers the code, but
    the tag must point at what is on `main`.
 7. **Tag `origin/main` and push the tag.** That is the irreversible step: a
@@ -390,10 +394,9 @@ nothing, which reads exactly like a successful deploy. `git branch
 origin/main` before believing a push.
 
 **The owner can still push directly to `main`.** `enforce_admins` is off, so
-protection is a workflow rather than a wall, and a hotfix is possible at
-three in the morning. It is not the route for a release: a release that
-skipped the pull request also skipped the required checks, which are the only
-thing standing between a tag and an unreproducible wheel on PyPI.
+protection is a workflow, and a hotfix is possible at three in the morning. A
+release that skipped the pull request also skipped the required checks, which
+are the only thing standing between a tag and an unreproducible wheel on PyPI.
 
 ## Tagging
 
@@ -479,7 +482,7 @@ one still 404s after ten minutes, the build failed and the crate page says why.
 - Submit the sitemap in Search Console if the page set changed. Google
   removed the ping endpoint in 2024, so it is a manual step.
 
-## What has gone wrong before, and what now catches it
+## Past failures and their checks
 
 | failure | what caught it | what stops it now |
 |---|---|---|
@@ -497,9 +500,8 @@ one still 404s after ten minutes, the build failed and the crate page says why.
 | a push reported `Everything up-to-date` while the fix sat on another branch | comparing SHAs rather than reading the push output | the branch check in the shipping list |
 
 The pattern in all five: **correct everywhere the author looks, wrong only in
-the destination.** That is why the checks above run against the artifact
-rather than the source, and why the last step is installing from PyPI rather
-than trusting the tree it was built from.
+the destination.** The checks above therefore run against the artifact, and
+the last step installs from PyPI.
 
 ## Version policy
 
@@ -509,7 +511,7 @@ every published result that cited it. Coefficient changes therefore arrive as
 a **new model preset**, never as an edit to an existing one, and old presets
 keep running exactly as they did.
 
-That is why `pt-v1` through `pt-v12` all still exist and reproduce, and why a
+This is why `pt-v1` through `pt-v12` all still exist and reproduce, and why a
 patch release can carry a new preset without being a breaking change. Check
 the range rather than trusting this sentence: the shipped list is what
 `pt.ModelParams.from_preset("pt-v99")` names in its error, and the default is

@@ -64,8 +64,8 @@ and collection reports 1,266 -- a missing extra shows up as a smaller total,
 not as a column of skips.
 
 Some suites are opt-in and skip cleanly rather than failing. Three different
-reasons put a test in the skip column and it is worth knowing which you are
-looking at: an optional import the default install does not have (`pyarrow`,
+reasons put a test in the skip column, and they read identically in the
+output: an optional import the default install does not have (`pyarrow`,
 `gymnasium`, `numpy`, `nbformat` and `nbclient`, the `mcp` extra), an
 artifact that is not in your tree (the Rust golden corpus, stored sweep
 results), or `TRADEFLOOR_SLOW_TESTS` being unset. Only the last is a choice you
@@ -76,21 +76,20 @@ executed rather than read (`tests/test_examples.py` walks `examples/` and
 parametrises over what it finds, so its count moves when an example is added
 -- the script syntax checks run on every pass, because a rename that missed a
 reference should fail whether or not you remembered the flag), and the one
-MCP test that runs a full 252-day evaluation. That test costs what it costs because
-the only way to show a result AT the certified horizon is not a slice of a
-shorter one is to reach the horizon.
+MCP test that runs a full 252-day evaluation. That test costs what it costs
+because a result AT the certified horizon exists only once a run has reached
+that horizon.
 
 The Rust parity suites compare against golden vectors generated from the
 reference implementation. They are the evidence for the port being
 bit-identical, so if you change anything in `rust/src/market/` or
 `rust/src/economy/`, run them.
 
-## Branches, and how work reaches `main`
+## Branches and merges
 
 `main` is what ships. It is protected: nothing lands on it except through a
-pull request that has passed the determinism gate on all five targets and the
-documentation build, and only the owner merges. `dev` carries the same
-requirement.
+pull request that has passed the determinism gate on all five targets, and
+only the owner merges, with `dev` carrying the same requirement.
 
 **Every piece of work gets its own branch.** Not `dev` directly, not `main`.
 
@@ -103,7 +102,7 @@ feature branch  ->  dev  ->  main  ->  tag
 | `preset/pt-vNN` | one preset, and nothing else. A preset is an era boundary; it needs its own history so it can be reviewed, measured and reverted as one thing. |
 | `feat/<name>` | a mechanism or an engine change |
 | `fix/<name>` | a reported defect |
-| `docs/<name>` | prose, the site, the notebooks |
+| `docs/<name>` | prose and the notebooks. The site itself lives in the private `tradefloor-docs` repo and is changed there, not here. |
 | `chore/<name>` | tooling, CI, release plumbing |
 
 **One preset per branch, always.** Two presets on one branch cannot be
@@ -112,16 +111,21 @@ rewriting the history of the winner. The measurement is the deliverable, so
 the branch is the unit that carries it.
 
 `dev` is the integration branch and is reset to `main` after every release, so
-it is never a long-lived fork. It requires the determinism gate but not the
-documentation build: model work legitimately leaves `docs/` stale until the
-release rebuilds it, and failing that check mid-experiment teaches nothing.
-`main` requires both, because that is where a reader sees it.
+it is never a long-lived fork.
+
+Both branches require the determinism gate, and the required check on each is
+`all targets agree`. `main` once required the documentation build too, which
+let `dev` carry model work while `docs/` went stale mid-experiment. That
+distinction left with the documentation in 0.5.0: the site is built and
+checked in `tradefloor-docs`, so there is no docs build here to require.
+`main` remains the stricter of the two, because it requires a branch to be up
+to date before a merge and `dev` does not.
 
 **Neither branch allows a force push or a deletion.** A rewritten `dev` used
 to be a normal way to tidy up; it is now blocked, because a calibration run
 that cloned it cannot be reproduced afterwards if its commits are gone.
 
-## Where code goes
+## Code layout
 
 **If it decides something about the market, it belongs in `rust/src/`, not
 in a binding.**
@@ -133,9 +137,10 @@ simulated market has drifted apart. The day loop lived in the Python binding
 until the browser build needed it too; moving it was a day's work that
 should not have to happen twice.
 
-Bindings own conversion, error translation and bookkeeping. Nothing else.
+Bindings own conversion, error translation and bookkeeping, and nothing
+beyond those three.
 
-## Where examples, integrations and fixtures go
+## Examples and fixtures
 
 `examples/` used to mean one thing: a numbered series read in order. It now
 means two, and keeping both flat has already cost something. The example test

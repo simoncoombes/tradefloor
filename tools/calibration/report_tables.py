@@ -3,7 +3,7 @@
 Every published figure in this repository names the method that produced
 it, and the weakest link in that chain is a person copying a number out of
 a JSON and into a markdown table. This script closes it: the tables in
-`pretium-design/CALIBRATION-PTV2.md` are generated from
+`tradefloor-design/CALIBRATION-PTV2.md` are generated from
 `results/calibrate-pt-v2-*.json` by running this, so re-running it against
 the same certificate reproduces the report's numbers exactly and a reader
 who disbelieves a row can regenerate it.
