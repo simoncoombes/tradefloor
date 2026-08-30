@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+**Flow composition: crashes get their sellers.** The engine gains a
+stress-activated forced-flow segment -- a common sell lean in the price
+path above a fear threshold, weighted by beta (leveraged names get sold
+hardest) and drawing down a finite, checkpointed budget, because
+deleveraging completes and stops (an instrument that held VIX 65 for
+sixty days caught the infinite-sellers version grinding prices into
+their clamps). Five dials, all shipped at zero and bit-inert there:
+`forced_flow_gain`, `forced_flow_threshold`, `forced_flow_beta_exponent`,
+`forced_flow_reservoir`, `forced_flow_replenish`. At the measured
+configuration (gain 0.003, threshold 50, beta exponent 2, reservoir 400,
+replenish 0.05) the replayed 2020 crash coheres at 0.78 against a real
+0.78 where the preset alone reads 0.52 on a good seed and 0.22 on a bad
+one, and crash dispersion improves -- at the price of a crash about
+eight percent hotter than the real one. Funding that price inside the
+certified preset was measured and failed (a joint noise trim repays the
+heat but spends correlation asymmetry across a third of the
+certification corpus), so the presets do not carry it: the segment is
+for embedders who want a market that crashes like a market, switched on
+with five documented numbers.
+
 **pt-v16 registered.** pt-v15 with the QE valuation channel silenced,
 correlation asymmetry recomposed from sector-loading dispersion and a quieter
 VIX cycle, a 0.86x joint trim of every noise source, and
