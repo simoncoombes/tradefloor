@@ -457,7 +457,7 @@ class StrategySpec:
         """Trades the true mispricing. Privileged, and says so.
 
         A spec naming ``oracle`` declares access to state no real trader
-        has, which is exactly what a reviewer needs to see. Leaving it out
+        has, and a reviewer needs to see that. Leaving it out
         of the grammar would push the one strategy most in need of
         disclosure into the uncitable escape hatch. Its ``top_k`` moves the
         denominator of every capture ratio the library quotes, so a ratio
@@ -680,8 +680,8 @@ class _BlendAgent:
     weighted by their variances rather than by the weights.
 
     For a single ranked component this reproduces the shipped baseline
-    trade for trade (there is a test), which is what licenses the canonical
-    collapse of a one-component blend to its bare signal.
+    trade for trade (there is a test), which licenses the canonical collapse
+    of a one-component blend to its bare signal.
     """
 
     #: True when any component reads the truth column. Set per instance so a

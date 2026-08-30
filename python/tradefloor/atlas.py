@@ -197,8 +197,8 @@ def axes_for(names: Iterable[str], preset: str = "pt-v3",
       the map's most interesting region somewhere nobody chose.
     - A key in `ranges` or `log` that is not in `names` is refused. A
       typo'd override would otherwise leave the default box silently in
-      place -- the caller believes the range was widened, and it was not,
-      which is the crisis_blend_ramp failure with worse ergonomics.
+      place. The caller believes the range was widened when it was not,
+      the crisis_blend_ramp failure with worse ergonomics.
     - A duplicated name is refused; two axes over one parameter would make
       the second silently win.
 
@@ -221,7 +221,7 @@ def axes_for(names: Iterable[str], preset: str = "pt-v3",
             raise ValidationError(
                 f"{label} names parameters not being surveyed: {unknown}. "
                 "Refused rather than ignored: a typo here would leave a "
-                "default box silently in place, which is how a search "
+                "default box silently in place. That is how a search "
                 "excluded its own optimum."
             )
     shipped = tradefloor.ModelParams.from_preset(preset)
@@ -453,8 +453,8 @@ class Survey:
         being a constant that is generous at four thousand rows and inside
         the noise at forty.
 
-        Same caveat as `sensitivity`, and it is the operative one: this is
-        "no monotone effect over THESE ranges at THIS resolution". A
+        Same caveat as `sensitivity`, and here it is the operative one: this
+        reads "no monotone effect over THESE ranges at THIS resolution". A
         parameter that acts only in combination, or only past a threshold
         the sample never crossed, appears here without being inert -- so
         this list justifies deprioritising a parameter in a search, never
@@ -738,8 +738,8 @@ class Survey:
         analysis downstream to skip it honestly. The output set is the
         UNION over every measurement, and every output must be finite at
         every seed on both vectors -- an output that vanishes or goes
-        non-finite at one seed, the first included, is a hole to refuse,
-        not a smaller answer to return.
+        non-finite at one seed, the first included, is a hole to refuse
+        rather than a smaller answer to return.
 
         Several DISJOINT blocks, not one: one block tells you a number,
         several tell you whether it is a property of the model, and the
@@ -759,8 +759,8 @@ class Survey:
         """
         recorded = self.meta.get("seeds")
         if not recorded:
-            # Absent OR empty: an empty list is not a record, it is the
-            # absence of one wearing the key -- and an early version
+            # Absent OR empty: an empty list is the absence of a record
+            # wearing the key -- and an early version
             # accepted it, ran a vacuous overlap check, and then RENDERED
             # "disjoint from the survey's: checked" over a check that had
             # checked nothing.
@@ -1102,15 +1102,15 @@ def _bin_noise(b: Mapping[str, Any]) -> float:
 
     Normal-theory arithmetic (p10-p90 span is 2.56 sd; a median's standard
     error is 1.25 sd/sqrt(n)) applied to data nobody claims is normal:
-    an order-of-magnitude device for separating signal from coin flips,
-    not an inference.
+    an order-of-magnitude device for separating signal from coin flips
+    rather than an inference.
 
     A bin with fewer than four rows gets an INFINITE scale, so nothing
     read from it ever clears a noise gate. The cut is not cosmetic: a
     one-row bin has p10 == p90, so the formula below would report it as
     infinitely PRECISE -- and an early version did exactly that, letting a
-    lone row in a thin bin (which is what a `where=` filter or an errored
-    region produces) present a coin flip as a confirmed driver of pure
+    lone row in a thin bin (the kind a `where=` filter or an errored region
+    produces) present a coin flip as a confirmed driver of pure
     noise. Below four rows the interpolated p10-p90 span is mostly the
     rows themselves, not a spread. Four or more IDENTICAL values are
     taken at face value (scale 0): repeated agreement is evidence of a

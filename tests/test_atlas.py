@@ -206,7 +206,7 @@ def test_record_refuses_ambiguous_and_malformed_rows():
 
 def test_a_curved_monotone_response_reads_at_full_strength():
     """The reason Spearman and not Pearson: these responses saturate, and
-    the strongly-saturating driver is exactly the one a linear measure
+    the strongly-saturating driver is the one a linear measure
     would under-rank. Under ranks, any strict monotone reads 1.0."""
     result = synthetic(lambda v: {"y": math.tanh(8.0 * (v["x1"] - 0.5))})
     sens = result.sensitivity("y")
@@ -664,7 +664,7 @@ def test_a_vanishing_gap_is_never_described_as_a_consistent_sign():
 # -- persistence ------------------------------------------------------------
 
 def test_a_saved_survey_reloads_and_answers_identically(tmp_path):
-    # Measured once, reused by every future question -- the whole point of
+    # Measured once, reused by every future question -- the reason for
     # persistence is that the reloaded map is the same map.
     result = synthetic(lambda v: {"y": math.tanh(4.0 * v["x1"])})
     result.meta["note"] = "survives the round trip"

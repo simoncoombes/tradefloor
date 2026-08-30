@@ -19,7 +19,7 @@ module was written after.
 One small market, defined once below and shared by everything here. Twelve
 instruments, twenty-six ticks a day, a hundred days, with a fixed two-sided
 order flow so the book, the fills and the price impact are exercised rather
-than a pure price process. It runs in about a fifth of a second, which is what
+than a pure price process. It runs in about a fifth of a second, the budget
 lets these tests be ordinary CI tests rather than a nightly job.
 
 ## What was wrong when this was written
@@ -408,7 +408,7 @@ def test_control_and_fork_match_before_intervention():
     """Same checkpoint, same agent, same history, same seeds.
 
     Both branches run the CONTROL path for ten steps, so nothing has been
-    changed yet. They must be identical, which is what makes the divergence
+    changed yet. They must be identical, which makes the divergence
     after the intervention attributable to the intervention.
     """
     _, _, control, treated = _branch_pair()
@@ -704,8 +704,8 @@ def test_manifest_records_fork_lineage():
 
         run -> checkpoint -> {control, treated}
 
-    from the artefacts alone, by comparison, and it is asserted here so it
-    stays true.
+    from the artefacts alone, by comparison, asserted here so it stays
+    true.
 
     What used to be missing was a manifest saying so on its own: a reader
     holding ONE of the two could not tell it was a branch of anything.
@@ -944,7 +944,7 @@ def test_a_snapshot_carries_the_dormant_engine_dials():
     """Two engine-level states are inert under every shipped preset and were
     left out of the snapshot for that reason.
 
-    That is exactly the position the common log-volume state was in before
+    That is the position the common log-volume state was in before
     pt-v10 turned it on, at which point a restored engine started trading
     different volume and printing different prices. Turning the dial on here
     proves they are carried now rather than waiting for a preset to find out.
@@ -1176,7 +1176,7 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "the remembered stress contributes only where it EXCEEDS the instant "
         "stress -- market/tick.rs computes max(remembered - instant, 0) -- so "
         "it needs a market whose VIX was high and is now held low. This "
-        "scenario keeps the VIX in crisis throughout, which is what makes "
+        "scenario keeps the VIX in crisis throughout, which makes "
         "every OTHER dial live.",
     "central_bank":
         "the meeting calendar runs off day_count, which IS restored, so both "
@@ -1241,7 +1241,7 @@ def test_a_snapshot_does_not_carry_history_and_says_so():
 
     It carries market state, not history: no order log, no recorded tape. A
     reader who assumes otherwise gets an engine that cannot be checkpointed,
-    which is why `branch` copies the engine instead of rebuilding one from
+    so `branch` copies the engine instead of rebuilding one from
     this. Asserted so the boundary stays where the docstring puts it.
     """
     engine, _ = checkpoint_at(5)
@@ -1259,7 +1259,7 @@ def test_a_snapshot_does_not_carry_history_and_says_so():
 
 #: Every preset a user can still select. Named rather than discovered, so a new
 #: one has to be added here on purpose -- and a preset that changes what a fork
-#: has to carry is exactly the thing that would otherwise ship unchecked.
+#: has to carry is the thing that would otherwise ship unchecked.
 SHIPPED_PRESETS = ("pt-v1", "pt-v4", "pt-v6", "pt-v8", "pt-v10", "pt-v12",
                    "pt-v14", "pt-v15")
 

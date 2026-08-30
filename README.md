@@ -9,7 +9,8 @@
 [![licence: MIT OR Apache-2.0](https://img.shields.io/badge/licence-MIT%20OR%20Apache--2.0-blue.svg)](#licence)
 [![python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
-A market simulator you can run a strategy against. Rust core, Python API.
+A market simulator you can run a strategy against, with a Rust core and a
+Python API.
 
 Give it a seed and a list of companies. It runs a market forward: prices, a
 limit order book, fills, and an economy that moves each day. Your orders match
@@ -22,7 +23,7 @@ caused a move. This can, because it computed every price.
 
 The full documentation lives at **https://tradefloor.dev**: install,
 core concepts, the realism envelope, presets, the API surface, and the
-notebooks. (Its source is maintained separately.)
+notebooks, whose source is maintained in a separate repository.
 
 ## Install
 
@@ -43,13 +44,13 @@ month.
 python examples/rate-shock/counterfactual.py
 ```
 
-Run an agent in a controlled market. Checkpoint the world. Fork it. Raise
-rates by 200bps in one branch. Compare what the exact same agent does next.
+Run an agent in a controlled market, checkpoint the world and fork it, then
+raise rates by 200bps in one branch and compare what the same agent does next.
 
-**Same world. Same agent. One changed variable.** Two seconds, no keys, no
-network. It prints the nine checks that prove the two branches started
-identical, the step at which the agent's behaviour changed, and the
-side-by-side. The walkthrough is
+**One changed variable, in the same world and with the same agent.** The run
+takes two seconds and needs no keys and no network. It prints the nine checks
+that prove the two branches started identical, the step at which the agent's
+behaviour changed, and the side-by-side. The walkthrough is
 [Your first counterfactual experiment](https://github.com/simoncoombes/tradefloor/blob/main/examples/rate-shock/README.md).
 
 ## First run
@@ -70,7 +71,7 @@ scores["mine"].strategy_fingerprint  # sha256, cite this
 That is one market draw. It tells you as much about the seed as about the
 strategy. `tf.rank` runs many seeds and compares them with a paired sign test.
 
-## What you get
+## Contents
 
 | | |
 |---|---|
@@ -79,7 +80,7 @@ strategy. `tf.rank` runs many seeds and compares them with a paired sign test.
 | `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | version, preset, seed, universe, macro, scenario. `reproduce()` stops on a mismatch |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
-| MCP server | eleven read-only tools for a coding agent |
+| MCP server | twelve read-only tools for a coding agent, scenarios included |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, a browser build |
 
 No historical dataset carries the labels `truth()` gives you. Real data shows
@@ -99,7 +100,7 @@ code. Each result carries its own caveats. See
 ## Controlled scenarios
 
 ```python
-scenario = tf.Scenario.from_yaml("scenarios/liquidity_crisis.yml")
+scenario = tf.Scenario.load("liquidity_crisis")   # ships with the package
 
 control, stress = tf.branch(engine, 2)
 for day in range(80):
@@ -125,12 +126,15 @@ Assumed transmission
 
 tradefloor does not claim what a war, an election, an oil shock or a
 recession will do to markets. It lets you state those assumptions and measure
-how an agent behaves under them. Six examples ship in
-[`scenarios/`](https://github.com/simoncoombes/tradefloor/tree/main/scenarios),
-each recording what it was measured to be worth. `tradefloor scenario
-targets` lists every target and what it actually reaches.
+how an agent behaves under them.
 
-## How real it is
+Six scenarios ship inside the package, so `Scenario.load` works on a plain
+`pip install` -- each one recording what it was measured to be worth. Their
+[source is here](https://github.com/simoncoombes/tradefloor/tree/main/python/tradefloor/scenarios).
+`tradefloor scenario list` names them, and `tradefloor scenario targets`
+lists every target and what it actually reaches.
+
+## Realism
 
 `tf.facts.measure()` scores fourteen statistics against real-market bands. The
 default preset, `pt-v14`, holds all fourteen at one year and at two years. It
@@ -159,14 +163,14 @@ model, so a strategy shaped like that model looks excellent and teaches you
 nothing. A strategy that fails here tells you more. There is one venue, no
 latency, and no counterparty that adapts to you.
 
-## Same seed, same market
+## Seed determinism
 
 Each release builds five targets, runs one fixed simulation in each, and
 compares digests. A disagreement stops the release. The crate ships its own
 `exp`, `log`, `sin` and `cos`, so the platform libm cannot change a result.
 
-`pt-v14` became the default on 2026-08-28. Name your preset and your run
-replays exactly. Every preset from `pt-v1` on is still selectable.
+`pt-v14` became the default on 2026-08-28. Naming your preset explicitly makes
+a run replay exactly, and every preset from `pt-v1` on is still selectable.
 
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
@@ -219,9 +223,10 @@ no network and no FinRobot install.
 - [`examples/finrobot/rate_shock.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/finrobot/rate_shock.py)
 - [`examples/finrobot/rate_shock.ipynb`](https://github.com/simoncoombes/tradefloor/blob/main/examples/finrobot/rate_shock.ipynb)
 
-FinRobot is a project of the AI4Finance Foundation, Apache-2.0. This is a
-Tradefloor integration for FinRobot. AI4Finance neither maintains nor endorses
-it. It is no part of FinRobot's own interface.
+FinRobot is a project of the AI4Finance Foundation, licensed Apache-2.0. The
+notebooks above are a Tradefloor integration for FinRobot, maintained in this
+repository without endorsement from AI4Finance, and they form no part of
+FinRobot's own interface.
 
 ## More
 

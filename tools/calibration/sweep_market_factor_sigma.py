@@ -6,7 +6,7 @@ so the value is a measurement instead: it patches the constant in
 `rust/src/market/tick.rs`, rebuilds the release wheel, reinstalls it,
 measures the full realism panel across seeds in a fresh interpreter, and
 restores the source when done. The output is the sigma -> statistics
-relationship as data, which is what makes the calibration re-runnable —
+relationship as data, which keeps the calibration re-runnable —
 in particular after any change that re-orders RNG draws, which invalidates
 every trajectory and therefore this calibration with it.
 

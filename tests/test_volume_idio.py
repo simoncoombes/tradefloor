@@ -7,7 +7,7 @@ that half is not modelled".
 
 It is the half the last panel miss needs. `volume_change_acf1` at 504 days
 reads about -0.316 against a band of -0.29 to -0.21 on every preset, and the
-model is too NEGATIVE, which is what independent per-tick noise does to the
+model is too NEGATIVE, as independent per-tick noise does to the
 change in a series. Reaching the band through the COMMON component needs a
 bigger innovation, and that takes `volume_abs_return_corr` out with it
 (CALIBRATION-FOLLOWUPS.md §21 to §23, §73), because a market-wide volume
@@ -57,7 +57,7 @@ def test_it_moves_volume() -> None:
 
 
 def test_it_is_per_name_and_not_common() -> None:
-    """The whole point: names must diverge from each other, not together.
+    """The claim under test: names must diverge from each other, not together.
 
     The common component multiplies every name by the same number, so it
     cannot change the SPREAD of volume across names on a given day. A
@@ -79,7 +79,7 @@ def test_it_is_per_name_and_not_common() -> None:
 
 
 def test_it_reaches_prices_through_the_book() -> None:
-    """Volume is NOT downstream of price here, and that is worth pinning.
+    """Volume is NOT downstream of price here, and worth pinning.
 
     This test was first written the other way round, asserting that a
     volume-only dial leaves prices untouched. It does not, on any preset,

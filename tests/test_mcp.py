@@ -35,10 +35,82 @@ def test_every_tool_registers_with_a_description():
     # opt-in extra already, and a second opt-in test plugin to await two
     # calls is not worth the dependency.
     tools = asyncio.run(mcp.server.list_tools())
-    assert len(tools) == 11
+    # Against the module rather than a literal. A hard-coded count here is a
+    # second place to remember the tool list, and it fails as a stale number
+    # rather than as the thing it is checking -- which is that every
+    # registered tool carries a usable description.
+    registered = {name for name, obj in vars(mcp).items()
+                  if getattr(obj, "__wrapped__", None) is not None
+                  or name in {t.name for t in tools}}
+    assert {t.name for t in tools} <= registered
+    assert len(tools) >= 11, [t.name for t in tools]
     for t in tools:
         assert t.description and len(t.description) > 30, t.name
         assert t.input_schema is not None, t.name
+
+
+def test_the_catalogue_lists_the_pack_the_constructors_and_the_registry():
+    out = mcp.list_scenarios()
+    assert out["ok"] is True
+    assert {e["name"] for e in out["shipped"]} == set(pt.Scenario.available())
+    for entry in out["shipped"]:
+        assert entry["fingerprint"].startswith("sha256:")
+        assert entry["shocks"], entry["name"]
+    assert set(out["targets"]) == set(pt.TARGETS)
+    assert set(out["not_supported"]) == set(pt.UNSUPPORTED_TARGETS)
+    assert out["operations"] == list(pt.interventions.OPERATIONS)
+    assert out["shapes"] == list(pt.interventions.SHAPES)
+
+
+def test_build_scenario_takes_either_grammar_but_not_both():
+    path = mcp.build_scenario(steps=[{"kind": "hold", "fields": {"vix": 30.0}}],
+                              days=5)
+    assert path["ok"] is True and path["fields_pinned"] == ["vix"]
+
+    shocks = mcp.build_scenario(
+        shocks=[{"target": "macro.vix", "operation": "multiply", "value": 2.0,
+                 "at": 2, "duration": 4}],
+        transmission=[{"target": "macro.corporate_yield", "operation": "add",
+                       "value": 0.005, "at": 2}])
+    assert shocks["ok"] is True
+    assert shocks["shocks"][0]["shape"] == "hold"
+    assert shocks["transmission"][0]["target"] == "macro.corporate_yield"
+
+    both = mcp.build_scenario(
+        steps=[{"kind": "hold", "fields": {"vix": 30.0}}],
+        shocks=[{"target": "macro.vix", "operation": "multiply", "value": 2.0,
+                 "at": 1}])
+    assert both.get("ok") is not True
+    assert "one at a time" in both["error"]
+
+
+def test_an_authored_document_is_runnable_as_it_stands():
+    """The split between authoring and running is only a saving if the thing
+    one returns is the thing the other takes."""
+    built = mcp.build_scenario(
+        shocks=[{"target": "market.liquidity", "operation": "multiply",
+                 "value": 0.4, "at": 1, "duration": 3}])
+    ran = mcp.run_stress_scenario(built["scenario"], seed=7, universe_size=10,
+                                  days=6)
+    assert ran["ok"] is True, ran
+
+
+def test_a_shipped_scenario_runs_by_name():
+    out = mcp.run_stress_scenario("liquidity_crisis", seed=7,
+                                  universe_size=10, days=6)
+    assert out["ok"] is True, out
+    unknown = mcp.run_stress_scenario("no_such_scenario", universe_size=8,
+                                      days=2)
+    assert unknown.get("ok") is not True
+    assert "liquidity_crisis" in unknown["error"]
+
+
+def test_an_unsupported_target_is_refused_with_the_real_lever():
+    out = mcp.build_scenario(
+        shocks=[{"target": "market.volatility", "operation": "multiply",
+                 "value": 2.0, "at": 1}])
+    assert out.get("ok") is not True
+    assert "macro.vix" in out["error"]
 
 
 def test_the_protocol_layer_returns_structured_content():
@@ -210,7 +282,7 @@ def test_a_version_the_caller_gave_is_not_overwritten():
 
 
 def test_python_source_is_not_a_strategy():
-    """There is no code path from a tool argument to execution, and this is
+    """No code path runs from a tool argument to execution. This is
     the test that says so out loud."""
     for hostile in ("lambda obs: {}", "__import__('os').system('id')",
                     {"signal": {"kind": "eval", "code": "1+1"}}):

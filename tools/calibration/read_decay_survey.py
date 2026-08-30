@@ -9,8 +9,8 @@ Real markets read -0.436. pt-v6 reads -0.917. Closer to zero is better.
 
 This took `sys.argv[1]` and nothing else until 2026-08-25, which meant
 `--help` opened a file called "--help" and died in a traceback. That is the
-exact failure `tests/test_tool_help.py` exists to catch, and it was invisible
-to it: that test collects scripts containing `add_argument`, so a tool with no
+exact failure `tests/test_tool_help.py` exists to catch, and was invisible
+there: that test collects scripts containing `add_argument`, so a tool with no
 argument parser is not an entry point as far as it is concerned and goes
 unchecked. Parsing arguments properly is what puts it back under the test.
 """
@@ -61,8 +61,8 @@ def attempt(label: str, fn, chars: int) -> None:
     `tradefloor.atlas` refuses a rank correlation over too few usable rows, which
     is correct: five points describe the sample rather than the model. But
     `atlas_survey.py collect` builds a readable survey from whatever is on
-    disk, ON PURPOSE, so that a run can be read mid-flight, and that is exactly
-    when rows are scarce. Dying in a traceback there turns a partial answer
+    disk, ON PURPOSE, so that a run can be read mid-flight, which is when
+    rows are scarcest. Dying in a traceback there turns a partial answer
     into no answer.
     """
     try:

@@ -229,6 +229,107 @@ def test_the_prose_surfaces_use_ascii_punctuation(path):
     )
 
 
+#: `PRODUCT.md`: 'no "X is not the Y, it is the Z" constructions'. Banned in
+#: the same sentence as the ASCII rule above, by the same owner, and unchecked
+#: until now -- so it drifted, into 312 sentences across 116 files, while the
+#: rule it was written beside held.
+#:
+#: Three shapes, and the third is the one that spreads. An antithesis states
+#: the negative to make the positive sound considered. A trailing clause tells
+#: the reader the sentence mattered, in place of a sentence that shows it. And
+#: "exactly" or "the whole point" asserts emphasis a measurement should carry
+#: on its own.
+BANNED_CONSTRUCTIONS = {
+    r"\b(?:is|was|are|were)\s+not\s+(?:a|an|the)?[^.;\n]{0,70}?,"
+    r"\s*(?:it|they|that|this)\s+(?:is|was|are|were)\b":
+        'an "X is not the Y, it is the Z" antithesis',
+    r",\s*(?:and|but)\s+(?:it|that|this)\s+(?:is|was)\b":
+        'a trailing ", and that is ..." clause',
+    r"\bwhich\s+is\s+(?:what|the\s+point|why)\b":
+        'a trailing "which is what/why ..." clause',
+    r"\bthe\s+(?:whole|entire)\s+point\b":
+        '"the whole point"',
+}
+
+#: `exactly` is NOT on the list. It earns its place in an arithmetic claim --
+#: "exactly half", "exactly 1.0 at any coupling", "exactly the vector" -- and
+#: a guard that could not tell those from emphasis would be answered by
+#: deleting the word from a precision claim, which is worse than the tic.
+#:
+#: Neither is "rather than a", which reads as the tic and mostly is not: 178
+#: of the 490 raw matches at the sweep were ordinary comparatives like
+#: "carries the training seeds rather than a subset of them".
+#:
+#: The trailing-clause pattern cannot see content, so it would flag
+#: `tests/test_pt_v6.py`'s "One coefficient, and it is exactly half" if this
+#: list ever reached that file. Widen the tuple and that sentence needs
+#: rewriting, or this needs a carve-out. Stated here rather than discovered.
+
+
+@pytest.mark.parametrize("path", ASCII_PROSE)
+def test_the_prose_surfaces_avoid_the_banned_constructions(path):
+    """`PRODUCT.md` bans them; nothing checked, so they came back.
+
+    Scoped to the same list the ASCII rule uses, for the same stated reason:
+    a repo-wide assertion that failed on arrival would be skipped instead of
+    fixed. The library docstrings, the tests and the tools were swept at the
+    same time as this landed and are clean today; widening this tuple is how
+    the commitment widens to them.
+
+    `PRODUCT.md` itself is exempt below, because the sentence that carries the
+    ban has to quote the construction in order to name it -- the same
+    exemption this file already takes for the origin patterns.
+    """
+    if path == "PRODUCT.md":
+        pytest.skip("PRODUCT.md quotes the construction in order to ban it")
+    text = read(path)
+    assert text is not None, f"{path} is missing"
+
+    found = []
+    for pattern, description in BANNED_CONSTRUCTIONS.items():
+        for i, line in enumerate(text.splitlines(), 1):
+            if re.search(pattern, line, re.IGNORECASE):
+                found.append(f"{path}:{i}: {description}\n      {line.strip()}")
+    assert not found, (
+        "PRODUCT.md bans these constructions. State the positive and stop; a "
+        "clause explaining that the previous clause mattered can go.\n  "
+        + "\n  ".join(found[:12])
+    )
+
+
+def test_the_construction_guard_would_actually_catch_one():
+    """Guards the guard, as the origin matcher above is guarded.
+
+    A pattern set that matched nothing would pass every file by vacuum and
+    report the commitment kept.
+
+    These sentences have to CONTAIN the constructions, so any blanket rewrite
+    over the tree has to skip this file. One did not, turned the third example
+    into a clean sentence, and this test caught it.
+    """
+    caught = [
+        "The reason is not modesty, it is that aggregation destroys it.",
+        "Declared order is kept, and it is what breaks a tie.",
+        "It reads the rate directly, which is what makes it macro-aware.",
+        "The whole point of the convention is that 4.5 means 450%.",
+    ]
+    for sentence in caught:
+        assert any(re.search(p, sentence, re.IGNORECASE)
+                   for p in BANNED_CONSTRUCTIONS), sentence
+
+    # And the shapes it must leave alone. "which is how" is ordinary English
+    # for naming a mechanism, and a sentence can state a limit without the
+    # antithesis.
+    for sentence in [
+        "A fork is a copy of the engine, which is how the log survives it.",
+        "The horizon chooses the ruler.",
+        "One coefficient, exactly half.",
+        "It is not certified beyond 252 days.",
+    ]:
+        assert not any(re.search(p, sentence, re.IGNORECASE)
+                       for p in BANNED_CONSTRUCTIONS), sentence
+
+
 def test_both_manifests_declare_the_dual_licence():
     """`PRODUCT.md`: dual-licensed MIT OR Apache-2.0, at the user's option.
 

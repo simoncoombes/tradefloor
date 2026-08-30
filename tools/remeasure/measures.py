@@ -13,7 +13,7 @@ has drained.
 
 Every function takes a `Ctx` and must not read or write anything outside the
 repository checkout it is given and its output dict. Nothing here edits docs;
-the whole point is to make the eventual doc edit mechanical, not to start it.
+the aim is to make the eventual doc edit mechanical, not to start it.
 """
 
 from __future__ import annotations
@@ -1191,7 +1191,7 @@ def g_workflow(ctx: Ctx) -> dict:
 # differently. The CONFIGS and their historical anchors are the durable half:
 # a hiking cycle is 11 increases from 0-0.25% to 5.25-5.50%, and no engine
 # change touches that. The MEASURED EFFECTS are this build's answer to those
-# configs and move whenever the model does, which is why every one of them is
+# configs and move whenever the model does, so every one of them is
 # a row here rather than a number typed into prose.
 #
 # These builders are the page's code blocks, copied verbatim. That is
@@ -1482,7 +1482,7 @@ def g_recipes(ctx: Ctx) -> dict:
 
     # The two refused orderings. The page prints the same-day message in
     # full, so the message itself is the published figure -- reword it and
-    # the page is stale, which is exactly what should be reported.
+    # the page is stale, and the report should say so.
     out["rule1_same_day_message"] = _refusal(
         lambda: (Scenario("looks right, is not")
                  .step("vix", before=15.0, after=48.0, at=60)

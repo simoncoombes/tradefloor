@@ -48,7 +48,7 @@ def replay(
     starting conditions without noticing. Passing them explicitly forces the
     question.
 
-    ``until`` stops after that many entries, which is what makes bisecting a
+    ``until`` stops after that many entries, which makes bisecting a
     divergence practical: replay both logs to step N and compare.
 
     An unknown operation raises rather than being skipped. A replay that
@@ -59,7 +59,7 @@ def replay(
     preset name or a :class:`ModelParams`, and defaults to the shipped preset.
     Like ``seed`` and ``universe`` it is identity, not history, so it is
     not in the log; replaying a custom-model run under the default would
-    produce a plausible market that is not the recorded one, which is why
+    produce a plausible market that is not the recorded one, so
     :class:`tradefloor.RunManifest` carries the full coefficient dictionary
     and passes it back through here.
     """

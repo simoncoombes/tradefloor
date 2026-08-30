@@ -45,7 +45,8 @@ def _classify(param, rho, threshold=0.05):
 
 
 def test_a_refuted_parameter_is_not_reported_as_a_candidate():
-    """The whole point. rho 0.274 is a strong reading AND a settled negative."""
+    """The case this exists for. rho 0.274 is a strong reading AND a settled
+    negative."""
     r = _classify("market_vol_slow_vix_damp", 0.2737)
     assert r["verdict"] == "effect detected, direction refuted"
     assert "keep at 0.0" in r["action"]
@@ -54,7 +55,7 @@ def test_a_refuted_parameter_is_not_reported_as_a_candidate():
 
 def test_refutation_survives_an_arbitrarily_strong_reading():
     # A bigger number must not promote a refuted parameter back to candidate:
-    # strength is not direction, and that is the entire failure this guards.
+    # strength is not direction, and this guards against confusing them.
     for rho in (0.0, 0.5, 0.99, -0.99):
         r = _classify("market_vol_slow_vix_damp", rho)
         assert r["verdict"] == "effect detected, direction refuted", rho

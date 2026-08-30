@@ -74,7 +74,7 @@ def test_the_probe_simulates_the_market_it_names():
     public API rather than rebuilding the digest. Rebuilding it here was the
     first attempt and it failed on units: the Python surface reports rates
     as fractions and an absent corporate bond yield as None, while the core
-    carries percent and a real initial value. That asymmetry is exactly why
+    carries percent and a real initial value. That asymmetry is why
     the digest lives in the core and is called from both bindings instead of
     being recomputed at each edge.
     """

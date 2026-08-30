@@ -384,7 +384,7 @@ def one(job):
         f = facts.measure(seed=seed, universe=_universe(), days=504, model=m)
     elif kind in ("vix5", "vix45", "vix65"):
         # The two ENDS as well as the middle: the crisis volatility lever is
-        # vol(VIX 65) / vol(VIX 5), and it is the headline number for any
+        # vol(VIX 65) / vol(VIX 5), the headline number for any
         # crisis preset. A gate that reported only the middle sent every
         # candidate to a separate laptop run to find its lever (§93).
         held = {"vix5": 5.0, "vix45": 45.0, "vix65": 65.0}[kind]

@@ -64,7 +64,7 @@ central-bank meeting window**. Measured on this build, on
 ``Universe.random(20, seed=4)`` at sim seed 5: a 250bp policy-only ramp over
 thirty days moved twenty instruments by exactly 0.00% at 40 days.
 
-That is not a defect, it is the valuation model. Equities are discounted off
+That is the valuation model doing its job. Equities are discounted off
 the **corporate bond yield**, and the policy rate is only a fallback used when
 no yield is present. `Some(0.0)` is a real zero yield and must be used, so
 inside the engine, where the economy always carries one, the policy rate never
@@ -82,7 +82,7 @@ cadence, through the curve. For an immediate repricing you still have to move
 the yield equities actually discount off.
 
 So :meth:`Scenario.rate_shock` moves the whole curve, policy rate and
-corporate yield together separated by a credit spread, which is what a rate
+corporate yield together separated by a credit spread. That is what a rate
 shock is. Moving one alone is still possible through :meth:`ramp`, because
 isolating a channel is a legitimate experiment, but you have to ask for it.
 
@@ -154,8 +154,8 @@ The correlation channel is no longer smaller than the name suggests. Mean
 pairwise correlation of daily log returns, the same 25 names over 120 days,
 300 pairs: +0.269 at VIX 15, +0.678 at VIX 45, +0.759 at VIX 65. A
 high-variance factor regime IS a high-correlation regime, and at crisis
-VIX diversification genuinely stops working, which is what real crises
-do, and what this model could not produce before the coupling.
+VIX diversification genuinely stops working. Real crises do that, and this
+model could not produce it before the coupling.
 
 So a VIX path now answers both stress questions: what an execution
 algorithm does when spreads widen, and what a strategy does when
@@ -179,8 +179,8 @@ market stream's schedule is now a pure function of (market status, active
 roster, sector count), so two runs under different macro paths consume, and
 therefore see, identical market noise, draw for draw. The economy
 stream MAY branch under a different macro path (a chain in contraction
-draws a shock the expansion never rolls), which is exactly why it is
-counted separately instead of polluting the market comparison.
+draws a shock the expansion never rolls), so it is counted separately
+instead of polluting the market comparison.
 
 Re-measured on this build, twenty instruments over forty days, 2,074,800
 market draws in the flat run:
@@ -244,6 +244,7 @@ and gives the composing form.
 
 from __future__ import annotations
 
+import difflib
 import json
 import warnings
 from typing import Any, Callable, Sequence
@@ -358,9 +359,9 @@ class _constructor:
 
     A plain ``classmethod`` cannot tell the two apart, because it is handed ``cls``
     either way. A descriptor can: ``__get__`` sees the instance. So the
-    instance form is the one place this failure can be caught, and it is
-    caught here rather than documented, because the documented version was
-    already true and people still wrote it.
+    instance form is the one place this failure can be caught, so it is
+    caught here rather than documented. The documented version was already
+    true and people still wrote it.
 
     ``advice`` is the composing form, given per constructor. A refusal that
     only said "this is a classmethod" would leave the caller to work out
@@ -415,6 +416,18 @@ def _describe_call(name: str, *args: Any, **kwargs: Any) -> str:
     parts = [repr(a) for a in args]
     parts += [f"{k}={v!r}" for k, v in kwargs.items()]
     return f"{name}({', '.join(parts)})"
+
+
+def _pack():
+    """The directory the shipped scenarios live in, installed or in a clone.
+
+    `importlib.resources` rather than `__file__ / "scenarios"`, because the
+    two differ exactly where it matters: a wheel installed into a zip, or a
+    package imported from anywhere but its source tree.
+    """
+    from importlib import resources
+
+    return resources.files(__package__) / "scenarios"
 
 
 def _wrap(text: str, width: int = 72) -> list[str]:
@@ -476,9 +489,9 @@ class Scenario:
     **Interventions** -- :meth:`shock`, :meth:`assume`, or a YAML file --
     state a CHANGE relative to whatever the market had arrived at: multiply
     oil by 1.40 on day 50 and let the chain carry it from there. That is the
-    right shape for a shock, and it is the only one that can express a
-    relative operation, because the value being multiplied is not knowable
-    until the day arrives.
+    right shape for a shock, and the only one that can express a relative
+    operation, because the value being multiplied is not knowable until the
+    day arrives.
 
     They compose. Pins are written first on each day, then interventions on
     top, so a scenario can hold VIX calm for sixty days and then spike it.
@@ -707,8 +720,8 @@ class Scenario:
     def intervene(self, intervention: Intervention) -> "Scenario":
         """Add one built :class:`tradefloor.Intervention`.
 
-        Declared order is kept, and it is what breaks a tie: two
-        interventions on the same target on the same day compose in the order
+        Declared order is kept, and it breaks a tie: two interventions on
+        the same target on the same day compose in the order
         they were written, the second reading what the first wrote. Shocks
         run before transmission, always, because that is the order the
         scenario claims they happen in.
@@ -955,7 +968,7 @@ class Scenario:
         checkpoint.
 
         That is the only reading under which one file means one experiment on
-        both sides of a checkpoint, which is the point of forking. The
+        both sides of a checkpoint, and forking exists for that. The
         alternative -- absolute simulation days -- would make the same YAML
         fire on day 50 of the parent's history, which for a branch taken at
         day 60 is a day that has already happened. Schema 1 therefore has one
@@ -1395,6 +1408,61 @@ class Scenario:
         "interventions to this one with .intervene(...)."
     ))
 
+    def load(cls, name: str) -> "Scenario":
+        """One of the scenarios that ship with the library, by name.
+
+        ```python
+        scenario = tf.Scenario.load("liquidity_crisis")
+        ```
+
+        The pack travels inside the wheel rather than only in the repository,
+        so this works on a pip install. That is the point: a scenario named
+        in the README that only resolves in a clone is a promise the package
+        does not keep, and an agent driving the library over MCP has no clone
+        at all.
+
+        :meth:`available` lists them. For a file of your own, use
+        :meth:`from_yaml` with its path.
+        """
+        if not isinstance(name, str):
+            raise ScenarioValidationError(
+                f"load() takes a scenario name, got {type(name).__name__}. "
+                f"Available: {', '.join(cls.available())}."
+            )
+        stem = name[:-4] if name.endswith(".yml") else name
+        if stem not in cls.available():
+            close = difflib.get_close_matches(stem, cls.available(), n=3,
+                                              cutoff=0.5)
+            hint = ("\n\nDid you mean:\n  " + "\n  ".join(close) if close
+                    else "\n\nAvailable:\n  "
+                         + "\n  ".join(cls.available()))
+            raise ScenarioValidationError(
+                f"no scenario named {name!r} ships with tradefloor.{hint}"
+                f"\n\nTo load a file of your own: "
+                f"Scenario.from_yaml('path/to/it.yml')."
+            )
+        text = (_pack() / f"{stem}.yml").read_text(encoding="utf-8")
+        return cls.from_document(yaml_subset.read(text), source=f"{stem}.yml")
+
+    load = _constructor(load, (
+        "there is nothing to add: load builds a whole scenario from the "
+        "shipped pack. Load it on the class, or add its interventions to "
+        "this one with .intervene(...)."
+    ))
+
+    @classmethod
+    def available(cls) -> tuple[str, ...]:
+        """The names :meth:`load` accepts, sorted.
+
+        Read from the installed package rather than from a list, so a
+        scenario added to the pack appears here without anyone remembering
+        to write it down twice.
+        """
+        return tuple(sorted(
+            path.name[:-4] for path in _pack().iterdir()
+            if path.name.endswith(".yml")
+        ))
+
     def from_document(cls, document: Any, *,
                       source: str | None = None) -> "Scenario":
         """Build a scenario from an already-parsed configuration mapping.
@@ -1549,7 +1617,7 @@ class Scenario:
     def vix_shock(cls, *, calm: float = 15.0, peak: float = 45.0,
                   at: int = 10, over: int = 20) -> "Scenario":
         """A VIX spike that decays back: a volatility, correlation and
-        spread stress in one, which is what a real one is.
+        spread stress in one, the shape a real one takes.
 
         Up as a step, down as a ramp, because that is the shape a stress
         episode has: it arrives at once and subsides slowly.
@@ -1719,9 +1787,9 @@ def _refuse_self_comparison(scenario: Scenario, days: int) -> None:
     """Refuse a default-baseline comparison the scenario cannot lose.
 
     The default baseline is ``hold(**scenario.at(0))``. When the scenario is
-    CONSTANT across the horizon that is not a counterfactual, it is the same
-    world twice, and the difference is exactly zero on every instrument by
-    construction rather than by measurement.
+    CONSTANT across the horizon, that comparison is the same world twice. The
+    difference comes out at exactly zero on every instrument by construction
+    rather than by measurement.
 
     Three shapes reach here and they are worth telling apart, because the
     reader's next action differs:
@@ -1832,7 +1900,7 @@ def compare(
     because it should equal the day the first intervention fires. Earlier
     means the scenario reached the market before it said it did; later means
     it fired into a market that did not notice. It costs a market digest per
-    day per world, which is why it is off by default rather than free.
+    day per world, so it is off by default rather than free.
     """
     import struct
 
@@ -1844,8 +1912,8 @@ def compare(
         # For an intervention scenario the counterfactual is the same world
         # with the interventions removed: same pins, same seed, same draws,
         # and the shock is the only difference. For a pins-only scenario it
-        # is the day-zero levels held flat, which is what isolates a PATH
-        # from the level it starts at.
+        # is the day-zero levels held flat, which isolates a PATH from the
+        # level it starts at.
         baseline = (scenario.without_interventions() if scenario.interventions
                     else Scenario(label="flat").hold(**scenario.at(0)))
     elif (scenario.table(days) == baseline.table(days)

@@ -43,11 +43,11 @@ def busy_run(seed=99):
 # --------------------------------------------------------------------------
 
 def test_a_replayed_log_reproduces_the_run_exactly():
-    """The whole point. A seed alone does not do this.
+    """The case this exists for. A seed alone does not do this.
 
     The market an agent trades in depends on its own orders, so one seed with
     different flow is a different market. Reproducing a run means reproducing
-    every input, and that is what the log holds.
+    every input, and the log holds those.
     """
     original = busy_run()
     replayed = tradefloor.replay(original.order_log, seed=99, universe=UNIVERSE,

@@ -267,7 +267,7 @@ def test_fills_joins_to_bars_on_instrument_day_and_tick():
 
     This test used to check only that the fills' instrument ids and days were
     SUBSETS of the bars' -- a containment check wearing the name of a join. It
-    passed with every fill sitting at tick zero, which is exactly the state
+    passed with every fill sitting at tick zero, which is the state
     the `tick` column was added to fix. It now does the join.
     """
     e, p, _, _ = traded()
@@ -537,7 +537,7 @@ def test_clearing_a_recording_clears_depth_too():
 
 
 def test_a_day_of_many_sessions_records_every_tick():
-    """The defect that made the fills join fail, and it was the bigger one.
+    """The defect that made the fills join fail, and the bigger of the two.
 
     `SessionBuffer` is the LAST session's path -- it rewrites from tick zero
     each call, which is right for `prices()`. `record(day)` snapshotted it,

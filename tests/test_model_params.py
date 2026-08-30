@@ -138,7 +138,7 @@ PERTURBATIONS = [
     ("daily_credit_floor_gain", 1.0, False),
     # 0.25, not 1.0: the default carries 1.0 since pt-v11, so perturbing TO
     # it is a no-op and the test read "not wired through". The value has to
-    # differ from whatever the default holds, which is what an era boundary
+    # differ from whatever the default holds, as an era boundary
     # keeps breaking.
     ("sector_vix_coupling", 0.25, True),
     ("garch_omega", 1e-5, True),
@@ -211,7 +211,7 @@ PERTURBATIONS = [
     # and a 3-day probe at a flat default VIX has no spike to track anyway.
     ("market_vol_slow_vix_damp", 0.5, False),  # needs slow weight AND a VIX move
     # Endogenous jumps (pt-v4). Every row here is inert ALONE, and each waits
-    # on a different partner, which is why they are listed separately rather
+    # on a different partner, so they are listed separately rather
     # than as one mechanism. An intensity of 1.0 fires a jump on every day and
     # still moves nothing, because the size is zero -- occurrence without
     # magnitude is not an event. A size or a mean moves nothing either,
@@ -350,7 +350,7 @@ def test_the_slow_variance_component_acts_when_its_three_parts_agree():
     bit-identical rather than merely small -- the composed update branches
     on a zero weight instead of adding `0.0 * deviation`.
 
-    So all three parts must be present for it to do anything, and that is
+    So all three parts must be present for it to do anything. This is
     what makes the three inert rows above honest rather than a hole an
     optimiser could walk through.
     """
@@ -544,7 +544,7 @@ def test_jumps_move_prices_when_intensity_is_on():
     """The model has no discontinuities without this.
 
     Prices diffuse; real markets gap. Nothing here ever surprised the market
-    unless a caller injected news by hand, which is why excess kurtosis reads
+    unless a caller injected news by hand, so excess kurtosis reads
     5.2 over 504-day windows against real markets' 7.1 to 22.
 
     Asserted three ways, because "the prices differ" alone would pass on a

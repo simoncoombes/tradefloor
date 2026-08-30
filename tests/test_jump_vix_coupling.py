@@ -5,7 +5,7 @@ the number of jump days in a dead-calm market and in a panic is the same.
 Decomposing the nine attribution components under a pinned VIX measured the
 cost (CALIBRATION-FOLLOWUPS.md §84): jumps carry 40.5% of the variance of a
 market pinned at VIX 5 and 1.1% of one pinned at VIX 65, on 3003 and 2998
-jump day-cells. Real markets cluster their jumps into crises, and this is
+jump day-cells. Real markets cluster their jumps into crises, and this
 also the floor under the calm end of the crisis lever.
 
 What is pinned here is the safety contract that lets the dial exist, and the
@@ -73,7 +73,7 @@ def test_the_anchor_is_a_fixed_point() -> None:
 
     `1 - c + c * (vix / anchor)^2` is exactly 1 when vix == anchor, for any
     coupling. So a market pinned there is bit-identical however this dial is
-    set, which is what makes the two ends comparable.
+    set, which makes the two ends comparable.
     """
     anchor = pt.ModelParams.from_preset("pt-v10").to_dict()["market_vol_vix_anchor"]
     base = _prices(anchor)
@@ -81,7 +81,8 @@ def test_the_anchor_is_a_fixed_point() -> None:
 
 
 def test_coupling_moves_jump_days_with_the_regime() -> None:
-    """The direction, which is the whole point: rarer when calm, denser in a panic.
+    """The direction, and the thing the coupling is for: rarer when calm,
+    denser in a panic.
 
     Uncoupled, the two counts are the same process at two VIX levels and
     differ only by sampling. Coupled, the calm market should jump strictly

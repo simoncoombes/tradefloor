@@ -2,7 +2,7 @@
 
 Runs in a subprocess pool, so everything here must be importable at module
 level and guarded — pytest already runs under ``__main__`` protection, but the
-payload function has to be picklable, which is why it lives at module scope in
+payload function has to be picklable, so it lives at module scope in
 the package rather than being a closure.
 """
 
@@ -40,7 +40,7 @@ def test_worker_count_does_not_change_the_answer():
     # how the work happened to be divided.
     #
     # The workers are THREADS sharing an address space, so a mistake here is a
-    # data race rather than a serialisation bug -- which is why several counts
+    # data race rather than a serialisation bug -- so several counts
     # are checked rather than one. A race that a 4-thread run hides can still
     # show at 8.
     seeds = list(range(10))

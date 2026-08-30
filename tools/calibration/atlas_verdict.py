@@ -277,7 +277,7 @@ def main() -> int:
     print("  verdict on whether a mechanism should be switched on.")
     print("  'below screening noise' means NO EFFECT DETECTABLE at this")
     print("  resolution over the sampled range. It is not a claim that the")
-    print("  parameter does nothing, and it is not grounds for deletion:")
+    print("  parameter does nothing, nor grounds for deletion:")
     print("  the preset fingerprint hashes the sorted parameter NAMES, so")
     print("  removing one changes every preset's fingerprint and orphans")
     print("  every published manifest. See CALIBRATION-FOLLOWUPS §25.")

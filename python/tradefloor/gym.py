@@ -77,8 +77,8 @@ class TradingEnv(_Base):
     """A market as a reinforcement-learning environment.
 
     Observation: prices, holdings as fractions of net worth, and cash as a
-    fraction of net worth. All ``float64`` and C-contiguous, which is what a
-    ``Box`` space wants.
+    fraction of net worth. All ``float64`` and C-contiguous, as a ``Box``
+    space wants.
 
     Prices are given as log returns since the previous step rather than as
     levels. A level of 512.44 tells a policy nothing without knowing what it
@@ -162,8 +162,8 @@ class TradingEnv(_Base):
         """Start a fresh episode.
 
         ``seed`` selects the market. Passing a different one gives a different
-        market, which is the point: an agent trained on one seed and evaluated
-        on another is being tested rather than recalled.
+        market, deliberately: an agent trained on one seed and evaluated on
+        another is being tested rather than recalled.
         """
         if _gym is not None:
             # Gymnasium keeps its own generator on the base class and its API

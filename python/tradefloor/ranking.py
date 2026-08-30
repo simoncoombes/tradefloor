@@ -26,7 +26,7 @@ least as much as of the agents, and anything built on it (a benchmark, a
 regression gate, an agent that tunes itself against this harness) inherits
 that.
 
-## And the aggregate can overstate too, which is why `separation` exists
+## And the aggregate can overstate too, so `separation` exists
 
 That gap does NOT establish that momentum is the better agent. Paired across
 the same twelve markets, momentum beats mean-reversion on nine and loses on
@@ -221,8 +221,8 @@ class Ranking:
         #: What the reference earned on each seed, parallel to ``seeds``. This
         #: is the denominator, and it varies several-fold across seeds --
         #: measured $10.6k to $36.8k over ten three-day seeds on the grid in
-        #: this module's docstring -- which is exactly why the headline
-        #: number pools rather than averages ratios.
+        #: this module's docstring -- so the headline number pools rather
+        #: than averages ratios.
         self.reference_pnls = reference_pnls
         #: Seeds where capture was not measurable because the reference did
         #: not make money. Reported rather than dropped: a median over eight

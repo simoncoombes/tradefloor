@@ -8,7 +8,7 @@ the same write, so pushing one down pushes the other down with it.
 
 The share advances the momentum reference with the jump, by the amount
 herding must not see. What these tests pin is the safety contract around
-that, which is what lets the mechanism exist at all:
+that, which lets the mechanism exist at all:
 
   * At 1.0 it is EXACTLY the old behaviour, bit for bit, on a preset that
     actually fires jumps. Not close, identical, because a preset that moved

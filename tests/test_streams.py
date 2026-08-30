@@ -80,7 +80,7 @@ def test_a_pinned_run_matches_its_endogenous_twin_when_the_values_agree():
     world B never runs a chain at all -- it pins each day to the values A
     happened to produce. Before the split, B's unconsumed macro draws
     shifted every market draw and the two worlds diverged everywhere. Now
-    they are the same market to the bit, which is what makes a pinned
+    they are the same market to the bit, which makes a pinned
     HISTORICAL series comparable against an endogenous baseline: the
     difference is the macro values, never the plumbing.
     """

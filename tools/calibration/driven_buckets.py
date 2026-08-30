@@ -16,8 +16,8 @@ no model defect at all, and `real_vix_lever.py` flags exactly that asymmetry
 in its own docstring.
 
 So bucket BOTH SIDES the same way, on the same days. Drive the model with
-the real 2020-21 path -- which is what `gate_pick.driven_window` already
-does, and which spans VIX 12 to 82 -- then bucket the model's daily returns
+the real 2020-21 path -- `gate_pick.driven_window` already does this, and it
+spans VIX 12 to 82 -- then bucket the model's daily returns
 and real AAPL's daily returns by the SAME session's VIX close, and take the
 ratio within each bucket. Same dates, same VIX, same estimator, no held-run
 construction anywhere.

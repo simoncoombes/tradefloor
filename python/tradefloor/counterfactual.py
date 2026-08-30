@@ -39,8 +39,8 @@ not have to take on trust.
 
 ## Fork on a day boundary, always
 
-:class:`World` runs whole days and forks between them, and that is not a
-convenience. `checkpoint.py` records a defect where a snapshot taken BETWEEN
+:class:`World` runs whole days and forks between them, and does so for a
+reason. `checkpoint.py` records a defect where a snapshot taken BETWEEN
 two sessions of the same day lost the day's accumulators, re-opened the day on
 its next session, and priced differently from the parent it was a copy of.
 Every test forked on a day boundary, so nothing caught it. This module cannot
@@ -71,7 +71,7 @@ Two optional hooks, neither required:
 
 It does not score. :class:`~tradefloor.Scorecard` and :func:`tradefloor.rank`
 already answer "which agent is better", across many seeds and with a paired
-test, and that is a different question from "what did this one change do".
+test, and that asks something different from "what did this one change do".
 A counterfactual is one seed by construction -- that is the point of it -- so
 a single arm's return here is a measurement of this market as much as of the
 agent, and :class:`Comparison` reports behaviour before it reports P&L for
@@ -90,6 +90,7 @@ from .checkpoint import Checkpoint, branch
 from .harness import Observation, session_clock
 from .manifest import RunManifest, market_digest
 from .portfolio import Portfolio
+from .interventions import Intervention
 from .scenario import Scenario
 from .universe_util import fingerprint_of
 
@@ -133,8 +134,8 @@ class World:
     __slots__ = ("label", "seed", "universe", "macro", "model", "cash",
                  "max_leverage", "steps_per_day", "ticks_per_step", "start",
                  "engine", "portfolio", "agent", "trace", "pins",
-                 "interventions", "rejected", "fork_step",
-                 "_day", "_step", "_adv")
+                 "interventions", "applied", "rejected", "fork_step",
+                 "_day", "_step", "_adv", "_ran")
 
     def __init__(
         self,
@@ -167,6 +168,11 @@ class World:
         self.start = start
         self.pins = dict(pins or {})
         self.interventions: list[dict[str, Any]] = []
+        # Interventions from a scenario handed to `apply`, already rebased
+        # onto this world's own day numbering. Separate from `interventions`
+        # above, which is this module's own one-field-at-a-time record.
+        self.applied: list[Intervention] = []
+        self._ran: Scenario | None = None
         self.agent = agent
         self.engine = Engine(seed=self.seed, universe=self.universe,
                              macro_state=macro, model=model)
@@ -223,8 +229,8 @@ class World:
         grid has already rounded. Two worlds with equal digests are on the
         same market to the bit.
 
-        Comparable between worlds at the same fork depth -- which is what an
-        experiment compares -- and NOT between a fork and its parent. The
+        Comparable between worlds at the same fork depth, the pairing an
+        experiment puts side by side, and NOT between a fork and its parent. The
         digest folds in ``draws_consumed``, and a branched engine's counter
         restarts at zero while every column is carried, so a fork and its
         parent report different digests for the same market.
@@ -250,6 +256,9 @@ class World:
         if days < 0:
             raise ValidationError(f"days cannot be negative, got {days}")
         scenario = self.scenario()
+        # Kept, so `firings` can report what the interventions actually saw.
+        # A fresh object per call, so the trail is this call's.
+        self._ran = scenario
         hour, minute, day_of_week = self.start
         tickers = self.engine.tickers
 
@@ -257,8 +266,8 @@ class World:
             day = self._day
             # Pinned before the market opens, so day zero already runs under
             # the path rather than under whatever the engine was built with.
-            # `pin_macro` is recorded in the order log, which is what puts
-            # the intervention inside the checkpoint and the manifest rather
+            # `pin_macro` is recorded in the order log, which puts the
+            # intervention inside the checkpoint and the manifest rather
             # than only in this object's memory.
             scenario.apply(self.engine, day)
             macro = _macro(self.engine)
@@ -321,13 +330,13 @@ class World:
                  tickers: Sequence[str]) -> tuple[list[dict], list[str]]:
         """Send the agent's orders, recording each fill against its arrival mid.
 
-        The mid is read BEFORE the sweep, which is what makes the recorded
+        The mid is read BEFORE the sweep, which makes the recorded
         slippage a cost rather than a tautology: after the sweep the book has
         already moved to where the trade left it.
 
         Refused trades are recorded and counted, not raised. Being unable to
-        size a position is information about the agent, and it is information
-        the comparison wants -- an arm that hit its leverage cap and an arm
+        size a position is information about the agent, and information the
+        comparison wants -- an arm that hit its leverage cap and an arm
         that did not are behaving differently.
         """
         fills: list[dict] = []
@@ -359,11 +368,12 @@ class World:
     def scenario(self) -> Scenario:
         """This world's macro path, as a :class:`~tradefloor.Scenario`.
 
-        Built fresh from the constant pins plus one step per intervention, so
-        it is always the path this world ran rather than a description written
+        Built fresh from the constant pins, one step per :meth:`intervene`,
+        and the rebased interventions of anything handed to :meth:`apply` --
+        so it is always what this world ran rather than a description written
         alongside it. Serialise it into a manifest and the reader has the
-        intervention as data: the field, the day, the value before, the value
-        after.
+        experiment as data: the field, the day, the value before, the value
+        after, and for a scenario the shocks kept apart from the assumptions.
         """
         scenario = Scenario(label=self.label)
         if self.pins:
@@ -374,12 +384,81 @@ class World:
                 scenario.step(field, before=current.get(field, after),
                               after=after, at=entry["day"])
                 current[field] = after
+        # Anything handed to `apply`, already rebased onto this world's days.
+        # One object carries both halves so that `run` applies one thing and
+        # a manifest records one thing, rather than the run and the document
+        # disagreeing about what the experiment was.
+        for item in self.applied:
+            scenario.intervene(item)
         return scenario
+
+    def apply(self, scenario: Scenario) -> "World":
+        """Drive this world from a scenario document, from today on.
+
+        ```python
+        stress.apply(tf.Scenario.load("liquidity_crisis"))
+        ```
+
+        The complement of :meth:`intervene`, and worth having beside it
+        rather than instead of it. `intervene` changes one macro field to one
+        absolute value and reads perfectly for the canonical experiment: one
+        variable, named on the line that changes it. A scenario reaches what
+        that cannot -- relative operations, whose value depends on where the
+        endogenous chain has arrived; `market.liquidity`, which is not a
+        macro field at all and is the only lever that touches execution;
+        windows that end; and the split between what a scenario asserts
+        happened and what it merely assumes followed.
+
+        # Timing, and why this rebases
+
+        A scenario counts `at` from where the run loop starts applying it.
+        A `World` counts days from the beginning of its own history, which a
+        forked arm shares with its sibling -- so an arm forked on day 20 is
+        on day 20, not day 0. Handing the same file to both would otherwise
+        mean two different experiments.
+
+        So each intervention is rebased by the day it is applied on: a file
+        that says `at: 50` fires on this world's day 20 + 50. What the
+        manifest records is the rebased form, which is the one that says
+        which days things actually fired.
+
+        The scenario is not stored by reference. Rebasing produces new
+        :class:`~tradefloor.Intervention` objects, so applying one document
+        to two arms on different days gives each the timing it asked for and
+        neither can perturb the other.
+        """
+        if not isinstance(scenario, Scenario):
+            raise ValidationError(
+                f"apply() takes a Scenario, got {type(scenario).__name__}. "
+                f"Load one with tf.Scenario.load('liquidity_crisis'), read a "
+                f"file with tf.Scenario.from_yaml(path), or build one with "
+                f"tf.Scenario(name=...).shock(...).")
+        if not scenario.interventions:
+            raise ValidationError(
+                f"{scenario.name or 'this scenario'} declares no "
+                f"interventions, so applying it would leave this world "
+                f"indistinguishable from one that ran without it. A scenario "
+                f"that carries only a macro path belongs in `pins` at "
+                f"construction, which drives the whole run rather than "
+                f"starting here.")
+        self._refuse_open_market("apply")
+        for item in scenario.interventions:
+            self.applied.append(Intervention(
+                item.target, operation=item.operation, value=item.value,
+                at=item.at + self._day, duration=item.duration,
+                shape=item.shape, role=item.role))
+        return self
+
+    @property
+    def firings(self) -> tuple:
+        """Every intervention that fired in the last :meth:`run`, with the
+        values it saw. Empty until something has run."""
+        return self._ran.log if self._ran is not None else ()
 
     def intervene(self, **fields: Any) -> "World":
         """Change one or more macro fields, from this world's next day on.
 
-        The whole point of the module, and deliberately narrow: it writes
+        What the module exists for, and deliberately narrow: it writes
         macro fields and nothing else. An intervention that could also reach
         into the portfolio, the book or the agent would not be a controlled
         variable, it would be a second experiment.
@@ -387,8 +466,8 @@ class World:
         Recorded three times over, because a counterfactual whose intervention
         is not written down is an anecdote: here on the world, in the
         :meth:`scenario` it derives, and -- once the next day opens and
-        ``pin_macro`` runs -- in the engine's own order log, which is what
-        travels inside a :class:`~tradefloor.Checkpoint` and a
+        ``pin_macro`` runs -- in the engine's own order log, which travels
+        inside a :class:`~tradefloor.Checkpoint` and a
         :class:`~tradefloor.RunManifest`.
         """
         if not fields:
@@ -461,6 +540,10 @@ class World:
             child.trace = copy.deepcopy(self.trace)
             child.rejected = list(self.rejected)
             child.interventions = copy.deepcopy(self.interventions)
+            # Interventions are immutable value objects, so the list is
+            # copied and its contents shared safely. Each arm may then
+            # `apply` a scenario of its own on top.
+            child.applied = list(self.applied)
             child._day = self._day
             child._step = self._step
             child.fork_step = self._step
@@ -516,7 +599,9 @@ class World:
                 "without going through it.")
         return RunManifest.of(engine, seed=self.seed,
                               universe=self.universe, macro=self.macro,
-                              scenario=self.scenario() if self.pins else None,
+                              scenario=(self.scenario()
+                                        if self.pins or self.applied
+                                        else None),
                               strategy=strategy,
                               label=label or self.label)
 
@@ -906,8 +991,17 @@ def compare(control: World, treatment: World,
             "line up step for step and no divergence step is meaningful.")
 
     a, b = control.trace, treatment.trace
+    # When the arm was driven by `intervene`, the first entry carries both
+    # the day and the step it happened on. When it was driven by `apply`, the
+    # scenario knows the DAY and this module knows how many steps a day is --
+    # without which the comparison reports "intervention: none" beside four
+    # divergence steps it cannot attribute to anything.
     intervention = (treatment.interventions[0] if treatment.interventions
                     else None)
+    if intervention is None and treatment.applied:
+        earliest = min(item.at for item in treatment.applied)
+        intervention = {"day": earliest,
+                        "step": earliest * treatment.steps_per_day}
 
     def first(field: str) -> int | None:
         for row_a, row_b in zip(a, b):

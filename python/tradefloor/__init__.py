@@ -159,7 +159,7 @@ class Universe(list):
         loss-maker so the book-value valuation path is actually exercised.
         Those ranges are editorial and are not pinned by any golden vector;
         what IS guaranteed is that ``(n, seed)`` gives the same universe on
-        every platform, which is what makes ``random(108, seed=7)`` citable.
+        every platform, so ``random(108, seed=7)`` is citable.
         """
         return cls(_core.random_instruments(n, seed=seed))
 
@@ -320,7 +320,7 @@ def _run_one(args: tuple) -> Any:
         return {
             # Stamped like the summary rows. This mode already returned a
             # dict, so there was room; `prices` returns raw bytes and has
-            # none, which is why it is the one mode without provenance.
+            # none, so it is the one mode without provenance.
             "seed": seed,
             "universe_fingerprint": fingerprint,
             "model_fingerprint": engine.model_fingerprint,
@@ -377,17 +377,17 @@ def run_many(
     This parallelises across seeds and nothing else, and that survives the
     2026-08 split of the engine's RNG into seven per-domain substreams
     (market, economy, external, jumps, volume, news and volume_idio, see
-    ``docs/rng-streams.md``), because the split is by DOMAIN, not by unit of
-    work. The market stream alone serves every draw in a tick: the market
-    factor, each sector factor, per-company noise, the intraday volume noise
-    and book settlement, in one fixed order across the whole roster, with the
-    Box-Muller spare cached per stream so even the parity of normal draws is
-    that stream's state. Any within-run decomposition
-    would repartition a single sequence, and the draw schedule does not
-    survive that. The economy's separate stream bought comparability, not
-    concurrency: a pinned macro path no longer reshuffles the market's
-    noise, but the day-close economy step feeds the next day's pricing, so
-    the domains run in sequence whatever their streams do.
+    ``tradefloor-docs: docs/rng-streams.md``), because the split is by
+    DOMAIN, not by unit of work. The market stream alone serves every draw
+    in a tick: the market factor, each sector factor, per-company noise, the
+    intraday volume noise and book settlement, in one fixed order across the
+    whole roster, with the Box-Muller spare cached per stream so even the
+    parity of normal draws is that stream's state. Any within-run
+    decomposition would repartition a single sequence, and the draw schedule
+    does not survive that. The economy's separate stream bought
+    comparability, not concurrency: a pinned macro path no longer reshuffles
+    the market's noise, but the day-close economy step feeds the next day's
+    pricing, so the domains run in sequence whatever their streams do.
 
     Parallelising *within* a run is therefore off the table by construction,
     not merely unimplemented. If you find yourself wanting ``n_threads=``, the
@@ -479,8 +479,8 @@ def run_many(
     # stdin has no importable `__main__` -- so the children die and the parent
     # waits for results that will never arrive. Measured as a ten-minute hang
     # on a twenty-seed sweep, with no error and no output. Jupyter is where
-    # this library is most likely to be used, and that is exactly where the
-    # process pool could not run.
+    # this library is most likely to be used, and the process pool could not
+    # run there.
     with ThreadPoolExecutor(max_workers=workers) as pool:
         # `map` yields in INPUT order regardless of completion order, which is
         # the property this function promises. Completion order would be
@@ -532,9 +532,9 @@ class FlowImpact:
 
     ``impact[i]`` is ``actual[i] - baseline[i]`` for instrument ``i``: positive
     means the trader pushed the price up. For a buyer that is a cost, because
-    they moved the market against themselves, which is why ``cost_bps`` flips sign
-    by side rather than reporting a signed impact and leaving the reader to
-    work out which direction hurt.
+    they moved the market against themselves, so ``cost_bps`` flips sign by
+    side rather than reporting a signed impact and leaving the reader to work
+    out which direction hurt.
     """
 
     __slots__ = ("tickers", "baseline", "actual", "seed", "_flow")
@@ -595,7 +595,7 @@ class FlowImpact:
         Measured, not assumed: a 390-tick session consumes 19,110 draws with
         or without flow. (Adding an INSTRUMENT is a different matter and does
         shift the schedule -- 4,900 draws at six names against 5,500 at seven
-        -- which is why a roster edit is not a counterfactual.)
+        -- so a roster edit does not give you a counterfactual.)
 
         Over several DAYS one non-noise channel qualifies the emptiness,
         since the 2026-08 VIX coupling: flow that moves the cap-weighted

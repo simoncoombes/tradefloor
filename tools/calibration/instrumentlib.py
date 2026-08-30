@@ -131,8 +131,8 @@ CONFIRM_SEEDS = tuple(range(201, 231))
 PARAM_SPECS: dict[str, dict] = {
     # Added when the surface grew and PARAM_SPECS did not. Every one of
     # these was settable and unreachable by any search, because a missing
-    # spec is a KeyError in `shipped_values()` -- which is how the first
-    # crisis search died one minute in.
+    # spec is a KeyError in `shipped_values()`. That is how the first crisis
+    # search died one minute in.
     # The pt-v16-era dials (rounds 96-119). All four ship at zero and are
     # bounded shares/levels, so "abs" with steps matched to their measured
     # useful neighbourhoods (asym folded at 0.025, screened to 0.04; the
@@ -159,8 +159,8 @@ PARAM_SPECS: dict[str, dict] = {
     # it to a box edge gives a deviation near 19, squared 372, times a
     # lambda of 10 -- roughly 3,700 of penalty against a realism loss of
     # order 1. The first search using it spent its whole budget minimising
-    # my own regulariser. Scale parameters take the log class, which is what
-    # the log/raw split exists for.
+    # my own regulariser. Scale parameters take the log class, the case the
+    # log/raw split exists for.
     "crisis_vix_threshold": {"kind": "log"},
     # The dollar's own crisis gate, split from the crisis threshold at 0.4.3.
     # Same class and box as its sibling: it is a VIX level, so a raw deviation
@@ -291,7 +291,7 @@ PARAM_SPECS: dict[str, dict] = {
     # budget and alpha + beta + gamma/2 reaches 1 with both other terms
     # at zero. What actually binds is the stationarity check below, and
     # the transformed box tops out at 1.896 -- so a ceiling of 1.0,
-    # which is what this said first, would have rejected planned vectors
+    # as this said first, would have rejected planned vectors
     # for leaving a range narrower than the sampler.
     "market_vol_gamma":         {"kind": "abs", "step_unit": 0.1,
                                  "hard_range": (0.0, 2.0)},
@@ -330,7 +330,7 @@ PARAM_SPECS: dict[str, dict] = {
     # `hi = min(8 * 4, 0.999) = 0.999` and `lo = max(8 / 4, 0.0) = 2.0`, so
     # LOW EXCEEDED HIGH. Probed through `DevSpace.repair`, every search
     # coordinate from -2.0 to +2.0 mapped to one identical point: the
-    # parameter was not searched, it was FROZEN, at a value produced by
+    # parameter was FROZEN rather than searched, at a value produced by
     # clamping the shipped 8.0 into an inverted box.
     #
     # That is why `ptv4`'s certificate reported `market_vol_ceiling_multiple`
@@ -361,8 +361,8 @@ PARAM_SPECS: dict[str, dict] = {
     #
     # §6.3's INTENT is that deviation units be comparable across parameters,
     # and a quantity spanning [2, 32] is a scale. Under log the same box-edge
-    # move costs ln(32/8)^2 = 1.92, which is what every other scale parameter
-    # here costs. Following the rule's letter would have reproduced, in a new
+    # move costs ln(32/8)^2 = 1.92, the same as every other scale parameter
+    # here. Following the rule's letter would have reproduced, in a new
     # place, exactly the mis-scaled penalty that made a 96-core search
     # optimise its own regulariser.
     "garch_vix_coupling": {"kind": "abs", "step_unit": 0.05,
@@ -372,8 +372,8 @@ PARAM_SPECS: dict[str, dict] = {
     "jump_vix_coupling": {"kind": "abs", "step_unit": 0.05,
                           "hard_range": (0.0, 1.0)},
     # How hard a crisis loads names onto the market factor (§97). 0.5 was
-    # the literal; the range reaches 2.0 because the whole point is headroom
-    # above the old ceiling of 0.5 x 0.98.
+    # the literal; the range reaches 2.0 to give headroom above the old
+    # ceiling of 0.5 x 0.98.
     "crisis_blend_gain": {"kind": "abs", "step_unit": 0.05,
                           "hard_range": (0.0, 2.0)},
     # How far the crisis injection is decoupled from the market factor's
@@ -722,8 +722,8 @@ def crn_streams(results: list[dict]) -> dict:
     the total reports a violation of §5.2 every time a vector is extreme
     enough to reroute the macro chain, which is a real event about the
     economy and says nothing about whether the two markets saw the same
-    noise. The market count is the sharp question, and it is the one this
-    function raises on.
+    noise. The market count is the sharp question, and this function raises
+    on that one.
 
     Returns::
 
