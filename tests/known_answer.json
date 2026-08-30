@@ -1,11 +1,11 @@
 {
   "bytes": 16920,
   "days": 250,
-  "katVersion": 12,
+  "katVersion": 13,
   "kind": "pretium.known-answer",
   "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
-  "note": "Cross-platform determinism baseline. Regenerated 2026-08-26 for the era boundary that made pt-v12 the default preset: every seeded trajectory changed, deliberately. Runs from before this baseline are not comparable to runs after it unless they name their preset. Re-based 2026-08-28 for a REPORTING fix only: pt-v13 and pt-v14 reported a 68.26-day mispricing half-life while running the inherited 60, because a const-fn constructor cannot recompute mispricing_phi. simulationSha256 and katVersion are unchanged, which is the proof no trajectory moved.",
+  "note": "Cross-platform determinism baseline. Regenerated 2026-08-26 for the era boundary that made pt-v12 the default preset: every seeded trajectory changed, deliberately. Runs from before this baseline are not comparable to runs after it unless they name their preset. Re-based 2026-08-28 for a REPORTING fix only: pt-v13 and pt-v14 reported a 68.26-day mispricing half-life while running the inherited 60, because a const-fn constructor cannot recompute mispricing_phi. simulationSha256 and katVersion are unchanged, which is the proof no trajectory moved. Regenerated 2026-08-30 for the era boundary that made pt-v16 the default preset at 0.6.0: every seeded trajectory changed, deliberately. Runs recorded before this baseline are comparable to runs after it only when they name their preset. The simulation digest was produced independently on windows-x86_64 and on linux-aarch64 before it was committed.",
   "seed": 20260820,
-  "sha256": "64ee47922c680c4be1cd31f67d1ab7f9dd515b9077e1eb07aff96200691504ee",
-  "simulationSha256": "63fa05e66084cc070c9ecfb3d7e0d4fb89f457e9048a5772964fc6413d93cc74"
+  "sha256": "74f451bb1e3372ca032f57b9546ddf40a51e08c8fc7dab82a17e73a3d7749f39",
+  "simulationSha256": "f0419b0ffbf054810929a8e1b843ea68af5bb59a0602ab71e77b34a3cc3f481f"
 }

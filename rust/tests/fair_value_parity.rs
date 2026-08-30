@@ -151,6 +151,9 @@ fn matches_the_reference_bit_for_bit() {
             corporate_bond_yield: opt(&case.inputs.corporate_bond_yield),
             federal_funds_rate: f(&case.inputs.federal_funds_rate),
             qe_pe_boost: opt(&case.inputs.qe_pe_boost),
+            // None is the reference's own default, and it makes the QE stock
+            // term zero, so these goldens hold unchanged.
+            qe_assets_ratio: None,
         };
 
         let fv = compute_fair_value(&company, &economy);
@@ -195,8 +198,10 @@ fn matches_the_reference_bit_for_bit() {
         // 1.0 is the parity value, not an arbitrary one: qe_adjustment is
         // 1 + qe_gain * qe_pe_boost, so a gain of one reproduces the formula
         // the reference implementation computes. Any other value would be
-        // testing the dial rather than the contract.
-        let pe = compute_target_pe(&company, &economy, 1.0);
+        // testing the dial rather than the contract. The stock gain is 0.0
+        // for the same reason: qe_stock_term returns zero at that gain, which
+        // is the shipped default and the only value the reference computes.
+        let pe = compute_target_pe(&company, &economy, 1.0, 0.0);
         let t = &case.target_pe;
         for problem in [
             same(

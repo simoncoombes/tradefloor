@@ -106,8 +106,15 @@ def test_the_ordering_of_the_reference_set_is_the_measured_one(scores):
     # buy_and_hold -0.396%, random -0.923%. Momentum and mean-reversion
     # swapped for the fourth time, which is the margin this comment has been
     # warning about since it was written; the oracle has never moved.
-    assert ranked == ["oracle", "mean_reversion", "momentum",
-                      "buy_and_hold", "random"]
+    # Re-measured again at the 0.6.0 boundary that made pt-v16 the default:
+    # oracle +6.290%, momentum +1.415%, mean_reversion +1.321%, random
+    # -0.856%, buy_and_hold -1.521%. Momentum and mean-reversion swapped for
+    # the fifth time, 0.094 points apart, and the bottom pair swapped with
+    # them. Under pt-v14 the same seed read oracle +4.874%, mean_reversion
+    # +1.801%, momentum +1.449%, buy_and_hold -0.588%, random -0.988%. The
+    # oracle has still never moved.
+    assert ranked == ["oracle", "momentum", "mean_reversion",
+                      "random", "buy_and_hold"]
 
 
 def test_random_trading_is_close_to_flat_over_a_short_run(scores):

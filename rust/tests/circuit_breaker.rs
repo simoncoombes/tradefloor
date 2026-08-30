@@ -102,6 +102,9 @@ fn tick_once(mut c: TickCompany, rng_value: f64) -> (f64, f64) {
     simulate_market_tick(
         &mut roster,
         &TickInputs {
+            // The lagged asymmetry branches on this flag and its gain
+            // defaults to 0.0, so false is bit-identical here.
+            prev_day_down: false,
             // The mechanism ships inert; 0.0 is the value that
             // preserves the behaviour these tests pin.
             universe_stress: 0.0,
@@ -230,6 +233,9 @@ fn the_band_holds_across_a_whole_session_of_adversarial_ticks() {
             simulate_market_tick(
                 &mut roster,
                 &TickInputs {
+                    // The lagged asymmetry branches on this flag and its gain
+                    // defaults to 0.0, so false is bit-identical here.
+                    prev_day_down: false,
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
                     universe_stress: 0.0,
@@ -272,6 +278,9 @@ fn the_band_holds_in_extended_hours_too() {
             simulate_market_tick(
                 &mut roster,
                 &TickInputs {
+                    // The lagged asymmetry branches on this flag and its gain
+                    // defaults to 0.0, so false is bit-identical here.
+                    prev_day_down: false,
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
                     universe_stress: 0.0,
@@ -324,6 +333,9 @@ fn the_clamp_is_actually_binding_and_not_merely_unreached() {
             simulate_market_tick(
                 &mut roster,
                 &TickInputs {
+                    // The lagged asymmetry branches on this flag and its gain
+                    // defaults to 0.0, so false is bit-identical here.
+                    prev_day_down: false,
                     // The mechanism ships inert; 0.0 is the value that
                     // preserves the behaviour these tests pin.
                     universe_stress: 0.0,

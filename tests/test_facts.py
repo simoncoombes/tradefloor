@@ -171,8 +171,17 @@ def test_volatility_clustering_is_in_band_at_short_lags_and_dies_too_fast():
     verdicts = compare_to_real_markets(facts)
     assert verdicts["abs_return_acf1"]["matches"]
     assert verdicts["abs_return_acf5"]["matches"]
-    # The shape defect, pinned: lag twenty has no clustering left.
-    assert facts["abs_return_acf20"] < 0.02
+    # The shape defect, pinned, and NARROWED at 0.6.0. On this seed pt-v14
+    # read lag twenty at -0.0071: the clustering was gone and had crossed to
+    # negative. pt-v16 reads +0.0221 against a real 252-day median of +0.020,
+    # so the curve now stays weakly positive where real markets do. The
+    # slow-variance mixture pt-v15 turned on is the mechanism.
+    #
+    # Still pinned as a defect rather than a fix, because the decay SLOPE has
+    # not been re-measured: `envelope.DECAY_252` and `DECAY_SLOPE` describe
+    # pt-v14 and the gap text goes with them. One seed at one lag narrows the
+    # claim; it does not retire it.
+    assert 0.0 < facts["abs_return_acf20"] < 0.03
     assert facts["abs_return_acf20"] < facts["abs_return_acf5"] < facts[
         "abs_return_acf1"]
 
