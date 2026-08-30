@@ -1,11 +1,8 @@
 # tradefloor
 
-> Formerly **pretium**. Versions through 0.4.3 were published under that
-> name and remain installable forever; results recorded against them replay
-> under those exact versions. The rename changed no behaviour: 0.5.0
-> reproduces the same known-answer digest on every platform.
-
 [![determinism](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml/badge.svg)](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml)
+[![PyPI](https://img.shields.io/pypi/v/tradefloor.svg)](https://pypi.org/project/tradefloor/)
+[![crates.io](https://img.shields.io/crates/v/tradefloor.svg)](https://crates.io/crates/tradefloor)
 [![licence: MIT OR Apache-2.0](https://img.shields.io/badge/licence-MIT%20OR%20Apache--2.0-blue.svg)](#licence)
 [![python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
@@ -30,6 +27,11 @@ notebooks, whose source is maintained in a separate repository.
 ```
 pip install tradefloor
 ```
+
+> Formerly **pretium**. Versions through 0.4.3 were published under that
+> name and remain installable forever; results recorded against them replay
+> under those exact versions. The rename changed no behaviour: 0.5.0
+> reproduces the same known-answer digest on every platform.
 
 Wheels for Linux, macOS and Windows on CPython 3.11+. No dependencies. The same
 engine is a Rust crate: `cargo add tradefloor`.
@@ -232,7 +234,7 @@ FinRobot's own interface.
 
 ## More
 
-Full docs: [**simoncoombes.github.io/tradefloor**](https://simoncoombes.github.io/tradefloor/).
+Full docs: [**tradefloor.dev**](https://tradefloor.dev/).
 
 To contribute, see [CONTRIBUTING.md](https://github.com/simoncoombes/tradefloor/blob/main/CONTRIBUTING.md) and [RELEASING.md](https://github.com/simoncoombes/tradefloor/blob/main/RELEASING.md). One rule shapes the
 rest: a change to the simulated trajectory is a breaking change, whatever its
@@ -241,4 +243,14 @@ size.
 To cite the software, see [CITATION.cff](https://github.com/simoncoombes/tradefloor/blob/main/CITATION.cff). To cite a result, use its
 `RunManifest`.
 
-Licence: MIT OR Apache-2.0, at your option. See [LICENSE-MIT](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-MIT) and [LICENSE-APACHE](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-APACHE).
+## Licence
+
+MIT OR Apache-2.0, at your option, which is the Rust-ecosystem norm. See
+[LICENSE-MIT](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-MIT)
+and
+[LICENSE-APACHE](https://github.com/simoncoombes/tradefloor/blob/main/LICENSE-APACHE).
+
+GitHub's sidebar reads Apache-2.0 because its detection picks one file and
+stops. So does the sidebar of `rust-lang/rust`, `serde` and `pyo3`, which
+carry the same two files. The dual grant is what `pyproject.toml`,
+`rust/Cargo.toml` and this section state, and it is what applies.

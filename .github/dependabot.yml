@@ -1,0 +1,31 @@
+# Dependency updates, weekly and grouped.
+#
+# Grouped on purpose: this project pins a Rust toolchain, a PyO3 version and
+# five wheel targets, and a stream of single-dependency pull requests against
+# a determinism gate that runs five builds is a lot of compute for very little
+# signal. One pull request per ecosystem per week is reviewable.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /rust
+    schedule:
+      interval: weekly
+    groups:
+      rust:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
