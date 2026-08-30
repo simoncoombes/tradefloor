@@ -103,7 +103,7 @@ feature branch  ->  dev  ->  main  ->  tag
 | `preset/pt-vNN` | one preset, and nothing else. A preset is an era boundary; it needs its own history so it can be reviewed, measured and reverted as one thing. |
 | `feat/<name>` | a mechanism or an engine change |
 | `fix/<name>` | a reported defect |
-| `docs/<name>` | prose, the site, the notebooks |
+| `docs/<name>` | prose and the notebooks. The site itself lives in the private `tradefloor-docs` repo and is changed there, not here. |
 | `chore/<name>` | tooling, CI, release plumbing |
 
 **One preset per branch, always.** Two presets on one branch cannot be
@@ -112,10 +112,15 @@ rewriting the history of the winner. The measurement is the deliverable, so
 the branch is the unit that carries it.
 
 `dev` is the integration branch and is reset to `main` after every release, so
-it is never a long-lived fork. It requires the determinism gate but not the
-documentation build: model work legitimately leaves `docs/` stale until the
-release rebuilds it, and failing that check mid-experiment teaches nothing.
-`main` requires both, because that is where a reader sees it.
+it is never a long-lived fork.
+
+Both branches require the determinism gate, and the required check on each is
+`all targets agree`. `main` once required the documentation build too, which
+let `dev` carry model work while `docs/` went stale mid-experiment. That
+distinction left with the documentation in 0.5.0: the site is built and
+checked in `tradefloor-docs`, so there is no docs build here to require.
+`main` remains the stricter of the two, because it requires a branch to be up
+to date before a merge and `dev` does not.
 
 **Neither branch allows a force push or a deletion.** A rewritten `dev` used
 to be a normal way to tidy up; it is now blocked, because a calibration run
