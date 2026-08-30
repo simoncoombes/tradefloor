@@ -11,7 +11,20 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import os
 CELLS = {"v16": {}}
-if os.environ.get("FLOW_GRID", "one") == "two":
+if os.environ.get("FLOW_GRID", "one") == "three":
+    # Screen three (round 140): the frontier corners — hot dose x strong
+    # concentration.
+    def c(g, th, k):
+        o = {"forced_flow_gain": g, "forced_flow_threshold": th}
+        if k: o["forced_flow_beta_exponent"] = k
+        return o
+    CELLS.update({
+        "g150t40k2": c(0.0015, 40.0, 2.0),
+        "g200t40k2": c(0.002, 40.0, 2.0),
+        "g150t35k2": c(0.0015, 35.0, 2.0),
+        "g200t45k2": c(0.002, 45.0, 2.0),
+    })
+elif os.environ.get("FLOW_GRID", "one") == "two":
     # Screen two (round 139): beta-weighted forced flow. The uniform lean
     # pinned cohesion at a dispersion cost; beta^k concentrates the same
     # pressure on high-beta names.
