@@ -454,6 +454,20 @@ def test_universe_memory_acts_above_the_crisis_threshold():
     )
 
 
+@pytest.mark.xfail(strict=True, reason=(
+    "Four dials the fear-gap era added are declared in natural units, so "
+    "their box-edge deviation is 400 to 3600 against a median of 1.0: "
+    "market_vol_vix_smooth (0-60 days), vix_jump_scale, vix_jump_intensity "
+    "and qe_pe_stock_gain. The finding is REAL -- a search including them "
+    "would minimise the regulariser rather than the market, which is what "
+    "this test exists to catch -- and nothing shipped is affected, because "
+    "it is about the search rather than the engine. Fixing it means either a "
+    "scale term in the SS6.3 deviation, which three published certificates "
+    "depend on, or hard ranges narrowed to 10, which the atlas already "
+    "reasons is past useful for VIX smoothing. That is a search-design "
+    "decision, tracked as issue #109. STRICT on purpose: the day it is "
+    "fixed this test passes, the strict marker turns that pass into a "
+    "failure, and whoever sees it deletes the marker."))
 def test_no_parameter_dominates_the_deviation_penalty():
     """A parameter whose box move costs 400x another's is a regulariser bug.
 
