@@ -1,6 +1,6 @@
 [package]
 name = "tradefloor"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 description = "A reproducible evaluation environment for financial AI agents."
 # Dual-licensed, the Rust-ecosystem norm (serde, tokio, rand): a downstream

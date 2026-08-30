@@ -187,6 +187,15 @@ def rule(text: str) -> None:
     print(f"\n{text}\n" + "-" * 68)
 
 
+def have_live_key() -> bool:
+    """Whether a live run is possible, without ending the process if not.
+
+    `llm_config` exits, which is right for the script and wrong inside a
+    notebook cell, where it stops the kernel rather than the cell.
+    """
+    return bool(os.environ.get(LIVE_KEY_VAR))
+
+
 def llm_config() -> dict:
     """The autogen configuration FinRobot runs under, in `--live`.
 

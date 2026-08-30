@@ -1,32 +1,57 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
-**pt-v16 registered.** pt-v15 with the QE valuation channel silenced,
-correlation asymmetry recomposed from sector-loading dispersion and a quieter
-VIX cycle, a 0.86x joint trim of every noise source, and
-`volume_move_response` raised from 0.6 to 1.0. Selectable by name, with
-`pt-v14` still the default.
+**`pt-v16` is the default.** The market itself is different, so a run that
+took the default under 0.5.0 does not replay under this release. A run that
+names its preset replays exactly, and every preset from `pt-v1` on stays
+selectable and bit-reproducing:
 
-**And its VIX learns fear.** Left alone, the engine's VIX tracked its own
-market's realized volatility at 0.16 correlation against a real 0.87 and
-decayed as fast as it rose. pt-v16 closes the loop: a third of the VIX target
-is the variance process's own inverse (`vix_realised_vol_weight` 0.3), fear
-decays at six tenths of the rate it arrives (`vix_decay_ratio` 0.6, a new
-dial, bit-inert at 1.0), and the reversion slows to match
-(`vix_mean_reversion` 0.06). Measured on ^VIX and ^GSPC over 2004-2025:
-realized-vol tracking 0.16 to 0.57, spike asymmetry 0.95 to 1.28 against a
-real 1.20, day persistence 0.90 to 0.985. The card over twenty-six seed
-blocks at one hundred seeds, thirteen never touched by any search: crisis
-co-movement and lever 26/26, the driven noise ratio 1.13 against pt-v15's
-1.46, both panels in band on twenty-five of twenty-six blocks -- one
-correlation-asymmetry row sits 0.0025 past a floor whose derivation noise is
-0.038, the fear process's measured price. Crisis frequency stays below real:
-every mechanism that raised P(VIX>30) broke certified statistics (three
-families measured to their deaths in the design record), so a market afraid
-of itself at the right frequency belongs to a later era's recalibration, not
-a dial this one could turn. The fear-event dials (`vix_jump_intensity`,
-`vix_jump_scale`) ship inert, taking no random draws at zero.
+```python
+eng = tf.Engine(seed=42, universe=u, model="pt-v14")
+```
+
+pt-v16 is the first preset to hold the complete card at the deepest standard
+this programme runs, over twenty-six seed blocks at one hundred seeds each,
+thirteen of the blocks never touched by any search:
+
+| | `pt-v16` | the pre-trim candidate |
+|---|---|---|
+| 504-day full house | **26 of 26** | 24 of 26 |
+| crisis co-movement in range | 26 of 26, spread 0.0406 | 26 of 26 |
+| crisis lever in tolerance | 26 of 26, median 6.241 | 26 of 26 |
+| driven noise ratio | **1.1246** | 1.2995 |
+| out-of-band rows anywhere | **none** | `corr_asymmetry` twice |
+
+Three ideas compose it. `qe_pe_gain` 0.0 silences a channel whose driven input
+is a proxy anticorrelated with measured Fed purchases at -0.485.
+`vix_cycle_amplitude` 0.85, `sector_loading_beta_slope` 0.7 and
+`market_beta_down_asym` 0.025 are the correlation-asymmetry composition, in
+which down ticks of the factor transmit harder, funded by sector-loading
+dispersion and seasoned by pulling the business-cycle share of the VIX in. The
+six noise sources then scale together by 0.86, a trim that has to be joint,
+since any single source alone re-balances the market and idiosyncratic split
+and collapses correlations instead of re-levelling. `volume_move_response`
+rises from 0.6 to 1.0, and `vix_decay_ratio`, `vix_jump_intensity` and
+`vix_jump_scale` join the settable set.
+
+**A policy rate now reaches equities before the first meeting.** Equities
+discount off the corporate bond yield, which the central bank recomputes from
+the 10Y at meetings, the first of them 45 days out. A policy-only ramp
+therefore moved nothing inside that window, and both the scenario
+documentation and `tests/test_scenario.py` stated it as a fact: 0.00% at 40
+days. `daily_credit_floor_gain` re-asserts both credit floors on every daily
+step, so from pt-v15 onward the spread is touched daily and the ramp
+transmits inside the window. Measured on `Universe.random(20, seed=4)` at sim
+seed 5, read at 40 days: pt-v12 and pt-v14 give 0.00% and the shipped default
+gives -3.34% on the median instrument. The 0.4.2 entry named this consequence
+in advance and placed it at a preset boundary, which is where it arrived. Pin
+`pt-v14` to keep the sharp boundary.
+
+**What is still short, stated.** The `corr_asymmetry` median of -0.022 is
+band-complete and sits below every real reference window, and the driven
+window at 1.12 is the closest this model has come to the real 1.00 without
+reaching it. Both gaps are named in the record.
 
 **Scenarios: a named collection of interventions, in YAML or Python.**
 `tf.Scenario` names targets from a registry of twelve fields the engine reads,
@@ -78,6 +103,9 @@ a development build wrote an extension and a Windows debug database into the
 source tree, both were committed, and maturin packaged the debug database into
 every wheel built from such a tree, including the published 0.5.0. The ignore
 rules now name the directory that exists.
+
+<!-- release-note-ends -->
+
 
 ## 0.5.0
 

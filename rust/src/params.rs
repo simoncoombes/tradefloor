@@ -1236,7 +1236,8 @@ pub const PT_V2: ModelParams = ModelParams::pt_v2();
 /// by the test at the bottom of this file — in both directions, so a
 /// coefficient that moved without appearing here fails just as loudly as one
 /// that drifted from its recorded value.
-/// `pt-v3`, the shipped default. Emitted beside the preset body by
+/// `pt-v3`, the shipped default from 2026-08-22 until pt-v10 took it at
+/// 0.2.0. Emitted beside the preset body by
 /// `emit_preset.py` from the converged certificate and held to by the test
 /// at the bottom of this file, in both directions.
 pub const PT_V3: ModelParams = ModelParams::pt_v3();
@@ -1285,7 +1286,7 @@ pub const PT_V16: ModelParams = ModelParams::pt_v16();
 /// bottom of this file asserts it resolves to the engine's default
 /// bit-for-bit. A future era that moves the default and forgets this
 /// constant fails the suite instead of mislabelling every manifest.
-pub const DEFAULT_PRESET_NAME: &str = "pt-v14";
+pub const DEFAULT_PRESET_NAME: &str = "pt-v16";
 
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
 /// certificate recorded.
@@ -1445,8 +1446,8 @@ impl ModelParams {
         p
     }
 
-    /// `pt-v3` — the converged margined optimum, and the shipped default
-    /// from 2026-08-22.
+    /// `pt-v3`, the converged margined optimum, and the shipped default
+    /// from 2026-08-22 until pt-v10 took it at 0.2.0.
     ///
     /// Emitted from
     /// `tools/calibration/results/calibrate-pt-v3-converged-2026-08-22.json`
@@ -1542,9 +1543,9 @@ impl ModelParams {
     /// correlation blend identical (§39). It passes §8 on every axis, both
     /// the loss thresholds and the flip test (§45).
     ///
-    /// NOT the default. The envelope certifies pt-v14 at 252 days since
-    /// the 2026-08-26 era boundary, and certification is a separate act
-    /// from passing the controls.
+    /// NOT the default. The envelope certifies whatever
+    /// `DEFAULT_PRESET_NAME` names at 252 days, and certification is a
+    /// separate act from passing the controls.
     ///
     /// `volume_change_acf1` remains out of band here as everywhere, for the
     /// structural reason recorded when it was excluded from the objective.
@@ -1586,9 +1587,9 @@ impl ModelParams {
     /// reliable edge over hold: pt-v3 is 8-16, pt-v5 is 13-11, this is
     /// 10-14, none significant (§51). There is no edge to remove.
     ///
-    /// NOT the default. pt-v14 holds that since the 2026-08-28 era
-    /// boundary and the envelope certifies pt-v10; passing the controls is
-    /// not certification.
+    /// NOT the default. [`PT_V16`] holds that since 0.6.0, and the
+    /// envelope certifies whatever `DEFAULT_PRESET_NAME` names. Passing the
+    /// controls is a separate act from certification.
     pub const fn pt_v6() -> ModelParams {
         let mut p = ModelParams::pt_v5();
         // Exactly half of pt-v3's 0.07420624999999997, asserted in tests
@@ -1635,8 +1636,8 @@ impl ModelParams {
     /// Gates, in the record: the response instrument against pt-v6, held-out
     /// seeds and universe, §8 against pt-v6's passing control.
     ///
-    /// NOT the default. pt-v14 holds that since the 2026-08-28 era
-    /// boundary, and the envelope certifies pt-v10.
+    /// NOT the default. [`PT_V16`] holds that since 0.6.0, and the
+    /// envelope certifies whatever `DEFAULT_PRESET_NAME` names.
     pub const fn pt_v7() -> ModelParams {
         let mut p = ModelParams::pt_v6();
         p.sector_factor_sigma = 0.012;
@@ -1675,8 +1676,8 @@ impl ModelParams {
     /// flips. Cost stated: crisis-state sector excess +0.053 against pt-v7's
     /// +0.079 (real +0.10).
     ///
-    /// NOT the default. pt-v14 holds that since the 2026-08-28 era
-    /// boundary, and the envelope certifies pt-v10.
+    /// NOT the default. [`PT_V16`] holds that since 0.6.0, and the
+    /// envelope certifies whatever `DEFAULT_PRESET_NAME` names.
     pub const fn pt_v8() -> ModelParams {
         let mut p = ModelParams::pt_v7();
         p.market_factor_sigma = 0.008829098749522557;
@@ -1727,8 +1728,8 @@ impl ModelParams {
     /// volatility lever rises to 4.31x from pt-v8's 4.34x-equivalent
     /// measurement, both under a pinned VIX.
     ///
-    /// NOT the default. pt-v14 holds that since the 2026-08-28 era
-    /// boundary, and the envelope certifies pt-v10.
+    /// NOT the default. [`PT_V16`] holds that since 0.6.0, and the
+    /// envelope certifies whatever `DEFAULT_PRESET_NAME` names.
     pub const fn pt_v9() -> ModelParams {
         let mut p = ModelParams::pt_v8();
         p.momentum_theta = 0.018551562499999993;
@@ -1794,9 +1795,10 @@ impl ModelParams {
     /// pt-v9's 4.31x, the correlation blend 3.13x against 3.16x and the shock
     /// ratio 1.078 against 1.084, all inside noise.
     ///
-    /// NOT the default. [`PT_V14`] holds it. This line has been wrong in
+    /// NOT the default. [`PT_V16`] holds it. This line has been wrong in
     /// both directions before -- it read "NOT the default" through 0.2.0
-    /// while pt-v10 held it, and "THE DEFAULT" after pt-v12 took it away.
+    /// while pt-v10 held it, "THE DEFAULT" after pt-v12 took it away, and
+    /// pt-v12's own block still claimed it two eras later.
     /// The envelope certifies whatever `DEFAULT_PRESET_NAME` names, which
     /// is the only place worth reading it from.
     pub const fn pt_v10() -> ModelParams {
@@ -1861,7 +1863,7 @@ impl ModelParams {
     /// excess also lands at +0.091 against a real +0.103, closer than any
     /// preset before it and still short.
     ///
-    /// NOT the default. [`PT_V14`] holds that. [`PT_V12`] is this preset plus one
+    /// NOT the default. [`PT_V16`] holds that. [`PT_V12`] is this preset plus one
     /// number: `volume_move_cap`. Selecting pt-v11 by name gives the crisis
     /// work without the volume-cap fix, which is the comparison §114 is
     /// written against.
@@ -1929,12 +1931,11 @@ impl ModelParams {
     /// against a real 1.00. That axis was already the worst thing about this
     /// model and this makes it 0.6% worse.
     ///
-    /// **The default since the second 2026-08-26 era boundary**, and what
-    /// the envelope certifies. [`PT_V10`] and [`PT_V3`] stay selectable and
-    /// bit-reproducing, so anything recorded under either replays exactly by
-    /// naming it.
-    /// THE DEFAULT. [`PT_V13`] is registered beside it and does not replace
-    /// it. What is measured rather than asserted: over thirteen
+    /// The default from the second 2026-08-26 era boundary until pt-v14
+    /// took it on 2026-08-28. Selectable and bit-reproducing, so anything
+    /// recorded under it replays exactly by naming it.
+    ///
+    /// What is measured rather than asserted: over thirteen
     /// thirty-seed blocks this preset holds all fourteen statistics at 504
     /// days on three of them, because its mean annualised volatility is
     /// 34.157 against a ceiling of 34.0 and its mean excess kurtosis 7.267
@@ -1947,7 +1948,7 @@ impl ModelParams {
         p
     }
 
-    /// REGISTERED AND SELECTABLE, NOT THE DEFAULT. [`PT_V14`] holds that.
+    /// REGISTERED AND SELECTABLE, NOT THE DEFAULT. [`PT_V16`] holds that.
     ///
     /// Registered because it is measured and because a preset nobody can
     /// select is a preset nobody can check. It is not the default because
@@ -2044,7 +2045,8 @@ impl ModelParams {
         p
     }
 
-    /// The fourteenth preset, and the shipped default since 2026-08-28.
+    /// The fourteenth preset, and the shipped default from 2026-08-28
+    /// until 0.6.0, when [`PT_V16`] took it.
     ///
     /// Measured against [`PT_V12`] on thirteen seed blocks of thirty seeds
     /// each, plus six independent roster draws:
@@ -2215,8 +2217,8 @@ impl ModelParams {
     /// invariant rather than a statistic: the corporate spread can no
     /// longer drift below its floor between meetings.
     ///
-    /// NOT the default. pt-v14 holds that and the envelope certifies
-    /// pt-v14.
+    /// NOT the default. [`PT_V16`] holds that, and the envelope certifies
+    /// whatever `DEFAULT_PRESET_NAME` names.
     pub const fn pt_v15() -> ModelParams {
         let mut p = ModelParams::pt_v14();
         p.market_vol_slow_weight = 0.35;
@@ -2265,8 +2267,9 @@ impl ModelParams {
     /// there. The gaps that remain are real, smaller than they have ever
     /// been, and named in the record.
     ///
-    /// NOT the default. pt-v14 holds that and the envelope certifies
-    /// pt-v14.
+    /// THE DEFAULT since 0.6.0, and what the envelope certifies.
+    /// [`PT_V14`] and every earlier preset stay selectable and
+    /// bit-reproducing, so anything recorded under one replays by naming it.
     pub const fn pt_v16() -> ModelParams {
         let mut p = ModelParams::pt_v15();
         p.qe_pe_gain = 0.0;
@@ -2968,13 +2971,15 @@ mod tests {
         assert_eq!(crate::params::PT_V10.fingerprint(), "pt-v10");
         assert_eq!(crate::params::PT_V12.fingerprint(), "pt-v12");
         assert_eq!(crate::params::PT_V13.fingerprint(), "pt-v13");
-        // pt-v14 took the default at the 2026-08-28 boundary. The guard that
-        // used to assert it was NOT the default lived here and is gone on
-        // purpose: it existed while the preset was registered inert, and a
-        // stale assertion about which preset is default is exactly the drift
-        // this test exists to catch.
+        // pt-v14 held the default from the 2026-08-28 boundary until pt-v16
+        // took it at 0.6.0. The guard that used to assert a preset was NOT
+        // the default lived here and is gone on purpose: it existed while
+        // the preset was registered inert, and a stale assertion about which
+        // preset is default is exactly the drift this test exists to catch.
         assert_eq!(crate::params::PT_V14.fingerprint(), "pt-v14");
-        assert_eq!(DEFAULT_PRESET_NAME, "pt-v14");
+        assert_eq!(crate::params::PT_V15.fingerprint(), "pt-v15");
+        assert_eq!(crate::params::PT_V16.fingerprint(), "pt-v16");
+        assert_eq!(DEFAULT_PRESET_NAME, "pt-v16");
     }
 
     #[test]

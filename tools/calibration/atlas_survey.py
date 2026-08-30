@@ -231,12 +231,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "volume_idio_variance_gain": (0.0, 2.0),
     "volume_idio_persistence": (0.0, 0.99),
     "volume_idio_sigma": (0.0, 0.6),
-    # How much of the business cycle's VIX swing survives (§77). A scale on
-    # the phase VIX around its mean, so the unit interval is the whole
-    # domain and both ends are shipped positions rather than guesses: every
-    # preset through pt-v8 ran 1.0, pt-v9 ran 0.6, and pt-v10 ships 0.0,
-    # having moved the volatility regime onto what the market does itself.
-    "vix_cycle_amplitude": (0.0, 1.0),
+    # `vix_cycle_amplitude` lived here from the 2026-08-26 boundary, when
+    # pt-v10 took the default shipping it at 0.0. pt-v16 ships 0.85, so it is
+    # zero on neither pt-v3 nor the default and the entry is dead: the
+    # convention box around the base's own value takes over. The stale guard
+    # below is what found it.
     # Which return the VIX reads: a share between the last tick and the day.
     "vix_return_source": (0.0, 1.0),
     # Jumps. Intensity is per-day probability: 0.25 is roughly one jump a
