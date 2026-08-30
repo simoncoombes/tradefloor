@@ -137,8 +137,9 @@ lists every target and what it actually reaches.
 ## Realism
 
 `tf.facts.measure()` scores fourteen statistics against real-market bands. The
-default preset, `pt-v14`, holds all fourteen at one year and at two years. It
-holds all fourteen on a roster it never saw, and thirteen on new seeds.
+default preset, `pt-v16`, holds all fourteen at one year and at two years on
+each of twenty-six seed blocks, thirteen of which no search ever touched, with
+no out-of-band row anywhere.
 
 Five of the fourteen were calibration targets, and the bands both tuned the
 model and graded it. So this is a stated envelope, not a test against market
@@ -169,8 +170,9 @@ Each release builds five targets, runs one fixed simulation in each, and
 compares digests. A disagreement stops the release. The crate ships its own
 `exp`, `log`, `sin` and `cos`, so the platform libm cannot change a result.
 
-`pt-v14` became the default on 2026-08-28. Naming your preset explicitly makes
-a run replay exactly, and every preset from `pt-v1` on is still selectable.
+`pt-v16` became the default at 0.6.0, taking it from `pt-v14`. Naming your
+preset explicitly makes a run replay exactly, and every preset from `pt-v1` on
+is still selectable.
 
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")

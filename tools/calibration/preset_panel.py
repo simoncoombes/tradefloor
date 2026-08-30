@@ -213,7 +213,12 @@ def main() -> None:
 
     out = {
         "pretium_version": tradefloor.version(),
-        "default_preset": envelope.PRESET,
+        # The ENGINE's default, not the envelope's claim about it. This field
+        # read `envelope.PRESET` until 0.6.0, so at an era boundary, which is
+        # exactly when this tool runs, the artefact labelled itself with the
+        # preset the envelope still described rather than the one measured.
+        "default_preset": tradefloor.model_preset()["name"],
+        "envelope_preset": envelope.PRESET,
         "wall_s": time.time() - started,
         "workers": args.workers,
         "panel": list(PANEL),
