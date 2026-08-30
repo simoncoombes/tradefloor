@@ -124,6 +124,7 @@ fn run_world(policy: SettleDrawPolicy, trader_flow: f64) -> (Vec<f64>, usize) {
                 // The lagged asymmetry branches on this flag and its gain
                 // defaults to 0.0, so false is bit-identical here.
                 prev_day_down: false,
+            forced_flow_eff: 1.0,
                 // The mechanism ships inert; 0.0 is the value that
                 // preserves the behaviour these tests pin.
                 universe_stress: 0.0,
